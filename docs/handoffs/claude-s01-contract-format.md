@@ -60,3 +60,7 @@ git status --short    → 4 个受版本控制文件被修改，1 个交接文�
 ## 回滚
 
 本任务只改文档与说明，无破坏性变更。需要撤回时，逐个还原上表四个文件并删除本交接文件；不要使用全局重置或清理命令，以免影响其他 Agent 的改动。
+
+---
+
+> **S-03 后路径变更**：本文提到的 `docs/decisions.md` 与 `docs/tasks.md` 已拆成 `docs/decisions/` 与 `docs/tasks/`。上文表格是当时的真实记录，不做改写；后续操作请按新路径，见 `docs/handoffs/claude-s03-collab-restructure.md`。

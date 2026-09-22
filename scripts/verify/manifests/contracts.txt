@@ -1,0 +1,3 @@
+# 后端 Agent 维护（src/contracts/ 单一写入方，见 ADR-004）。
+# M0-04a 落地后在此补 src/contracts/v1/python/__init__.py 等。
+src/contracts/README.md

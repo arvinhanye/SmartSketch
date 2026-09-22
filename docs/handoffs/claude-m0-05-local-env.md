@@ -125,3 +125,7 @@ cp .env.example .env    # 改掉 NEO4J_PASSWORD
 - **有容器环境的成员（解除 M0-05）**：`cp .env.example .env` → 改 `NEO4J_PASSWORD` → `./scripts/dev-up.sh`，把 APOC 版本号回填本文件并把 M0-05 转 DONE。
 - **后端 Agent（M0-03）**：`.env.example` 已提供全部连接变量，可直接按 `NEO4J_URI` / `NEO4J_DATABASE` / `SQLITE_URL` 接线；补全 `docker-compose.yml` 里注释掉的 `backend` 服务。
 - **数据/AI Agent（M1-03）**：在 `./scripts/check-apoc.sh` 通过之前不要开工，`apoc.refactor.mergeNodes` 没有 APOC 就不存在。
+
+---
+
+> **S-03 后路径变更**：本文提到的 `docs/decisions.md` 与 `docs/tasks.md` 已拆成 `docs/decisions/` 与 `docs/tasks/`。上文表格是当时的真实记录，不做改写；后续操作请按新路径，见 `docs/handoffs/claude-s03-collab-restructure.md`。

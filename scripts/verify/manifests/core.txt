@@ -1,0 +1,26 @@
+# 全仓共享的必需文件。改这里需要协调 Agent 同意。
+# 每行一个仓库相对路径；空行与 # 开头的行忽略。
+AGENTS.md
+CLAUDE.md
+README.md
+.gitignore
+.mcp.json
+.env.example
+docker-compose.yml
+.claude/settings.json
+.claude/rules/frontend.md
+.claude/rules/backend.md
+.claude/rules/testing.md
+.claude/hooks/notify-macos.sh
+.claude/hooks/block-dangerous.sh
+docs/product.md
+docs/architecture.md
+docs/integrations.md
+docs/handoffs/README.md
+docs/decisions/README.md
+docs/tasks.md
+docs/tasks/M0.md
+docs/tasks/M1.md
+docs/tasks/open-questions.md
+specs/course-knowledge-graph.md
+src/README.md

@@ -1,0 +1,3 @@
+# 后端 Agent 自己维护。初始化 FastAPI（M0-03）后在此补 pyproject.toml 等。
+src/backend/README.md
+src/backend/app/__init__.py

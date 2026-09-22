@@ -1,40 +1,33 @@
-# 任务看板
+# 任务看板索引
 
-> 状态：`TODO` → `IN PROGRESS` → `BLOCKED` / `DONE`。认领或完成任务时更新本表；每个 DONE 项必须指向验收证据和交接文件。
+任务按里程碑分文件，避免所有 Agent 抢改同一张表（见 `AGENTS.md` §3「写争用规则」）。
 
-## 当前里程碑：M0 协作与应用骨架
+| 文件 | 内容 |
+| --- | --- |
+| [`docs/tasks/M0.md`](tasks/M0.md) | M0 协作与应用骨架，含协调任务 S-xx |
+| [`docs/tasks/M1.md`](tasks/M1.md) | M1 课程资料到草稿图谱 |
+| [`docs/tasks/open-questions.md`](tasks/open-questions.md) | 未决问题 D-xx |
 
-| ID | 状态 | 任务 | 负责人 | 验收条件 | 证据 |
-| --- | --- | --- | --- | --- | --- |
-| M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
-| M0-02 | TODO | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | 待补充 |
-| M0-03 | TODO | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | 待补充 |
-| M0-04a | TODO | 起草 v1 契约真源（REST DTO、SSE 任务事件、图谱导入/导出）与 `scripts/gen-contracts.sh` | Backend Agent | 三类契约在 `src/contracts/v1/python/` 齐全并符合 ADR-004、ADR-005；生成物已入库；`./scripts/gen-contracts.sh --check` 通过 | 待补充 |
-| M0-04b | TODO | 前端消费 v1 生成类型并回送契约反馈（依赖 M0-04a 为 DONE） | Frontend Agent | `src/frontend/` 只从 `src/contracts/v1/generated/typescript/` 导入契约类型，无本地重定义或 `any` 绕过；任务状态穷尽分支含 `cancelled`；反馈写入交接文件 | 待补充 |
-| M0-05 | BLOCKED | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Claude（数据/后端） | 无密钥可启动依赖；环境变量文档完整；容器内 `RETURN apoc.version()` 返回版本号 | compose、脚本与文档已交付且 `./scripts/verify.sh` 通过；**APOC 实测未完成**，见 `docs/handoffs/claude-m0-05-local-env.md` |
-| M0-06 | TODO | 按 ADR-004、ADR-005 同步 `specs/course-knowledge-graph.md` | 产品/协调 Agent | 验收条件 2 的状态序列与 ADR-005 一致并标注 `cancelled` 为 MVP 不产生的预留终态；「待细化」中失效的 M0-04 引用改为 M0-04a | 待补充 |
-| S-01 | DONE | 确定 `src/contracts/` 的契约格式与单一真源，并拆分 M0-04 | Claude（协调） | ADR-004、ADR-005 已记录；契约目录与命名规则可供冷启动 Agent 使用；M0-04 已拆分为顺序子任务 | `./scripts/verify.sh`；`docs/handoffs/claude-s01-contract-format.md` |
+## 状态约定
 
-> **M0-05 阻塞原因**：本机未安装任何容器运行时（Docker / OrbStack / Podman 均不存在），无法启动 Neo4j 实测 APOC。
-> 而 APOC 是 M1-03（`apoc.refactor.mergeNodes`）的硬前置，未实证前不得标 DONE。
-> 解除方式：在装有容器运行时的机器上执行 `./scripts/dev-up.sh`，把 `RETURN apoc.version()` 的真实输出补进交接文件即可转 DONE。
+`TODO` → `IN PROGRESS` → `BLOCKED` / `DONE`。
 
-> **M0-04a 与 M0-04b 顺序执行，不并行。** `src/contracts/` 只由 M0-04a 写入，`src/frontend/` 只由 M0-04b 写入；前端不得直接改契约，需求通过交接文件回送后端 Agent 改真源后重新生成（ADR-004、AGENTS.md §3）。
+- 认领任务时填负责人并改状态；完成时改状态并补证据。
+- 每个 `DONE` 必须在证据列指向可复核的东西：运行过的命令、交接文件路径。
+- `BLOCKED` 必须在该里程碑文件的「说明」里写清阻塞原因和解除方式，不能只标状态。
 
-## 下一里程碑：M1 课程资料到草稿图谱
+## 列的含义
 
-| ID | 状态 | 任务 | 负责人 | 验收条件 |
-| --- | --- | --- | --- | --- |
-| M1-01 | TODO | 课程与资料上传 API | Backend Agent | 资料记录、格式校验、任务创建、错误响应均有测试 |
-| M1-02 | TODO | 文档解析与分块 | Data/AI Agent | 支持四种格式；分块保留定位来源 |
-| M1-03 | TODO | 节点关系抽取与融合 | Data/AI Agent | 四类关系；低置信度项可审核；课程隔离 |
-| M1-04 | TODO | 前置关系 DAG 校验 | Backend Agent | 环路拒绝、错误可解释、自动化测试 |
-| M1-05 | TODO | 教师审核与发布版本 | Full-stack Agent | 可编辑、发布、读取已发布版本 |
+| 列 | 含义 |
+| --- | --- |
+| ID | `M<里程碑>-<序号>` 为功能任务，`S-<序号>` 为跨领域协调任务 |
+| 状态 | 见上 |
+| 负责人 | 单一角色。需要两个角色同时写同一文件时，先拆成顺序子任务（`M0-04a` / `M0-04b` 是范例） |
+| 截止日期 | 对齐参考方案 S2 表 4.2 的里程碑窗口；仓库编号与 S2 编号含义不同，对照写在各里程碑文件开头 |
+| 阻塞关系 | 依赖谁、阻塞谁。开工前先确认上游为 `DONE` |
+| 验收条件 | 可验证的条件，不写「完成开发」这类无法判定的描述 |
+| 证据 | 命令输出、交接文件；未完成时写「待补充」 |
 
-## 未决问题
+## 新增任务
 
-| ID | 问题 | 决策人 | 需要在何时确认 |
-| --- | --- | --- | --- |
-| D-01 | MVP 首批课程示例和脱敏资料来源 | 产品负责人 | M1 开始前 |
-| D-02 | 首个 OpenAI 兼容模型供应商与预算上限 | 技术负责人 | 接入抽取服务前 |
-| D-03 | 登录是否先采用本地演示角色 | 产品负责人 | M0-03 前 |
+在对应里程碑文件的表末**加一行**，不要重排或对齐整张表——纯排版改动会让别人的 worktree 产生无谓冲突。新里程碑新建 `docs/tasks/M<n>.md` 并在上表加一行。

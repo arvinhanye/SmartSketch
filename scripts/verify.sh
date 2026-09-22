@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
-# Single lightweight quality gate for the project scaffold.
+# 质量门禁分发器：只负责依次调用 scripts/verify/ 下的子脚本。
+#
+# 不要把具体检查写进本文件——各领域 Agent 应该只改自己的子脚本和清单，
+# 避免所有人抢改同一个文件（AGENTS.md §3「写争用规则」）。
 set -euo pipefail
-required=(
-  AGENTS.md CLAUDE.md README.md .gitignore .mcp.json .env.example
-  .claude/settings.json .claude/rules/frontend.md .claude/rules/backend.md .claude/rules/testing.md
-  .claude/hooks/notify-macos.sh .claude/hooks/block-dangerous.sh
-  docs/product.md docs/architecture.md docs/decisions.md docs/tasks.md docs/integrations.md docs/handoffs/README.md
-  specs/course-knowledge-graph.md
-  src/README.md src/frontend/README.md src/backend/README.md src/backend/app/__init__.py src/contracts/README.md
-)
-for path in "${required[@]}"; do [[ -f "$path" ]] || { echo "Missing required file: $path" >&2; exit 1; }; done
-for json_file in .mcp.json .claude/settings.json; do python3 -m json.tool "$json_file" >/dev/null || { echo "Invalid JSON: $json_file" >&2; exit 1; }; done
-grep -qxF '.claude/settings.local.json' .gitignore || { echo 'settings.local.json is not ignored' >&2; exit 1; }
-grep -q 'M0-01 | DONE' docs/tasks.md || { echo 'M0-01 task status is not recorded' >&2; exit 1; }
-grep -q 'PREREQUISITE' docs/architecture.md || { echo 'Graph prerequisite constraint is undocumented' >&2; exit 1; }
-echo 'Scaffold verification passed.'
+cd "$(dirname "$0")/.."
+
+CHECKS=(structure backend frontend contracts)
+failed=()
+
+for check in "${CHECKS[@]}"; do
+  script="scripts/verify/${check}.sh"
+  [[ -f $script ]] || { echo "缺少子脚本：$script" >&2; exit 1; }
+  printf '\n──── verify: %s ────\n' "$check"
+  # 跑完全部再汇总，而不是首错即停：一次就能看到所有问题。
+  if ! bash "$script"; then
+    failed+=("$check")
+  fi
+done
+
+printf '\n────────────────────\n'
+if ((${#failed[@]})); then
+  printf '验证失败：%s\n' "${failed[*]}" >&2
+  exit 1
+fi
+echo 'All verification checks passed.'
