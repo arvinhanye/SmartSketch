@@ -20,16 +20,17 @@
 
 ## 优先覆盖清单
 
-`.claude/rules/testing.md` 要求优先覆盖以下六项。每项都必须有成功、边界与失败三条路径：
+`.claude/rules/testing.md` 要求优先覆盖前六项；第 7 项是门禁自身的测试，因为门禁曾在缺依赖时静默放行（codex 审查 R02）。每项都必须有成功、边界与失败三条路径：
 
 | # | 覆盖点 | 关键断言 | 主要落点 |
 | --- | --- | --- | --- |
 | 1 | 前置关系环检测 | 成环时写入被拒，并返回导致冲突的节点/关系 | `tests/backend/` |
 | 2 | 课程隔离 | 任何查询与写入都带 `course_id`；跨课程读取返回空或 403，不泄漏 | `tests/backend/` |
 | 3 | 抽取审核状态 | 草稿仅教师可编辑；低置信度项可审核；学生读不到未发布草稿 | `tests/backend/` |
-| 4 | 来源引用 | 回答要么带至少一个可定位来源，要么返回 `NOT_COVERED`（ADR-003） | `tests/backend/` |
+| 4 | 来源引用 | `answered` 至少一条带页码或章节的引用；否则 `status = not_covered` 且给出机读 `reason`（ADR-003，契约见 `ChatAnswered` / `ChatNotCovered`） | `tests/backend/` |
 | 5 | SSE 任务状态转换 | 状态机按 ADR-005 推进；终态后不再发事件；取消请求后任务进入 `cancelled`，且对已终态任务取消返回明确错误码（ADR-006） | `tests/backend/`、`tests/frontend/` |
 | 6 | 学习路径排序 | 推荐顺序满足前置依赖，且每条建议带可解释理由 | `tests/backend/` |
+| 7 | 契约门禁自身 | 缺依赖 / 坏 YAML / 坏 `$ref` / 非法枚举 / 生成物漂移分别返回非 0；正常契约通过 | `tests/contracts/test_contracts.py` |
 
 ## 约定
 

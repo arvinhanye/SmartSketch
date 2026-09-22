@@ -26,7 +26,7 @@
 | 情况 | 正确做法 | 依据 |
 | --- | --- | --- |
 | 问答证据不足 | 200 + `ChatResponse.status = "not_covered"`，`citations` 为空，`answer` 给出可解释原因 | ADR-003、`.claude/rules/backend.md` |
-| 任务处理失败 | 200 + `Task.stage = "failed"`，`Task.error` 填 `Error` 对象 | ADR-004 状态机 |
+| 任务处理失败 | 200 + `Task.stage = "failed"`，`Task.error` 填 `Error` 对象 | ADR-005 状态机 |
 
 `NOT_COVERED` 与 `TASK_FAILED` 因此**不在 `ErrorCode` 枚举中** —— 它们是状态，不是错误码。把它们做成 HTTP 4xx/5xx 会让「资料未覆盖」与「服务故障」在前端无法区分，直接违反可信问答的硬契约。
 

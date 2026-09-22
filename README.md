@@ -37,6 +37,8 @@
 ├── scripts/
 │   ├── verify.sh             # 质量门禁分发器
 │   ├── verify/               # 各领域子门禁与必需文件清单
+│   ├── gen-contracts.sh      # 契约真源 → 生成物；--check 做漂移检查
+│   ├── check_contracts.py    # 契约结构与不变量校验（缺依赖即失败）
 │   └── dev-*.sh              # 本地依赖启停
 ├── tests/                    # backend / frontend / contracts 测试
 ├── prompts/                  # 提示词资产：约定、模板、索引
@@ -45,7 +47,7 @@
 └── src/
     ├── frontend/             # Vue 应用
     ├── backend/app/          # FastAPI 分层：api/schemas/services/repositories/workers
-    └── contracts/            # 前后端共享 API / 事件契约
+    └── contracts/            # 契约真源 api.v1.yaml + 时序文档；v1/generated/ 为生成物
 ```
 
 Codex Desktop 若在本机生成 `.codex/`，它是**可选的本地目录，不提交**，仓库协作不依赖它——所以上面的树里没有它。

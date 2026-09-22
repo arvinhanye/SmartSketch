@@ -1,4 +1,13 @@
 # 后端 Agent 维护（src/contracts/ 单一写入方，见 ADR-004）。
-# M0-04a 落地后在此补 src/contracts/v1/python/__init__.py 等。
+# 真源与配套文档；生成物由 gen-contracts.sh --check 校验，不在这里逐个列。
 src/contracts/README.md
+src/contracts/api.v1.yaml
+src/contracts/events.v1.md
+src/contracts/errors.v1.md
+src/contracts/toolchain.txt
+src/contracts/v1/generated/openapi.json
+scripts/check_contracts.py
+scripts/gen_contracts.py
+scripts/gen-contracts.sh
 tests/contracts/README.md
+tests/contracts/test_contracts.py

@@ -21,6 +21,9 @@ docs/decisions/README.md
 docs/tasks.md
 docs/tasks/M0.md
 docs/tasks/M1.md
+docs/tasks/M2.md
+docs/tasks/M3.md
+docs/tasks/M4.md
 docs/tasks/open-questions.md
 specs/course-knowledge-graph.md
 src/README.md

@@ -16,7 +16,7 @@ queued → parsing → extracting → merging → persisting → awaiting_review
 ```
 
   1. **采纳「入库中」，命名 `persisting`**，位于 `merging` 与 `awaiting_review` 之间。理由：`docs/architecture.md` 数据流第 2 步已经存在「DAG 校验 → 写入草稿图谱」这一真实阶段，它跨 Neo4j 与 SQLite 两个存储（ADR-002），其失败原因（前置关系成环被拒、图库不可用、跨存储写入需补偿）与解析/抽取/融合失败完全不同；不单独建模就无法向教师说明失败发生在哪一步。对应 `docs/product.md` 教师流程中的「校验」，前端展示文案为「校验入库」。
-  2. **保留 `cancelled` 为终态枚举值，但 MVP 不产生该状态，也不提供 `POST /api/v1/tasks/{task_id}/cancel`**。理由：取消需要 worker 协作式中断、跨两个存储的部分写入补偿，以及「取消与完成竞争」的处理，超出 AGENTS.md §1 的 MVP 目标；而在枚举里先占位是向后兼容的，将来上线取消功能不必升 v2。
+  2. **保留 `cancelled` 为终态枚举值，但 MVP 不产生该状态，也不提供 `POST /api/v1/tasks/{tid}/cancel`**。理由：取消需要 worker 协作式中断、跨两个存储的部分写入补偿，以及「取消与完成竞争」的处理，超出 AGENTS.md §1 的 MVP 目标；而在枚举里先占位是向后兼容的，将来上线取消功能不必升 v2。
   3. 前端必须把 `cancelled` 当作终态渲染；后端必须有一条测试断言 MVP 的 worker 不会发出该状态。取消端点需先有独立规格与任务，才能实现。
 - **后果**：
   - `specs/course-knowledge-graph.md` 验收条件 2 与本 ADR 不一致，由产品/协调 Agent 按 M0-06 同步；本任务不拥有 `specs/`，未直接修改。
