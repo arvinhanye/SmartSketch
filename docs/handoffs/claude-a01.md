@@ -5,7 +5,8 @@
 - **review_status**：ready_for_review
 - **worktree**：`/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/adoring-sinoussi-709263`
 - **分支 / base**：`claude/adoring-sinoussi-709263` / base `05d214c`（main）
-- **head**：未提交，工作区 dirty（见下方指纹）
+- **交付提交**：`88ea517`（`docs(A01): 裁定契约唯一真源与 ADR 编号（结论待签收）`，4 文件 / 232 行新增）
+- **head**：本文件的 head 字段修正另起一个提交，因此 review 的固定基线取 `88ea517`；其后若只有本文件的修正提交，视为同一次交付，未推送
 - **类型**：仅文档任务，无代码、无依赖变更、无合并、无网络调用
 
 ## 一、范围与交付物
@@ -81,8 +82,7 @@ git diff --check           exit 0（改动前后各一次）
 仅四个文档文件，无持久层与依赖变更。回滚：
 
 ```text
-git -C <本 worktree> checkout -- docs/decisions.md docs/architecture.md docs/tasks.md
-rm docs/handoffs/claude-a01.md
+git -C <本 worktree> revert --no-edit 88ea517
 ```
 
-不要使用 reset 或清理命令——本仓库有多个并行 worktree，stash 栈也是共享的。
+若本文件的 head 修正已另有提交，先 revert 该提交再 revert `88ea517`。不要使用 reset 或清理命令——本仓库有多个并行 worktree，stash 栈也是共享的。
