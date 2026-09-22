@@ -49,12 +49,15 @@ generate_into() {  # $1=目标目录
   python3 scripts/gen_contracts.py schemas "$dest"
 
   if command -v datamodel-codegen >/dev/null 2>&1; then
+    # 输出必须落成 python/models.py：单输入时 datamodel-codegen 把 --output 当文件名，
+    # 写成 "$dest/python" 会得到一个没有扩展名、无法 import 的文件（ADR-004 第 2 条要的是目录）。
+    mkdir -p "$dest/python"
     datamodel-codegen \
       --input src/contracts/api.v1.yaml --input-file-type openapi \
-      --output "$dest/python" --output-model-type pydantic_v2.BaseModel \
+      --output "$dest/python/models.py" --output-model-type pydantic_v2.BaseModel \
       --target-python-version 3.11 --use-annotated --use-standard-collections \
       --disable-timestamp
-    echo "  · python/（Pydantic v2）"
+    echo "  · python/models.py（Pydantic v2）"
   else
     note_missing datamodel-codegen "python/（Pydantic v2 模型）" \
       "pip3 install 'datamodel-code-generator==0.26.3'"
@@ -83,9 +86,17 @@ if ((CHECK)); then
   # 只比对本次真正生成出来的阶段；跳过的阶段由下面的未完成标记负责暴露。
   for produced in "$tmp"/*; do
     name="$(basename "$produced")"
-    if ! diff -r -- "$OUT/$name" "$produced" >/dev/null 2>&1; then
-      echo "生成物与真源不同步：$OUT/$name" >&2
-      diff -r -- "$OUT/$name" "$produced" 2>&1 | head -40 >&2
+    # -x __pycache__：python/ 是目录后，任何人 import 过生成的模型都会在里面留下字节码缓存，
+    # 那不是契约漂移，不该让门禁变红。
+    if ! diff -r -x '__pycache__' -- "$OUT/$name" "$produced" >/dev/null 2>&1; then
+      if [[ ! -e "$OUT/$name" ]]; then
+        echo "生成物缺失：$OUT/$name（真源能生成该阶段，但仓库里没有入库）" >&2
+      else
+        echo "生成物与真源不同步：$OUT/$name" >&2
+        # diff 非 0 是预期结果；不裹住它，set -e + pipefail 会让脚本死在这里，
+        # 退出码变成 diff 的 2，下面的修复提示也永远不会打印。
+        { diff -r -x '__pycache__' -- "$OUT/$name" "$produced" 2>&1 || true; } | head -40 >&2
+      fi
       echo "  跑 ./scripts/gen-contracts.sh 重新生成并一并提交（ADR-004 第 7 条）。" >&2
       exit 1
     fi
