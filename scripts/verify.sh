@@ -9,6 +9,8 @@ required=(
   specs/course-knowledge-graph.md
   src/README.md src/frontend/README.md src/backend/README.md src/backend/app/__init__.py src/contracts/README.md
   prompts/README.md evals/README.md
+  src/contracts/api.v1.yaml src/contracts/events.v1.md src/contracts/errors.v1.md
+  scripts/check_contracts.py
 )
 for path in "${required[@]}"; do [[ -f "$path" ]] || { echo "Missing required file: $path" >&2; exit 1; }; done
 for json_file in .mcp.json .claude/settings.json; do python3 -m json.tool "$json_file" >/dev/null || { echo "Invalid JSON: $json_file" >&2; exit 1; }; done
@@ -17,7 +19,7 @@ grep -q 'M0-01 | DONE' docs/tasks.md || { echo 'M0-01 task status is not recorde
 grep -q 'PREREQUISITE' docs/architecture.md || { echo 'Graph prerequisite constraint is undocumented' >&2; exit 1; }
 
 # ADR-004 naming baseline:契约文档中不得出现同义别名
-contract_docs=(AGENTS.md docs/architecture.md specs/course-knowledge-graph.md)
+contract_docs=(AGENTS.md docs/architecture.md specs/course-knowledge-graph.md src/contracts/api.v1.yaml src/contracts/errors.v1.md)
 banned=('\bRELATED\b:use RELATED_TO' 'APPLIES_TO:use EXAMPLE_OF' 'SourceChunk:use Chunk')
 for entry in "${banned[@]}"; do
   pattern="${entry%%:*}"; hint="${entry#*:}"
@@ -33,5 +35,7 @@ for state in persisting cancelled; do
   grep -q "$state" specs/course-knowledge-graph.md \
     || { echo "Task state machine misses '$state' (ADR-004)" >&2; exit 1; }
 done
+
+python3 scripts/check_contracts.py || exit 1
 
 echo 'Scaffold verification passed.'

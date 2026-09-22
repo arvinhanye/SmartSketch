@@ -11,16 +11,23 @@
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
 | M0-06 | DONE | 统一 S2 与仓库的命名、数据模型与任务状态机；补齐赛题漏项 | Claude | 契约文档零命名分歧；MVP 范围覆盖赛题全部技术要求；门禁可拦截漂移 | ADR-004；`./scripts/verify.sh` 通过并已做负向测试；`docs/handoffs/claude-m0-06-naming-and-scope.md` |
 | M0-08 | DONE | 建立 `prompts/` 与 `evals/` 资产目录与规范 | Claude | 目录、格式约定、提示词清单、评测指标与消融表模板就位 | `prompts/README.md`；`evals/README.md`；已纳入 `verify.sh` 必需文件 |
-| M0-04a | TODO | REST DTO 定稿：课程/资料/任务/图谱/知识点/关系/进度/推荐/问答 | 后端 + 前端 | `src/contracts/api.v1.yaml` 可被 OpenAPI 工具解析 | 待补充 |
-| M0-04b | TODO | SSE 事件契约：`stage`/`progress`/`chunks_done`/`kp_count`/`error` | 后端 + 前端 | 覆盖 ADR-004 全部状态枚举与终止条件 | 待补充 |
-| M0-04c | TODO | 图谱交换 JSON：nodes（含 `level`/`type`/`confidence`）、edges、evidence | 后端 + 前端 | 前端 G6 适配层可直接消费 | 待补充 |
-| M0-04d | TODO | 错误码表：`UNSUPPORTED_FORMAT`/`CYCLE_DETECTED`/`NOT_COVERED`/`TASK_FAILED`/`COURSE_FORBIDDEN` | 后端 | 每码有 HTTP 状态、可读消息与触发条件 | 待补充 |
+| M0-04a | DONE | REST DTO 定稿：课程/资料/任务/图谱/知识点/关系/进度/推荐/问答 | Claude | `src/contracts/api.v1.yaml` 可被 OpenAPI 工具解析 | openapi-spec-validator 0.9.0 校验通过：OpenAPI 3.1.0 valid，22 paths / 29 operations / 52 schemas；`docs/handoffs/claude-m0-04-api-contracts.md` |
+| M0-04b | DONE | SSE 事件契约：事件名、顺序保证、心跳、终止与重连 | Claude | 覆盖 ADR-004 全部状态枚举与终止条件 | `src/contracts/events.v1.md`；状态机 9 个取值全覆盖，三终态互斥且各恰一次 |
+| M0-04c | DONE | 图谱交换 JSON：nodes（含 `level`/`type`/`confidence`）、edges、evidence、stats | Claude | 前端 G6 适配层可直接消费 | `GraphExchange` schema，含 `format_version` 与图谱质量体检 `GraphStats` |
+| M0-04d | DONE | 错误码表：16 个码，闭集 | Claude | 每码有 HTTP 状态、可读消息与触发条件 | `src/contracts/errors.v1.md`；**`NOT_COVERED`/`TASK_FAILED` 经判定为领域状态而非错误码，见下方说明** |
 | M0-07 | BLOCKED | 回写 ADR-005：LLM 供应商与主备、本地演示角色登录 | 产品 + 技术负责人 | D-02、D-03 从未决问题移除 | 阻塞 M1-03a 起步 |
 | M0-03 | TODO | FastAPI 骨架：分层目录 + 环境变量配置装载 + `GET /health` + pytest | 后端 | `pytest` 通过；`/health` 有契约和测试 | 待补充 |
 | M0-02 | TODO | Vue 3 + Vite + TS 骨架：路由 + Pinia + Ant Design Vue + G6 依赖 + vitest | 前端 | `npm run dev` 可启动；`vue-tsc` 无错误 | 待补充 |
 | M0-05 | TODO | `docker-compose.yml`：Neo4j(APOC) + 后端 + 前端；约束与索引初始化脚本 | 数据 | 一条命令启动全栈；含 `course_id` 索引与向量索引 | 待补充 |
 
-> **M0-04a~d 是阻塞项**：未定稿即并行开发会产生接口漂移，应优先于 M0-02/M0-03 完成。
+> **M0-04a~d 已定稿（2026-09-22）**，M0-02/M0-03/M0-05 可并行开工，一律以 `src/contracts/` 为准。
+>
+> 定稿过程中的两项判定，实现时必须遵守：
+>
+> 1. **`NOT_COVERED` 与 `TASK_FAILED` 不是错误码，是领域状态。** 问答证据不足返回 200 + `ChatResponse.status = not_covered`；任务失败返回 200 + `Task.stage = failed` 并填 `Task.error`。做成 HTTP 4xx/5xx 会让「资料未覆盖」与「服务故障」在前端无法区分，违反 ADR-003。本条已推翻原 M0-04d 描述中把两者列为错误码的写法。
+> 2. **SSE 鉴权走一次性短时效令牌。** `EventSource` 不支持自定义请求头，令牌只能进查询参数，因此该令牌有效期 ≤60 秒且仅对该任务只读，不得复用常规 Bearer 令牌。
+>
+> 认证方案暂按 Bearer JWT（载荷含 `sub` 与 `role`）编写。该选择与 D-03 的结论无关：无论登录后端是本地演示角色表还是其他方案，传输层不变，契约不需返工。
 
 ## 里程碑 M1：主链路打通（9.23–9.27）
 
