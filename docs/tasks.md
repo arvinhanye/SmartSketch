@@ -11,9 +11,13 @@
 | M0-03 | TODO | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | 待补充 |
 | M0-04a | TODO | 起草 v1 契约真源（REST DTO、SSE 任务事件、图谱导入/导出）与 `scripts/gen-contracts.sh` | Backend Agent | 三类契约在 `src/contracts/v1/python/` 齐全并符合 ADR-004、ADR-005；生成物已入库；`./scripts/gen-contracts.sh --check` 通过 | 待补充 |
 | M0-04b | TODO | 前端消费 v1 生成类型并回送契约反馈（依赖 M0-04a 为 DONE） | Frontend Agent | `src/frontend/` 只从 `src/contracts/v1/generated/typescript/` 导入契约类型，无本地重定义或 `any` 绕过；任务状态穷尽分支含 `cancelled`；反馈写入交接文件 | 待补充 |
-| M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
+| M0-05 | BLOCKED | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Claude（数据/后端） | 无密钥可启动依赖；环境变量文档完整；容器内 `RETURN apoc.version()` 返回版本号 | compose、脚本与文档已交付且 `./scripts/verify.sh` 通过；**APOC 实测未完成**，见 `docs/handoffs/claude-m0-05-local-env.md` |
 | M0-06 | TODO | 按 ADR-004、ADR-005 同步 `specs/course-knowledge-graph.md` | 产品/协调 Agent | 验收条件 2 的状态序列与 ADR-005 一致并标注 `cancelled` 为 MVP 不产生的预留终态；「待细化」中失效的 M0-04 引用改为 M0-04a | 待补充 |
 | S-01 | DONE | 确定 `src/contracts/` 的契约格式与单一真源，并拆分 M0-04 | Claude（协调） | ADR-004、ADR-005 已记录；契约目录与命名规则可供冷启动 Agent 使用；M0-04 已拆分为顺序子任务 | `./scripts/verify.sh`；`docs/handoffs/claude-s01-contract-format.md` |
+
+> **M0-05 阻塞原因**：本机未安装任何容器运行时（Docker / OrbStack / Podman 均不存在），无法启动 Neo4j 实测 APOC。
+> 而 APOC 是 M1-03（`apoc.refactor.mergeNodes`）的硬前置，未实证前不得标 DONE。
+> 解除方式：在装有容器运行时的机器上执行 `./scripts/dev-up.sh`，把 `RETURN apoc.version()` 的真实输出补进交接文件即可转 DONE。
 
 > **M0-04a 与 M0-04b 顺序执行，不并行。** `src/contracts/` 只由 M0-04a 写入，`src/frontend/` 只由 M0-04b 写入；前端不得直接改契约，需求通过交接文件回送后端 Agent 改真源后重新生成（ADR-004、AGENTS.md §3）。
 
