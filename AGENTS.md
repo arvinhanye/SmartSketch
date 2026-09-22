@@ -28,7 +28,7 @@ SmartSketch（中文名：智绘学途）是面向高校课程的 AIGC 知识图
 | 产品/协调 Agent | `docs/`、`specs/`、`docs/tasks/` | 需求、验收、任务拆分、决策记录 |
 | 前端 Agent | `src/frontend/` | Vue 页面、G6 图谱交互、SSE 客户端、前端测试 |
 | 后端 Agent | `src/backend/`、`src/contracts/` | FastAPI、领域服务、仓储、OpenAPI/DTO |
-| 数据与 AI Agent | `src/backend/app/services/`、`workers/`、评测资产 | 解析、抽取、融合、检索、问答、路径算法 |
+| 数据与 AI Agent | `src/backend/app/services/`、`src/backend/app/workers/`、`prompts/`、`evaluation/`、`datasets/` | 解析、抽取、融合、检索、问答、路径算法、提示词与评测资产 |
 | 测试 Agent | `tests/`、测试段落与质量报告 | 用例、回归、指标、缺陷复现 |
 
 - 共享边界（DTO、API、Neo4j 模型）由相关 Agent 在同一任务中同步协商，并先更新 `docs/architecture.md` 或规格。
