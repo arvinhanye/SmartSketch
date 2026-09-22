@@ -137,3 +137,22 @@
   1. `740adb` 的 codex 审查结论推翻 `api.v1.yaml` 的内容基线（例如 R03/R04 修复被判不成立）。
   2. 团队决定不把生成物入库；那时 A 与 B′ 的成本对比需重算。
   3. `datamodel-code-generator` 无法从本 YAML 生成可用的 Pydantic v2 模型（B′ 的前提「Pydantic 不手改」失效），此时应回到 A 并承担翻译成本。
+
+### ADR-004 生成链实测补注（2026-09-22，**不改变上面的结论，也不构成签收**）
+
+写 ADR-004 时两个生成器本机未安装，「生成物入库」在任何分支上都**没有跑通过**。经授权安装后已实测，结果记录如下，供签收时参考。安装位置：`datamodel-code-generator==0.26.3` 在独立 venv `~/.local/share/smartsketch/contracts-venv`（Python 3.11.9，不动 conda base）；`openapi-typescript@7.4.4` 全局装在 npm prefix `/usr/local`。测试在 scratch 副本中进行，**未修改 `740adb` 的 worktree**。
+
+| 验证项 | 结果 |
+| --- | --- |
+| 完整生成（不带 `--allow-scaffold`） | exit 0，四个阶段全部产出，无 `INCOMPLETE` 标记 |
+| 两次生成字节一致 | PASS（6 个产物 SHA256 全等） |
+| `--check` 与真源同步 | exit 0 |
+| 篡改检出（`openapi.json` / `python` / `typescript/openapi.d.ts` / `schemas/TaskEvent.schema.json` 各加一个换行） | 四项均非 0 退出，恢复后 exit 0 |
+| 生成的 Pydantic 可用性 | import 成功，54 个 `BaseModel` 子类，pydantic 2.13.5 |
+
+- **「推翻条件」第 3 条不触发**：`datamodel-code-generator` 能从本 YAML 生成可用的 Pydantic v2 模型，B′ 的前提「Pydantic 不手改」成立。ADR-004 的结论维持不变，仍待签收。
+- **实测暴露两个缺陷，属 B14 / M0-09 范围，本条不代修**：
+  1. `gen-contracts.sh` 的 `--output "$dest/python"` 产出的是一个**没有扩展名的文件** `python`，不是 ADR-004 第 2 条写的 `python/` 目录。内容是合法 Pydantic v2，但按当前路径**无法被 import**。已验证修法：先 `mkdir -p "$dest/python"` 再 `--output "$dest/python/models.py"`，产出内容与现在逐字节相同。
+  2. `--check` 在产物**缺失**（而非内容不同）时退出码是 2 而不是 1，且「跑 gen-contracts.sh 重新生成」那行提示不会打印——`set -euo pipefail` 下第二次 `diff` 的非 0 退出会让脚本在到达 `exit 1` 前就中止。门禁仍然是红的，不是假绿，但操作者丢了修复提示。
+- **`740adb` 已入库的 `v1/generated/` 不完整**：只有 `openapi.json` 与 3 个 `schemas/*.json`，缺 `python/` 与 `typescript/`（它们是在降级模式下被跳过的）。这 4 个文件与真源实测一致，但对该分支跑 `--check` 现在会非 0 退出。补齐入库是 M0-09 的动作。
+- **版本漂移**：`src/contracts/toolchain.txt` 锁 `jsonschema==4.23.0`，本机校验侧解释器（conda base Python 3.13.5）装的是 4.26.0；`pyyaml` 6.0.2、`openapi-spec-validator` 0.9.0 与锁一致。是否收紧由 B07 处理。
