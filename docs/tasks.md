@@ -29,3 +29,14 @@
 | D-01 | MVP 首批课程示例和脱敏资料来源 | 产品负责人 | M1 开始前 |
 | D-02 | 首个 OpenAI 兼容模型供应商与预算上限 | 技术负责人 | 接入抽取服务前 |
 | D-03 | 登录是否先采用本地演示角色 | 产品负责人 | M0-03 前 |
+
+## 原子任务认领（`docs/atomic-task-plan.md`）
+
+> 本节只记录本 worktree 认领的叶子任务。main 的 `docs/tasks.md` 另有 PLAN-01 与 PLAN-D01～D05 行（当前未提交），合入时按本节增量叠加，不要整文件覆盖。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A01 | DONE（产出待签收） | 裁决契约唯一来源与 ADR 编号 | Claude（协调 Agent） | `.claude/worktrees/adoring-sinoussi-709263` / base `05d214c` | `docs/decisions.md`、`docs/architecture.md`、本节、`docs/handoffs/claude-a01.md` | `docs/decisions.md` ADR-004；`docs/handoffs/claude-a01.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
+
+- A01 的交付物是**未签收的裁定建议 + 迁移映射**，不是已生效决定。PLAN-D01 仍待技术负责人签收，签收位置在 `docs/decisions.md` ADR-004 末尾。
+- A01 未触发任何分支合并；集成基线与合并顺序仍是 PLAN-D04 / 原子任务 A10 的范围。
