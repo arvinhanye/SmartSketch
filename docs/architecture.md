@@ -44,6 +44,6 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 - REST 响应、SSE 任务事件与图谱导入/导出格式的单一真源是 `src/contracts/v1/python/` 的 Pydantic 模型；OpenAPI 与 TypeScript 类型全部由 `./scripts/gen-contracts.sh` 生成并入库，不得手工编辑（ADR-004）。
 - 接口变更必须先改契约真源，再改后端与前端；前端不在 `src/frontend/` 内自行定义契约类型。目录结构、命名与版本化规则见 `src/contracts/README.md`。
-- 文档处理任务状态机为 `queued → parsing → extracting → merging → persisting → awaiting_review → completed`，任一非终态可转 `failed`；`cancelled` 是 v1 预留终态，MVP 不产生，也不提供取消端点（ADR-005）。
+- 文档处理任务状态机为 `queued → parsing → extracting → merging → persisting → awaiting_review → completed`，任一非终态可转 `failed`；`cancelled` 为正常可达终态，由 `POST /api/v1/tasks/{task_id}/cancel` 触发，worker 在阶段边界协作式响应（ADR-005、ADR-006）。
 - LLM 是可替换适配器，基础 URL、模型和密钥均来自环境变量。
 - 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。

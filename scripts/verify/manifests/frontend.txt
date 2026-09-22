@@ -1,2 +1,3 @@
 # 前端 Agent 自己维护。初始化 Vite（M0-02）后在此补 package.json 等。
 src/frontend/README.md
+tests/frontend/README.md

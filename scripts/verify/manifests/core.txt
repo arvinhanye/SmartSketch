@@ -24,3 +24,10 @@ docs/tasks/M1.md
 docs/tasks/open-questions.md
 specs/course-knowledge-graph.md
 src/README.md
+NOTICE
+tests/README.md
+prompts/README.md
+prompts/TEMPLATE.yaml
+prompts/MANIFEST.md
+evaluation/README.md
+datasets/README.md

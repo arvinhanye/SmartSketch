@@ -1,3 +1,14 @@
 # 后端 Agent 自己维护。初始化 FastAPI（M0-03）后在此补 pyproject.toml 等。
 src/backend/README.md
 src/backend/app/__init__.py
+src/backend/app/api/__init__.py
+src/backend/app/api/README.md
+src/backend/app/schemas/__init__.py
+src/backend/app/schemas/README.md
+src/backend/app/services/__init__.py
+src/backend/app/services/README.md
+src/backend/app/repositories/__init__.py
+src/backend/app/repositories/README.md
+src/backend/app/workers/__init__.py
+src/backend/app/workers/README.md
+tests/backend/README.md

@@ -1,5 +1,9 @@
 # ADR-005：统一文档处理任务状态机，保留 `cancelled` 但 MVP 不实现取消
 
+> **部分修订**：第 2 条「MVP 不实现取消」已被 [ADR-006](ADR-006-implement-task-cancel.md) 取代——
+> 取消端点改为在 MVP 实现，`cancelled` 成为正常可达终态。本文其余内容（状态机序列、`persisting`
+> 阶段、枚举一次定稿原则）仍然有效，保留原文不改写。
+
 
 - **日期**：2026-09-22
 - **背景**：`specs/course-knowledge-graph.md` 验收条件 2 的状态机为 `queued → parsing → extracting → merging → awaiting_review → completed/failed`；参考方案 S2 §4.3.2 的状态机另有「入库中」与「已取消」，§6.5 还提供 `POST /api/tasks/{tid}/cancel`。两者必须统一：按 ADR-004，状态枚举是 SSE 事件契约的一部分，而对做穷尽分支的前端来说**枚举增值是破坏性变更**，留到以后补就要把契约升到 v2。

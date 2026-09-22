@@ -1,0 +1,33 @@
+# 提示词骨架。复制为 prompts/<id>.yaml 后填写。
+# 本文件只定义字段，不含任何提示词正文。
+
+id:                 # 与 MANIFEST.md 的名称一致，下划线风格（如 extract_entities）
+version:            # 语义化版本；正文每次改动 +1
+status:             # TODO | DRAFT | ACTIVE | DEPRECATED
+owner:              # 负责角色，如 Data/AI Agent
+purpose:            # 一句话：这个提示词解决什么问题
+
+model:              # 依赖的模型能力，写环境变量名（如 LLM_EXTRACTION_MODEL），不写具体模型
+temperature:        # 数值；抽取类应固定为可复现的低温
+max_tokens:         # 数值
+response_format:    # text | json；json 时下面的 output 必须指向契约
+
+input:              # 模板变量：变量名 -> 含义
+  # course_id:      # 课程隔离标识，所有课程域提示词必填
+
+output:             # 期望输出结构
+  contract:         # 对应 src/contracts/ 中的模型名；不在此另立字段名
+  on_insufficient:  # 证据不足时的约定返回（问答类须为 NOT_COVERED）
+
+template: |         # 提示词正文。本模板留空。
+
+evaluation:
+  dataset:          # datasets/ 下使用的标注集路径
+  metrics:          # 关注的指标名
+
+changelog:
+  - version:
+    date:           # YYYY-MM-DD
+    change:         # 改了什么、为什么
+    eval_run:       # evaluation/reports/ 下的报告路径
+    effect:         # 指标变化，写实测数字

@@ -8,5 +8,10 @@ if [[ ! -f src/backend/pyproject.toml && ! -f src/backend/requirements.txt ]]; t
   exit 0
 fi
 
+# ── 预留调用点：M0-03 落地后把下面几行换成真实命令（S-04 预留）──
+# pytest tests/backend -q            # 用例见 tests/backend/README.md
+# ruff check src/backend
+# mypy src/backend
+
 echo "  ! 后端已初始化，但门禁仍是占位实现。"
-echo "    后端 Agent 请在本文件补上：pytest、类型检查、lint。"
+echo "    后端 Agent 请启用本文件的预留调用点：pytest tests/backend、ruff、mypy。"

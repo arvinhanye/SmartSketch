@@ -35,6 +35,20 @@ uploads/
 neo4j/data/
 neo4j/logs/
 
+# Course material and evaluation artifacts (S-04)
+# 原始课程资料受版权保护，只留目录不留内容
+datasets/raw/*
+!datasets/raw/.gitkeep
+# 评测报告是可重新生成的产物，且常含课程原文片段
+evaluation/reports/*
+!evaluation/reports/.gitkeep
+
+# 参考方案原文（受版权保护，只读不提交）
+*.pdf
+*.docx
+*.pptx
+!docs/**/*.pdf
+
 # Editors and OS
 .DS_Store
 .idea/
