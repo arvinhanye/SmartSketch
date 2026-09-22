@@ -7,10 +7,11 @@
 | [ADR-001](ADR-001-vue3-g6-2d-graph.md) | 前端采用 Vue 3 + AntV G6 的 2D 图谱 | 2026-09-22 |
 | [ADR-002](ADR-002-neo4j-sqlite-dual-store.md) | Neo4j + SQLite 双存储 | 2026-09-22 |
 | [ADR-003](ADR-003-answer-source-citation.md) | 可信问答以来源引用为硬契约 | 2026-09-22 |
-| [ADR-004](ADR-004-contract-single-source-of-truth.md) | 契约以 Pydantic 为单一真源，生成 OpenAPI 与 TypeScript 类型 | 2026-09-22 |
+| [ADR-004](ADR-004-contract-single-source-of-truth.md) | 契约以 OpenAPI YAML 为单一真源，生成 Pydantic 与 TypeScript（2026-09-22 改判，首版为 Pydantic 真源） | 2026-09-22 |
 | [ADR-005](ADR-005-task-state-machine.md) | 统一文档处理任务状态机，保留 `cancelled` 但 MVP 不实现取消（第 2 条已被 ADR-006 修订） | 2026-09-22 |
 | [ADR-006](ADR-006-implement-task-cancel.md) | MVP 实现任务取消，修订 ADR-005 第 2 条 | 2026-09-22 |
 | [ADR-007](ADR-007-study-material-bonus-scope.md) | 学习材料生成纳入范围，定位为加分项 | 2026-09-22 |
+| [ADR-008](ADR-008-data-model-naming-baseline.md) | 统一 S2 方案与仓库文档的数据模型命名（原 tech-plan 分支 ADR-004，撞号改编） | 2026-09-22 |
 
 ## 新增一条 ADR
 

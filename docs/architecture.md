@@ -24,12 +24,23 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/services/` | 领域规则、流程编排 | HTTP/框架细节 |
 | `src/backend/app/repositories/` | Neo4j / SQLite 读写 | 产品策略 |
 | `src/backend/app/workers/` | 长时文档任务与状态迁移 | Web 请求处理 |
-| `src/contracts/` | 前后端共享契约的单一真源（Pydantic）与生成物（OpenAPI / JSON Schema / TS） | 供应商专用密钥、实现代码、手工编辑的生成物 |
+| `src/contracts/` | 前后端共享契约的单一真源（`api.v1.yaml` + 两份时序文档）与生成物（Pydantic / JSON Schema / TS） | 供应商专用密钥、实现代码、手工编辑的生成物 |
+| `prompts/` | 版本化提示词资产（含版本、模型、温度、修改说明） | 密钥、课程原始资料 |
+| `evaluation/` | 标注集、评测脚本与报告（抽取准确率、问答测试集、性能实测） | 真实课程版权资料 |
 
 ## 核心数据模型
 
-- SQLite：`Course`、`Material`、`ProcessingTask`、`GraphVersion`、`LearningProgress`、`QuestionSession`。
-- Neo4j：`Course`、`KnowledgePoint`、`SourceChunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。
+命名基线见 ADR-004；`src/contracts/` 与实现代码不得引入同义别名。
+
+- SQLite（模型名 / 表名）：`User`/`users`、`Course`/`courses`、`CourseMember`/`course_members`、
+  `Document`/`documents`、`ProcessingTask`/`tasks`、`GraphSnapshot`/`snapshots`、
+  `LearningProgress`/`progress`、`ChatLog`/`chat_logs`、`EditLog`/`edit_logs`、`LlmCall`/`llm_calls`。
+- Neo4j 节点：`Course`、`Chapter`、`Document`、`KnowledgePoint`、`Chunk`。
+- Neo4j 关系：课程结构 `HAS_CHAPTER`、`HAS_DOCUMENT`、`HAS_CHUNK`、`EVIDENCE`；
+  教学关系仅限 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`。
+- `KnowledgePoint` 必含：`id`、`course_id`、`name`、`aliases`、`type`、`definition`、
+  `importance`、`difficulty`、`level`、`confidence`、`status`、`source`、`locked`、`embedding`。
+  `level` = 该节点在前置关系图中的最长前置路径长度，供层次布局与路径排序使用。
 - 所有查询和写入均以 `course_id` 为第一隔离条件。`PREREQUISITE` 只能形成 DAG。
 
 ## 数据流

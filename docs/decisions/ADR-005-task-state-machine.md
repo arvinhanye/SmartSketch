@@ -20,5 +20,5 @@ queued → parsing → extracting → merging → persisting → awaiting_review
   3. 前端必须把 `cancelled` 当作终态渲染；后端必须有一条测试断言 MVP 的 worker 不会发出该状态。取消端点需先有独立规格与任务，才能实现。
 - **后果**：
   - `specs/course-knowledge-graph.md` 验收条件 2 与本 ADR 不一致，由产品/协调 Agent 按 M0-06 同步；本任务不拥有 `specs/`，未直接修改。
-  - 状态机在 M0-04a 变成契约真源里的 Pydantic 枚举，`persisting` 的 SSE 事件与失败原因分类同批定稿。
+  - 状态机在 M0-04b 变成契约真源 `api.v1.yaml` 里的 `TaskStage` 枚举（ADR-004 改判后真源是 YAML，不是 Pydantic），`persisting` 的 SSE 事件与失败原因分类同批定稿。
   - v1 存在一个当前不可达的枚举值，代价是它无法被状态转换测试覆盖，且可能诱使 Agent 去实现取消功能；因此契约中显式标注为「预留，MVP 不产生」。

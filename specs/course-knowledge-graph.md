@@ -2,7 +2,7 @@
 
 - **状态**：DRAFT
 - **负责人**：产品 / 后端 / 前端共同维护
-- **关联任务**：M1-01 ~ M1-05
+- **关联任务**：M1-01 ~ M1-09、M2-01 ~ M2-12、M3-01 ~ M3-05
 
 ## 用户故事
 
@@ -10,20 +10,34 @@
 
 ## 数据与规则
 
-- 节点至少含：`id`、`course_id`、`name`、`definition`、`confidence`、`status`、`source_refs`。
+- 节点至少含：`id`、`course_id`、`name`、`aliases`、`type`、`definition`、`importance`、
+  `difficulty`、`level`、`confidence`、`status`、`source`、`locked`、`source_refs`。
 - 关系至少含：`id`、`course_id`、`type`、`from_id`、`to_id`、`confidence`、`source_refs`。
 - `type ∈ {CONTAINS, PREREQUISITE, RELATED_TO, EXAMPLE_OF}`。
 - `PREREQUISITE` 语义为 `from_id` 是学习 `to_id` 的前置条件，且同一课程内不得成环。
+- `locked = true` 的节点不被后续自动抽取/融合流程覆盖。
 - 草稿仅教师可编辑；学生 API 只返回已发布版本。
 
 ## 验收条件
 
 1. 支持 PDF、DOCX、TXT、Markdown 上传；不支持格式返回明确错误代码。
-2. 每次上传返回任务 ID；任务按 `queued → parsing → extracting → merging → awaiting_review → completed/failed` 转换，并能通过 SSE 观察。
-3. 图谱查询、编辑和学生浏览均按 `course_id` 隔离。
+2. 每次上传返回任务 ID；任务按
+   `queued → parsing → extracting → merging → persisting → awaiting_review → completed`
+   转换，任意阶段可转 `failed`、任意非终态可转 `cancelled`，全部可通过 SSE 观察。
+3. 图谱查询、编辑和学生浏览均按 `course_id` 隔离；系统可并行维护 ≥2 门课程，
+   跨课程读取返回 `COURSE_FORBIDDEN`。
 4. 新增/修改前置关系形成环时操作被拒绝，并返回导致冲突的节点/关系信息。
-5. 2D 图谱具备缩放、拖拽、节点详情、关系图例/筛选；节点详情展示至少一个来源。
+5. 2D 图谱具备缩放、拖拽、节点详情、关系图例/筛选；节点详情展示至少一个来源；
+   并提供与图谱选中态联动的卡片/列表视图。
 6. 教师发布后学生可读取该版本；未发布草稿不可由学生读取。
+7. 学生可对路径中的知识点请求学习材料，返回通俗讲解、示例与 3 道带解析的练习题；
+   结果可缓存，教师可审核后固定。
+8. 学生指定目标知识点时，返回去除已掌握项后的拓扑有序学习路径，
+   并在图谱上以步骤编号高亮；目标不可达时返回可解释原因。
+9. 单章（约 2 万字）解析至入库总耗时 ≤60 秒；问答首字 ≤3 秒、完整响应 ≤15 秒；
+   实测需记录机器配置与文档字数基准。
+10. 抽取评测在人工标注集上进行：单章知识点 ≥20 个，关系类型覆盖 4 类，
+    人工抽样准确率 ≥70%（目标 知识点 ≥85% / 关系 ≥75%），报告含分关系类型的 P/R。
 
 ## 待细化
 
