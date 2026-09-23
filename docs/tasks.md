@@ -167,3 +167,10 @@
 
 - A06-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 1）：草稿按任务记录贡献（`contrib_tasks`、`contrib_manual`、来源关联带 `task_id`），可见性由 SQLite 有效任务集合 V 决定，T6 提交才可见、T9 起即不可见；清理按贡献撤销，只删无贡献元素，降为存储回收。
 - 交出的后续项（均未认领）：**F02** 草稿查询必带 V；**F03** 贡献字段约束/索引；**F08/F13** 写入登记贡献；**E10/E11** 融合候选按 V 过滤；**G04** 建快照按 V 过滤。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A07-R01 修复 | DONE（ADR-011 修订 2 已签收） | 修复 Codex 审查 A07-R01（`model_calls` 去重键未覆盖物理重试与问答调用） | Claude（协调 Agent） | `.claude/worktrees/a04-f5f479`（分支 `claude/a07-r01-fix`）/ base `8340b1e` | `docs/integrations.md`（预算）、`specs/task-processing.md`（§8.4「计费不重复」、LEASE-17、LEASE-24～27）、`docs/decisions.md`（ADR-011 修订 2）、`docs/tasks.md`、`docs/handoffs/claude-a07.md` | §8.4「计费不重复」、LEASE-17 修订与 LEASE-24～27；`docs/integrations.md`「预算」四条与新增「调用记录（`model_calls`）」；ADR-011 修订 2（决定 12）；专项核对 17 项 ALL PASS、四个篡改副本 exit 1；`check_a07.py` 329/329、`check_a06.py` 第二版与 A04 核对脚本 ALL PASS；`./scripts/verify.sh` exit 0、`git diff --cached --check` exit 0；`docs/handoffs/claude-a07.md` 第九节 |
+
+- A07-R01 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 2）：每次实际供应商调用一条 `model_calls`，以发请求前生成的 `call_id` 为身份与去重键；预写失败不发请求；未收到响应按「输入估算 + 声明的输出上限」计入；问答以 `request_id` 归属。
+- 交出的后续项（均未认领）：**E03** 每个 LLM 请求声明输出上限并估算输入；**E04** 预写、回写与预算汇总；**E05** 修复调用独立记录；**J03/J05** 问答调用带 `request_id`；**C01** 建表以 `call_id` 为主键。

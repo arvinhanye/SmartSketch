@@ -100,6 +100,41 @@
 
 不影响其他 worktree 和分支。
 
+## 九、Codex 审查修复（A07-R01）
+
+- **task_id**：A07-R01 修复
+- **状态**：DONE。修复方案由 ArvinHan 于 2026-09-23 在会话中选择并签收，记为 **ADR-011 修订 2**（决定 12）
+- **review_status**：ready_for_review
+- **worktree / 分支**：`.claude/worktrees/a04-f5f479`，分支 `claude/a07-r01-fix`，base `8340b1e`（= 合入 PR #11 后的 `origin/main`）
+- **审查报告**：主目录 `docs/reviews/codex-claude-a05-a07-2026-09-23-0804z.md`（目标提交 `af9ff7d`，尚未入库）
+
+**核对结论**：成立。沿用的去重键「任务 + 块 + 用途 + 尝试序号」在同一块尝试内对 L1 重试、备用调用、E05 修复取值相同，按键去重会吞掉真实用量；问答调用无任务 ID，键无从定义。另有一处报告未提及：断线或超时时供应商侧已产生的用量拿不到，「收到响应才记录」会让这类调用完全漏计。
+
+| 选择（用户签收） | 否决 | 落点 |
+| --- | --- | --- |
+| 每次实际调用一个 `call_id`，发请求前预写，未收到响应按「输入估算 + 声明的输出上限」计入；问答以 `request_id` 归属 | 确定性复合键；只加 `call_id`、收到响应才记录 | `docs/integrations.md`「预算」计量/软上限/任务预算/每日预算与新增「调用记录（`model_calls`）」；`specs/task-processing.md` §8.4「计费不重复」、LEASE-17、LEASE-24～27；`docs/decisions.md` ADR-011 修订 2 |
+
+**验证**：
+
+```text
+./scripts/verify.sh                          exit 0
+git add … && git diff --cached --check       exit 0
+python3 check_a07.py .（附录 A）              329/329 PASS（main 基线 328/328；多出的一项是新增「见「调用记录」」引用检查）
+python3 check_a06.py 第二版 . api.v1.yaml     ALL PASS（LEASE 编号连续到 27）
+A04 核对脚本                                 ALL PASS
+python3 check_a07r01.py .（附录 C）           正例 exit 0，17 项 ALL PASS
+  N1 任务预算改回旧键                         exit 1
+  N2 删去「预写失败则不发请求」               exit 1
+  N3 删除 LEASE-26                           exit 1
+  N4 字段表删去 request_id                    exit 1
+```
+
+专项脚本首跑有 2 项 FAIL，是脚本自身问题：`integrations.md` 有两个 `### 预算` 标题（变量表与规则），脚本切到了前一个；改为按「`### 预算` 紧接 `- **计量**`」定位后通过，文档未因此改动。四个负例在修正后重跑，各只命中目标断言。
+
+**遗留**：估算值通常明显高于真实用量，断线频繁时预算会提前触顶（有意的保守方向）；`purpose` 的枚举由 E03 定；尚无实现或自动化测试。
+
+**下一步**：请 Codex 按本轮提交复核 A07-R01。
+
 ## 附录 A：`check_a07.py`（核对脚本全文）
 
 ```python
@@ -273,4 +308,45 @@ for name, edits in cases.items():
     if r.returncode != 1 or r.stderr: bad += 1; print(r.stderr[-500:])
 print("ALL DETECTED" if bad == 0 else f"{bad} NOT DETECTED")
 sys.exit(1 if bad else 0)
+```
+
+## 附录 C：`check_a07r01.py`（A07-R01 修复核对）
+
+用法：`python3 check_a07r01.py <仓库根目录>`。
+
+```python
+"""A07-R01 修复核对：check_a07r01.py <repo_root>；任一 FAIL 则 exit 1。"""
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+tp = (root / "specs/task-processing.md").read_text(encoding="utf-8")
+integ = (root / "docs/integrations.md").read_text(encoding="utf-8")
+dec = (root / "docs/decisions.md").read_text(encoding="utf-8")
+fails = []
+def ok(c, m):
+    print(("PASS " if c else "FAIL ") + m)
+    if not c: fails.append(m)
+bill = next((l for l in tp.splitlines() if l.startswith("**计费不重复**")), "")
+ok("`call_id`" in bill and "预写失败则不发请求" in bill, "§8.4 计费不重复：以 call_id 去重、预写失败不发请求")
+ok("未收到响应的调用按「输入估算 + 声明的输出上限」计入" in bill, "§8.4：未收到响应按估算计入")
+ok("键为「任务 + 块" not in bill, "§8.4：旧复合键不再作为去重键")
+K = "### 预算\n\n- **计量**"  # 文中有两个「### 预算」：前者是变量表，这里要的是规则小节
+budget = ("- **计量**" + integ.split(K, 1)[1]).split("\n### ", 1)[0] if K in integ else ""
+task_b = next((l for l in budget.splitlines() if l.startswith("- **任务预算**")), "")
+ok("按 `call_id` 去重" in task_b and "（任务 + 块 + 用途 + 尝试序号）" not in task_b, "预算：任务预算按 call_id 去重")
+daily = next((l for l in budget.splitlines() if l.startswith("- **每日预算**")), "")
+ok("无任务 ID 的问答调用" in daily, "预算：每日预算覆盖无任务 ID 的问答调用")
+rec = integ.split("### 调用记录（`model_calls`）", 1)[1].split("\n### ", 1)[0] if "### 调用记录（`model_calls`）" in integ else ""
+for f in ("call_id", "request_id", "input_tokens_est", "max_output_tokens", "usage_estimated", "provider_role", "is_repair"):
+    ok(f"`{f}`" in rec, f"调用记录字段表含 {f}")
+ok("声明输出 token 上限" in rec, "调用记录：E03 必须声明输出上限")
+ids = {int(n) for n in re.findall(r"\*\*LEASE-(\d+)\*\*", tp)}
+ok({24, 25, 26, 27} <= ids and ids == set(range(1, max(ids) + 1)), f"LEASE-24～27 存在且编号连续（最大 {max(ids)}）")
+l24 = next((l for l in tp.splitlines() if "**LEASE-24**" in l), "")
+ok("A07-R01" in l24 and "估算" in l24, "LEASE-24 为 A07-R01 回归")
+l26 = next((l for l in tp.splitlines() if "**LEASE-26**" in l), "")
+ok("`request_id`" in l26 and "不计入任何任务预算" in l26, "LEASE-26 覆盖无任务 ID 的问答调用")
+r2 = dec.split("### ADR-011 修订 2", 1)[1].split("## ADR-012", 1)[0] if "### ADR-011 修订 2" in dec else ""
+ok(bool(r2) and "**签收**：ArvinHan 2026-09-23" in r2, "ADR-011 修订 2 存在、位于 ADR-012 前且已签收")
+print(f"\nRESULT: {'ALL PASS' if not fails else str(len(fails)) + ' FAIL'}"); sys.exit(1 if fails else 0)
 ```
