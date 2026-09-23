@@ -68,7 +68,7 @@
 | ID | 问题 | 决策人 | 需要在何时确认 |
 | --- | --- | --- | --- |
 | D-01 | MVP 首批课程示例和脱敏资料来源 | 产品负责人 | M1 开始前 |
-| D-02 | 首个 OpenAI 兼容模型供应商与预算上限 | 技术负责人 | 接入抽取服务前 |
+| D-02 | 首个 OpenAI 兼容模型供应商与预算上限。A07 已拆为 D-02a～f 六项，签收入口见 `docs/integrations.md`「待签收取值（D-02）」；配置形状与规则已定，取值均未签收 | 技术负责人 | 接入抽取服务前（fake 实现可先行） |
 | D-03 | 登录是否先采用本地演示角色 | 产品负责人 | M0-03 前 |
 | PLAN-D01 | 两个 Claude 分支 YAML-first/Pydantic-first 唯一源、API 前缀和冲突 ADR 编号如何统一（A01/A02）。**已关闭**：唯一源与 ADR 编号由 ADR-004 签收；API 前缀由 ADR-009（A02）定为 `/api/v1`（均为 ArvinHan，2026-09-22） | 技术负责人 | 已完成 |
 | PLAN-D02 | 发布快照/图与向量版本化/双存储补偿方案（A04） | 技术负责人 | 发布与学生检索仓储实现前 |
@@ -131,3 +131,10 @@
 
 - A06 的决定（ArvinHan，2026-09-23 签收）：worker 为与 API 同机的独立进程，共用 SQLite（WAL）作队列，不支持跨机器；单条条件更新领取、60 秒租约心跳续约、令牌防旧写；三层重试（模型调用 / 块 2 次 / 任务 3 次），存储不可用与模型熔断为阶段级临时故障，退避后重排；`extracting` 块级检查点续跑，`persisting` 在课程写锁下单事务 `MERGE`；迁移须停机、`VACUUM INTO` 备份并校验，回滚靠备份恢复。PLAN-D03 至此全部关闭。
 - A06 交出的后续项（均未认领）：**B08** 增加 `TASK_ATTEMPTS_EXHAUSTED`；**A07** 登记 §8.8 五个变量；**E 组** 定模型调用缓存键与失效（`merging` 重跑依赖）；**E04** 暴露熔断状态；**A04** 定发布侧何时持课程写锁；C01/C09/E12/F13/K08 按 §8 实现。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A07 | DONE（形状已定；取值待 D-02a～f 签收） | 落实模型配置形状与预算决策入口 | Claude（协调 Agent） | `.claude/worktrees/a07-297f68`（分支 `claude/a07-model-config`，叠在 `claude/a06-worker-lease` 之上）/ base `ab04053` | `docs/integrations.md`、`.env.example`；**范围扩展**：D-02 行（指向签收入口）、本节、`docs/handoffs/claude-a07.md` | `docs/integrations.md`「运行时环境变量」（38 个变量，类型/约束/样例/状态）与「模型接入规则（A07）」（切换矩阵、预算、模型版本与向量空间、启动校验、待签收取值 D-02a～f）；`.env.example` 与之逐项一致；核对脚本 344 项 ALL PASS（含对 §8.8、ADR-010 阈值与 `740adb` 命名的逐项核对），11 个篡改副本均被检出（exit 1）；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a07.md` |
+
+- A07 的形状（ArvinHan，2026-09-23 在会话中确认三节设计）：平铺环境变量、沿用 `740adb` 命名；显式 `LLM_MODE` / `EMBEDDING_MODE`，生产禁 fake；每次调用先试主用、熔断器负责粘住备用；鉴权失败不切备用；流式出字后不切换；向量永不跨模型切换；预算按 token 计的软上限（任务 + 每日），`0` 不发请求、无「不限」写法，向量调用不计入；被拒调用走所在环节既有失败路径。**取值未签收**：D-02a～f 见 `docs/integrations.md`，签收后写 ADR。
+- A07 交出的后续项（均未认领）：**B08** 加 `BUDGET_EXCEEDED`（D-02f）；**B06** 按「启动校验」实现设置加载；**E03/E04** 实现切换矩阵、熔断与预算，退避参数须有上限；**E07** 发送 `dimensions`、比对返回长度、按 `EMBEDDING_BATCH_SIZE` 分批；**D09/E 组** 缓存键用实际给出结果的模型 ID；**A10** 导入 `740adb` 时 `.env.example` 与 `docs/integrations.md` 会文本冲突，模型与任务段取本分支、存储与 Neo4j 容器段取 `740adb`。
