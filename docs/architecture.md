@@ -50,7 +50,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 ## API 前缀与 wire 枚举（A02 / ADR-009）
 
-> **签收状态：已签收**，ArvinHan，2026-09-22。本节是路径前缀、枚举取值与大小写的规范表；`src/contracts/api.v1.yaml` 导入 main（A10）时必须与本表逐值一致，不一致以本表为准回改真源，并同批重新生成。状态转换语义不在本节，归 A03。
+> **签收状态：已签收**，ArvinHan，2026-09-22。本节是路径前缀、枚举取值与大小写的规范表；`src/contracts/api.v1.yaml` 导入 main（A10）时必须与本表逐值一致，不一致以本表为准回改真源，并同批重新生成。状态转换语义不在本节，见 `specs/task-processing.md`（A03 / ADR-010）。
 
 ### 路径前缀
 
@@ -72,7 +72,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | --- | --- | --- | --- | --- |
 | `ErrorCode` | `UNAUTHENTICATED`、`COURSE_FORBIDDEN`、`ROLE_FORBIDDEN`、`NOT_FOUND`、`GRAPH_NOT_PUBLISHED`、`UNSUPPORTED_FORMAT`、`FILE_TOO_LARGE`、`VALIDATION_ERROR`、`CYCLE_DETECTED`、`DANGLING_ENDPOINT`、`DUPLICATE_RELATION`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`PUBLISH_BLOCKED`、`RATE_LIMITED`、`LLM_UNAVAILABLE` | UPPER | `Error.code` | 一致。**不含** `NOT_COVERED`、`TASK_FAILED`：它们是领域状态，不是错误码 |
 | `RelationType` | `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF` | UPPER | `Relation.type` | 一致。闭集；S2 图 6.3 的 `RELATED`、`APPLIES_TO` 不得使用（ADR-008） |
-| `TaskStage` | `queued`、`parsing`、`extracting`、`merging`、`persisting`、`awaiting_review`、`completed`、`failed`、`cancelled` | lower | `Task.stage`、`TaskEvent.stage`、`Document.parse_status` | 一致。终态为 `completed`、`failed`、`cancelled`；转换、触发者与取消语义归 A03 |
+| `TaskStage` | `queued`、`parsing`、`extracting`、`merging`、`persisting`、`awaiting_review`、`completed`、`failed`、`cancelled` | lower | `Task.stage`、`TaskEvent.stage`、`Document.parse_status` | 一致。终态为 `completed`、`failed`、`cancelled`；转换、触发者与取消语义见 `specs/task-processing.md`（ADR-010） |
 | `CourseStatus` | `draft`、`published`、`revising` | lower | `Course.status` | 一致 |
 | `KnowledgePointStatus` | `draft`、`low_confidence`、`approved`、`rejected` | lower | `KnowledgePoint.status`、`Relation.status` | 一致。名字带 KnowledgePoint，但关系也复用；自动降级的边取 `low_confidence` |
 | `KnowledgePointType` | `concept`、`theorem`、`formula`、`method`、`example` | lower | `KnowledgePoint.type` | 一致 |
@@ -88,7 +88,7 @@ SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同�
 
 | 流 | 事件名 | 终止事件 |
 | --- | --- | --- |
-| 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | `done` / `error` / `cancelled` 互斥且恰好一次 |
+| 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | 只覆盖处理阶段。每个连接恰好以一条结束事件收尾：`stage = awaiting_review` 快照或 `done` / `error` / `cancelled` 之一（互斥），随后关流；`completed` 不经已有连接送达，通过任务查询或课程发布状态观察（ADR-010） |
 | 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `done` / `error` 互斥且恰好一次 |
 
 ### 文档用语 → wire 值
@@ -101,7 +101,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | `TASK_FAILED`、「任务失败」 | HTTP 200 + `stage: "failed"` + `error: Error` | 同上，领域状态不是 HTTP 错误 |
 | S2「已上传」 | `queued` | |
 | S2「入库中」、前端文案「校验入库」 | `persisting` | 覆盖 DAG 校验与草稿写入 |
-| S2「完成」（处理流程结束） | `awaiting_review` | 处理完成待审核；`completed` 由教师发布触发（现行 740adb `events.v1.md` §2，A03 复核） |
+| S2「完成」（处理流程结束） | `awaiting_review` | 处理完成待审核；`completed` 由教师发布触发，发布时按任务水位推进（含内容被全部驳回的任务），不经 SSE 送达（A03 已复核，ADR-010） |
 | 「已取消」 | `cancelled` | 双 l |
 | 前置 / 包含 / 相关 / 应用实例 | `PREREQUISITE` / `CONTAINS` / `RELATED_TO` / `EXAMPLE_OF` | S2 成环降级的目标「相关」即 `RELATED_TO` |
 
