@@ -70,9 +70,27 @@
 | `git show 978671e:src/contracts/api.v1.yaml` | 仓库对象 | 核对 `ProgressEntry`（`updated_at` 必填）、`PUT /progress` 批量、`MergeRequest`、`KnowledgePoint` 的必填集合 |
 | 参考脚本 `a08_recheck.py`（在 scratchpad，未入库） | 本机 python3 | 星形中心度（R02）、章节前序（R05）、舍入不一致 39,702/100,000（R13）、谱系无 V 成员与成环（R12） |
 
+## 第 3 轮：R11～R14 修复复审（2026-09-23）
+
+- **修复方式**：ArvinHan 要求由 Codex 修 R11～R14。Claude 用 ChatGPT.app 自带的 Codex 命令行（`0.155.0-alpha.16`）以 `codex exec -s workspace-write` 在 Codex worktree 中执行；提示词限定了可写文件，R15 不在本轮。`/usr/local/bin/codex` 的 `0.154.0` 不支持本机配置的 `gpt-6-sol`，第一次运行 400 失败，没有改动任何文件。
+- **读取时指纹**（sha256，与 Codex 交接一致）：`specs/learning-path.md` `ade64a3d…71c6`；`docs/atomic-task-plan.md` `b6d77820…c694`；`docs/atomic-tasks.json` `690045e1…042d`；`git diff -- docs/tasks.md` `0165865b…35a3`。
+- **范围核对**：与运行前的备份逐文件比对，只改了允许的范围：规格 §3、§5、§6（LP-17～19）、§7；Markdown 清单的 B12、I05 两行；JSON 中 B12、I05 两条 `acceptance`，缩进和其他字段未变；任务板的 A08 行及说明；交接。ADR-014 的规则和 §7 细则 1 的原文都没有改。
+- **结论**：**R11～R14 均已修复，没有新的 P1/P2**。从审查角度看，A08 规格可以签收；剩余事项都是产品签收，见下方“建议处理”。
+
+| 项 | 修订位置 | 结果 |
+| --- | --- | --- |
+| R11 | §5 新增一段、LP-17/18、§7 首条 | 已修。`GET` 和成功的 `PUT /progress` 都返回 V 中**每个**节点：`status` 为与推荐同一投影的有效状态，`own_status` 可空，`inherited_from[]` 为有原始行的来源（按 `kp_id` 字节序排列），`updated_at` 只表示自身行的时间，没有自身行时为空。LP-18 覆盖“写入成功但有效值被继承覆盖”。新增字段名和 `updated_at` 的可空语义已列入 §7，待签收，由 B12 落地。 |
+| R12 | §5 谱系段、LP-19 | 已修。整条链上没有 V 中节点时，来源记录为 dormant；每个来源至多对应一个主节点且谱系无环，违反时返回 5xx 和诊断 ID。 |
+| R13 | §3、B12（Markdown 与 JSON） | 已修。wire 上传未舍入的 double，只在前端展示时舍入；`score` 与按 `u→i→c→e` 对未舍入加权分量求和的结果逐位相等。 |
+| R14 | B12、I05（Markdown 与 JSON） | 已修。两份清单的 B12、I05 验收逐字一致（脚本比对）；I05 改为“未发布 404 与全掌握区别；已提交图损坏 5xx”；“无图/暂无图”已清零。 |
+
+非阻塞建议（交给 I06 自行决定，不列为问题）：`inherited_from[]` 中的来源 `kp_id` 不在当前版本里，前端无法从图中取到名称。展示时可以写“继承自已合并的知识点”，或借用主节点的 `aliases`；`kp/merge` 会把被合并节点的名称并入 `aliases`。
+
+第 3 轮已运行（Codex worktree）：`./scripts/verify.sh` exit 0；`git diff --check` exit 0；`python3 -m json.tool docs/atomic-tasks.json` exit 0；`grep -nE '[[:blank:]]+$'` 检查规格和交接，无匹配；`grep -rn -e 无图 -e 暂无图` 检查两份清单，无匹配；Python 逐字比对 B12、I05 两份验收，均一致；LP-1～19 连续。
+
 ## 建议处理
 
-1. Codex 修 R11；R12～R14 建议同批修。修完后按新指纹再请 Claude 复审，只需看改动部分。
+1. ~~Codex 修 R11；R12～R14 建议同批修。修完后按新指纹再请 Claude 复审，只需看改动部分。~~ 已完成，见第 3 轮。A08 的改动仍未提交，入库须由 Codex 或 ArvinHan 在 `codex/a08-learning-path` 上提交并开 PR。
 2. **合并顺序**：规格引用的 ADR-014 目前只在 PR #13（`claude/codex-a08-check-ade85c`）上。A08 入库须在 PR #13 之后，或与它一起，否则 main 上的规格会引用一个不存在的 ADR。
-3. 仍待产品签收：§7 的缺失中性值 0.5、权重来源、推荐上限；ADR-014 的细则 1（签收前先按 R15 写死）和细则 2。
+3. 仍待产品签收：§7 的缺失中性值 0.5、权重来源、推荐上限、进度响应新增字段名与 `updated_at` 语义；ADR-014 的细则 1（签收前先按 R15 写死）和细则 2。
 4. 本报告未修改 Codex 的任何文件，也没有代为提交或合并。
