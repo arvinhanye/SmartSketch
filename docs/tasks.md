@@ -160,3 +160,10 @@
 
 - A04-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-012 修订 1）：文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID 且不可变，快照固定修订列表，检索按 `revision_id` 过滤；失败任务的来源块加删除保护；运行时只有一个向量空间，换模型须停机离线重新向量化全部文本块、草稿与已提交版本，配置与记录不一致即拒绝启动。
 - 交出的后续项（均未认领）：**A10** 在清单中为「重新向量化命令」补登叶子任务；**C06/C07** 定义「下线旧资料修订」；**B06/D09/D10/C09/D11/E07/F03** 按 ADR-012 修订 1 的实现依赖落实。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A06-R01/R02 修复 | DONE（ADR-011 修订 1 已签收） | 修复 Codex 审查 A06-R01（失败清理会删除被其他任务复用的图元素）与 A06-R02（`cleanup_pending` 期间失败任务仍可暴露草稿） | Claude（协调 Agent） | `.claude/worktrees/a04-f5f479`（分支 `claude/a06-r01-r02-fix`）/ base `50a15c9` | `specs/task-processing.md`（I6、§8.4、§8.9）、`docs/decisions.md`（ADR-011 修订 1）、`docs/tasks.md`、`docs/handoffs/claude-a06.md`；**范围扩展**：`specs/teacher-review-publish.md` V3 与 PUB-35（A04 条文）、`docs/architecture.md` | I6、§8.4（贡献记录、草稿可见性、`persisting` 第 1/3/4 条）、LEASE-12 修订与 LEASE-18～23；ADR-011 修订 1（决定 9～11）；A04 V3 可见性前提与 PUB-35；`check_a06.py` 第二版 55 项 ALL PASS、四个篡改副本 exit 1；A04 核对脚本 ALL PASS；`./scripts/verify.sh` exit 0、`git diff --cached --check` exit 0；`docs/handoffs/claude-a06.md` 第九节 |
+
+- A06-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 1）：草稿按任务记录贡献（`contrib_tasks`、`contrib_manual`、来源关联带 `task_id`），可见性由 SQLite 有效任务集合 V 决定，T6 提交才可见、T9 起即不可见；清理按贡献撤销，只删无贡献元素，降为存储回收。
+- 交出的后续项（均未认领）：**F02** 草稿查询必带 V；**F03** 贡献字段约束/索引；**F08/F13** 写入登记贡献；**E10/E11** 融合候选按 V 过滤；**G04** 建快照按 V 过滤。

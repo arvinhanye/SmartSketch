@@ -134,7 +134,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## 数据流
 
 1. 上传资料 → SQLite 创建任务/资料记录 → Worker 进程经租约领取任务 → 解析和分块。
-2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
+2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。草稿按任务记录贡献，T6 提交后才可见，失败任务的内容从失败起即不可见（ADR-011 修订 1）。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
 3. Worker 更新任务状态，API 经 SSE 发送进度；教师审核并发布不可变图谱版本：持课程写锁读取草稿建快照 → SQLite 写快照 → Neo4j 按 `version_id` 物化并核对摘要 → SQLite 单事务切换发布指针（唯一提交点）。协议见上节「图谱版本与跨库发布」。
 4. 学生浏览发布版本（请求开始时绑定一个 `version_id`）；学习进度保存在 SQLite，路径服务查询 Neo4j 前置关系并计算候选与理由。
 5. 问答服务检索课程图谱与来源片段，生成带引用答案；若证据不足返回 `NOT_COVERED`（wire：`status: "not_covered"` + `reason`，见上方「文档用语 → wire 值」）。
