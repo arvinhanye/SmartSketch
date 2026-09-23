@@ -262,12 +262,12 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | 对象 | 本协议的要求 | 去向 |
 | --- | --- | --- |
 | A03 任务生命周期（PR #5，ADR-010） | 发布持锁读取任务水位，并在 P11 与幂等路径执行 T7；回滚不执行 T7；发布失败不改任务状态 | 与 A03 §3 一致，无需改 A03 |
-| A06 课程写锁（PR #6，ADR-011） | 持有方扩大到所有草稿写入；API 侧持锁者有界等待 | ADR-012 修订 ADR-011 决定 6；A10 导入 `specs/task-processing.md` 时在 §8.5「只有两处持锁」旁加注指向 ADR-012 |
+| A06 课程写锁（PR #6，ADR-011） | 持有方扩大到所有草稿写入；API 侧持锁者有界等待 | ADR-012 修订 ADR-011 决定 6；`specs/task-processing.md` §8.5 与 ADR-011 引言已加注指向 ADR-012 |
 | B08 公共错误码 | 新增 `PUBLISH_IN_PROGRESS`（409，同课程已有发布或回滚在进行）与 `COURSE_BUSY`（409，课程写锁有界等待超时，`details.holder`） | B08 改 `api.v1.yaml` 并重新生成 |
 | B11 图谱与版本契约 | `PublishResult` 加 `unchanged`、`excluded`；`GraphVersion` 加 `kind`、`source_version`；回滚端点补 409 响应；`PUBLISH_BLOCKED` 的 `details.reasons` 结构（V3 表）；快照字段清单与 DTO 对齐 | B11 |
 | A07 配置 | `PUBLISH_LEASE_SECONDS`（整数 ≥ 15，默认 60）、`COURSE_LOCK_WAIT_SECONDS`（整数 ≥ 0，默认 5）；非法值拒绝启动 | 登记到 `.env.example` 与 `docs/integrations.md` |
 | A08 / A09 | `kp_id` 跨版本稳定；请求绑定单一 `version_id` | 进度与引用的跨版本规则 |
-| A10 | 文本块标签名；ADR-011 加注；本文件替换桩 | 导入批次 |
+| A10 | 文本块标签名；本文件替换 `740adb`/`209be9` 的桩 | 导入批次 |
 | K10 备份恢复 | 两库恢复时间点对齐；按快照重建缺失副本 | K10 |
 | G02 | 原计划的 `preparing/ready` 两态改为本节的 `preparing/materialized/committed/failed` | G02 |
 
