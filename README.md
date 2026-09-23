@@ -39,6 +39,8 @@
 4. 完成后运行：`./scripts/verify.sh`。
 5. 写入 `docs/handoffs/<agent>-<task>.md`，再交由下一个 Agent 接续。
 
+GitHub Actions 的 [CI 工作流](.github/workflows/ci.yml) 在 push、pull request 和手动触发时运行当前骨架校验。前后端测试命令尚未建立，CI 通过暂不表示应用构建或业务测试通过；扩展范围见 [架构说明](docs/architecture.md#持续集成当前骨架阶段)。
+
 ## 本地配置
 
 复制 `.env.example` 为 `.env` 后填入本机配置。`.env`、`.claude/settings.local.json` 和 Codex 本地状态均不提交。当前不需要任何密钥即可运行基础校验。

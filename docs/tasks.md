@@ -12,6 +12,20 @@
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
 
+## CI 配置
+
+| ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| CI-01 | DONE（待 GitHub 首次运行确认） | 为当前仓库建立 GitHub Actions 基础质量门禁 | Codex | push、pull request 和手动触发；只运行仓库现有 `scripts/verify.sh`，不把尚未建立的前后端测试标成通过；工作流语法和本地校验通过 | `.github/workflows/ci.yml`；`./scripts/verify.sh` PASS；YAML 解析/关键字段检查 PASS；`git diff --check` PASS；`docs/handoffs/codex-ci-01.md` |
+
+### CI-01 执行约定
+
+- 输入：当前主分支骨架、`scripts/verify.sh`、仓库现有任务与架构约定。
+- 输出：`.github/workflows/ci.yml`、CI 范围说明、交接记录。
+- 依赖：GitHub Actions 托管运行器；无项目密钥、数据库或付费模型服务。
+- 风险：当前门禁只检查骨架，不能代表尚未实现的前后端测试；后续由 K11 接入实际质量门禁。
+- 验证：`./scripts/verify.sh`、工作流 YAML 解析与关键字段检查、`git diff --check`。
+
 ## 下一里程碑：M1 课程资料到草稿图谱
 
 | ID | 状态 | 任务 | 负责人 | 验收条件 |
