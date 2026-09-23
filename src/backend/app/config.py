@@ -69,22 +69,42 @@ def _has_value(value: str | SecretStr) -> bool:
 
 
 def _valid_url(value: str, schemes: set[str]) -> bool:
+    if not value or any(character.isspace() or ord(character) < 32 for character in value):
+        return False
     try:
         parsed = urlsplit(value)
-        return parsed.scheme in schemes and parsed.hostname is not None and parsed.port != 0
+        return (
+            parsed.scheme in schemes
+            and parsed.hostname is not None
+            and parsed.port != 0
+            and parsed.username is None
+            and parsed.password is None
+        )
     except ValueError:
         return False
 
 
 def _check_rules(settings: Settings) -> None:
     invalid: set[str] = set()
-    for name in ("WEB_ORIGIN", "LLM_BASE_URL", "LLM_FALLBACK_BASE_URL", "EMBEDDING_BASE_URL"):
+    if not _valid_url(settings.WEB_ORIGIN, {"http", "https"}):
+        invalid.add("WEB_ORIGIN")
+    else:
+        origin = urlsplit(settings.WEB_ORIGIN)
+        if origin.path or origin.query or origin.fragment:
+            invalid.add("WEB_ORIGIN")
+    for name in ("LLM_BASE_URL", "LLM_FALLBACK_BASE_URL", "EMBEDDING_BASE_URL"):
         value = getattr(settings, name)
         if value and not _valid_url(value, {"http", "https"}):
             invalid.add(name)
     if not _valid_url(settings.NEO4J_URI, {"bolt", "neo4j"}):
         invalid.add("NEO4J_URI")
-    if not settings.SQLITE_URL.startswith("sqlite:///") or len(settings.SQLITE_URL) <= 10:
+    if (
+        not settings.SQLITE_URL.startswith("sqlite:///")
+        or not settings.SQLITE_URL[10:].strip()
+        or settings.SQLITE_URL[10:] == ":memory:"
+        or "?" in settings.SQLITE_URL
+        or "#" in settings.SQLITE_URL
+    ):
         invalid.add("SQLITE_URL")
 
     primary = ("LLM_BASE_URL", "LLM_API_KEY", "LLM_EXTRACTION_MODEL", "LLM_CHAT_MODEL")

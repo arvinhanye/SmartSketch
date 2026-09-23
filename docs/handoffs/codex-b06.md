@@ -32,3 +32,14 @@
 
 - 首个后续动作：C05 可消费已验证的存储设置并实现文件落盘边界；C01 可消费 SQLite/worker 配置并建立迁移运行器。
 - 回滚只撤销 B06 本地提交；没有数据库或远端状态需恢复。
+
+## 审查修复（2026-09-23）
+
+本节覆盖上方关于「启动不访问数据库」「没有数据库变更」和「运行时空间留待后续」的原交付说明。
+
+- 输入：`ca353b1` 的三项审查问题——PUB-32 缺启动门禁、`WEB_ORIGIN` 接受空值/无效主机、`API_HOST`/`API_PORT` 未用于监听。
+- 交付：`src/backend/app/repositories/embedding_space.py` 用 `BEGIN IMMEDIATE` 创建并读写 SQLite 单行向量空间；`src/backend/app/services/startup.py` 提供 API/后续 worker 共用的比对函数；API lifespan 在对外服务前调用。`config.py` 拒绝空或含空格的 URL、非 origin 的 `WEB_ORIGIN`、内存 SQLite；`python -m app` 读取监听主机和端口。同步架构、集成、发布规格、示例环境变量、README 与任务板。
+- 复现与验证：新增负例先运行得 5 FAIL、12 PASS；修复后设置 `PYTHONPATH` 为本工作树 `src/backend`，执行 `.venv/Scripts/python.exe -B -m pytest -p no:cacheprovider tests/backend/test_b06.py tests/backend/test_b05.py -q`，47 PASS、2 条上游弃用警告、exit 0；Git Bash 临时映射 `python3` 后 `./scripts/verify.sh` exit 0；`git diff --check` exit 0。
+- 数据/回滚：首次启动会在 `SQLITE_URL` 指向的文件建 `embedding_space_state` 并写入空间；再次启动不一致时只读旧行并拒绝服务。C01 的 `001_base.sql` 须保留此表并由迁移接管。若需撤销数据模型变更，停 API/worker，用变更前 SQLite 备份恢复后重启；只回退代码时可保留表与记录，不得删除记录绕过空间门禁。
+- 未完成：C09 worker 入口尚不存在，创建时须调用 `validate_embedding_space()`；离线重新向量化命令尚未实现，A10 须登记承接任务。在命令与 E07/F03 实现前，改变已有空间只能被拒绝，不能在线迁移。API/worker 必须指向同一 SQLite 文件；示例相对路径按进程工作目录解析。
+- 下一位 Agent：C01 先把单行状态表纳入 `001_base.sql` / 迁移；C09 复用共享门禁；A10 为离线重新向量化命令编号并明确实际运行命令。

@@ -34,7 +34,7 @@
 | `API_HOST` | 字符串 | `127.0.0.1` | FastAPI 监听地址 | 已约定 |
 | `API_PORT` | 整数 1～65535 | `8000` | FastAPI 监听端口 | 已约定 |
 | `WEB_ORIGIN` | URL | `http://localhost:5173` | 允许的前端来源（CORS） | 已约定 |
-| `SQLITE_URL` | 字符串，`sqlite:///` 开头 | `sqlite:///./storage/smartsketch.sqlite3` | SQLite 连接串，不含凭据 | 已约定 |
+| `SQLITE_URL` | 字符串，`sqlite:///` 开头；不得为内存库 | `sqlite:///./storage/smartsketch.sqlite3` | SQLite 连接串，不含凭据；相对路径按进程工作目录解析，API/worker 须指向同一文件 | 已约定 |
 | `NEO4J_URI` | URL，`bolt://` 或 `neo4j://` 开头 | `bolt://localhost:7687` | Neo4j 地址 | 已约定 |
 | `NEO4J_USER` | 字符串 | `neo4j` | Neo4j 用户 | 已约定 |
 | `NEO4J_PASSWORD` | 密钥 | `change-me-locally` | Neo4j 密码 | 本机填写 |

@@ -1,14 +1,18 @@
 """B06: environment-only settings and startup validation."""
 
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.config import Settings, SettingsError, load_settings
 from app.main import create_app
+from app.services.startup import validate_embedding_space
 
 
 def test_fake_defaults_need_no_model_secrets_or_network():
@@ -85,8 +89,13 @@ def test_invalid_ranges_name_the_variable(name, value):
         ({"APP_ENV": "production"}, "LLM_MODE"),
         ({"LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS": "15"}, "LLM_CHAT_TIMEOUT_SECONDS"),
         ({"WEB_ORIGIN": "not-a-url"}, "WEB_ORIGIN"),
+        ({"WEB_ORIGIN": ""}, "WEB_ORIGIN"),
+        ({"WEB_ORIGIN": "http://bad host:5173"}, "WEB_ORIGIN"),
+        ({"WEB_ORIGIN": "http://localhost:5173/path"}, "WEB_ORIGIN"),
+        ({"WEB_ORIGIN": "http://user:secret@localhost:5173"}, "WEB_ORIGIN"),
         ({"NEO4J_URI": "http://localhost:7687"}, "NEO4J_URI"),
         ({"SQLITE_URL": "postgres:///data"}, "SQLITE_URL"),
+        ({"SQLITE_URL": "sqlite:///:memory:"}, "SQLITE_URL"),
         ({"LLM_BASE_URL": "https://:bad-host"}, "LLM_BASE_URL"),
     ],
 )
@@ -170,3 +179,59 @@ def test_valid_app_stores_settings_without_external_connections(monkeypatch):
     application = create_app()
 
     assert application.state.settings.API_PORT == 8123
+
+
+def test_first_start_persists_embedding_space_and_restarts_cleanly(tmp_path, monkeypatch):
+    database = tmp_path / "state.sqlite3"
+    monkeypatch.setenv("SQLITE_URL", f"sqlite:///{database.as_posix()}")
+
+    with TestClient(create_app()) as client:
+        assert client.get("/health").status_code == 200
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT model, dimensions, is_fake FROM embedding_space_state WHERE singleton = 1"
+        ).fetchone() == ("", 1024, 1)
+    with TestClient(create_app()) as client:
+        assert client.get("/health").status_code == 200
+
+
+def test_changed_embedding_space_rejects_startup_without_mutating_record(tmp_path, monkeypatch):
+    database = tmp_path / "state.sqlite3"
+    monkeypatch.setenv("SQLITE_URL", f"sqlite:///{database.as_posix()}")
+    with TestClient(create_app()):
+        pass
+
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "512")
+    with pytest.raises(SettingsError, match="1024.*512.*重新向量化"):
+        with TestClient(create_app()):
+            pass
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT model, dimensions, is_fake FROM embedding_space_state WHERE singleton = 1"
+        ).fetchone() == ("", 1024, 1)
+
+
+def test_listener_uses_configured_host_and_port(monkeypatch):
+    from app.__main__ import main as serve_main
+
+    monkeypatch.setenv("API_HOST", "127.0.0.2")
+    monkeypatch.setenv("API_PORT", "8123")
+    with patch("uvicorn.run") as run:
+        serve_main()
+    assert run.call_args.kwargs["host"] == "127.0.0.2"
+    assert run.call_args.kwargs["port"] == 8123
+
+
+def test_worker_can_reuse_space_gate_and_model_changes_fail(tmp_path):
+    sqlite_url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
+    validate_embedding_space(
+        load_settings(
+            {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "local", "EMBEDDING_MODEL": "model-a"}
+        )
+    )
+    with pytest.raises(SettingsError, match="model-a.*model-b.*重新向量化"):
+        validate_embedding_space(
+            load_settings(
+                {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "local", "EMBEDDING_MODEL": "model-b"}
+            )
+        )

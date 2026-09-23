@@ -178,7 +178,7 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B06 | DONE | 从环境变量加载类型化设置并在启动时校验 | Codex（后端） | `codex/b06-settings` / base `e8ce796` | `src/backend/app/config.py`、`tests/backend/test_b06.py`；范围扩展：`src/backend/app/main.py`（接入启动校验）、`src/backend/README.md`、`docs/architecture.md`、`docs/integrations.md`、`.env.example`（登记发布锁参数）、本任务板、`docs/handoffs/codex-b06.md` | B06 35 PASS、B05 回归 3 PASS、基础 verify PASS；见 `docs/handoffs/codex-b06.md` |
+| B06 | DONE（审查修复） | 从环境变量加载类型化设置并在启动时校验 | Codex（后端） | `codex/b06-settings` / base `e8ce796` | `src/backend/app/config.py`、`tests/backend/test_b06.py`；范围扩展：`src/backend/app/main.py`（接入启动校验）、`src/backend/README.md`、`docs/architecture.md`、`docs/integrations.md`、`.env.example`（登记发布锁参数）、本任务板、`docs/handoffs/codex-b06.md`；审查修复增加 `src/backend/app/repositories/embedding_space.py`、`src/backend/app/services/startup.py`、`src/backend/app/__main__.py`、`tests/backend/test_b05.py` 与发布规格同步 | B05+B06 47 PASS；基础 verify PASS；`git diff --check` PASS；见 `docs/handoffs/codex-b06.md` |
 
 - 输入：A07 环境变量表及启动校验规则、A03/A06 任务配置、ADR-012 发布锁参数、B05 应用工厂。
 - 输出：只读环境变量的类型化设置、非法值拒绝启动、密钥脱敏、fake 模式无真实模型凭据可启动。
@@ -186,3 +186,12 @@
 - 风险：既有 `.env.example` 未登记 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS`；本轮同步补齐，不改变已签收的默认值。
 - 验证：`python -m pytest tests/backend/test_b06.py -q`、B05 回归、`./scripts/verify.sh`、`git diff --check`。
 - 实际结果：B06 35 PASS、B05 回归 3 PASS；默认 fake、合法 live、非法范围与条件、密钥脱敏、应用导入时拒绝非法配置均有实际测试；基础 verify 与 diff check exit 0。D-02 真实模型取值仍待签收。
+
+### B06 审查修复
+
+- 输入：B06 固定提交 `ca353b1`、审查指出的 PUB-32 启动门禁、URL 漏检和监听参数未接线；`specs/teacher-review-publish.md` V12、ADR-012 修订 1。
+- 输出：SQLite 单行向量空间启动门禁、严格 URL 校验、读取 `API_HOST`/`API_PORT` 的启动入口及回归测试。
+- 依赖：Python 标准库 SQLite；C01 后续迁移须接管并保留引导表，worker 入口须调用同一门禁。
+- 风险：新增 SQLite 引导表；首次启动会写入配置空间，已有空间不一致必须保持旧值并拒绝启动。回滚需停机并从变更前 SQLite 备份恢复，不能删除空间记录绕过检查。
+- 验证：先运行新增负例复现；再运行 B05/B06 pytest、`./scripts/verify.sh`、`git diff --check`。
+- 结果：新增负例先为 5 FAIL；修复后 B05+B06 共 47 PASS、基础 verify PASS、`git diff --check` PASS。API lifespan 已接入门禁；C09 尚无 worker 入口，须复用 `validate_embedding_space()`；离线重新向量化命令仍归后续任务。
