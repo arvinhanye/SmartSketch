@@ -1,17 +1,17 @@
 {
   "version": 1,
-  "updated_at": "2026-09-22T13:25:23.692155+00:00",
+  "updated_at": "2026-09-23T01:38:32.049069+00:00",
   "automation_id": "claude-smartsketch",
   "review_root": "/Users/arvinhan/Desktop/SmartSketch",
   "purpose": "Incremental review state, not task completion evidence",
   "worktrees": [
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch",
-      "head": "05d214c09b770b0a18268f5e1ee27bb5194bc1dd",
+      "head": "9ddcef8ee11d335f52c8f17964bc3ad6f218e7b3",
       "sessions": [
         {
           "session_id": "09951476-bd65-45ae-b74d-d98d4535d4dd",
-          "last_complete_offset": 218863,
+          "last_complete_offset": 219785,
           "last_observed_stop": "2026-09-22T12:00:50.973Z"
         }
       ],
@@ -22,7 +22,7 @@
       "open_findings": [],
       "dirty_sha256": "76a72482cf2a5bdaaf09e5c3f9e9848dda3c5dcad5911d7965679d98f2e45445",
       "handoff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "last_observed_at": "2026-09-22T13:25:23.692155+00:00",
+      "last_observed_at": "2026-09-23T01:38:32.049069+00:00",
       "last_check_result": "NO_NEW_CLAUDE_ACTIVITY"
     },
     {
@@ -33,7 +33,7 @@
       "sessions": [
         {
           "session_id": "7f61308f-077f-43d3-af9f-bb396a5f2677",
-          "last_complete_offset": 1522931,
+          "last_complete_offset": 1523107,
           "last_observed_stop": "2026-09-22T12:06:55.069Z"
         }
       ],
@@ -135,11 +135,11 @@
     },
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/worktree-contract-conflicts-740adb",
-      "head": "1bc63ad5ae9fa16a642535e1487bc9e81cb0e18b",
+      "head": "8865686f202f367db7d67e4e16bec19f5841939a",
       "sessions": [
         {
           "session_id": "e6e2babd-4e1e-4540-b82d-186884a2fb87",
-          "last_complete_offset": 1959379,
+          "last_complete_offset": 1959503,
           "last_observed_stop": "2026-09-22T13:23:01.725Z",
           "last_event": {
             "type": "system",
@@ -148,29 +148,80 @@
           }
         }
       ],
-      "status": "COMPLETION_CANDIDATE_WAIT_STABILITY",
-      "stable_observations": 1,
+      "status": "PARTIAL_REVIEW",
+      "stable_observations": 2,
       "pending_paths": [
         "S-07 merge conflict resolution versus both parents",
-        "scripts/gen-contracts.sh",
-        "scripts/gen_contracts.py",
-        "scripts/check_contracts.py",
-        "scripts/verify/contracts.sh",
-        "src/contracts/api.v1.yaml",
-        "src/contracts/v1/",
-        "tests/contracts/test_contracts.py",
-        "tests/contracts/_shim/sitecustomize.py",
-        "S-07 ADR/spec/events consistency"
+        "src/contracts/v1/generated/ (remaining artifact audit)",
+        "S-07 remaining ADR/spec consistency"
       ],
-      "open_findings": [],
+      "open_findings": [
+        "S07-R06",
+        "S07-R07",
+        "S07-R08",
+        "S07-R09",
+        "S07-R10",
+        "S07-R11",
+        "S07-R12",
+        "S07-R13",
+        "S07-R14"
+      ],
       "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "handoff_sha256": "8104d97fee3080e718c59841d5fd7655993ea3eede4bea8f23a3fa2c0881164e",
-      "last_observed_at": "2026-09-22T13:25:23.692155+00:00",
-      "last_check_result": "NEW_ACTIVITY_WAIT_FOR_STABILITY",
+      "handoff_sha256": "9ec6bdbeee948a2f253e02b9903e550c7220a7988cd8eee7a32d4adfa90868a2",
+      "last_observed_at": "2026-09-23T01:38:32.049069+00:00",
+      "last_check_result": "REVIEWED_TOOLING_BATCH_WITH_FINDINGS",
       "review_candidate": true,
       "candidate_handoff": "docs/handoffs/claude-s07-contract-conflicts.md",
       "candidate_head": "1bc63ad5ae9fa16a642535e1487bc9e81cb0e18b",
-      "completion_signal": "stop_hook_summary at 2026-09-22T13:23:01.725Z and Claude ready_for_review handoff; first clean-head observation only"
+      "completion_signal": "stop_hook_summary at 2026-09-22T13:23:01.725Z and Claude ready_for_review handoff; first clean-head observation only",
+      "reviewed_paths": [
+        ".claude/hooks/block-dangerous.sh",
+        "docker-compose.yml",
+        "scripts/_dev-common.sh",
+        "scripts/dev-up.sh",
+        "scripts/dev-down.sh",
+        "scripts/check-apoc.sh",
+        "scripts/verify.sh",
+        "scripts/verify/structure.sh",
+        "scripts/verify/backend.sh",
+        "scripts/verify/frontend.sh",
+        "scripts/verify/contracts.sh",
+        "scripts/gen-contracts.sh",
+        "scripts/gen_contracts.py",
+        "scripts/check_contracts.py",
+        "tests/contracts/test_contracts.py",
+        "src/contracts/api.v1.yaml",
+        "src/contracts/events.v1.md"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/adoring-sinoussi-709263",
+      "head": "6c19f258729c4e9b2390d2e79bf2869e3aade87f",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "2ade2542e2fbf954c932ab34504e93f5a3bf082acc74fbbd8bdcdf825173fdbe",
+      "stable_observations": 2,
+      "sessions": [
+        {
+          "session_id": "77fbec9b-a322-414b-9b3f-2faff92cc3e2",
+          "last_complete_offset": 2010303,
+          "last_observed_stop": "2026-09-22T14:50:30.401Z"
+        }
+      ],
+      "status": "REVIEWED_DOCUMENT_SCOPE_NEEDS_SIGNOFF",
+      "initial_report": "docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md",
+      "covered_scope": "A01 88ea517 documents plus 6c19f25 handoff corrections; M0-09 toolchain record cross-check only",
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/decisions.md",
+        "docs/tasks.md",
+        "docs/handoffs/claude-a01.md",
+        "docs/handoffs/claude-m0-09-toolchain.md"
+      ],
+      "pending_paths": [],
+      "open_findings": [],
+      "last_observed_at": "2026-09-23T01:38:32.049069+00:00",
+      "last_check_result": "REVIEWED_NO_NEW_A01_DEFECTS"
     }
   ],
   "rules": {
@@ -179,5 +230,5 @@
     "unchanged_notifications": "quiet",
     "raw_transcripts_stored": false
   },
-  "last_heartbeat_result": "S-07 completed candidate at 1bc63ad observed once; await next unchanged HEAD/diff/handoff observation before review. Prior findings not repeated."
+  "last_heartbeat_result": "A01 document scope reviewed with no new defect; PLAN-D01/D04 await decisions. S-07 tooling batch found R12-R14; prior R06-R11 and remaining paths still open."
 }
