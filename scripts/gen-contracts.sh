@@ -14,6 +14,7 @@ cd "$(dirname "$0")/.."
 OUT="src/contracts/v1/generated"
 CHECK=0
 ALLOW_SCAFFOLD=0
+_completed=0   # 走到脚本结尾才置 1，EXIT trap 据此判断是否被中止（见 --check 段）
 for arg in "$@"; do
   case "$arg" in
     --check) CHECK=1 ;;
@@ -81,7 +82,14 @@ if ((CHECK)); then
     exit 1
   fi
   tmp="$(mktemp -d)"
-  trap 'empty_dir "$tmp"; rmdir "$tmp" 2>/dev/null || true' EXIT
+  # bash 3.2（macOS 自带）被 set -u 中止后进入 EXIT trap 时 $? 已经是 0，光保存 $? 救不回
+  # 失败状态——S07-R06 的假绿就是这么来的。所以再加一道：没走到脚本结尾就一律按失败处理。
+  trap 'rc=$?; empty_dir "$tmp" || true; rmdir "$tmp" 2>/dev/null || true
+        if [[ $rc -eq 0 && ${_completed:-0} -ne 1 ]]; then
+          echo "gen-contracts.sh 未正常结束（可能被 set -u / set -e 中止），按失败处理。" >&2
+          rc=1
+        fi
+        exit "$rc"' EXIT
   generate_into "$tmp" >/dev/null
   # 只比对本次真正生成出来的阶段；跳过的阶段由下面的未完成标记负责暴露。
   for produced in "$tmp"/*; do
@@ -90,7 +98,8 @@ if ((CHECK)); then
     # 那不是契约漂移，不该让门禁变红。
     if ! diff -r -x '__pycache__' -- "$OUT/$name" "$produced" >/dev/null 2>&1; then
       if [[ ! -e "$OUT/$name" ]]; then
-        echo "生成物缺失：$OUT/$name（真源能生成该阶段，但仓库里没有入库）" >&2
+        # 变量紧挨全角字符时必须加花括号：UTF-8 locale 下 bash 3.2 会把「（」的字节并入变量名（S07-R06）。
+        echo "生成物缺失：${OUT}/${name}（真源能生成该阶段，但仓库里没有入库）" >&2
       else
         echo "生成物与真源不同步：$OUT/$name" >&2
         # diff 非 0 是预期结果；不裹住它，set -e + pipefail 会让脚本死在这里，
@@ -111,3 +120,5 @@ if ((${#skipped[@]})); then
   printf 'INCOMPLETE 未生成：%s\n' "$(IFS=,; echo "${skipped[*]}")"
   echo "  本次结果不构成契约验收。按 src/contracts/toolchain.txt 安装后重跑，去掉 --allow-scaffold。"
 fi
+
+_completed=1

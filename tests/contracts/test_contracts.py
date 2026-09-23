@@ -208,6 +208,72 @@ def test_architecture_missing_cancelled_fails():
     assert _gate_with(mutate_text=break_it) != 0, "架构漏掉 cancelled 必须失败（R05）"
 
 
+# ── S07-R06：生成物缺失时 --check 必须非 0，UTF-8 locale 下同样成立 ──────────
+#
+# 8865686 的「生成物缺失」报错行写成 "$OUT/$name（…"。bash 3.2 在 UTF-8 locale 下把
+# 全角括号的字节并入变量名，set -u 中止；而 bash 3.2 进入 EXIT trap 时 $? 已被清成 0，
+# 于是 --check exit 0，verify.sh 打出 All verification checks passed。只在 C locale 下
+# 测抓不到——那正是这个缺陷当初漏过的原因，所以这里必须覆盖至少一个 UTF-8 locale。
+
+GENCHECK_FILES = [
+    "scripts/gen-contracts.sh",
+    "scripts/gen_contracts.py",
+    "src/contracts/api.v1.yaml",
+]
+UTF8_LOCALES = ("en_US.UTF-8", "zh_CN.UTF-8", "C.UTF-8")
+
+
+def _available_locales() -> set[str]:
+    out = subprocess.run(["locale", "-a"], capture_output=True, text=True).stdout
+    # macOS 写作 en_US.UTF-8，glibc 常写作 en_US.utf8
+    return {line.strip().replace(".utf8", ".UTF-8") for line in out.splitlines()}
+
+
+def _gencheck(tmp: Path, locale: str, *args: str) -> subprocess.CompletedProcess:
+    env = dict(os.environ, LC_ALL=locale)
+    env.pop("PYTHONPATH", None)
+    # 缺陷触发时 stderr 里是被截断的多字节字符，不能按严格 UTF-8 解码
+    return subprocess.run(["./scripts/gen-contracts.sh", *args], cwd=tmp, env=env,
+                          capture_output=True, encoding="utf-8", errors="replace")
+
+
+def test_gencheck_missing_stage_fails_in_every_locale():
+    utf8 = [loc for loc in UTF8_LOCALES if loc in _available_locales()]
+    assert utf8, "本机没有任何 UTF-8 locale，覆盖不到 S07-R06；不允许静默跳过"
+    locales = ["C", *utf8]
+    tmp = Path(tempfile.mkdtemp(prefix="gencheck-"))
+    try:
+        for rel in GENCHECK_FILES:
+            dest = tmp / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / rel, dest)
+        # 先在临时区生成一份与真源一致的产物：正向对照不受本机装了哪些生成器影响，
+        # 装了生成器时 python/、typescript/ 也会一并纳入下面的缺失用例。
+        gen = _gencheck(tmp, "C", "--allow-scaffold")
+        assert gen.returncode == 0, f"临时区生成失败：{gen.stderr[-300:]}"
+        out = tmp / "src/contracts/v1/generated"
+
+        for loc in locales:
+            ok = _gencheck(tmp, loc, "--check", "--allow-scaffold")
+            assert ok.returncode == 0, f"[{loc}] 未施加破坏时 --check 应通过：{ok.stderr[-300:]}"
+
+        for stage in sorted(p.name for p in out.iterdir()):
+            hold = tmp / f"held-{stage}"
+            (out / stage).rename(hold)
+            try:
+                for loc in ("C", utf8[0]):
+                    bad = _gencheck(tmp, loc, "--check", "--allow-scaffold")
+                    assert bad.returncode == 1, (
+                        f"[{loc}] 缺 {stage} 时 --check 必须 exit 1，实际 {bad.returncode}："
+                        f"{bad.stderr[-300:]}")
+                    assert "生成物缺失" in bad.stderr and "重新生成" in bad.stderr, (
+                        f"[{loc}] 缺 {stage} 时必须打印缺失信息与修复提示：{bad.stderr[-300:]}")
+            finally:
+                hold.rename(out / stage)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ── 实例级正负例：schema 真的拦得住报告里的两个例子吗 ──────────────
 
 def _instance_cases():
