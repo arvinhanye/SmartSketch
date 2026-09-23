@@ -174,3 +174,10 @@
 
 - A07-R01 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 2）：每次实际供应商调用一条 `model_calls`，以发请求前生成的 `call_id` 为身份与去重键；预写失败不发请求；未收到响应按「输入估算 + 声明的输出上限」计入；问答以 `request_id` 归属。
 - 交出的后续项（均未认领）：**E03** 每个 LLM 请求声明输出上限并估算输入；**E04** 预写、回写与预算汇总；**E05** 修复调用独立记录；**J03/J05** 问答调用带 `request_id`；**C01** 建表以 `call_id` 为主键。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| FIX-R01/R02 修复 | DONE（ADR-011 修订 3、ADR-012 修订 2 已签收） | 修复 Codex REVIEW-09 的 FIX-R01（响应无 usage 时按 0 计费）与 FIX-R02（向量迁移目标集合与单一空间不变式不一致） | Claude（协调 Agent） | `.claude/worktrees/quirky-dijkstra-eca5de`（分支 `claude/fix-r01-r02`）/ base `1a47eb2` | `docs/integrations.md`（预算、调用记录、模型版本与向量空间、D-02a/b）、`specs/task-processing.md`（§8.4「计费不重复」、LEASE）、`specs/teacher-review-publish.md`（V10、V11、V12）、`docs/decisions.md`（ADR-011 修订 3、ADR-012 修订 2）、`docs/architecture.md`（向量空间一行）、本节、`docs/handoffs/claude-a07.md`、`docs/handoffs/claude-a04.md` | 审查报告 `docs/reviews/codex-claude-a04-fixes-1012b6f-2026-09-23-1215z.md`（主目录）；`docs/integrations.md`「预算」「调用记录」第 5 条；LEASE-28～30；V12 第 3/4/6 步与「空间标识随向量走」、PUB-36～38；ADR-011 修订 3、ADR-012 修订 2；`check_fix.py` 修改前 38 FAIL，修改后 40 项 ALL PASS，6 个负例均 exit 1；`check_a07` 347/347、`check_a07r01`、`check_a06` ALL PASS，`check_a04` 除修改前就存在的 2 项过时断言外，仅新增 1 项脚本边界问题（修订 1 之后多了修订 2，见交接）；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a07.md` 第十节、`docs/handoffs/claude-a04.md` 第十一节 |
+
+- FIX-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 3、ADR-012 修订 2）：响应不带 usage 时，生成前被拒的错误（`400/401/403/404/413/422/429`）计 0，其余情形按「输入估算 + 输出上限」计，E03 流式请求须请求 usage；重新向量化按 Neo4j 实际存量迁移并按存量核对，缓存与节点外的向量带空间标识，写入按空间标识而非维度拒绝。
+- 交出的后续项（均未认领）：**E03** 错误分类含「生成前被拒」、流式请求 usage；**E04** 按修订 3 汇总计费量；**D-02a/b** 签收时注明供应商是否返回 usage；**E07** 缓存键含空间标识；**F03** 写入向量核对空间标识；**A10** 仍须为重新向量化命令补登叶子任务。
