@@ -36,4 +36,12 @@ else
   fail=1
 fi
 
+# B08 公共错误、来源和身份安全契约回归。
+if python3 -m pytest tests/contracts/test_b08.py -q; then
+  echo '  ✓ B08 契约回归通过'
+else
+  echo '  ✗ B08 契约回归失败' >&2
+  fail=1
+fi
+
 exit "$fail"

@@ -218,10 +218,10 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B08 | DONE（本地，待审查） | 迁移公共错误和来源契约 | Codex（后端） | `kongsc/b08-contracts` / `codex/a10-batch1@b801553` | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、生成物、`tests/contracts/test_b08.py`、相关规格与架构、本任务板、`docs/handoffs/codex-b08.md` | `tests/contracts/test_b08.py` 4 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b08.md` |
+| B08 | DONE（本地，审查问题已修复） | 迁移公共错误和来源契约 | Codex（后端） | `kongsc/b08-contracts` / `codex/a10-batch1@b801553` | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、生成物、`tests/contracts/test_b08.py`、`scripts/verify/contracts.sh`、相关规格与架构、本任务板、`docs/handoffs/codex-b08.md` | `tests/contracts/test_b08.py` 5 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例及 B08 回归）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b08.md` |
 
 - 输入：A10 批 1 的 OpenAPI 真源、ADR-010/011/012 与 A07 已确认的错误语义。
 - 输出：公共错误码闭集、同步与异步失败语义、已有 SourceRef 定位及四类关系约束的回归测试、更新的生成物。
 - 依赖：A10 批 1 已完成；B05 后端运行时尚未进入本基线，B08 只改契约。
-- 风险：新增枚举值需下游按未知码兜底；BUDGET_EXCEEDED 的 HTTP 状态由本任务定为 429。
+- 风险：新增枚举值需下游按未知码兜底；BUDGET_EXCEEDED 的 HTTP 状态由本任务定为 429，并在共享 429 响应中与可重试的 RATE_LIMITED 区分。
 - 验证：`python -m pytest tests/contracts/test_b08.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
