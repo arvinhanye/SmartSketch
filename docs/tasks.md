@@ -190,3 +190,15 @@
 | A08 | IN REVIEW（R01～R14 第 3 轮复审通过；待 §7 产品签收） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（`claude/codex-a08-check-0ae6d7@acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
 
 - A08 输入：S2 §6.4.7、A04/ADR-012、A02 掌握枚举、Claude 第 1 轮 R01～R10 与第 2 轮 R11～R14 报告、第 3 轮复审、已签收 ADR-014。输出：修订后的可学/评分/跨版本读时继承与批量写入规格；进度接口有效/原始状态及来源提案；B12/I05 的 Markdown 与 JSON 验收同步。依赖：ADR-014 已随 `origin/main@6881ffe` 集成，B12 需在 YAML 真源落地进度响应字段；风险与待决：缺值、权重来源、展示上限、进度响应字段名及 `updated_at` 语义，以及显式降级覆盖继承与谱系存放位置均见 `specs/learning-path.md` §7；R15 未在本轮修订，未改 DTO、仓储或发布快照格式。验证命令：`./scripts/verify.sh`、`git diff --check`、`python3 -m json.tool docs/atomic-tasks.json > /dev/null` 及两项 grep，实际结果见交接。
+
+## A10 批 0：规划文档对齐
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10-批0 | DONE（本地，待审查） | 按 ADR-016 更新契约任务白名单并补齐 G-1～G-6 清单缺口 | Codex（协调） | `codex/a10-batch0` / A10 `37da669`，已合入 `origin/main@f9dfc8f` | `docs/atomic-task-plan.md`、`docs/atomic-tasks.json`、`docs/reviews/validate_atomic_plan.py`、本任务板、`docs/handoffs/codex-a10-batch0.md` | 140 项清单校验 PASS；无环、路径与链接检查 PASS；基础 verify PASS；负例（缺依赖）被拒；`docs/handoffs/codex-a10-batch0.md` |
+
+- 输入：A10/ADR-016 的导入映射第 3 节批 0 与第 6 节 G-1～G-6；ADR-004 YAML 真源裁定；A05/ADR-013 身份与票据规则。
+- 输出：B08～B14、O02、O05 的 YAML 真源与生成物白名单；新增 C13～C16、F14、H12、K13～K19 共 13 个叶子任务；验证器动态计数并可在当前 checkout 运行。
+- 依赖：A10 决定已签收；批 1 必须在批 0 验收后开始。
+- 风险：A10 本身尚未进入远端 `main`；本轮只在独立分支工作，不改动 B02/B06 工作区。新增任务均为计划，未声称实现。
+- 验证：`python docs/reviews/validate_atomic_plan.py`、负例、`./scripts/verify.sh`、`git diff --check`。
