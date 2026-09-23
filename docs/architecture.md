@@ -34,10 +34,16 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 ## 后端启动与健康检查（B05）
 
-- `src/backend/app/main.py` 暴露 `create_app()` 与 `app`，将路由注册到 FastAPI。创建应用和导入模块时不连接数据库、模型服务或外部网络，也不要求密钥；环境变量的类型化读取与校验由 B06 接续。
+- `src/backend/app/main.py` 暴露 `create_app()` 与 `app`，将路由注册到 FastAPI。创建应用和导入模块时不连接数据库、模型服务或外部网络；B06 从环境变量读取并校验设置，默认 fake 模式不要求真实模型密钥，非法配置使应用创建失败。
 - `GET /health` 是无鉴权的根路径，返回 HTTP 200 和 JSON 对象 `{"status": "ok", "version": "<非空版本字符串>"}`。它只表示 API 进程可响应，不表示 Neo4j、SQLite 或模型服务就绪。响应形状沿用待 A10 导入的 `src/contracts/api.v1.yaml` 现有定义，不新增契约真源。
 - 健康检查不接受写入方法；未知或带 `/api/v1` 前缀的健康路径不注册。B05 的测试须覆盖响应、路径边界、错误方法，以及应用工厂无网络副作用。
 - `src/backend/app/api/health.py` 中的最小响应模型是契约生成物尚未导入 main 时的 B05 过渡实现。A10/B14 接续导入并生成真源 DTO 后，应按 ADR-004 改为消费生成模型，避免手写公共 DTO 长期存在。
+
+## 后端设置与启动校验（B06）
+
+- `src/backend/app/config.py` 定义只从环境变量构造的类型化 `Settings`；`create_app()` 在创建 FastAPI 对象前执行校验，并把设置放入 `app.state.settings`。校验本身不连接外部服务，也不读取 `.env` 文件。
+- 数值范围、URL、模型模式与条件必填按 `docs/integrations.md`「启动校验」和 `specs/task-processing.md` §8.8 执行；非法配置只报告变量名。密钥使用 Pydantic `SecretStr`，设置对象的 `repr` 不含明文。
+- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`；运行时向量空间与已存记录的一致性检查留给数据库及向量层接入任务。
 
 ## 契约真源与生成物（ADR-004）
 

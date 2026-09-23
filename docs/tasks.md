@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
 | M0-02 | TODO | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | 待补充 |
-| M0-03 | IN PROGRESS（B05；B06 待做） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05 见下方认领行；B06 设置加载尚未完成 |
+| M0-03 | DONE（B05+B06） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05/B06 测试 38 PASS；基础 verify PASS；`docs/handoffs/codex-b05.md`、`docs/handoffs/codex-b06.md` |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
 
@@ -173,3 +173,16 @@
 - 风险：当前主分支尚无契约真源或数据库实现；本任务的健康检查只表示 API 进程可响应，不探测 Neo4j、SQLite 或模型服务。
 - 验证：`python -m pytest tests/backend/test_b05.py -q`（本机 Windows 的 `python3` 等价命令）3 PASS；`./scripts/verify.sh` PASS；`git diff --check` PASS；Uvicorn HTTP 冒烟 200，响应含 `status` 与 `version`。详细命令、版本和限制见交接。
 - B05 只完成后端最小启动与健康检查；父任务 M0-03 的 B06 设置加载仍待完成。A10 导入契约真源后，生成 DTO 应替换 B05 的临时响应模型。
+
+## B06 后端设置加载与启动验证
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B06 | DONE | 从环境变量加载类型化设置并在启动时校验 | Codex（后端） | `codex/b06-settings` / base `e8ce796` | `src/backend/app/config.py`、`tests/backend/test_b06.py`；范围扩展：`src/backend/app/main.py`（接入启动校验）、`src/backend/README.md`、`docs/architecture.md`、`docs/integrations.md`、`.env.example`（登记发布锁参数）、本任务板、`docs/handoffs/codex-b06.md` | B06 35 PASS、B05 回归 3 PASS、基础 verify PASS；见 `docs/handoffs/codex-b06.md` |
+
+- 输入：A07 环境变量表及启动校验规则、A03/A06 任务配置、ADR-012 发布锁参数、B05 应用工厂。
+- 输出：只读环境变量的类型化设置、非法值拒绝启动、密钥脱敏、fake 模式无真实模型凭据可启动。
+- 依赖：B05、A07 已完成；真实模型供应商取值 D-02a～f 待签收，不影响 fake 验证。
+- 风险：既有 `.env.example` 未登记 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS`；本轮同步补齐，不改变已签收的默认值。
+- 验证：`python -m pytest tests/backend/test_b06.py -q`、B05 回归、`./scripts/verify.sh`、`git diff --check`。
+- 实际结果：B06 35 PASS、B05 回归 3 PASS；默认 fake、合法 live、非法范围与条件、密钥脱敏、应用导入时拒绝非法配置均有实际测试；基础 verify 与 diff check exit 0。D-02 真实模型取值仍待签收。
