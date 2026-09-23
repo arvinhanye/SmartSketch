@@ -153,3 +153,10 @@
 - A05 的决定（ArvinHan，2026-09-23 签收）：本地账号登录，演示账号由种子脚本创建、口令只来自环境变量，无注册端点；调用者身份只来自已验证的令牌，不读请求中的 `user_id`；`users.role` 只决定首页和能否建课，课程内授权只看 `course_members.role` 并每次回查；教师按用户名添加学生；进度、推荐、问答仅学生成员可用，教师不开放；SSE 改用一次性票据（Codex S07-R07、A03 移交项）。
 - A05 交出的后续项（均未认领）：**B08 / B09 / B10** 按 `specs/identity-access.md` §7 改契约（`my_role`、成员三操作、票据端点与安全方案、补 `401`）；**原子清单缺口**：登录端点与令牌签发、账号命令行与演示种子、成员管理 API、成员管理页面、票据申领端点，清单均无承接任务，需协调 Agent 拆分编号；`event_tickets` 表补登命名基线交 **A10**（`docs/architecture.md` 现由 A04 持锁）；`AUTH_JWT_SECRET` 等三个变量写入 `.env.example` 交 **A07 或 C03**。
 - ADR 编号：ADR-010、011、012 分别由 A03、A06、A04 使用（PR #5、#6、#7；A04 原与 A03 同撞 010，已改用预留的 012），A05 取 013。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A04-R01/R02 修复 | DONE（ADR-012 修订 1 已签收） | 修复 Codex 审查 A04-R01（历史版本只按 `material_id` 过滤会检索到后来的文本块）与 A04-R02（换向量模型后幂等发布与回滚规则冲突） | Claude（协调 Agent） | `.claude/worktrees/a04-f5f479`（分支 `claude/a04-r01-r02-fix`）/ base `0630664` | `specs/teacher-review-publish.md`、`docs/decisions.md`（ADR-012 修订 1）、`docs/architecture.md`、`docs/tasks.md`、`docs/handoffs/claude-a04.md`；**范围扩展**：`specs/task-processing.md` §8.4 `parsing` 行与 §8.6 删除规则（块 ID 与删除保护，A06 条文）、`docs/integrations.md` 两处「重新向量化」（A07 条文） | 规格 V2/V3/V5/V6/V8/V10 修订、新增 V12 与 PUB-28～34；ADR-012 修订 1（决定 9～12）；A06 §8.4/§8.6 与 A07 两处已改并加注；核对脚本 55 项 ALL PASS，三个篡改副本 exit 1；`./scripts/verify.sh` exit 0、`git diff --cached --check` exit 0；`docs/handoffs/claude-a04.md` 第十节 |
+
+- A04-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-012 修订 1）：文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID 且不可变，快照固定修订列表，检索按 `revision_id` 过滤；失败任务的来源块加删除保护；运行时只有一个向量空间，换模型须停机离线重新向量化全部文本块、草稿与已提交版本，配置与记录不一致即拒绝启动。
+- 交出的后续项（均未认领）：**A10** 在清单中为「重新向量化命令」补登叶子任务；**C06/C07** 定义「下线旧资料修订」；**B06/D09/D10/C09/D11/E07/F03** 按 ADR-012 修订 1 的实现依赖落实。

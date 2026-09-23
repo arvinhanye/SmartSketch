@@ -1,6 +1,6 @@
 # 功能规格：教师审核与图谱发布
 
-- **状态**：DRAFT。「图谱版本与跨库发布协议」一节由 A04 提交，**ADR-012 已签收**（ArvinHan，2026-09-23）；节点加锁、并发编辑、审核队列排序等仍是桩（见「待细化」）
+- **状态**：DRAFT。「图谱版本与跨库发布协议」一节由 A04 提交，**ADR-012 已签收**（ArvinHan，2026-09-23；修订 1 修复 Codex A04-R01/R02，同日签收）；节点加锁、并发编辑、审核队列排序等仍是桩（见「待细化」）
 - **负责人**：产品 / 后端 / 前端共同维护
 - **关联任务**：M1-05；A04（版本与发布协议）；实现方 B08、B11、C01、F02、F03、G01～G07、H10、I01、J01
 - **底稿**：本文件以 `claude/worktree-contract-conflicts-740adb` `978671e` 的同名草稿桩为底稿（与 `209be9` 同文），保留原有章节与验收编号。A10 导入时以本文件为准，不再合入桩的旧文本。
@@ -88,7 +88,7 @@
 | `node_count`、`edge_count`、`excluded` | 统计；`excluded` 见 V3 |
 | `draft_revision` | 建快照时读到的草稿修订号（仅发布） |
 | `task_watermark` | 建快照时读到的任务水位（仅发布；A03 §3） |
-| `embedding_model`、`embedding_dim` | 本版本知识点向量的模型标识与维度 |
+| `embedding_space` | 本版本知识点向量所在的向量空间（V12）；重新向量化后随之更新 |
 | `failure_reason`、`cleanup_pending` | 失败原因；Neo4j 清理未完成时为真 |
 | `created_by`、`created_at`、`committed_at` | 审计 |
 
@@ -108,7 +108,10 @@
 
 - 知识点、关系、章节都带 `course_id` 与 `version_id`。约束：`(course_id, version_id, kp_id)` 唯一（章节同理）；关系在同一版本内按 `rel_id` 唯一。约束迁移归 F03。
 - `kp_id`、`rel_id`、`chapter_id` **跨版本不变**：发布只复制，不改 ID。
-- 文本块节点（标签名 `SourceChunk` / `Chunk` 待 A10 统一）**不带 `version_id`，由所有版本共享**。它们由 `parsing` 按确定性 ID 写入后不再修改；A06 §8.6 规定到达 `awaiting_review` 的任务的来源块永久保留。每个版本以自己的 `EVIDENCE` 边从知识点指向文本块；关系的来源以文本块 ID 列表属性保存。
+- 文本块节点（标签名 `SourceChunk` / `Chunk` 待 A10 统一）**不带 `version_id`，由所有版本共享**，每个文本块带所属的 `revision_id`。每个版本以自己的 `EVIDENCE` 边从知识点指向文本块；关系的来源以文本块 ID 列表属性保存。
+- **资料修订**：`(material_id, 内容哈希, 解析器版本)` 确定一个修订，由此确定性生成 `revision_id`。文本块 ID 由「`revision_id` + 块序号」确定性生成（修订 A06 §8.4 的原公式「文档 ID + 解析器版本 + 块序号」）：同一任务重跑、或同内容同解析器再处理，得到同 ID 同文本；内容或解析器版本变化即新 ID。
+- **文本块不可变**：一个文本块 ID 的原文与定位一经写入永不改变。写入已存在的 ID 时比对内容哈希，不一致即拒绝写入并报错（只可能是实现缺陷）。
+- **文本块删除保护**（修订 A06 §8.6）：失败或取消任务的来源块，只有当其修订不属于任何已到 `awaiting_review` / `completed` 的任务、也不在任何 `committed` 版本的修订列表中时才删除；否则保留。
 - 已发布副本**只含快照字段 + 知识点向量 + 作用域字段**，不复制置信度、审核状态、锁等草稿元数据。
 - 所有业务查询必须同时以 `course_id` 和 `version_id` 为参数；`version_id = "draft"` 只能出现在教师鉴权通过的路径上（F02 验收）。
 
@@ -116,7 +119,7 @@
 
 **发布集合**：
 
-1. 资料：本课程中任务已到 `awaiting_review` 或 `completed`、且 T6 提交序号 ≤ 本次任务水位的资料（A03 §3）。水位以外的资料整体不在本版本内。
+1. 资料修订：本课程中任务已到 `awaiting_review` 或 `completed`、且 T6 提交序号 ≤ 本次任务水位的任务所产生的**全部**资料修订（A03 §3）。水位以外的修订整体不在本版本内。同一资料的旧修订只要仍满足本条就仍在版本内；下线旧修订见「待细化」。
 2. 知识点：`status ∈ {draft, approved}`。`low_confidence` 与 `rejected` 排除。
 3. 关系：`status ∈ {draft, approved}`，且两个端点都在第 2 条的集合内。端点因 `low_confidence` 或 `rejected` 被排除的关系**连带排除**。
 4. 章节：发布集合中知识点引用到的章节。
@@ -130,7 +133,7 @@
 | --- | --- |
 | `cycle` | 发布集合中的 `PREREQUISITE` 成环，附环路（ADR-009 / DAG-11） |
 | `dangling_endpoint` | 关系端点在草稿中根本不存在（区别于被排除，属草稿不变量被破坏） |
-| `invalid_source_ref` | 来源引用的文本块不存在、不属于本课程，或其资料不在第 1 条的集合内 |
+| `invalid_source_ref` | 来源引用的文本块不存在、不属于本课程，或其 `revision_id` 不在第 1 条的修订集合内 |
 | `empty_graph` | 发布集合没有任何知识点 |
 
 `details` 的具体结构由 B11 写入真源。「manual 条目是否必须有来源」不在本协议裁定；本协议只要求已有引用全部有效。
@@ -141,7 +144,8 @@
 {
   "snapshot_format": 1,
   "course_id": "c_01",
-  "materials": [{"material_id": "m_01", "content_hash": "sha256:…"}],
+  "revisions": [{"revision_id": "rev_01", "material_id": "m_01",
+                 "content_hash": "sha256:…", "parser_version": "…"}],
   "chapters": [{"chapter_id": "ch_01", "title": "…", "order": 1, "parent_id": null}],
   "nodes": [{"kp_id": "kp_01", "name": "…", "aliases": ["…"], "type": "concept",
              "definition": "…", "difficulty": 0.4, "importance": 0.8,
@@ -153,9 +157,9 @@
 
 - 只含**学生可见的内容字段**。字段清单以 B11 迁移后的 `KnowledgePoint` / `Relation` / `Chapter` 为准；今后新增学生可见字段必须同时加入快照，并把 `snapshot_format` 加 1。
 - **不含**：`status`、`confidence`、锁、`source`（`ai`/`manual`）、修订号、时间戳、向量，以及可由图推导的字段（`level`、统计）。因此教师只点「通过」而内容不变时，摘要不变。
-- `materials` 纳入摘要：只新增资料、不改图，也会产生新版本，因为问答可检索的范围变了。
+- `revisions` 纳入摘要：只新增资料或再处理出新修订、不改图，也会产生新版本，因为问答可检索的范围变了。尚无任何实现，修订 1 直接修订格式 1，`snapshot_format` 不升号。
 
-**规范化与摘要**：UTF-8；对象键按字典序；紧凑分隔符（无空白）；不转义非 ASCII；空值显式写 `null`，不省略键；`materials`、`chapters`、`nodes`、`edges` 分别按各自 ID 升序；集合语义的数组（`aliases`、`source_refs`）去重后升序；数值按存储值原样输出。摘要 = `sha256:` + 规范化字节的 sha256。快照本身就以规范形态存储，读出即可复算摘要。`snapshot_format` 变化会使摘要变化，升级后的首次发布即使内容相同也产生新版本，这是预期行为。
+**规范化与摘要**：UTF-8；对象键按字典序；紧凑分隔符（无空白）；不转义非 ASCII；空值显式写 `null`，不省略键；`revisions`、`chapters`、`nodes`、`edges` 分别按各自 ID 升序（`revisions` 按 `revision_id`）；集合语义的数组（`aliases`、`source_refs`）去重后升序；数值按存储值原样输出。摘要 = `sha256:` + 规范化字节的 sha256。快照本身就以规范形态存储，读出即可复算摘要。`snapshot_format` 变化会使摘要变化，升级后的首次发布即使内容相同也产生新版本，这是预期行为。
 
 ### V4 草稿写入与课程写锁
 
@@ -185,9 +189,9 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | P4 | 持锁读取：`draft_revision` 记为 r；当前最大 T6 提交序号记为任务水位 w；按 V3 读取发布集合，知识点向量读入内存 | SQLite + Neo4j | 读失败 → 释放锁，尝试行 `failed`，5xx |
 | P5 | 释放课程写锁 | SQLite | 释放失败无妨，锁到期自动失效 |
 | P6 | 按 V3 校验 | 内存 | 409 `PUBLISH_BLOCKED`，尝试行 `failed` |
-| P7 | 生成快照与摘要。**摘要等于当前发布版摘要** → 幂等路径（见下）；否则写入尝试行的 `snapshot_json`、`digest`、`draft_revision=r`、`task_watermark=w`、统计与向量模型 | SQLite | 写失败 → 尝试行 `failed`（写不进去则由清扫收尾），5xx |
+| P7 | 生成快照与摘要。**摘要等于当前发布版摘要，且当前发布版的 `embedding_space` 等于当前向量空间** → 幂等路径（见下）；摘要相等而空间不等说明 V12 的不变式被破坏，5xx 并告警，不走幂等；否则写入尝试行的 `snapshot_json`、`digest`、`draft_revision=r`、`task_watermark=w`、统计与 `embedding_space` | SQLite | 写失败 → 尝试行 `failed`（写不进去则由清扫收尾），5xx |
 | P8 | 物化：在**一个 Neo4j 写事务**内按快照与内存向量创建 `(course_id, version_id)` 下的章节、知识点、关系与 `EVIDENCE` 边 | Neo4j | C1 |
-| P9 | 核对：读回 `(course_id, version_id)` 复算摘要，必须等于 P7；向量数 = 知识点数，维度与模型等于当前配置 | Neo4j | C1 |
+| P9 | 核对：读回 `(course_id, version_id)` 复算摘要，必须等于 P7；向量数 = 知识点数，且全部属于当前向量空间（V12），维度等于该空间维度 | Neo4j | C1 |
 | P10 | 尝试行 `state=materialized` | SQLite | C1 |
 | P11 | **提交点**，一个 SQLite 事务（见下） | SQLite | C1 |
 | P12 | 停止心跳，返回 200 `PublishResult{version, published_at, stats, excluded, unchanged:false}` | — | — |
@@ -216,9 +220,9 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | --- | --- | --- |
 | R1 | 鉴权：本课程教师 | 403 |
 | R2 | 在本课程内查 `version = k AND state = committed` 的行 | 404 `NOT_FOUND`。查询按 `course_id` 限定，他课版本号同样 404，不泄露存在性 |
-| R3 | k 的摘要等于当前发布版摘要 → 200 `PublishResult{version: 当前版本, unchanged: true}`，不产生版本号。覆盖「回滚到当前版本」与「回滚到内容相同的旧版本」 | — |
-| R4 | 插入尝试行 `kind=rollback, source_version=k`，`snapshot_json`、`digest`、向量模型从 k 复制，`state=preparing`；开始心跳 | 409 `PUBLISH_IN_PROGRESS` |
-| R5 | 物化：在一个 Neo4j 写事务内把 `(course_id, k 的 version_id)` 复制到 `(course_id, 本尝试)`，**向量一并复制，不调用模型**；随后按 P9 核对并置 `materialized` | 源副本缺失 → C1 + 告警，5xx；**不得**静默重算向量。其他失败 → C1 |
+| R3 | k 的摘要等于当前发布版摘要（两者空间必然都等于当前空间，见 V12）→ 200 `PublishResult{version: 当前版本, unchanged: true}`，不产生版本号。覆盖「回滚到当前版本」与「回滚到内容相同的旧版本」 | — |
+| R4 | 插入尝试行 `kind=rollback, source_version=k`，`snapshot_json`、`digest`、`embedding_space` 从 k 复制，`state=preparing`；开始心跳 | 409 `PUBLISH_IN_PROGRESS` |
+| R5 | 物化：在一个 Neo4j 写事务内把 `(course_id, k 的 version_id)` 复制到 `(course_id, 本尝试)`，**向量一并复制，不调用模型**；复制前核对 **k 自身记录的** `embedding_space` 等于当前向量空间，随后按 P9 核对并置 `materialized` | 源副本缺失，或 k 的空间不等于当前空间（V12 不变式被破坏）→ C1 + 告警，5xx；**不得**静默重算向量。其他失败 → C1 |
 | R6 | 取课程写锁（有界等待），读 `draft_revision` 记为 r，按 V3 复算草稿发布集合的摘要 d，释放锁 | 等锁超时或读失败**不使回滚失败**：按 d 未知处理 |
 | R7 | 提交点：与 P11 的第 1、2 条相同；`published_from_revision = (d 等于新版本摘要 ? r : -1)`；**不执行 T7**（A03 §3：回滚不改变任务状态） | C1 |
 
@@ -237,13 +241,14 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 
 ### V8 读取绑定
 
-- **学生请求**（图谱、推荐、问答）在请求开始时**只读一次**发布指针，得到 `(version_id, version)`。此后所有 Neo4j 查询、引用解析、缓存键都用这个 `version_id`，请求途中不再读指针；响应带回 `graph_version`。实现集中在 G07 的版本解析器，图谱、推荐、问答共用。
+- **学生请求**（图谱、推荐、问答）在请求开始时**只读一次**发布指针，得到 `(version_id, version)` 及该版本的修订列表（版本不可变，修订列表可按 `version_id` 缓存）。此后所有 Neo4j 查询、引用解析、缓存键都用这个 `version_id`，请求途中不再读指针；响应带回 `graph_version`。实现集中在 G07 的版本解析器，图谱、推荐、问答共用。
 - **从未发布**：学生请求返回 404 `GRAPH_NOT_PUBLISHED`，不是空图谱。
 - **`?version=n`**：教师与学生都可以读取本课程任一 `committed` 版本；n 不存在、未提交或属他课 → 404 `NOT_FOUND`。省略时教师读草稿，学生读发布指针。**草稿只有教师能读。**
 - **长请求**：MVP 不回收任何 `committed` 版本，请求绑定的版本在处理期间不会消失。将来引入回收时，保留期必须长于最长请求时长，且不得回收当前指针指向的版本；这是回收功能的前置条件，须另立 ADR。
 - **向量检索**：
   - 知识点向量随版本复制，查询后按 `course_id` 与 `version_id` 过滤；
-  - 文本块向量共享，查询后按 `course_id` 过滤，并只保留 `material_id` 属于该版本 `materials` 的文本块；
+  - 文本块向量共享，查询后按 `course_id` 过滤，并只保留 `revision_id` 属于该版本修订列表的文本块。不按 `material_id` 过滤：同一资料可能有版本之外的新修订（Codex A04-R01）；
+  - 查询向量按当前向量空间计算；运行时只存在一个空间（V12）；
   - Neo4j 向量索引做不到先过滤再检索，因此采用「多取再过滤」，取多少由 J01 实测召回后确定。
 - **跨版本对应**：`kp_id`、`rel_id` 跨版本不变。进度如何在版本间对应、节点删除或改名后如何处理，归 A08；问答日志记录 `version_id`，引用撤回协议归 A09。
 
@@ -270,6 +275,9 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | A10 | 文本块标签名；本文件替换 `740adb`/`209be9` 的桩 | 导入批次 |
 | K10 备份恢复 | 两库恢复时间点对齐；按快照重建缺失副本 | K10 |
 | G02 | 原计划的 `preparing/ready` 两态改为本节的 `preparing/materialized/committed/failed` | G02 |
+| A06 来源块（ADR-011） | 块 ID 改由 `revision_id` + 块序号生成；失败/取消任务的来源块按 V2 删除保护保留 | 修订 1 修订 ADR-011 决定 5、7 的对应部分；`specs/task-processing.md` §8.4 `parsing` 行与 §8.6 已改并加注 |
+| A07 向量空间 | 换空间按 V12 离线重新向量化，不产生新内容版本 | `docs/integrations.md` 两处已改 |
+| B06 / D09 / D10 / E07 / F03 | B06 启动门禁；D09/D10 按修订生成块 ID 并检查不可变；E07 按文本哈希缓存向量；F03 允许新旧空间属性与索引并存 | 各任务实现 |
 
 ### V11 验收（PUB-n）
 
@@ -294,6 +302,9 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
   - **PUB-15**（G06）回滚不动草稿：草稿有未发布修改时回滚 → 草稿不变，状态 `revising`；草稿与新版本内容相同时回滚 → 状态 `published`。
   - **PUB-16**（G06）R6 等锁超时 → 回滚照常成功，状态为 `revising`；随后发布走幂等路径纠正为 `published`（草稿确与新版本相同时）。
   - **PUB-17**（J01）问答检索 v1 时，v1 之后才上传的资料的文本块不进入候选；知识点向量只命中 v1 副本。
+  - **PUB-28**（D10、J01）v1 发布后同一资料换内容再处理，新任务到 `awaiting_review`、v2 未发布 → v1 检索不到新修订的任何文本块；v1 引用的旧文本块原文与定位不变（Codex A04-R01 回归）。
+  - **PUB-29**（D10、J01）同一资料内容不变、解析器版本升级后再处理 → 产生新修订与新块 ID；v1 检索结果不变。
+  - **PUB-30**（D10）同内容同解析器再处理 → 块 ID 与原文完全相同，不新增文本块；向已存在的块 ID 写入不同内容 → 拒绝并报错。
 - 失败路径
   - **PUB-18**（G05）在 P7、P8、P9、P10、P11 分别注入失败 → 每次都满足：发布指针不变，学生仍读旧版本；Neo4j 中没有该尝试的 `version_id` 残留（或 `cleanup_pending = true` 且清扫后没有）；尝试行为 `failed`；任务状态不变。
   - **PUB-19**（G05）进程在 P8 之后、P11 之前崩溃 → 尝试租约到期后清扫执行 C1；指针不变；此后可再次发布。
@@ -301,10 +312,30 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
   - **PUB-21**（G04）并发发布：同一课程两个发布同时发起 → 一个成功，另一个 409 `PUBLISH_IN_PROGRESS`；发布与回滚并发同理。
   - **PUB-22**（F08、G04）发布 P3～P5 持锁期间教师编辑 → 编辑等待；超过 `COURSE_LOCK_WAIT_SECONDS` 返回 409 `COURSE_BUSY`，`details.holder = publish`；P5 之后（物化期间）编辑立即成功，且不进入本次快照。
   - **PUB-23**（G01、G04）发布集合含 `PREREQUISITE` 环 → 409 `PUBLISH_BLOCKED`，`details.reasons` 含 `cycle` 与环路；不产生版本（与 DAG-11 一致）。
-  - **PUB-24**（G01）来源引用指向他课文本块或水位外资料的文本块 → 409 `PUBLISH_BLOCKED`，`invalid_source_ref`；发布集合为空 → `empty_graph`。
+  - **PUB-24**（G01）来源引用指向他课文本块，或所属修订不在本次修订集合内的文本块 → 409 `PUBLISH_BLOCKED`，`invalid_source_ref`；发布集合为空 → `empty_graph`。
   - **PUB-25**（G06）回滚到不存在的版本、`failed` 尝试或他课版本号 → 404 `NOT_FOUND`，无任何写入。
   - **PUB-26**（G06）回滚源版本的 Neo4j 副本缺失 → 回滚失败并告警；不调用向量模型，指针不变。
   - **PUB-27**（F02）任一学生读路径的 Cypher 缺少 `version_id` 参数，或以 `"draft"` 作参数 → 仓储层拒绝执行。
+  - **PUB-31**（C09、D11）处理同一修订的另一任务失败或取消 → v1 固定的文本块不被删除；修订未被任何进入审核的任务或已提交版本使用时才删除。
+  - **PUB-32**（B06）`EMBEDDING_MODEL` 或 `EMBEDDING_DIMENSIONS` 改变而未重新向量化 → API 与 worker 均拒绝启动，并指出记录空间、配置空间与需运行的命令（Codex A04-R02 回归前半）。
+  - **PUB-33**（E07、F03、G04、G06）M1 下发布 v1、v2 后重新向量化到 M2 → 所有版本行 `embedding_space = M2`；内容未变再发布走幂等；回滚到 v1 成功且不调用模型；用 M2 查询能检索到 v1、v2 的结果（Codex A04-R02 回归后半）。
+  - **PUB-34**（E07、F03）重新向量化中途失败（向量调用失败或 Neo4j 写失败）→ 当前空间仍为 M1，旧索引与旧向量完好，用 M1 配置可正常启动与检索；重新运行复用已算好的向量并完成切换。
+
+### V12 向量空间切换（重新向量化）
+
+> 修订 1 新增（Codex A04-R02）。**向量空间** = `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`（A07「模型版本与向量空间」）。向量是内容的派生数据，不在摘要内；重算向量不改变任何版本的内容，也不产生新版本。
+
+- **单一空间不变式**：运行时只有一个当前向量空间，所有文本块、草稿知识点与全部 `committed` 版本的知识点副本都在这个空间里。SQLite 记录当前空间（单行），版本行记录 `embedding_space`。
+- **启动门禁**（B06）：API 与 worker 启动时比对配置空间与记录空间。不一致 → 拒绝启动，指出两边的值并提示运行重新向量化命令；尚无记录（首次启动）→ 写入配置空间。运行时不切换空间。
+- **重新向量化命令**（离线）：
+  1. 前置条件同 A06 §8.7：没有未过期的任务租约、课程写锁或发布尝试，先停 API 与 worker；执行前备份 SQLite（`VACUUM INTO` + `integrity_check`）与 Neo4j（K10 流程）。
+  2. 为新空间建独立的向量属性与索引；**切换前不改动旧空间的属性与索引**。属性与索引的命名由 F03/E07 定，必须能与旧空间并存。
+  3. 按新空间计算并写入：已到 `awaiting_review` / `completed` 的任务所产生的全部修订的文本块、草稿知识点、全部 `committed` 版本的知识点副本。按文本哈希去重，同一段文字只算一次；已写入的向量在重跑时复用。调用记入 `model_calls`，不计入预算（A07）。
+  4. 核对：每个目标都有新空间向量，维度等于新空间维度，数量与目标集合一致。
+  5. 一个 SQLite 事务内把当前空间改为新空间，并把全部 `committed` 版本行的 `embedding_space` 改为新空间。**这是切换的唯一提交点。**
+  6. 删除旧空间的索引与属性；失败可重试，不影响新空间。
+  7. 第 5 步之前任何失败：记录空间仍是旧空间，用旧配置可照常启动；修正后重新运行。
+- **与发布、回滚的关系**：P7 幂等路径与 R3 只在「摘要相等且空间相同」时成立；P9 与 R5 核对的都是版本自己的 `embedding_space` 与当前空间。启动门禁保证这些条件在正常运行中恒成立；一旦不成立即视为不变式被破坏，按 5xx 告警处理，不静默拒绝回滚，也不走幂等返回。
 
 ## 验收条件
 
@@ -339,6 +370,7 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 
 - ~~快照的存储形态~~：已由 A04 定为「SQLite 规范化快照为真相 + Neo4j 按版本物化副本」，全量保存、MVP 不回收（V2、V8，ADR-012）。
 - ~~回滚是否产生新版本号~~：前滚，产生新号；回滚到当前版本幂等（V6）。
+- **下线旧资料修订**：资料换内容再处理后，旧修订只要仍在发布集合第 1 条的范围内，新旧两份原文都可被检索。若需要让教师下线旧修订（及引用它的来源），须另定操作与规则，归 C06/C07。
 - **加锁的粒度**：整个节点、单个字段，还是节点加其关系？教师只改了定义，是否连带锁住难度字段？
 - **解锁方式**：教师显式解锁，还是有过期策略。
 - **并发编辑冲突策略**：B11/F08 的 `expected_revision`（节点级乐观锁）。与 V4 的课程写锁互补：写锁只保证单次写入与发布互斥，不解决两名教师先后覆盖同一字段。

@@ -116,9 +116,47 @@ rm <本 worktree>/specs/teacher-review-publish.md <本 worktree>/docs/handoffs/c
 - 因此在本分支 `git merge --no-ff origin/claude/a06-worker-lease` 并解决冲突：ADR 按 010、011、012 排列；PLAN-D02 取本任务版本、PLAN-D03 取 A03/A06 版本；认领行按 A03、A06、A04 排列；架构文档数据模型取 A06 的 SQLite 清单并补本任务的 `GraphVersion`/`Course` 说明。#5、#6 以普通 merge commit 合入 main 后，#7 可无冲突合并。
 - **范围扩展（两行注记）**：A06 规格改为直接进入 main、不再经 A10 导入，因此在 `specs/task-processing.md` §8.5「只有两处持锁」下与 `docs/decisions.md` ADR-011 引言各加一行指向 ADR-012 的修订注记，正文未改；ADR-012「后果」与规格 V10 同步改写。
 
-## 附录：`check_a04.py`（核对脚本全文）
+## 十、第二轮：Codex 审查修复（A04-R01 / A04-R02）
 
-用法：`python3 check_a04.py <spec> <api.v1.yaml> <A03 task-processing.md> <A06 task-processing.md> <全部 ADR 文本> <architecture.md> <decisions.md>`；依赖 PyYAML。源文件导出方式：`git show 978671e:src/contracts/api.v1.yaml`、`git show 6345ce1:specs/task-processing.md`、`git show ab04053:specs/task-processing.md`；ADR 文本为遍历 `git branch -r` 后拼接各分支的 `docs/decisions.md` 与 `docs/decisions/*.md`。
+- **task_id**：A04-R01/R02 修复
+- **状态**：DONE。修复方案由 ArvinHan 于 2026-09-23 在会话中逐项选择并签收，记为 **ADR-012 修订 1**（决定 9～12）
+- **review_status**：ready_for_review
+- **worktree / 分支**：同上 worktree，分支 `claude/a04-r01-r02-fix`，base `0630664`（= 合入 #5～#9 后的 `origin/main`）
+- **审查报告**：主目录 `docs/reviews/codex-claude-a04-4b2ccb5-2026-09-23-0730z.md`（目标提交 `110f243` / `4b2ccb5`，尚未入库）
+
+**核对结论**：两条均成立，根因比报告更深。R01：A06 的块 ID 不含内容，同一资料换内容再处理会原地覆盖已发布版本引用的原文；失败任务按 A06 §8.6 删除来源块，也可能删掉处理同一内容的已发布块。R02：查询向量总按当前模型计算，换模型后所有旧空间向量（含当前发布版）都无法检索。
+
+| 编号 | 选择（用户签收） | 落点 |
+| --- | --- | --- |
+| R01 | 按资料修订固定：块 ID = `revision_id` + 块序号，文本块不可变；快照 `revisions` 取代 `materials`；检索按 `revision_id` 过滤；失败任务来源块加删除保护（否决：快照直接列全部 `chunk_id`） | 规格 V2、V3、V8、V10，PUB-17、24、28～31；A06 §8.4 `parsing` 行与 §8.6；ADR-011 引言加注 |
+| R02 | 离线全量重新向量化 + 启动门禁：运行时只有一个空间，向量是派生数据，重算不产生新版本（否决：只迁移当前版；运行时按需补算） | 规格 V2、V5、V6、V8、新增 V12，PUB-32～34；A07 `docs/integrations.md` 两处 |
+
+**范围扩展**：`specs/task-processing.md` 的两行（A06 条文）与 `docs/integrations.md` 的两处（A07 条文），各带修订注记；原因是修复必须改动块 ID 公式、删除规则与「换模型」的去向说明，只改 A04 规格会留下互相矛盾的条文。
+
+**验证**：
+
+```text
+./scripts/verify.sh                         exit 0
+git add … && git diff --cached --check      exit 0
+python3 check_a04.py（第二版，见附录）       正例 exit 0，55 项 ALL PASS
+  负例 A：检索改回按 material_id 过滤         exit 1
+  负例 B：P9 改回「等于当前配置」             exit 1
+  负例 C：删掉 PUB-33                        exit 1
+```
+
+脚本第二版首跑出现 4 项 FAIL，均为脚本自身问题并已修正：把 `EMBEDDING_*` 配置变量当成错误码；`### ADR-012 修订 1` 标题使 `## ADR-012` 子串计数为 2；架构签收行措辞已改；`task-processing.md` 状态表另有一行以 `` `parsing` `` 开头。规格本身未因此改动。第二版的 A03/A06 输入改用本分支 `specs/task-processing.md`（已含 A03/A06 正文）。
+
+**遗留**：
+- 「下线旧资料修订」未定义（规格「待细化」，交 C06/C07）：资料换内容后新旧原文都可检索。
+- 「重新向量化命令」在原子清单中没有对应叶子任务，交 A10 补登。
+- Codex 的 A06-R01/R02（图元素清理与 `cleanup_pending` 可见性）不在本轮范围，仍未修；A04 发布读取草稿的风险随之仍在。
+- 协议仍只有规格与验收用例，没有实现或自动化测试。
+
+**下一步**：请 Codex 按本轮提交复核 A04-R01/R02；修复另开一轮。
+
+## 附录：`check_a04.py`（核对脚本全文，第二版）
+
+用法与第一版相同：`python3 check_a04.py <spec> <api.v1.yaml> <A03 task-processing.md> <A06 task-processing.md> <全部 ADR 文本> <architecture.md> <decisions.md>`；第二版另读工作目录下的 `specs/task-processing.md` 与 `docs/integrations.md`，需在仓库根目录运行。
 
 ```python
 import re, sys, yaml
@@ -142,7 +180,7 @@ codes=set(sch['ErrorCode']['enum'])
 new={'PUBLISH_IN_PROGRESS','COURSE_BUSY'}
 ok(not (codes & new),'新错误码尚不存在于真源（交 B08 属实）')
 used=set(re.findall(r'`([A-Z][A-Z_]{3,})`',spec)) - {'PREREQUISITE','RELATED_TO','CONTAINS','EXAMPLE_OF','EVIDENCE','NULL','ULID'}
-config={'PUBLISH_LEASE_SECONDS','COURSE_LOCK_WAIT_SECONDS'}  # A07 配置变量，非错误码
+config={'PUBLISH_LEASE_SECONDS','COURSE_LOCK_WAIT_SECONDS','EMBEDDING_MODEL','EMBEDDING_DIMENSIONS'}  # A07 配置变量，非错误码
 unknown=used-codes-new-config
 ok(not unknown,f'规格中出现的大写错误码均在真源或声明的新增集合内 {sorted(unknown)}')
 rb=paths['/api/v1/courses/{cid}/versions/{version}/rollback']['post']['responses']
@@ -169,21 +207,42 @@ alla=open(adrs,encoding='utf-8').read()
 ok('ADR-010：任务生命周期' in alla and 'ADR-011：worker' in alla,'ADR-010/011 已被 A03/A06 占用')
 ok('## ADR-012' not in alla,'远端任何分支均未使用 ADR-012')
 d=open(dec,encoding='utf-8').read()
-ok(d.count('## ADR-012')==1 and '**签收**：ArvinHan 2026-09-23' in d,'本分支 ADR-012 唯一且已签收')
+ok(len(re.findall(r'^## ADR-012',d,re.M))==1 and '**签收**：ArvinHan 2026-09-23' in d,'本分支 ADR-012 唯一且已签收')
 # 5 规格结构
 pub=[int(x) for x in re.findall(r'\*\*PUB-(\d+)\*\*',spec)]
-ok(pub==list(range(1,len(pub)+1)) and len(pub)>=20,f'PUB 编号连续 1..{len(pub)}')
+ok(sorted(pub)==list(range(1,35)) and len(pub)==len(set(pub)),f'PUB 编号为 1..34 且不重复（实际 {len(pub)} 个）')
 for k in ['成功路径','边界路径','失败路径']:
     ok(k in spec.split('### V11')[1].split('## 验收条件')[0],f'V11 含{k}')
-ok(all(f'### V{i} ' in spec for i in range(1,12)),'V1～V11 齐全')
+ok(all(f'### V{i} ' in spec for i in range(1,13)),'V1～V12 齐全')
 main_acc=[int(x) for x in re.findall(r'^(\d+)\. ',spec.split('## 验收条件')[1].split('## 待细化')[0],re.M)]
 ok(main_acc==list(range(1,19)),'原桩主验收 1～18 编号保留')
 ok('ADR-012 已签收' in spec.split('\n')[2],'规格状态行标记已签收')
 a=open(arch,encoding='utf-8').read()
-ok('## 图谱版本与跨库发布（A04 / ADR-012）' in a and '**签收状态：已签收**，ArvinHan，2026-09-23（ADR-012）' in a,'架构文档 A04 节存在且已签收')
+ok('## 图谱版本与跨库发布（A04 / ADR-012）' in a and '**签收状态：已签收**，ArvinHan，2026-09-23（ADR-012，含修订 1）' in a,'架构文档 A04 节存在且已签收')
 ok('PREREQUISITE' in a,'架构文档仍含 PREREQUISITE（verify 依赖）')
 # 6 验收覆盖 A04 条款
 for term,label in [('读取绑定','图/向量读版本'),('向量检索','向量读版本'),('CAS','指针切换'),('C1 补偿','失败补偿'),('前滚','回滚编号')]:
     ok(term in spec,f'A04 验收条款「{label}」有落点：{term}')
+# 7 修订 1（A04-R01/R02）
+tp=open('specs/task-processing.md',encoding='utf-8').read()
+integ=open('docs/integrations.md',encoding='utf-8').read()
+ok('"materials"' not in spec and '"revisions"' in spec,'R01：快照以 revisions 取代 materials')
+v8=spec.split('### V8 ')[1].split('### V9 ')[0]
+ok('`revision_id` 属于该版本修订列表' in v8 and '不按 `material_id` 过滤' in v8,'R01：检索按 revision_id 过滤且明确不按 material_id')
+ok('其 `revision_id` 不在第 1 条的修订集合内' in spec,'R01：invalid_source_ref 按修订判定')
+row=[l for l in tp.splitlines() if l.startswith('| `parsing` |') and '来源块 ID' in l]
+ok(len(row)==1 and '资料修订 ID + 块序号' in row[0] and '文档 ID + 解析器版本 + 块序号' not in row[0],'R01：A06 §8.4 parsing 行已改为按资料修订生成块 ID')
+drow=[l for l in tp.splitlines() if l.startswith('| `failed` / `cancelled` 任务的来源块')]
+ok(len(drow)==1 and '则保留' in drow[0],'R01：A06 §8.6 删除保护已写入')
+ok('PUB-28' in spec and '换内容再处理' in spec and 'PUB-31' in spec,'R01：再处理与删除保护回归用例存在')
+ok('### V12 向量空间切换' in spec and '拒绝启动' in spec.split('### V12 ')[1],'R02：V12 存在且含启动门禁')
+p9=[l for l in spec.splitlines() if l.startswith('| P9 |')][0]
+ok('当前配置' not in p9 and '当前向量空间' in p9,'R02：P9 按当前向量空间核对')
+ok('k 自身记录的** `embedding_space`' in spec,'R02：R5 核对源版本自身空间')
+ok('且当前发布版的 `embedding_space` 等于当前向量空间' in spec,'R02：幂等路径要求空间相同')
+ok('`embedding_model`、`embedding_dim`' not in spec and '| `embedding_space` |' in spec,'R02：版本行以 embedding_space 取代模型与维度两字段')
+ok('生成新向量版本（A04）' not in integ and '生成新的向量版本（A04）' not in integ and integ.count('V12')>=2,'R02：A07 两处已指向 V12')
+ok('PUB-32' in spec and 'PUB-33' in spec and 'PUB-34' in spec,'R02：换模型回归用例存在')
+ok('### ADR-012 修订 1' in d and d.split('### ADR-012 修订 1')[1].split('## ADR-013')[0].count('**签收**：ArvinHan 2026-09-23')==1,'ADR-012 修订 1 存在且已签收')
 print('\nRESULT:', 'ALL PASS' if not fails else f'{len(fails)} FAIL'); sys.exit(1 if fails else 0)
 ```
