@@ -218,22 +218,22 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B08 | DONE（本地，待审查） | 迁移公共错误和来源契约 | Codex（后端） | `kongsc/b08-contracts` / `codex/a10-batch1@b801553` | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、生成物、`tests/contracts/test_b08.py`、相关规格与架构、本任务板、`docs/handoffs/codex-b08.md` | `tests/contracts/test_b08.py` 4 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b08.md` |
+| B08 | DONE（本地，审查问题已修复） | 迁移公共错误和来源契约 | Codex（后端） | `kongsc/b08-contracts` / `codex/a10-batch1@b801553` | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、生成物、`tests/contracts/test_b08.py`、`scripts/verify/contracts.sh`、相关规格与架构、本任务板、`docs/handoffs/codex-b08.md` | `tests/contracts/test_b08.py` 5 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例及 B08 回归）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b08.md` |
 
 - 输入：A10 批 1 的 OpenAPI 真源、ADR-010/011/012 与 A07 已确认的错误语义。
 - 输出：公共错误码闭集、同步与异步失败语义、已有 SourceRef 定位及四类关系约束的回归测试、更新的生成物。
 - 依赖：A10 批 1 已完成；B05 后端运行时尚未进入本基线，B08 只改契约。
-- 风险：新增枚举值需下游按未知码兜底；BUDGET_EXCEEDED 的 HTTP 状态由本任务定为 429。
+- 风险：新增枚举值需下游按未知码兜底；BUDGET_EXCEEDED 的 HTTP 状态由本任务定为 429，并在共享 429 响应中与可重试的 RATE_LIMITED 区分。
 - 验证：`python -m pytest tests/contracts/test_b08.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
 
 ## B09 课程与资料 REST 契约
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B09 | DONE（本地，待审查） | 迁移课程与资料 REST 契约 | Codex（后端） | `kongsc/b09-contracts` / `kongsc/b08-contracts@21253f8` | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b09.py`；文档为身份规格、任务板与 `docs/handoffs/codex-b09.md` | B09/B08 专项 8 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b09.md` |
+| B09 | DONE（本地，审查问题已修复） | 迁移课程与资料 REST 契约 | Codex（后端） | `kongsc/b09-contracts` / `kongsc/b08-contracts@21253f8`，已纳入 `15dacce` | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b09.py`、`scripts/verify/contracts.sh`；文档为身份规格、任务板与 `docs/handoffs/codex-b09.md` | B09/B08 专项 9 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例、B08 5 项及 B09 4 项）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b09.md` |
 
 - 输入：现有课程/资料 OpenAPI 路径、ADR-013 与 `specs/identity-access.md` §3～§7。
 - 输出：带课程内角色的 Course、成员管理 DTO 与 REST 操作、课程列表可见性及现有资料接口的错误响应契约。
-- 依赖：B08、A05 已完成；基于 B08 的已验证提交，不修改 B05 运行时文件。
+- 依赖：B08、A05 已完成；B09 分支已纳入 B08 审查修复 `15dacce`，不修改 B05 运行时文件。
 - 风险：B09 只定义协议，成员权限和课程过滤须由后续 C03/C04/C15 实现；当前基线 A10 批 1 尚待集成。
 - 验证：`python -m pytest tests/contracts/test_b09.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。

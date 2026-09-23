@@ -1526,7 +1526,7 @@
         }
       },
       "RateLimited": {
-        "description": "触发限流（`RATE_LIMITED`）",
+        "description": "请求受限：`RATE_LIMITED` 为限流，可按 `Retry-After` 重试；\n`BUDGET_EXCEEDED` 为预算耗尽，不重试，需等待额度恢复。\n",
         "content": {
           "application/json": {
             "schema": {

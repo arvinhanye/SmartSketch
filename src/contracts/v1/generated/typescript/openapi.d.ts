@@ -1120,7 +1120,9 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description 触发限流（`RATE_LIMITED`） */
+        /** @description 请求受限：`RATE_LIMITED` 为限流，可按 `Retry-After` 重试；
+         *     `BUDGET_EXCEEDED` 为预算耗尽，不重试，需等待额度恢复。
+         *      */
         RateLimited: {
             headers: {
                 [name: string]: unknown;

@@ -22,6 +22,16 @@ def test_shared_error_codes_cover_signed_off_domain_failures():
     assert len(codes) == len(SCHEMAS["ErrorCode"]["enum"])
 
 
+def test_chat_429_describes_rate_limit_and_budget_exhaustion():
+    chat = SPEC["paths"]["/api/v1/courses/{cid}/chat"]["post"]
+    response = chat["responses"]["429"]
+    assert response == {"$ref": "#/components/responses/RateLimited"}
+    description = SPEC["components"]["responses"]["RateLimited"]["description"]
+    assert "RATE_LIMITED" in description
+    assert "BUDGET_EXCEEDED" in description
+    assert "不重试" in description
+
+
 def test_source_ref_requires_a_real_location():
     source = SCHEMAS["SourceRef"]
     base = {"chunk_id": "chunk-1", "document_id": "doc-1"}
