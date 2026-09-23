@@ -21,13 +21,11 @@
 - **决定**：问答 API 要么返回至少一个可定位来源，要么返回 `NOT_COVERED`。
 - **后果**：检索、提示词和响应 DTO 都需要来源字段；引用校验纳入测试。
 
-## ADR-004：契约唯一真源与 ADR 编号裁定（**待签收**）
+## ADR-004：契约唯一真源与 ADR 编号裁定
 
-> **签收状态：未签收（PROPOSED）。** 决策人：技术负责人（见 `docs/tasks.md` 未决问题 PLAN-D01）。
-> 本条是原子任务 **A01** 提交的裁定建议与迁移映射，**不是已生效的团队决定**。签收前：
-> 不得以「已裁定」为由动工写 `src/contracts/` 的真源或生成物，也不得把本条结论复制进规格当成既定事实。
-> 签收方式：在本条末尾追加一行 `- **签收**：<姓名> <日期>`，并删除标题中的「（待签收）」。
-> 未签收不阻塞与契约真源无关的任务（例如 B01/B05 骨架、F05 纯函数、D02～D07 解析器）。
+> **签收状态：已签收（ACCEPTED）**，ArvinHan，2026-09-22。签收行见本条正文末尾。
+> 本条由原子任务 **A01** 提交，签收后成为生效的团队决定：接口变更第一步必须改 `src/contracts/api.v1.yaml`，清单中 `src/contracts/v1/python/*.py` 的候选路径按下方「清单路径映射」改读。
+> **签收范围**：本条关闭 PLAN-D01 中的「唯一源」与「ADR 编号」两项。PLAN-D01 的第三项「API 前缀」本条只记录现状 `/api/v1`，最终裁定仍属 A02，**不因本条签收而关闭**。
 
 - **日期**：2026-09-22
 - **背景**：main（`05d214c`）只有协作骨架，`src/contracts/` 下只有一份说明，没有任何机器可读契约。同日三个 Claude worktree 各自产出了互斥或重叠的契约成果，且其中两份都自称「唯一真源」：
@@ -46,7 +44,7 @@
   | --- | --- | --- | --- | --- |
   | A. Pydantic → OpenAPI → TS | 手写 `src/contracts/v1/python/` | 真源同时是 FastAPI 运行时校验模型，响应结构不可能偏离契约；不引入第三种语言 | `openapi.json` 要等 FastAPI 应用存在才能导出，而契约必须先于应用冻结；SSE 事件与图谱交换不在 OpenAPI paths 内，仍需单独导出 JSON Schema | 否决 |
   | B. 手写 OpenAPI YAML 双向生成 | `src/contracts/api.v1.yaml` | 语言中立；前端不等后端；人类可直接评审 | 首版的否决理由：后端仍要 Pydantic，生成后通常手改，于是「契约」与「运行时校验」是两份会漂移的产物 | 见 B′ |
-  | B′. B + Pydantic 也是生成物、禁止手改 | `src/contracts/api.v1.yaml` | 消掉 B 唯一的否决前提：Pydantic 由 `datamodel-code-generator` 生成，套用与前端生成物同一条规则（入库、禁改、`--check` 兜底）；SSE 事件与图谱格式直接从 `components/schemas` 摘成独立 JSON Schema | 新增两个开发期生成器依赖；生成物入库后可能与真源不同步，需门禁兜底 | **采纳（待签收）** |
+  | B′. B + Pydantic 也是生成物、禁止手改 | `src/contracts/api.v1.yaml` | 消掉 B 唯一的否决前提：Pydantic 由 `datamodel-code-generator` 生成，套用与前端生成物同一条规则（入库、禁改、`--check` 兜底）；SSE 事件与图谱格式直接从 `components/schemas` 摘成独立 JSON Schema | 新增两个开发期生成器依赖；生成物入库后可能与真源不同步，需门禁兜底 | **采纳** |
   | C. JSON Schema 为真源 | `src/contracts/v1/*.schema.json` | 对事件与交换文件表达力最好，两端都是生成方 | 不描述路径、方法、状态码与错误响应，REST 契约仍要第二份文档 | 否决 |
 
 - **为什么采纳 B′ 而不是清单默认的 Pydantic-first**（四条可核查依据）：
@@ -128,7 +126,7 @@
   - 本条只裁定「契约怎么表达、谁写、生成什么」。**不裁定**契约内容本身是否正确：`740adb` 的 R03/R04 修复（引用非空、事件判别联合）仍须由 B08/B10/B13 用负例测试复验；schema 表达不了的「引用确属同一课程同一发布版本」必须在服务层实现，不因本条签收而视为已满足。
 
 - **需要人拍板、本条不代批的事项**：
-  1. PLAN-D01 的签收本身（技术负责人）。
+  1. ~~PLAN-D01 的签收本身~~——已于 2026-09-22 由 ArvinHan 签收，见本条末尾。
   2. PLAN-D04：以哪个 worktree 作为集成基线、分批合并顺序与合并权——本条**不触发任何合并**。
   3. 两个生成器的安装授权（M0-09）。
   4. ADR-005/006/007 的内容是否原样同步 main（分别属 A03/A06、PLAN-D05）。
@@ -137,6 +135,8 @@
   1. `740adb` 的 codex 审查结论推翻 `api.v1.yaml` 的内容基线（例如 R03/R04 修复被判不成立）。
   2. 团队决定不把生成物入库；那时 A 与 B′ 的成本对比需重算。
   3. `datamodel-code-generator` 无法从本 YAML 生成可用的 Pydantic v2 模型（B′ 的前提「Pydantic 不手改」失效），此时应回到 A 并承担翻译成本。
+
+- **签收**：ArvinHan 2026-09-22
 
 ### ADR-004 生成链实测补注（2026-09-22，**不改变上面的结论，也不构成签收**）
 
@@ -150,7 +150,7 @@
 | 篡改检出（`openapi.json` / `python` / `typescript/openapi.d.ts` / `schemas/TaskEvent.schema.json` 各加一个换行） | 四项均非 0 退出，恢复后 exit 0 |
 | 生成的 Pydantic 可用性 | import 成功，54 个 `BaseModel` 子类，pydantic 2.13.5 |
 
-- **「推翻条件」第 3 条不触发**：`datamodel-code-generator` 能从本 YAML 生成可用的 Pydantic v2 模型，B′ 的前提「Pydantic 不手改」成立。ADR-004 的结论维持不变，仍待签收。
+- **「推翻条件」第 3 条不触发**：`datamodel-code-generator` 能从本 YAML 生成可用的 Pydantic v2 模型，B′ 的前提「Pydantic 不手改」成立。ADR-004 的结论维持不变（本补注写成时仍待签收，此后已于 2026-09-22 由 ArvinHan 签收）。
 - **实测暴露两个缺陷，已在 `740adb` 的 `8865686` 修复**（经用户授权直接改该分支；本仓库的 ADR 不随之改动）：
   1. `gen-contracts.sh` 的 `--output "$dest/python"` 产出的是一个**没有扩展名的文件** `python`，不是 ADR-004 第 2 条写的 `python/` 目录。内容是合法 Pydantic v2，但按当前路径**无法被 import**。修法：先 `mkdir -p "$dest/python"` 再 `--output "$dest/python/models.py"`，产出内容与修复前逐字节相同，只是落点变了。
   2. `--check` 在产物**缺失**（而非内容不同）时退出码是 2 而不是 1，且「跑 gen-contracts.sh 重新生成」那行提示不会打印——`set -euo pipefail` 下第二次 `diff` 的非 0 退出会让脚本在到达 `exit 1` 前就中止。门禁仍然是红的，不是假绿，但操作者丢了修复提示。修法：把该 `diff` 裹进 `{ ... || true; }`，并为「产物缺失」单独给一条明确信息。

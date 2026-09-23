@@ -1,7 +1,7 @@
 # A01：裁决契约唯一来源与 ADR 编号
 
 - **task_id**：A01（`docs/atomic-task-plan.md` / `docs/atomic-tasks.json`）
-- **状态**：交付完成，**结论未签收**（PROPOSED）。决策人：技术负责人（PLAN-D01）
+- **状态**：交付完成；**ADR-004 已于 2026-09-22 由 ArvinHan 签收**（交付时为 PROPOSED）。PLAN-D01 中「API 前缀」一项不在本条签收范围内，仍属 A02
 - **review_status**：ready_for_review
 - **worktree**：`/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/adoring-sinoussi-709263`
 - **分支 / base**：`claude/adoring-sinoussi-709263` / base `05d214c`（main）
@@ -65,7 +65,7 @@ git diff --check           exit 0（改动前后各一次）
 
 ## 七、未完成 / 风险
 
-- **签收未完成**：PLAN-D01 仍待技术负责人。未签收前不得开工 B08～B14。
+- **签收**：已完成（ArvinHan，2026-09-22）。B08～B14 的契约方向阻塞解除，但它们各自还有 A02/A03/A04/A05/A08/A09/B05 等依赖，并非立即可开工。
 - **合并未执行**：本轮未合并任何分支；集成基线与合并权是 PLAN-D04 / A10 的范围。
 - **契约内容未复验**：本条只裁定「怎么表达、谁写」。`740adb` 的 R03/R04 修复（引用非空、事件判别联合）仍须 B08/B10/B13 用负例测试复验；跨课程/跨版本引用校验 schema 表达不了，必须在服务层做。
 - **生成链**（2026-09-22 更正）：写这份交接时两个生成器本机未安装，原文写的是「在任何分支上都没有跑通过」。此后经授权安装并实测，生成链已跑通（完整生成、两次字节一致、篡改检出、生成的 Pydantic 可 import），详见 `docs/handoffs/claude-m0-09-toolchain.md`。**仍然成立的部分**：`740adb` 的 `v1/generated/` 至今缺 `python/` 与 `typescript/`，「生成物入库」依旧不算已验证。
@@ -73,8 +73,8 @@ git diff --check           exit 0（改动前后各一次）
 
 ## 八、下一位 Agent 的首个动作
 
-1. **技术负责人**：在 `docs/decisions.md` ADR-004 末尾签收或驳回。驳回请直接写在「推翻条件」下方，说明命中哪一条。
-2. 签收后，下一个可执行叶子任务是 **A02**（统一路径前缀和领域枚举，依赖 A01）；A02 若推翻 `/api/v1` 前缀，必须同步改 ADR-004 的端点表。
+1. ~~技术负责人签收 ADR-004~~——已完成（ArvinHan，2026-09-22）。
+2. 下一个可执行叶子任务是 **A02**（统一路径前缀和领域枚举，依赖 A01）；A02 若推翻 `/api/v1` 前缀，必须同步改 ADR-004 的端点表。
 3. 不依赖本条的任务（B01 前端骨架、B05 后端 health、F05 纯 DAG、D02～D07 解析器）可并行认领，但仍须各自单独认领与文件锁。
 
 ## 九、回滚

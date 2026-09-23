@@ -85,7 +85,7 @@ import python.models 0    import 留下 __pycache__ 后 --check 0
 
 ## 五、对 ADR-004 的影响
 
-ADR-004「推翻条件」第 3 条（生成器无法产出可用 Pydantic v2）**不触发**，B′ 的前提成立，结论维持不变、**仍未签收**。实测补注已追加在 `docs/decisions.md` 的 ADR-004 之后。
+ADR-004「推翻条件」第 3 条（生成器无法产出可用 Pydantic v2）**不触发**，B′ 的前提成立，结论维持不变。（本交接写成时 ADR-004 仍未签收，此后已于 2026-09-22 由 ArvinHan 签收。）实测补注已追加在 `docs/decisions.md` 的 ADR-004 之后。
 
 ## 六、未完成 / 风险
 
