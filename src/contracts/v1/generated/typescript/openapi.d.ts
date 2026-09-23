@@ -47,7 +47,10 @@ export interface paths {
         };
         /**
          * 当前用户可见的课程列表
-         * @description 教师返回自己拥有的课程；学生只返回已发布课程。
+         * @description 仅返回调用者是成员的课程。课程内角色为 student 的课程只在曾经发布过
+         *     （published_version 非空）后出现；每项 my_role 为调用者在该课的成员角色，
+         *     与账号类型无关。见 `specs/identity-access.md` §4.4。
+         *
          */
         get: operations["listCourses"];
         put?: never;
@@ -74,6 +77,55 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        /** 列出课程成员（教师成员） */
+        get: operations["listMembers"];
+        put?: never;
+        /**
+         * 按用户名添加学生成员（教师成员）
+         * @description 新成员的课程内角色固定为 student，返回 201；已是任意角色的成员时
+         *     幂等返回原成员行和 200，不修改角色。用户名不存在或账号停用返回 404。
+         *
+         */
+        post: operations["addMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/members/{uid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 移除学生成员（教师成员）
+         * @description 只能移除学生成员；移除教师成员返回 403 `ROLE_FORBIDDEN`。
+         */
+        delete: operations["removeMember"];
         options?: never;
         head?: never;
         patch?: never;
@@ -558,6 +610,7 @@ export interface components {
             name: string;
             description?: string | null;
             status: components["schemas"]["CourseStatus"];
+            my_role: components["schemas"]["Role"];
             teacher_id?: string;
             kp_count?: number;
             /** @description 学生可见的版本号；从未发布为 null */
@@ -568,6 +621,17 @@ export interface components {
         CourseCreate: {
             name: string;
             description?: string;
+        };
+        CourseMember: {
+            user_id: string;
+            username: string;
+            role: components["schemas"]["Role"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        MemberAdd: {
+            /** @description 目标学生的用户名，不填写调用者身份或成员角色。 */
+            username: string;
         };
         /** @enum {string} */
         DocumentFormat: "pdf" | "docx" | "txt" | "markdown";
@@ -1079,6 +1143,7 @@ export interface components {
         /** @description 课程 ID，所有查询的第一隔离条件 */
         CourseId: string;
         TaskId: string;
+        UserId: string;
         KnowledgePointId: string;
         RelationId: string;
     };
@@ -1136,6 +1201,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
         };
     };
     listCourses: {
@@ -1206,6 +1272,97 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Course"];
                 };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 资源不存在，或学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`）。 */
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 课程成员列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseMember"][];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    addMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberAdd"];
+            };
+        };
+        responses: {
+            /** @description 已是成员，原角色不变 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseMember"];
+                };
+            };
+            /** @description 已添加学生成员 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseMember"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    removeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                uid: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 学生成员已移除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];

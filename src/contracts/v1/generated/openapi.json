@@ -122,6 +122,9 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -132,7 +135,7 @@
           "courses"
         ],
         "summary": "当前用户可见的课程列表",
-        "description": "教师返回自己拥有的课程；学生只返回已发布课程。",
+        "description": "仅返回调用者是成员的课程。课程内角色为 student 的课程只在曾经发布过\n（published_version 非空）后出现；每项 my_role 为调用者在该课的成员角色，\n与账号类型无关。见 `specs/identity-access.md` §4.4。\n",
         "operationId": "listCourses",
         "responses": {
           "200": {
@@ -217,6 +220,128 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound",
+            "description": "资源不存在，或学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`）。"
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{cid}/members": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CourseId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "列出课程成员（教师成员）",
+        "operationId": "listMembers",
+        "responses": {
+          "200": {
+            "description": "课程成员列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CourseMember"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "按用户名添加学生成员（教师成员）",
+        "description": "新成员的课程内角色固定为 student，返回 201；已是任意角色的成员时\n幂等返回原成员行和 200，不修改角色。用户名不存在或账号停用返回 404。\n",
+        "operationId": "addMember",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "已是成员，原角色不变",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseMember"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "已添加学生成员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseMember"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{cid}/members/{uid}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CourseId"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "移除学生成员（教师成员）",
+        "description": "只能移除学生成员；移除教师成员返回 403 `ROLE_FORBIDDEN`。",
+        "operationId": "removeMember",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "学生成员已移除"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -1304,6 +1429,14 @@
           "type": "string"
         }
       },
+      "UserId": {
+        "name": "uid",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
       "KnowledgePointId": {
         "name": "kid",
         "in": "path",
@@ -1548,6 +1681,7 @@
           "id",
           "name",
           "status",
+          "my_role",
           "created_at"
         ],
         "properties": {
@@ -1565,6 +1699,9 @@
           },
           "status": {
             "$ref": "#/components/schemas/CourseStatus"
+          },
+          "my_role": {
+            "$ref": "#/components/schemas/Role"
           },
           "teacher_id": {
             "type": "string"
@@ -1600,6 +1737,43 @@
           "description": {
             "type": "string",
             "maxLength": 1000
+          }
+        }
+      },
+      "CourseMember": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "role",
+          "created_at"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MemberAdd": {
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "目标学生的用户名，不填写调用者身份或成员角色。"
           }
         }
       },
