@@ -117,7 +117,7 @@
 | **D07 实现重复页眉页脚清洗** | D05 | 分页行 → 清洗文本与位置映射 | `src/backend/app/services/parsers/cleanup.py` | 重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗 | `python3 -m pytest tests/backend/test_d07.py -q` |
 | **D08 实现章节内语义分块** | D02, D03, D04, D06, D07 | 定位段落 → 约1500字/200重叠块 | `src/backend/app/services/chunking.py` | 跨章不混、超长句/段、空输入；来源映射可回到原文 | `python3 -m pytest tests/backend/test_d08.py -q` |
 | **D09 实现块身份与缓存键** | D08, A07 | 块内容/出处/版本 → 身份与抽取缓存键 | `src/backend/app/services/chunk_identity.py` | 同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效 | `python3 -m pytest tests/backend/test_d09.py -q` |
-| **D10 实现来源块持久化** | D09, C01 | 定位块 → 可查询 SourceChunk | `src/backend/app/repositories/chunks.py`<br>`src/backend/migrations/004_chunks.sql` | 重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用 | `python3 -m pytest tests/backend/test_d10.py -q` |
+| **D10 实现来源块持久化** | D09, C01 | 定位块 → 可查询 Chunk | `src/backend/app/repositories/chunks.py`<br>`src/backend/migrations/004_chunks.sql` | 重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用 | `python3 -m pytest tests/backend/test_d10.py -q` |
 | **D11 实现解析阶段 worker 编排** | C09, C10, D10 | 已领取任务 → parsing 完成检查点 | `src/backend/app/workers/parse_task.py` | 解析失败/取消/重启均落状态；只做解析阶段不顺手接真实 LLM | `python3 -m pytest tests/backend/test_d11.py -q` |
 
 ## E 模型抽取与融合（12 项）

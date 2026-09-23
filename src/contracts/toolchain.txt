@@ -1,0 +1,13 @@
+# 契约生成与校验的工具链版本锁（ADR-004 第 6 条）。
+# 缺任一工具时门禁必须失败而不是跳过；仅 --allow-scaffold 可降级并打印未完成标记。
+# 每行：<工具> <安装命令> <用途>
+
+# ── 校验（scripts/check_contracts.py 必需）────────────────────────────
+pyyaml                  pip3 install 'pyyaml==6.0.2'                        解析 api.v1.yaml
+openapi-spec-validator  pip3 install 'openapi-spec-validator==0.9.0'        OpenAPI 3.1 形式校验
+jsonschema              pip3 install 'jsonschema==4.26.0'                   tests/contracts 的正负例校验
+
+# ── 生成（scripts/gen-contracts.sh）──────────────────────────────────
+# openapi.json 与独立 JSON Schema 只依赖 pyyaml，随校验依赖一起装。
+datamodel-code-generator pip3 install 'datamodel-code-generator==0.26.3'    YAML → Pydantic v2（M0-09）
+openapi-typescript       npm i -D 'openapi-typescript@7.4.4'                YAML → TypeScript 类型（M0-09）

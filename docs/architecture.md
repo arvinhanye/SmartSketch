@@ -2,7 +2,7 @@
 
 ## 当前审查与实施入口
 
-- 2026-09-22 现状核查与技术全景：[架构审查](architecture-review-2026-09-22.md)。主目录仍是骨架；Claude 两个 worktree 的契约真源冲突尚待裁决。
+- 2026-09-22 现状核查与技术全景：[架构审查](architecture-review-2026-09-22.md)。契约真源与生成链按 A10 批 1 在集成分支导入；以本节和 ADR-016 的现行决定为准。
 - 单轮实施范围与依赖：[原子任务清单](atomic-task-plan.md)，机器可读版为 `docs/atomic-tasks.json`。清单中的建议不自动替代已确认 ADR。
 - 后续完成后审查：[Claude → Codex 流程](claude-review-workflow.md)。
 
@@ -30,7 +30,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/services/` | 领域规则、流程编排 | HTTP/框架细节 |
 | `src/backend/app/repositories/` | Neo4j / SQLite 读写 | 产品策略 |
 | `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
-| `src/contracts/` | 前后端共享 API 和 SSE 事件约定 | 供应商专用密钥/实现 |
+| `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
 
 ## 契约真源与生成物（ADR-004）
 
@@ -45,7 +45,8 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | 前端消费 | `src/frontend/src/api/` | 前端 Agent | 类型从 `v1/generated/typescript/` 导入；不得重写、断言或 `any` 绕过 |
 
 - REST 路径前缀与 wire 枚举已由 A02 裁定（ADR-009），见下一节。
-- 生成器及版本锁在 `src/contracts/toolchain.txt`；缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
+- 生成器及版本锁在 `src/contracts/toolchain.txt`；CI 按其安装。缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
+- `scripts/verify.sh` 调用 `scripts/verify/contracts.sh`，依次校验真源结构、生成物同步和门禁负例；缺依赖或生成物漂移均失败。
 - 契约的**表达方式**由 ADR-004 裁定，契约的**内容正确性**不由它保证：来源非空、事件判别联合等约束仍须各自的负例测试复验；「引用确属同一课程同一发布版本」schema 表达不了，必须在服务层校验。
 
 ## API 前缀与 wire 枚举（A02 / ADR-009）
@@ -108,7 +109,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## 核心数据模型
 
 - SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`QuestionSession`。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
-- Neo4j：`Course`、`KnowledgePoint`、`SourceChunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
+- Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
 
 ## 图谱版本与跨库发布（A04 / ADR-012）

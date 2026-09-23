@@ -1144,7 +1144,7 @@
         "C01"
       ],
       "input": "定位块",
-      "output": "可查询 SourceChunk",
+      "output": "可查询 Chunk",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/chunks.py",
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/004_chunks.sql",
