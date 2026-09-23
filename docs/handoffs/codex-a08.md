@@ -2,14 +2,14 @@
 
 - `task_id`: A08；`status`: R01～R14 第 3 轮复审通过，无新 P1/P2；待 §7 产品签收；R15 不在本轮范围。
 - `worktree`: `/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/codex-a08-learning-path`；`branch`: `codex/a08-learning-path`；base HEAD `1a47eb2`。
-- `审查依据`: 第 1 轮 `claude/codex-a08-check-ade85c@8901371` 报告、第 2 轮 PR #13 `dc0bef8` 的 `docs/reviews/claude-codex-a08-r2-2026-09-23.md`、第 3 轮 `claude/codex-a08-check-0ae6d7@acb257c` 复审（R11～R14 通过）与已签收 ADR-014。ADR-014 已在 `origin/main@6881ffe`，集成时须保留，不在 A08 分支另造同号决定。
+- `审查依据`: 第 1 轮 `claude/codex-a08-check-ade85c@8901371` 报告、第 2 轮 PR #13 `dc0bef8` 的 `docs/reviews/claude-codex-a08-r2-2026-09-23.md`、第 3 轮 `claude/codex-a08-check-0ae6d7@acb257c` 复审（R11～R14 通过）与已签收 ADR-014。ADR-014 已随 `origin/main@6881ffe` 合入本分支，不另造同号决定。
 - `文件锁/范围`: `specs/learning-path.md`、`docs/atomic-task-plan.md` 的 B12/I05 行、`docs/atomic-tasks.json` 的 B12/I05 `acceptance`、`docs/tasks.md` 的 A08 行及下方说明、本交接。均在本 worktree，未修改 main、其他 worktree 或 `src/`。
 
 ## 输入、输出、依赖、风险
 
 - 输入：S2 §6.4.7、A04 V3/V8/V9 与 ADR-012、A02 三态进度、候选 YAML 真源、Claude A08-R01～R14、ADR-014。
 - 输出：LP-1～19 的可学/评分/进度投影/批量写入规格，及 B12/I05 在 Markdown 与 JSON 中一致的验收；无 DTO、仓储、迁移或发布快照代码变更。
-- 依赖：ADR-014 集成到本分支；B08/B12 迁移公开错误与响应；F10/B11/G04/G06 在谱系存放位置签收后实现版本化谱系。
+- 依赖：B08/B12 迁移公开错误与响应；F10/B11/G04/G06 在谱系存放位置签收后实现版本化谱系。
 - 风险：§7 的缺值 0.5、权重来源、推荐上限、进度响应字段名与 `updated_at` 可空语义，以及显式降级覆盖继承、谱系存放位置仍未签收。已签收的 ADR-014 只确立中心度分母和最高状态读时继承，不等于这些细则已批准。R15 涉及细则 1，提案文字保持不变。
 
 ## Claude R01～R10 修复映射与逐项核对
@@ -47,7 +47,7 @@
 | `grep -nE '[[:blank:]]+$' specs/learning-path.md docs/handoffs/codex-a08.md` | exit 1，无匹配（两个未跟踪新文件也已覆盖）。 |
 | `grep -rn -e 无图 -e 暂无图 docs/atomic-task-plan.md docs/atomic-tasks.json` | exit 1，无匹配。 |
 | B12/I05 验收与 LP 编号核对 | Python 解析 JSON 并逐字对比两行 Markdown `acceptance`：B12、I05 均一致；LP-1～19 连续且各一行；exit 0。此为文档检查，不代表 I01～I06 实现测试。 |
-| `specs/learning-path.md` SHA-256 | `ade64a3d42407cf77034ea8b2948310f54f715b78fa71ff11b3ea8d0955871c6` |
+| `specs/learning-path.md` SHA-256 | `1a9c54780c5364ef31c78f165b5f564cbd07bb720649dc4f228ee593373767a3` |
 | `docs/atomic-task-plan.md` SHA-256 | `b6d778208c967f16247aa89027ad52edf8b73fa741224a7429abd053d505c694` |
 | `docs/atomic-tasks.json` SHA-256 | `690045e13423c234e994b41237640090289980d25c79f57ed45845c3d979042d` |
 | `docs/tasks.md` | A08 行已更新为第 3 轮复审通过；提交前以 `git diff --check` 核对。 |

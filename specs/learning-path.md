@@ -1,7 +1,7 @@
 # 功能规格：学习进度与下一步推荐（A08）
 
 - **状态**：A08 领域规格修订稿；ADR-014 的中心度与合并继承决定已签收，§7 所列参数及两项实施细则待签收；B12 wire 契约与后端尚未实现。
-- **依据**：S2 解决方案 §6.4.7（四项公式与可学条件）；`specs/teacher-review-publish.md` V1～V9（ADR-012，稳定 `kp_id`、不可变发布版、发布空图被阻断、请求绑定单一版本）；`docs/architecture.md` 的 `MasteryStatus`；`specs/identity-access.md` 的学生成员边界；已签收的 ADR-014（`8901371`，待集成到本分支）。
+- **依据**：S2 解决方案 §6.4.7（四项公式与可学条件）；`specs/teacher-review-publish.md` V1～V9（ADR-012，稳定 `kp_id`、不可变发布版、发布空图被阻断、请求绑定单一版本）；`docs/architecture.md` 的 `MasteryStatus`；`specs/identity-access.md` 的学生成员边界；已签收并集成的 ADR-014（`8901371`）。
 - **承接**：B12 定 DTO，I01/I02 定进度持久化与写入，I03 定可学集合，I04 定评分与理由，I05 定查询空态，I06 定展示。目标导向完整路径是 O01～O04 的条件性加分项，不属于 A08 的推荐列表。
 
 ## 1. 输入、输出与不变量
