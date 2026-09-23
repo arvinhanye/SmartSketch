@@ -72,7 +72,7 @@
 | D-03 | 登录是否先采用本地演示角色 | 产品负责人 | M0-03 前 |
 | PLAN-D01 | 两个 Claude 分支 YAML-first/Pydantic-first 唯一源、API 前缀和冲突 ADR 编号如何统一（A01/A02）。**已关闭**：唯一源与 ADR 编号由 ADR-004 签收；API 前缀由 ADR-009（A02）定为 `/api/v1`（均为 ArvinHan，2026-09-22） | 技术负责人 | 已完成 |
 | PLAN-D02 | 发布快照/图与向量版本化/双存储补偿方案（A04） | 技术负责人 | 发布与学生检索仓储实现前 |
-| PLAN-D03 | worker 队列/租约/取消/重试及部分失败语义（A03/A06）。**部分关闭**：取消与部分失败语义由 ADR-010（A03）签收（ArvinHan，2026-09-23）；**队列 / 租约 / 重试仍待 A06** | 技术负责人 | worker 实现前 |
+| PLAN-D03 | worker 队列/租约/取消/重试及部分失败语义（A03/A06）。**已关闭**：取消与部分失败语义由 ADR-010（A03），队列 / 租约 / 重试 / 幂等由 ADR-011（A06）签收（均为 ArvinHan，2026-09-23） | 技术负责人 | 已完成 |
 | PLAN-D04 | 哪个 worktree 作为集成基线、分批合并顺序与合并权（A10） | 项目负责人 | 合并前；本轮未代为合并 |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
@@ -124,3 +124,10 @@
 | A03-R01/R02 修复 | DONE | 修复 Codex 审查 A03-R01（SSE 在 `awaiting_review` 关流后「全部可通过 SSE 观察 / 终态事件恰好一次」措辞失真）与 A03-R02（T7 发布推进谓词与「全部驳回仍 `completed`」自相矛盾） | Claude | `.claude/worktrees/a03-d430b9`（分支 `claude/a03-task-lifecycle`）/ base `2049129` | `specs/task-processing.md`、`specs/course-knowledge-graph.md` 验收 2、`docs/architecture.md` SSE 事件表一行与「文档用语 → wire 值」映射一行、`docs/decisions.md` ADR-010、本节、`docs/handoffs/claude-a03.md` | 审查报告 `docs/reviews/codex-claude-a03-ci01-s07-2026-09-23-0606z.md`（主目录）；核对脚本新增 12 项先红后绿，共 74 项 ALL PASS；新增 5 个负例（N8～N12），连同原 7 个共 12 个均被逐条检出；A02 枚举核对回归 ALL PASS；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a03.md` 第九节 |
 
 - A03-R01/R02 的修复不改变 ADR-010 的决定方向，只澄清措辞：任务 SSE 只覆盖处理阶段，每个连接恰好以一条结束事件收尾，`completed` 通过任务查询或课程发布状态观察；T7 推进谓词统一为「T6 提交序号 ≤ 快照任务水位」。新增 TASK-20～22。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A06 | DONE（ADR-011 已签收） | 定义 worker 租约和幂等机制 | Claude（协调 Agent） | `.claude/worktrees/a03-d430b9`（分支 `claude/a06-worker-lease`，叠在 `claude/a03-task-lifecycle` 之上）/ base `6345ce1` | `specs/task-processing.md`（§8 及 §1～§7 中指向 A06 的指针、§6「由 A06 定」一行）、`docs/decisions.md`（新增 ADR-011）；**范围扩展（用户同意）**：`docs/architecture.md`（目录表 workers 行、核心数据模型 SQLite 列表）、PLAN-D03 行、本节、`docs/handoffs/claude-a06.md` | `specs/task-processing.md` §8（部署边界、领取/租约/回收、三层重试与耗尽码、各阶段幂等、课程写锁、中间产物、迁移备份与回滚、配置、LEASE-1～17）；`docs/decisions.md` ADR-011；A06 核对脚本 45 项 ALL PASS，9 个篡改副本均被逐条检出；A03 核对（74 项）与 12 个负例、A02 枚举核对回归均通过；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a06.md` |
+
+- A06 的决定（ArvinHan，2026-09-23 签收）：worker 为与 API 同机的独立进程，共用 SQLite（WAL）作队列，不支持跨机器；单条条件更新领取、60 秒租约心跳续约、令牌防旧写；三层重试（模型调用 / 块 2 次 / 任务 3 次），存储不可用与模型熔断为阶段级临时故障，退避后重排；`extracting` 块级检查点续跑，`persisting` 在课程写锁下单事务 `MERGE`；迁移须停机、`VACUUM INTO` 备份并校验，回滚靠备份恢复。PLAN-D03 至此全部关闭。
+- A06 交出的后续项（均未认领）：**B08** 增加 `TASK_ATTEMPTS_EXHAUSTED`；**A07** 登记 §8.8 五个变量；**E 组** 定模型调用缓存键与失效（`merging` 重跑依赖）；**E04** 暴露熔断状态；**A04** 定发布侧何时持课程写锁；C01/C09/E12/F13/K08 按 §8 实现。
