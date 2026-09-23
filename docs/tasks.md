@@ -22,13 +22,39 @@
 | M1-04 | TODO | 前置关系 DAG 校验 | Backend Agent | 环路拒绝、错误可解释、自动化测试 |
 | M1-05 | TODO | 教师审核与发布版本 | Full-stack Agent | 可编辑、发布、读取已发布版本 |
 
-## 未决问题
+## 架构审查与可执行拆分
+
+| ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| PLAN-01 | DONE | 核对架构现状、汇总技术方案、拆分单轮任务、建立 Claude 完成后审查约定 | Codex | 协调文档交付；127 个未认领叶子任务；5 项初始审查问题；本项目会话可读；heartbeat 已创建 | `docs/handoffs/codex-plan-01.md`；`docs/reviews/validate_atomic_plan.py`；`./scripts/verify.sh` 与 `git diff --check` |
+
+### PLAN-01 执行约定
+
+- 输入：当前 checkout、项目规格/ADR、关联 worktree 的只读状态、当前项目 Claude 会话元数据。
+- 输出：架构审查、原子任务清单、Claude → Codex 审查流程及交接。
+- 依赖：现有协作骨架；无需模型密钥或数据库服务。
+- 风险：Claude 可能在其他 worktree 工作；文档方案不等于已实现；会话包含私有内容，仅提取项目和完成状态所需字段。
+- 验证：`./scripts/verify.sh`、`git diff --check`、任务 ID/依赖/文档链接结构检查。
+
+### 原子任务派发入口
+
+- [技术全景与现状](architecture-review-2026-09-22.md)；[127 项原子计划](atomic-task-plan.md)；机器可读 `docs/atomic-tasks.json`。
+- 119 项主线、8 项条件性加分项均为 PROPOSED，尚未认领；本轮 DONE 仅指规划和审查交付，不指其中实现任务完成。
+- 认领时按原子 ID 新增状态行，写目标 worktree/HEAD 和文件所有权；M0/M1 原行保留为父任务，不把未合并 worktree 的完成状态自动搬到 main。
+- Claude 完成后的自动审查已启用，规则见 [审查流程](claude-review-workflow.md)，首轮问题见 [审查报告](reviews/codex-claude-initial-2026-09-22.md)。
+
+## 待确认决策
 
 | ID | 问题 | 决策人 | 需要在何时确认 |
 | --- | --- | --- | --- |
 | D-01 | MVP 首批课程示例和脱敏资料来源 | 产品负责人 | M1 开始前 |
 | D-02 | 首个 OpenAI 兼容模型供应商与预算上限 | 技术负责人 | 接入抽取服务前 |
 | D-03 | 登录是否先采用本地演示角色 | 产品负责人 | M0-03 前 |
+| PLAN-D01 | 两个 Claude 分支 YAML-first/Pydantic-first 唯一源、API 前缀和冲突 ADR 编号如何统一（A01/A02） | 技术负责人 | 契约消费者开工前；最高优先 |
+| PLAN-D02 | 发布快照/图与向量版本化/双存储补偿方案（A04） | 技术负责人 | 发布与学生检索仓储实现前 |
+| PLAN-D03 | worker 队列/租约/取消/重试及部分失败语义（A03/A06） | 技术负责人 | worker 实现前 |
+| PLAN-D04 | 哪个 worktree 作为集成基线、分批合并顺序与合并权（A10） | 项目负责人 | 合并前；本轮未代为合并 |
+| PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## 原子任务认领（`docs/atomic-task-plan.md`）
 

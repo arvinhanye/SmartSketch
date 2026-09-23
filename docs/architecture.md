@@ -1,5 +1,11 @@
 # 架构与边界
 
+## 当前审查与实施入口
+
+- 2026-09-22 现状核查与技术全景：[架构审查](architecture-review-2026-09-22.md)。主目录仍是骨架；Claude 两个 worktree 的契约真源冲突尚待裁决。
+- 单轮实施范围与依赖：[原子任务清单](atomic-task-plan.md)，机器可读版为 `docs/atomic-tasks.json`。清单中的建议不自动替代已确认 ADR。
+- 后续完成后审查：[Claude → Codex 流程](claude-review-workflow.md)。
+
 ## 逻辑分层
 
 ```text

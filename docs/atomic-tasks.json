@@ -1,0 +1,3145 @@
+{
+  "version": 1,
+  "date": "2026-09-22",
+  "baseline": "05d214c",
+  "kind": "proposed_plan_not_execution_evidence",
+  "tasks": [
+    {
+      "id": "A01",
+      "title": "裁决契约唯一来源与 ADR 编号",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [],
+      "input": "两个分支契约决定",
+      "output": "一条生成方向及迁移映射",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/docs/decisions.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/architecture.md"
+      ],
+      "acceptance": "明确真源、生成物、写入方；原有每个端点有迁移去向，不擅自删功能",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A01 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A02",
+      "title": "统一路径前缀和领域枚举",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01"
+      ],
+      "input": "现有 YAML/状态规格",
+      "output": "API 前缀与 wire 枚举表",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/course-knowledge-graph.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/architecture.md"
+      ],
+      "acceptance": "同步 persisting/cancelled/未覆盖大小写；人工编辑造环与自动候选降级区别明确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A02 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A03",
+      "title": "定义任务生命周期和取消协议",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A02"
+      ],
+      "input": "现有 SSE 时序",
+      "output": "状态转换表与取消竞争语义",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/task-processing.md"
+      ],
+      "acceptance": "区分处理完成和人工审核完成；定义部分失败、取消请求/取消完成、重复取消与重连",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A03 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A04",
+      "title": "定义图谱版本和跨库发布协议",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01"
+      ],
+      "input": "S2 快照表/双库存储",
+      "output": "version_id、快照位置、发布步骤",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/teacher-review-publish.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/architecture.md"
+      ],
+      "acceptance": "定义图/向量读版本、指针切换、失败补偿、回滚编号；决策前不写仓储",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A04 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A05",
+      "title": "定义课程成员与本地身份边界",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01"
+      ],
+      "input": "两个分支登录决定",
+      "output": "身份、成员、角色访问矩阵",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/identity-access.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/decisions.md"
+      ],
+      "acceptance": "明确演示角色或账号模式；禁止仅相信请求 user_id；不扩展生产 SSO",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A05 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A06",
+      "title": "定义 worker 租约和幂等机制",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A03"
+      ],
+      "input": "任务生命周期",
+      "output": "原子领取、超时接管、阶段重试规则",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/task-processing.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/decisions.md"
+      ],
+      "acceptance": "明确单机/多进程边界、重试上限与去重；迁移前有备份/回滚说明",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A06 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A07",
+      "title": "落实模型配置形状与预算决策入口",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01"
+      ],
+      "input": "S2 主备与向量方案",
+      "output": "配置名/类型/切换矩阵",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/docs/integrations.md",
+        "/Users/arvinhan/Desktop/SmartSketch/.env.example"
+      ],
+      "acceptance": "包括 embedding 维度、模型版本、超时/限并发/预算；真实值由负责人确认，不写密钥",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A07 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A08",
+      "title": "定义推荐评分与进度跨版本规则",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A04"
+      ],
+      "input": "S2 四项公式",
+      "output": "完整纯函数规格",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/learning-path.md"
+      ],
+      "acceptance": "定义实际解锁数、归一化零分母、同分键、空态、节点删除/改名及人工跳过先修",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A08 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A09",
+      "title": "定义问答终态和引用撤回协议",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A02",
+        "A04"
+      ],
+      "input": "R03/R04 与 S2",
+      "output": "流式状态/正文/引用结构",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/grounded-qa.md"
+      ],
+      "acceptance": "answered 必有定位来源；临时正文失败后清除；空检索不调用生成；与未知引用区分",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A09 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "A10",
+      "title": "整理已有成果导入顺序与任务映射",
+      "group": "决策与基线对齐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05"
+      ],
+      "input": "两个 worktree diff",
+      "output": "分文件复用/冲突/补测列表",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/docs/tasks.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/reviews/branch-integration-map.md"
+      ],
+      "acceptance": "不自动 merge；明确 ADR/S-06 编号冲突、每批最多一个功能边界、决策签收人",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 A10 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-a10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B01",
+      "title": "初始化前端构建和单个挂载页面",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01"
+      ],
+      "input": "Vue/Vite 约定",
+      "output": "可构建空应用",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/package.json",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/tsconfig.json",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/vite.config.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/index.html",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/main.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/App.vue"
+      ],
+      "acceptance": "锁定依赖；挂载烟测和 type-check/build 成功，无业务页面",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run build；浏览器挂载烟测，正式测试脚本由 B02 建立",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B02",
+      "title": "初始化前端测试配置",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B01"
+      ],
+      "input": "空应用",
+      "output": "tests/frontend 可被实际发现",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/vitest.config.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/package.json",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/setup.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/b02.test.ts"
+      ],
+      "acceptance": "包含仓库外层 tests/frontend；故意失败用例使命令非 0；不是零用例通过",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b02.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B03",
+      "title": "建立路由壳和角色入口",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B02",
+        "A05"
+      ],
+      "input": "身份访问矩阵",
+      "output": "教师/学生空路由",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/router/index.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/TeacherHome.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/StudentHome.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/b03.test.ts"
+      ],
+      "acceptance": "直接进入错误角色页有提示；不将前端路由判断当后端鉴权",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b03.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B04",
+      "title": "建立 Pinia 课程上下文",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B02"
+      ],
+      "input": "课程 ID 切换",
+      "output": "状态清理和请求作用域",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/stores/course.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/b04.test.ts"
+      ],
+      "acceptance": "切课清除旧图/问答，晚到响应不覆盖新课；无请求写入组件",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b04.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B05",
+      "title": "初始化后端应用工厂与 health",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01"
+      ],
+      "input": "FastAPI 约定",
+      "output": "health 路由与响应",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/pyproject.toml",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/main.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/health.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_b05.py"
+      ],
+      "acceptance": "无密钥可测 GET /health；测试 app 工厂不触发网络连接",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_b05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B06",
+      "title": "建立后端设置加载与验证",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B05",
+        "A07"
+      ],
+      "input": "环境变量表",
+      "output": "类型化 settings",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/config.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_b06.py"
+      ],
+      "acceptance": "非法端口/预算/维度显式错误；缺真实模型配置时 fake 模式可测；日志无密钥",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_b06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B07",
+      "title": "修复校验缺依赖假绿",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01",
+        "B05"
+      ],
+      "input": "R02 与分支门禁",
+      "output": "显式 PASS/SKIP/FAIL",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/check_contracts.py",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/verify/contracts.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/pyproject.toml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/tooling/test_b07.py"
+      ],
+      "acceptance": "缺依赖、坏引用、坏枚举非 0；骨架跳过显式标注；在选定基线落地，不保留双门禁",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/tooling/test_b07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B08",
+      "title": "迁移公共错误和来源契约",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A01",
+        "A02",
+        "B05"
+      ],
+      "input": "已有错误/SourceRef",
+      "output": "选定真源公共类型",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/common.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b08.py"
+      ],
+      "acceptance": "page 正整数或 section 非空；4 类关系闭集；错误码与未覆盖领域状态分开",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b08.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B09",
+      "title": "迁移课程与资料 REST 契约",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B08",
+        "A05"
+      ],
+      "input": "现有课程/文档端点",
+      "output": "DTO 和路径声明",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/courses.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b09.py"
+      ],
+      "acceptance": "列表/创建/上传/读取有成功与失败响应；不从零重写已有字段",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b09.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B10",
+      "title": "迁移任务与 SSE 契约",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B08",
+        "A03"
+      ],
+      "input": "任务转换表",
+      "output": "判别事件 DTO",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/tasks.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b10.py"
+      ],
+      "acceptance": "每种事件必填字段不同；空 payload 拒绝；取消请求和终态区别正确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B11",
+      "title": "迁移图谱编辑和版本契约",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B08",
+        "A04"
+      ],
+      "input": "现有图节点关系接口",
+      "output": "作用域/修订号 DTO",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/graph.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b11.py"
+      ],
+      "acceptance": "跨版本标识齐全；编辑携带 expected_revision；端点与来源校验负例",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b11.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B12",
+      "title": "迁移进度和推荐契约",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B08",
+        "A08"
+      ],
+      "input": "进度/推荐规格",
+      "output": "DTO",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/learning.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b12.py"
+      ],
+      "acceptance": "空态可区分全部掌握/尚未发布/无图；分量可还原评分",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b12.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b12.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B13",
+      "title": "迁移问答与事件契约",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B08",
+        "A09"
+      ],
+      "input": "R03/R04",
+      "output": "响应判别联合",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/chat.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b13.py"
+      ],
+      "acceptance": "answered 空引用拒绝、无定位拒绝、空事件拒绝；最终替换正文有字段",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b13.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b13.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B14",
+      "title": "建立契约导出与漂移检查",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B09",
+        "B10",
+        "B11",
+        "B12",
+        "B13"
+      ],
+      "input": "选定真源",
+      "output": "OpenAPI/Schema/TS 生成物",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/gen-contracts.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/generate.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/generated",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_b14.py"
+      ],
+      "acceptance": "两次输出一致；只检查模式不改工作文件；临时篡改生成物必被检出",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_b14.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b14.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "B15",
+      "title": "建立前端 HTTP 客户端",
+      "group": "应用骨架与契约",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B02",
+        "B14"
+      ],
+      "input": "生成 TS 契约",
+      "output": "请求封装",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/api/http.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/b15.test.ts"
+      ],
+      "acceptance": "类型化错误、超时/取消、认证失败处理；组件不自行拼路径",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-b15.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C01",
+      "title": "建立 SQLite 连接和迁移运行器",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B06",
+        "A04",
+        "A06"
+      ],
+      "input": "业务模型决定",
+      "output": "连接/迁移版本表",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/sqlite.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/001_base.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c01.py"
+      ],
+      "acceptance": "临时数据库迁移可重复；事务回滚；备份后恢复命令可验证",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C02",
+      "title": "实现课程和成员仓储",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C01",
+        "A05"
+      ],
+      "input": "课程/成员字段",
+      "output": "scoped CRUD",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/courses.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/002_courses.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c02.py"
+      ],
+      "acceptance": "课程成员唯一；同用户不同课程角色独立；读写外键正确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C03",
+      "title": "实现身份边界与课程访问依赖",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C02",
+        "B09"
+      ],
+      "input": "访问矩阵",
+      "output": "身份/权限依赖与服务",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/dependencies.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/access.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c03.py"
+      ],
+      "acceptance": "伪造 user_id、非成员、学生编辑均拒绝；按 A05 决定接入身份，不自行选登录方案",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C04",
+      "title": "实现课程列表和创建 API",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C03"
+      ],
+      "input": "课程仓储",
+      "output": "两个薄路由",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/courses.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/courses.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c04.py"
+      ],
+      "acceptance": "仅列可访问课程；创建者成员写入同事务；无业务 SQL 留在路由",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C05",
+      "title": "实现文件落盘边界",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B06"
+      ],
+      "input": "上传字节流",
+      "output": "文件元数据",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/file_storage.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c05.py"
+      ],
+      "acceptance": "路径穿越、伪扩展名、超限/中断流失败且无半文件；生成随机存储名",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C06",
+      "title": "实现资料和任务创建事务",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C01",
+        "B10"
+      ],
+      "input": "合法文件元数据",
+      "output": "material + queued task",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/materials.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/tasks.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/003_tasks.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c06.py"
+      ],
+      "acceptance": "数据库写入失败不留孤儿记录；重复请求的幂等键按课程隔离",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C07",
+      "title": "实现上传及资料列表 API",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C03",
+        "C05",
+        "C06",
+        "B09"
+      ],
+      "input": "上传请求",
+      "output": "task_id/资料列表",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/materials.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/materials.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c07.py"
+      ],
+      "acceptance": "非法格式/课程越权拒绝；存盘或建任务失败可补偿；长处理不堵请求",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C08",
+      "title": "实现状态迁移纯函数",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A03",
+        "B10"
+      ],
+      "input": "当前状态 + 事件",
+      "output": "新状态",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/task_state.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c08.py"
+      ],
+      "acceptance": "所有合法边覆盖；非法跳转、进度倒退、终态再写失败",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c08.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C09",
+      "title": "实现 worker 原子领取与租约",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C06",
+        "C08",
+        "A06"
+      ],
+      "input": "queued/过期任务",
+      "output": "单 worker 所有权",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/task_leases.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c09.py"
+      ],
+      "acceptance": "两个连接争同任务只有一个成功；旧租约 token 禁止续写；到期可接管",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c09.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C10",
+      "title": "实现任务取消服务与 API",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C09",
+        "C03"
+      ],
+      "input": "取消请求",
+      "output": "持久取消意图/终态",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/task_cancel.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/task_cancel.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c10.py"
+      ],
+      "acceptance": "queued/运行中/完成后/重复取消；取消和写入竞争有确定结果",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C11",
+      "title": "实现任务查询与 GET SSE",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C08",
+        "C03",
+        "B10"
+      ],
+      "input": "task 状态",
+      "output": "快照/心跳/终态流",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/tasks.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/task_events.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c11.py"
+      ],
+      "acceptance": "先验证课程权限；重连快照；终态关闭；断开释放监听器",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_c11.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "C12",
+      "title": "实现前端任务流客户端",
+      "group": "课程资料与持久任务",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B15",
+        "C11"
+      ],
+      "input": "SSE 字节",
+      "output": "任务状态订阅",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/api/taskEvents.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/c12.test.ts"
+      ],
+      "acceptance": "分片帧/CRLF/心跳/重连；终态和卸载关闭；旧课程事件不污染当前课",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/c12.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-c12.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D01",
+      "title": "定义解析输出与自编 fixture",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B08"
+      ],
+      "input": "四格式定位需求",
+      "output": "ParsedBlock/来源规则",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/models.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/fixtures/documents/README.md",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d01.py"
+      ],
+      "acceptance": "无页码格式用章节/段落；fixtures 自编不含真实课程和个人资料",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D02",
+      "title": "实现 TXT 编码与标题解析",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D01"
+      ],
+      "input": "UTF-8/GBK 文本",
+      "output": "定位段落",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/txt.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d02.py"
+      ],
+      "acceptance": "空文、坏编码、无标题、中文编号标题；保留行号和章节",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D03",
+      "title": "实现 Markdown AST 解析",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D01"
+      ],
+      "input": "Markdown",
+      "output": "标题路径/段落块",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/markdown.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d03.py"
+      ],
+      "acceptance": "代码块中的 # 不当标题；表格/列表保留；空文有明确结果",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D04",
+      "title": "实现 DOCX 段落和表格解析",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D01"
+      ],
+      "input": "自编 DOCX",
+      "output": "章节/段落来源",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/docx.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d04.py"
+      ],
+      "acceptance": "标题样式、表格、损坏 zip；避免编造页码；嵌入内容有范围说明",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D05",
+      "title": "实现 PDF 正文与页码提取",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D01"
+      ],
+      "input": "文本 PDF",
+      "output": "分页文本行",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/pdf.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d05.py"
+      ],
+      "acceptance": "多页、空白、加密、损坏及扫描件明确返回状态；不声称已有 OCR",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D06",
+      "title": "实现 PDF 标题判定",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D05"
+      ],
+      "input": "行字号/字重/正则",
+      "output": "章节树",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/pdf_headings.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d06.py"
+      ],
+      "acceptance": "正文加粗不误做所有标题；标题跨页、无字号层级有退路",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D07",
+      "title": "实现重复页眉页脚清洗",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D05"
+      ],
+      "input": "分页行",
+      "output": "清洗文本与位置映射",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/parsers/cleanup.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d07.py"
+      ],
+      "acceptance": "重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D08",
+      "title": "实现章节内语义分块",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D02",
+        "D03",
+        "D04",
+        "D06",
+        "D07"
+      ],
+      "input": "定位段落",
+      "output": "约1500字/200重叠块",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/chunking.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d08.py"
+      ],
+      "acceptance": "跨章不混、超长句/段、空输入；来源映射可回到原文",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d08.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D09",
+      "title": "实现块身份与缓存键",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D08",
+        "A07"
+      ],
+      "input": "块内容/出处/版本",
+      "output": "身份与抽取缓存键",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/chunk_identity.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d09.py"
+      ],
+      "acceptance": "同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d09.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D10",
+      "title": "实现来源块持久化",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D09",
+        "C01"
+      ],
+      "input": "定位块",
+      "output": "可查询 SourceChunk",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/chunks.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/004_chunks.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d10.py"
+      ],
+      "acceptance": "重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "D11",
+      "title": "实现解析阶段 worker 编排",
+      "group": "解析与分块",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C09",
+        "C10",
+        "D10"
+      ],
+      "input": "已领取任务",
+      "output": "parsing 完成检查点",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/workers/parse_task.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d11.py"
+      ],
+      "acceptance": "解析失败/取消/重启均落状态；只做解析阶段不顺手接真实 LLM",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_d11.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-d11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E01",
+      "title": "建立版本化提示词装载器",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A07",
+        "B06"
+      ],
+      "input": "模板与变量",
+      "output": "可追踪 prompt",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/prompts.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/MANIFEST.md",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e01.py"
+      ],
+      "acceptance": "缺变量/未知版本报错；记录模板摘要；8 类清单统一 evaluation/evals 命名",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E02",
+      "title": "建立模型接口和 fake 适配器",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E01"
+      ],
+      "input": "抽取/对话请求",
+      "output": "统一结果结构",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/client.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/fake.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e02.py"
+      ],
+      "acceptance": "固定输入输出可复现；超时/坏 JSON/限流可模拟；无需密钥",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E03",
+      "title": "实现兼容 API 适配器",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E02"
+      ],
+      "input": "A07 接入配置",
+      "output": "HTTP 模型调用",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/compatible.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e03.py"
+      ],
+      "acceptance": "先核对选定供应商官方协议；用 mock transport 测超时/错误/结构；真实调用需另行配置",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E04",
+      "title": "实现模型调用预算与退避",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E03",
+        "C01"
+      ],
+      "input": "请求/额度",
+      "output": "有界重试和熔断",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/policy.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/model_calls.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e04.py"
+      ],
+      "acceptance": "429/5xx 有界退避，鉴权错误不重试；预算零不发请求；日志无 token/原文",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E05",
+      "title": "实现块级实体抽取",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E02",
+        "D09"
+      ],
+      "input": "chunk",
+      "output": "有来源的规范实体候选",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/entities.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/extract_entities.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e05.py"
+      ],
+      "acceptance": "五类实体、字段范围、证据必须来自输入；坏 JSON 修复最多一次",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E06",
+      "title": "实现补漏实体抽取",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E05"
+      ],
+      "input": "原块/首轮实体",
+      "output": "遗漏实体差量",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/gleaning.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/extract_entities_gleaning.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e06.py"
+      ],
+      "acceptance": "不开启时零调用；只加遗漏不复制已有实体；预算和轮数有上限",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E07",
+      "title": "实现向量适配与维度检查",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E02",
+        "A07"
+      ],
+      "input": "文本批次",
+      "output": "带模型版本的向量",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/embeddings.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e07.py"
+      ],
+      "acceptance": "维度不符、空批次、部分失败明确；在线/本地切换可 fake 验证",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E08",
+      "title": "实现名称归一和重复候选",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E05"
+      ],
+      "input": "实体名称/定义",
+      "output": "归一键与候选对",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/fusion/normalize.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e08.py"
+      ],
+      "acceptance": "全半角/空格/括号处理；名称包含只列候选，误合并反例保留",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e08.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E09",
+      "title": "实现向量候选分层",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E07",
+        "E08"
+      ],
+      "input": "相似度/阈值",
+      "output": "自动/裁决/保留三组",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/fusion/candidates.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e09.py"
+      ],
+      "acceptance": "课程隔离；阈值顺序非法拒绝；边界等号有明确规则",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e09.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E10",
+      "title": "实现重复裁决与定义归并",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E09",
+        "E04"
+      ],
+      "input": "候选对/证据",
+      "output": "同义判断与统一定义",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/fusion/judge.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/judge_duplicate.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/summarize_definition.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e10.py"
+      ],
+      "acceptance": "裁决有理由；定义仅用证据；假同义/坏输出保持独立并进入审核",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E11",
+      "title": "实现关系两阶段抽取",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E10",
+        "E05"
+      ],
+      "input": "小节实体 ID 表 + 来源块",
+      "output": "四类关系候选",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/ai/relations.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/extract_relations.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e11.py"
+      ],
+      "acceptance": "悬空端点/跨课/自环/重复边拦截；仅提及不判前置；方向反例",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e11.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "E12",
+      "title": "实现抽取阶段编排和检查点",
+      "group": "模型抽取与融合",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "D11",
+        "E04",
+        "E11"
+      ],
+      "input": "解析检查点",
+      "output": "待持久化候选",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/workers/extract_task.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_e12.py"
+      ],
+      "acceptance": "每块失败可局部重试；并发上限；取消边界；重跑不重复扣计/污染来源",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_e12.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-e12.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F01",
+      "title": "复用本地 Neo4j 环境并验证",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A10"
+      ],
+      "input": "分支 Compose/脚本",
+      "output": "可启动依赖",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/docker-compose.yml",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/dev-up.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/check-apoc.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f01.py"
+      ],
+      "acceptance": "先审原脚本；配置检查、健康检查、停启数据仍在；真实容器命令需环境满足",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F02",
+      "title": "实现 Neo4j 驱动与作用域仓储",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F01",
+        "B06",
+        "A04"
+      ],
+      "input": "连接设置",
+      "output": "参数化图查询入口",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/neo4j.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f02.py"
+      ],
+      "acceptance": "所有业务 query 接收 course/version；断线明确错误；不把凭据写日志",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_f02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F03",
+      "title": "建立图唯一约束和索引迁移",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F02",
+        "B11"
+      ],
+      "input": "图模型",
+      "output": "可重复执行迁移",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/neo4j/001_constraints.cypher",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/graph_migrations.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f03.py"
+      ],
+      "acceptance": "同作用域 ID 唯一；版本不同可共存；迁移失败有回滚/修复说明",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F04",
+      "title": "实现草稿节点和来源批写",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F03",
+        "E12"
+      ],
+      "input": "实体候选",
+      "output": "草稿节点/来源关联",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/graph_nodes.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f04.py"
+      ],
+      "acceptance": "重试幂等；教师锁不覆盖；跨课程源被拒绝；批量部分失败有记录",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F05",
+      "title": "实现 DAG 环检测纯函数",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B11"
+      ],
+      "input": "节点/前置边 + 候选边",
+      "output": "合法或环路径",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/dag.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f05.py"
+      ],
+      "acceptance": "自环、三节点环、反转造环、断开图、大链条；复杂度边界明确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_f05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F06",
+      "title": "实现关系事务写入与并发防环",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F04",
+        "F05"
+      ],
+      "input": "关系候选/当前 revision",
+      "output": "已校验边",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/graph_relations.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/relations.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f06.py"
+      ],
+      "acceptance": "两个连接并发 A→B/B→A 至少一方冲突；校验与提交同写入序列",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F07",
+      "title": "实现草稿图读取与详情服务",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F04",
+        "F06",
+        "C03"
+      ],
+      "input": "course/version/filter",
+      "output": "图与节点出处",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/read.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/graph.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f07.py"
+      ],
+      "acceptance": "明确教师草稿和学生发布读入口；返回空图/尚未发布区别；来源定位完整",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_f07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F08",
+      "title": "实现教师节点编辑与手改锁",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F07",
+        "B11"
+      ],
+      "input": "expected_revision + patch",
+      "output": "新 revision",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/edit_node.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/graph_nodes.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f08.py"
+      ],
+      "acceptance": "后写冲突不覆盖；教师修改置锁；显式解锁单独权限；自动流程守锁",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_f08.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F09",
+      "title": "实现节点删除与关系清理",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F08"
+      ],
+      "input": "节点 ID/revision",
+      "output": "删除草稿节点",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/delete_node.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f09.py"
+      ],
+      "acceptance": "只清同版本边；已发布快照不变；不存在/跨课/并发删除明确结果",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f09.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F10",
+      "title": "实现节点合并与重接边",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F08",
+        "F06"
+      ],
+      "input": "重复节点集合",
+      "output": "合并节点和来源并集",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/merge_nodes.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f10.py"
+      ],
+      "acceptance": "迁移入出边后去重并验环；锁/冲突时不部分提交；来源不丢",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F11",
+      "title": "实现审核队列和单项处理",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F10"
+      ],
+      "input": "草稿候选",
+      "output": "三类审核项",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/review.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/review.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f11.py"
+      ],
+      "acceptance": "低置信度/重复/孤立分类；通过拒绝合并后队列变化；分页稳定",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_f11.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F12",
+      "title": "实现图编辑审计日志",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F08",
+        "F09",
+        "F10",
+        "C01"
+      ],
+      "input": "图编辑事件",
+      "output": "审计记录",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/edit_logs.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/graph/audit.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f12.py"
+      ],
+      "acceptance": "谁/何时/何版本/变更摘要齐全；跨库失败可重试；不记录秘密",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_f12.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f12.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "F13",
+      "title": "完成图持久化 worker 阶段",
+      "group": "图存储与教师编辑",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F04",
+        "F06",
+        "E12",
+        "C08"
+      ],
+      "input": "抽取候选",
+      "output": "persisting/awaiting_review",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/workers/persist_graph.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_f13.py"
+      ],
+      "acceptance": "失败重跑幂等；取消不标已完成；部分块失败策略严格按 A03",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_f13.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-f13.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G01",
+      "title": "实现快照序列化和摘要",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A04",
+        "B11",
+        "F07"
+      ],
+      "input": "草稿图/来源",
+      "output": "可验证快照",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/versions/snapshot.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_g01.py"
+      ],
+      "acceptance": "字段顺序稳定；缺端点/来源/环拒绝；完整 roundtrip 不丢属性",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_g01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G02",
+      "title": "实现版本元数据与发布操作记录",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G01",
+        "C01"
+      ],
+      "input": "快照摘要",
+      "output": "preparing/ready 元数据",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/versions.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/005_versions.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_g02.py"
+      ],
+      "acceptance": "相同幂等键不重复版本；唯一课程版本；失败可查",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_g02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G03",
+      "title": "实现版本图与向量构建",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G02",
+        "F03",
+        "E07"
+      ],
+      "input": "快照",
+      "output": "隔离的版本图/索引",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/versions/materialize.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_g03.py"
+      ],
+      "acceptance": "构建期间学生仍读旧版；维度/模型版本不一致失败；重试不重复图",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_g03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G04",
+      "title": "实现原子发布指针切换",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G03",
+        "F05",
+        "F12"
+      ],
+      "input": "ready 版本",
+      "output": "当前 published_version",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/versions/publish.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_g04.py"
+      ],
+      "acceptance": "先验 DAG/来源再切指针；任一前置失败保留旧指针；并发发布有冲突",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_g04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G05",
+      "title": "实现发布失败补偿与恢复",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G04"
+      ],
+      "input": "失败操作记录",
+      "output": "重试/清理未激活版本",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/versions/reconcile.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_g05.py"
+      ],
+      "acceptance": "模拟 SQLite/Neo4j 各阶段失败；补偿幂等；不清仍被读的旧版本",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_g05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G06",
+      "title": "实现回滚和版本列表 API",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G05",
+        "C03"
+      ],
+      "input": "历史版本",
+      "output": "列表或指针回滚",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/versions.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/versions/rollback.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_g06.py"
+      ],
+      "acceptance": "不存在/跨课版本拒绝；回滚当前版按 A04 幂等；保留历史审计",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_g06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "G07",
+      "title": "实现统一发布版本解析器",
+      "group": "发布版本和补偿",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G04"
+      ],
+      "input": "学生课程请求",
+      "output": "固定 version_id",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/versions/resolver.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_g07.py"
+      ],
+      "acceptance": "无发布版明确状态；请求中发布新版本不混读；图/问答/路径复用",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_g07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-g07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H01",
+      "title": "实现课程首页和创建表单",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B03",
+        "B04",
+        "B15",
+        "C04"
+      ],
+      "input": "课程 API",
+      "output": "课程卡片/创建交互",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/CoursesView.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useCourses.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h01.test.ts"
+      ],
+      "acceptance": "加载/空/错/禁止访问；重复点提交不重复创建；切课正确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h01.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H02",
+      "title": "实现资料上传和进度页面",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H01",
+        "C07",
+        "C12"
+      ],
+      "input": "上传响应/task SSE",
+      "output": "阶段和取消界面",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/MaterialsView.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useMaterials.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h02.test.ts"
+      ],
+      "acceptance": "非法格式提示、失败重试、取消中/已取消分开；离开关闭流",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h02.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H03",
+      "title": "实现契约到 G6 数据适配",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B14",
+        "F07"
+      ],
+      "input": "Graph DTO",
+      "output": "独立 G6 数据",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/graph/adapter.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h03.test.ts"
+      ],
+      "acceptance": "四类边样式、方向、缺端点、空图、稳定 ID；不修改输入对象",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h03.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H04",
+      "title": "实现 G6 生命周期组件",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H03"
+      ],
+      "input": "适配图",
+      "output": "可缩放拖拽画布",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/GraphCanvas.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/graph/lifecycle.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h04.test.ts"
+      ],
+      "acceptance": "挂载/更新/销毁；反复切页不泄漏；resize 后布局正确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h04.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H05",
+      "title": "实现图搜索筛选与布局切换",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H04"
+      ],
+      "input": "搜索词/类型/章节",
+      "output": "图可见集合",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useGraphFilters.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/GraphToolbar.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h05.test.ts"
+      ],
+      "acceptance": "筛选后无悬空边；清空恢复；层次/力导向切换不丢选中态",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h05.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H06",
+      "title": "实现知识点详情和来源浏览",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H04",
+        "F07"
+      ],
+      "input": "节点 ID",
+      "output": "定义/关系/原文抽屉",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/KnowledgeDetail.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useKnowledgeDetail.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h06.test.ts"
+      ],
+      "acceptance": "点击来源定位页/章节；未知来源不伪造；XSS 文本不执行；迟到请求隔离",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h06.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H07",
+      "title": "实现教师节点编辑面板",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H06",
+        "F08",
+        "F09"
+      ],
+      "input": "详情/patch",
+      "output": "保存/删除交互",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/NodeEditor.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useNodeEditor.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h07.test.ts"
+      ],
+      "acceptance": "字段错误、revision 冲突、锁/解锁；失败不假装保存成功",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h07.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H08",
+      "title": "实现教师连边编辑交互",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H04",
+        "F06"
+      ],
+      "input": "拖线/类型/反转",
+      "output": "关系请求",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/RelationEditor.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useRelationEditor.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h08.test.ts"
+      ],
+      "acceptance": "成环错误高亮冲突路径；服务拒绝时撤销临时边；无组件 Cypher",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h08.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H09",
+      "title": "实现审核队列和节点合并 UI",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F10",
+        "F11",
+        "H07"
+      ],
+      "input": "审核项",
+      "output": "单项动作与结果",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/ReviewView.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useReview.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h09.test.ts"
+      ],
+      "acceptance": "三类空态、重复操作、合并冲突；刷新后数量一致",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h09.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H10",
+      "title": "实现发布历史和回滚 UI",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G06",
+        "H09"
+      ],
+      "input": "版本 API",
+      "output": "发布/历史/回滚界面",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/VersionPanel.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useVersions.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h10.test.ts"
+      ],
+      "acceptance": "发布失败保持旧标识；修订中学生仍见旧版；回滚前显示目标版本",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "H11",
+      "title": "实现学生图谱和卡片视图",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H05",
+        "H06",
+        "G07"
+      ],
+      "input": "发布图",
+      "output": "图/卡片切换",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/StudentGraphView.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/KnowledgeCards.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h11.test.ts"
+      ],
+      "acceptance": "无发布、空图、分页卡片、键盘可用；任何入口不取草稿",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h11.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "I01",
+      "title": "实现学习进度仓储",
+      "group": "进度与可解释推荐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C01",
+        "A08",
+        "G07"
+      ],
+      "input": "当前用户/知识点状态",
+      "output": "进度记录",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/progress.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/006_progress.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_i01.py"
+      ],
+      "acceptance": "用户/课程隔离，重复写幂等，未知节点拒绝；版本迁移按 A08",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_i01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-i01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "I02",
+      "title": "实现掌握标记 API",
+      "group": "进度与可解释推荐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "I01",
+        "C03",
+        "B12"
+      ],
+      "input": "标记请求",
+      "output": "当前进度",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/learning/progress.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/progress.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_i02.py"
+      ],
+      "acceptance": "拒绝请求冒用他人 user_id；改标后可重算；不能标草稿独有点",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_i02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-i02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "I03",
+      "title": "实现可学集合纯函数",
+      "group": "进度与可解释推荐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A08",
+        "F05"
+      ],
+      "input": "发布 DAG + M",
+      "output": "可学候选",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/learning/eligible.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_i03.py"
+      ],
+      "acceptance": "M 空/全掌握/孤立点/多前置/环/外课 ID；不擅改用户掌握集合",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_i03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-i03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "I04",
+      "title": "实现四项评分和结构化理由",
+      "group": "进度与可解释推荐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "I03"
+      ],
+      "input": "候选/图/参数",
+      "output": "排序及分量",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/learning/ranking.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_i04.py"
+      ],
+      "acceptance": "零分母、全零权重、同分、真实解锁数；分量求和等于 score；理由不用 LLM",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_i04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-i04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "I05",
+      "title": "实现推荐查询 API",
+      "group": "进度与可解释推荐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "I02",
+        "I04",
+        "G07"
+      ],
+      "input": "用户课程",
+      "output": "候选列表与明确空态",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/learning/recommend.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/recommend.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_i05.py"
+      ],
+      "acceptance": "请求全程同版本；截断稳定；暂无图与全掌握区别；有环明确错误",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_i05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-i05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "I06",
+      "title": "实现掌握标记与推荐 UI",
+      "group": "进度与可解释推荐",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "I05",
+        "H11"
+      ],
+      "input": "进度/推荐",
+      "output": "学习状态色/推荐高亮",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useLearning.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/Recommendations.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/i06.test.ts"
+      ],
+      "acceptance": "失败撤销乐观标记；切课后旧推荐不覆盖；理由与服务分量一致",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/i06.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-i06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J01",
+      "title": "建立发布来源向量检索",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G07",
+        "G03",
+        "E07"
+      ],
+      "input": "问题向量 + course/version",
+      "output": "来源候选",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/vector_search.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_j01.py"
+      ],
+      "acceptance": "先限定作用域或可靠过滤并补足召回；跨课/旧版本结果不进入上下文",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_j01.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J02",
+      "title": "实现图结构检索",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G07",
+        "F07"
+      ],
+      "input": "术语/知识点",
+      "output": "有界子图",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/graph_search.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_j02.py"
+      ],
+      "acceptance": "跳数和节点数有上限；只返回同课程发布版；无匹配返回空",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_j02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J03",
+      "title": "实现多轮问题改写",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "E04",
+        "E01"
+      ],
+      "input": "有限历史+问题",
+      "output": "检索问题",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/qa/rewrite.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/rewrite_query.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j03.py"
+      ],
+      "acceptance": "历史裁剪、指代失败保留原问题、超时降级；不接受历史中的系统角色",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_j03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J04",
+      "title": "实现检索合并与上下文预算",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J01",
+        "J02",
+        "J03",
+        "A09"
+      ],
+      "input": "两路候选",
+      "output": "编号证据上下文",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/qa/context.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j04.py"
+      ],
+      "acceptance": "去重保留出处；低分/空上下文返回未覆盖；阈值用 fake；token 预算不截断定位",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_j04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J05",
+      "title": "实现有证据问答生成",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J04",
+        "E04"
+      ],
+      "input": "上下文",
+      "output": "待校验答案",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/qa/generate.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/answer_with_context.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j05.py"
+      ],
+      "acceptance": "空/低分上下文生成调用数为0；原文注入按资料处理；超时为独立错误",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_j05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J06",
+      "title": "实现引用和终态校验",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J05",
+        "B13"
+      ],
+      "input": "待校验答案/允许引用集合",
+      "output": "最终响应",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/qa/citations.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j06.py"
+      ],
+      "acceptance": "未知编号/外课/旧版/空引用；全部失效则未覆盖并清除答案；有效来源定位可解",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_j06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J07",
+      "title": "实现问答 POST SSE API",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J06",
+        "C03"
+      ],
+      "input": "课程问题",
+      "output": "meta/delta/done/error",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/chat.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/qa/stream.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j07.py"
+      ],
+      "acceptance": "协议事件有序；断连释放任务；无自动重复生成；失败终态不展示已验证答案",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_j07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J08",
+      "title": "实现问答 fetch 流客户端",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J07",
+        "B15"
+      ],
+      "input": "任意网络分片",
+      "output": "类型化事件",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/api/chatStream.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/j08.test.ts"
+      ],
+      "acceptance": "UTF-8跨字节、CRLF、多行data、空帧、异常EOF、取消；不自动重放提问",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/j08.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J09",
+      "title": "实现问答与引用联动 UI",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J08",
+        "H06"
+      ],
+      "input": "流/最终引用",
+      "output": "对话和出处面板",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/ChatView.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useChat.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/j09.test.ts"
+      ],
+      "acceptance": "临时文字标识；引用失败终态替换；Markdown/XSS过滤；切课清上下文",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/j09.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "J10",
+      "title": "实现问答审计与统计",
+      "group": "可信问答",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "J07",
+        "C01"
+      ],
+      "input": "完成/失败事件",
+      "output": "可检索日志",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/chat_logs.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/007_chat_logs.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j10.py"
+      ],
+      "acceptance": "课程用户隔离、版本/耗时齐全；日志留存与脱敏明确；重试不重复统计",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_j10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-j10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K01",
+      "title": "建立自编标注集及评测口径",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "A07",
+        "E11",
+        "J06",
+        "I04"
+      ],
+      "input": "自编材料",
+      "output": "标注格式与指标定义",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/evaluation/README.md",
+        "/Users/arvinhan/Desktop/SmartSketch/evaluation/fixtures/synthetic.json"
+      ],
+      "acceptance": "区分实体/关系准确召回、引用有效/支持度、未覆盖混淆矩阵；阈值不在测试集调",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 K01 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K02",
+      "title": "实现抽取和融合离线评测",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "K01",
+        "E11"
+      ],
+      "input": "预测/金标",
+      "output": "分项指标报告",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/evaluation/evaluate_extraction.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_k02.py"
+      ],
+      "acceptance": "空分母、ID匹配、四类型分组；固定输入重复结果一致；假模型不充真实效果",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_k02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K03",
+      "title": "实现可信问答离线评测",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "K01",
+        "J06"
+      ],
+      "input": "问题/答案/证据",
+      "output": "质量指标",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/evaluation/evaluate_qa.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_k03.py"
+      ],
+      "acceptance": "编号存在不等于支持结论；包含注入/不覆盖负例；支持人工复核与假阳性记录",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_k03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K04",
+      "title": "实现全链路阶段性能测量",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F13",
+        "J07",
+        "E04"
+      ],
+      "input": "固定约2万字fixture",
+      "output": "阶段耗时/token报告",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/evaluation/benchmark_pipeline.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_k04.py"
+      ],
+      "acceptance": "注明机器/模型/并发/样本数/p50/p95；区分目标与实测；付费执行另行确认",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_k04.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K05",
+      "title": "建立教师主线 E2E",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "H02",
+        "H08",
+        "H09",
+        "H10",
+        "F13"
+      ],
+      "input": "自编四格式资料",
+      "output": "上传到发布用例",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/tests/e2e/teacher.spec.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/e2e/fixtures.ts"
+      ],
+      "acceptance": "fake模型也走真实服务；成环拒绝、失败重试、发布可见；保留失败证据",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run test:e2e -- ../../tests/e2e/teacher.spec.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K06",
+      "title": "建立学生主线 E2E",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "I06",
+        "J09",
+        "H11",
+        "K05"
+      ],
+      "input": "已发布课程",
+      "output": "浏览/掌握/推荐/问答",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/tests/e2e/student.spec.ts"
+      ],
+      "acceptance": "跨课程拒绝；草稿不可见；旧发布版稳定；无来源答案不完成显示",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run test:e2e -- ../../tests/e2e/student.spec.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K07",
+      "title": "复用并审查环境启停脚本",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "F01",
+        "A10"
+      ],
+      "input": "已有 dev-up/down",
+      "output": "启停行为修正",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/dev-up.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/dev-down.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/_dev-common.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/tooling/test_k07.py"
+      ],
+      "acceptance": "普通停止保留数据；删除卷需要显式确认；缺 env 给提示；不覆盖个人 .env",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/tooling/test_k07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K08",
+      "title": "实现前后端与 worker 容器配置",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "K07",
+        "B05",
+        "B01",
+        "F13"
+      ],
+      "input": "可运行应用",
+      "output": "镜像/Compose 服务",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/Dockerfile",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/Dockerfile",
+        "/Users/arvinhan/Desktop/SmartSketch/docker-compose.yml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_k08.py"
+      ],
+      "acceptance": "按 A06 运行worker；容器健康检查；密钥只在后端；前端构建不含密钥",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_k08.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K09",
+      "title": "实现示例课程幂等导入",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "K05",
+        "K06"
+      ],
+      "input": "自编课程包",
+      "output": "一键演示数据",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/import-demo.py",
+        "/Users/arvinhan/Desktop/SmartSketch/datasets/demo/manifest.json",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_k09.py"
+      ],
+      "acceptance": "重跑不重复；只写示例课；失败可重试；不混入真实资料或删除他课",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_k09.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k09.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K10",
+      "title": "建立备份和恢复演练",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "G05",
+        "K08"
+      ],
+      "input": "临时双库/文件",
+      "output": "可恢复快照集",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/backup-demo.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/restore-demo.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/integration/test_k10.py"
+      ],
+      "acceptance": "一致时间点和发布指针；恢复在隔离副本验证引用/图/进度；不覆盖用户库",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/integration/test_k10.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k10.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K11",
+      "title": "接入实际质量门禁",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "B07",
+        "B14",
+        "K05",
+        "K06"
+      ],
+      "input": "各层真实测试",
+      "output": "单入口汇总",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/verify.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/verify/backend.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/scripts/verify/frontend.sh",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/tooling/test_k11.py"
+      ],
+      "acceptance": "已实现模块无静默SKIP；零测试视为缺口；失败退出非0；基础/集成模式明确",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/tooling/test_k11.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k11.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "K12",
+      "title": "编写部署验收和演示说明",
+      "group": "评测部署与交付",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "K08",
+        "K09",
+        "K10",
+        "K11"
+      ],
+      "input": "已测命令/指标",
+      "output": "运行手册和验收矩阵",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/docs/runbook.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/acceptance.md"
+      ],
+      "acceptance": "逐功能指向真实证据；Windows/macOS/Linux仅列已测平台；限制和恢复步骤齐全",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 K12 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k12.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O01",
+      "title": "确认目标路径和学习材料范围",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "K06"
+      ],
+      "input": "S2加分项/分支ADR",
+      "output": "独立准入决定",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/docs/decisions.md",
+        "/Users/arvinhan/Desktop/SmartSketch/docs/tasks.md"
+      ],
+      "acceptance": "明确是否纳入、优先级、预算、字段变更；未批准时后续 O 项不执行",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "git diff --check；逐条核对 O01 验收矩阵与源文档，人工决策保留未签收标记",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o01.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O02",
+      "title": "定义目标路径契约",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O01",
+        "B12"
+      ],
+      "input": "目标t/已掌握M",
+      "output": "祖先子图和步骤DTO",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/learning-path.md",
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/learning.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_o02.py"
+      ],
+      "acceptance": "是否包含目标、目标已掌握、环/缺点、并列顺序全部明确；重新生成契约",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_o02.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o02.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O03",
+      "title": "实现目标路径算法与API",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O02",
+        "I05"
+      ],
+      "input": "目标/发布DAG/M",
+      "output": "Kahn有序步骤",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/learning/target_path.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/recommend.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_o03.py"
+      ],
+      "acceptance": "多前置祖先完整；不重复、不越课、无环；目标已掌握按规格",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_o03.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o03.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O04",
+      "title": "实现目标路径编号高亮",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O03",
+        "I06"
+      ],
+      "input": "有序步骤",
+      "output": "图步骤编号与导航",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/TargetPath.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/o04.test.ts"
+      ],
+      "acceptance": "筛选不丢必要前置说明；切目标/课程清旧路径；键盘可操作",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/o04.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o04.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O05",
+      "title": "定义学习材料缓存与审核契约",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O01",
+        "B13"
+      ],
+      "input": "按需讲解/练习",
+      "output": "来源/审核/缓存模型",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/specs/study-material.md",
+        "/Users/arvinhan/Desktop/SmartSketch/src/contracts/v1/python/study_material.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/contracts/test_o05.py"
+      ],
+      "acceptance": "包含version/prompt/model缓存键；发布前教师审核；未覆盖和失败有区别",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/contracts/test_o05.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o05.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O06",
+      "title": "实现学习材料生成与缓存服务",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O05",
+        "J06",
+        "E04"
+      ],
+      "input": "知识点证据",
+      "output": "讲解/示例/3题答案解析",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/study_material.py",
+        "/Users/arvinhan/Desktop/SmartSketch/prompts/gen_study_material.yaml",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_o06.py"
+      ],
+      "acceptance": "证据不足不生成；题量正确；引用校验；缓存换版本失效；mock测预算",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_o06.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o06.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O07",
+      "title": "实现学习材料审核与读取API",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O06",
+        "C03"
+      ],
+      "input": "生成内容/教师决策",
+      "output": "可读审核结果",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/study_material.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/study_material.py",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_o07.py"
+      ],
+      "acceptance": "学生仅见已审核；教师拒绝可回查；并发审核冲突；创建数据库迁移另拆如超范围",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "python3 -m pytest tests/backend/test_o07.py -q",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o07.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    },
+    {
+      "id": "O08",
+      "title": "实现材料按需入口与审核UI",
+      "group": "可选加分项",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "O07",
+        "J09",
+        "H09"
+      ],
+      "input": "材料状态",
+      "output": "请求/审核/显示界面",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/components/StudyMaterial.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/composables/useStudyMaterial.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/o08.test.ts"
+      ],
+      "acceptance": "生成中/失败/未覆盖/待审核区分；三题解析可读；无凭证或秘密入前端",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/o08.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-o08.md",
+      "rollback": "只撤销本任务自有变更；持久层/依赖变更先备份并附定向恢复命令；禁止覆盖其他工作区。"
+    }
+  ]
+}
