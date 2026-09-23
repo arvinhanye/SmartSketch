@@ -29,7 +29,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/schemas/` | 请求/响应/事件 DTO | 持久化实现 |
 | `src/backend/app/services/` | 领域规则、流程编排 | HTTP/框架细节 |
 | `src/backend/app/repositories/` | Neo4j / SQLite 读写 | 产品策略 |
-| `src/backend/app/workers/` | 长时文档任务与状态迁移 | Web 请求处理 |
+| `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
 | `src/contracts/` | 前后端共享 API 和 SSE 事件约定 | 供应商专用密钥/实现 |
 
 ## 契约真源与生成物（ADR-004）
@@ -107,13 +107,13 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 核心数据模型
 
-- SQLite：`Course`、`Material`、`ProcessingTask`、`GraphVersion`、`LearningProgress`、`QuestionSession`。
+- SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`QuestionSession`。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。
 - Neo4j：`Course`、`KnowledgePoint`、`SourceChunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。
 - 所有查询和写入均以 `course_id` 为第一隔离条件。`PREREQUISITE` 只能形成 DAG。
 
 ## 数据流
 
-1. 上传资料 → SQLite 创建任务/资料记录 → Worker 解析和分块。
+1. 上传资料 → SQLite 创建任务/资料记录 → Worker 进程经租约领取任务 → 解析和分块。
 2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
 3. Worker 更新任务状态，API 经 SSE 发送进度；教师审核并发布不可变图谱版本。
 4. 学生浏览发布版本；学习进度保存在 SQLite，路径服务查询 Neo4j 前置关系并计算候选与理由。
