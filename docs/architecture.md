@@ -32,6 +32,22 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/workers/` | 长时文档任务与状态迁移 | Web 请求处理 |
 | `src/contracts/` | 前后端共享 API 和 SSE 事件约定 | 供应商专用密钥/实现 |
 
+## 契约真源与生成物（ADR-004）
+
+下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/decisions.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
+
+| 角色 | 位置 | 谁写 | 规则 |
+| --- | --- | --- | --- |
+| 人工编辑真源 | `src/contracts/api.v1.yaml`（OpenAPI 3.1） | 后端 Agent | 唯一允许人工编辑的机器可读契约；任何 REST/SSE/图谱格式变更的第一步 |
+| 配套语义文档 | `src/contracts/errors.v1.md`、`src/contracts/events.v1.md` | 后端 Agent | 只写 OpenAPI 表达不了的时序与语义，不重复定义结构 |
+| 生成物 | `src/contracts/v1/generated/`（`openapi.json`、`schemas/*.schema.json`、`python/`、`typescript/`） | `./scripts/gen-contracts.sh` | 入库、**禁止手工编辑**；两次生成字节一致；`--check` 不通过即拒绝合入 |
+| 后端消费 | `src/backend/app/schemas/` | 后端 Agent | 只放不对外暴露的内部模型；对外 DTO 从 `v1/generated/python/` 导入 |
+| 前端消费 | `src/frontend/src/api/` | 前端 Agent | 类型从 `v1/generated/typescript/` 导入；不得重写、断言或 `any` 绕过 |
+
+- REST 路径前缀现状为 `/api/v1`，与生成物目录 `v1/` 同步升级；`/health` 不带前缀。前缀与 wire 枚举的最终裁定属原子任务 A02。
+- 生成器及版本锁在 `src/contracts/toolchain.txt`；缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
+- 契约的**表达方式**由 ADR-004 裁定，契约的**内容正确性**不由它保证：来源非空、事件判别联合等约束仍须各自的负例测试复验；「引用确属同一课程同一发布版本」schema 表达不了，必须在服务层校验。
+
 ## 核心数据模型
 
 - SQLite：`Course`、`Material`、`ProcessingTask`、`GraphVersion`、`LearningProgress`、`QuestionSession`。
