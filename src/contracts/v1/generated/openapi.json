@@ -170,6 +170,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "201": {
             "description": "已创建",
             "content": {
@@ -202,6 +205,9 @@
         "summary": "课程详情",
         "operationId": "getCourse",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "课程详情",
             "content": {
@@ -234,6 +240,9 @@
         "summary": "课程资料列表",
         "operationId": "listDocuments",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "资料列表",
             "content": {
@@ -284,6 +293,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "202": {
             "description": "已接受，任务已创建",
             "content": {
@@ -320,6 +332,9 @@
         "description": "SSE 不可用时的轮询兜底。`stage = failed` 时 `error` 必填，HTTP 仍为 200。",
         "operationId": "getTask",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "任务当前状态",
             "content": {
@@ -353,6 +368,9 @@
         "description": "`text/event-stream`。事件名、顺序保证、心跳与重连语义在 `events.v1.md` 中定义，\n本条目仅约束单条事件的数据结构。\n",
         "operationId": "streamTaskEvents",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "事件流",
             "content": {
@@ -386,6 +404,9 @@
         "description": "仅非终态任务可取消；终态任务返回 `TASK_NOT_CANCELLABLE`。",
         "operationId": "cancelTask",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已转入 cancelled",
             "content": {
@@ -460,6 +481,9 @@
           }
         ],
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "图谱交换格式",
             "content": {
@@ -517,6 +541,9 @@
           }
         ],
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "知识点列表",
             "content": {
@@ -552,6 +579,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "201": {
             "description": "已创建，`source` 固定为 manual、`locked` 固定为 true",
             "content": {
@@ -588,6 +618,9 @@
         "description": "必须返回至少一条 `source_refs`（规格验收条件 5）。",
         "operationId": "getKnowledgePoint",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "知识点详情",
             "content": {
@@ -624,6 +657,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已更新",
             "content": {
@@ -652,6 +688,9 @@
         "summary": "删除知识点及其关系（教师）",
         "operationId": "deleteKnowledgePoint",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "204": {
             "description": "已删除"
           },
@@ -688,6 +727,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "合并后的主节点",
             "content": {
@@ -727,6 +769,9 @@
         "description": "对应规格验收条件 7。结果可缓存，教师审核后固定。",
         "operationId": "generateStudyMaterial",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "学习材料",
             "content": {
@@ -773,6 +818,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "201": {
             "description": "已创建",
             "content": {
@@ -822,6 +870,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已更新",
             "content": {
@@ -850,6 +901,9 @@
         "summary": "删除关系（教师）",
         "operationId": "deleteRelation",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "204": {
             "description": "已删除"
           },
@@ -876,6 +930,9 @@
         "description": "三栏：低置信度关系、疑似重复知识点、孤立知识点。每条附原文证据。",
         "operationId": "getReviewQueue",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "审核队列",
             "content": {
@@ -906,6 +963,9 @@
         "description": "发布前返回图谱质量体检结果；存在环冲突时拒绝发布。",
         "operationId": "publishGraph",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已发布",
             "content": {
@@ -938,6 +998,9 @@
         "summary": "历史发布版本列表（教师）",
         "operationId": "listVersions",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "版本列表",
             "content": {
@@ -979,6 +1042,9 @@
         "summary": "回滚到指定版本（教师）",
         "operationId": "rollbackVersion",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "回滚后的版本信息",
             "content": {
@@ -1011,6 +1077,9 @@
         "summary": "当前学生在本课程的掌握状态",
         "operationId": "getProgress",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "掌握状态列表",
             "content": {
@@ -1049,6 +1118,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "更新后的掌握状态",
             "content": {
@@ -1105,6 +1177,9 @@
           }
         ],
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "推荐列表或学习路径",
             "content": {
@@ -1162,6 +1237,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "回答，或 `not_covered` 状态",
             "content": {
@@ -1199,7 +1277,13 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "令牌载荷含 `sub`（用户 ID）与 `role`（teacher / student）。"
+        "description": "令牌载荷含 `sub`（用户 ID）与 `role`（teacher / student）。\n`role` 仅作前端路由提示；服务端不据此授权，课程内权限每次回查成员关系。\n"
+      },
+      "eventTicket": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "ticket",
+        "description": "任务 SSE 使用的一次性票据；申领与核销规则见 `specs/identity-access.md` §5。"
       }
     },
     "parameters": {
@@ -1370,7 +1454,15 @@
           "TASK_NOT_CANCELLABLE",
           "PUBLISH_BLOCKED",
           "RATE_LIMITED",
-          "LLM_UNAVAILABLE"
+          "LLM_UNAVAILABLE",
+          "DOCUMENT_UNREADABLE",
+          "EXTRACTION_INCOMPLETE",
+          "STORAGE_UNAVAILABLE",
+          "INTERNAL_ERROR",
+          "TASK_ATTEMPTS_EXHAUSTED",
+          "PUBLISH_IN_PROGRESS",
+          "COURSE_BUSY",
+          "BUDGET_EXCEEDED"
         ]
       },
       "Role": {
