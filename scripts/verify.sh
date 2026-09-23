@@ -14,4 +14,6 @@ for json_file in .mcp.json .claude/settings.json; do python3 -m json.tool "$json
 grep -qxF '.claude/settings.local.json' .gitignore || { echo 'settings.local.json is not ignored' >&2; exit 1; }
 grep -q 'M0-01 | DONE' docs/tasks.md || { echo 'M0-01 task status is not recorded' >&2; exit 1; }
 grep -q 'PREREQUISITE' docs/architecture.md || { echo 'Graph prerequisite constraint is undocumented' >&2; exit 1; }
+hook_tests="$(tests/hooks/test_block_dangerous.sh 2>&1)" || { printf '%s\n' "$hook_tests" >&2; echo 'block-dangerous hook regression tests failed' >&2; exit 1; }
+tail -n 1 <<<"$hook_tests"
 echo 'Scaffold verification passed.'
