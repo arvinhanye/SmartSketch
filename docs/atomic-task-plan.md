@@ -67,7 +67,7 @@
 | **B09 迁移课程与资料 REST 契约** | B08, A05 | 现有课程/文档端点 → DTO 和路径声明 | `src/contracts/v1/python/courses.py` | 列表/创建/上传/读取有成功与失败响应；不从零重写已有字段 | `python3 -m pytest tests/contracts/test_b09.py -q` |
 | **B10 迁移任务与 SSE 契约** | B08, A03 | 任务转换表 → 判别事件 DTO | `src/contracts/v1/python/tasks.py` | 每种事件必填字段不同；空 payload 拒绝；取消请求和终态区别正确 | `python3 -m pytest tests/contracts/test_b10.py -q` |
 | **B11 迁移图谱编辑和版本契约** | B08, A04 | 现有图节点关系接口 → 作用域/修订号 DTO | `src/contracts/v1/python/graph.py` | 跨版本标识齐全；编辑携带 expected_revision；端点与来源校验负例 | `python3 -m pytest tests/contracts/test_b11.py -q` |
-| **B12 迁移进度和推荐契约** | B08, A08 | 进度/推荐规格 → DTO | `src/contracts/v1/python/learning.py` | 空态可区分全部掌握/尚未发布/无图；分量可还原评分 | `python3 -m pytest tests/contracts/test_b12.py -q` |
+| **B12 迁移进度和推荐契约** | B08, A08 | 进度/推荐规格 → DTO | `src/contracts/v1/python/learning.py` | 区分未发布错误与全部掌握空态；已提交空图按发布快照完整性故障处理，不增加 `no_graph` wire 状态；未舍入 double 分量按 `u→i→c→e` 求和逐位等于评分，仅展示舍入 | `python3 -m pytest tests/contracts/test_b12.py -q` |
 | **B13 迁移问答与事件契约** | B08, A09 | R03/R04 → 响应判别联合 | `src/contracts/v1/python/chat.py` | answered 空引用拒绝、无定位拒绝、空事件拒绝；最终替换正文有字段 | `python3 -m pytest tests/contracts/test_b13.py -q` |
 | **B14 建立契约导出与漂移检查** | B09, B10, B11, B12, B13 | 选定真源 → OpenAPI/Schema/TS 生成物 | `scripts/gen-contracts.sh`<br>`src/contracts/generate.py`<br>`src/contracts/v1/generated` | 两次输出一致；只检查模式不改工作文件；临时篡改生成物必被检出 | `python3 -m pytest tests/contracts/test_b14.py -q` |
 | **B15 建立前端 HTTP 客户端** | B02, B14 | 生成 TS 契约 → 请求封装 | `src/frontend/src/api/http.ts` | 类型化错误、超时/取消、认证失败处理；组件不自行拼路径 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts` |
@@ -176,7 +176,7 @@
 | **I02 实现掌握标记 API** | I01, C03, B12 | 标记请求 → 当前进度 | `src/backend/app/services/learning/progress.py`<br>`src/backend/app/api/progress.py` | 拒绝请求冒用他人 user_id；改标后可重算；不能标草稿独有点 | `python3 -m pytest tests/backend/test_i02.py -q` |
 | **I03 实现可学集合纯函数** | A08, F05 | 发布 DAG + M → 可学候选 | `src/backend/app/services/learning/eligible.py` | M 空/全掌握/孤立点/多前置/环/外课 ID；不擅改用户掌握集合 | `python3 -m pytest tests/backend/test_i03.py -q` |
 | **I04 实现四项评分和结构化理由** | I03 | 候选/图/参数 → 排序及分量 | `src/backend/app/services/learning/ranking.py` | 零分母、全零权重、同分、真实解锁数；分量求和等于 score；理由不用 LLM | `python3 -m pytest tests/backend/test_i04.py -q` |
-| **I05 实现推荐查询 API** | I02, I04, G07 | 用户课程 → 候选列表与明确空态 | `src/backend/app/services/learning/recommend.py`<br>`src/backend/app/api/recommend.py` | 请求全程同版本；截断稳定；暂无图与全掌握区别；有环明确错误 | `python3 -m pytest tests/backend/test_i05.py -q` |
+| **I05 实现推荐查询 API** | I02, I04, G07 | 用户课程 → 候选列表与明确空态 | `src/backend/app/services/learning/recommend.py`<br>`src/backend/app/api/recommend.py` | 请求全程同版本；截断稳定；未发布 404 与全掌握区别；已提交图损坏 5xx；有环明确错误 | `python3 -m pytest tests/backend/test_i05.py -q` |
 | **I06 实现掌握标记与推荐 UI** | I05, H11 | 进度/推荐 → 学习状态色/推荐高亮 | `src/frontend/src/composables/useLearning.ts`<br>`src/frontend/src/components/Recommendations.vue` | 失败撤销乐观标记；切课后旧推荐不覆盖；理由与服务分量一致 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/i06.test.ts` |
 
 ## J 可信问答（10 项）
