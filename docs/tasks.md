@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
 | M0-02 | TODO | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | 待补充 |
-| M0-03 | TODO | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | 待补充 |
+| M0-03 | IN PROGRESS（B05；B06 待做） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05 见下方认领行；B06 设置加载尚未完成 |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
 
@@ -160,3 +160,16 @@
 
 - A04-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-012 修订 1）：文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID 且不可变，快照固定修订列表，检索按 `revision_id` 过滤；失败任务的来源块加删除保护；运行时只有一个向量空间，换模型须停机离线重新向量化全部文本块、草稿与已提交版本，配置与记录不一致即拒绝启动。
 - 交出的后续项（均未认领）：**A10** 在清单中为「重新向量化命令」补登叶子任务；**C06/C07** 定义「下线旧资料修订」；**B06/D09/D10/C09/D11/E07/F03** 按 ADR-012 修订 1 的实现依赖落实。
+
+## B05 后端应用工厂与健康检查
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B05 | DONE | 初始化 FastAPI 应用工厂与匿名 `GET /health` | Codex（后端） | `codex/b05-fastapi-health` / base `50a15c9` | `src/backend/pyproject.toml`、`src/backend/app/main.py`、`src/backend/app/api/health.py`、`tests/backend/test_b05.py`；**范围扩展**：`src/backend/app/api/__init__.py`（包标记）、`src/backend/README.md`（启动与测试说明）、任务板、架构说明和 `docs/handoffs/codex-b05.md` | pytest 3 PASS；基础 verify PASS；Uvicorn 实际启动并返回 HTTP 200；`docs/handoffs/codex-b05.md` |
+
+- 输入：已签收的 ADR-004、ADR-009，以及 `740adb` 分支现有 `/health` 契约（`status = ok`、`version` 为字符串）；B05 不引入第二套契约真源。
+- 输出：可由 Uvicorn 启动的应用工厂、无鉴权健康检查、后端依赖及 pytest 配置、成功/边界/失败测试。
+- 依赖：A01 已完成；A10 导入完整 `api.v1.yaml` 与 B06 配置校验仍是后续任务，不阻塞无密钥健康检查。
+- 风险：当前主分支尚无契约真源或数据库实现；本任务的健康检查只表示 API 进程可响应，不探测 Neo4j、SQLite 或模型服务。
+- 验证：`python -m pytest tests/backend/test_b05.py -q`（本机 Windows 的 `python3` 等价命令）3 PASS；`./scripts/verify.sh` PASS；`git diff --check` PASS；Uvicorn HTTP 冒烟 200，响应含 `status` 与 `version`。详细命令、版本和限制见交接。
+- B05 只完成后端最小启动与健康检查；父任务 M0-03 的 B06 设置加载仍待完成。A10 导入契约真源后，生成 DTO 应替换 B05 的临时响应模型。
