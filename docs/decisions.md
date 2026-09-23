@@ -105,6 +105,8 @@
 
   路径前缀现状：`ff30e0` 用 `/api/`，`740adb` 已统一为 `/api/v1/`，与 `docs/architecture.md`、目录 `v1/` 同步。本条按 `/api/v1/` 记录现状，**前缀与 wire 枚举大小写的最终裁定属 A02**，A02 若推翻需同时更新本表。
 
+  > **A02 已裁定（ADR-009，2026-09-22 签收，见本文件下文）**：维持 `/api/v1`，本表无需改动；上方编号表中「ADR-008 内容待 A02 复核」的结果也记在 ADR-009「后果」。
+
 - **清单路径映射**（`docs/atomic-task-plan.md` 使用规则第 3 条要求：选 YAML-first 时，先把 B08～B14、O02、O05 的候选路径映射到实际真源）：
 
   | 清单任务 | 清单中的候选路径（Pydantic-first 假设） | 签收后的实际真源位置 | 该任务改做什么 |
@@ -159,3 +161,46 @@
 - **仍未修（留给 B14 / M0-09）**：`--check` 只遍历本次生成出来的阶段，`v1/generated/` 顶层多出的**整个陈旧阶段目录**检不出来（阶段**内部**多出的陈旧文件能检出）。
 - **`740adb` 已入库的 `v1/generated/` 不完整**：只有 `openapi.json` 与 3 个 `schemas/*.json`，缺 `python/` 与 `typescript/`（它们是在降级模式下被跳过的）。这 4 个文件与真源实测一致，但对该分支跑 `--check` 现在会非 0 退出。补齐入库是 M0-09 的动作。
 - **版本漂移**：`src/contracts/toolchain.txt` 锁 `jsonschema==4.23.0`，本机校验侧解释器（conda base Python 3.13.5）装的是 4.26.0；`pyyaml` 6.0.2、`openapi-spec-validator` 0.9.0 与锁一致。是否收紧由 B07 处理。
+
+## ADR-009：API 路径前缀、wire 枚举大小写与前置关系成环分流
+
+> **签收状态：已签收（ACCEPTED）**，ArvinHan，2026-09-22。本条由原子任务 **A02** 提交，关闭 PLAN-D01 的第三项「API 前缀」（前两项已由 ADR-004 关闭，PLAN-D01 至此全部关闭）。
+> 规范表只有一份，在 `docs/architecture.md`「API 前缀与 wire 枚举」；成环算法与验收在 `specs/course-knowledge-graph.md`「前置关系成环处理」。本条只记录决定与理由，不复制表格。
+
+- **日期**：2026-09-22
+- **背景**：ADR-004 裁定了契约「怎么表达、谁写」，但把三处内容漂移留给 A02：
+  1. **路径前缀**：S2 表 6.6 与 `ff30e0` 用 `/api/...`；`740adb` 与 ADR-004 端点迁移表用 `/api/v1/...`。
+  2. **枚举大小写与遗漏**：AGENTS.md §4、ADR-003、`.claude/rules/backend.md` 写 `NOT_COVERED`，而 YAML 真源的 wire 值是 `status: "not_covered"`；main 的规格状态机缺 `persisting` 与 `cancelled`（Codex R05）；`740adb` 的 `src/contracts/README.md` 写 `not_covered_reason`，YAML 字段却是 `reason`。
+  3. **前置关系成环**：S2 规则校验写「出现环时保留置信度较高的边，最弱的边降级为'相关'并进入审核」；`740adb` 的 ADR-005 却把「前置关系成环被拒」列为 `persisting` 的失败原因，按字面读就是一条模型错边让整份资料的任务失败。架构审查把它列为「自动策略与规格待对齐」。
+- **评估方案**：
+
+  | 问题 | 方案 | 结论 | 理由 |
+  | --- | --- | --- | --- |
+  | 前缀 | `/api/v1` | **采纳** | 与真源文件名 `api.v1.yaml`、生成物目录 `v1/`、ADR-004 端点表一致，零迁移成本；主版本号有唯一可见位置 |
+  | 前缀 | `/api`（S2 原样） | 否决 | 要改 ADR-004 端点表与 `740adb` 的 22 条路径；v2 时只能靠请求头区分版本 |
+  | 未覆盖 | wire `not_covered` | **采纳** | 符合「只有错误码与关系类型大写」的统一规则；YAML、`events.v1.md` 与判别联合 mapping 都不用改 |
+  | 未覆盖 | wire `NOT_COVERED` | 否决 | `ChatStatus` 会成为唯一大写的状态枚举，规则出现例外；需改 YAML、事件文档与 discriminator |
+  | 自动成环 | 降级不失败 | **采纳** | 与 S2 一致；错边进入审核队列，教师可见可改；任务不因一条低置信度边作废 |
+  | 自动成环 | 整个任务 `failed` | 否决 | 一条模型错边就让整份资料的处理作废，教师只能重跑 |
+  | 自动成环 | 丢弃成环边 | 否决 | 教师看不到被丢弃的关系，违反「AI 生成、教师审核」的人机协同原则 |
+
+- **决定**：
+  1. **前缀**：所有 REST 与 SSE 端点为 `/api/v1`，唯一例外 `GET /health`。S2 的 `/api/...` 视为省略版本号的缩写。ADR-004 端点迁移表不改。
+  2. **大小写规则**：UPPER_SNAKE 只用于 `ErrorCode` 与 `RelationType`；其余所有 wire 枚举值（含 SSE 事件名、判别字段取值）一律 lower_snake。
+  3. **概念名与 wire 值分离**：`NOT_COVERED`、`TASK_FAILED` 是共同契约中的概念名，wire 分别是 `status: "not_covered"` + `reason`、`stage: "failed"` + `error`，都不是错误码。新代码、测试与前端分支只用 wire 值。AGENTS.md、ADR-003 与角色规则的措辞不改，由架构文档的映射表对照。
+  4. **`TaskStage` 取 9 个值**：`queued`、`parsing`、`extracting`、`merging`、`persisting`、`awaiting_review`、`completed`、`failed`、`cancelled`，终态为后三者。转换触发者、取消竞争与重连语义归 A03，本条不定。
+  5. **成环按来源分流**：
+     - 人工编辑（新建、改类型、改端点、反转、恢复 `rejected`、合并重接边、自环）成环 → 409 `CYCLE_DETECTED` + `details.cycle`，不自动修复；
+     - 自动候选成环 → 在环上未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`）中选置信度最低者（并列取 `id` 最小），改为 `RELATED_TO` + `low_confidence` 送审核，逐环重复直到无环，任务继续到 `awaiting_review`；
+     - 环上无可降级边（草稿已违反不变量）→ 任务 `failed`，`CYCLE_DETECTED`；
+     - 发布时仍有环 → 409 `PUBLISH_BLOCKED`。
+- **后果**：
+  - `740adb` ADR-005 第 1 条中「前置关系成环被拒」作为 `persisting` 失败原因，收窄为「环上无可降级边」这一种情形。A10 导入 ADR-005 时在其文首加注指向本条，不改原文。
+  - `740adb` `src/contracts/README.md` 的 `not_covered_reason` 须改为 `reason`（以 YAML 为准），随 A10 导入或 B13 修正。
+  - **契约缺口**：`Relation` 没有字段记录「原为 `PREREQUISITE`、因哪条环降级」，审核队列无法向教师解释降级。B11 须先在 `api.v1.yaml` 增加字段并重新生成，F13 才能实现降级。
+  - F05（DAG 纯函数）须同时提供「返回环路」与「按本条规则选出待降级边」两种能力；F06（人工写入）只用前者。
+  - **ADR-008 复核**（ADR-004 编号表要求 A02 复核）：关系类型、任务状态机、枚举命名与本条一致。唯一差异是 main `docs/architecture.md` 的 Neo4j 文本块标签写 `SourceChunk`，ADR-008 写 `Chunk`。它不是 wire 枚举，本条不裁定，交 A10 导入 ADR-008 时统一。
+- **推翻条件**：
+  1. 评测或试用显示自动降级大量误伤真实前置关系（例如教师在审核中把降级边改回 `PREREQUISITE` 的比例很高）。此时应重开第 5 条，而不是调参数掩盖。
+  2. 需要同时对外提供两个主版本时，前缀规则随 v2 的 ADR 一并重审。
+- **签收**：ArvinHan 2026-09-22
