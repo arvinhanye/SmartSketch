@@ -289,6 +289,7 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 
 - 表 `course_locks(course_id 主键, holder, token, expires_at)`，与任务租约同构：用 `INSERT … ON CONFLICT(course_id) DO UPDATE … WHERE course_locks.expires_at < 现在 RETURNING …` 获取，心跳每 `L/3` 续约，释放时 `DELETE … WHERE token = ?`，过期即可被他人获取。§8.2 的本地截止规则同样适用于持锁期间的 Neo4j 写入。
 - **只有两处持锁**：`persisting` 的「Neo4j 写入 + T6」；发布的「建立快照 + 读取水位」。发布方在何时取锁、持锁多久由 A04 决定。
+  > **已被 ADR-012（A04，2026-09-23 签收）修订**：持有方扩大为所有草稿写入（含教师编辑）；发布只在读草稿建快照期间持锁、回滚只在读草稿摘要期间持锁，API 侧有界等待，超时 409 `COURSE_BUSY`。见 `specs/teacher-review-publish.md` V4。
 - 等锁时轮询退避，同时照常续约自己的任务租约；等待本身不另设超时，上限由持锁者的租约决定。同一 worker 同一时刻最多持有一把课程写锁，不嵌套，因此不会死锁。
 - `merging` **不持锁**（含模型调用，耗时长）。代价：两份资料同时处理时可能产生跨任务的重复节点，它们进入审核队列的「疑似重复」（F11），由教师合并。
 
