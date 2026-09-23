@@ -113,13 +113,15 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 图谱版本与跨库发布（A04 / ADR-012）
 
-> **签收状态：已签收**，ArvinHan，2026-09-23（ADR-012）。规范文本只有一份，在 `specs/teacher-review-publish.md`「图谱版本与跨库发布协议」V1～V11；本节只列架构层面的结论，不复制步骤表。
+> **签收状态：已签收**，ArvinHan，2026-09-23（ADR-012，含修订 1）。规范文本只有一份，在 `specs/teacher-review-publish.md`「图谱版本与跨库发布协议」V1～V12；本节只列架构层面的结论，不复制步骤表。
 
 | 问题 | 结论 |
 | --- | --- |
 | 版本标识 | 内部 `version_id`（ULID，尝试开始时生成、永不复用）；对外整数 `version`（按课程、提交时分配 `max+1`，无空洞） |
 | 快照位置 | SQLite `GraphVersion.snapshot_json` 是版本内容的真相，附 sha256 摘要；Neo4j 按 `version_id` 物化副本供遍历与向量检索 |
-| 向量版本 | 知识点向量随版本复制；文本块向量共享，读取时按版本的资料清单过滤；Neo4j 向量索引「多取再过滤」 |
+| 文本块固定 | 文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID，一经写入不可变；快照固定修订列表，检索按 `revision_id` 过滤，不按 `material_id`（修订 1） |
+| 向量版本 | 知识点向量随版本复制；文本块向量共享；Neo4j 向量索引「多取再过滤」 |
+| 向量空间 | 运行时只有一个空间（模型 + 维度）；换模型须停机离线重新向量化全部文本块、草稿与已提交版本，配置与记录不一致即拒绝启动；向量是派生数据，重算不产生新版本（修订 1） |
 | 提交点 | 唯一：SQLite 中「CAS 切换发布指针 + 分配版本号 + T7 推进任务」的单个事务。之前任一步失败，按 `(course_id, version_id)` 删除 Neo4j 副本并把尝试记为 `failed`，学生继续读旧版本 |
 | 互斥 | 同课程同时至多一个发布/回滚（SQLite 部分唯一索引）；草稿写入与建快照共用 A06 的 SQLite 课程写锁，发布只在读草稿的几秒内持锁 |
 | 回滚编号 | 以历史版本内容前滚为新版本号；目标与当前版本摘要相同则幂等，不产生新号；回滚不改草稿、不推进任务 |
@@ -127,7 +129,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 读取绑定 | 学生请求开始时读一次指针，全程使用同一 `version_id`；MVP 不回收已提交版本 |
 | 崩溃恢复 | worker 周期回收步骤清扫过期尝试与 `cleanup_pending`；Neo4j 有而 SQLite 无的版本只告警不删除 |
 
-跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 交 B08，DTO 字段交 B11，配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
+跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；修订 1 再修订 ADR-011 决定 5、7（块 ID 按资料修订生成、来源块删除保护）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 交 B08，DTO 字段交 B11，配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
 
 ## 数据流
 
