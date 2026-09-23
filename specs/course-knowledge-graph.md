@@ -62,7 +62,7 @@
 ## 验收条件
 
 1. 支持 PDF、DOCX、TXT、Markdown 上传；不支持格式返回明确错误代码。
-2. 每次上传返回任务 ID；任务按 `queued → parsing → extracting → merging → persisting → awaiting_review → completed` 转换，全部可通过 SSE 观察。`awaiting_review` 表示处理完成，`completed` 由教师发布触发；`failed` 只能从 `parsing`～`persisting` 转入，`cancelled` 只能从 `queued`～`merging` 转入。终态为 `completed`、`failed`、`cancelled`。转换表、取消协议、部分失败与重连见 `specs/task-processing.md`（A03 / ADR-010）。
+2. 每次上传返回任务 ID；任务按 `queued → parsing → extracting → merging → persisting → awaiting_review → completed` 转换。处理阶段（直到 `awaiting_review`、`failed` 或 `cancelled`）可通过 SSE 观察；`awaiting_review` 表示处理完成，SSE 在此关流；`completed` 由教师发布触发，通过任务查询 `GET /api/v1/tasks/{tid}` 或课程发布状态观察，不经已有 SSE 连接送达；`failed` 只能从 `parsing`～`persisting` 转入，`cancelled` 只能从 `queued`～`merging` 转入。终态为 `completed`、`failed`、`cancelled`。转换表、取消协议、部分失败与重连见 `specs/task-processing.md`（A03 / ADR-010）。
 3. 图谱查询、编辑和学生浏览均按 `course_id` 隔离。
 4. 人工新增/修改前置关系形成环时操作被拒绝，并返回导致冲突的节点/关系信息；自动候选成环按上方「前置关系成环处理」降级，不拒绝整个任务。
 5. 2D 图谱具备缩放、拖拽、节点详情、关系图例/筛选；节点详情展示至少一个来源。

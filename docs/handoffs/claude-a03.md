@@ -25,7 +25,7 @@
 
 | 问题 | 决定 |
 | --- | --- |
-| 处理完成 vs 审核完成 | `awaiting_review` = 处理完成：worker 不再触碰，不可取消（409 `processing_finished`），不会 `failed`，SSE 推送后服务端关流。`completed` = 审核完成：发布成功时，在切换发布指针的同一 SQLite 事务内推进该课程中草稿已含在快照内的全部 `awaiting_review` 任务；发布失败、回滚不改任务状态 |
+| 处理完成 vs 审核完成 | `awaiting_review` = 处理完成：worker 不再触碰，不可取消（409 `processing_finished`），不会 `failed`，SSE 推送后服务端关流。`completed` = 审核完成：发布成功时，在切换发布指针的同一 SQLite 事务内推进该课程中草稿已含在快照内的全部 `awaiting_review` 任务（**第二轮更正**：该谓词与「全部驳回仍转 `completed`」矛盾，已改为「T6 提交序号 ≤ 快照任务水位」，见第九节）；发布失败、回滚不改任务状态 |
 | 取消边界 | `queued` 由 API 直接转 `cancelled`；`parsing`/`extracting`/`merging` 置 `cancel_requested`，worker 在阶段边界与 `extracting` 块间检查点转 `cancelled`；`merging → persisting` 是最后取消点；`persisting` 取消得 409 `persisting_uninterruptible`。竞争由同一行的比较并交换裁决 |
 | 取消响应 | 受理一律 HTTP 200 + `Task` 快照（含真实 `stage` 与 `cancel_requested`）；重复取消幂等、不推新事件；终态取消 409 `already_terminal`（ADR-006 第 4 条不变） |
 | 部分失败 | 只在 `extracting`；`TASK_MAX_FAILED_CHUNK_RATIO` 默认 0.2、取值 `[0, 1)`；失败比例 ≤ 阈值继续并逐块记录定位，否则 `failed`；允许结论确定后提前失败；不阻塞发布 |
@@ -110,9 +110,48 @@ rm <本 worktree>/specs/task-processing.md <本 worktree>/docs/handoffs/claude-a
 
 不要使用 reset 或 stash 清理；stash 栈与其他 worktree 共享。
 
-## 附录 A：`check_a03.py`（核对脚本全文）
+## 九、第二轮：Codex 审查修复（A03-R01 / A03-R02）
 
-用法：`python3 check_a03.py <repo 根目录> <api.v1.yaml>`；依赖 PyYAML。YAML 取自 `git show 978671e:src/contracts/api.v1.yaml`。
+- **review_status**：ready_for_review
+- **审查报告**：主目录 `docs/reviews/codex-claude-a03-ci01-s07-2026-09-23-0606z.md`（目标提交 `2049129`）。本轮只处理其中 A03 的两条 P2；CI-01 与 S-07 部分无新问题，未涉及
+- **base / head**：base `2049129`；head 为本轮交付提交（`git log -1 -- docs/handoffs/claude-a03.md` 可查）。内容指纹：`git diff 2049129 <该提交> -- docs/architecture.md docs/decisions.md docs/tasks.md specs/course-knowledge-graph.md specs/task-processing.md | shasum -a 256` 前 16 位 `93bf51951869d60f`
+- **结论**：两条均复核属实，按审查建议修复；ADR-010 的决定方向不变，只澄清措辞
+
+| 问题 | 复核 | 修复 |
+| --- | --- | --- |
+| **A03-R01** SSE 在 `awaiting_review` 关流后，原订阅者收不到 `done`；而验收 2 写「全部可通过 SSE 观察」、架构表与规格 §7 写终态事件「恰好一次」 | 属实。按生命周期理解，这些措辞与关流规则冲突，实现方可能为满足旧验收保留长连接 | 规格 §7 新增「覆盖范围」：任务 SSE 只覆盖处理阶段；「恰好一次」改为按连接的「每个连接恰好以一条结束事件收尾」；终态行拆为「处理中进入 `failed`/`cancelled`」与「建连时已终态」；写明 `completed` 的观察方式（任务查询、课程发布状态），将来如需实时推送须另定课程级事件流。同步验收 2、架构 SSE 行、ADR-010 决定 1 与「后果」、契约缺口表中 `events.v1.md` 第 4 条。新增 **TASK-20**（订阅先于发布） |
+| **A03-R02** T7 与 ADR-010 决定 2 写「只推进草稿已含在快照中的任务」（按内容成员资格），§3 却要求「全部驳回仍转 `completed`」 | 属实。按前者，内容全被驳回的任务永远停在 `awaiting_review` | 按审查建议统一为**任务水位**：T6 在提交事务内分配课程内严格递增的提交序号；建快照时（与 `persisting` 串行）读取最大序号作为水位并随版本元数据保存；T7 推进 `stage = awaiting_review AND 序号 ≤ 水位` 的全部任务，不看内容。T7、§3、ADR-010 决定 2 与方案表、TASK-2、架构映射行、任务板摘要使用同一谓词。新增 **TASK-21**（全部驳回）、**TASK-22**（水位竞争：读水位后、切指针前完成 T6 的任务不推进） |
+
+**本轮改动文件**：`specs/task-processing.md`（T7、§3、§7、验收矩阵、`events.v1.md` 差异与缺口行）、`specs/course-knowledge-graph.md`（验收 2）、`docs/architecture.md`（SSE 任务行、映射表「S2 完成」行）、`docs/decisions.md`（ADR-010 条首修订说明、方案表一行、决定 1、决定 2、「后果」中 `events.v1.md` 一条）、`docs/tasks.md`（修复轮次行、A03 摘要措辞、修复说明一条）、本文件（第一轮第二节一处更正标记、本节、附录换为新版脚本）。
+
+**实际运行的命令与结果**：
+
+```text
+python3 check_a03.py . <978671e api.v1.yaml>   先红：新增 11 项 FAIL（原 62 项 PASS），exit 1
+                                              修复后：一处漏改被 grep 发现（architecture.md 映射行仍写「推进快照内的任务」），
+                                              补第 12 项检查，先红后改；最终 74 项 ALL PASS，exit 0
+python3 negatives.py <scratch> <worktree>     12 个篡改副本全部 exit 1、无崩溃；新增 N8～N12 各自命中对应 R01/R02 检查
+python3 check_a02.py docs/architecture.md <978671e api.v1.yaml>
+                                              ALL PASS（本轮改了 architecture.md，回归 A02 的枚举表核对）
+./scripts/verify.sh                           exit 0
+git diff --check                              exit 0；新文件行尾空白 grep exit 1（无）
+```
+
+核对脚本本轮有两处放宽，均属措辞层面、不降低检查力度：旧检查项「architecture.md 含 `awaiting_review` 后关流字样」改为「SSE 任务行同时含 `awaiting_review` 与关流」；R02 的 ADR 检查只看决定 2 本身（修订说明为交代改动而引用旧谓词）。TASK 编号检查改为集合相等，因为 TASK-20～22 追加在「边界路径」末尾，已有编号不重排，以免破坏交接、PR 与任务板中的 TASK-13～19 引用。
+
+**未验证 / 风险**：
+
+- 任务水位需要一个实现侧字段（T6 提交序号）与版本元数据字段（水位），均不上 wire；列名与迁移由 C06/G04 定。水位读取必须与 `persisting` 提交串行，机制仍归 A04/A06，TASK-22 在该机制存在前无法实现。
+- 规格仍无实现或自动化测试；TASK-20～22 与 TASK-1～19 一样是后续任务的验收契约。
+- 审查报告指出核对脚本未入库、不计为可独立复验的自动化测试——本轮维持不入库（`tests/` 归测试 Agent），脚本全文仍附在附录。
+
+**回滚**：仅文档改动。提交后首选 `git revert <本轮提交>`；提交前只还原本轮六个文件：`git -C <本 worktree> checkout 2049129 -- docs/architecture.md docs/decisions.md docs/tasks.md specs/course-knowledge-graph.md specs/task-processing.md docs/handoffs/claude-a03.md`。不用 reset 或 stash。
+
+**下一步**：请 Codex 按本轮固定提交复核 A03-R01/R02 两条；修复另开一轮。
+
+## 附录 A：`check_a03.py`（核对脚本全文，第二轮版本）
+
+用法：`python3 check_a03.py <repo 根目录> <api.v1.yaml>`；依赖 PyYAML。YAML 取自 `git show 978671e:src/contracts/api.v1.yaml`。第一轮的 62 项检查全部保留，第二轮新增 12 项（R01 六项、R02 六项）。
 
 ```python
 """A03 验收核对：specs/task-processing.md 的内部一致性、与其他文档及 740adb 真源的一致性。
@@ -284,7 +323,7 @@ check("**进入 `awaiting_review`**" in sse and "**服务端关流**" in sse, "S
 # ---------- 验收矩阵 ----------
 acc = section(spec, "## 验收矩阵", "## 交给后续任务")
 ids = [int(n) for n in re.findall(r"\*\*TASK-(\d+)\*\*", acc)]
-check(ids == list(range(1, len(ids) + 1)), f"TASK 编号连续 1～{len(ids)}")
+check(sorted(ids) == list(range(1, len(ids) + 1)) and len(set(ids)) == len(ids), f"TASK 编号无重复且覆盖 1～{len(ids)}")
 cats = re.split(r"- (成功路径|边界路径|失败路径)\n", acc)
 counts = {cats[i]: len(re.findall(r"\*\*TASK-", cats[i + 1])) for i in range(1, len(cats) - 1, 2)}
 check(all(counts.get(c, 0) >= 1 for c in ("成功路径", "边界路径", "失败路径")), f"成功/边界/失败各至少一例 {counts}")
@@ -311,12 +350,36 @@ check(bool(c_rng) and expand_range(*c_rng.groups()) == cancel_src, "course-knowl
 check("任一非终态可转" not in acc2 and "specs/task-processing.md" in acc2, "验收 2 旧表述已移除并指向新规格")
 check("归 A03" not in arch and "A03 复核" not in arch, "architecture.md 无「归 A03 / A03 复核」残留占位")
 check(arch.count("specs/task-processing.md") >= 2, "architecture.md 指向新规格")
-check("awaiting_review` 后关流" in arch, "architecture.md SSE 终止规则同步 awaiting_review 关流")
+sse_row = next((l for l in arch.splitlines() if l.startswith("| 任务进度 `GET /api/v1/tasks/{tid}/events`")), "")
+check("awaiting_review" in sse_row and "关流" in sse_row, "architecture.md SSE 任务行同步 awaiting_review 关流")
 adr10 = section(adr, "## ADR-010")
 check(bool(adr10) and "**签收**：ArvinHan 2026-09-23" in adr10, "ADR-010 存在且有签收行")
 check("## ADR-010" in adr and adr.index("## ADR-009") < adr.index("## ADR-010"), "ADR-010 位于 ADR-009 之后")
 check(re.search(r"\| A03 \| [^|]+ \| 定义任务生命周期和取消协议", tasks) is not None, "任务板有 A03 认领行")
 check("PLAN-D03" in tasks and "部分关闭" in tasks.split("PLAN-D03", 1)[1].split("\n", 1)[0], "PLAN-D03 标为部分关闭")
+
+# ---------- Codex A03-R01：SSE 只覆盖处理阶段，按连接表述 ----------
+sse_task_row = next((l for l in arch.splitlines() if l.startswith("| 任务进度 `GET /api/v1/tasks/{tid}/events`")), "")
+check("全部可通过 SSE 观察" not in acc2 and "处理阶段" in acc2, "R01 验收 2 把 SSE 观察范围限定为处理阶段")
+check("GET /api/v1/tasks/{tid}" in acc2 or "任务查询" in acc2, "R01 验收 2 写明 completed 的观察方式")
+check("恰好一次" not in sse_task_row and "每个连接" in sse_task_row, "R01 架构 SSE 任务行按连接表述，不再写生命周期级「恰好一次」")
+check("恰好一次" not in sse and "每个连接恰好以一条结束事件收尾" in sse, "R01 规格 §7 按连接定义结束事件")
+check(re.search(r"\*\*TASK-\d+\*\*（[^）]+）订阅先于发布", acc) is not None, "R01 验收含「订阅先于发布」时序用例")
+adr10_d1 = re.search(r"  1\. \*\*`awaiting_review` = 处理完成\*\*.+", adr10)
+check(bool(adr10_d1) and "只覆盖处理阶段" in adr10_d1.group(0), "R01 ADR-010 决定 1 写明任务 SSE 只覆盖处理阶段")
+
+# ---------- Codex A03-R02：发布推进谓词统一为任务水位 ----------
+t7_row = next((l for l in spec.splitlines() if l.startswith("| T7 |")), "")
+sec3 = section(spec, "## 3. 处理完成与审核完成", "## 4.")
+adr10_d2 = re.search(r"  2\. \*\*`completed` = 审核完成\*\*.+", adr10)
+check("含在本次发布快照" not in t7_row and "任务水位" in t7_row, "R02 T7 用任务水位谓词，不按内容成员资格")
+check("任务水位" in sec3 and "草稿在发布快照生成前已提交" not in sec3, "R02 §3 定义任务水位并移除旧谓词")
+check(bool(adr10_d2) and "任务水位" in adr10_d2.group(0) and "草稿已含在本次快照内" not in adr10_d2.group(0), "R02 ADR-010 决定 2 用同一谓词")
+map_row = next((l for l in arch.splitlines() if l.startswith("| S2「完成」")), "")
+check("推进快照内" not in map_row and "任务水位" in map_row, "R02 架构「文档用语 → wire 值」映射行用同一谓词")
+task2 = re.search(r"\*\*TASK-2\*\*.+", acc)
+check(bool(task2) and "任务水位" in task2.group(0), "R02 TASK-2 用同一谓词")
+check(re.search(r"\*\*TASK-\d+\*\*（[^）]+）全部驳回", acc) is not None, "R02 验收含「全部驳回仍 completed」回归用例")
 
 # ---------- 列出的契约缺口在真源中确实存在 ----------
 check("cancel_requested" in schemas["TaskEvent"]["properties"], "真源 TaskEvent 已有 cancel_requested")
@@ -332,9 +395,9 @@ if failures:
 print("\nALL PASS")
 ```
 
-## 附录 B：`negatives.py`（负例脚本全文）
+## 附录 B：`negatives.py`（负例脚本全文，第二轮版本）
 
-用法：`python3 negatives.py <scratch 目录（含 check_a03.py 与 api.v1.yaml）> <worktree>`。每个用例把五份文档复制到 `<scratch>/neg/<编号>/` 后只改一处。
+用法：`python3 negatives.py <scratch 目录（含 check_a03.py 与 api.v1.yaml）> <worktree>`。每个用例把五份文档复制到 `<scratch>/neg/<编号>/` 后只改一处；N8～N12 为第二轮新增。
 
 ```python
 import shutil, subprocess, sys
@@ -355,6 +418,14 @@ cases = {
    "| `persisted` | worker | `persisting` | T6 |", "| `persisted` | worker | `merging` | T6 |"),
  "N7 提议码与现有码重名": ("specs/task-processing.md",
    "`STORAGE_UNAVAILABLE` | — | **提议新增** |", "`LLM_UNAVAILABLE` | — | **提议新增** |"),
+    "N8 T7 退回按内容成员资格": ("specs/task-processing.md",
+   "推进该课程中 T6 提交序号 ≤ 本次快照**任务水位**的全部 `awaiting_review` 任务，与其内容是否进入快照无关（§3）", "只推进草稿已含在本次发布快照中的任务"),
+ "N9 验收 2 恢复「全部可通过 SSE 观察」": ("specs/course-knowledge-graph.md",
+   "转换。处理阶段（直到 `awaiting_review`、`failed` 或 `cancelled`）可通过 SSE 观察；", "转换，全部可通过 SSE 观察；"),
+ "N10 架构 SSE 行恢复生命周期级「恰好一次」": ("docs/architecture.md",
+   "| 只覆盖处理阶段。每个连接恰好以一条结束事件收尾：", "| `done` / `error` / `cancelled` 互斥且恰好一次；"),
+ "N11 删除全部驳回用例": ("specs/task-processing.md", "（G04）全部驳回：", "（G04）内容驳回："),
+    "N12 架构映射行退回旧谓词": ("docs/architecture.md", "发布时按任务水位推进（含内容被全部驳回的任务）", "发布时推进快照内的任务"),
 }
 for name, (rel, old, new) in cases.items():
     d = sp / "neg" / name.split()[0]

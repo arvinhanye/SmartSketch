@@ -88,7 +88,7 @@ SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同�
 
 | 流 | 事件名 | 终止事件 |
 | --- | --- | --- |
-| 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | `done` / `error` / `cancelled` 互斥且恰好一次；另在推送 `stage = awaiting_review` 后关流（ADR-010） |
+| 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | 只覆盖处理阶段。每个连接恰好以一条结束事件收尾：`stage = awaiting_review` 快照或 `done` / `error` / `cancelled` 之一（互斥），随后关流；`completed` 不经已有连接送达，通过任务查询或课程发布状态观察（ADR-010） |
 | 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `done` / `error` 互斥且恰好一次 |
 
 ### 文档用语 → wire 值
@@ -101,7 +101,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | `TASK_FAILED`、「任务失败」 | HTTP 200 + `stage: "failed"` + `error: Error` | 同上，领域状态不是 HTTP 错误 |
 | S2「已上传」 | `queued` | |
 | S2「入库中」、前端文案「校验入库」 | `persisting` | 覆盖 DAG 校验与草稿写入 |
-| S2「完成」（处理流程结束） | `awaiting_review` | 处理完成待审核；`completed` 由教师发布触发，发布时推进快照内的任务（A03 已复核，ADR-010） |
+| S2「完成」（处理流程结束） | `awaiting_review` | 处理完成待审核；`completed` 由教师发布触发，发布时按任务水位推进（含内容被全部驳回的任务），不经 SSE 送达（A03 已复核，ADR-010） |
 | 「已取消」 | `cancelled` | 双 l |
 | 前置 / 包含 / 相关 / 应用实例 | `PREREQUISITE` / `CONTAINS` / `RELATED_TO` / `EXAMPLE_OF` | S2 成环降级的目标「相关」即 `RELATED_TO` |
 

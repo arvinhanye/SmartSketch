@@ -55,7 +55,7 @@
 | T4 | `parsing` → `extracting`，`extracting` → `merging` | worker，阶段边界 | `cancel_requested = false` |
 | T5 | `merging` → `persisting` | worker | `cancel_requested = false`。**最后一个取消点** |
 | T6 | `persisting` → `awaiting_review` | worker | 草稿整体写入成功（含 ADR-009 成环降级）。**处理完成** |
-| T7 | `awaiting_review` → `completed` | **教师发布** | 与发布指针切换同一 SQLite 事务；只推进草稿已含在本次发布快照中的任务。**审核完成** |
+| T7 | `awaiting_review` → `completed` | **教师发布** | 与发布指针切换同一 SQLite 事务；推进该课程中 T6 提交序号 ≤ 本次快照**任务水位**的全部 `awaiting_review` 任务，与其内容是否进入快照无关（§3）。**审核完成** |
 | T8 | `parsing` / `extracting` / `merging` → `cancelled` | worker，检查点 | `cancel_requested = true` |
 | T9 | `parsing` / `extracting` / `merging` / `persisting` → `failed` | worker | 不可恢复的失败，`error` 必填（§6） |
 
@@ -91,13 +91,15 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 ## 3. 处理完成与审核完成
 
 - worker 的职责在 T6 结束。`awaiting_review` 不可取消、不会失败；教师若要丢弃某份资料带来的内容，走审核中的驳回或删除，而不是取消任务。
-- **发布推进哪些任务（T7）**：发布成功时，在切换发布指针的同一 SQLite 事务内，把该课程中「`stage = awaiting_review` 且草稿在发布快照生成前已提交」的全部任务转为 `completed`。
+- **任务水位**：每次 T6 在其提交事务内给任务分配一个 **T6 提交序号**，同一课程内严格单调递增（实现可用 SQLite 自增列或课程级计数器，列名由 C06/G04 定，不上 wire）。发布建立快照时，在与 `persisting` 提交串行化的同一区段内读取该课程当前最大的 T6 提交序号，作为本次快照的任务水位，随版本元数据保存。不用时间戳作水位：时钟精度与回拨会让同一时刻提交的任务归属不确定。
+- **发布推进哪些任务（T7）**：发布成功时，在切换发布指针的同一 SQLite 事务内，把满足 `course_id = 本课程 AND stage = awaiting_review AND T6 提交序号 ≤ 任务水位` 的全部任务转为 `completed`。谓词只看提交先后，**不看任务内容是否进入快照**。
   - 发布时仍在处理中的任务不受影响；它们之后到达 `awaiting_review`，等下一次发布。
-  - 某任务带来的内容在审核中被全部驳回，发布时仍转 `completed`——审核完成不等于内容被采纳。
+  - 读取水位之后、切换指针之前才完成 T6 的任务，序号大于水位，本次不推进，等下一次发布。
+  - 某任务带来的内容在审核中被全部驳回，快照里没有它的任何节点或边，发布时仍转 `completed`——审核完成不等于内容被采纳。
   - 发布失败（含 409 `PUBLISH_BLOCKED`）不改变任何任务状态。
   - 版本回滚不改变任务状态。
   - 课程没有 `awaiting_review` 任务时照样可以发布（例如只有人工编辑）。
-- **一致性前提**：同一课程的 `persisting` 提交与发布快照必须串行，保证一个任务的草稿要么整体在快照内、要么整体不在。串行化机制归 A04/A06。
+- **一致性前提**：同一课程的 `persisting` 提交与「建立快照 + 读取水位」必须串行，保证水位以内任务的草稿整体进入快照输入（之后再经审核取舍），水位以外的整体不在。串行化机制归 A04/A06。
 
 ## 4. 取消协议
 
@@ -164,15 +166,20 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 
 端点 `GET /api/v1/tasks/{tid}/events`。事件名不变：`stage`、`done`、`error`、`cancelled`（ADR-009 表）。
 
+**覆盖范围**：任务 SSE 只覆盖**处理阶段**，即从建连到任务进入 `awaiting_review` 或 `failed`/`cancelled` 为止。**审核完成（`completed`）不通过已有连接送达**：任务到 `awaiting_review` 时所有连接都已关闭，之后的发布不会向这些连接补发任何事件。
+
 | 时机 | 推送 | 之后 |
 | --- | --- | --- |
 | 建立连接 | 立即补发当前快照：非终态为 `stage`，终态为对应终态事件 | 视快照所处状态按下面各行处理 |
 | 进入新阶段；阶段内进度变化；`cancel_requested` 由 false 变 true | `stage` | 保持连接 |
 | **进入 `awaiting_review`**，或建连时已处于该状态 | `stage`（`progress = 0.95`） | **服务端关流** |
-| 进入 `completed` / `failed` / `cancelled` | `done` / `error` / `cancelled`，互斥且恰好一次 | 服务端关流 |
+| 处理中进入 `failed` / `cancelled` | `error` / `cancelled` | 服务端关流 |
+| 建连时任务已处于终态（含 `completed`） | 对应的 `done` / `error` / `cancelled`，作为首条快照 | 服务端关流 |
 
-- 客户端收到 `stage = awaiting_review` 或任何终态事件后必须主动 `close()`。其后状态（是否已 `completed`）通过 `GET /api/v1/tasks/{tid}` 或课程发布状态获得，不挂着 SSE 等。
-- 由于处理流在 `awaiting_review` 已结束，`done` 实际只出现在「发布之后才建立的连接」的首条补发中。
+- **每个连接恰好以一条结束事件收尾**：`stage = awaiting_review` 的快照，或 `done` / `error` / `cancelled` 之一；同一连接内这几种结束事件互斥，发送后即关流。这是按连接的保证，不是按任务生命周期的保证：一个到达 `completed` 的任务，其处理期的连接都以 `awaiting_review` 收尾，永远收不到 `done`。
+- 客户端收到任何结束事件后必须主动 `close()`，不得为等待 `done` 保持或重建连接。
+- **审核完成的观察方式**：`GET /api/v1/tasks/{tid}`（`stage = completed`）或课程发布状态（`GET /api/v1/courses/{cid}`、`GET /api/v1/courses/{cid}/versions`）。`done` 只会作为「发布之后才建立的连接」的首条快照出现。
+- 若产品将来要求实时推送发布结果，须另定课程级发布事件流（新规格 + ADR）；不得为此恢复处理流在 `awaiting_review` 之后的长连接。
 - 心跳：每 15 秒一行 `:ping`。
 - 多订阅者：同一任务允许多个连接，各自先收快照，此后事件广播给全部连接。
 - worker 崩溃：任务停在原阶段，连接照常心跳，不产生新状态；接管归 A06。
@@ -184,7 +191,7 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 - 不使用 `Last-Event-ID`：每次连接先补快照即可恢复，I1/I2 保证跨连接不回退。
 - 客户端丢弃 `task_id` 不等于当前订阅任务的事件（切换资料/课程时旧流的迟到事件不得污染当前视图）。
 
-**与现行 `events.v1.md` 的差异**（`740adb`，B10 迁移时改）：§2 顺序保证第 4、5 条「只有终态事件后关流」→ 增加 `awaiting_review` 关流；§4「`EventSource` 自动重连」→ 改为上面的客户端管理重连。该文件 §6 规定终态语义变更须升 v2，但 v1 尚未进入 main、没有任何消费者，此时修改迁移成本为零（与 ADR-005「枚举一次定稿」的理由相同）。
+**与现行 `events.v1.md` 的差异**（`740adb`，B10 迁移时改）：§2 顺序保证第 4 条「三个终态事件互斥且恰好发生一次」→ 改为按连接的「每个连接恰好以一条结束事件收尾」，并写明 `completed` 不经已有连接送达；第 5 条「只有终态事件后关流」→ 增加 `awaiting_review` 关流；§4「`EventSource` 自动重连」→ 改为上面的客户端管理重连。该文件 §6 规定终态语义变更须升 v2，但 v1 尚未进入 main、没有任何消费者，此时修改迁移成本为零（与 ADR-005「枚举一次定稿」的理由相同）。
 
 ## 8. 租约、重试与幂等（A06 待补）
 
@@ -192,11 +199,11 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 
 ## 验收矩阵
 
-独立编号 TASK-n，不占用其他规格的序号。「实现方」指负责让该条变成自动化测试的原子任务。
+独立编号 TASK-n，不占用其他规格的序号。TASK-20～22 为 Codex 审查修复轮（A03-R01/R02）新增，追加在所属类别末尾，已有编号不重排。「实现方」指负责让该条变成自动化测试的原子任务。
 
 - 成功路径
   - **TASK-1**（C08、C11、F13）完整处理：任务依次经过 `queued → parsing → extracting → merging → persisting → awaiting_review`；SSE 按序推 `stage`，`progress` 单调不减；推送 `awaiting_review` 后服务端关流。
-  - **TASK-2**（G04）发布推进：课程有任务 A（`awaiting_review`）与 B（`extracting`），发布成功 → A 为 `completed`，B 不变；B 之后到达 `awaiting_review`，直到下一次发布前保持不变。
+  - **TASK-2**（G04）发布推进：课程有任务 A（`awaiting_review`，T6 提交序号 ≤ 任务水位）与 B（`extracting`），发布成功 → A 为 `completed`，B 不变；B 之后到达 `awaiting_review`，其序号大于本次任务水位，直到下一次发布前保持不变。
   - **TASK-3**（C10、C11）`queued` 取消：200 且 `stage = cancelled`、`cancel_requested = true`；worker 此后不会领取；SSE 推 `cancelled` 后关流。
   - **TASK-4**（C10、E12）运行中取消：`extracting` 中取消 → 200，`stage = extracting`、`cancel_requested = true`；SSE 推一条同阶段 `stage` 事件；下一个块边界后转 `cancelled`；草稿中没有该任务的任何节点或边。
 - 边界路径
@@ -208,6 +215,9 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
   - **TASK-10**（E12）阈值边界：失败比例恰等于阈值 → 继续；阈值为 0 时 1 块失败 → `failed`；提前判定与跑完全部块的结论一致。
   - **TASK-11**（C11、C12）重连：断线后客户端重新申领令牌建连，首条为当前快照且 `progress` 不小于断线前；对已处于 `awaiting_review` 的任务建连 → 收到快照后被关流；对终态任务建连 → 收到终态事件后被关流；旧任务的迟到事件被丢弃。
   - **TASK-12**（C10）`awaiting_review` 取消 → 409 `processing_finished`；任务与草稿均不变。
+  - **TASK-20**（C11、C12、H02）订阅先于发布：教师在 `extracting` 时订阅；收到 `stage = awaiting_review` 快照后连接被关闭，客户端不重建连接；随后发布 → 该连接不再收到任何事件，前端不等待 `done`；`GET /api/v1/tasks/{tid}` 返回 `stage = completed`；发布后新建的连接首条即 `done` 并被关流。
+  - **TASK-21**（G04）全部驳回：任务 A 在 `awaiting_review`，其带来的全部节点与边在审核中被驳回，快照中没有 A 的任何内容；发布成功 → A 仍转 `completed`。
+  - **TASK-22**（G04）水位竞争：发布已读取任务水位、尚未切换指针时，任务 C 完成 T6 → C 的序号大于水位，本次发布后 C 仍为 `awaiting_review`，下一次发布才转 `completed`。
 - 失败路径
   - **TASK-13**（E12）超阈值：10 块失败 3 块、阈值 0.2 → `failed`，`EXTRACTION_INCOMPLETE`，`details` 含计数与阈值；若失败块最终错误全为模型不可用 → `LLM_UNAVAILABLE`。
   - **TASK-14**（D 组、C08）解析失败：加密 PDF → `failed`，`DOCUMENT_UNREADABLE`、`reason = encrypted`；解析后 0 块 → `reason = no_text`；二者都不进入 `extracting`。
@@ -230,5 +240,5 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 | `stage = failed` ⇔ `error` 非空（`if/then` 或按状态拆分，Codex S07-R09） | B10 |
 | `TaskStage` 描述「任意阶段可转 failed，任意非终态可转 cancelled」改为指向本文 §2 | B10 |
 | `ErrorCode` 增加 `DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` | B08 |
-| `events.v1.md` §2 转换表改为指向本文；§2 关流规则与 §4 重连按本文 §7 改写 | B10 |
+| `events.v1.md` §2 转换表改为指向本文；§2 顺序保证第 4、5 条（结束事件按连接、`awaiting_review` 关流、只覆盖处理阶段）与 §4 重连按本文 §7 改写 | B10 |
 | SSE 令牌签发端点 | B10 / A05 |

@@ -210,7 +210,8 @@
 ## ADR-010：任务生命周期——处理完成与审核完成分离、`persisting` 不可取消、抽取部分失败按阈值
 
 > **签收状态：已签收（ACCEPTED）**，ArvinHan，2026-09-23。本条由原子任务 **A03** 提交，关闭 PLAN-D03 中的「取消」与「部分失败语义」；「队列 / 租约 / 重试」仍归 A06，PLAN-D03 因此**部分关闭**。
-> 规范表只有一份，在 `specs/task-processing.md`（转换表、取消矩阵、失败码、SSE 关流、验收 TASK-1～19）。本条只记录决定与理由，不复制表格。
+> 规范表只有一份，在 `specs/task-processing.md`（转换表、取消矩阵、失败码、SSE 关流、验收 TASK-1～22）。本条只记录决定与理由，不复制表格。
+> **措辞修订（2026-09-23，Codex A03-R01/R02，决定方向不变）**：决定 1 补明任务 SSE 只覆盖处理阶段、`completed` 不经已有连接送达；决定 2 的推进谓词由「草稿已含在本次快照内」改为「T6 提交序号 ≤ 快照任务水位」，消除与「全部驳回仍转 `completed`」的矛盾。
 
 - **日期**：2026-09-23
 - **背景**：ADR-009 把 `TaskStage` 定为 9 个值、3 个终态，把转换触发者、取消竞争与重连交给 A03。现行描述（`740adb` 的 ADR-005/006 与 `events.v1.md` §2）留下这些缺口：
@@ -224,7 +225,7 @@
 
   | 问题 | 方案 | 结论 | 理由 |
   | --- | --- | --- | --- |
-  | 处理完成与审核完成 | `awaiting_review` 为处理结束态，推送后关流；发布时推进快照内的任务到 `completed` | **采纳** | 连接不空挂；worker 职责在写完草稿时结束，边界清楚；不需要新端点 |
+  | 处理完成与审核完成 | `awaiting_review` 为处理结束态，推送后关流；发布时按任务水位推进 `awaiting_review` 任务到 `completed` | **采纳** | 连接不空挂；worker 职责在写完草稿时结束，边界清楚；不需要新端点 |
   | 同上 | 语义同上，但 SSE 保持到发布 | 否决 | 审核可持续数天，连接长期空挂；前端离开页面后也拿不到后续推送 |
   | 同上 | 教师逐份资料点「审核完成」 | 否决 | 需新端点与契约改动；审核项目前不按资料归属，实现成本最高 |
   | 部分失败 | 失败块占比 ≤ 阈值继续，超阈值失败 | **采纳** | 一次模型抖动不致整份资料作废；阈值取 0 即退化为严格模式，保留选择权 |
@@ -235,8 +236,8 @@
   | 同上 | 受理但完成先赢 | 否决 | 前端先显示「取消中」再看到处理完成，语义不直观 |
 
 - **决定**：
-  1. **`awaiting_review` = 处理完成**：worker 不再触碰；不可取消（409 `processing_finished`）、不会转 `failed`；SSE 推送该快照后服务端关流，客户端也须关闭。
-  2. **`completed` = 审核完成**：发布成功时，在切换发布指针的同一 SQLite 事务内，把该课程中草稿已含在本次快照内的全部 `awaiting_review` 任务转为 `completed`。发布失败、版本回滚都不改变任务状态。
+  1. **`awaiting_review` = 处理完成**：worker 不再触碰；不可取消（409 `processing_finished`）、不会转 `failed`；SSE 推送该快照后服务端关流，客户端也须关闭。任务 SSE 只覆盖处理阶段：每个连接恰好以一条结束事件（`awaiting_review` 快照或一个终态事件）收尾；`completed` 不经已有连接送达，通过任务查询或课程发布状态观察。若要实时推送发布结果，须另定课程级事件流，不得恢复处理流的长连接。
+  2. **`completed` = 审核完成**：发布成功时，在切换发布指针的同一 SQLite 事务内，把该课程中 T6 提交序号 ≤ 本次快照**任务水位**的全部 `awaiting_review` 任务转为 `completed`。任务水位是建立快照时（与 `persisting` 提交串行）读取的该课程最大 T6 提交序号；谓词只看提交先后，不看任务内容是否进入快照，因此内容被全部驳回的任务同样转 `completed`。发布失败、版本回滚都不改变任务状态。
   3. **`failed` 只能从 `parsing`～`persisting` 转入**，`cancelled` 只能从 `queued`～`merging` 转入。
   4. **取消**：`queued` 由 API 直接转 `cancelled`；`parsing`/`extracting`/`merging` 置持久标志 `cancel_requested`，worker 在阶段边界及 `extracting` 的块间检查点转 `cancelled`；`merging → persisting` 是最后取消点；`persisting` 取消返回 409 `persisting_uninterruptible`。所有受理结果均为 HTTP 200 + 含真实 `stage` 与 `cancel_requested` 的 `Task` 快照；重复取消幂等；对终态取消仍 409（ADR-006 第 4 条不变）。
   5. **部分失败只在 `extracting`**：环境变量 `TASK_MAX_FAILED_CHUNK_RATIO`，默认 0.2、取值 `[0, 1)`；失败比例 ≤ 阈值继续到 `awaiting_review` 并逐块记录定位与错误码，否则 `failed`；允许结论确定后提前失败；部分失败不阻塞发布。
@@ -245,7 +246,7 @@
 - **后果**：
   - **ADR-005 复核**：状态机序列与 `persisting` 阶段维持。其第 1 条「前置关系成环被拒」作为失败原因已被 ADR-009 收窄，本条不再改动。
   - **ADR-006 复核**：第 1、2、4、6 条维持。第 3 条「阶段边界检查」细化为「阶段边界 + `extracting` 块间」，仍不打断在途的单次模型调用。第 5 条「不得留下半截图谱」改由决定 4 在结构上保证：取消只可能发生在草稿写入之前；`persisting` **失败**后的清理机制归 F13/A06。第 5 条中「清理策略在 M1-06 定稿」随之作废。
-  - **`740adb` `events.v1.md`**：§2 转换表由 `specs/task-processing.md` 取代；§2 顺序保证第 4、5 条增加 `awaiting_review` 关流；§4 重连改为客户端管理。该文件 §6 要求终态语义变更升 v2，但 v1 尚未进入 main、没有消费者，此时修改无迁移成本。由 B10 迁移时执行。
+  - **`740adb` `events.v1.md`**：§2 转换表由 `specs/task-processing.md` 取代；§2 顺序保证第 4 条「终态事件恰好一次」改为按连接的「每个连接恰好以一条结束事件收尾」，第 5 条增加 `awaiting_review` 关流；§4 重连改为客户端管理。该文件 §6 要求终态语义变更升 v2，但 v1 尚未进入 main、没有消费者，此时修改无迁移成本。由 B10 迁移时执行。
   - **契约缺口**（均交 B08/B10，先改 `api.v1.yaml` 再生成）：`Task.cancel_requested`、`TaskCounts.chunks_failed`、`Task.failed_chunks`、`failed ⇔ error` 约束（S07-R09）、取消端点描述、4 个提议新错误码 `DOCUMENT_UNREADABLE` / `EXTRACTION_INCOMPLETE` / `STORAGE_UNAVAILABLE` / `INTERNAL_ERROR`。新码进入真源前，`docs/architecture.md` 的 `ErrorCode` 行不改。
   - **后续约束**：A06 补写 `specs/task-processing.md` §8 时不得改变转换表与不变量；同一课程的 `persisting` 提交与发布快照必须串行，机制归 A04/A06；阈值变量登记归 A07。
 - **推翻条件**：
