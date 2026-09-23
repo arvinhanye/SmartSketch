@@ -1,7 +1,7 @@
 # CI-01 冒烟：Codex 新增 GitHub Actions 的首次托管运行
 
 - **task_id**：CI-01 冒烟验证（CI-01 本身属 Codex，见 `docs/handoffs/codex-ci-01.md`；本文件只补「GitHub 首次运行待确认」这一项的证据）
-- **状态**：DONE。托管运行成功，临时分支已删除
+- **状态**：DONE。托管运行成功，临时分支已删除；此后 CI-01 已入库，main 的 push 与 PR 的 pull_request 两条触发路径均已实测通过（见第六节，2026-09-23 更新）
 - **review_status**：ready_for_review
 - **worktree**：`/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/adoring-sinoussi-709263`
 - **分支 / base**：`claude/ci-01-smoke` / base `bfa236c`（`origin/main`）
@@ -54,11 +54,23 @@
 1. **CI 仍未入库**：`ci.yml` 仍是 main checkout 的未跟踪文件，属于 Codex 的 CI-01 交付，本文件不代为提交。Codex 或负责人提交并推送后：
    - push 到 main 即会运行；
    - PR #2（A02）要推一个新提交才会触发 `pull_request` 运行。情形 B 预测结果为通过。
+   - **已更新（2026-09-23）**：负责人已提交并推送为 `b345a34`，预测均已兑现，见第六节。
 2. **运行器迁移提示**：`ubuntu-latest` 将于 2026-10-19 起迁到 Ubuntu 26。当前 CI 只用 bash 与 Python，受影响概率低；若要环境固定，可改为 `ubuntu-24.04`，由 CI-01 负责人决定。
 3. **CI 覆盖面**：与 Codex 交接一致，现阶段绿灯只代表骨架文件、JSON 与文档约束通过，不代表前后端可构建或可测试。
-4. **任务板未改**：CI-01 的认领行在 main checkout 未提交的 `docs/tasks.md` 中。本分支不改 `docs/tasks.md`，避免与 Codex 的未提交改动和 PR #2 冲突。建议 Codex 把该行的「GitHub 首次运行待确认」改为引用本交接。
-5. **过程记录**：模拟阶段有一条命令含 `rm -rf`（只清理会话 scratch 目录），被项目的 PreToolUse 钩子 `block-dangerous.sh` 拦截。之后改用新建目录，不再删除。另发现钩子只截取 `command` 字段中第一个 `"` 之前的内容，因此更早一条同样含 `rm -rf` 的 scratch 清理命令没有被拦下。该命令只作用于会话 scratch 目录，未影响仓库。这个匹配缺陷是否修复由钩子负责人决定。
+4. **任务板未改**：CI-01 的认领行在 main checkout 未提交的 `docs/tasks.md` 中。本分支不改 `docs/tasks.md`，避免与 Codex 的未提交改动和 PR #2 冲突。建议 Codex 把该行的「GitHub 首次运行待确认」改为引用本交接。**截至 2026-09-23**，`b345a34` 中该行仍写「DONE（待 GitHub 首次运行确认）」，本分支仍不代改。
+5. **过程记录**：模拟阶段有一条命令含 `rm -rf`（只清理会话 scratch 目录），被项目的 PreToolUse 钩子 `block-dangerous.sh` 拦截。之后改用新建目录，不再删除。另发现钩子只截取 `command` 字段中第一个 `"` 之前的内容，因此更早一条同样含 `rm -rf` 的 scratch 清理命令没有被拦下。该命令只作用于会话 scratch 目录，未影响仓库。这个匹配缺陷是否修复由钩子负责人决定。**已更新（2026-09-23）**：经用户指派，已由 HOOK-01 修复（PR #3，`3c2dfab`，交接 `docs/handoffs/claude-hook-01.md` 随该 PR 入库）。
 
-## 六、回滚
+## 六、后续进展（2026-09-23 更新）
+
+| 项 | 结果 |
+| --- | --- |
+| CI-01 入库 | 负责人提交并推送为 `b345a34`（`ci: add scaffold GitHub Actions workflow`）；其中 `ci.yml` 与本文冒烟版本逐字节一致；workflow `CI` 已注册，状态 active |
+| main 的 push 运行 | [#35815254690](https://github.com/arvinhanye/SmartSketch/actions/runs/35815254690)（head `b345a34`）success；ubuntu-24.04 / CPython 3.12.14；`Scaffold verification passed.` |
+| PR #2 的 pull_request 运行 | 把 `origin/main` 合入 A02 分支（`cd1ecd6`，无冲突）后触发 [#35816358187](https://github.com/arvinhanye/SmartSketch/actions/runs/35816358187) success；同一推送的 push 运行 #35816355088 success。第三节情形 B 的预测成立 |
+| PR #3 的 pull_request 运行 | HOOK-01 修复分支（`3c2dfab`）[#35816330323](https://github.com/arvinhanye/SmartSketch/actions/runs/35816330323) success，日志中可见 `block-dangerous hook tests passed.`；push 运行 #35816325210 success |
+| 尚未实测 | `workflow_dispatch`（手动触发） |
+| 新观察 | 同仓库分支上的 PR 每次推送会触发**两次**运行（`push` 与 `pull_request` 各一次），结果一致，属于重复消耗。是否把 `push` 限定为 main，由 CI-01 负责人决定 |
+
+## 七、回滚
 
 仓库内只新增本文件：`git revert <本提交>`。临时分支已删除，无需再处理。不要使用 reset、clean 或 stash 清理；stash 栈与其他 worktree 共享。
