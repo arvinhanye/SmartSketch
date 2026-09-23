@@ -44,9 +44,66 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | 后端消费 | `src/backend/app/schemas/` | 后端 Agent | 只放不对外暴露的内部模型；对外 DTO 从 `v1/generated/python/` 导入 |
 | 前端消费 | `src/frontend/src/api/` | 前端 Agent | 类型从 `v1/generated/typescript/` 导入；不得重写、断言或 `any` 绕过 |
 
-- REST 路径前缀现状为 `/api/v1`，与生成物目录 `v1/` 同步升级；`/health` 不带前缀。前缀与 wire 枚举的最终裁定属原子任务 A02。
+- REST 路径前缀与 wire 枚举已由 A02 裁定（ADR-009），见下一节。
 - 生成器及版本锁在 `src/contracts/toolchain.txt`；缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
 - 契约的**表达方式**由 ADR-004 裁定，契约的**内容正确性**不由它保证：来源非空、事件判别联合等约束仍须各自的负例测试复验；「引用确属同一课程同一发布版本」schema 表达不了，必须在服务层校验。
+
+## API 前缀与 wire 枚举（A02 / ADR-009）
+
+> **签收状态：已签收**，ArvinHan，2026-09-22。本节是路径前缀、枚举取值与大小写的规范表；`src/contracts/api.v1.yaml` 导入 main（A10）时必须与本表逐值一致，不一致以本表为准回改真源，并同批重新生成。状态转换语义不在本节，归 A03。
+
+### 路径前缀
+
+- 所有 REST 与 SSE 端点前缀为 **`/api/v1`**；唯一例外是 `GET /health`（运维探针，不随契约版本变化）。
+- 主版本号四处同步：真源文件名 `api.v1.yaml` = URL 前缀 `/api/v1` = 生成物目录 `v1/` = 配套文档 `events.v1.md`/`errors.v1.md`。破坏性变更成套新建 v2，不在 v1 路径下混入。
+- S2 方案表 6.6 的 `/api/...` 是省略版本号的书面缩写，不是另一套路径。实现、测试与前端客户端一律写 `/api/v1`；ADR-004 端点迁移表（22 路径 / 29 操作）无需改动。
+
+### 大小写规则
+
+1. **UPPER_SNAKE 只用于两类**：错误码 `ErrorCode`，以及图关系类型 `RelationType`（与 Neo4j 关系类型标签同形）。
+2. **其余一切 wire 枚举值一律 lower_snake**，包括领域状态、判别字段取值与 SSE 事件名。
+3. 新增枚举若既不是错误码也不是图关系类型，必须 lower_snake；同一概念不得出现大小写变体或同义别名（例如不得写 `canceled`、`md`、`NOT_COVERED` 作 wire 值）。
+
+### wire 枚举表
+
+取值顺序即真源中的顺序。「740adb 核对」指与 `claude/worktree-contract-conflicts-740adb` `978671e` 的 `api.v1.yaml` 逐值比对的结果。
+
+| schema | 取值 | 大小写 | 用于 | 740adb 核对 / 备注 |
+| --- | --- | --- | --- | --- |
+| `ErrorCode` | `UNAUTHENTICATED`、`COURSE_FORBIDDEN`、`ROLE_FORBIDDEN`、`NOT_FOUND`、`GRAPH_NOT_PUBLISHED`、`UNSUPPORTED_FORMAT`、`FILE_TOO_LARGE`、`VALIDATION_ERROR`、`CYCLE_DETECTED`、`DANGLING_ENDPOINT`、`DUPLICATE_RELATION`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`PUBLISH_BLOCKED`、`RATE_LIMITED`、`LLM_UNAVAILABLE` | UPPER | `Error.code` | 一致。**不含** `NOT_COVERED`、`TASK_FAILED`：它们是领域状态，不是错误码 |
+| `RelationType` | `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF` | UPPER | `Relation.type` | 一致。闭集；S2 图 6.3 的 `RELATED`、`APPLIES_TO` 不得使用（ADR-008） |
+| `TaskStage` | `queued`、`parsing`、`extracting`、`merging`、`persisting`、`awaiting_review`、`completed`、`failed`、`cancelled` | lower | `Task.stage`、`TaskEvent.stage`、`Document.parse_status` | 一致。终态为 `completed`、`failed`、`cancelled`；转换、触发者与取消语义归 A03 |
+| `CourseStatus` | `draft`、`published`、`revising` | lower | `Course.status` | 一致 |
+| `KnowledgePointStatus` | `draft`、`low_confidence`、`approved`、`rejected` | lower | `KnowledgePoint.status`、`Relation.status` | 一致。名字带 KnowledgePoint，但关系也复用；自动降级的边取 `low_confidence` |
+| `KnowledgePointType` | `concept`、`theorem`、`formula`、`method`、`example` | lower | `KnowledgePoint.type` | 一致 |
+| `NodeSource` | `ai`、`manual` | lower | `KnowledgePoint.source`、`Relation.source` | 一致。自动降级只作用于未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`，见规格「前置关系成环处理」） |
+| `DocumentFormat` | `pdf`、`docx`、`txt`、`markdown` | lower | `Document.format` | 一致。wire 值是 `markdown`，扩展名 `.md` 不是枚举值 |
+| `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
+| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致 |
+| `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
+| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`out_of_course_scope`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | 一致；`ff30e0` 无此枚举 |
+| 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
+
+SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同值）：
+
+| 流 | 事件名 | 终止事件 |
+| --- | --- | --- |
+| 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | `done` / `error` / `cancelled` 互斥且恰好一次 |
+| 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `done` / `error` 互斥且恰好一次 |
+
+### 文档用语 → wire 值
+
+AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名；它们不是 wire 字面值。新代码、测试断言与前端分支**只使用右列**。
+
+| 文档用语 | wire 表达 | 说明 |
+| --- | --- | --- |
+| `NOT_COVERED`、「资料未覆盖」 | HTTP 200 + `status: "not_covered"` + `reason: NotCoveredReason` + `citations: []` | 概念名。字段名是 `reason`，不是 `not_covered_reason`（740adb 的 `src/contracts/README.md` 写法有误，以 YAML 为准） |
+| `TASK_FAILED`、「任务失败」 | HTTP 200 + `stage: "failed"` + `error: Error` | 同上，领域状态不是 HTTP 错误 |
+| S2「已上传」 | `queued` | |
+| S2「入库中」、前端文案「校验入库」 | `persisting` | 覆盖 DAG 校验与草稿写入 |
+| S2「完成」（处理流程结束） | `awaiting_review` | 处理完成待审核；`completed` 由教师发布触发（现行 740adb `events.v1.md` §2，A03 复核） |
+| 「已取消」 | `cancelled` | 双 l |
+| 前置 / 包含 / 相关 / 应用实例 | `PREREQUISITE` / `CONTAINS` / `RELATED_TO` / `EXAMPLE_OF` | S2 成环降级的目标「相关」即 `RELATED_TO` |
 
 ## 核心数据模型
 
@@ -57,10 +114,10 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 ## 数据流
 
 1. 上传资料 → SQLite 创建任务/资料记录 → Worker 解析和分块。
-2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。
+2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
 3. Worker 更新任务状态，API 经 SSE 发送进度；教师审核并发布不可变图谱版本。
 4. 学生浏览发布版本；学习进度保存在 SQLite，路径服务查询 Neo4j 前置关系并计算候选与理由。
-5. 问答服务检索课程图谱与来源片段，生成带引用答案；若证据不足返回 `NOT_COVERED`。
+5. 问答服务检索课程图谱与来源片段，生成带引用答案；若证据不足返回 `NOT_COVERED`（wire：`status: "not_covered"` + `reason`，见上方「文档用语 → wire 值」）。
 
 ## 关键质量边界
 
