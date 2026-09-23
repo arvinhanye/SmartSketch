@@ -26,6 +26,12 @@
 - 风险：当前门禁只检查骨架，不能代表尚未实现的前后端测试；后续由 K11 接入实际质量门禁。
 - 验证：`./scripts/verify.sh`、工作流 YAML 解析与关键字段检查、`git diff --check`。
 
+## 协作安全修复
+
+| ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| HOOK-01 | DONE | 修复 `block-dangerous.sh` 在命令含双引号时漏检，以及解析失败时放行 | Claude | `.claude/hooks/block-dangerous.sh`、新增 `tests/hooks/test_block_dangerous.sh`、`scripts/verify.sh` 加一行接入回归测试（用户同意）；拦截规则不变，只修命令提取；引号之后的危险命令必须被拦截，无法解析的输入必须拒绝，正常命令不误拦 | 回归测试修复前 10 FAIL / exit 1，修复后 14 PASS / exit 0（含系统 Python 3.9 + `LC_ALL=C`）；会话内实时探针被拦；`./scripts/verify.sh` exit 0 且已包含该测试，换回旧钩子则 verify exit 1；`docs/handoffs/claude-hook-01.md` |
+
 ## 下一里程碑：M1 课程资料到草稿图谱
 
 | ID | 状态 | 任务 | 负责人 | 验收条件 |
