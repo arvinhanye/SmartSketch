@@ -1,4 +1,7 @@
-"""Atomic bootstrap storage for the active embedding space."""
+"""Read or record the active embedding space in the migrated SQLite table.
+
+The table itself is created only by migration 001 (ADR-012 补注修订 1, REVIEW-C01-R03).
+"""
 
 import sqlite3
 from contextlib import closing
@@ -14,14 +17,6 @@ def read_or_initialize_space(
     with closing(sqlite3.connect(database, timeout=5)) as connection:
         with connection:
             connection.execute("BEGIN IMMEDIATE")
-            connection.execute(
-                """CREATE TABLE IF NOT EXISTS embedding_space_state (
-                    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                    model TEXT NOT NULL,
-                    dimensions INTEGER NOT NULL CHECK (dimensions >= 1),
-                    is_fake INTEGER NOT NULL CHECK (is_fake IN (0, 1))
-                )"""
-            )
             row = connection.execute(
                 "SELECT model, dimensions, is_fake FROM embedding_space_state WHERE singleton = 1"
             ).fetchone()

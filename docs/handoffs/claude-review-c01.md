@@ -1,7 +1,7 @@
 # 交接：同步并审查 C01（PR #174，539210 / kongsc）
 
 - `task_id`: REVIEW-C01
-- `status`: 审查完成；9 项意见，均未修改，等 ArvinHan 决定由谁修、修哪些
+- `status`: 审查完成；按 ArvinHan 的决定由 Claude 修 R01～R03 后合并，R04～R09 未改
 - `审查目标`: `origin/codex/c01-sqlite` @ `121365c`（base `9d2437e`），同步后 @ `c9d5738`
 - `依据`: `specs/task-processing.md` §8.2、§8.5、§8.7（ADR-011）；ADR-012 补注（`embedding_space_state`）；`docs/integrations.md`「调用记录」（ADR-011 修订 2、3）；AGENTS.md §5
 
@@ -39,6 +39,23 @@ R02、R03 可合并为一个改动：启动门禁改为校验迁移版本并只�
 
 `pip install -e` 生成的 `src/backend/smartsketch_backend.egg-info/` 已删除（`.gitignore` 未忽略，见 HANDOFF-0924 第 7 节）。
 
+## R01～R03 的修正（ArvinHan 2026-09-24 决定：由 Claude 修后合并）
+
+- **R01**：`_checksum()` 先把 CRLF 归一化为 LF 再算 SHA-256；`.gitattributes` 加 `src/backend/migrations/*.sql text eol=lf`。两层都做：规则防止检出差异，归一化兼容已经存在的 CRLF 副本。
+- **R02**：新增只读的 `pending_migrations(sqlite_url)`——校验历史（与 `migrate()` 共用 `_validate_history()`），返回未执行版本；数据库文件不存在时直接返回全部版本，**不会创建文件**。`services/startup.py` 新增 `validate_schema_current()`，API lifespan 在向量空间门禁之前调用；有未执行迁移或历史不一致即以 `SettingsError` 拒绝启动，并提示停机后运行 `python -m app.repositories.sqlite`。C09 worker 入口须调用同一检查。
+- **R03**：`embedding_space.py` 删除 `CREATE TABLE`，只在事务内读取或写入这一行；建表只在迁移 001。
+- **行为变化与文档**：首次启动前必须先迁移。已在 `docs/decisions.md` 补「ADR-012 补注修订 1」（改的是已签收的决定 1 中「启动时建表」一句，首次写入与不一致即拒绝的规则不变），并更新 `docs/architecture.md`、`src/backend/README.md`（启动前先迁移）。
+- **测试**：`test_c01.py` 新增 5 项（CRLF/LF 校验和一致、`.gitattributes` 规则、只读检查不建库且校验历史、API 未迁移拒绝启动、门禁不建表）；「接管」用例改为手工建旧版 B06 表来模拟已有数据库，场景不变。`test_b05.py`、`test_b06.py` 在启动 API 前先 `migrate()`——这是本次有意引入的前置条件，断言未改动。
+
+| 命令 | 结果 |
+| --- | --- |
+| 改实现前 `pytest tests/backend -q` | 收集失败：`cannot import name 'pending_migrations'` |
+| 改实现后 | 76 passed（原 71 + 新 5） |
+| 逐项撤销修复（不归一化换行、去掉 `.gitattributes` 规则、lifespan 不调检查、只读检查改为会建库、门禁恢复建表） | 分别 1、1、1、2、1 failed，且失败的正是对应的新测试；恢复后 76 passed |
+| 命令行端到端（临时库） | 未迁移时 `python -m app` 退出码 3，报「SQLite schema is not migrated (pending: 001)…」且未创建数据库文件；`python -m app.repositories.sqlite` 先后输出 `001`、`none`；之后启动 API，`/health` 返回 `{"status":"ok","version":"0.1.0"}` |
+| `./scripts/verify.sh` | exit 0 |
+| `git diff --check` | exit 0 |
+
 ## 未验证
 
 - R01 的 CRLF 情形只按 git 行为推断，没有在 Windows 上实测；原作者有 Windows 环境，可以直接复现。
@@ -46,5 +63,5 @@ R02、R03 可合并为一个改动：启动门禁改为校验迁移版本并只�
 
 ## 下一步
 
-- ArvinHan 决定修正范围与执行人（原作者 kongsc，或 Claude）。R01～R03 建议合并前处理。
+- R04～R09 未改：可由 C06（R04 任务表名）、C09（worker 入口调用 `validate_schema_current` 与向量空间门禁）或后续整理处理。
 - 合并后关闭 issue #58；C02、C06、C13 的依赖即全部满足。

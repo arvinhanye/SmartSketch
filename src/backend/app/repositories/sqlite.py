@@ -87,8 +87,44 @@ def _migration_files(directory: Path) -> list[tuple[str, Path, str]]:
         if version in versions:
             raise MigrationError(f"Duplicate migration version: {version}")
         versions.add(version)
-        found.append((version, path, hashlib.sha256(path.read_bytes()).hexdigest()))
+        found.append((version, path, _checksum(path)))
     return found
+
+
+def _checksum(path: Path) -> str:
+    # Hash LF-normalized bytes so CRLF checkouts (Windows core.autocrlf) match LF ones.
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _applied(database: sqlite3.Connection) -> dict[str, str]:
+    if not _table_exists(database, "schema_migrations"):
+        return {}
+    return dict(database.execute("SELECT version, checksum FROM schema_migrations"))
+
+
+def _validate_history(known: dict[str, str], files: list[tuple[str, Path, str]]) -> list[str]:
+    """Reject drift between the database history and the codebase; return pending versions."""
+    file_versions = {version for version, _, _ in files}
+    if set(known) - file_versions:
+        raise MigrationError("Database has a migration version absent from this codebase")
+    for version, _, checksum in files:
+        if version in known and known[version] != checksum:
+            raise MigrationError(f"Migration {version} checksum changed")
+    pending = [version for version, _, _ in files if version not in known]
+    if known and any(version < max(known) for version in pending):
+        raise MigrationError("Cannot apply a migration older than an already applied version")
+    return pending
+
+
+def pending_migrations(sqlite_url: str, migrations_dir: Path | None = None) -> list[str]:
+    """Return versions not yet applied, validating history; never creates or writes the database."""
+    path = database_path(sqlite_url)
+    files = _migration_files(migrations_dir or MIGRATIONS_DIR)
+    if not path.exists():
+        return [version for version, _, _ in files]
+    with closing(sqlite3.connect(path, timeout=BUSY_TIMEOUT_MS / 1000)) as database:
+        known = _applied(database)
+    return _validate_history(known, files)
 
 
 def _statements(script: str) -> Iterator[str]:
@@ -130,21 +166,10 @@ def migrate(sqlite_url: str, migrations_dir: Path | None = None) -> list[str]:
     files = _migration_files(migrations_dir or MIGRATIONS_DIR)
     applied_now: list[str] = []
     with connect(sqlite_url) as database:
-        known = (
-            dict(database.execute("SELECT version, checksum FROM schema_migrations"))
-            if _table_exists(database, "schema_migrations")
-            else {}
-        )
-        file_versions = {version for version, _, _ in files}
-        if set(known) - file_versions:
-            raise MigrationError("Database has a migration version absent from this codebase")
-        for version, _, checksum in files:
-            if version in known and known[version] != checksum:
-                raise MigrationError(f"Migration {version} checksum changed")
-        if known and any(version < max(known) for version, _, _ in files if version not in known):
-            raise MigrationError("Cannot apply a migration older than an already applied version")
+        known = _applied(database)
+        pending = set(_validate_history(known, files))
         for version, sql_file, checksum in files:
-            if version in known:
+            if version not in pending:
                 continue
             _check_no_live_leases(database)
             try:

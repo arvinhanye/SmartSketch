@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings, SettingsError, load_settings
 from app.main import create_app
+from app.repositories.sqlite import migrate
 from app.services.startup import validate_embedding_space
 
 
@@ -183,6 +184,7 @@ def test_valid_app_stores_settings_without_external_connections(monkeypatch):
 
 def test_first_start_persists_embedding_space_and_restarts_cleanly(tmp_path, monkeypatch):
     database = tmp_path / "state.sqlite3"
+    migrate(f"sqlite:///{database.as_posix()}")   # REVIEW-C01-R02/R03：建表归迁移
     monkeypatch.setenv("SQLITE_URL", f"sqlite:///{database.as_posix()}")
 
     with TestClient(create_app()) as client:
@@ -197,6 +199,7 @@ def test_first_start_persists_embedding_space_and_restarts_cleanly(tmp_path, mon
 
 def test_changed_embedding_space_rejects_startup_without_mutating_record(tmp_path, monkeypatch):
     database = tmp_path / "state.sqlite3"
+    migrate(f"sqlite:///{database.as_posix()}")   # REVIEW-C01-R02/R03：建表归迁移
     monkeypatch.setenv("SQLITE_URL", f"sqlite:///{database.as_posix()}")
     with TestClient(create_app()):
         pass
@@ -224,6 +227,7 @@ def test_listener_uses_configured_host_and_port(monkeypatch):
 
 def test_worker_can_reuse_space_gate_and_model_changes_fail(tmp_path):
     sqlite_url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
+    migrate(sqlite_url)   # REVIEW-C01-R03：建表归迁移
     validate_embedding_space(
         load_settings(
             {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "local", "EMBEDDING_MODEL": "model-a"}

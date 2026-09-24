@@ -11,10 +11,11 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pytest tests/backend/test_b06.py -q
 ```
 
-从仓库根目录启动；相对 `SQLITE_URL` 路径以这个目录为基准，API 和后续 worker 必须使用同一个 SQLite 文件：
+从仓库根目录启动；相对 `SQLITE_URL` 路径以这个目录为基准，API 和后续 worker 必须使用同一个 SQLite 文件。首次启动前先执行迁移（见下方「SQLite 迁移与恢复」），否则 API 会以「SQLite schema is not migrated」拒绝启动：
 
 ```powershell
 $env:PYTHONPATH = (Resolve-Path ./src/backend).Path
+.\.venv\Scripts\python.exe -m app.repositories.sqlite
 .\.venv\Scripts\python.exe -m app
 ```
 
@@ -24,7 +25,7 @@ $env:PYTHONPATH = (Resolve-Path ./src/backend).Path
 
 ## SQLite 迁移与恢复（C01）
 
-首次启动或部署新增迁移前，**先停止 API 与 worker**，从仓库根目录运行；进程环境中的 `SQLITE_URL` 必须与两者使用的值一致（不设置时为 `sqlite:///./storage/smartsketch.sqlite3`）：
+API 启动时会检查迁移是否已是最新，有未执行的迁移即拒绝启动；因此首次启动或部署新增迁移前，**先停止 API 与 worker**，从仓库根目录运行；进程环境中的 `SQLITE_URL` 必须与两者使用的值一致（不设置时为 `sqlite:///./storage/smartsketch.sqlite3`）：
 
 ```powershell
 $env:PYTHONPATH = (Resolve-Path ./src/backend).Path

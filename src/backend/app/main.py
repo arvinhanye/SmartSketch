@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from app.api.health import router as health_router
 from app.config import load_settings
-from app.services.startup import validate_embedding_space
+from app.services.startup import validate_embedding_space, validate_schema_current
 
 
 APP_VERSION = "0.1.0"
@@ -16,6 +16,7 @@ APP_VERSION = "0.1.0"
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Check persistent runtime invariants before serving requests."""
+    validate_schema_current(application.state.settings)
     validate_embedding_space(application.state.settings)
     yield
 

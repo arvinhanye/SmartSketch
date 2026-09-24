@@ -2,12 +2,31 @@
 
 import shutil
 import sqlite3
+import subprocess
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.config import SettingsError
+from app.main import create_app
 from app.repositories.embedding_space import read_or_initialize_space
-from app.repositories.sqlite import MigrationError, _check_no_live_leases, connect, migrate
+from app.repositories.sqlite import (
+    MigrationError,
+    _check_no_live_leases,
+    connect,
+    migrate,
+    pending_migrations,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+# C01 之前 B06 启动门禁自己建出的表（ADR-012 补注第 1 条），用于模拟已有数据库。
+LEGACY_B06_DDL = """CREATE TABLE embedding_space_state (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions >= 1),
+    is_fake INTEGER NOT NULL CHECK (is_fake IN (0, 1))
+)"""
 
 
 def _url(path: Path) -> str:
@@ -24,7 +43,9 @@ def test_connection_enables_wal_foreign_keys_and_busy_timeout(tmp_path):
 def test_base_migration_adopts_existing_embedding_space_and_is_repeatable(tmp_path):
     path = tmp_path / "db.sqlite3"
     url = _url(path)
-    read_or_initialize_space(url, "model-a", 768, 0)
+    with sqlite3.connect(path) as database:
+        database.execute(LEGACY_B06_DDL)
+        database.execute("INSERT INTO embedding_space_state VALUES (1, 'model-a', 768, 0)")
 
     assert migrate(url) == ["001"]
     assert migrate(url) == []
@@ -238,3 +259,79 @@ def test_sql_migration_allows_trailing_comment(tmp_path):
         "CREATE TABLE example (id INTEGER);\n-- end of migration\n", encoding="utf-8"
     )
     assert migrate(_url(path), migrations) == ["001"]
+
+
+# ── REVIEW-C01 R01：校验和不受换行符影响 ─────────────────────────────────────
+
+def test_checksum_is_the_same_for_crlf_and_lf_checkouts(tmp_path):
+    url = _url(tmp_path / "db.sqlite3")
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    sql = migrations / "001_base.sql"
+    sql.write_bytes(b"-- base\r\nCREATE TABLE example (id INTEGER PRIMARY KEY);\r\n")
+    assert migrate(url, migrations) == ["001"]
+
+    sql.write_bytes(b"-- base\nCREATE TABLE example (id INTEGER PRIMARY KEY);\n")
+    assert migrate(url, migrations) == []
+    assert pending_migrations(url, migrations) == []
+
+    sql.write_bytes(b"-- changed\nCREATE TABLE example (id INTEGER PRIMARY KEY);\n")
+    with pytest.raises(MigrationError, match="checksum"):
+        migrate(url, migrations)
+
+
+def test_repository_pins_migration_files_to_lf():
+    result = subprocess.run(
+        ["git", "check-attr", "eol", "--", "src/backend/migrations/001_base.sql"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    )
+    assert result.stdout.strip().endswith("eol: lf")
+
+
+# ── REVIEW-C01 R02：启动前确认迁移已是最新 ────────────────────────────────────
+
+def test_pending_migrations_is_read_only_and_validates_history(tmp_path):
+    path = tmp_path / "db.sqlite3"
+    url = _url(path)
+    assert pending_migrations(url) == ["001"]
+    assert not path.exists(), "只读检查不得创建数据库文件"
+
+    migrate(url)
+    assert pending_migrations(url) == []
+
+    with sqlite3.connect(path) as database:
+        database.execute("UPDATE schema_migrations SET checksum = 'x' WHERE version = '001'")
+    with pytest.raises(MigrationError, match="checksum"):
+        pending_migrations(url)
+
+
+def test_api_refuses_to_start_before_migrations_run(tmp_path, monkeypatch):
+    path = tmp_path / "db.sqlite3"
+    monkeypatch.setenv("SQLITE_URL", _url(path))
+    with pytest.raises(SettingsError, match="not migrated.*001.*app.repositories.sqlite"):
+        with TestClient(create_app()):
+            pass
+    assert not path.exists()
+
+    migrate(_url(path))
+    with TestClient(create_app()) as client:
+        assert client.get("/health").status_code == 200
+
+
+# ── REVIEW-C01 R03：建表只在迁移里 ───────────────────────────────────────────
+
+def test_space_gate_reads_and_writes_the_row_but_never_creates_the_table(tmp_path):
+    source = (ROOT / "src/backend/app/repositories/embedding_space.py").read_text(encoding="utf-8")
+    assert "CREATE TABLE" not in source.upper()
+
+    path = tmp_path / "db.sqlite3"
+    sqlite3.connect(path).close()
+    with pytest.raises(sqlite3.OperationalError, match="embedding_space_state"):
+        read_or_initialize_space(_url(path), "model-a", 768, 0)
+    with sqlite3.connect(path) as database:
+        assert database.execute(
+            "SELECT name FROM sqlite_master WHERE name = 'embedding_space_state'"
+        ).fetchone() is None
+
+    migrate(_url(path))
+    assert read_or_initialize_space(_url(path), "model-a", 768, 0) == ("model-a", 768, 0)
