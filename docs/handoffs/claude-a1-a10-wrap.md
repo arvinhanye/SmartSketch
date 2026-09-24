@@ -22,7 +22,7 @@
 | #16 解冲突 + FIX-R03 | #16 `claude/fix-r01-r02` | `77310d2`（合入 main）、`970c582` | 13 FAIL → ALL PASS；FIX-R01/R02 原核对仍 ALL PASS | 6/6 | ADR-012 修订 2 补注 |
 | A08S-R01/R02 | #23 `claude/a08-signoff`（新开） | `445478e`（固定审查快照）、`39633fe` | 11 FAIL → ALL PASS | 6/6 | ADR-014 修订 1 决定 9 补注 |
 | A09-R01/R02 | #20 `claude/a09-dev-environment-check-8e5e93` | `097f248` | 27 FAIL → ALL PASS；Q3.5 参考切分器 11/11 | 9/9 | ADR-015 修订 1（方向已选定） |
-| A10-R01/R02 | #24 `claude/a10-r01-r02-fix`（新开，叠在 #18 上） | `fae2212` | 10 FAIL → ALL PASS；`check_a10.py` 仍 ALL PASS | 5/5 | ADR-016 修订 1 |
+| A10-R01/R02 | #24 `claude/a10-r01-r02-fix`（新开，叠在 #18 上） | `fae2212`、`559cd18`（合入 main 解 `tasks.md` 冲突） | 10 FAIL → ALL PASS；`check_a10.py` 仍 ALL PASS | 5/5 | ADR-016 修订 1 |
 
 每个分支都跑过 `./scripts/verify.sh`（exit 0）和 `git diff --check`（exit 0）。各自的交接写明了细节：`claude-a04.md` 第十二节、`claude-sign-a08.md`「第二轮」、`claude-a09.md` 第九节、`claude-a10.md` 第十节。核对脚本、负例和参考模型都在会话草稿区，没有入库。
 
@@ -47,4 +47,4 @@
 
 ## 六、回滚
 
-对各 PR 分支上本任务的提交执行 `git revert`：`970c582`、`39633fe`、`097f248`、`fae2212`。`445478e` 是签收稿本身，是否保留由 A08 签收决定。`77310d2` 是合并提交，回滚时用 `git revert -m 1`。本分支则 revert 自己的提交。不涉及数据或依赖。
+对各 PR 分支上本任务的提交执行 `git revert`：`970c582`、`39633fe`、`097f248`、`fae2212`。`445478e` 是签收稿本身，是否保留由 A08 签收决定。`77310d2`、`559cd18` 是合并提交，回滚时用 `git revert -m 1`。本分支则 revert 自己的提交。不涉及数据或依赖。
