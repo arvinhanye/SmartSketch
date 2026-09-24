@@ -1,7 +1,7 @@
 # 交接：审查 B06（PR #21）、同步 main 与集成修复
 
 - `task_id`: REVIEW-B06
-- `status`: 审查完成；两项 P2 需 ArvinHan 签收后才能合入；集成缺陷已修
+- `status`: 审查完成；B06-R01、B06-R02 已由 ArvinHan 于 2026-09-24 签收（`docs/decisions.md`「ADR-012 补注：启动门禁的当前空间记录表与职责拆分」）；集成缺陷已修
 - `审查目标`: `origin/B06` @ `4142156`（PR #21，kongsc；含 B05 提交 `e8ce796`）。B06 自身提交为 `ca353b1`、`2930052`，`4142156` 是它合入旧 main（`f9dfc8f`）
 - `同步`: 把已同步 main 的 B05 分支合入 B06，冲突 3 处（见下）；随后一个集成修复提交
 
@@ -34,12 +34,12 @@
 
 ## 审查意见
 
-- **B06-R01（P2，需签收）**：原子清单给 B06 的范围只有 `config.py` 和 `test_b06.py`；实际还新增了 SQLite 表 `embedding_space_state`，在 API 启动（lifespan）时建表并写入，走的不是迁移。它承担规格要求的「SQLite 记录当前空间（单行）」，设计合理：`BEGIN IMMEDIATE`、单行 CHECK、不一致时不改旧记录。但这是一个数据模型决定：表名不在 ADR-008 / A10 命名基线里，而且要求 C01 的 `001_base.sql` 与迁移运行器接管此表。需要签收表名与「C01 接管」约定，建议写进 ADR-012 补注或命名基线。
-- **B06-R02（P2，需签收）**：B06 改了已签收的 `specs/teacher-review-publish.md`（ADR-012）两处职责标注。PUB-32 与「启动门禁」改为：B06 提供共享检查，API 在 lifespan 调用，C09 的 worker 入口必须调用，离线命令归后续重新向量化任务。规则本身没变，只是拆分职责，但按惯例已签收规格的文字改动需要签收。
+- **B06-R01（P2，已签收）**：原子清单给 B06 的范围只有 `config.py` 和 `test_b06.py`；实际还新增了 SQLite 表 `embedding_space_state`，在 API 启动（lifespan）时建表并写入，走的不是迁移。它承担规格要求的「SQLite 记录当前空间（单行）」，设计合理：`BEGIN IMMEDIATE`、单行 CHECK、不一致时不改旧记录。但这是一个数据模型决定：表名不在 ADR-008 / A10 命名基线里，而且要求 C01 的 `001_base.sql` 与迁移运行器接管此表。需要签收表名与「C01 接管」约定，建议写进 ADR-012 补注或命名基线。
+- **B06-R02（P2，已签收）**：B06 改了已签收的 `specs/teacher-review-publish.md`（ADR-012）两处职责标注。PUB-32 与「启动门禁」改为：B06 提供共享检查，API 在 lifespan 调用，C09 的 worker 入口必须调用，离线命令归后续重新向量化任务。规则本身没变，只是拆分职责，但按惯例已签收规格的文字改动需要签收。
 - **B06-R03（P3）**：模块级 `app = create_app()` 在导入时读取并校验环境变量，这是有意为之且有测试覆盖。代价是任何 `import app.main` 在非法环境下都会抛错，后续工具和脚本应改为导入 `create_app`。
 - **B06-R04（P3）**：默认 `SQLITE_URL` 是相对路径，按进程工作目录解析；README 和 `.env.example` 已写明，API 与 worker 需从同一目录启动。
 
 ## 下一步
 
-- ArvinHan 签收 B06-R01、R02 后，先合 PR #14，再合 PR #21。
+- 已签收；先合 PR #14，再合 PR #21。
 - C01 认领时须接管 `embedding_space_state`；C09 的 worker 入口须调用 `validate_embedding_space`。
