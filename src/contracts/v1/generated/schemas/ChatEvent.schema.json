@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smartsketch.local/contracts/v1/ChatEvent.schema.json",
+  "title": "ChatEvent",
+  "$ref": "#/$defs/ChatEvent",
+  "$defs": {
+    "ChatAnswered": {
+      "type": "object",
+      "description": "有依据的回答。**至少一条引用**，每条引用必须可定位。",
+      "required": [
+        "status",
+        "answer",
+        "citations"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "answered"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Citation"
+          }
+        },
+        "related_kp_ids": {
+          "type": "array",
+          "description": "「涉及的知识点」标签，点击跳转图谱并高亮",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ChatDeltaEvent": {
+      "type": "object",
+      "description": "正文增量。**delta 阶段的正文是临时态**：其中出现的引用编号可能在\n引用校验后被剔除，前端不得在此阶段渲染可点击引用（events.v1.md §3）。\n",
+      "required": [
+        "event",
+        "delta"
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "const": "delta"
+        },
+        "delta": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ChatDoneEvent": {
+      "type": "object",
+      "description": "终态事件，恰好一条，且**携带最终正文**。前端收到后用 `final` 整体\n替换累积的 delta 文本，而不是把 delta 拼接结果当成答案——两者可能\n不同（引用校验剔除了编号，或全部引用失效导致降级为 not_covered）。\n",
+      "required": [
+        "event",
+        "final"
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "const": "done"
+        },
+        "final": {
+          "$ref": "#/$defs/ChatResponse"
+        }
+      }
+    },
+    "ChatErrorEvent": {
+      "type": "object",
+      "description": "生成中断的异常终止。与 done 互斥，发送后关闭连接。",
+      "required": [
+        "event",
+        "error"
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "const": "error"
+        },
+        "error": {
+          "$ref": "#/$defs/Error"
+        }
+      }
+    },
+    "ChatEvent": {
+      "description": "单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：\n原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在\n（codex 审查 R04）。事件名、顺序与终止语义见 `events.v1.md` §3。\n",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatMetaEvent"
+        },
+        {
+          "$ref": "#/$defs/ChatDeltaEvent"
+        },
+        {
+          "$ref": "#/$defs/ChatDoneEvent"
+        },
+        {
+          "$ref": "#/$defs/ChatErrorEvent"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "event",
+        "mapping": {
+          "meta": "#/components/schemas/ChatMetaEvent",
+          "delta": "#/components/schemas/ChatDeltaEvent",
+          "done": "#/components/schemas/ChatDoneEvent",
+          "error": "#/components/schemas/ChatErrorEvent"
+        }
+      }
+    },
+    "ChatMetaEvent": {
+      "type": "object",
+      "description": "检索完成、生成开始前的第一条事件，恒为一条。\n`status = not_covered` 时后续不再有 delta，直接发 done。\n",
+      "required": [
+        "event",
+        "status"
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "const": "meta"
+        },
+        "status": {
+          "$ref": "#/$defs/ChatStatus"
+        },
+        "retrieved": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "进入生成上下文的证据块数量，供前端显示「已检索 N 段」"
+        }
+      }
+    },
+    "ChatNotCovered": {
+      "type": "object",
+      "description": "资料未覆盖。**引用必须为空数组**，并给出机读原因。\n这是 200 响应的领域状态，不是 HTTP 错误（ADR-003）。\n",
+      "required": [
+        "status",
+        "answer",
+        "citations",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "not_covered"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "面向用户的可解释说明，不得包含无依据的结论性内容"
+        },
+        "citations": {
+          "type": "array",
+          "maxItems": 0,
+          "items": {
+            "$ref": "#/$defs/Citation"
+          }
+        },
+        "reason": {
+          "$ref": "#/$defs/NotCoveredReason"
+        },
+        "related_kp_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ChatResponse": {
+      "description": "按 `status` 分支的问答响应。分支存在的原因见 `src/contracts/README.md` §5.4：\n「answered 至少一条引用」若只写在描述里，生成的客户端会把\n`{\"status\":\"answered\",\"answer\":\"结论\",\"citations\":[]}` 当成合格响应。\n",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatAnswered"
+        },
+        {
+          "$ref": "#/$defs/ChatNotCovered"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "status",
+        "mapping": {
+          "answered": "#/components/schemas/ChatAnswered",
+          "not_covered": "#/components/schemas/ChatNotCovered"
+        }
+      }
+    },
+    "ChatStatus": {
+      "type": "string",
+      "description": "问答的两种终态。结构差异由 `ChatAnswered` / `ChatNotCovered` 两个\n独立 schema 表达，不靠本枚举的描述文字约束（ADR-003）。\n",
+      "enum": [
+        "answered",
+        "not_covered"
+      ]
+    },
+    "Citation": {
+      "type": "object",
+      "description": "引用编号与原文定位；生成后经引用校验，无效编号被剔除。\n与 `SourceRef` 同样要求可定位：`page` 与 `section_path` 至少给出一个。\n",
+      "required": [
+        "index",
+        "chunk_id",
+        "document_id",
+        "text"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "page"
+          ]
+        },
+        {
+          "required": [
+            "section_path"
+          ]
+        }
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "回答正文中标注的编号"
+        },
+        "chunk_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "message": {
+          "type": "string",
+          "description": "面向用户的可读说明"
+        },
+        "details": {
+          "type": "object",
+          "description": "结构化补充，例如 `CYCLE_DETECTED` 的 `cycle` 节点链路",
+          "additionalProperties": true
+        }
+      }
+    },
+    "ErrorCode": {
+      "type": "string",
+      "description": "错误码全集，逐条说明见 `errors.v1.md`",
+      "enum": [
+        "UNAUTHENTICATED",
+        "COURSE_FORBIDDEN",
+        "ROLE_FORBIDDEN",
+        "NOT_FOUND",
+        "GRAPH_NOT_PUBLISHED",
+        "UNSUPPORTED_FORMAT",
+        "FILE_TOO_LARGE",
+        "VALIDATION_ERROR",
+        "CYCLE_DETECTED",
+        "DANGLING_ENDPOINT",
+        "DUPLICATE_RELATION",
+        "NODE_LOCKED",
+        "TASK_NOT_CANCELLABLE",
+        "PUBLISH_BLOCKED",
+        "RATE_LIMITED",
+        "LLM_UNAVAILABLE"
+      ]
+    },
+    "NotCoveredReason": {
+      "type": "string",
+      "description": "机读的拒答原因，闭集。前端按此分支给出不同引导文案，\n不解析 `answer` 的自然语言（AGENTS.md §4「可机读的资料未覆盖状态」）。\n",
+      "enum": [
+        "no_retrieval_hit",
+        "below_similarity_threshold",
+        "out_of_course_scope",
+        "all_citations_invalidated"
+      ]
+    }
+  }
+}

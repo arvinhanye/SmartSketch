@@ -1,14 +1,14 @@
 # SmartSketch 单轮可执行原子任务清单
 
-共 **127 个叶子任务**，其中 **119 个主线任务、8 个条件性加分任务**。这是实施计划，不是已完成列表，也不承诺 AI 自动保证正确。每次只选一个依赖已验收的叶子任务；用负例、真实命令、人工决策和独立审查形成可靠性边界。机器可读版见 [atomic-tasks.json](atomic-tasks.json)。
+共 **140 个叶子任务**，其中 **132 个主线任务、8 个条件性加分任务**。这是实施计划，不是已完成列表，也不承诺 AI 自动保证正确。每次只选一个依赖已验收的叶子任务；用负例、真实命令、人工决策和独立审查形成可靠性边界。机器可读版见 [atomic-tasks.json](atomic-tasks.json)。
 
 ## 使用规则
 
 1. 本清单所有项初始为 **PROPOSED / 未认领**；原任务 M0/M1 是父任务，下面是叶子任务，编号不覆盖分支中已有的 M0-04a/S-06。认领时在主任务板写 ID、负责人、目标 worktree/HEAD 与文件锁。不要一次认领整组。
 2. 一轮通常只实现一个函数、一个小服务、一种解析格式、一个 UI 交互或一项契约迁移。目标为约 30–90 分钟的可测工作量，不是完成时限承诺；若需要改变第二项领域规则、超过约 6 个手写功能文件、等待外部决策或复杂迁移，先细分为 a/b 子项。B01 初始化工具产生的锁文件/模板和 B14 生成物除外，仍不得夹带业务。
-3. **A01 是路线门**：清单使用 Pydantic-first 文件位置作候选定位，不表示已经替团队采纳。若选 YAML-first，先在 A01 把 B08～B14/O02/O05 的路径映射到实际真源，再认领；不双写。模型预算、快照存储、登录、worker 等同理先决策再实现。
+3. **A01 是路线门**：ADR-004 已选 YAML-first：`src/contracts/api.v1.yaml` 是唯一人工编辑的机器可读契约；B08～B14/O02/O05 先改真源，再用脚本生成 `src/contracts/v1/generated/`，不得手写生成物。批 1 导入真源与生成链后才能执行这些契约任务。模型预算、快照存储、登录、worker 等同理先决策再实现。
 4. 表内给的是允许编辑的功能文件；每项另允许自己的测试、对应规格的本任务段落、任务板状态和自己的交接文件。共享文件一次一个写入者。完整白名单在 JSON，范围改变须记录，不通过宽泛目录授权顺手重构。
-5. 每项最终都须在 `/Users/arvinhan/Desktop/SmartSketch` 或已记录的目标 worktree 运行 `./scripts/verify.sh`、`git diff --check` 和表内单项命令，记录退出码与 PASS/SKIP。表内测试路径和 npm 命令是**待创建的验收契约**，当前骨架未具备这些测试，绝非已经跑通。
+5. 每项最终都须在当前 checkout 或已记录的目标 worktree 运行 `./scripts/verify.sh`、`git diff --check` 和表内单项命令，记录退出码与 PASS/SKIP。表内测试路径和 npm 命令是**待创建的验收契约**，当前骨架未具备这些测试，绝非已经跑通。
 6. 前端统一命令由 B02 建立并保证发现外层 tests/frontend；后端 pytest 配置由 B05 建立；集成夹具由对应首个 integration 任务建立；E2E 脚本/配置在 K05 建立，若环境适配超出单轮就先拆 K05a。使用测试假模型；真实服务/付费调用、依赖安装按环境审批，不暗中做。
 7. 完成证据 = 可运行成果 + 至少成功/边界/失败各一例 + 所有依赖版本 + 实际命令结果 + 交接。仅文档任务用可核查决策表/映射表验收，未签收决定不得写成确定结论。无人拍板不妨碍不依赖该决定的其他任务。
 8. 更新 `docs/handoffs/<agent>-<id>.md`：task_id、worktree、base/head、范围、测试结果、待定/风险、首个后续动作；如需审查，添加 ready_for_review 与固定提交或 dirty 指纹。一次任务完成不自动提交、合并或宣称父里程碑完成。
@@ -22,20 +22,31 @@
 | M0-03 后端骨架 | B05～B06 | 身份决定不应阻塞无状态 health |
 | M0-04 共享契约 | A01～A03、B07～B14 | 先解决两个分支冲突，再复用现有契约 |
 | M0-05 开发环境 | F01、K07 | 配置文件存在不等于容器验收通过 |
-| M1-01 上传与课程 | C01～C12 | 身份、文件、事务、队列、SSE 分开 |
+| M1-01 上传与课程 | C01～C16 | 身份、文件、事务、队列、SSE 分开；C13～C16 补齐登录、账号、成员和票据 |
 | M1-02 解析分块 | D01～D11 | 四种格式独立测，避免一个任务包办 |
-| M1-03 抽取融合 | E01～E12、F04、F13 | fake 接口先行，模型真实效果另评测 |
+| M1-03 抽取融合 | E01～E12、F04、F13～F14 | fake 接口先行，模型真实效果另评测 |
 | M1-04 DAG | F05～F06 | 纯函数和数据库并发分别验收 |
 | M1-05 教师审核发布 | F07～F12、G01～G07、H07～H10 | 服务、快照、补偿、UI 顺序交接 |
-| main 尚缺的学生端主线 | H11、I01～I06、J01～J10 | 属现有 MVP，不当新增加分范围 |
-| S2 M3/M4 交付 | K01～K12 | 回归、实测、部署、数据恢复和文档 |
+| main 尚缺的学生端主线 | H11～H12、I01～I06、J01～J10 | 属现有 MVP，不当新增加分范围 |
+| S2 M3/M4 交付 | K01～K19 | 回归、实测、部署、数据恢复、消融和参赛材料 |
 | 可选范围 | O01～O08 | 未批准不执行；不挤占主线 |
+
+## A10 批 0 清单缺口处理
+
+| 缺口 | 承接任务 | 说明 |
+| --- | --- | --- |
+| G-1 本地身份与成员 | C13～C16、H12 | 登录、账号命令、成员 API/页面与 SSE 票据分开验收 |
+| G-2 离线重新向量化 | F14 | 按 ADR-012 修订 1 对存量草稿和已提交版本核对 |
+| G-3 消融实验 | K13 | 三种抽取阶段配置使用同一标注集 |
+| G-4 参赛材料与合规 | K14～K19 | 提示词、图谱示例、S2、S1/PPT/视频、S5、合规分别交付 |
+| G-5 `event_tickets` 命名基线 | A10 批 5 | 属已签收命名文档对齐，无需新实现任务 |
+| G-6 身份环境变量 | C13 | 在登录实现中补 `.env.example`、`docs/integrations.md` 与启动校验 |
 
 ## 推荐调度顺序
 
 先 A01 确认契约方向，A02/A03 同步术语，A10 记录每批导入计划；继而 B01/B05 骨架，再按依赖图取可执行项。F05 纯 DAG、解析器等可在其依赖就绪后独立执行，但本次未启动其他 Agent。A10 不是要求把两个分支一次性合并。
 
-下表输入→输出写明单一完成物；“验收/负例”是该轮停止条件。所有代码任务同时承担表内测试文件（JSON 白名单已列出）。文件路径以项目根目录 `/Users/arvinhan/Desktop/SmartSketch/` 为固定基准。
+下表输入→输出写明单一完成物；“验收/负例”是该轮停止条件。所有代码任务同时承担表内测试文件（JSON 白名单已列出）。JSON 中的旧绝对路径以仓库根目录为逻辑前缀，执行时映射到当前 checkout，不能当作本机固定路径。
 
 ## A 决策与基线对齐（10 项）
 
@@ -63,22 +74,22 @@
 | **B05 初始化后端应用工厂与 health** | A01 | FastAPI 约定 → health 路由与响应 | `src/backend/pyproject.toml`<br>`src/backend/app/main.py`<br>`src/backend/app/api/health.py` | 无密钥可测 GET /health；测试 app 工厂不触发网络连接 | `python3 -m pytest tests/backend/test_b05.py -q` |
 | **B06 建立后端设置加载与验证** | B05, A07 | 环境变量表 → 类型化 settings | `src/backend/app/config.py` | 非法端口/预算/维度显式错误；缺真实模型配置时 fake 模式可测；日志无密钥 | `python3 -m pytest tests/backend/test_b06.py -q` |
 | **B07 修复校验缺依赖假绿** | A01, B05 | R02 与分支门禁 → 显式 PASS/SKIP/FAIL | `scripts/check_contracts.py`<br>`scripts/verify/contracts.sh`<br>`src/backend/pyproject.toml` | 缺依赖、坏引用、坏枚举非 0；骨架跳过显式标注；在选定基线落地，不保留双门禁 | `python3 -m pytest tests/tooling/test_b07.py -q` |
-| **B08 迁移公共错误和来源契约** | A01, A02, B05 | 已有错误/SourceRef → 选定真源公共类型 | `src/contracts/v1/python/common.py` | page 正整数或 section 非空；4 类关系闭集；错误码与未覆盖领域状态分开 | `python3 -m pytest tests/contracts/test_b08.py -q` |
-| **B09 迁移课程与资料 REST 契约** | B08, A05 | 现有课程/文档端点 → DTO 和路径声明 | `src/contracts/v1/python/courses.py` | 列表/创建/上传/读取有成功与失败响应；不从零重写已有字段 | `python3 -m pytest tests/contracts/test_b09.py -q` |
-| **B10 迁移任务与 SSE 契约** | B08, A03 | 任务转换表 → 判别事件 DTO | `src/contracts/v1/python/tasks.py` | 每种事件必填字段不同；空 payload 拒绝；取消请求和终态区别正确 | `python3 -m pytest tests/contracts/test_b10.py -q` |
-| **B11 迁移图谱编辑和版本契约** | B08, A04 | 现有图节点关系接口 → 作用域/修订号 DTO | `src/contracts/v1/python/graph.py` | 跨版本标识齐全；编辑携带 expected_revision；端点与来源校验负例 | `python3 -m pytest tests/contracts/test_b11.py -q` |
-| **B12 迁移进度和推荐契约** | B08, A08 | 进度/推荐规格 → DTO | `src/contracts/v1/python/learning.py` | 空态可区分全部掌握/尚未发布/无图；分量可还原评分 | `python3 -m pytest tests/contracts/test_b12.py -q` |
-| **B13 迁移问答与事件契约** | B08, A09 | R03/R04 → 响应判别联合 | `src/contracts/v1/python/chat.py` | answered 空引用拒绝、无定位拒绝、空事件拒绝；最终替换正文有字段 | `python3 -m pytest tests/contracts/test_b13.py -q` |
-| **B14 建立契约导出与漂移检查** | B09, B10, B11, B12, B13 | 选定真源 → OpenAPI/Schema/TS 生成物 | `scripts/gen-contracts.sh`<br>`src/contracts/generate.py`<br>`src/contracts/v1/generated` | 两次输出一致；只检查模式不改工作文件；临时篡改生成物必被检出 | `python3 -m pytest tests/contracts/test_b14.py -q` |
+| **B08 迁移公共错误和来源契约** | A01, A02, B05 | 已有错误/SourceRef → 选定真源公共类型 | `src/contracts/api.v1.yaml`<br>`src/contracts/errors.v1.md`<br>`src/contracts/v1/generated/` | page 正整数或 section 非空；4 类关系闭集；错误码与未覆盖领域状态分开；重新生成 | `python3 -m pytest tests/contracts/test_b08.py -q` |
+| **B09 迁移课程与资料 REST 契约** | B08, A05 | 现有课程/文档端点 → DTO 和路径声明 | `src/contracts/api.v1.yaml`<br>`src/contracts/v1/generated/` | 列表/创建/上传/读取有成功与失败响应；不从零重写已有字段；重新生成 | `python3 -m pytest tests/contracts/test_b09.py -q` |
+| **B10 迁移任务与 SSE 契约** | B08, A03 | 任务转换表 → 判别事件 DTO | `src/contracts/api.v1.yaml`<br>`src/contracts/events.v1.md`<br>`src/contracts/v1/generated/` | 每种事件必填字段不同；空 payload 拒绝；取消请求和终态区别正确；重新生成 | `python3 -m pytest tests/contracts/test_b10.py -q` |
+| **B11 迁移图谱编辑和版本契约** | B08, A04 | 现有图节点关系接口 → 作用域/修订号 DTO | `src/contracts/api.v1.yaml`<br>`src/contracts/v1/generated/` | 跨版本标识齐全；编辑携带 expected_revision；端点与来源校验负例；重新生成 | `python3 -m pytest tests/contracts/test_b11.py -q` |
+| **B12 迁移进度和推荐契约** | B08, A08 | 进度/推荐规格 → DTO | `src/contracts/api.v1.yaml`<br>`src/contracts/v1/generated/` | 区分未发布错误与全部掌握空态；已提交空图按发布快照完整性故障处理，不增加 `no_graph` wire 状态；未舍入 double 分量按 `u→i→c→e` 求和逐位等于评分，仅展示舍入；重新生成 | `python3 -m pytest tests/contracts/test_b12.py -q` |
+| **B13 迁移问答与事件契约** | B08, A09 | R03/R04 → 响应判别联合 | `src/contracts/api.v1.yaml`<br>`src/contracts/events.v1.md`<br>`src/contracts/v1/generated/` | answered 空引用拒绝、无定位拒绝、空事件拒绝；最终替换正文有字段；重新生成 | `python3 -m pytest tests/contracts/test_b13.py -q` |
+| **B14 建立契约导出与漂移检查** | B09, B10, B11, B12, B13 | 选定真源 → OpenAPI/Schema/TS 生成物 | `src/contracts/api.v1.yaml`<br>`scripts/gen-contracts.sh`<br>`scripts/gen_contracts.py`<br>`src/contracts/v1/generated/` | 两次输出一致；只检查模式不改工作文件；临时篡改生成物必被检出；重新生成 | `python3 -m pytest tests/contracts/test_b14.py -q` |
 | **B15 建立前端 HTTP 客户端** | B02, B14 | 生成 TS 契约 → 请求封装 | `src/frontend/src/api/http.ts` | 类型化错误、超时/取消、认证失败处理；组件不自行拼路径 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts` |
 
-## C 课程资料与持久任务（12 项）
+## C 课程资料与持久任务（16 项）
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
 | **C01 建立 SQLite 连接和迁移运行器** | B06, A04, A06 | 业务模型决定 → 连接/迁移版本表 | `src/backend/app/repositories/sqlite.py`<br>`src/backend/migrations/001_base.sql` | 临时数据库迁移可重复；事务回滚；备份后恢复命令可验证 | `python3 -m pytest tests/backend/test_c01.py -q` |
 | **C02 实现课程和成员仓储** | C01, A05 | 课程/成员字段 → scoped CRUD | `src/backend/app/repositories/courses.py`<br>`src/backend/migrations/002_courses.sql` | 课程成员唯一；同用户不同课程角色独立；读写外键正确 | `python3 -m pytest tests/backend/test_c02.py -q` |
-| **C03 实现身份边界与课程访问依赖** | C02, B09 | 访问矩阵 → 身份/权限依赖与服务 | `src/backend/app/api/dependencies.py`<br>`src/backend/app/services/access.py` | 伪造 user_id、非成员、学生编辑均拒绝；按 A05 决定接入身份，不自行选登录方案 | `python3 -m pytest tests/backend/test_c03.py -q` |
+| **C03 实现身份边界与课程访问依赖** | C02, B09, C13 | 访问矩阵 → 身份/权限依赖与服务 | `src/backend/app/api/dependencies.py`<br>`src/backend/app/services/access.py` | 伪造 user_id、非成员、学生编辑均拒绝；按 A05 决定接入身份，不自行选登录方案 | `python3 -m pytest tests/backend/test_c03.py -q` |
 | **C04 实现课程列表和创建 API** | C03 | 课程仓储 → 两个薄路由 | `src/backend/app/api/courses.py`<br>`src/backend/app/services/courses.py` | 仅列可访问课程；创建者成员写入同事务；无业务 SQL 留在路由 | `python3 -m pytest tests/backend/test_c04.py -q` |
 | **C05 实现文件落盘边界** | B06 | 上传字节流 → 文件元数据 | `src/backend/app/services/file_storage.py` | 路径穿越、伪扩展名、超限/中断流失败且无半文件；生成随机存储名 | `python3 -m pytest tests/backend/test_c05.py -q` |
 | **C06 实现资料和任务创建事务** | C01, B10 | 合法文件元数据 → material + queued task | `src/backend/app/repositories/materials.py`<br>`src/backend/app/repositories/tasks.py`<br>`src/backend/migrations/003_tasks.sql` | 数据库写入失败不留孤儿记录；重复请求的幂等键按课程隔离 | `python3 -m pytest tests/backend/test_c06.py -q` |
@@ -86,8 +97,12 @@
 | **C08 实现状态迁移纯函数** | A03, B10 | 当前状态 + 事件 → 新状态 | `src/backend/app/services/task_state.py` | 所有合法边覆盖；非法跳转、进度倒退、终态再写失败 | `python3 -m pytest tests/backend/test_c08.py -q` |
 | **C09 实现 worker 原子领取与租约** | C06, C08, A06 | queued/过期任务 → 单 worker 所有权 | `src/backend/app/repositories/task_leases.py` | 两个连接争同任务只有一个成功；旧租约 token 禁止续写；到期可接管 | `python3 -m pytest tests/backend/test_c09.py -q` |
 | **C10 实现任务取消服务与 API** | C09, C03 | 取消请求 → 持久取消意图/终态 | `src/backend/app/services/task_cancel.py`<br>`src/backend/app/api/task_cancel.py` | queued/运行中/完成后/重复取消；取消和写入竞争有确定结果 | `python3 -m pytest tests/backend/test_c10.py -q` |
-| **C11 实现任务查询与 GET SSE** | C08, C03, B10 | task 状态 → 快照/心跳/终态流 | `src/backend/app/api/tasks.py`<br>`src/backend/app/services/task_events.py` | 先验证课程权限；重连快照；终态关闭；断开释放监听器 | `python3 -m pytest tests/backend/test_c11.py -q` |
+| **C11 实现任务查询与 GET SSE** | C08, C03, B10, C16 | task 状态 → 快照/心跳/终态流 | `src/backend/app/api/tasks.py`<br>`src/backend/app/services/task_events.py` | 先验证课程权限；重连快照；终态关闭；断开释放监听器 | `python3 -m pytest tests/backend/test_c11.py -q` |
 | **C12 实现前端任务流客户端** | B15, C11 | SSE 字节 → 任务状态订阅 | `src/frontend/src/api/taskEvents.ts` | 分片帧/CRLF/心跳/重连；终态和卸载关闭；旧课程事件不污染当前课 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/c12.test.ts` |
+| **C13 实现本地账号登录与访问令牌签发** | C01, B09, B06, A05 | 账号与口令 → 经过校验的 Bearer 令牌 | `src/backend/app/api/auth.py`<br>`src/backend/app/services/auth.py`<br>`src/backend/app/repositories/accounts.py`<br>`src/backend/migrations/008_accounts.sql`<br>`src/backend/app/config.py`<br>`.env.example`<br>`docs/integrations.md` | 正确口令可登录；错口令、停用账号、超过 5 次/60 秒拒绝；密钥只读环境变量且迁移可恢复 | `python3 -m pytest tests/backend/test_c13.py -q` |
+| **C14 实现账号管理命令与演示账号种子** | C13 | 本地账号管理决定 → 可重复执行的账号命令与演示种子 | `scripts/manage-accounts.py`<br>`scripts/seed-demo-accounts.py` | 创建/停用可复查；重复种子不重复；缺 SEED_DEMO_PASSWORD 非 0；不提交真实口令 | `python3 -m pytest tests/backend/test_c14.py -q` |
+| **C15 实现课程成员管理 API** | C03, C04, B09 | 教师成员管理请求 → 列出、添加、移除成员 | `src/backend/app/api/members.py`<br>`src/backend/app/services/members.py` | 仅课程教师可改；重复添加幂等且不降级教师；跨课与非成员拒绝 | `python3 -m pytest tests/backend/test_c15.py -q` |
+| **C16 实现 SSE 一次性票据申领** | C03, C06, B10 | 已授权的任务请求 → 一次性且绑定任务的事件票据 | `src/backend/app/api/event_tickets.py`<br>`src/backend/app/repositories/event_tickets.py`<br>`src/backend/migrations/009_event_tickets.sql` | 仅保存票据哈希；60 秒过期；重复、跨任务或普通 Bearer 查询票据拒绝；迁移可恢复 | `python3 -m pytest tests/backend/test_c16.py -q` |
 
 ## D 解析与分块（11 项）
 
@@ -102,7 +117,7 @@
 | **D07 实现重复页眉页脚清洗** | D05 | 分页行 → 清洗文本与位置映射 | `src/backend/app/services/parsers/cleanup.py` | 重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗 | `python3 -m pytest tests/backend/test_d07.py -q` |
 | **D08 实现章节内语义分块** | D02, D03, D04, D06, D07 | 定位段落 → 约1500字/200重叠块 | `src/backend/app/services/chunking.py` | 跨章不混、超长句/段、空输入；来源映射可回到原文 | `python3 -m pytest tests/backend/test_d08.py -q` |
 | **D09 实现块身份与缓存键** | D08, A07 | 块内容/出处/版本 → 身份与抽取缓存键 | `src/backend/app/services/chunk_identity.py` | 同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效 | `python3 -m pytest tests/backend/test_d09.py -q` |
-| **D10 实现来源块持久化** | D09, C01 | 定位块 → 可查询 SourceChunk | `src/backend/app/repositories/chunks.py`<br>`src/backend/migrations/004_chunks.sql` | 重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用 | `python3 -m pytest tests/backend/test_d10.py -q` |
+| **D10 实现来源块持久化** | D09, C01 | 定位块 → 可查询 Chunk | `src/backend/app/repositories/chunks.py`<br>`src/backend/migrations/004_chunks.sql` | 重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用 | `python3 -m pytest tests/backend/test_d10.py -q` |
 | **D11 实现解析阶段 worker 编排** | C09, C10, D10 | 已领取任务 → parsing 完成检查点 | `src/backend/app/workers/parse_task.py` | 解析失败/取消/重启均落状态；只做解析阶段不顺手接真实 LLM | `python3 -m pytest tests/backend/test_d11.py -q` |
 
 ## E 模型抽取与融合（12 项）
@@ -122,7 +137,7 @@
 | **E11 实现关系两阶段抽取** | E10, E05 | 小节实体 ID 表 + 来源块 → 四类关系候选 | `src/backend/app/services/ai/relations.py`<br>`prompts/extract_relations.yaml` | 悬空端点/跨课/自环/重复边拦截；仅提及不判前置；方向反例 | `python3 -m pytest tests/backend/test_e11.py -q` |
 | **E12 实现抽取阶段编排和检查点** | D11, E04, E11 | 解析检查点 → 待持久化候选 | `src/backend/app/workers/extract_task.py` | 每块失败可局部重试；并发上限；取消边界；重跑不重复扣计/污染来源 | `python3 -m pytest tests/backend/test_e12.py -q` |
 
-## F 图存储与教师编辑（13 项）
+## F 图存储与教师编辑（14 项）
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
@@ -139,6 +154,7 @@
 | **F11 实现审核队列和单项处理** | F10 | 草稿候选 → 三类审核项 | `src/backend/app/services/graph/review.py`<br>`src/backend/app/api/review.py` | 低置信度/重复/孤立分类；通过拒绝合并后队列变化；分页稳定 | `python3 -m pytest tests/backend/test_f11.py -q` |
 | **F12 实现图编辑审计日志** | F08, F09, F10, C01 | 图编辑事件 → 审计记录 | `src/backend/app/repositories/edit_logs.py`<br>`src/backend/app/services/graph/audit.py` | 谁/何时/何版本/变更摘要齐全；跨库失败可重试；不记录秘密 | `python3 -m pytest tests/backend/test_f12.py -q` |
 | **F13 完成图持久化 worker 阶段** | F04, F06, E12, C08 | 抽取候选 → persisting/awaiting_review | `src/backend/app/workers/persist_graph.py` | 失败重跑幂等；取消不标已完成；部分块失败策略严格按 A03 | `python3 -m pytest tests/integration/test_f13.py -q` |
+| **F14 实现离线重新向量化命令** | E07, D10, F03, G04 | 已提交版本与来源块及目标向量空间 → 可核对的离线向量空间切换 | `scripts/reembed.py` | 停机运行；完整枚举草稿及已提交版本；失败保留旧空间；校验维度、数量、版本并给出回滚步骤 | `python3 -m pytest tests/integration/test_f14.py -q` |
 
 ## G 发布版本和补偿（7 项）
 
@@ -152,7 +168,7 @@
 | **G06 实现回滚和版本列表 API** | G05, C03 | 历史版本 → 列表或指针回滚 | `src/backend/app/api/versions.py`<br>`src/backend/app/services/versions/rollback.py` | 不存在/跨课版本拒绝；回滚当前版按 A04 幂等；保留历史审计 | `python3 -m pytest tests/backend/test_g06.py -q` |
 | **G07 实现统一发布版本解析器** | G04 | 学生课程请求 → 固定 version_id | `src/backend/app/services/versions/resolver.py` | 无发布版明确状态；请求中发布新版本不混读；图/问答/路径复用 | `python3 -m pytest tests/backend/test_g07.py -q` |
 
-## H 教师与学生图谱界面（11 项）
+## H 教师与学生图谱界面（12 项）
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
@@ -167,6 +183,7 @@
 | **H09 实现审核队列和节点合并 UI** | F10, F11, H07 | 审核项 → 单项动作与结果 | `src/frontend/src/views/ReviewView.vue`<br>`src/frontend/src/composables/useReview.ts` | 三类空态、重复操作、合并冲突；刷新后数量一致 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h09.test.ts` |
 | **H10 实现发布历史和回滚 UI** | G06, H09 | 版本 API → 发布/历史/回滚界面 | `src/frontend/src/components/VersionPanel.vue`<br>`src/frontend/src/composables/useVersions.ts` | 发布失败保持旧标识；修订中学生仍见旧版；回滚前显示目标版本 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts` |
 | **H11 实现学生图谱和卡片视图** | H05, H06, G07 | 发布图 → 图/卡片切换 | `src/frontend/src/views/StudentGraphView.vue`<br>`src/frontend/src/components/KnowledgeCards.vue` | 无发布、空图、分页卡片、键盘可用；任何入口不取草稿 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h11.test.ts` |
+| **H12 实现课程成员管理页面** | C15, B15, H01 | 课程成员 API → 教师成员列表与增删操作 | `src/frontend/src/views/MembersView.vue`<br>`src/frontend/src/api/members.ts` | 教师可添加和移除；学生无入口；权限失败明确提示；重复提交不重复成员 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h12.test.ts` |
 
 ## I 进度与可解释推荐（6 项）
 
@@ -176,7 +193,7 @@
 | **I02 实现掌握标记 API** | I01, C03, B12 | 标记请求 → 当前进度 | `src/backend/app/services/learning/progress.py`<br>`src/backend/app/api/progress.py` | 拒绝请求冒用他人 user_id；改标后可重算；不能标草稿独有点 | `python3 -m pytest tests/backend/test_i02.py -q` |
 | **I03 实现可学集合纯函数** | A08, F05 | 发布 DAG + M → 可学候选 | `src/backend/app/services/learning/eligible.py` | M 空/全掌握/孤立点/多前置/环/外课 ID；不擅改用户掌握集合 | `python3 -m pytest tests/backend/test_i03.py -q` |
 | **I04 实现四项评分和结构化理由** | I03 | 候选/图/参数 → 排序及分量 | `src/backend/app/services/learning/ranking.py` | 零分母、全零权重、同分、真实解锁数；分量求和等于 score；理由不用 LLM | `python3 -m pytest tests/backend/test_i04.py -q` |
-| **I05 实现推荐查询 API** | I02, I04, G07 | 用户课程 → 候选列表与明确空态 | `src/backend/app/services/learning/recommend.py`<br>`src/backend/app/api/recommend.py` | 请求全程同版本；截断稳定；暂无图与全掌握区别；有环明确错误 | `python3 -m pytest tests/backend/test_i05.py -q` |
+| **I05 实现推荐查询 API** | I02, I04, G07 | 用户课程 → 候选列表与明确空态 | `src/backend/app/services/learning/recommend.py`<br>`src/backend/app/api/recommend.py` | 请求全程同版本；截断稳定；未发布 404 与全掌握区别；已提交图损坏 5xx；有环明确错误 | `python3 -m pytest tests/backend/test_i05.py -q` |
 | **I06 实现掌握标记与推荐 UI** | I05, H11 | 进度/推荐 → 学习状态色/推荐高亮 | `src/frontend/src/composables/useLearning.ts`<br>`src/frontend/src/components/Recommendations.vue` | 失败撤销乐观标记；切课后旧推荐不覆盖；理由与服务分量一致 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/i06.test.ts` |
 
 ## J 可信问答（10 项）
@@ -194,7 +211,7 @@
 | **J09 实现问答与引用联动 UI** | J08, H06 | 流/最终引用 → 对话和出处面板 | `src/frontend/src/views/ChatView.vue`<br>`src/frontend/src/composables/useChat.ts` | 临时文字标识；引用失败终态替换；Markdown/XSS过滤；切课清上下文 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/j09.test.ts` |
 | **J10 实现问答审计与统计** | J07, C01 | 完成/失败事件 → 可检索日志 | `src/backend/app/repositories/chat_logs.py`<br>`src/backend/migrations/007_chat_logs.sql` | 课程用户隔离、版本/耗时齐全；日志留存与脱敏明确；重试不重复统计 | `python3 -m pytest tests/backend/test_j10.py -q` |
 
-## K 评测部署与交付（12 项）
+## K 评测部署与交付（19 项）
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
@@ -210,16 +227,23 @@
 | **K10 建立备份和恢复演练** | G05, K08 | 临时双库/文件 → 可恢复快照集 | `scripts/backup-demo.sh`<br>`scripts/restore-demo.sh` | 一致时间点和发布指针；恢复在隔离副本验证引用/图/进度；不覆盖用户库 | `python3 -m pytest tests/integration/test_k10.py -q` |
 | **K11 接入实际质量门禁** | B07, B14, K05, K06 | 各层真实测试 → 单入口汇总 | `scripts/verify.sh`<br>`scripts/verify/backend.sh`<br>`scripts/verify/frontend.sh` | 已实现模块无静默SKIP；零测试视为缺口；失败退出非0；基础/集成模式明确 | `python3 -m pytest tests/tooling/test_k11.py -q` |
 | **K12 编写部署验收和演示说明** | K08, K09, K10, K11 | 已测命令/指标 → 运行手册和验收矩阵 | `docs/runbook.md`<br>`docs/acceptance.md` | 逐功能指向真实证据；Windows/macOS/Linux仅列已测平台；限制和恢复步骤齐全 | `git diff --check；逐条核对 K12 验收矩阵与源文档，人工决策保留未签收标记` |
+| **K13 实现抽取消融实验** | K02, E06 | 同一自编标注集与三种抽取配置 → 单阶段、两阶段、两阶段加补漏的对照报告 | `evaluation/ablation.py`<br>`evaluation/reports/ablation.md` | 同数据同指标记录三组结果、成本与版本；空样本和失败组明确；不得把 fake 效果充真实结果 | `python3 -m pytest tests/backend/test_k13.py -q` |
+| **K14 整理提示词工程完整记录** | E01, E05, E06 | 已实际使用的提示词和版本 → 可追溯的提示词工程材料 | `docs/submission/prompt-engineering.md` | 记录版本、用途、输入输出和修改依据；不含密钥或真实课程资料；引用实际评测证据 | `git diff --check；逐条核对 K14 验收矩阵与源文档` |
+| **K15 整理图谱构建示例** | K05, K09 | 已验证的演示课程和图谱 → 带来源的构建示例 | `docs/submission/graph-example.md` | 展示上传、审核、发布与来源；使用自编数据；图与文本可追溯同一版本 | `git diff --check；逐条核对 K15 验收矩阵与源文档` |
+| **K16 形成 S2 技术方案定稿** | K04, K13, K14, K15 | 已验证的实现与评测证据 → 与当前代码一致的 S2 定稿 | `docs/submission/S2-final.md` | ADR-008 命名与现行协议一致；性能写实测条件；未实现功能不写为已完成 | `git diff --check；逐条核对 K16 验收矩阵与源文档` |
+| **K17 制作 S1 概要、展示稿与演示视频** | K12, K15, K16 | 运行手册与演示课程 → 可重复演示的概要、PPT 与视频 | `docs/submission/S1-overview.md`<br>`docs/submission/demo-script.md`<br>`docs/submission/S1-overview.pptx`<br>`docs/submission/demo-video.mp4` | 视频与 PPT 展示同一已验证版本；失败场景不剪成成功；链接和文件可打开 | `git diff --check；人工核对 S1、PPT、视频与运行手册` |
+| **K18 整理 S5 团队过程材料** | K12 | 任务板、交接与审查记录 → 可追溯的团队过程材料 | `docs/submission/S5-team-process.md` | 任务分工、审查和修复均指向真实提交或交接；不泄露个人敏感路径 | `git diff --check；逐条核对 S5 记录与提交` |
+| **K19 执行提交材料合规自检** | K14, K15, K16, K17, K18 | 完整参赛材料 → 去标识化与原创承诺检查记录 | `docs/submission/compliance.md` | 检查真实姓名路径、密钥、第三方素材许可和原创承诺；未通过项列出负责人和修复证据 | `git diff --check；逐项核对 K19 合规清单` |
 
 ## O 可选加分项（8 项）
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
 | **O01 确认目标路径和学习材料范围** | K06 | S2加分项/分支ADR → 独立准入决定 | `docs/decisions.md`<br>`docs/tasks.md` | 明确是否纳入、优先级、预算、字段变更；未批准时后续 O 项不执行 | `git diff --check；逐条核对 O01 验收矩阵与源文档，人工决策保留未签收标记` |
-| **O02 定义目标路径契约** | O01, B12 | 目标t/已掌握M → 祖先子图和步骤DTO | `specs/learning-path.md`<br>`src/contracts/v1/python/learning.py` | 是否包含目标、目标已掌握、环/缺点、并列顺序全部明确；重新生成契约 | `python3 -m pytest tests/contracts/test_o02.py -q` |
+| **O02 定义目标路径契约** | O01, B12 | 目标t/已掌握M → 祖先子图和步骤DTO | `specs/learning-path.md`<br>`src/contracts/api.v1.yaml`<br>`src/contracts/v1/generated/` | 是否包含目标、目标已掌握、环/缺点、并列顺序全部明确；重新生成契约；重新生成 | `python3 -m pytest tests/contracts/test_o02.py -q` |
 | **O03 实现目标路径算法与API** | O02, I05 | 目标/发布DAG/M → Kahn有序步骤 | `src/backend/app/services/learning/target_path.py`<br>`src/backend/app/api/recommend.py` | 多前置祖先完整；不重复、不越课、无环；目标已掌握按规格 | `python3 -m pytest tests/backend/test_o03.py -q` |
 | **O04 实现目标路径编号高亮** | O03, I06 | 有序步骤 → 图步骤编号与导航 | `src/frontend/src/components/TargetPath.vue` | 筛选不丢必要前置说明；切目标/课程清旧路径；键盘可操作 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/o04.test.ts` |
-| **O05 定义学习材料缓存与审核契约** | O01, B13 | 按需讲解/练习 → 来源/审核/缓存模型 | `specs/study-material.md`<br>`src/contracts/v1/python/study_material.py` | 包含version/prompt/model缓存键；发布前教师审核；未覆盖和失败有区别 | `python3 -m pytest tests/contracts/test_o05.py -q` |
+| **O05 定义学习材料缓存与审核契约** | O01, B13 | 按需讲解/练习 → 来源/审核/缓存模型 | `specs/study-material.md`<br>`src/contracts/api.v1.yaml`<br>`src/contracts/v1/generated/` | 包含version/prompt/model缓存键；发布前教师审核；未覆盖和失败有区别；重新生成 | `python3 -m pytest tests/contracts/test_o05.py -q` |
 | **O06 实现学习材料生成与缓存服务** | O05, J06, E04 | 知识点证据 → 讲解/示例/3题答案解析 | `src/backend/app/services/study_material.py`<br>`prompts/gen_study_material.yaml` | 证据不足不生成；题量正确；引用校验；缓存换版本失效；mock测预算 | `python3 -m pytest tests/backend/test_o06.py -q` |
 | **O07 实现学习材料审核与读取API** | O06, C03 | 生成内容/教师决策 → 可读审核结果 | `src/backend/app/api/study_material.py`<br>`src/backend/app/repositories/study_material.py` | 学生仅见已审核；教师拒绝可回查；并发审核冲突；创建数据库迁移另拆如超范围 | `python3 -m pytest tests/backend/test_o07.py -q` |
 | **O08 实现材料按需入口与审核UI** | O07, J09, H09 | 材料状态 → 请求/审核/显示界面 | `src/frontend/src/components/StudyMaterial.vue`<br>`src/frontend/src/composables/useStudyMaterial.ts` | 生成中/失败/未覆盖/待审核区分；三题解析可读；无凭证或秘密入前端 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/o08.test.ts` |

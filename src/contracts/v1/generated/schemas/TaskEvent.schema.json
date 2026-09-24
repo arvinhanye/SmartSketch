@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smartsketch.local/contracts/v1/TaskEvent.schema.json",
+  "title": "TaskEvent",
+  "$ref": "#/$defs/TaskEvent",
+  "$defs": {
+    "Error": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "message": {
+          "type": "string",
+          "description": "面向用户的可读说明"
+        },
+        "details": {
+          "type": "object",
+          "description": "结构化补充，例如 `CYCLE_DETECTED` 的 `cycle` 节点链路",
+          "additionalProperties": true
+        }
+      }
+    },
+    "ErrorCode": {
+      "type": "string",
+      "description": "错误码全集，逐条说明见 `errors.v1.md`",
+      "enum": [
+        "UNAUTHENTICATED",
+        "COURSE_FORBIDDEN",
+        "ROLE_FORBIDDEN",
+        "NOT_FOUND",
+        "GRAPH_NOT_PUBLISHED",
+        "UNSUPPORTED_FORMAT",
+        "FILE_TOO_LARGE",
+        "VALIDATION_ERROR",
+        "CYCLE_DETECTED",
+        "DANGLING_ENDPOINT",
+        "DUPLICATE_RELATION",
+        "NODE_LOCKED",
+        "TASK_NOT_CANCELLABLE",
+        "PUBLISH_BLOCKED",
+        "RATE_LIMITED",
+        "LLM_UNAVAILABLE"
+      ]
+    },
+    "TaskCounts": {
+      "type": "object",
+      "properties": {
+        "chunks_done": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chunks_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kp_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "relation_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "TaskEvent": {
+      "type": "object",
+      "description": "单条 SSE 事件的 data 载荷；事件名与顺序语义见 `events.v1.md`",
+      "required": [
+        "task_id",
+        "stage",
+        "progress"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "stage": {
+          "$ref": "#/$defs/TaskStage"
+        },
+        "cancel_requested": {
+          "type": "boolean",
+          "default": false,
+          "description": "已收到取消请求但 worker 尚未到达阶段边界（ADR-006 的协作式取消）。\n这是**标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，\n前端据此把取消按钮置为「取消中」而不是直接显示已取消。\n"
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "counts": {
+          "$ref": "#/$defs/TaskCounts"
+        },
+        "elapsed_ms": {
+          "type": "integer"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "TaskStage": {
+      "type": "string",
+      "description": "ADR-005 + ADR-006 的状态机（命名基线 ADR-008）：\n`queued → parsing → extracting → merging → persisting → awaiting_review → completed`；\n任意阶段可转 `failed`，任意非终态可转 `cancelled`。\n终态为 completed、failed、cancelled。\n",
+      "enum": [
+        "queued",
+        "parsing",
+        "extracting",
+        "merging",
+        "persisting",
+        "awaiting_review",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    }
+  }
+}

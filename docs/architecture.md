@@ -2,7 +2,7 @@
 
 ## 当前审查与实施入口
 
-- 2026-09-22 现状核查与技术全景：[架构审查](architecture-review-2026-09-22.md)。主目录仍是骨架；Claude 两个 worktree 的契约真源冲突尚待裁决。
+- 2026-09-22 现状核查与技术全景：[架构审查](architecture-review-2026-09-22.md)。契约真源与生成链按 A10 批 1 在集成分支导入；以本节和 ADR-016 的现行决定为准。
 - 单轮实施范围与依赖：[原子任务清单](atomic-task-plan.md)，机器可读版为 `docs/atomic-tasks.json`。清单中的建议不自动替代已确认 ADR。
 - 后续完成后审查：[Claude → Codex 流程](claude-review-workflow.md)。
 
@@ -30,7 +30,12 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/services/` | 领域规则、流程编排 | HTTP/框架细节 |
 | `src/backend/app/repositories/` | Neo4j / SQLite 读写 | 产品策略 |
 | `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
-| `src/contracts/` | 前后端共享 API 和 SSE 事件约定 | 供应商专用密钥/实现 |
+| `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
+
+## 前端构建入口（B01）
+
+- `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
+- Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。B02 再建立测试命令，B03 再引入教师/学生路由。
 
 ## 后端启动与健康检查（B05）
 
@@ -52,7 +57,8 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | 前端消费 | `src/frontend/src/api/` | 前端 Agent | 类型从 `v1/generated/typescript/` 导入；不得重写、断言或 `any` 绕过 |
 
 - REST 路径前缀与 wire 枚举已由 A02 裁定（ADR-009），见下一节。
-- 生成器及版本锁在 `src/contracts/toolchain.txt`；缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
+- 生成器及版本锁在 `src/contracts/toolchain.txt`；CI 按其安装。缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
+- `scripts/verify.sh` 调用 `scripts/verify/contracts.sh`，依次校验真源结构、生成物同步和门禁负例；缺依赖或生成物漂移均失败。
 - 契约的**表达方式**由 ADR-004 裁定，契约的**内容正确性**不由它保证：来源非空、事件判别联合等约束仍须各自的负例测试复验；「引用确属同一课程同一发布版本」schema 表达不了，必须在服务层校验。
 
 ## API 前缀与 wire 枚举（A02 / ADR-009）
@@ -88,7 +94,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
 | `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致 |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
-| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`out_of_course_scope`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | 一致；`ff30e0` 无此枚举 |
+| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`out_of_course_scope`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | 一致；`ff30e0` 无此枚举。A09（ADR-015，已签收）决定把 `out_of_course_scope` 改为 `insufficient_evidence`（生成模型以哨兵声明证据不足），由 B13 改真源后同一次提交更新本行；在此之前本行不改，以免与真源逐值核对失配 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
 
 SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同值）：
@@ -96,7 +102,7 @@ SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同�
 | 流 | 事件名 | 终止事件 |
 | --- | --- | --- |
 | 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | 只覆盖处理阶段。每个连接恰好以一条结束事件收尾：`stage = awaiting_review` 快照或 `done` / `error` / `cancelled` 之一（互斥），随后关流；`completed` 不经已有连接送达，通过任务查询或课程发布状态观察（ADR-010） |
-| 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `done` / `error` 互斥且恰好一次 |
+| 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `meta` 恰好一条且为首条；`done` / `error` 互斥且恰好一次。客户端断开时服务端停止生成、不再发事件；流未以二者之一结束时客户端本地按错误处理并撤回临时正文（A09，`specs/grounded-qa.md` Q2、Q5、Q6） |
 
 ### 文档用语 → wire 值
 
@@ -105,6 +111,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 文档用语 | wire 表达 | 说明 |
 | --- | --- | --- |
 | `NOT_COVERED`、「资料未覆盖」 | HTTP 200 + `status: "not_covered"` + `reason: NotCoveredReason` + `citations: []` | 概念名。字段名是 `reason`，不是 `not_covered_reason`（740adb 的 `src/contracts/README.md` 写法有误，以 YAML 为准） |
+| 「临时正文」「引用撤回」 | 无独立 wire 字段：临时正文 = 已收到 `delta` 的拼接；撤回 = 结局不是 `done` + `answered` 时客户端清除临时正文 | 答案为 `answered` 时 `final.answer` 恒等于 delta 拼接（A09 不变式 I1，`specs/grounded-qa.md` Q3.3） |
 | `TASK_FAILED`、「任务失败」 | HTTP 200 + `stage: "failed"` + `error: Error` | 同上，领域状态不是 HTTP 错误 |
 | S2「已上传」 | `queued` | |
 | S2「入库中」、前端文案「校验入库」 | `persisting` | 覆盖 DAG 校验与草稿写入 |
@@ -114,8 +121,8 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 核心数据模型
 
-- SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`QuestionSession`。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
-- Neo4j：`Course`、`KnowledgePoint`、`SourceChunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
+- SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`ChatLog`（表 `chat_logs`，每个通过鉴权与版本绑定的问答请求一行，服务端不保存会话；命名由 A09 定，ADR-015，A10 N5；覆盖范围见 ADR-015 修订 1）。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
+- Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
 
 ## 图谱版本与跨库发布（A04 / ADR-012）
@@ -128,7 +135,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 快照位置 | SQLite `GraphVersion.snapshot_json` 是版本内容的真相，附 sha256 摘要；Neo4j 按 `version_id` 物化副本供遍历与向量检索 |
 | 文本块固定 | 文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID，一经写入不可变；快照固定修订列表，检索按 `revision_id` 过滤，不按 `material_id`（修订 1） |
 | 向量版本 | 知识点向量随版本复制；文本块向量共享；Neo4j 向量索引「多取再过滤」 |
-| 向量空间 | 运行时只有一个空间（模型 + 维度）；换模型须停机离线重新向量化全部文本块、草稿与已提交版本，配置与记录不一致即拒绝启动；向量是派生数据，重算不产生新版本（修订 1） |
+| 向量空间 | 运行时只有一个空间（模型 + 维度）；换模型须停机离线重新向量化 Neo4j 实际存量中的全部文本块、草稿知识点与已提交版本副本，并按存量核对；缓存与中间产物中的向量带空间标识；运行时写入只接受当前空间，只有迁移命令可写迁移目标空间（修订 2 补注）；配置与记录不一致即拒绝启动；向量是派生数据，重算不产生新版本（修订 1、修订 2） |
 | 提交点 | 唯一：SQLite 中「CAS 切换发布指针 + 分配版本号 + T7 推进任务」的单个事务。之前任一步失败，按 `(course_id, version_id)` 删除 Neo4j 副本并把尝试记为 `failed`，学生继续读旧版本 |
 | 互斥 | 同课程同时至多一个发布/回滚（SQLite 部分唯一索引）；草稿写入与建快照共用 A06 的 SQLite 课程写锁，发布只在读草稿的几秒内持锁 |
 | 回滚编号 | 以历史版本内容前滚为新版本号；目标与当前版本摘要相同则幂等，不产生新号；回滚不改草稿、不推进任务 |
@@ -141,7 +148,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## 数据流
 
 1. 上传资料 → SQLite 创建任务/资料记录 → Worker 进程经租约领取任务 → 解析和分块。
-2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
+2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。草稿按任务记录贡献，T6 提交后才可见，失败任务的内容从失败起即不可见（ADR-011 修订 1）。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
 3. Worker 更新任务状态，API 经 SSE 发送进度；教师审核并发布不可变图谱版本：持课程写锁读取草稿建快照 → SQLite 写快照 → Neo4j 按 `version_id` 物化并核对摘要 → SQLite 单事务切换发布指针（唯一提交点）。协议见上节「图谱版本与跨库发布」。
 4. 学生浏览发布版本（请求开始时绑定一个 `version_id`）；学习进度保存在 SQLite，路径服务查询 Neo4j 前置关系并计算候选与理由。
 5. 问答服务检索课程图谱与来源片段，生成带引用答案；若证据不足返回 `NOT_COVERED`（wire：`status: "not_covered"` + `reason`，见上方「文档用语 → wire 值」）。
