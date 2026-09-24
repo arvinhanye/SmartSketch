@@ -135,6 +135,52 @@ python3 check_a07r01.py .（附录 C）           正例 exit 0，17 项 ALL PAS
 
 **下一步**：请 Codex 按本轮提交复核 A07-R01。
 
+## 十、Codex 复审修复（FIX-R01）
+
+- **task_id**：FIX-R01 修复（Codex REVIEW-09）
+- **状态**：DONE。方向由 ArvinHan 于 2026-09-23 在会话中选定（按错误类型区分），记为 **ADR-011 修订 3**（决定 13）；书面条文（含下列推导细则）由 ArvinHan 于 2026-09-23 签收
+- **review_status**：ready_for_review（以交付提交为准，提交前不生效）
+- **worktree / 分支**：`.claude/worktrees/quirky-dijkstra-eca5de`，分支 `claude/fix-r01-r02`，base `1a47eb2`（= 合入 PR #12 后的 `origin/main`）
+- **head_commit**：随交付提交入库（`git log -1 -- docs/handoffs/claude-a07.md` 可查）。内容指纹：`git diff 1a47eb2 <该提交> -- docs/integrations.md specs/task-processing.md specs/teacher-review-publish.md docs/decisions.md docs/architecture.md | shasum -a 256` 前 16 位 `7efe9ef5a417f8a2`（与 FIX-R02 同批，五个文件合算；含签收行）
+- **审查报告**：主目录 `docs/reviews/codex-claude-a04-fixes-1012b6f-2026-09-23-1215z.md`（目标提交 `1012b6f`，尚未入库）
+- **同批**：FIX-R02 见 `docs/handoffs/claude-a04.md` 第十一节；两项共用本文件附录 D、E 的核对与负例脚本
+
+**核对结论**：成立。修订 2 只在「未收到响应、停在 `sent`」时估算，已回写但不带 usage 的调用按 0 计。部分 OpenAI 兼容供应商在流式响应中默认不返回 usage，这类真实调用会从预算中消失。
+
+| 选择（用户签收） | 否决 | 落点 |
+| --- | --- | --- |
+| 缺 usage 时按错误类型区分：生成前被拒（`400/401/403/404/413/422/429`）计 0；其余（成功、`408`、`5xx`、流中途断开、响应无法解析）按「输入估算 + 输出上限」计 | 一律按估算（报告的最小修复）：任务预算跨尝试不清零，限流期间每次 `429` 都按上限扣，会把可用性故障变成预算失败。成功响应按本地计数实际输出：暂不采纳，先靠流式请求 usage 减少缺失 | `docs/integrations.md`「预算」计量条，「调用记录」第 2、4 条与新增第 5 条，字段表三行，计费量一行，D-02a/b 两行；`specs/task-processing.md` §8.4「计费不重复」、LEASE-28～30；`docs/decisions.md` ADR-011 修订 3 与两处指针 |
+
+**由方向推导、未单独询问的细则**（已随书面条文签收）：
+
+1. 「生成前被拒」名单取 `400`、`401`、`403`、`404`、`413`、`422`、`429`；`408` 与 `5xx` 不在名单内，因为无法确认供应商是否已开始生成。
+2. 错误响应若带 usage，按 usage 计，不按 0 或估算。
+3. E03 在流式请求中请求 usage（`stream_options.include_usage`）；D-02a/b 签收时注明供应商是否返回 usage。
+4. `usage_estimated` 仍为派生字段，规则改为「usage 为空且不属于生成前被拒」，不新增存储列。
+
+**验证**：
+
+```text
+./scripts/verify.sh                               exit 0
+git diff --check                                  exit 0
+python3 check_fix.py .（附录 D）                  修改前 38 FAIL / exit 1；修改后 40 项 ALL PASS / exit 0
+python3 neg_fix.py . <scratch>（附录 E）          6 个篡改副本全部 exit 1，各只命中目标断言
+python3 check_a07.py . 740adb.env.example（附录 A）修改前 345/345，修改后 347/347 PASS
+python3 check_a07r01.py .（附录 C）               ALL PASS
+python3 check_a06.py . api.v1.yaml（A06 第二版）   ALL PASS
+check_a04.py（A04 第二版）                        修改前 2 项 FAIL；签收后 3 项，新增 1 项为脚本边界问题（见下）
+```
+
+- `check_a07` 多出的 2 项来自脚本第 114 行，它逐个核对「见「…」」引用的小节是否存在。本轮新增了「见「调用记录」第 5 条」「见「主备切换矩阵」」两处引用，两个小节都存在。
+- `check_a04` 的 2 项 FAIL 在修改前就有，属于脚本过时，不是文档缺陷：「远端任何分支均未使用 ADR-012」是 A04 撰写时的撞号预检，ADR-012 现已合入 main；「PUB 编号为 1..34」写死了上限，A06 修复加了 PUB-35，本轮又加了 PUB-36～38。
+- 签收后 `check_a04` 新增的 1 项是「ADR-012 修订 1 存在且已签收」：脚本第 85 行统计「`### ADR-012 修订 1` 到 `## ADR-013` 之间的签收行恰好 1 条」，假定修订 1 是 ADR-012 的最后一个小节。修订 2 排在它之后，签收后该范围内有 2 条。按「修订 1 到修订 2」截取复核，两个修订各恰好 1 条签收行。
+- 专项脚本首轮有两个负例（N2 删名单中的 `429`、N5 写入核对改回只比维度）未被检出，原因是脚本的问题：`429` 在同一行后半句还出现一次，「空间标识」在同一条目的后半句也出现。两条断言改为只截取名单本身与「F 组写入前」这一分句后，6 个负例全部检出。文档没有因此改动。
+- 全仓库搜索「无 usage 记 0」等旧表述，只剩 ADR 修订史中的引用。
+
+**遗留**：估算通常高于真实用量；若所选供应商都不返回 usage，每次调用按输出上限计，预算会明显提前触顶，D-02a/b/d 签收时要一并考虑。仍没有实现或自动化测试。
+
+**下一步**：请 Codex 按交付提交复核 FIX-R01；修复另开一轮。
+
 ## 附录 A：`check_a07.py`（核对脚本全文）
 
 ```python
@@ -349,4 +395,142 @@ ok("`request_id`" in l26 and "不计入任何任务预算" in l26, "LEASE-26 覆
 r2 = dec.split("### ADR-011 修订 2", 1)[1].split("## ADR-012", 1)[0] if "### ADR-011 修订 2" in dec else ""
 ok(bool(r2) and "**签收**：ArvinHan 2026-09-23" in r2, "ADR-011 修订 2 存在、位于 ADR-012 前且已签收")
 print(f"\nRESULT: {'ALL PASS' if not fails else str(len(fails)) + ' FAIL'}"); sys.exit(1 if fails else 0)
+```
+
+## 附录 D：`check_fix.py`（FIX-R01/R02 修复核对）
+
+用法：`python3 check_fix.py <仓库根目录>`。
+
+```python
+"""FIX-R01/R02 修复核对：check_fix.py <repo_root>；任一 FAIL 则 exit 1。"""
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+rd = lambda p: (root / p).read_text(encoding="utf-8")
+integ, tp, pub, dec, arch = (rd("docs/integrations.md"), rd("specs/task-processing.md"),
+                             rd("specs/teacher-review-publish.md"), rd("docs/decisions.md"),
+                             rd("docs/architecture.md"))
+fails = []
+def ok(c, m):
+    print(("PASS " if c else "FAIL ") + m)
+    if not c: fails.append(m)
+def section(text, head, stop="\n### "):
+    return text.split(head, 1)[1].split(stop, 1)[0] if head in text else ""
+def line(text, prefix):
+    return next((l for l in text.splitlines() if l.startswith(prefix)), "")
+REJECT = ("400", "401", "403", "404", "413", "422", "429")
+
+# ---------- FIX-R01：响应无 usage 的计费 ----------
+budget = section(integ, "### 预算\n\n- **计量**")  # 文中有两个「### 预算」，这里取规则小节
+meter = line("- **计量**" + budget, "- **计量**")
+ok("记 0）" not in meter and "不含 usage 记 0" not in meter, "预算·计量：不再把无 usage 的响应记 0")
+ok("生成前被拒" in meter and "估算" in meter, "预算·计量：区分生成前被拒与其余缺 usage 情形")
+rec = section(integ, "### 调用记录（`model_calls`）")
+ok(bool(rec), "调用记录小节存在")
+bill = line(rec, "计费量")
+ok("无 usage 记 0" not in bill, "调用记录·计费量：删去「无 usage 记 0」")
+ok("生成前被拒" in bill and "input_tokens_est + max_output_tokens" in bill, "调用记录·计费量：三种情形齐全")
+rej = line(rec, "5. **生成前被拒**")
+rej_list = rej.split("HTTP ", 1)[-1].split("的错误响应", 1)[0]  # 只取名单本身，后文还会再提到 429
+ok(all(f"`{c}`" in rej_list for c in REJECT), "调用记录：生成前被拒的 HTTP 状态码为 400/401/403/404/413/422/429")
+ok("408" in rej and "5xx" in rej, "调用记录：明确 408 与 5xx 不属于生成前被拒")
+ok("stream_options" in rec and "include_usage" in rec, "调用记录：E03 流式请求须请求 usage")
+est_row = next((l for l in rec.splitlines() if l.startswith("| `usage_estimated`")), "")
+ok("已回写" in est_row and "生成前被拒" in est_row, "字段表：usage_estimated 覆盖已回写但无 usage 的情形")
+err_row = next((l for l in rec.splitlines() if "`error_class`" in l and l.startswith("|")), "")
+ok("生成前被拒" in err_row, "字段表：error_class 标出生成前被拒类")
+for d in ("D-02a", "D-02b"):
+    row = next((l for l in integ.splitlines() if l.startswith(f"| {d} |")), "")
+    ok("usage" in row, f"{d} 签收时注明供应商是否返回 usage")
+ok("响应不含 usage 记 0" not in integ and "无 usage 记 0" not in integ, "integrations.md 全文无「记 0」旧规则残留")
+b84 = line(tp, "**计费不重复**")
+ok("未收到响应的调用按「输入估算 + 声明的输出上限」计入" in b84, "§8.4：保留未收到响应按估算计入（A07-R01 回归）")
+ok("usage" in b84 and "生成前被拒" in b84 and "修订 3" in b84, "§8.4：补上收到响应但无 usage 的规则并指向修订 3")
+lease = {int(n) for n in re.findall(r"\*\*LEASE-(\d+)\*\*", tp)}
+ok({28, 29, 30} <= lease and lease == set(range(1, max(lease) + 1)), f"LEASE-28～30 存在且编号连续（最大 {max(lease)}）")
+l = lambda n: next((x for x in tp.splitlines() if f"**LEASE-{n}**" in x), "")
+ok("FIX-R01" in l(28) and "成功" in l(28) and "估算" in l(28), "LEASE-28：成功响应无 usage 按估算（FIX-R01 回归）")
+ok("5xx" in l(29) and "估算" in l(29), "LEASE-29：错误响应（5xx）无 usage 按估算")
+ok("429" in l(30) and "0" in l(30) and "带 usage" in l(30), "LEASE-30：429 无 usage 计 0，带 usage 的错误响应按 usage")
+r2 = section(dec, "### ADR-011 修订 2", "\n## ADR-012")
+r3 = section(dec, "### ADR-011 修订 3", "\n## ADR-012")
+ok(bool(r3) and dec.index("### ADR-011 修订 3") < dec.index("## ADR-012："), "ADR-011 修订 3 存在且位于 ADR-012 之前")
+ok("**签收**" in r3 and "FIX-R01" in r3, "ADR-011 修订 3 有签收行并注明来源")
+ok("修订 3" in line(r2.split("- **决定**", 1)[-1].lstrip("：\n"), "  12."), "修订 2 决定 12 旁有指向修订 3 的注记")
+head011 = section(dec, "## ADR-011：", "\n- **日期**")
+ok("修订 3" in head011, "ADR-011 引言有修订 3 指针")
+
+# ---------- FIX-R02：向量迁移按实际存量 ----------
+v12 = section(pub, "### V12 向量空间切换", "\n## ")
+inv = line(v12, "- **单一空间不变式**")
+ok("实际存储" in inv and "不可见" in inv, "V12 不变式：覆盖实际存储的全部对象，含不可见草稿")
+ok("已到 `awaiting_review` / `completed` 的任务所产生的全部修订的文本块" not in v12, "V12 第 3 步：删去按任务状态推导的目标集合")
+s3 = line(v12, "  3. ")
+ok("实际存量" in s3 and "失败" in s3 and "中断" in s3, "V12 第 3 步：目标为 Neo4j 实际存量，含失败/中断任务留下的块")
+s4 = line(v12, "  4. ")
+ok("实际存量" in s4 and "0" in s4 and "不从任务状态推导" in s4, "V12 第 4 步：按实际存量核对缺新空间向量数为 0")
+s6 = line(v12, "  6. ")
+ok("缓存" in s6, "V12 第 6 步：一并清理旧空间的向量缓存")
+cache = line(v12, "- **空间标识随向量走**")
+ok("缓存键" in cache and "中间产物" in cache and "维度相同" in cache, "V12：缓存/中间产物带空间标识，写入按空间标识而非维度拒绝")
+pubs = [int(n) for n in re.findall(r"\*\*PUB-(\d+)\*\*", pub)]
+ok({36, 37, 38} <= set(pubs) and sorted(pubs) == list(range(1, max(pubs) + 1)), f"PUB-36～38 存在、编号连续不重复（最大 {max(pubs)}）")
+p = lambda n: next((x for x in pub.splitlines() if f"**PUB-{n}**" in x), "")
+ok("FIX-R02" in p(36) and "中断" in p(36) and "接管" in p(36), "PUB-36：中断任务留块后切换空间再接管（FIX-R02 回归）")
+ok("核对" in p(37) and "不切换" in p(37), "PUB-37：存量中有漏算对象时第 4 步失败、不切换")
+ok("缓存" in p(38) and "维度相同" in p(38), "PUB-38：同维度换模型时缓存不命中、旧空间写入被拒")
+v10 = next((x for x in pub.splitlines() if x.startswith("| B06 / D09 / D10 / E07 / F03")), "")
+ok("空间标识" in v10, "V10：E07/F03 实现依赖含空间标识")
+emb = next((x for x in integ.splitlines() if x.startswith("- **向量空间标识**")), "")
+emb_write = emb.split("F 组写入前", 1)[-1].split("；", 1)[0]  # 只取写入核对这一分句
+ok("空间标识" in emb_write and "只比对维度" in emb_write and "缓存键" in emb, "integrations：写入按空间标识核对、缓存键含空间")
+arow = next((x for x in arch.splitlines() if x.startswith("| 向量空间 |")), "")
+ok("实际存量" in arow and "修订 2" in arow, "architecture：向量空间一行指向按实际存量迁移（修订 2）")
+r12_1 = section(dec, "### ADR-012 修订 1", "\n## ADR-013")
+r12_2 = section(dec, "### ADR-012 修订 2", "\n## ADR-013")
+ok(bool(r12_2) and dec.index("### ADR-012 修订 2") < dec.index("## ADR-013："), "ADR-012 修订 2 存在且位于 ADR-013 之前")
+ok("**签收**" in r12_2 and "FIX-R02" in r12_2, "ADR-012 修订 2 有签收行并注明来源")
+ok("修订 2" in line(r12_1.split("- **决定**", 1)[-1].lstrip("：\n"), "  11."), "修订 1 决定 11 旁有指向修订 2 的注记")
+head012 = section(dec, "## ADR-012：", "\n- **日期**")
+ok("修订 2" in head012, "ADR-012 引言有修订 2 指针")
+
+print(f"\nRESULT: {'ALL PASS' if not fails else str(len(fails)) + ' FAIL'} ({len(fails)} fail)")
+sys.exit(1 if fails else 0)
+```
+
+## 附录 E：`neg_fix.py`（FIX-R01/R02 负例）
+
+用法：`python3 neg_fix.py <仓库根目录> <临时目录>`，`check_fix.py` 须在临时目录中；每个篡改副本都必须使其非 0 退出。
+
+```python
+"""FIX-R01/R02 负例：neg_fix.py <repo_root> <scratch>。每个篡改副本都必须使 check_fix.py 非 0 退出。"""
+import shutil, subprocess, sys
+from pathlib import Path
+src, S = Path(sys.argv[1]), Path(sys.argv[2])
+FILES = ["docs/integrations.md", "specs/task-processing.md", "specs/teacher-review-publish.md",
+         "docs/decisions.md", "docs/architecture.md"]
+CASES = {
+    "N1 计量改回「响应不含 usage 记 0」": ("docs/integrations.md",
+        "响应是生成前被拒的错误且不带 usage 时计 0", "响应不含 usage 记 0）；响应是生成前被拒的错误且不带 usage 时计 0"),
+    "N2 生成前被拒名单删去 429": ("docs/integrations.md", "、`422`、`429` 的错误响应", "、`422` 的错误响应"),
+    "N3 V12 第 3 步改回按任务状态推导": ("specs/teacher-review-publish.md",
+        "按新空间计算并写入 Neo4j 的**实际存量**：", "按新空间计算并写入：已到 `awaiting_review` / `completed` 的任务所产生的全部修订的文本块。"),
+    "N4 删除 PUB-36": ("specs/teacher-review-publish.md", "  - **PUB-36**", "  - PUB-36 已删"),
+    "N5 写入核对改回只比对维度": ("docs/integrations.md",
+        "F 组写入前比对向量的空间标识与当前空间（维度相同的两个模型只比对维度无法区分）", "F 组写入前比对 Neo4j 索引维度"),
+    "N6 删除 LEASE-30": ("specs/task-processing.md", "  - **LEASE-30**", "  - LEASE-30 已删"),
+}
+bad = 0
+for name, (f, old, new) in CASES.items():
+    d = S / "neg" / name.split()[0]
+    shutil.rmtree(d, ignore_errors=True)
+    for x in FILES:
+        (d / x).parent.mkdir(parents=True, exist_ok=True); shutil.copy(src / x, d / x)
+    t = (d / f).read_text(encoding="utf-8"); assert t.count(old) == 1, (name, t.count(old))
+    (d / f).write_text(t.replace(old, new), encoding="utf-8")
+    r = subprocess.run([sys.executable, str(S / "check_fix.py"), str(d)], capture_output=True, text=True)
+    hits = [l[5:] for l in r.stdout.splitlines() if l.startswith("FAIL")]
+    print(f"{name}: exit {r.returncode}；命中 {hits}")
+    bad += r.returncode == 0
+print("NEGATIVES:", "ALL DETECTED" if not bad else f"{bad} 未检出"); sys.exit(1 if bad else 0)
 ```
