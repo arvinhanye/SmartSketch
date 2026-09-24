@@ -1,26 +1,27 @@
-# C08 认领交接（2026-09-24）
+# C08 状态迁移纯函数交接（2026-09-24）
 
-- **任务与状态**：C08「实现状态迁移纯函数」，`IN PROGRESS`；本轮仅完成认领和协作状态同步，运行时代码尚未修改。
-- **基线**：`origin/main@62cbbc7`（含 PR #175 的 Claude 交接）；工作分支 `codex/c08-task-state`，隔离 worktree `/Users/arvinhan/.codex/worktrees/c08-task-state/SmartSketch`。
-- **文件所有权**：后续实现限 `src/backend/app/services/task_state.py` 与 `tests/backend/test_c08.py`；本次协调记录改 `docs/tasks.md` 与本文件。不得编辑 Claude 的 B10/B13 契约分支或 539210 的 C01/B11 文件。
+- **任务与状态**：C08「实现状态迁移纯函数」，实现和本地验证完成，待 PR 审核/合入；issue #65 合入前保持开放。
+- **基线与分支**：`origin/main@62cbbc7`（含 PR #175 的 Claude 交接）；`codex/c08-task-state`，隔离 worktree `/Users/arvinhan/.codex/worktrees/c08-task-state/SmartSketch`。
+- **所有权**：仅新增 `src/backend/app/services/task_state.py` 和 `tests/backend/test_c08.py`；协调状态更新 `docs/tasks.md` 与本交接文件。未编辑 B10/B13 契约或 C01/B11 文件。
 
-## 输入、输出与依赖
+## 输入、交付与边界
 
-- 输入：`docs/handoffs/claude-handoff-codex-2026-09-24.md`；`docs/atomic-task-plan.md` C08；`specs/task-processing.md` §1～§4 与 TASK-16；B10 `Task`/事件契约。
-- 输出：后续交付纯状态迁移函数及覆盖合法转换、非法跳转、进度倒退、终态再写的定向测试。拒绝必须为可辨识结果且不修改输入状态；本轮未实现。
-- 依赖：A03、B10 已完成并并入 main；C01/B13 的开放 PR 不阻塞。C09、C11、F13 等待 C08。
-- API/数据/配置变更：本轮无；后续若需改 DTO 或状态机规范，先更新规格/ADR 并协调文件锁。
+- 输入：`specs/task-processing.md` §1～§4、TASK-16；`src/contracts/events.v1.md` 阶段进度区间；B10 Task 形状。A03/B10 均已合入。
+- 输出：不可变 `TaskState`、`TaskError`、`TransitionEvent`，以及 `apply_event(state, event) -> Applied | Rejected`。`Applied.changed=false` 明确表示重复取消、无取消标志的 checkpoint 或同值进度无需写入；`Rejected` 保留原状态对象和原因。
+- 覆盖 T2～T9：领取、阶段边界、检查点、阶段内进度、持久化完成、失败、取消、发布；T1 创建任务归 C06 API 事务，不在事件词表。阶段进度区间、固定进度、单调性、终态不可变、`failed ⇔ error`、取消标志只增不减均由纯函数检查。
+- 无 API、数据库、wire DTO、配置、依赖、迁移或已签收规范改动；C09 负责 CAS/租约持久化，C11/F13 等消费结果前必须通过条件写提交，提交成功后才能推送事件。纯函数本身不裁决并发。
 
-## 状态核对与验证
+## 验证证据
 
-- 交接稿已在 `origin/main@62cbbc7`；指定的 `.claude/worktrees/a05-aa1561` 目录仍停在 `f00a3e8`，故本轮读取 main 中的新稿，不把旧 worktree 当最新任务板。
-- GitHub 当前开放 PR：B13 #32、C01 #174；#55/#58 为 `status:in-review`，B11 #53 为 `status:blocked`；#65 C08 在认领前为 `status:pending` 且无人分配。C02 #59 已分配 539210，未接取。
-- 认领后已复核 [issue #65](https://github.com/arvinhanye/SmartSketch/issues/65)：`OPEN`，负责人 `arvinhanye`，标签 `task` + `status:in-progress`，不再有 `status:pending`；[认领评论](https://github.com/arvinhanye/SmartSketch/issues/65#issuecomment-5817844501) 已登记分支、文件锁与验证缺口。新标签 `status:in-progress` 只表示认领中、尚无 PR。
-- `./scripts/verify.sh`（认领前基线）：exit 1；本机 Python 缺 `pyyaml`、`openapi-spec-validator`、`pytest`，契约门禁 2/24；这不是实现验收。后续须在具备锁定依赖的环境重跑。
-- 后续验收命令：`python3 -m pytest tests/backend/test_c08.py -q`、`./scripts/verify.sh`、`git diff --check`。本轮无实现测试可报告为通过。
+- TDD：首个定向测试先因模块缺失失败；一次扩展测试发现「取消挂起时进度上报丢失标志」，修复并复测。独立代码复核又发现终态错误详情的可变别名和畸形输入异常，先加四个失败用例再修复。
+- `PYTHONPATH=src/backend PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /private/tmp/smartsketch-c08-venv/bin/python -m pytest tests/backend/test_c08.py -q`：67 passed。
+- 同一解释器运行 `tests/backend`：125 passed，1 条来自 FastAPI TestClient/httpx 的现有弃用警告。
+- `PATH=/private/tmp/smartsketch-c08-venv/bin:$PATH PYTHONPATH=src/backend PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' ./scripts/verify.sh`：通过；契约门禁负例 24 项、B08 5、B09 5、B10 45 全通过。
+- `git diff --check`：通过。隔离 venv 使用锁定 Python 依赖，不写入仓库。
 
-## 风险、下一步与回滚
+## 风险、协作、回滚
 
-- 风险：把 C08 的纯函数与 C09 的数据库 CAS/租约实现混在一起；B10 的固定进度/错误约束在生成模型中表现与规格不一致；缺依赖导致假绿或验证中断。
-- 下一步：先按交接稿第 3 节完成 B10 固定范围审查，再为 C08 写失败测试并实现纯函数；如审查发现影响 C08 的契约问题，先记录审查意见，不直接改 Claude 文件。issue 在认领阶段应为 `status:in-progress`，有 PR 后再转 `status:in-review`，合入且验证后才 DONE。
-- 回滚：撤销本分支的 `docs/tasks.md` C08 认领节与本文件，并将 #65 恢复原负责人/标签；不触碰其他任务或仓库数据。
+- 后续 C09/C11 集成需把 `Rejected.reason` 映射到仓储竞争/HTTP 409；本函数只处理已取得的当前状态，不替代数据库行条件更新。`progress(p)` 在取消请求挂起、检查点到来之前仍按规范允许单调更新，并保留取消标志。
+- B10 生成类型对固定进度约束的表达不足，C08 检查内部状态；C11 从数据库生成快照时仍应确保固定进度和 `failed ⇔ error`。`TaskError.details` 在构造时递归复制为只读 JSON-like 结构；后续 wire 序列化方需转换成普通 dict/list。
+- 回滚：仅撤销本分支的两个新增 Python 文件及本交接/任务板增量，不触碰其他成员分支或任务数据；无数据迁移。
+- 下一步：审核 PR、运行 CI；合入后将 #65 和任务板转 DONE，再解除 C09/C11/F13 对 C08 的依赖标记。B13 issue #55 仍保持待审，其 P2 见 `docs/reviews/codex-claude-handoff-0924-b13-791b1d8.md`。
