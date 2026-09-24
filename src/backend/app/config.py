@@ -20,6 +20,7 @@ RECOMMEND_WEIGHT_NAMES = (
     "RECOMMEND_WEIGHT_EASE",
 )
 DEFAULT_RECOMMEND_WEIGHTS = (0.35, 0.25, 0.20, 0.20)
+AUTH_JWT_SECRET_MIN_BYTES = 32
 
 
 class Settings(BaseModel):
@@ -71,6 +72,11 @@ class Settings(BaseModel):
     TASK_ARTIFACT_RETENTION_DAYS: int = Field(default=7, ge=0)
     PUBLISH_LEASE_SECONDS: int = Field(default=60, ge=15)
     COURSE_LOCK_WAIT_SECONDS: int = Field(default=5, ge=0)
+
+    # 本地账号登录（ADR-013、specs/identity-access.md §2.1、§6）。密钥不在 load_settings 里强制：
+    # worker 与迁移命令不签发令牌；API 服务入口另行调用 check_auth_settings（C13）。
+    AUTH_JWT_SECRET: SecretStr = SecretStr("")
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: int = Field(default=28800, ge=1)
 
     # 四项成组（ADR-014 修订 1 决定 6）；都不设或都为空时用 S2 缺省值，读取请用 recommend_weights
     RECOMMEND_WEIGHT_UNLOCK: float | None = Field(default=None, ge=0, allow_inf_nan=False)
@@ -166,6 +172,20 @@ def _check_rules(settings: Settings) -> None:
         invalid.update(RECOMMEND_WEIGHT_NAMES)
     if invalid:
         raise SettingsError(f"Invalid configuration: {', '.join(sorted(invalid))}")
+
+
+def check_auth_settings(settings: Settings) -> None:
+    """Refuse to serve the API without a token signing secret of at least 32 bytes.
+
+    There is no fallback key (specs/identity-access.md §2.1, IAM-23); the error names
+    the variable only, never the supplied value.
+    """
+    raw = settings.AUTH_JWT_SECRET.get_secret_value()
+    if not raw.strip() or len(raw.encode("utf-8")) < AUTH_JWT_SECRET_MIN_BYTES:
+        raise SettingsError(
+            "Invalid configuration: AUTH_JWT_SECRET "
+            f"(required, at least {AUTH_JWT_SECRET_MIN_BYTES} bytes)"
+        )
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
