@@ -19,6 +19,7 @@ B13 与 Q11 分配的改动逐项对上：`insufficient_evidence` 改名、`meta
 | R06 | P2 | `events.v1.md` §6 未登记 B13 对 §3 的原地改写；`claude-b13.md` 称已登记 | 已修 |
 | R07 | P3 | 内联 `details` 生成按出现顺序编号的 `Details`～`Details3`，类名随其他契约变化；同步 B10 时文本合并还留下两个同名类 | 已修 |
 | R08 | P3 | `graph_version` / `request_id` 在三个 schema 中逐字重复 | 未改 |
+| R09 | P2 | （Codex 审查 `791b1d8` 时发现，见 `docs/reviews/codex-claude-handoff-0924-b13-791b1d8.md`）`ChatDoneEvent` 描述仍称 `final` 与 delta 拼接「可能不同」，与 Q3 I1、Q6 矛盾 | PR #32 合并后另开 PR 修正，见下节 |
 
 ## 修正内容
 
@@ -56,6 +57,12 @@ B13 与 Q11 分配的改动逐项对上：`insufficient_evidence` 改名、`meta
 
 - ArvinHan 决定是否合并 PR #32；合并后 B11 仍阻塞，B12 可开工，B14 需等 B11、B12。
 - R08 可在 B14（契约导出与漂移检查）时一并整理。
+
+## R09 的修正（2026-09-24，合并后另开 PR）
+
+- `ChatDoneEvent.description` 改为按结局分述：`answered` 时 `final.answer` 与已下发 delta 逐字相等（I1），不一致时显示 `final.answer` 并上报异常；`not_covered` 时撤回临时正文、显示服务端模板。
+- 先加 `test_done_event_description_follows_invariant_i1`：改前 1 failed / 52 passed，改后 53 passed。`grep` 确认契约、规格、架构与前端源码中没有其他「可能不同」的说法。
+- 重新生成 `openapi.json`、`ChatEvent.schema.json`、`openapi.d.ts`（Pydantic 生成物不含该描述，无变化）；`gen-contracts.sh --check` 一致。
 
 ## 回滚
 
