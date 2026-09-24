@@ -452,3 +452,14 @@
 - 风险：迁移必须在 API/worker 停机时执行；后续表迁移需沿用同一备份与租约检查协议。
 - 验证：`python -m pytest tests/backend/test_c01.py -q`、B05/B06 回归、`./scripts/verify.sh`、`git diff --check`。
 - Claude 同步与审查（REVIEW-C01，2026-09-24）：同步 main `6790d22`（本节按编号移到 B13 之后，内容不变）；后端 71 passed、CI 三个 job 通过。P2×3（R01 迁移文件换行影响校验和、R02 启动不检查迁移版本、R03 `embedding_space_state` 建表有两处）已由 Claude 修正（ArvinHan 决定；ADR-012 补注修订 1：建表只在迁移，API 启动先检查迁移版本），后端 76 passed；P3×6 未改；见 `docs/handoffs/claude-review-c01.md`。
+
+## ADR-012 修订 3：快照谱系与共享提交序号（解除 B11 阻塞）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| ADR-012 修订 3 | 草案，待签收 | 落实 ADR-014 修订 1 决定 9、10 交给 ADR-012 的两项：快照节点 `merged_from` 的形状与摘要纳入、版本提交从共享序列取 `commit_seq` | ArvinHan（Claude 起草） | `claude/adr-012-r3` / base `248b895` | `docs/decisions.md`（ADR-012 修订 3 一节与引言一行）、`specs/teacher-review-publish.md`（V2、V3、V5、V6、V10）、`specs/learning-path.md`（§7 细则 1、2 的指向）、本节、`docs/handoffs/claude-adr-012-r3.md` | `docs/handoffs/claude-adr-012-r3.md`；`./scripts/verify.sh` 通过 |
+
+- 输入：ADR-014 修订 1 决定 9、10 与「后果」；`specs/learning-path.md` §5、LP-9、LP-17～LP-20；`specs/teacher-review-publish.md` V2～V6。
+- 输出：决定 15～25——`merged_from` 为本版本中归属到该节点的全部来源、链已展平；不变式与 `invalid_lineage` 校验；草稿维护规则；纳入摘要、不升 `snapshot_format`；不进 wire DTO；单行表 `commit_sequence` 与 `commit_seq` / `write_seq`。
+- 依赖与风险：签收前 B11、F10、G01、G02、G04、G06、I01 不得按本条实现；B11 须同时并入 A02-R01。
+- 验证：`./scripts/verify.sh`、`git diff --check`；LP-9、LP-19、LP-20 三个谱系场景已在交接中逐一推演。

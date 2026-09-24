@@ -91,6 +91,7 @@
 | `embedding_space` | 本版本知识点向量所在的向量空间（V12）；重新向量化后随之更新 |
 | `failure_reason`、`cleanup_pending` | 失败原因；Neo4j 清理未完成时为真 |
 | `created_by`、`created_at`、`committed_at` | 审计 |
+| `commit_seq` | 提交序号：P11 / R7 在提交事务内从 `commit_sequence` 取号；提交前为 NULL，非空时唯一。同一课程内版本号越大、提交序号越大（ADR-012 修订 3，待签收） |
 
 - 部分唯一索引：同一 `course_id` 至多一行 `state ∈ {preparing, materialized}`。这是「同一课程同时只有一个发布或回滚」的唯一机制。
 - `failed` 行保留作审计，不参与版本列表；`committed` 行永不删除（MVP 不回收旧版本，见 V8）。
@@ -103,6 +104,8 @@
 | `published_version` | 与指针同事务维护的整数版本号，供列表直接读取 |
 | `draft_revision` | 草稿修订号，每次草稿写入在持锁后、写 Neo4j 前加 1（V4） |
 | `published_from_revision` | 当前发布版对应的草稿修订号；-1 表示「已知与草稿不同」 |
+
+`commit_sequence`（ADR-012 修订 3，待签收）：单行表 `(singleton = 1, value)`，建表迁移插入 `(1, 0)`。版本提交（P11、R7）与进度写入（`specs/learning-path.md` §5）只在各自的写事务内执行 `UPDATE commit_sequence SET value = value + 1 WHERE singleton = 1 RETURNING value` 取号；全库一个序列，不分课程。事务回滚则号不被占用。
 
 **Neo4j**
 
@@ -122,7 +125,7 @@
 **可见性前提**（ADR-011 修订 1）：以下各条只考察草稿中**可见**的元素与来源关联，有效任务集合 V 取本课程 T6 提交序号 ≤ 本次任务水位的 `awaiting_review` / `completed` 任务（在 P4 持锁读取的前提下与「当前全部有效任务」相同，此处写明以免实现另取）。未 T6、已失败或待清理任务的贡献一律不计入。
 
 1. 资料修订：本课程中任务已到 `awaiting_review` 或 `completed`、且 T6 提交序号 ≤ 本次任务水位的任务所产生的**全部**资料修订（A03 §3）。水位以外的修订整体不在本版本内。同一资料的旧修订只要仍满足本条就仍在版本内；下线旧修订见「待细化」。
-2. 知识点：`status ∈ {draft, approved}`。`low_confidence` 与 `rejected` 排除。
+2. 知识点：`status ∈ {draft, approved}`。`low_confidence` 与 `rejected` 排除；被排除节点的 `merged_from` 一并不进入本版本，这些来源在本版本中为 dormant（ADR-012 修订 3，待签收）。
 3. 关系：`status ∈ {draft, approved}`，且两个端点都在第 2 条的集合内。端点因 `low_confidence` 或 `rejected` 被排除的关系**连带排除**。
 4. 章节：发布集合中知识点引用到的章节。
 5. 「疑似重复」「孤立知识点」照常纳入（本规格「审核队列」）。
@@ -137,6 +140,7 @@
 | `dangling_endpoint` | 关系端点在草稿中根本不存在（区别于被排除，属草稿不变量被破坏） |
 | `invalid_source_ref` | 来源引用的文本块不存在、不属于本课程，或其 `revision_id` 不在第 1 条的修订集合内 |
 | `empty_graph` | 发布集合没有任何知识点 |
+| `invalid_lineage` | 谱系违反不变式：来源是本快照的节点、同一来源出现在两个节点的 `merged_from` 中，或节点的 `merged_from` 含其自身（属草稿不变量被破坏）（ADR-012 修订 3，待签收） |
 
 `details` 的具体结构由 B11 写入真源。「manual 条目是否必须有来源」不在本协议裁定；本协议只要求已有引用全部有效。
 
@@ -151,7 +155,8 @@
   "chapters": [{"chapter_id": "ch_01", "title": "…", "order": 1, "parent_id": null}],
   "nodes": [{"kp_id": "kp_01", "name": "…", "aliases": ["…"], "type": "concept",
              "definition": "…", "difficulty": 0.4, "importance": 0.8,
-             "chapter_id": "ch_01", "source_refs": ["chunk_01"]}],
+             "chapter_id": "ch_01", "source_refs": ["chunk_01"],
+             "merged_from": ["kp_07"]}],
   "edges": [{"rel_id": "r_01", "type": "PREREQUISITE", "from_id": "kp_01",
              "to_id": "kp_02", "source_refs": ["chunk_02"]}]
 }
@@ -159,9 +164,10 @@
 
 - 只含**学生可见的内容字段**。字段清单以 B11 迁移后的 `KnowledgePoint` / `Relation` / `Chapter` 为准；今后新增学生可见字段必须同时加入快照，并把 `snapshot_format` 加 1。
 - **不含**：`status`、`confidence`、锁、`source`（`ai`/`manual`）、修订号、时间戳、向量，以及可由图推导的字段（`level`、统计）。因此教师只点「通过」而内容不变时，摘要不变。
+- **例外 `merged_from`**（ADR-012 修订 3，待签收）：每个知识点都有，为 `kp_id` 集合，含义是**本版本中归属到该节点的全部合并来源，链已展平**（`a` 并入 `b`、`b` 再并入 `c` 后，`c.merged_from = ["a", "b"]`）。它不是学生可见字段，而是为进度投影（`specs/learning-path.md` §5）随版本保存的元数据，不进入 `KnowledgePoint` wire DTO。草稿中由 F10 合并时维护、F09 删除时丢弃；直接父子关系只记在 F12 审计日志。
 - `revisions` 纳入摘要：只新增资料或再处理出新修订、不改图，也会产生新版本，因为问答可检索的范围变了。尚无任何实现，修订 1 直接修订格式 1，`snapshot_format` 不升号。
 
-**规范化与摘要**：UTF-8；对象键按字典序；紧凑分隔符（无空白）；不转义非 ASCII；空值显式写 `null`，不省略键；`revisions`、`chapters`、`nodes`、`edges` 分别按各自 ID 升序（`revisions` 按 `revision_id`）；集合语义的数组（`aliases`、`source_refs`）去重后升序；数值按存储值原样输出。摘要 = `sha256:` + 规范化字节的 sha256。快照本身就以规范形态存储，读出即可复算摘要。`snapshot_format` 变化会使摘要变化，升级后的首次发布即使内容相同也产生新版本，这是预期行为。
+**规范化与摘要**：UTF-8；对象键按字典序；紧凑分隔符（无空白）；不转义非 ASCII；空值显式写 `null`，不省略键；`revisions`、`chapters`、`nodes`、`edges` 分别按各自 ID 升序（`revisions` 按 `revision_id`）；集合语义的数组（`aliases`、`source_refs`、`merged_from`）去重后升序，空集写 `[]`；数值按存储值原样输出。摘要 = `sha256:` + 规范化字节的 sha256。快照本身就以规范形态存储，读出即可复算摘要。`snapshot_format` 变化会使摘要变化，升级后的首次发布即使内容相同也产生新版本，这是预期行为。
 
 ### V4 草稿写入与课程写锁
 
@@ -200,7 +206,7 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 
 **P11 提交事务**，全部成立才提交，否则整体回滚并转 C1：
 
-1. 尝试行满足 `state = materialized AND expires_at > 现在`，更新为 `committed`，`version = 本课程已提交最大 version + 1`，写 `committed_at`；
+1. 尝试行满足 `state = materialized AND expires_at > 现在`，更新为 `committed`，`version = 本课程已提交最大 version + 1`，写 `committed_at`，并从 `commit_sequence` 取号写入 `commit_seq`（ADR-012 修订 3，待签收）；
 2. 发布指针 CAS：`UPDATE courses SET published_version_id = 本尝试, published_version = 新号, published_from_revision = r WHERE course_id = ? AND published_version_id IS 读取时的旧值`，影响 1 行；
 3. T7：`course_id = 本课程 AND stage = awaiting_review AND T6 提交序号 ≤ w` 的任务全部转 `completed`（A03 §3）。
 
@@ -226,7 +232,7 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | R4 | 插入尝试行 `kind=rollback, source_version=k`，`snapshot_json`、`digest`、`embedding_space` 从 k 复制，`state=preparing`；开始心跳 | 409 `PUBLISH_IN_PROGRESS` |
 | R5 | 物化：在一个 Neo4j 写事务内把 `(course_id, k 的 version_id)` 复制到 `(course_id, 本尝试)`，**向量一并复制，不调用模型**；复制前核对 **k 自身记录的** `embedding_space` 等于当前向量空间，随后按 P9 核对并置 `materialized` | 源副本缺失，或 k 的空间不等于当前空间（V12 不变式被破坏）→ C1 + 告警，5xx；**不得**静默重算向量。其他失败 → C1 |
 | R6 | 取课程写锁（有界等待），读 `draft_revision` 记为 r，按 V3 复算草稿发布集合的摘要 d，释放锁 | 等锁超时或读失败**不使回滚失败**：按 d 未知处理 |
-| R7 | 提交点：与 P11 的第 1、2 条相同；`published_from_revision = (d 等于新版本摘要 ? r : -1)`；**不执行 T7**（A03 §3：回滚不改变任务状态） | C1 |
+| R7 | 提交点：与 P11 的第 1、2 条相同（含取号写 `commit_seq`）；`published_from_revision = (d 等于新版本摘要 ? r : -1)`；**不执行 T7**（A03 §3：回滚不改变任务状态） | C1 |
 
 - 回滚**不修改草稿**。回滚后若草稿与新版本不同，课程为 `revising`，教师下次发布的是自己的草稿。
 - 新版本在列表中显示为「v(n+1)，回滚自 vk」（`GraphVersion.kind`、`source_version`，B11 加字段）。
@@ -279,6 +285,7 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | G02 | 原计划的 `preparing/ready` 两态改为本节的 `preparing/materialized/committed/failed` | G02 |
 | A06 来源块（ADR-011） | 块 ID 改由 `revision_id` + 块序号生成；失败/取消任务的来源块按 V2 删除保护保留 | 修订 1 修订 ADR-011 决定 5、7 的对应部分；`specs/task-processing.md` §8.4 `parsing` 行与 §8.6 已改并加注 |
 | A07 向量空间 | 换空间按 V12 离线重新向量化，不产生新内容版本 | `docs/integrations.md` 两处已改 |
+| A08 进度继承（ADR-014 修订 1 决定 9、10） | 快照节点的 `merged_from` 与共享序列 `commit_sequence`：B11 在 `PUBLISH_BLOCKED` 加 `invalid_lineage`，不给 `KnowledgePoint` 加 `merged_from`；F10/F09 维护草稿谱系，F12 记直接父子；G01 快照、摘要与校验；G02 `commit_seq`；G03 P8/P9 含 `merged_from`；G04/G06 取号；I01 `write_seq`；I02/I05 按 `specs/learning-path.md` §5 | ADR-012 修订 3（待签收） |
 | B06 / D09 / D10 / E07 / F03 | B06 启动门禁；D09/D10 按修订生成块 ID 并检查不可变；E07 按「空间标识 + 文本哈希」缓存向量；F03 允许新旧空间属性与索引并存，写入向量时核对空间标识（修订 2） | 各任务实现 |
 
 ### V11 验收（PUB-n）
