@@ -434,21 +434,21 @@
 
 | 分类 | 当前整理结果 |
 | --- | --- |
-| 已交付并入 main | A01～A10、B01～B06、B08～B10、B13、C01、CI-01/02、HOOK-01、A10 批 0/1/1 补；B13 #55 与 C01 #58 已关闭并标 `status:done` |
-| 有 PR、尚未并入 | C08 PR #176（issue #65），`status:in-review`；B13 #32、C01 #174 已合入，不再列为待审 PR |
+| 已交付并入 main | A01～A10、B01～B06、B08～B10、B13、C01、C08、CI-01/02、HOOK-01、A10 批 0/1/1 补；B13 #55、C01 #58 与 C08 #65 已关闭并标 `status:done` |
+| 有 PR、尚未并入 | 无（本节范围内）；B13 #32、C01 #174、C08 #176 均已合入，不再列为待审 PR |
 | 阻塞/待认领 | B11 #53 仍按其 issue 处理；C02 #59 已分配 539210，C01 依赖现已合入，不重复认领 |
 | 可接取但未认领 | D01、B12、E01、F01、B07、C05；依赖以交接稿第 5 节为起点，开工前再核对 issue 与文件锁 |
-| 本轮认领 | C08 #65：已分配 `arvinhanye`，PR #176 已创建，标签现为 `status:in-review`，见 [issue 验收记录](https://github.com/arvinhanye/SmartSketch/issues/65#issuecomment-5818583257) |
+| 本轮认领 | C08 #65：已分配 `arvinhanye`，PR #176 已于 2026-09-24 合入 `main@f0b4afe`，issue 已关闭并标 `status:done`，见 [issue 验收记录](https://github.com/arvinhanye/SmartSketch/issues/65#issuecomment-5818583257) |
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 验收与证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C08 | IMPLEMENTED（PR #176 待审/合入） | 实现状态迁移纯函数 | Codex（后端） | `codex/c08-task-state` / 初始 `62cbbc7`、已同步 `1bce2c6`；隔离 worktree `c08-task-state` | `src/backend/app/services/task_state.py`、`tests/backend/test_c08.py`；协作文档仅本节和 `docs/handoffs/codex-c08.md` | §2 合法边与 TASK-16 拒绝路径已实现；C08 定向 67 例、最新 main 上后端 143 例通过、B13 53 例通过，`./scripts/verify.sh`、`git diff --check` 通过。证据与边界见 `docs/handoffs/codex-c08.md`。REVIEW-C08 R01～R04 由 Claude 经授权在同分支修复并同步 `main@28b09b4`：C08 122 例、后端 198 例通过，见 `docs/handoffs/claude-review-fix-c08.md`；合入前不记为 DONE。 |
+| C08 | DONE（PR #176 已合入 `f0b4afe`；#65 已关闭） | 实现状态迁移纯函数 | Codex（后端） | `codex/c08-task-state` / 初始 `62cbbc7`、已同步 `1bce2c6`；隔离 worktree `c08-task-state` | `src/backend/app/services/task_state.py`、`tests/backend/test_c08.py`；协作文档仅本节和 `docs/handoffs/codex-c08.md` | §2 合法边与 TASK-16 拒绝路径已实现；C08 定向 67 例、最新 main 上后端 143 例通过、B13 53 例通过，`./scripts/verify.sh`、`git diff --check` 通过。证据与边界见 `docs/handoffs/codex-c08.md`。REVIEW-C08 R01～R04 由 Claude 经授权在同分支修复并同步 `main@28b09b4`：C08 122 例、后端 198 例通过，见 `docs/handoffs/claude-review-fix-c08.md`。PR #176 CI 全绿后由 ArvinHan 授权于 2026-09-24 合入 `main@f0b4afe`。 |
 
 - 输入：B10 已合入的 `Task`/事件契约；ADR-010 签收的 `specs/task-processing.md` §1～§4、TASK-16。
 - 输出：无 I/O 的 `(当前任务状态, 事件) → 新任务状态 | 拒绝` 逻辑和定向测试，不变更 API、数据库或既有 DTO。
-- 依赖：A03、B10、C01、B13 均已合入；C09、C11、F13 后续消费 C08。
+- 依赖：A03、B10、C01、B13 均已合入；C09、C11、F13 后续消费 C08，C08 已合入，这三项对 C08 的依赖已满足。
 - 风险：并发 CAS、租约与持久化不属于本轮纯函数；固定进度及 `failed ⇔ error` 已由运行时校验覆盖。认领时缺依赖的环境缺口已用锁定版本的隔离 venv 解决，`verify.sh` 已通过。
-- 当前协作状态：B13 #55 与 C01 #58 已关闭、标 `status:done`；C08 #65 开放、标 `status:in-review`；C02 #59 已分配 539210，现不再受 C01 未合入阻塞。其余任务仍需逐项按 issue/文件锁复核后再认领。
+- 当前协作状态：B13 #55 与 C01 #58 已关闭、标 `status:done`；C08 #65 已关闭、标 `status:done`；C02 #59 已分配 539210，现不再受 C01 未合入阻塞。其余任务仍需逐项按 issue/文件锁复核后再认领。
 
 ### HANDOFF-0924 固定范围复审（本节覆盖上文各任务行的旧「待审查」标记）
 
@@ -457,7 +457,7 @@
 | REVIEW-HANDOFF-0924 | DONE（B02 Windows 缺口保留；B13 R09 已修） | B10 `f00a3e8..bb48429`；B02 `9d2437e..3fedd4e`；B03/B04 `3fedd4e..06f33aa`；CI-02 `06f33aa..025cbee`；B13 PR #32 `bb48429..791b1d8` | Codex | B10、B02、B03/B04、CI-02 固定范围未发现新增 P1/P2；B13 固定提交发现 P2×7、P3×2。Claude 在 `8a4992c` 修 R01～R07 后 PR #32 已合入；R09 后续由 PR #177 修复并合入，[#178](https://github.com/arvinhanye/SmartSketch/issues/178) 已关闭；本轮未跨文件锁修改契约。Windows 缺口及原始证据见 `docs/handoffs/codex-review-handoff-0924.md`。 |
 
 - 复审只检查固定提交与实际运行的命令，不修改 Claude 的源码；B13 结论不等于新头提交已审。旧自动审查状态文件 `docs/reviews/claude-review-state.json` 在主目录有其他 Codex 未提交改动，本分支不覆盖它；本次增量状态另记 `docs/reviews/codex-handoff-0924-state.json`。
-- C08 纯函数已实现并通过本地验证；B10 生成类型忽略固定阶段进度条件的已知限制由 C08 运行时及后续 C11 序列化路径承担。PR #176 与 issue #65 均为待审，合入前不关 issue；实现验收另记在 `docs/handoffs/codex-c08.md`，不与审查完成混算。REVIEW-C08（PR #176 评论）的 R01 错误详情序列化、R02 失败码按 §6 绑定阶段、R03 `invalid_event`、R04 契约对齐测试已修复，见 `docs/handoffs/claude-review-fix-c08.md`。
+- C08 纯函数已实现并通过本地验证；B10 生成类型忽略固定阶段进度条件的已知限制由 C08 运行时及后续 C11 序列化路径承担。PR #176 已合入 `main@f0b4afe`，issue #65 已关闭；实现验收另记在 `docs/handoffs/codex-c08.md`，不与审查完成混算。REVIEW-C08（PR #176 评论）的 R01 错误详情序列化、R02 失败码按 §6 绑定阶段、R03 `invalid_event`、R04 契约对齐测试已修复，见 `docs/handoffs/claude-review-fix-c08.md`。
 
 ## B13 问答与事件契约
 

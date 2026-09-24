@@ -1,6 +1,6 @@
 # REVIEW-C08 修复交接（Claude，2026-09-24）
 
-- **任务与状态**：修复 PR #176（C08 状态迁移纯函数，Codex 实现）审查评论 REVIEW-C08 的 R01～R04。ArvinHan 2026-09-24 授权 Claude 直接在 PR 分支上修。状态：已修复并验证，待 ArvinHan 合入。
+- **任务与状态**：（2026-09-24 更新：PR #176 已合入 `main@f0b4afe`，#65 已关闭并标 `status:done`，任务板 C08 转 DONE，见文末「合入后收尾」。）修复 PR #176（C08 状态迁移纯函数，Codex 实现）审查评论 REVIEW-C08 的 R01～R04。ArvinHan 2026-09-24 授权 Claude 直接在 PR 分支上修。状态：已修复并验证，待 ArvinHan 合入。
 - **分支**：`codex/c08-task-state`，修复前 head `a5b8c79`；已同步 `origin/main@28b09b4`（含 PR #179、#180），合并无冲突。
 - **改动文件**：`src/backend/app/services/task_state.py`、`tests/backend/test_c08.py`；协作状态 `docs/tasks.md` C08 行与本交接。未改契约、规格、Codex 交接（`codex-c08.md` 里「wire 序列化方需转换成普通 dict/list」一句已被 R01 取代，由 Codex 后续自行更新）。
 
@@ -29,3 +29,11 @@
 - `TaskError` 带 details 时不可哈希（修复前同样如此），不要把 `TaskState` 放进 set/dict 键。
 - 下一步：ArvinHan 审核并合入 PR #176；合入后关闭 #65、任务板 C08 转 DONE。
 - 回滚：`git revert` 本次修复提交即可，无迁移、无契约改动。
+
+## 合入后收尾（2026-09-24）
+
+- PR #176 两轮 CI（Backend、Frontend、Repository scaffold）全部通过后，经 ArvinHan 授权合入，锁定头 `e23e6d5`，合并提交 `main@f0b4afe`。
+- issue #65：去掉 `status:in-review`、加 `status:done`，附合入说明后关闭。
+- `docs/tasks.md`：C08 行转 DONE，协作状态表与说明同步；C09、C11、F13 对 C08 的依赖标记为已满足。`docs/atomic-tasks.json` 的 `status` 字段全表均为 `PROPOSED`，没有逐项更新的惯例，本次不改。
+- 验证：`./scripts/verify.sh` exit 0；`python3 docs/reviews/validate_atomic_plan.py` PASS；`git diff --check` 通过。
+- Codex 的 worktree `~/.codex/worktrees/c08-task-state` 停在 `a5b8c79`，分支已合入；后续任务应从最新 main 新开分支。
