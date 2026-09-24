@@ -182,3 +182,33 @@
 | A08 | IN REVIEW（R01～R14 第 3 轮复审通过；待 §7 产品签收） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（`claude/codex-a08-check-0ae6d7@acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
 
 - A08 输入：S2 §6.4.7、A04/ADR-012、A02 掌握枚举、Claude 第 1 轮 R01～R10 与第 2 轮 R11～R14 报告、第 3 轮复审、已签收 ADR-014。输出：修订后的可学/评分/跨版本读时继承与批量写入规格；进度接口有效/原始状态及来源提案；B12/I05 的 Markdown 与 JSON 验收同步。依赖：ADR-014 已随 `origin/main@6881ffe` 集成，B12 需在 YAML 真源落地进度响应字段；风险与待决：缺值、权重来源、展示上限、进度响应字段名及 `updated_at` 语义，以及显式降级覆盖继承与谱系存放位置均见 `specs/learning-path.md` §7；R15 未在本轮修订，未改 DTO、仓储或发布快照格式。验证命令：`./scripts/verify.sh`、`git diff --check`、`python3 -m json.tool docs/atomic-tasks.json > /dev/null` 及两项 grep，实际结果见交接。
+
+## A1～A10 收尾（2026-09-24）
+
+> 盘点基线：`origin/main@f9dfc8f`；各在途 PR 的头见下表。本节只登记状态与去向，不代替各 PR 自己的任务行；PR 合入后以各自的任务行为准。
+
+| 原子 ID | 决定 | 合入状态 | Codex 审查意见 | 收尾动作 |
+| --- | --- | --- | --- | --- |
+| A01 | ADR-004 已签收 | main（PR #1） | 无未决 | — |
+| A02 | ADR-009 已签收 | main（PR #2） | **A02-R01**（P2）：YAML 真源 `Relation.required` 未含 `status`、`source`、`source_refs`，与规格「关系至少含」不一致 | 交 **B11**（见下） |
+| A03 | ADR-010 已签收 | main（PR #5，修复 A03-R01/R02 同 PR） | 无未决 | — |
+| A04 | ADR-012 及修订 1 已签收 | main（PR #7、#10） | FIX-R02 已关闭；**FIX-R03**（P2）已修 | PR #16：合入 main 解冲突 + FIX-R03（`970c582`），ADR-012 修订 2 补注**待签收** |
+| A05 | ADR-013 已签收 | main（PR #9） | 无未决 | — |
+| A06 | ADR-011 及修订 1 已签收 | main（PR #6、#11） | 无未决 | — |
+| A07 | 形状已定，ADR-011 修订 2 已签收 | main（PR #8、#12） | FIX-R01 已关闭（PR #16，ADR-011 修订 3 已签收） | 取值仍待 D-02a～f |
+| A08 | ADR-014 已签收 | main（PR #19） | 签收稿 **A08S-R01**（P2）、**A08S-R02**（P3）已修 | PR #23：ADR-014 修订 1（已签收）+ 修复（`39633fe`），决定 9 补注**待签收** |
+| A09 | ADR-015 已签收 | PR #20 在途 | **A09-R01**、**A09-R02**（P2）已修 | PR #20 追加 `097f248`，ADR-015 修订 1 方向已选定、条文**待签收** |
+| A10 | ADR-016 已签收 | PR #18 在途；批 0/1 在 PR #22（kongsc） | **A10-R01**、**A10-R02**（P2）已修 | PR #24（叠在 #18 之上），ADR-016 修订 1 **待签收** |
+
+- **合并顺序**（ADR-016：Agent 只开 PR，由 ArvinHan 合并）：#16 → #23 → #20 → #18 → #24 → #22 → 本节所在 PR。几份 PR 都在 `docs/tasks.md` 文末追加内容，#23 与 #18/#24 还都在 `docs/decisions.md` 文末追加；后合并的 PR 保留双方内容，ADR 按编号排列（014 修订 1 → 015 及修订 1 → 016 及修订 1）。
+- **待签收的四处补注**（均按 Codex 的最小修复建议或已选方向落实，不改变原决定的方向）：ADR-012 修订 2 补注（迁移写入与运行时写入分开核对）、ADR-014 修订 1 决定 9 补注（同值写入判定）、ADR-015 修订 1（逐句引用覆盖、问答日志覆盖范围）、ADR-016 修订 1（批 1 扫描集合、ADR-005/006 标为被取代）。签收后由各 PR 把「待签收」改为已签收。
+- **A 组全部关闭的条件**：上述 PR 合入、四处补注签收、Codex 对四个修复提交复核无新的 P1/P2。当前 A 组没有未认领的原子任务。
+- **仍开放、但不阻塞 A 组关闭的决定**：D-01（示例课程资料）、D-02a～f（模型供应商与预算取值）、PLAN-D05（学习材料分支）、D-08（A10 登记）。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A1～A10 收尾 | DONE（修复已提交；合并与四处补注签收待 ArvinHan） | 盘点 A01～A10，修复 Codex 未决意见 FIX-R03、A08S-R01/R02、A09-R01/R02、A10-R01/R02，登记 A02-R01 去向与合并顺序 | Claude（协调 Agent） | `.claude/worktrees/a1-a10-meta-task-wrap-ddbf4b`（分支 `claude/a1-a10-meta-task-wrap-ddbf4b`）/ base `f9dfc8f`；修复分别在 PR #16、#23、#20、#24 的分支上 | 本节、`docs/handoffs/claude-a1-a10-wrap.md`；各修复的文件锁见对应 PR 的任务行 | `docs/handoffs/claude-a1-a10-wrap.md`；各修复的核对脚本先红后绿、篡改负例全部检出，`./scripts/verify.sh` 与 `git diff --check` 均 exit 0（见各 PR 交接） |
+
+- **A02-R01 → B11**（未认领）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
+- **批 1 补**（未认领，后端 Agent）：A09 合入后把 `specs/grounded-qa.md` 加回契约门禁的扫描清单与测试夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
+- Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
