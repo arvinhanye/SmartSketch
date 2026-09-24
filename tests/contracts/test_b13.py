@@ -236,3 +236,12 @@ def test_generated_details_classes_have_stable_names():
     for name in ("ChatErrorDetails", "ChatLlmUnavailableDetails", "TaskPersistingDetails",
                  "TaskProcessingFinishedDetails", "TaskAlreadyTerminalDetails"):
         assert re.search(rf"^class {name}\(", models, re.M), name
+
+
+def test_done_event_description_follows_invariant_i1():
+    """REVIEW-B13-R09（Codex）：answered 时 final.answer 与 delta 拼接逐字相等（Q3 I1、Q6）。"""
+    description = SCHEMAS["ChatDoneEvent"]["description"]
+    assert "可能" not in description and "剔除了编号" not in description, "旧说法：final 与 delta 可能不同"
+    assert "I1" in description and "逐字" in description
+    assert "not_covered" in description and "撤回" in description
+    assert "上报异常" in description
