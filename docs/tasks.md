@@ -7,7 +7,7 @@
 | ID | 状态 | 任务 | 负责人 | 验收条件 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
-| M0-02 | TODO | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | 待补充 |
+| M0-02 | IN PROGRESS（B01 已完成；B02～B04、B15 待做） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01 见下方验收证据；路由与测试配置仍待后续任务 |
 | M0-03 | TODO | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | 待补充 |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
@@ -297,3 +297,17 @@
 - **A02-R01 → B11**（未认领）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。契约真源已随 PR #22 进入 main，可以开始。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
 - **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
 - Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
+
+## B01 前端构建与单页挂载
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B01 | DONE | 初始化 Vue 3 + TypeScript + Vite 构建及单个挂载页面 | Codex（前端） | `codex/b01-vue-scaffold` / base `50a15c9` | `src/frontend/package.json`、`src/frontend/package-lock.json`、`src/frontend/tsconfig.json`、`src/frontend/vite.config.ts`、`src/frontend/index.html`、`src/frontend/src/main.ts`、`src/frontend/src/App.vue`；文档范围：`src/frontend/README.md`、`docs/architecture.md`、本任务板、`docs/handoffs/codex-b01.md` | `npm ci`、`vue-tsc`、Vite build、浏览器挂载烟测、`./scripts/verify.sh` 均通过；见 `docs/handoffs/codex-b01.md` |
+
+- 输入：A01 已确认的前端技术栈与 `docs/atomic-task-plan.md` B01 验收条件；不新增 REST、SSE 或业务 DTO。
+- 输出：锁定依赖的最小 Vue 应用、严格类型检查、可构建产物与单页挂载烟测。
+- 依赖：A01 已完成；B02 的测试配置与 B03 的角色路由在本轮范围外。
+- 风险：构建工具对 Node 版本有下限；本轮以实际本机版本核验。锁文件和构建产物必须分开，`dist/` 不入库。
+- 验证：`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、浏览器挂载烟测、`./scripts/verify.sh`、`git diff --check`。
+- 实际结果：Node 24.16.0 / npm 11.13.0；锁文件重装成功；类型检查与生产构建 exit 0；本地 Vite 页面在浏览器显示标题和挂载内容；基础 verify 与 diff check exit 0。正式测试脚本归 B02。
+- Claude 审查（REVIEW-B01，2026-09-23）：无 P1/P2；P3×3（B01-R01～R03）不阻塞。合入 `origin/main@548c4f8` 后在合并结果上重跑 `npm ci`、type-check、build、浏览器挂载烟测与 `./scripts/verify.sh` 均通过；见 `docs/handoffs/claude-review-b01.md`。
