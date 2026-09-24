@@ -799,22 +799,28 @@ export interface components {
         TaskNotCancellableError: components["schemas"]["Error"] & {
             /** @constant */
             code: "TASK_NOT_CANCELLABLE";
-            details: {
-                /** @constant */
-                stage: "persisting";
-                /** @constant */
-                reason: "persisting_uninterruptible";
-            } | {
-                /** @constant */
-                stage: "awaiting_review";
-                /** @constant */
-                reason: "processing_finished";
-            } | {
-                /** @enum {string} */
-                stage: "completed" | "failed" | "cancelled";
-                /** @constant */
-                reason: "already_terminal";
-            };
+            details: components["schemas"]["TaskPersistingDetails"] | components["schemas"]["TaskProcessingFinishedDetails"] | components["schemas"]["TaskAlreadyTerminalDetails"];
+        };
+        /** @description 正在入库，不可中断。 */
+        TaskPersistingDetails: {
+            /** @constant */
+            stage: "persisting";
+            /** @constant */
+            reason: "persisting_uninterruptible";
+        };
+        /** @description 处理已结束（`awaiting_review`）。 */
+        TaskProcessingFinishedDetails: {
+            /** @constant */
+            stage: "awaiting_review";
+            /** @constant */
+            reason: "processing_finished";
+        };
+        /** @description 已处于终态，`stage` 为实际终态。 */
+        TaskAlreadyTerminalDetails: {
+            /** @enum {string} */
+            stage: "completed" | "failed" | "cancelled";
+            /** @constant */
+            reason: "already_terminal";
         };
         /** @description `event: stage`。建连快照（非终态）、进入新阶段、阶段内进度变化、`cancel_requested` 由 false 变 true 时推送。
          *     `stage = awaiting_review`（`progress = 0.95`）是处理期连接的结束事件，推送后服务端关流。
@@ -1197,13 +1203,10 @@ export interface components {
         ChatResponse: components["schemas"]["ChatAnswered"] | components["schemas"]["ChatNotCovered"];
         /** @description 检索完成、生成开始前的第一条事件，恒为一条（`specs/grounded-qa.md` Q2）。
          *     `status = not_covered` 当且仅当检索阶段判定拒答，此时 `retrieved = 0`，后续不再有 delta，直接发 done。
-         *     `status = answered` 表示进入生成，不是承诺：终态仍可能是 `not_covered` 或 `error`。
+         *     `status = answered` 表示进入生成（允许引用集合 A 非空，`retrieved ≥ 1`），不是承诺：终态仍可能是 `not_covered` 或 `error`。
          *      */
         ChatMetaEvent: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
+            /** @constant */
             event: "meta";
             status: components["schemas"]["ChatStatus"];
             /** @description 允许引用集合 A 的大小（进入生成上下文的编号文本块数），供前端显示「已检索 N 段」 */
@@ -1212,7 +1215,13 @@ export interface components {
             graph_version: number;
             /** @description P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应 */
             request_id: string;
-        };
+        } & (unknown & unknown & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "meta";
+        });
         /** @description 正文增量。**delta 阶段的正文是临时态**：其中出现的引用编号可能在
          *     引用校验后被剔除，前端不得在此阶段渲染可点击引用（events.v1.md §3）。
          *      */
@@ -1236,16 +1245,64 @@ export interface components {
             event: "done";
             final: components["schemas"]["ChatResponse"];
         };
-        /** @description 问答开流后（P2 之后）的错误：`details.request_id` 必填；`LLM_UNAVAILABLE` 另须
-         *     `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`（`specs/grounded-qa.md` Q5）。
-         *     `message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。
+        /** @description 问答开流后（P2 之后）的错误，按 `code` 分两支（`specs/grounded-qa.md` Q5 的 O7～O13），码为闭集：
+         *     `LLM_UNAVAILABLE` 必带 `details.reason`；`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` 不带 `reason`。
+         *     两支都必带 `details.request_id`。`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。
          *      */
-        ChatError: components["schemas"]["Error"] & {
-            details: {
-                request_id: string;
-                /** @enum {string} */
-                reason?: "upstream" | "stream_interrupted" | "timeout" | "auth";
-            };
+        ChatError: components["schemas"]["ChatLlmUnavailableError"] | components["schemas"]["ChatServiceError"];
+        /** @description 模型不可用（O7～O10）；`details.reason` 区分上游故障、流中断、链路超时与鉴权失败。 */
+        ChatLlmUnavailableError: components["schemas"]["Error"] & {
+            /** @constant */
+            code: "LLM_UNAVAILABLE";
+            details: components["schemas"]["ChatLlmUnavailableDetails"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "LLM_UNAVAILABLE";
+        };
+        /** @description 预算拒绝（O11）、调用记录预写失败（O12）或未预期异常（O13）；不带 `reason`。 */
+        ChatServiceError: components["schemas"]["Error"] & {
+            /** @enum {string} */
+            code: "BUDGET_EXCEEDED" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR";
+            details: components["schemas"]["ChatErrorDetails"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "BUDGET_EXCEEDED" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR";
+        };
+        /** @description 开流后错误的公共细节，闭合对象；`reason` 只属于 `LLM_UNAVAILABLE`。 */
+        ChatErrorDetails: {
+            request_id: string;
+        };
+        /** @description 开流后 `LLM_UNAVAILABLE` 的细节，闭合对象。 */
+        ChatLlmUnavailableDetails: {
+            request_id: string;
+            reason: components["schemas"]["ChatLlmUnavailableReason"];
+        };
+        /**
+         * @description 问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期；其余首字前失败（含两路首字超时）
+         *     一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`。
+         *
+         * @enum {string}
+         */
+        ChatLlmUnavailableReason: "upstream" | "stream_interrupted" | "timeout" | "auth";
+        /** @description 问答接口的 503（开流前的 P2/P4 失败，以及 JSON 模式下的 O7～O10、O12，Q2、Q7）。
+         *     `details` 为闭合对象：`request_id` 在 P2 之后出现；`reason` 只属于 `LLM_UNAVAILABLE` 且取 Q5 闭集。
+         *     P4 向量调用失败的 `reason` 规格未定，因此 `reason` 可缺省。
+         *      */
+        ChatUnavailableError: components["schemas"]["Error"] & {
+            /** @enum {string} */
+            code: "LLM_UNAVAILABLE" | "STORAGE_UNAVAILABLE";
+            details?: components["schemas"]["ChatUnavailableDetails"];
+        };
+        /** @description 问答 503 的细节，闭合对象；两项都可缺省（P2 之前没有 `request_id`，P4 向量失败的 `reason` 规格未定）。 */
+        ChatUnavailableDetails: {
+            request_id?: string;
+            reason?: components["schemas"]["ChatLlmUnavailableReason"];
         };
         /** @description 生成中断的异常终止（Q5 的 O7～O13）。与 done 互斥、恰好一条、恒为末条，发送后关闭连接。
          *     客户端收到后清除已显示的临时正文（Q6）。
@@ -2339,7 +2396,14 @@ export interface operations {
             /** @description JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth），
              *     或存储不可用（`STORAGE_UNAVAILABLE`）。P2 之后发生时 `details.request_id` 带回请求 ID。
              *      */
-            503: components["responses"]["LlmUnavailable"];
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatUnavailableError"];
+                };
+            };
         };
     };
 }

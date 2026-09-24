@@ -1,6 +1,9 @@
 """B13: grounded Q&A response union, chat SSE events, and terminal-state wire fields."""
 
 import copy
+import importlib.util
+import re
+import sys
 from pathlib import Path
 
 import jsonschema
@@ -34,6 +37,16 @@ DEFS = _rewrite(copy.deepcopy(SCHEMAS))
 def is_valid(name: str, instance) -> bool:
     schema = {"$defs": DEFS, "$ref": f"#/$defs/{name}"}
     return jsonschema.Draft202012Validator(schema).is_valid(instance)
+
+
+def generated_models():
+    """导入入库的 Pydantic 生成物，确认约束进入了生成类型（REVIEW-B13-R02）。"""
+    path = ROOT / "src/contracts/v1/generated/python/models.py"
+    spec = importlib.util.spec_from_file_location("b13_generated_models", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module   # Pydantic 按模块命名空间解析前向引用
+    spec.loader.exec_module(module)
+    return module
 
 
 BOUND = {"graph_version": 3, "request_id": "01J8ZQ3N6T7W8X9Y0ZABCDEF12"}
@@ -160,3 +173,66 @@ def test_rate_limited_only_means_this_service():
     errors_doc = (ROOT / "src/contracts/errors.v1.md").read_text(encoding="utf-8")
     row = next(line for line in errors_doc.splitlines() if line.startswith("| `RATE_LIMITED`"))
     assert "模型 API" not in row and "本服务" in row
+
+
+# ── REVIEW-B13（2026-09-24）─────────────────────────────────────────────────
+
+def _error_event(code, details):
+    return {"event": "error", "error": {"code": code, "message": "m", "details": details}}
+
+
+@pytest.mark.parametrize("payload", [
+    _error_event("CYCLE_DETECTED", {"request_id": "r1"}),                      # R01：Q5 之外的码
+    _error_event("VALIDATION_ERROR", {"request_id": "r1"}),                    # R01：开流前的码
+    _error_event("INTERNAL_ERROR", {"request_id": "r1", "reason": "timeout"}),  # R03：reason 只属于 LLM_UNAVAILABLE
+    _error_event("BUDGET_EXCEEDED", {"request_id": "r1", "reason": "upstream"}),
+    META_ANSWERED | {"retrieved": 0},                                          # R04：进入生成时 |A| ≥ 1
+])
+def test_review_b13_rejects(payload):
+    assert not is_valid("ChatEvent", payload)
+
+
+def test_chat_error_is_a_union_by_code_so_generators_keep_reason():
+    error = SCHEMAS["ChatError"]
+    assert "if" not in error and "if" not in str(error.get("allOf", "")), "if/then 会被生成器忽略"
+    assert error["discriminator"]["propertyName"] == "code"
+    assert set(error["discriminator"]["mapping"]) == {
+        "LLM_UNAVAILABLE", "BUDGET_EXCEEDED", "STORAGE_UNAVAILABLE", "INTERNAL_ERROR"}
+
+    event = generated_models().ChatErrorEvent
+    event.model_validate(LLM_ERROR)
+    event.model_validate(_error_event("INTERNAL_ERROR", {"request_id": "r1"}))
+    for bad in (_error_event("LLM_UNAVAILABLE", {"request_id": "r1"}),          # 缺 reason
+                _error_event("CYCLE_DETECTED", {"request_id": "r1"}),
+                _error_event("INTERNAL_ERROR", {"request_id": "r1", "reason": "timeout"})):
+        with pytest.raises(Exception):
+            event.model_validate(bad)
+
+
+def test_json_mode_503_constrains_reason_to_the_closed_set():
+    schema = CHAT["responses"]["503"]["content"]["application/json"]["schema"]
+    assert schema == {"$ref": "#/components/schemas/ChatUnavailableError"}
+    ok = [{"code": "LLM_UNAVAILABLE", "message": "m", "details": {"reason": "timeout", "request_id": "r1"}},
+          {"code": "LLM_UNAVAILABLE", "message": "m"},                            # P4 向量失败：规格未定 reason
+          {"code": "STORAGE_UNAVAILABLE", "message": "m"},                          # P2 失败：尚无 request_id
+          {"code": "STORAGE_UNAVAILABLE", "message": "m", "details": {"request_id": "r1"}}]
+    bad = [{"code": "LLM_UNAVAILABLE", "message": "m", "details": {"reason": "provider_down"}},
+           {"code": "STORAGE_UNAVAILABLE", "message": "m", "details": {"reason": "upstream"}},
+           {"code": "INTERNAL_ERROR", "message": "m"}]
+    for body in ok:
+        assert is_valid("ChatUnavailableError", body), body
+    for body in bad:
+        assert not is_valid("ChatUnavailableError", body), body
+
+
+def test_events_doc_records_the_b13_in_place_exception():
+    section = EVENTS_DOC.split("## 6. 变更策略", 1)[1]
+    assert re.search(r"例外记录：B13", section), "B13 原地改写 §3 须在 §6 登记（REVIEW-B13-R06）"
+
+
+def test_generated_details_classes_have_stable_names():
+    models = (ROOT / "src/contracts/v1/generated/python/models.py").read_text(encoding="utf-8")
+    assert not re.findall(r"^class Details\d*\(", models, re.M), "内联 details 会按出现顺序编号（REVIEW-B13-R07）"
+    for name in ("ChatErrorDetails", "ChatLlmUnavailableDetails", "TaskPersistingDetails",
+                 "TaskProcessingFinishedDetails", "TaskAlreadyTerminalDetails"):
+        assert re.search(rf"^class {name}\(", models, re.M), name

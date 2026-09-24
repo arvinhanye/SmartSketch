@@ -31,6 +31,7 @@
 ## 决定与理由
 
 - **`ChatError` 用 `allOf` 加 `if/then`，不改共享的 `Error`**：`details.request_id` 与 `reason` 闭集只适用于问答开流后的错误。其他接口的 `Error.details` 仍是开放对象，不受影响。
+  - **已由 REVIEW-B13 取代**：`ChatError` 改为按 `code` 判别的两支（`ChatLlmUnavailableError`、`ChatServiceError`），`details` 为具名闭合对象，生成物可见 `reason` 必填；见 `docs/handoffs/claude-review-b13.md`。
 - **JSON 模式的 HTTP 错误不强制 `details.request_id`**：P2 之前的失败（401、403、404、422、429 `RATE_LIMITED`）没有请求 ID；503、429 也可能发生在 P2 之前或之后。因此 JSON 模式的这一约束只写在描述里，流内的 `error` 事件（一定在 P2 之后）则用结构强制。
 - **`latency_ms` 仍为可选**：规格没有把它列为新必填项，按「不从零重写已有字段」保持原样。
 
@@ -48,8 +49,8 @@
 
 ## 风险
 
-- 问答事件与响应收紧属于结构上的破坏性变更。目前没有消费者（J07、J08、J09 均未实现）；依据与 B10 相同，已在 `events.v1.md` §6 登记。
-- 代码生成器会忽略 `if/then`；J06/J07 实现时须在服务端保证同样的约束。
+- 问答事件与响应收紧属于结构上的破坏性变更。目前没有消费者（J07、J08、J09 均未实现）；依据与 B10 相同。（原稿称「已在 `events.v1.md` §6 登记」，实际未登记；REVIEW-B13-R06 已补登。）
+- 代码生成器会忽略 `if/then`；J06/J07 实现时须在服务端保证同样的约束。（`ChatError` 已由 REVIEW-B13-R02 改为判别联合；`ChatMetaEvent` 的 `retrieved` 取值约束仍为 `if/then`。）
 
 ## 下一步
 

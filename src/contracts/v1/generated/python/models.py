@@ -203,12 +203,12 @@ class FixedStageProgress(BaseModel):
     pass
 
 
-class Details(BaseModel):
+class TaskPersistingDetails(BaseModel):
     stage: Literal['persisting']
     reason: Literal['persisting_uninterruptible']
 
 
-class Details1(BaseModel):
+class TaskProcessingFinishedDetails(BaseModel):
     stage: Literal['awaiting_review']
     reason: Literal['processing_finished']
 
@@ -219,7 +219,7 @@ class Stage1(Enum):
     cancelled = 'cancelled'
 
 
-class Details2(BaseModel):
+class TaskAlreadyTerminalDetails(BaseModel):
     stage: Stage1
     reason: Literal['already_terminal']
 
@@ -721,16 +721,37 @@ class ChatDoneEvent(BaseModel):
     final: ChatResponse
 
 
-class Reason(Enum):
+class Code(Enum):
+    BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+    INTERNAL_ERROR = 'INTERNAL_ERROR'
+
+
+class ChatErrorDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(min_length=1)]
+
+
+class ChatLlmUnavailableReason(Enum):
     upstream = 'upstream'
     stream_interrupted = 'stream_interrupted'
     timeout = 'timeout'
     auth = 'auth'
 
 
-class Details3(BaseModel):
-    request_id: Annotated[str, Field(min_length=1)]
-    reason: Optional[Reason] = None
+class Code1(Enum):
+    LLM_UNAVAILABLE = 'LLM_UNAVAILABLE'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+
+
+class ChatUnavailableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[Optional[str], Field(min_length=1)] = None
+    reason: Optional[ChatLlmUnavailableReason] = None
 
 
 class Exercise(BaseModel):
@@ -779,7 +800,9 @@ class TaskFailed(TaskBase):
 
 class TaskNotCancellableError(Error):
     code: Literal['TASK_NOT_CANCELLABLE']
-    details: Union[Details, Details1, Details2]
+    details: Union[
+        TaskPersistingDetails, TaskProcessingFinishedDetails, TaskAlreadyTerminalDetails
+    ]
 
 
 class TaskErrorEvent(BaseModel):
@@ -820,25 +843,22 @@ class KnowledgePointDetail(KnowledgePoint):
     related: Optional[list[KnowledgePointRef]] = None
 
 
-class ChatError(Error):
-    details: Details3
+class ChatServiceError(Error):
+    code: Literal['BUDGET_EXCEEDED', 'STORAGE_UNAVAILABLE', 'INTERNAL_ERROR']
+    details: ChatErrorDetails
 
 
-class ChatErrorEvent(BaseModel):
-    event: Literal['error']
-    error: ChatError
+class ChatLlmUnavailableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(min_length=1)]
+    reason: ChatLlmUnavailableReason
 
 
-class ChatEvent(
-    RootModel[Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent]]
-):
-    root: Annotated[
-        Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent],
-        Field(
-            description='单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：\n原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在\n（codex 审查 R04）。事件名、顺序与终止语义见 `events.v1.md` §3。\n',
-            discriminator='event',
-        ),
-    ]
+class ChatUnavailableError(Error):
+    code: Code1
+    details: Optional[ChatUnavailableDetails] = None
 
 
 class StudyMaterial(BaseModel):
@@ -857,5 +877,37 @@ class Task(RootModel[Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled]
         Field(
             description='任务快照，按 `stage` 分为四个分支（与 `TaskEvent` 同构，生成的 Pydantic / TypeScript 类型据此收窄）：\n处理中或待审核 `TaskActive`、`TaskCompleted`、`TaskFailed`、`TaskCancelled`。\n`stage = failed` ⇔ `error` 非空（TASK-17）；`cancelled` ⇒ `cancel_requested = true`（I5）；\n固定进度见 `specs/task-processing.md` §1。`failed_chunks` 只在快照中返回，SSE 事件只带计数。\n',
             discriminator='stage',
+        ),
+    ]
+
+
+class ChatLlmUnavailableError(Error):
+    code: Literal['LLM_UNAVAILABLE']
+    details: ChatLlmUnavailableDetails
+
+
+class ChatError(RootModel[Union[ChatLlmUnavailableError, ChatServiceError]]):
+    root: Annotated[
+        Union[ChatLlmUnavailableError, ChatServiceError],
+        Field(
+            description='问答开流后（P2 之后）的错误，按 `code` 分两支（`specs/grounded-qa.md` Q5 的 O7～O13），码为闭集：\n`LLM_UNAVAILABLE` 必带 `details.reason`；`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` 不带 `reason`。\n两支都必带 `details.request_id`。`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。\n',
+            discriminator='code',
+        ),
+    ]
+
+
+class ChatErrorEvent(BaseModel):
+    event: Literal['error']
+    error: ChatError
+
+
+class ChatEvent(
+    RootModel[Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent]]
+):
+    root: Annotated[
+        Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent],
+        Field(
+            description='单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：\n原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在\n（codex 审查 R04）。事件名、顺序与终止语义见 `events.v1.md` §3。\n',
+            discriminator='event',
         ),
     ]

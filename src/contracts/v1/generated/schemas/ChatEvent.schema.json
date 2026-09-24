@@ -89,61 +89,38 @@
       }
     },
     "ChatError": {
-      "description": "问答开流后（P2 之后）的错误：`details.request_id` 必填；`LLM_UNAVAILABLE` 另须\n`details.reason ∈ {upstream, stream_interrupted, timeout, auth}`（`specs/grounded-qa.md` Q5）。\n`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。\n",
-      "allOf": [
+      "description": "问答开流后（P2 之后）的错误，按 `code` 分两支（`specs/grounded-qa.md` Q5 的 O7～O13），码为闭集：\n`LLM_UNAVAILABLE` 必带 `details.reason`；`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` 不带 `reason`。\n两支都必带 `details.request_id`。`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。\n",
+      "oneOf": [
         {
-          "$ref": "#/$defs/Error"
+          "$ref": "#/$defs/ChatLlmUnavailableError"
         },
         {
-          "type": "object",
-          "required": [
-            "details"
-          ],
-          "properties": {
-            "details": {
-              "type": "object",
-              "required": [
-                "request_id"
-              ],
-              "properties": {
-                "request_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "reason": {
-                  "type": "string",
-                  "enum": [
-                    "upstream",
-                    "stream_interrupted",
-                    "timeout",
-                    "auth"
-                  ]
-                }
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "code": {
-                "const": "LLM_UNAVAILABLE"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          },
-          "then": {
-            "properties": {
-              "details": {
-                "required": [
-                  "request_id",
-                  "reason"
-                ]
-              }
-            }
-          }
+          "$ref": "#/$defs/ChatServiceError"
         }
-      ]
+      ],
+      "discriminator": {
+        "propertyName": "code",
+        "mapping": {
+          "LLM_UNAVAILABLE": "#/components/schemas/ChatLlmUnavailableError",
+          "BUDGET_EXCEEDED": "#/components/schemas/ChatServiceError",
+          "STORAGE_UNAVAILABLE": "#/components/schemas/ChatServiceError",
+          "INTERNAL_ERROR": "#/components/schemas/ChatServiceError"
+        }
+      }
+    },
+    "ChatErrorDetails": {
+      "type": "object",
+      "description": "开流后错误的公共细节，闭合对象；`reason` 只属于 `LLM_UNAVAILABLE`。",
+      "required": [
+        "request_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "ChatErrorEvent": {
       "type": "object",
@@ -188,9 +165,61 @@
         }
       }
     },
+    "ChatLlmUnavailableDetails": {
+      "type": "object",
+      "description": "开流后 `LLM_UNAVAILABLE` 的细节，闭合对象。",
+      "required": [
+        "request_id",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "$ref": "#/$defs/ChatLlmUnavailableReason"
+        }
+      }
+    },
+    "ChatLlmUnavailableError": {
+      "description": "模型不可用（O7～O10）；`details.reason` 区分上游故障、流中断、链路超时与鉴权失败。",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code",
+            "details"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "const": "LLM_UNAVAILABLE"
+            },
+            "details": {
+              "$ref": "#/$defs/ChatLlmUnavailableDetails"
+            }
+          }
+        }
+      ]
+    },
+    "ChatLlmUnavailableReason": {
+      "type": "string",
+      "description": "问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期；其余首字前失败（含两路首字超时）\n一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`。\n",
+      "enum": [
+        "upstream",
+        "stream_interrupted",
+        "timeout",
+        "auth"
+      ]
+    },
     "ChatMetaEvent": {
       "type": "object",
-      "description": "检索完成、生成开始前的第一条事件，恒为一条（`specs/grounded-qa.md` Q2）。\n`status = not_covered` 当且仅当检索阶段判定拒答，此时 `retrieved = 0`，后续不再有 delta，直接发 done。\n`status = answered` 表示进入生成，不是承诺：终态仍可能是 `not_covered` 或 `error`。\n",
+      "description": "检索完成、生成开始前的第一条事件，恒为一条（`specs/grounded-qa.md` Q2）。\n`status = not_covered` 当且仅当检索阶段判定拒答，此时 `retrieved = 0`，后续不再有 delta，直接发 done。\n`status = answered` 表示进入生成（允许引用集合 A 非空，`retrieved ≥ 1`），不是承诺：终态仍可能是 `not_covered` 或 `error`。\n",
       "required": [
         "event",
         "status",
@@ -198,23 +227,46 @@
         "graph_version",
         "request_id"
       ],
-      "if": {
-        "properties": {
-          "status": {
-            "const": "not_covered"
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_covered"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retrieved": {
+                "const": 0
+              }
+            }
           }
         },
-        "required": [
-          "status"
-        ]
-      },
-      "then": {
-        "properties": {
-          "retrieved": {
-            "const": 0
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "answered"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retrieved": {
+                "minimum": 1
+              }
+            }
           }
         }
-      },
+      ],
       "properties": {
         "event": {
           "type": "string",
@@ -310,6 +362,34 @@
           "not_covered": "#/components/schemas/ChatNotCovered"
         }
       }
+    },
+    "ChatServiceError": {
+      "description": "预算拒绝（O11）、调用记录预写失败（O12）或未预期异常（O13）；不带 `reason`。",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code",
+            "details"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "BUDGET_EXCEEDED",
+                "STORAGE_UNAVAILABLE",
+                "INTERNAL_ERROR"
+              ]
+            },
+            "details": {
+              "$ref": "#/$defs/ChatErrorDetails"
+            }
+          }
+        }
+      ]
     },
     "ChatStatus": {
       "type": "string",

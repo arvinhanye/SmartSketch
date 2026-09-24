@@ -124,7 +124,7 @@ data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"EXTRAC
 | `meta` | 检索与判定完成、开流即发 | `ChatMetaEvent` | `event`、`status`、`retrieved`（`not_covered` 时为 0）、`graph_version`、`request_id` |
 | `delta` | 生成中的正文增量 | `ChatDeltaEvent` | `event`、`delta`（非空串） |
 | `done` | 终态已构造 | `ChatDoneEvent` | `event`、`final`（`ChatResponse`，含 `answer`、`citations`、`graph_version`、`request_id`；`not_covered` 另含 `reason`） |
-| `error` | 开流后的异常终止（Q5 O7～O13） | `ChatErrorEvent` | `event`、`error`（`ChatError`：`details.request_id` 必填；`LLM_UNAVAILABLE` 另须 `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`） |
+| `error` | 开流后的异常终止（Q5 O7～O13） | `ChatErrorEvent` | `event`、`error`（`ChatError`：码只取 `LLM_UNAVAILABLE`、`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`；`details.request_id` 必填；`LLM_UNAVAILABLE` 另须 `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`，其余三码不带 `reason`） |
 
 > `data` 为 `{}` 的事件**不合法**，会被结构校验拒绝（codex 审查 R04）。
 
@@ -241,3 +241,5 @@ data: {"event":"error","error":{"code":"LLM_UNAVAILABLE","message":"回答生成
 事件名、顺序保证与终态语义属于破坏性变更，必须新增 `events.v2.md` 并在 `api.v2.yaml` 中同步，不得原地修改本文件。新增可选字段不算破坏性变更。
 
 > 例外记录：B10（2026-09-24）按 ADR-010、ADR-013 原地改写了 §1 鉴权、§2 关流语义与 §4 重连，并收紧了 `TaskEvent` 结构。依据是 `specs/task-processing.md` §7：v1 尚无任何消费者（C11/C12 未实现），此时修改迁移成本为零。此后再改须按本节升 v2。
+
+> 例外记录：B13（2026-09-24）按 ADR-015 及修订 1 原地改写了 §3：`meta` 与 `done.final` 增加必填 `graph_version`、`request_id`，`error` 改用 `ChatError`（错误码闭集、`LLM_UNAVAILABLE` 必带 `details.reason`），时序与撤回条文改为指向 `specs/grounded-qa.md`。依据与 B10 相同：问答流尚无消费者（J07/J08/J09 未实现），`specs/grounded-qa.md` Q11 已把这些改动分配给 B13。此后再改须按本节升 v2。

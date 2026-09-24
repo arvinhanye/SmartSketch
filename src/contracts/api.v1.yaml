@@ -944,10 +944,13 @@ paths:
           $ref: '#/components/responses/InternalError'
           description: JSON 模式下未预期的服务端异常（`INTERNAL_ERROR`，Q5 O13）；`details.request_id` 带回请求 ID。
         '503':
-          $ref: '#/components/responses/LlmUnavailable'
           description: |
             JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth），
             或存储不可用（`STORAGE_UNAVAILABLE`）。P2 之后发生时 `details.request_id` 带回请求 ID。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatUnavailableError'
 
 components:
 
@@ -1463,36 +1466,45 @@ components:
               const: TASK_NOT_CANCELLABLE
             details:
               oneOf:
-                - type: object
-                  description: 正在入库，不可中断。
-                  required: [stage, reason]
-                  properties:
-                    stage:
-                      type: string
-                      const: persisting
-                    reason:
-                      type: string
-                      const: persisting_uninterruptible
-                - type: object
-                  description: 处理已结束（`awaiting_review`）。
-                  required: [stage, reason]
-                  properties:
-                    stage:
-                      type: string
-                      const: awaiting_review
-                    reason:
-                      type: string
-                      const: processing_finished
-                - type: object
-                  description: 已处于终态，`stage` 为实际终态。
-                  required: [stage, reason]
-                  properties:
-                    stage:
-                      type: string
-                      enum: [completed, failed, cancelled]
-                    reason:
-                      type: string
-                      const: already_terminal
+                - $ref: '#/components/schemas/TaskPersistingDetails'
+                - $ref: '#/components/schemas/TaskProcessingFinishedDetails'
+                - $ref: '#/components/schemas/TaskAlreadyTerminalDetails'
+
+    TaskPersistingDetails:
+      type: object
+      description: 正在入库，不可中断。
+      required: [stage, reason]
+      properties:
+        stage:
+          type: string
+          const: persisting
+        reason:
+          type: string
+          const: persisting_uninterruptible
+
+    TaskProcessingFinishedDetails:
+      type: object
+      description: 处理已结束（`awaiting_review`）。
+      required: [stage, reason]
+      properties:
+        stage:
+          type: string
+          const: awaiting_review
+        reason:
+          type: string
+          const: processing_finished
+
+    TaskAlreadyTerminalDetails:
+      type: object
+      description: 已处于终态，`stage` 为实际终态。
+      required: [stage, reason]
+      properties:
+        stage:
+          type: string
+          enum: [completed, failed, cancelled]
+        reason:
+          type: string
+          const: already_terminal
 
     TaskStageEvent:
       type: object
@@ -2293,17 +2305,27 @@ components:
       description: |
         检索完成、生成开始前的第一条事件，恒为一条（`specs/grounded-qa.md` Q2）。
         `status = not_covered` 当且仅当检索阶段判定拒答，此时 `retrieved = 0`，后续不再有 delta，直接发 done。
-        `status = answered` 表示进入生成，不是承诺：终态仍可能是 `not_covered` 或 `error`。
+        `status = answered` 表示进入生成（允许引用集合 A 非空，`retrieved ≥ 1`），不是承诺：终态仍可能是 `not_covered` 或 `error`。
       required: [event, status, retrieved, graph_version, request_id]
-      if:
-        properties:
-          status:
-            const: not_covered
-        required: [status]
-      then:
-        properties:
-          retrieved:
-            const: 0
+      allOf:
+        - if:
+            properties:
+              status:
+                const: not_covered
+            required: [status]
+          then:
+            properties:
+              retrieved:
+                const: 0
+        - if:
+            properties:
+              status:
+                const: answered
+            required: [status]
+          then:
+            properties:
+              retrieved:
+                minimum: 1
       properties:
         event:
           type: string
@@ -2353,33 +2375,111 @@ components:
 
     ChatError:
       description: |
-        问答开流后（P2 之后）的错误：`details.request_id` 必填；`LLM_UNAVAILABLE` 另须
-        `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`（`specs/grounded-qa.md` Q5）。
-        `message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。
+        问答开流后（P2 之后）的错误，按 `code` 分两支（`specs/grounded-qa.md` Q5 的 O7～O13），码为闭集：
+        `LLM_UNAVAILABLE` 必带 `details.reason`；`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` 不带 `reason`。
+        两支都必带 `details.request_id`。`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。
+      oneOf:
+        - $ref: '#/components/schemas/ChatLlmUnavailableError'
+        - $ref: '#/components/schemas/ChatServiceError'
+      discriminator:
+        propertyName: code
+        mapping:
+          LLM_UNAVAILABLE: '#/components/schemas/ChatLlmUnavailableError'
+          BUDGET_EXCEEDED: '#/components/schemas/ChatServiceError'
+          STORAGE_UNAVAILABLE: '#/components/schemas/ChatServiceError'
+          INTERNAL_ERROR: '#/components/schemas/ChatServiceError'
+
+    ChatLlmUnavailableError:
+      description: 模型不可用（O7～O10）；`details.reason` 区分上游故障、流中断、链路超时与鉴权失败。
       allOf:
         - $ref: '#/components/schemas/Error'
         - type: object
-          required: [details]
+          required: [code, details]
           properties:
+            code:
+              type: string
+              const: LLM_UNAVAILABLE
             details:
-              type: object
-              required: [request_id]
-              properties:
-                request_id:
-                  type: string
-                  minLength: 1
-                reason:
-                  type: string
-                  enum: [upstream, stream_interrupted, timeout, auth]
+              $ref: '#/components/schemas/ChatLlmUnavailableDetails'
+
+    ChatServiceError:
+      description: 预算拒绝（O11）、调用记录预写失败（O12）或未预期异常（O13）；不带 `reason`。
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [code, details]
+          properties:
+            code:
+              type: string
+              enum: [BUDGET_EXCEEDED, STORAGE_UNAVAILABLE, INTERNAL_ERROR]
+            details:
+              $ref: '#/components/schemas/ChatErrorDetails'
+
+    ChatErrorDetails:
+      type: object
+      description: 开流后错误的公共细节，闭合对象；`reason` 只属于 `LLM_UNAVAILABLE`。
+      required: [request_id]
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+          minLength: 1
+
+    ChatLlmUnavailableDetails:
+      type: object
+      description: 开流后 `LLM_UNAVAILABLE` 的细节，闭合对象。
+      required: [request_id, reason]
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+          minLength: 1
+        reason:
+          $ref: '#/components/schemas/ChatLlmUnavailableReason'
+
+    ChatLlmUnavailableReason:
+      type: string
+      description: |
+        问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期；其余首字前失败（含两路首字超时）
+        一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`。
+      enum: [upstream, stream_interrupted, timeout, auth]
+
+    ChatUnavailableError:
+      description: |
+        问答接口的 503（开流前的 P2/P4 失败，以及 JSON 模式下的 O7～O10、O12，Q2、Q7）。
+        `details` 为闭合对象：`request_id` 在 P2 之后出现；`reason` 只属于 `LLM_UNAVAILABLE` 且取 Q5 闭集。
+        P4 向量调用失败的 `reason` 规格未定，因此 `reason` 可缺省。
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+              enum: [LLM_UNAVAILABLE, STORAGE_UNAVAILABLE]
+            details:
+              $ref: '#/components/schemas/ChatUnavailableDetails'
           if:
             properties:
               code:
-                const: LLM_UNAVAILABLE
+                const: STORAGE_UNAVAILABLE
             required: [code]
           then:
             properties:
               details:
-                required: [request_id, reason]
+                not:
+                  required: [reason]
+
+    ChatUnavailableDetails:
+      type: object
+      description: 问答 503 的细节，闭合对象；两项都可缺省（P2 之前没有 `request_id`，P4 向量失败的 `reason` 规格未定）。
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+          minLength: 1
+        reason:
+          $ref: '#/components/schemas/ChatLlmUnavailableReason'
 
     ChatErrorEvent:
       type: object
