@@ -58,6 +58,7 @@
 
 - `TaskEvent` 与 `Task` 收紧属于结构上的破坏性变更。目前没有消费者（后端 C10/C11、前端 C12/H02 均未实现），生成类型的调用点为 0。
 - `datamodel-codegen` 与 `openapi-typescript` 会忽略 `if/then/else`，`failed ⇔ error` 只由结构校验（jsonschema）和运行时实现保证。C10/C11 实现时应在服务端校验，或直接用 `TaskEvent` 联合类型构造事件。
+  - **已由 REVIEW-B10-R01 解决**：`Task` 改为按 `stage` 判别的四个分支，生成的 Pydantic / TS 类型直接带上该约束，见 `docs/handoffs/claude-review-b10.md`。
 - 后端运行时（票据表、核销、SSE 端点）归 C11/C16，本任务不含。
 
 ## 下一步

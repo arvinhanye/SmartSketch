@@ -404,11 +404,14 @@ paths:
           $ref: '#/components/responses/NotFound'
           description: 任务不存在，或调用者是任务所在课程的非成员（`NOT_FOUND`，二者不可区分，不含任务快照字段）。
         '409':
-          $ref: '#/components/responses/Conflict'
           description: |
             `TASK_NOT_CANCELLABLE`，`details: {stage, reason}`。`reason` 取值：
             `persisting_uninterruptible`（正在入库）、`processing_finished`（`awaiting_review`）、
             `already_terminal`（`completed` / `failed` / `cancelled`，`stage` 为实际终态）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskNotCancellableError'
 
   /api/v1/courses/{cid}/graph:
     parameters:
@@ -1302,25 +1305,33 @@ components:
           $ref: '#/components/schemas/ErrorCode'
 
     Task:
-      type: object
       description: |
-        任务快照。`stage = failed` ⇔ `error` 非空（TASK-17）：`failed` 时 `error` 必填且不为 null，
-        其他阶段 `error` 缺省或为 null。`failed_chunks` 只在快照中返回，SSE 事件只带计数。
+        任务快照，按 `stage` 分为四个分支（与 `TaskEvent` 同构，生成的 Pydantic / TypeScript 类型据此收窄）：
+        处理中或待审核 `TaskActive`、`TaskCompleted`、`TaskFailed`、`TaskCancelled`。
+        `stage = failed` ⇔ `error` 非空（TASK-17）；`cancelled` ⇒ `cancel_requested = true`（I5）；
+        固定进度见 `specs/task-processing.md` §1。`failed_chunks` 只在快照中返回，SSE 事件只带计数。
+      oneOf:
+        - $ref: '#/components/schemas/TaskActive'
+        - $ref: '#/components/schemas/TaskCompleted'
+        - $ref: '#/components/schemas/TaskFailed'
+        - $ref: '#/components/schemas/TaskCancelled'
+      discriminator:
+        propertyName: stage
+        mapping:
+          queued: '#/components/schemas/TaskActive'
+          parsing: '#/components/schemas/TaskActive'
+          extracting: '#/components/schemas/TaskActive'
+          merging: '#/components/schemas/TaskActive'
+          persisting: '#/components/schemas/TaskActive'
+          awaiting_review: '#/components/schemas/TaskActive'
+          completed: '#/components/schemas/TaskCompleted'
+          failed: '#/components/schemas/TaskFailed'
+          cancelled: '#/components/schemas/TaskCancelled'
+
+    TaskBase:
+      type: object
+      description: 任务快照的公共字段。不单独出现在 wire 上，按 `stage` 由 `Task` 的四个分支各自收窄。
       required: [id, course_id, document_id, stage, progress, cancel_requested, created_at, updated_at]
-      if:
-        properties:
-          stage:
-            const: failed
-        required: [stage]
-      then:
-        required: [error]
-        properties:
-          error:
-            $ref: '#/components/schemas/Error'
-      else:
-        properties:
-          error:
-            type: 'null'
       properties:
         id:
           type: string
@@ -1350,17 +1361,138 @@ components:
           description: 各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04）
           additionalProperties:
             type: integer
-        error:
-          oneOf:
-            - $ref: '#/components/schemas/Error'
-            - type: 'null'
-          description: stage = failed 时必填
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+
+    TaskActive:
+      description: 处理中或待审核（`queued`～`awaiting_review`）。`error` 缺省或为 null；`queued`、`awaiting_review` 的进度固定。
+      allOf:
+        - $ref: '#/components/schemas/TaskBase'
+        - $ref: '#/components/schemas/FixedStageProgress'
+        - type: object
+          properties:
+            stage:
+              type: string
+              enum: [queued, parsing, extracting, merging, persisting, awaiting_review]
+            error:
+              type: 'null'
+
+    TaskCompleted:
+      description: 审核发布后的终态；`progress` 固定为 1，`error` 缺省或为 null。
+      allOf:
+        - $ref: '#/components/schemas/TaskBase'
+        - type: object
+          properties:
+            stage:
+              type: string
+              const: completed
+            progress:
+              type: number
+              const: 1
+            error:
+              type: 'null'
+
+    TaskFailed:
+      description: 失败终态；`error` 必填且不为 null（TASK-17）。取消中失败时 `cancel_requested` 保持 true（TASK-7）。
+      allOf:
+        - $ref: '#/components/schemas/TaskBase'
+        - type: object
+          required: [error]
+          properties:
+            stage:
+              type: string
+              const: failed
+            error:
+              $ref: '#/components/schemas/Error'
+
+    TaskCancelled:
+      description: 取消终态；取消必然先置标志，`cancel_requested` 恒为 true（I5），`error` 缺省或为 null。
+      allOf:
+        - $ref: '#/components/schemas/TaskBase'
+        - type: object
+          properties:
+            stage:
+              type: string
+              const: cancelled
+            cancel_requested:
+              type: boolean
+              const: true
+            error:
+              type: 'null'
+
+    FixedStageProgress:
+      description: |
+        `specs/task-processing.md` §1 的固定进度：`queued` 为 0，`awaiting_review` 为 0.95
+        （`completed` 为 1，由对应分支的 `const` 表达）。只约束取值，代码生成器会忽略，
+        运行时由 C08 状态迁移纯函数保证。
+      allOf:
+        - if:
+            properties:
+              stage:
+                const: queued
+            required: [stage]
+          then:
+            properties:
+              progress:
+                const: 0
+        - if:
+            properties:
+              stage:
+                const: awaiting_review
+            required: [stage]
+          then:
+            properties:
+              progress:
+                const: 0.95
+
+    TaskNotCancellableError:
+      description: |
+        取消被拒（`specs/task-processing.md` §4）。`details.stage` 为任务实际阶段，前端据此刷新界面（H02）；
+        `details.reason` 与 `stage` 的组合是闭集。
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [code, details]
+          properties:
+            code:
+              type: string
+              const: TASK_NOT_CANCELLABLE
+            details:
+              oneOf:
+                - type: object
+                  description: 正在入库，不可中断。
+                  required: [stage, reason]
+                  properties:
+                    stage:
+                      type: string
+                      const: persisting
+                    reason:
+                      type: string
+                      const: persisting_uninterruptible
+                - type: object
+                  description: 处理已结束（`awaiting_review`）。
+                  required: [stage, reason]
+                  properties:
+                    stage:
+                      type: string
+                      const: awaiting_review
+                    reason:
+                      type: string
+                      const: processing_finished
+                - type: object
+                  description: 已处于终态，`stage` 为实际终态。
+                  required: [stage, reason]
+                  properties:
+                    stage:
+                      type: string
+                      enum: [completed, failed, cancelled]
+                    reason:
+                      type: string
+                      const: already_terminal
 
     TaskStageEvent:
       type: object
@@ -1369,6 +1501,8 @@ components:
         `stage = awaiting_review`（`progress = 0.95`）是处理期连接的结束事件，推送后服务端关流。
       required: [task_id, stage, progress, cancel_requested]
       additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/FixedStageProgress'
       properties:
         task_id:
           type: string

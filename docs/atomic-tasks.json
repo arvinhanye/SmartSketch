@@ -3317,6 +3317,36 @@
       "rollback": "只撤销本任务自有文件；若含数据库迁移，先备份并演练定向恢复。"
     },
     {
+      "id": "H13",
+      "title": "实现前端登录页与会话存储",
+      "group": "教师与学生图谱界面",
+      "status": "PROPOSED",
+      "owner": null,
+      "depends_on": [
+        "C13",
+        "B15",
+        "B03",
+        "B04"
+      ],
+      "input": "登录端点与 A05 §2.4 前端持有令牌规则",
+      "output": "登录页、会话读写与 401 回登录",
+      "allowed_files": [
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/views/LoginView.vue",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/stores/session.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/api/auth.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/router/index.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/src/frontend/src/main.ts",
+        "/Users/arvinhan/Desktop/SmartSketch/tests/frontend/h13.test.ts"
+      ],
+      "acceptance": "令牌与 LoginResponse.user 只存 sessionStorage（不存 localStorage/Cookie）；登录后按 user.role 进首页；401、429 分别明确提示；收到 401 清会话与课程上下文并回登录页；口令/令牌不写日志；不解析 JWT 做授权",
+      "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
+      "verification_command": "npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts",
+      "verification_status": "NOT_RUN_PLANNED",
+      "risk": "依赖未验收或范围超出单轮时先拆分；不把计划测试写成已运行，密钥和真实资料不得入库。",
+      "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-h13.md",
+      "rollback": "只撤销本任务自有文件；若含数据库迁移，先备份并演练定向恢复。"
+    },
+    {
       "id": "K13",
       "title": "实现抽取消融实验",
       "group": "评测部署与交付",
