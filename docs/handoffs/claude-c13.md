@@ -3,8 +3,8 @@
 - `task_id`: C13（GitHub issue #160）
 - `review_status`: ready_for_review
 - `worktree`: `/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/agent-aa4a622995b0beeb6`，分支 `claude/c13-auth`
-- `base`: `origin/main` `f0b4afe`（Merge PR #176，C08）；开工时为 `68affa8`，其后 PR #180（D-10）、PR #176 先后合入，两次都是快进，与本任务文件无重叠。开 PR 前重新拉取核对过：main 仍只有 `001_base.sql`，本任务取 `002`
-- `head`: 见 PR 最新提交（两个提交：功能提交 + 越锁测试适配提交）
+- `base`: `origin/main` `909ce33`（Merge PR #185）。开工时为 `68affa8`，其后 PR #180（D-10）、#176（C08）、#181（C05）、#182（E01）、#184、#185 陆续合入。前两次快进；推送后以合并提交同步最新 main，均与本任务文件无重叠。开 PR 前重新拉取核对过：main 仍只有 `001_base.sql`，本任务取 `002`
+- `head`: 以 PR 最新提交为准。提交依次为：越锁测试适配、功能实现、同步 main 的合并提交、本交接的基线更新
 - 依据：`specs/identity-access.md` §1.1～§1.4、§2.1、§6、IAM-7/10/21/23；ADR-013；`src/contracts/api.v1.yaml` 的 `login`、`LoginRequest`、`LoginResponse`、`User`、`Error`；`errors.v1.md` 的 `UNAUTHENTICATED`、`RATE_LIMITED`、`INTERNAL_ERROR`；D-10 迁移编号规则。
 
 ## 交付物
@@ -47,8 +47,8 @@
 | 红灯 | `pytest tests/backend/test_c13.py -q`（仅有测试） | exit 2，收集阶段 `ImportError: cannot import name 'check_auth_settings'` |
 | 中间态 | `pytest tests/backend -q`（实现后、适配前） | 6 failed / 115 passed：B06 `.env.example` 覆盖（补登变量后修复）、C01 四个用例硬编码「迁移目录只有 001」、C13 契约形状（`expires_in` 改为可选后修复） |
 | 绿灯 | `pytest tests/backend/test_c13.py -q` | 45 passed |
-| 全部后端 | `pytest tests/backend -q` | 基线 `28b09b4`：121 passed；快进到 `f0b4afe`（含 C08 的 `test_c08.py`）后：243 passed，exit 0 |
-| 门禁 | `./scripts/verify.sh`（系统 python3） | 两个基线上均输出 `Scaffold verification passed.`，exit 0 |
+| 全部后端 | `pytest tests/backend -q` | 基线 `28b09b4`：121 passed；`f0b4afe`（加入 C08）：243 passed；最终基线 `909ce33`（加入 C05、E01）：373 passed，exit 0 |
+| 门禁 | `./scripts/verify.sh`（系统 python3） | 三个基线上均输出 `Scaffold verification passed.`，exit 0 |
 | 空白 | `git diff --check` | exit 0 |
 | 清理 | `rm -r src/backend/smartsketch_backend.egg-info` | 已删除，未提交 |
 
