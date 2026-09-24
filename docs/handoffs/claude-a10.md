@@ -86,7 +86,7 @@ python3 docs/reviews/validate_atomic_plan.py                  exit 0（脚本写
 ## 十、第二轮：Codex 审查修复（A10-R01 / A10-R02）
 
 - **task_id**：A10-R01/R02 修复（Codex REVIEW-13），A1～A10 收尾的一部分
-- **状态**：DONE；ADR-016 修订 1 **待 ArvinHan 签收**（按审查的最小修复建议落实，不改变决定 1～6 的方向）
+- **状态**：DONE；ADR-016 修订 1 已由 ArvinHan 2026-09-24 签收（按审查的最小修复建议落实，不改变决定 1～6 的方向）
 - **review_status**：ready_for_review（以交付提交为准）
 - **worktree / 分支**：`.claude/worktrees/wrap-a10-fix`，分支 `claude/a10-r01-r02-fix`，base `37da669`（PR #18 的头）。另开 PR 而不改 #18，因为 PR #22（批 0、批 1）叠在 #18 之上
 - **审查报告**：主目录 `docs/reviews/codex-claude-a10-37da669-2026-09-23-1403z.md`（尚未入库）
