@@ -189,3 +189,10 @@
 
 - FIX-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 3、ADR-012 修订 2）：响应不带 usage 时，生成前被拒的错误（`400/401/403/404/413/422/429`）计 0，其余情形按「输入估算 + 输出上限」计，E03 流式请求须请求 usage；重新向量化按 Neo4j 实际存量迁移并按存量核对，缓存与节点外的向量带空间标识，写入按空间标识而非维度拒绝。
 - 交出的后续项（均未认领）：**E03** 错误分类含「生成前被拒」、流式请求 usage；**E04** 按修订 3 汇总计费量；**D-02a/b** 签收时注明供应商是否返回 usage；**E07** 缓存键含空间标识；**F03** 写入向量核对空间标识；**A10** 仍须为重新向量化命令补登叶子任务。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| FIX-R03 修复 | DONE（ADR-012 修订 2 补注待签收） | 修复 Codex REVIEW-10 的 FIX-R03（离线迁移写新空间与「只能写当前空间」冲突），并把 `origin/main` 合入本分支解除 PR #16 冲突 | Claude（协调 Agent，A1～A10 收尾） | `.claude/worktrees/wrap-fix-pr16`（分支 `claude/fix-r01-r02`）/ base `5186e09` + 合入 `f9dfc8f` | `specs/teacher-review-publish.md`（V12 第 3 步、「空间标识随向量走」、PUB-39）、`docs/integrations.md`（写入核对一处）、`docs/architecture.md`（向量空间一行）、`docs/decisions.md`（ADR-012 修订 2 补注）、本节、`docs/handoffs/claude-a04.md` 第十二节 | 审查报告 `docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md`（主目录）；`check_fixr03.py` 修改前 13 FAIL、修改后 ALL PASS，负例见交接；`./scripts/verify.sh`、`git diff --check` 结果见 `docs/handoffs/claude-a04.md` 第十二节 |
+
+- FIX-R03 的修复：空间标识按写入上下文核对。运行时写入只接受当前空间，没有绕过参数；只有重新向量化命令在自己的进程内持有迁移上下文，第 3 步只写本次目标空间、不动旧空间，第 5 步提交后失效。不改变 ADR-012 修订 2 已签收的方向。
+- 交出的后续项（均未认领）：**F03** 写入接口区分运行时与迁移两种上下文并实现 PUB-39；**重新向量化命令**（A10 批 0 补登的叶子任务）建立并持有迁移上下文。

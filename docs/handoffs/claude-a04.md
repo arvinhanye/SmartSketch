@@ -190,6 +190,41 @@ python3 check_a04.py（第二版，见附录）       正例 exit 0，55 项 ALL
 
 **下一步**：请 Codex 按交付提交复核 FIX-R02；修复另开一轮。
 
+## 十二、第四轮：Codex 复核修复（FIX-R03）与 PR #16 解冲突
+
+- **task_id**：FIX-R03 修复（Codex REVIEW-10），A1～A10 收尾的一部分
+- **状态**：DONE；ADR-012 修订 2 补注（决定 14a）**待 ArvinHan 签收**。补注只澄清决定 14 的适用范围，不改变已签收的方向
+- **review_status**：ready_for_review（以交付提交为准）
+- **worktree / 分支**：`.claude/worktrees/wrap-fix-pr16`，分支 `claude/fix-r01-r02`；base `5186e09`，先合入 `origin/main@f9dfc8f`（提交 `77310d2`），再做本轮修改
+- **审查报告**：主目录 `docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md`（尚未入库）
+
+**解冲突**：PR #16 与 main 只在 `docs/tasks.md` 文末冲突（main 追加了 A08 一节）。保留两边：main 的 A08 一节在前，FIX-R01/R02 一节在后并补回表头。`docs/decisions.md` 自动合并，ADR 顺序为 011 修订 1～3 → 012 修订 1、2 → 013 → 014。
+
+**核对结论**：FIX-R03 成立。V12 第 3 步要在当前空间仍为 M1 时写入 M2 向量，第 5 步才切换，而决定 14 要求所有 F 组写入的空间标识等于当前空间。
+
+| 修改 | 落点 |
+| --- | --- |
+| 空间标识按写入上下文核对：运行时写入只接受当前空间，无绕过参数；迁移写入只存在于重新向量化命令进程内，固定目标空间，只写目标空间的属性与索引，不动旧空间，第 5 步提交或命令退出后失效 | `specs/teacher-review-publish.md` V12 第 3 步、「空间标识随向量走」下两条子项 |
+| 回归用例 | PUB-39：迁移上下文写 M2 成功且 M1 不变；同时运行时写 M2 被拒；迁移上下文写 M1 向量到 M2 属性被拒；第 5 步后旧上下文写入被拒 |
+| 同步 | `docs/integrations.md` 写入核对注明唯一例外；`docs/architecture.md` 向量空间一行；`docs/decisions.md` ADR-012 修订 2 补注 |
+
+**验证**（均在本 worktree 运行）：
+
+```text
+python3 check_fixr03.py .（修改前）        13 FAIL / exit 1
+python3 check_fixr03.py .（修改后）        ALL PASS / exit 0
+python3 neg_fixr03.py . <scratch>         6 个篡改副本全部 exit 1，各自命中目标断言
+python3 check_fix.py .（本文件所在分支 claude-a07.md 附录 D）   ALL PASS / exit 0（加入 PUB-39 未破坏 FIX-R01/R02 的断言）
+./scripts/verify.sh                        exit 0
+git diff --check                           exit 0
+```
+
+两个脚本在会话草稿区，未入库；断言覆盖第 3 步措辞、两种写入的规则、PUB-39 四种情形与位置、integrations / architecture / ADR / 任务板四处同步。仍只有规格与验收用例，没有实现或自动化测试。
+
+**遗留**：F03 实现两种写入上下文与 PUB-39；重新向量化命令（A10 批 0 补登）持有迁移上下文。
+
+**下一步**：ArvinHan 签收补注后把本节与任务行的「待签收」改为已签收；请 Codex 按交付提交复核 FIX-R03。
+
 ## 附录：`check_a04.py`（核对脚本全文，第二版）
 
 用法与第一版相同：`python3 check_a04.py <spec> <api.v1.yaml> <A03 task-processing.md> <A06 task-processing.md> <全部 ADR 文本> <architecture.md> <decisions.md>`；第二版另读工作目录下的 `specs/task-processing.md` 与 `docs/integrations.md`，需在仓库根目录运行。
