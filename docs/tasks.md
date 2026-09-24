@@ -184,3 +184,10 @@
 
 - A07-R01 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 2）：每次实际供应商调用一条 `model_calls`，以发请求前生成的 `call_id` 为身份与去重键；预写失败不发请求；未收到响应按「输入估算 + 声明的输出上限」计入；问答以 `request_id` 归属。
 - 交出的后续项（均未认领）：**E03** 每个 LLM 请求声明输出上限并估算输入；**E04** 预写、回写与预算汇总；**E05** 修复调用独立记录；**J03/J05** 问答调用带 `request_id`；**C01** 建表以 `call_id` 为主键。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10-R01/R02 修复 | DONE（ADR-016 修订 1 待签收） | 修复 Codex REVIEW-13 的 A10-R01（批 1 把已合入的学习路径规格移出命名门禁）与 A10-R02（批 5 拟原样导入与现行状态机相反的 ADR-005/006） | Claude（协调 Agent，A1～A10 收尾） | `.claude/worktrees/wrap-a10-fix`（分支 `claude/a10-r01-r02-fix`）/ base `37da669`（PR #18） | `docs/reviews/branch-integration-map.md`（第 3 节批 1/5、第 4 节 ADR-005/006、第 7 节风险 2/6）、`docs/decisions.md`（ADR-016 修订 1）、本节、`docs/handoffs/claude-a10.md` 第十节 | 审查报告 `docs/reviews/codex-claude-a10-37da669-2026-09-23-1403z.md`（主目录）；核对脚本修改前 10 FAIL、修改后 ALL PASS，负例与 `check_a10.py` 回归见交接；`./scripts/verify.sh`、`git diff --check` 结果见 `docs/handoffs/claude-a10.md` 第十节 |
+
+- A10-R01/R02 的修复（ADR-016 修订 1，待签收）：批 1 的扫描集合按执行时 main 中已存在的规格确定，`learning-path.md` 保留，`grounded-qa.md` 待 A09 合入后加回并补负例；ADR-005/006 在批 5 以 SUPERSEDED 历史记录导入，不得作现行依据。
+- 交出的后续项（均未认领）：**批 1 补**（后端 Agent）：A09 合入后把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例；**批 5**（协调 Agent）按修订 1 导入 ADR-005/006。
