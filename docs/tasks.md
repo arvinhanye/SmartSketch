@@ -7,7 +7,7 @@
 | ID | 状态 | 任务 | 负责人 | 验收条件 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
-| M0-02 | IN PROGRESS（B01 已完成；B02～B04、B15 待做） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01 见下方验收证据；路由与测试配置仍待后续任务 |
+| M0-02 | IN PROGRESS（B01、B02 已完成；B03、B04、B15 待做） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01、B02 见下方验收证据；路由仍待 B03 |
 | M0-03 | DONE（B05+B06） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05/B06 测试 38 PASS；基础 verify PASS；`docs/handoffs/codex-b05.md`、`docs/handoffs/codex-b06.md` |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
@@ -348,6 +348,19 @@
 - 验证：先运行新增负例复现；再运行 B05/B06 pytest、`./scripts/verify.sh`、`git diff --check`。
 - 结果：新增负例先为 5 FAIL；修复后 B05+B06 共 47 PASS、基础 verify PASS、`git diff --check` PASS。API lifespan 已接入门禁；C09 尚无 worker 入口，须复用 `validate_embedding_space()`；离线重新向量化命令仍归后续任务。
 - Claude 审查（REVIEW-B06，2026-09-24）：P2×2 已签收（ArvinHan 2026-09-24，见 `docs/decisions.md`「ADR-012 补注：启动门禁的当前空间记录表与职责拆分」）——**B06-R01** 启动时建 SQLite 表 `embedding_space_state`（超出原子范围的数据模型决定，表名与「C01 接管」约定待签收）；**B06-R02** 修改已签收的 ADR-012 规格两处职责标注。P3×2。同步 main 后补 `RECOMMEND_WEIGHT_*` 四项成组校验（集成修复 `dbfb63d`）；后端 58 passed、启动门禁/密钥脱敏实测通过；见 `docs/handoffs/claude-review-b06.md`。
+
+## B02 前端测试配置
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B02 | DONE（待 Codex 审查） | 初始化前端测试配置，使仓库外层 `tests/frontend` 被实际发现 | Claude（前端） | `claude/frontend-dev-04eee7` / base `dddafb3` | `src/frontend/vitest.config.ts`、`src/frontend/package.json`、`src/frontend/package-lock.json`、`tests/frontend/setup.ts`、`tests/frontend/b02.test.ts`；因 B01-R01 需要时扩到 `src/frontend/tsconfig*.json`；文档：`src/frontend/README.md`、`docs/architecture.md`、本任务板、`docs/handoffs/claude-b02.md` | 计划验收命令 exit 0（5 passed）；三处反向篡改（去 setup、`passWithNoTests`、脚本吞退出码）均被检出；类型检查覆盖测试与 Node 侧配置，应用代码不可见 Node 类型；`npm ci`、build、`./scripts/verify.sh`、`git diff --check` 通过；见 `docs/handoffs/claude-b02.md` |
+
+- 输入：B01 已合入的 Vue 3 + Vite 骨架（PR #15）；`docs/atomic-task-plan.md` B02 验收；审查意见 B01-R01（Node 侧配置不得混入浏览器类型）。
+- 输出：Vitest 配置与 `test` 脚本；DOM 测试环境与全局 setup；`tests/frontend/b02.test.ts` 同时验证 SFC 挂载、setup 生效，以及「故意失败用例使命令非 0」「零用例不算通过」两条门禁行为。
+- 依赖：B01；npm 公共源。无后端、契约或环境变量变化。
+- 风险：`tests/frontend` 位于 Vite 根目录外，裸模块解析与类型检查可能找不到 `src/frontend/node_modules`；测试依赖可能抬高 Node 版本下限。
+- 验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b02.test.ts`、`./scripts/verify.sh`、`git diff --check`。
+- 实际结果：新增 `src/frontend/tsconfig.node.json`（文件锁中预留的扩展，处理 B01-R01）；`engines` 收紧为 `^22.22.2 || ^24.15.0 || >=26.0.0`（Vitest 5 / jsdom 30 下限）；B01-R02 的 README 命令块已改为 `bash`。CI 仍未跑前端命令，归 K11。
 
 ## B08 公共错误与来源契约
 
