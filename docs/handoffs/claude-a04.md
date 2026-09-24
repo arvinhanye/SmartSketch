@@ -193,7 +193,7 @@ python3 check_a04.py（第二版，见附录）       正例 exit 0，55 项 ALL
 ## 十二、第四轮：Codex 复核修复（FIX-R03）与 PR #16 解冲突
 
 - **task_id**：FIX-R03 修复（Codex REVIEW-10），A1～A10 收尾的一部分
-- **状态**：DONE；ADR-012 修订 2 补注（决定 14a）**待 ArvinHan 签收**。补注只澄清决定 14 的适用范围，不改变已签收的方向
+- **状态**：DONE；ADR-012 修订 2 补注（决定 14a）已由 ArvinHan 2026-09-24 签收。补注只澄清决定 14 的适用范围，不改变已签收的方向
 - **review_status**：ready_for_review（以交付提交为准）
 - **worktree / 分支**：`.claude/worktrees/wrap-fix-pr16`，分支 `claude/fix-r01-r02`；base `5186e09`，先合入 `origin/main@f9dfc8f`（提交 `77310d2`），再做本轮修改
 - **审查报告**：主目录 `docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md`（尚未入库）
@@ -223,7 +223,9 @@ git diff --check                           exit 0
 
 **遗留**：F03 实现两种写入上下文与 PUB-39；重新向量化命令（A10 批 0 补登）持有迁移上下文。
 
-**下一步**：ArvinHan 签收补注后把本节与任务行的「待签收」改为已签收；请 Codex 按交付提交复核 FIX-R03。
+**签收**：ArvinHan 2026-09-24 在会话中签收补注，本节、ADR 与任务行已同步。
+
+**下一步**：请 Codex 按交付提交复核 FIX-R03。
 
 ## 附录：`check_a04.py`（核对脚本全文，第二版）
 
