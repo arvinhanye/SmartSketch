@@ -17,6 +17,7 @@
 | ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | CI-01 | DONE（待 GitHub 首次运行确认） | 为当前仓库建立 GitHub Actions 基础质量门禁 | Codex | push、pull request 和手动触发；只运行仓库现有 `scripts/verify.sh`，不把尚未建立的前后端测试标成通过；工作流语法和本地校验通过 | `.github/workflows/ci.yml`；`./scripts/verify.sh` PASS；YAML 解析/关键字段检查 PASS；`git diff --check` PASS；`docs/handoffs/codex-ci-01.md` |
+| CI-02 | DONE（本地演练通过；待 PR #14、#21、#27 合入后开 PR） | 把前端与后端测试接入 CI | Claude | 新增 Frontend（`npm ci`、type-check、`test -- --run`、build）与 Backend（`pip install -e src/backend[test]`、`pip check`、`pytest tests/backend`）两个 job；只读权限、无密钥；不跳过、不吞退出码。依赖：B02（PR #27）与 B05/B06（PR #14、#21）合入 main，否则新 job 必然失败。K11 仍负责 E2E 接入 | 分支 `claude/ci-02`；YAML 解析三 job PASS；在含 B02～B06 的临时合并树上以干净环境逐条运行 job 命令：前端 30 passed、build 通过，后端（Python 3.11）58 passed、`pip check` 通过；`docs/handoffs/claude-ci-02.md` |
 
 ### CI-01 执行约定
 

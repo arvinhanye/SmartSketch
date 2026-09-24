@@ -152,8 +152,10 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 - LLM 是可替换适配器，基础 URL、模型和密钥均来自环境变量。
 - 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。
 
-## 持续集成（当前骨架阶段）
+## 持续集成
 
-- `.github/workflows/ci.yml` 在 push、pull request 和手动触发时运行 `scripts/verify.sh`，并检查该脚本的 Bash 语法；工作流只使用只读仓库权限，不注入项目密钥。
-- 现阶段前后端只有目录骨架，CI 的成功仅表示基础文件、JSON 和文档约束通过，不代表应用构建或业务测试通过。
-- 前后端依赖清单、实际测试与契约漂移检查就绪后，由原子任务 K11 扩展同一质量门禁；新增检查应失败即退出，不能以静默跳过冒充通过。
+- `.github/workflows/ci.yml` 在 push、pull request 和手动触发时运行三个并行 job，只使用只读仓库权限，不注入项目密钥：
+  - **Repository scaffold**（CI-01）：`scripts/verify.sh` 及其 Bash 语法检查，含契约生成物漂移与门禁负例。
+  - **Frontend**（CI-02）：Node 24 下 `npm ci`（锁文件）、`type-check`、`test -- --run`（收集 `tests/frontend`，零用例即失败）、`build`。
+  - **Backend**（CI-02）：Python 3.12 下可编辑安装 `src/backend[test]`、`pip check`、`pytest tests/backend`。
+- CI 通过表示上述单元/组件测试与构建通过，不代表 E2E、真实模型或数据库集成通过。K11 在 E2E（K05/K06）就绪后扩展同一门禁；新增检查必须失败即退出，不能以静默跳过冒充通过。

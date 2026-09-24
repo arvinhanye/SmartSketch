@@ -39,7 +39,7 @@
 4. 完成后运行：`./scripts/verify.sh`。
 5. 写入 `docs/handoffs/<agent>-<task>.md`，再交由下一个 Agent 接续。
 
-GitHub Actions 的 [CI 工作流](.github/workflows/ci.yml) 在 push、pull request 和手动触发时运行当前骨架校验。前后端测试命令尚未建立，CI 通过暂不表示应用构建或业务测试通过；扩展范围见 [架构说明](docs/architecture.md#持续集成当前骨架阶段)。
+GitHub Actions 的 [CI 工作流](.github/workflows/ci.yml) 在 push、pull request 和手动触发时运行骨架校验、前端（类型检查、测试、构建）与后端（pytest）三个 job；CI 通过不代表 E2E 或真实服务集成通过，范围见 [架构说明](docs/architecture.md#持续集成)。
 
 ## 本地配置
 
