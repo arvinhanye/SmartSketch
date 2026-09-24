@@ -154,6 +154,79 @@ python3 check_a04.py（第二版，见附录）       正例 exit 0，55 项 ALL
 
 **下一步**：请 Codex 按本轮提交复核 A04-R01/R02；修复另开一轮。
 
+## 十一、第三轮：Codex 复审修复（FIX-R02）
+
+- **task_id**：FIX-R02 修复（Codex REVIEW-09）
+- **状态**：DONE。方向由 ArvinHan 于 2026-09-23 在会话中选定（按实际存量全部重算），记为 **ADR-012 修订 2**（决定 13、14）；书面条文（含下列推导细则）由 ArvinHan 于 2026-09-23 签收
+- **review_status**：ready_for_review（以交付提交为准，提交前不生效）
+- **worktree / 分支**：`.claude/worktrees/quirky-dijkstra-eca5de`，分支 `claude/fix-r01-r02`，base `1a47eb2`（= 合入 PR #12 后的 `origin/main`）
+- **head_commit / 指纹**：与 FIX-R01 同一交付提交，见 `docs/handoffs/claude-a07.md` 第十节
+- **审查报告**：主目录 `docs/reviews/codex-claude-a04-fixes-1012b6f-2026-09-23-1215z.md`（目标提交 `02bc228`，尚未入库）
+
+**核对结论**：成立。V12 第 3 步按「已到审核或完成的任务」推导目标，但失败任务的块在回收前保留，中断任务的块在接管时复用，它们只有旧空间向量。启动门禁只比对 SQLite 记录的空间，发现不了。另有两处报告未提及、本轮一并修复：
+
+1. E07 按文本哈希缓存向量（修订 1 的实现依赖），键中没有空间，切换后同一段文字会命中旧空间的缓存。
+2. F 组写入前只比对索引维度，两个模型维度相同时，旧空间的向量能通过核对。
+
+| 选择（用户签收） | 否决 | 落点 |
+| --- | --- | --- |
+| 目标按 Neo4j 实际存量枚举（全部文本块、全部草稿知识点、全部已提交版本副本），第 4 步按存量核对；缓存键与节点外的向量带空间标识，写入按空间标识拒绝 | 先排空任务队列、目标仍按任务状态推导：运维上要等待或取消全部任务，推导集合与存量仍可能不一致，缓存问题照样要修 | `specs/teacher-review-publish.md` V12 的引言、不变式、第 3/4/6 步与新增「空间标识随向量走」，V10 一行，PUB-36～38；`docs/integrations.md`「模型版本与向量空间」一处；`docs/architecture.md` 向量空间一行；`docs/decisions.md` ADR-012 修订 2 与三处指针 |
+
+**范围扩展**：`docs/integrations.md`（A07 条文）与 `docs/architecture.md` 各一处，原因同上一轮：只改 A04 规格会留下互相矛盾的写入核对与架构结论。
+
+**由方向推导、未单独询问的细则**（已随书面条文签收）：
+
+1. 草稿知识点按存量迁移时**不论可见性**，包括 T6 前崩溃留下的和失败后尚未回收的节点。
+2. 第 4 步除了「缺新空间向量数为 0」，还要求复查时的存量总数与第 3 步开始时一致（停机期间不应有写入）。
+3. 第 6 步清理旧空间时一并清除旧空间的缓存条目；即使清理失败，残留条目也因空间标识不符而不会被使用。
+4. F 组写入向量必须附空间标识，与当前空间不符即拒绝，不再只核对维度。
+
+**验证**：与 FIX-R01 同批运行，命令与结果见 `docs/handoffs/claude-a07.md` 第十节。本项相关的断言：V12 不变式与第 3/4/6 步、「空间标识随向量走」、PUB-36～38 编号连续（1～38）、V10、integrations 写入核对、architecture 一行、ADR-012 修订 2 与三处指针；负例 N3（第 3 步改回按任务推导）、N4（删 PUB-36）、N5（写入改回只比维度）均 exit 1。
+
+**遗留**：
+- 「重新向量化命令」在原子清单中仍没有叶子任务，交 A10 补登（修订 1 已记）。
+- 缓存与中间产物的具体存放位置尚未定义（E07、E 组），本轮只规定「带空间标识、不符即重算」。
+- 仍只有规格与验收用例，没有实现或自动化测试。
+
+**下一步**：请 Codex 按交付提交复核 FIX-R02；修复另开一轮。
+
+## 十二、第四轮：Codex 复核修复（FIX-R03）与 PR #16 解冲突
+
+- **task_id**：FIX-R03 修复（Codex REVIEW-10），A1～A10 收尾的一部分
+- **状态**：DONE；ADR-012 修订 2 补注（决定 14a）已由 ArvinHan 2026-09-24 签收。补注只澄清决定 14 的适用范围，不改变已签收的方向
+- **review_status**：ready_for_review（以交付提交为准）
+- **worktree / 分支**：`.claude/worktrees/wrap-fix-pr16`，分支 `claude/fix-r01-r02`；base `5186e09`，先合入 `origin/main@f9dfc8f`（提交 `77310d2`），再做本轮修改
+- **审查报告**：主目录 `docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md`（尚未入库）
+
+**解冲突**：PR #16 与 main 只在 `docs/tasks.md` 文末冲突（main 追加了 A08 一节）。保留两边：main 的 A08 一节在前，FIX-R01/R02 一节在后并补回表头。`docs/decisions.md` 自动合并，ADR 顺序为 011 修订 1～3 → 012 修订 1、2 → 013 → 014。
+
+**核对结论**：FIX-R03 成立。V12 第 3 步要在当前空间仍为 M1 时写入 M2 向量，第 5 步才切换，而决定 14 要求所有 F 组写入的空间标识等于当前空间。
+
+| 修改 | 落点 |
+| --- | --- |
+| 空间标识按写入上下文核对：运行时写入只接受当前空间，无绕过参数；迁移写入只存在于重新向量化命令进程内，固定目标空间，只写目标空间的属性与索引，不动旧空间，第 5 步提交或命令退出后失效 | `specs/teacher-review-publish.md` V12 第 3 步、「空间标识随向量走」下两条子项 |
+| 回归用例 | PUB-39：迁移上下文写 M2 成功且 M1 不变；同时运行时写 M2 被拒；迁移上下文写 M1 向量到 M2 属性被拒；第 5 步后旧上下文写入被拒 |
+| 同步 | `docs/integrations.md` 写入核对注明唯一例外；`docs/architecture.md` 向量空间一行；`docs/decisions.md` ADR-012 修订 2 补注 |
+
+**验证**（均在本 worktree 运行）：
+
+```text
+python3 check_fixr03.py .（修改前）        13 FAIL / exit 1
+python3 check_fixr03.py .（修改后）        ALL PASS / exit 0
+python3 neg_fixr03.py . <scratch>         6 个篡改副本全部 exit 1，各自命中目标断言
+python3 check_fix.py .（本文件所在分支 claude-a07.md 附录 D）   ALL PASS / exit 0（加入 PUB-39 未破坏 FIX-R01/R02 的断言）
+./scripts/verify.sh                        exit 0
+git diff --check                           exit 0
+```
+
+两个脚本在会话草稿区，未入库；断言覆盖第 3 步措辞、两种写入的规则、PUB-39 四种情形与位置、integrations / architecture / ADR / 任务板四处同步。仍只有规格与验收用例，没有实现或自动化测试。
+
+**遗留**：F03 实现两种写入上下文与 PUB-39；重新向量化命令（A10 批 0 补登）持有迁移上下文。
+
+**签收**：ArvinHan 2026-09-24 在会话中签收补注，本节、ADR 与任务行已同步。
+
+**下一步**：请 Codex 按交付提交复核 FIX-R03。
+
 ## 附录：`check_a04.py`（核对脚本全文，第二版）
 
 用法与第一版相同：`python3 check_a04.py <spec> <api.v1.yaml> <A03 task-processing.md> <A06 task-processing.md> <全部 ADR 文本> <architecture.md> <decisions.md>`；第二版另读工作目录下的 `specs/task-processing.md` 与 `docs/integrations.md`，需在仓库根目录运行。
