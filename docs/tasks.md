@@ -386,3 +386,15 @@
 - 依赖：B08（已合入）、A03、A05。无运行时代码、数据库或环境变量改动。
 - 风险：`events.v1.md` §6 要求破坏性变更升 v2；依据 ADR-010（`specs/task-processing.md` §7）——v1 尚无消费者（C11/C12 未实现），原地修改。
 - 验证：`python3 -m pytest tests/contracts/test_b10.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+
+## B13 问答与事件契约
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B13 | DONE（待审查） | 迁移问答与事件契约 | ArvinHan（Claude 执行） | `claude/b13-chat-contract` / 叠在 B10 `3771ae1`（PR #31）上 | `src/contracts/api.v1.yaml`、`src/contracts/events.v1.md` §3、`src/contracts/v1/generated/`、`tests/contracts/test_b13.py`；接入 `scripts/verify/contracts.sh`；随附：`docs/architecture.md` 的 `NotCoveredReason` 行（Q11 要求同一次提交）、`src/contracts/errors.v1.md` 的 `RATE_LIMITED` 措辞（Q11 交 B08 的遗留）、`specs/grounded-qa.md` Q11 状态标注、`docs/handoffs/claude-b13.md` | `test_b13.py` 先 17 failed 后 43 passed；六处反向篡改均被检出；门禁实例级夹具按新必填字段补齐；`gen-contracts.sh --check` 一致；`verify.sh` exit 0；生成的 TS 经 `tsc --strict` 通过；`docs/handoffs/claude-b13.md` |
+
+- 输入：`specs/grounded-qa.md` Q2、Q4、Q5、Q6、Q7、Q9、Q11 B13 行（ADR-015 及修订 1 已签收）。
+- 输出：`NotCoveredReason` 改名为 `insufficient_evidence`；`ChatMetaEvent`、`ChatAnswered`、`ChatNotCovered` 增加 `graph_version`、`request_id`；问答错误事件带 `details.request_id`，`LLM_UNAVAILABLE` 的 `details.reason` 取闭集；问答接口补 404/500；`events.v1.md` §3 改为指向规格。
+- 依赖：B08（已合入）、A09；叠在 B10 上以避免生成物冲突。
+- 风险：同 B10，v1 问答事件尚无消费者（J07/J08 未实现），原地修改。
+- 验证：`python3 -m pytest tests/contracts/test_b13.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。

@@ -585,6 +585,10 @@ export interface paths {
          *     证据不足时 **不是** HTTP 错误：返回 200，`status = not_covered`，
          *     `answer` 为可解释原因，`citations` 为空数组（ADR-003）。
          *
+         *     时序、终态矩阵与撤回规则以 `specs/grounded-qa.md` Q2、Q5、Q6 为准：开流前的失败是普通 HTTP 错误；
+         *     开流后一切结局只通过事件表达。`meta` 与 `final` 都带绑定版本 `graph_version` 和 `request_id`；
+         *     JSON 模式下 P2 之后发生的错误在 `details.request_id` 中带回请求 ID（Q7）。
+         *
          */
         post: operations["chat"];
         delete?: never;
@@ -1059,10 +1063,11 @@ export interface components {
         /**
          * @description 机读的拒答原因，闭集。前端按此分支给出不同引导文案，
          *     不解析 `answer` 的自然语言（AGENTS.md §4「可机读的资料未覆盖状态」）。
+         *     前两者在检索阶段判定、不调用生成；后两者调用了生成（`specs/grounded-qa.md` Q4、Q5）。
          *
          * @enum {string}
          */
-        NotCoveredReason: "no_retrieval_hit" | "below_similarity_threshold" | "out_of_course_scope" | "all_citations_invalidated";
+        NotCoveredReason: "no_retrieval_hit" | "below_similarity_threshold" | "insufficient_evidence" | "all_citations_invalidated";
         /** @description 有依据的回答。**至少一条引用**，每条引用必须可定位。 */
         ChatAnswered: {
             /**
@@ -1075,6 +1080,10 @@ export interface components {
             /** @description 「涉及的知识点」标签，点击跳转图谱并高亮 */
             related_kp_ids?: string[];
             latency_ms?: number;
+            /** @description 本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9） */
+            graph_version: number;
+            /** @description P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应 */
+            request_id: string;
         };
         /** @description 资料未覆盖。**引用必须为空数组**，并给出机读原因。
          *     这是 200 响应的领域状态，不是 HTTP 错误（ADR-003）。
@@ -1091,14 +1100,19 @@ export interface components {
             reason: components["schemas"]["NotCoveredReason"];
             related_kp_ids?: string[];
             latency_ms?: number;
+            /** @description 本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9） */
+            graph_version: number;
+            /** @description P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应 */
+            request_id: string;
         };
         /** @description 按 `status` 分支的问答响应。分支存在的原因见 `src/contracts/README.md` §5.4：
          *     「answered 至少一条引用」若只写在描述里，生成的客户端会把
          *     `{"status":"answered","answer":"结论","citations":[]}` 当成合格响应。
          *      */
         ChatResponse: components["schemas"]["ChatAnswered"] | components["schemas"]["ChatNotCovered"];
-        /** @description 检索完成、生成开始前的第一条事件，恒为一条。
-         *     `status = not_covered` 时后续不再有 delta，直接发 done。
+        /** @description 检索完成、生成开始前的第一条事件，恒为一条（`specs/grounded-qa.md` Q2）。
+         *     `status = not_covered` 当且仅当检索阶段判定拒答，此时 `retrieved = 0`，后续不再有 delta，直接发 done。
+         *     `status = answered` 表示进入生成，不是承诺：终态仍可能是 `not_covered` 或 `error`。
          *      */
         ChatMetaEvent: {
             /**
@@ -1107,8 +1121,12 @@ export interface components {
              */
             event: "meta";
             status: components["schemas"]["ChatStatus"];
-            /** @description 进入生成上下文的证据块数量，供前端显示「已检索 N 段」 */
-            retrieved?: number;
+            /** @description 允许引用集合 A 的大小（进入生成上下文的编号文本块数），供前端显示「已检索 N 段」 */
+            retrieved: number;
+            /** @description 本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9） */
+            graph_version: number;
+            /** @description P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应 */
+            request_id: string;
         };
         /** @description 正文增量。**delta 阶段的正文是临时态**：其中出现的引用编号可能在
          *     引用校验后被剔除，前端不得在此阶段渲染可点击引用（events.v1.md §3）。
@@ -1133,14 +1151,27 @@ export interface components {
             event: "done";
             final: components["schemas"]["ChatResponse"];
         };
-        /** @description 生成中断的异常终止。与 done 互斥，发送后关闭连接。 */
+        /** @description 问答开流后（P2 之后）的错误：`details.request_id` 必填；`LLM_UNAVAILABLE` 另须
+         *     `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`（`specs/grounded-qa.md` Q5）。
+         *     `message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。
+         *      */
+        ChatError: components["schemas"]["Error"] & {
+            details: {
+                request_id: string;
+                /** @enum {string} */
+                reason?: "upstream" | "stream_interrupted" | "timeout" | "auth";
+            };
+        };
+        /** @description 生成中断的异常终止（Q5 的 O7～O13）。与 done 互斥、恰好一条、恒为末条，发送后关闭连接。
+         *     客户端收到后清除已显示的临时正文（Q6）。
+         *      */
         ChatErrorEvent: {
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
             event: "error";
-            error: components["schemas"]["Error"];
+            error: components["schemas"]["ChatError"];
         };
         /** @description 单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：
          *     原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在
@@ -1241,6 +1272,15 @@ export interface components {
         };
         /** @description 主备模型均不可用（`LLM_UNAVAILABLE`） */
         LlmUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description 同步请求遇到未预期错误（`INTERNAL_ERROR`）；不含堆栈、密钥或原文 */
+        InternalError: {
             headers: {
                 [name: string]: unknown;
             };
@@ -2198,8 +2238,15 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            /** @description 学生成员提问从未发布的课程（`GRAPH_NOT_PUBLISHED`）。 */
+            404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
+            /** @description JSON 模式下未预期的服务端异常（`INTERNAL_ERROR`，Q5 O13）；`details.request_id` 带回请求 ID。 */
+            500: components["responses"]["InternalError"];
+            /** @description JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth），
+             *     或存储不可用（`STORAGE_UNAVAILABLE`）。P2 之后发生时 `details.request_id` 带回请求 ID。
+             *      */
             503: components["responses"]["LlmUnavailable"];
         };
     };

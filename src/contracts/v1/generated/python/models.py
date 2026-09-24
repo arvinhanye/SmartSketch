@@ -547,7 +547,7 @@ class ChatStatus(Enum):
 class NotCoveredReason(Enum):
     no_retrieval_hit = 'no_retrieval_hit'
     below_similarity_threshold = 'below_similarity_threshold'
-    out_of_course_scope = 'out_of_course_scope'
+    insufficient_evidence = 'insufficient_evidence'
     all_citations_invalidated = 'all_citations_invalidated'
 
 
@@ -560,6 +560,20 @@ class ChatAnswered(BaseModel):
         Field(description='「涉及的知识点」标签，点击跳转图谱并高亮'),
     ] = None
     latency_ms: Annotated[Optional[int], Field(ge=0)] = None
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatNotCovered(BaseModel):
@@ -574,6 +588,20 @@ class ChatNotCovered(BaseModel):
     reason: NotCoveredReason
     related_kp_ids: Optional[list[str]] = None
     latency_ms: Annotated[Optional[int], Field(ge=0)] = None
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatResponse(RootModel[Union[ChatAnswered, ChatNotCovered]]):
@@ -590,11 +618,26 @@ class ChatMetaEvent(BaseModel):
     event: Literal['meta']
     status: ChatStatus
     retrieved: Annotated[
-        Optional[int],
+        int,
         Field(
-            description='进入生成上下文的证据块数量，供前端显示「已检索 N 段」', ge=0
+            description='允许引用集合 A 的大小（进入生成上下文的编号文本块数），供前端显示「已检索 N 段」',
+            ge=0,
         ),
-    ] = None
+    ]
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatDeltaEvent(BaseModel):
@@ -605,6 +648,18 @@ class ChatDeltaEvent(BaseModel):
 class ChatDoneEvent(BaseModel):
     event: Literal['done']
     final: ChatResponse
+
+
+class Reason(Enum):
+    upstream = 'upstream'
+    stream_interrupted = 'stream_interrupted'
+    timeout = 'timeout'
+    auth = 'auth'
+
+
+class Details(BaseModel):
+    request_id: Annotated[str, Field(min_length=1)]
+    reason: Optional[Reason] = None
 
 
 class Exercise(BaseModel):
@@ -703,9 +758,13 @@ class KnowledgePointDetail(KnowledgePoint):
     related: Optional[list[KnowledgePointRef]] = None
 
 
+class ChatError(Error):
+    details: Details
+
+
 class ChatErrorEvent(BaseModel):
     event: Literal['error']
-    error: Error
+    error: ChatError
 
 
 class ChatEvent(
