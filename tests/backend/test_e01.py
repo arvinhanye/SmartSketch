@@ -31,6 +31,11 @@ EIGHT_PURPOSES = {
 NOT_YET_CREATED = {"gen_study_material"}  # 待 O01 准入，由 O06 建文件
 
 
+def repo_template_files() -> list[Path]:
+    # 分支骨架 TEMPLATE.yaml 若随 A10 批 3 导入，它只是字段说明，不是可装载的提示词。
+    return sorted(p for p in REPO_PROMPTS.glob("*.yaml") if p.name != "TEMPLATE.yaml")
+
+
 def write(root: Path, name: str, text: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"{name}.yaml"
@@ -316,7 +321,7 @@ def test_manifest_header_uses_evaluation_not_evals():
 
 
 def test_every_template_file_is_in_manifest_and_loads_with_default_root():
-    files = {p.stem for p in REPO_PROMPTS.glob("*.yaml") if p.name != "TEMPLATE.yaml"}
+    files = {p.stem for p in repo_template_files()}
     assert files == EIGHT_PURPOSES - NOT_YET_CREATED
 
     lib = PromptLibrary()  # 默认根目录即仓库 prompts/
@@ -337,7 +342,7 @@ def test_not_yet_created_purpose_is_unknown_to_the_loader():
 
 
 def test_repo_templates_never_use_evals_spelling_and_hold_no_secrets():
-    for path in REPO_PROMPTS.glob("*.yaml"):
+    for path in repo_template_files():
         text = path.read_text(encoding="utf-8")
         assert not re.search(r"\bevals\b", text), path.name
         assert not re.search(r"(?i)(api[_-]?key|sk-[a-z0-9]{8,}|bearer\s)", text), path.name
@@ -353,6 +358,6 @@ def test_answer_prompt_carries_sentinel_and_citation_contract():
 
 def test_course_material_prompts_declare_injection_guard():
     lib = PromptLibrary()
-    for path in REPO_PROMPTS.glob("*.yaml"):
+    for path in repo_template_files():
         template = lib.get(path.stem, int(_manifest_rows()[path.stem][1]))
         assert "只当作数据" in template.template, path.name
