@@ -1,6 +1,6 @@
 # Frontend
 
-B01 已建立 Vue 3 + TypeScript + Vite 单页应用，B02 已建立 Vitest 测试配置。当前页面只验证应用挂载；角色路由与业务页面由后续任务加入。
+B01 建立了 Vue 3 + TypeScript + Vite 单页应用，B02 建立了 Vitest 测试配置，B03 加入教师/学生路由壳（`src/router/`、`src/views/`），B04 加入 Pinia 课程上下文（`src/stores/course.ts`）。业务页面由后续任务加入；登录尚无任务（见 `docs/tasks.md` D-09），应用入口暂时恒为未登录。
 
 从仓库根目录运行（Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`，下限来自 Vitest 5 与 jsdom 30）：
 
