@@ -1,5 +1,6 @@
 """Typed runtime settings loaded only from environment variables."""
 
+import math
 import os
 from collections.abc import Mapping
 from typing import Literal
@@ -10,6 +11,15 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 class SettingsError(ValueError):
     """A configuration error containing variable names, never supplied values."""
+
+
+RECOMMEND_WEIGHT_NAMES = (
+    "RECOMMEND_WEIGHT_UNLOCK",
+    "RECOMMEND_WEIGHT_IMPORTANCE",
+    "RECOMMEND_WEIGHT_CHAPTER",
+    "RECOMMEND_WEIGHT_EASE",
+)
+DEFAULT_RECOMMEND_WEIGHTS = (0.35, 0.25, 0.20, 0.20)
 
 
 class Settings(BaseModel):
@@ -61,6 +71,20 @@ class Settings(BaseModel):
     TASK_ARTIFACT_RETENTION_DAYS: int = Field(default=7, ge=0)
     PUBLISH_LEASE_SECONDS: int = Field(default=60, ge=15)
     COURSE_LOCK_WAIT_SECONDS: int = Field(default=5, ge=0)
+
+    # 四项成组（ADR-014 修订 1 决定 6）；都不设或都为空时用 S2 缺省值，读取请用 recommend_weights
+    RECOMMEND_WEIGHT_UNLOCK: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    RECOMMEND_WEIGHT_IMPORTANCE: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    RECOMMEND_WEIGHT_CHAPTER: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    RECOMMEND_WEIGHT_EASE: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @property
+    def recommend_weights(self) -> tuple[float, float, float, float]:
+        """(unlock, importance, chapter, ease)，顺序固定。"""
+        values = tuple(getattr(self, name) for name in RECOMMEND_WEIGHT_NAMES)
+        if all(value is None for value in values):
+            return DEFAULT_RECOMMEND_WEIGHTS
+        return values  # type: ignore[return-value]  # _check_rules 已保证四项齐全
 
 
 def _has_value(value: str | SecretStr) -> bool:
@@ -133,13 +157,24 @@ def _check_rules(settings: Settings) -> None:
             invalid.add("EMBEDDING_MODE")
     if settings.LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS >= settings.LLM_CHAT_TIMEOUT_SECONDS:
         invalid.update(("LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS", "LLM_CHAT_TIMEOUT_SECONDS"))
+    weights = [getattr(settings, name) for name in RECOMMEND_WEIGHT_NAMES]
+    if any(value is not None for value in weights) and (
+        any(value is None for value in weights)
+        or not any(weights)
+        or not math.isclose(sum(weights), 1, rel_tol=0, abs_tol=1e-9)
+    ):
+        invalid.update(RECOMMEND_WEIGHT_NAMES)
     if invalid:
         raise SettingsError(f"Invalid configuration: {', '.join(sorted(invalid))}")
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     """Validate environment values without reading a .env file or contacting services."""
-    source = os.environ if environ is None else environ
+    source = dict(os.environ if environ is None else environ)
+    # 空字符串等同未设置，与「都为空时用缺省值」一致
+    for name in RECOMMEND_WEIGHT_NAMES:
+        if name in source and not source[name].strip():
+            del source[name]
     try:
         settings = Settings.model_validate(source)
     except ValidationError as exc:

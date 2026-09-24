@@ -235,3 +235,44 @@ def test_worker_can_reuse_space_gate_and_model_changes_fail(tmp_path):
                 {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "local", "EMBEDDING_MODEL": "model-b"}
             )
         )
+
+
+RECOMMEND_WEIGHTS = (
+    "RECOMMEND_WEIGHT_UNLOCK",
+    "RECOMMEND_WEIGHT_IMPORTANCE",
+    "RECOMMEND_WEIGHT_CHAPTER",
+    "RECOMMEND_WEIGHT_EASE",
+)
+
+
+def _weights(*values):
+    return dict(zip(RECOMMEND_WEIGHTS, values))
+
+
+@pytest.mark.parametrize("values", [{}, _weights("", "", "", "")])
+def test_unset_or_empty_recommend_weights_use_s2_defaults(values):
+    assert load_settings(values).recommend_weights == (0.35, 0.25, 0.20, 0.20)
+
+
+def test_complete_recommend_weights_are_used_in_fixed_order():
+    settings = load_settings(_weights("0.4", "0.3", "0.2", "0.1"))
+
+    assert settings.recommend_weights == (0.4, 0.3, 0.2, 0.1)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"RECOMMEND_WEIGHT_UNLOCK": "1"},
+        _weights("0.5", "0.5", "", ""),
+        _weights("-0.1", "0.5", "0.3", "0.3"),
+        _weights("nan", "0.5", "0.3", "0.2"),
+        _weights("inf", "0", "0", "0"),
+        _weights("0", "0", "0", "0"),
+        _weights("0.4", "0.3", "0.2", "0.2"),
+        _weights("0.25", "0.25", "0.25", "0.2499"),
+    ],
+)
+def test_invalid_recommend_weight_group_rejects_startup(values):
+    with pytest.raises(SettingsError, match="RECOMMEND_WEIGHT_"):
+        load_settings(values)
