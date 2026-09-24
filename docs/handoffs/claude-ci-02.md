@@ -37,3 +37,10 @@
 ## 回滚
 
 撤销本分支对 `.github/workflows/ci.yml` 与三处文档的改动即可；无数据或外部状态。
+
+## 同步更新后的 B02 分支（2026-09-24，PR #29）
+
+- 基线：`claude/ci-02` `506e0d0` 合并 `claude/frontend-dev-04eee7` `f4b3054`（B02 分支已并入 main `9d2437e`，含 PR #30 的 B08/B09）。
+- 没有冲突。`.github/workflows/ci.yml` 自动合并后检查过：scaffold job 保留了 main 新增的 `pytest==8.3.5`，frontend、backend 两个 job 不变，YAML 可解析，共 3 个 job。`docs/architecture.md`「持续集成」一节与工作流一致。
+- 验证（macOS，Node 26.4.0，Python venv）：`./scripts/verify.sh` exit 0；前端 `type-check` exit 0、`test -- --run` 5 passed、`build` 成功；后端 `pip install -e './src/backend[test]'`、`pip check` 通过、`pytest tests/backend -q` 58 passed；`git diff --cached --check` exit 0。
+- PR #27 合入后，把 PR #29 的目标分支改为 `main`。
