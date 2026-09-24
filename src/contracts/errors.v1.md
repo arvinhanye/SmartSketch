@@ -76,6 +76,18 @@
 | --- | --- | --- | --- |
 | `TASK_NOT_CANCELLABLE` | 409 | 对已处于终态的任务调用取消 | 刷新任务状态，隐藏取消按钮 |
 | `PUBLISH_BLOCKED` | 409 | 发布前校验未通过，如存在未解决的环冲突 | `details.reasons` 列出阻塞项，引导至审核队列 |
+| `PUBLISH_IN_PROGRESS` | 409 | 同一课程已有发布或回滚进行中 | 等待当前操作结束后刷新版本列表 |
+| `COURSE_BUSY` | 409 | 获取课程写锁的有界等待超时 | `details.holder` 标明持锁操作；稍后重试 |
+
+任务处理失败仍按上文返回 200 的 `Task.error`，其中 `code` 可为下列值，不把任务失败变成 HTTP 错误：
+
+| 码 | 触发条件 | `details` |
+| --- | --- | --- |
+| `DOCUMENT_UNREADABLE` | 文档损坏、加密或无可提取文本 | `reason` 为 `corrupted`、`encrypted` 或 `no_text` |
+| `EXTRACTION_INCOMPLETE` | 抽取失败块超阈值，且并非全部由模型不可用导致 | `chunks_failed`、`chunks_total`、`threshold`、按错误码计数 |
+| `STORAGE_UNAVAILABLE` | 图库或数据库不可用、写入失败 | 重试耗尽时另含 `attempts`、`stage` |
+| `INTERNAL_ERROR` | 未预期的处理错误 | 不包含堆栈、密钥或原文 |
+| `TASK_ATTEMPTS_EXHAUSTED` | 连续租约过期，原因不明且任务尝试耗尽 | `attempts`、`stage` |
 
 ### 外部依赖
 
@@ -83,6 +95,9 @@
 | --- | --- | --- | --- |
 | `RATE_LIMITED` | 429 | 触发模型 API 或本服务限流 | 读 `Retry-After`，指数退避后重试 |
 | `LLM_UNAVAILABLE` | 503 | 主模型与备用模型均不可用 | 提示稍后重试；构图场景下任务转 `failed` 并保留已完成的块 |
+| `BUDGET_EXCEEDED` | 429 | 调用前发现任务或当日 token 预算已耗尽；不再发模型请求 | 提示额度耗尽；问答返回错误，抽取按失败块规则处理，不自动重试 |
+| `STORAGE_UNAVAILABLE` | 503 | 同步请求的存储依赖不可用 | 提示稍后重试；异步任务按上表返回 200 快照 |
+| `INTERNAL_ERROR` | 500 | 同步请求遇到未预期错误 | 显示通用失败提示，服务端日志保留诊断信息 |
 
 ---
 

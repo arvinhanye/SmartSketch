@@ -122,6 +122,9 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -132,7 +135,7 @@
           "courses"
         ],
         "summary": "当前用户可见的课程列表",
-        "description": "教师返回自己拥有的课程；学生只返回已发布课程。",
+        "description": "仅返回调用者是成员的课程。课程内角色为 student 的课程只在曾经发布过\n（published_version 非空）后出现；每项 my_role 为调用者在该课的成员角色，\n与账号类型无关。见 `specs/identity-access.md` §4.4。\n",
         "operationId": "listCourses",
         "responses": {
           "200": {
@@ -170,6 +173,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "201": {
             "description": "已创建",
             "content": {
@@ -202,6 +208,9 @@
         "summary": "课程详情",
         "operationId": "getCourse",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "课程详情",
             "content": {
@@ -211,6 +220,128 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound",
+            "description": "学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`）。课程不存在与非成员同为 403 `COURSE_FORBIDDEN`，见 `specs/identity-access.md` §4.1。"
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{cid}/members": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CourseId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "列出课程成员（教师成员）",
+        "operationId": "listMembers",
+        "responses": {
+          "200": {
+            "description": "课程成员列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CourseMember"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "按用户名添加学生成员（教师成员）",
+        "description": "新成员的课程内角色固定为 student，返回 201；已是任意角色的成员时\n幂等返回原成员行和 200，不修改角色。用户名不存在或账号停用返回 404。\n",
+        "operationId": "addMember",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "已是成员，原角色不变",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseMember"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "已添加学生成员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseMember"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{cid}/members/{uid}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CourseId"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "移除学生成员（教师成员）",
+        "description": "只能移除学生成员；移除教师成员返回 403 `ROLE_FORBIDDEN`。",
+        "operationId": "removeMember",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "学生成员已移除"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -234,6 +365,9 @@
         "summary": "课程资料列表",
         "operationId": "listDocuments",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "资料列表",
             "content": {
@@ -284,6 +418,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "202": {
             "description": "已接受，任务已创建",
             "content": {
@@ -320,6 +457,9 @@
         "description": "SSE 不可用时的轮询兜底。`stage = failed` 时 `error` 必填，HTTP 仍为 200。",
         "operationId": "getTask",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "任务当前状态",
             "content": {
@@ -353,6 +493,9 @@
         "description": "`text/event-stream`。事件名、顺序保证、心跳与重连语义在 `events.v1.md` 中定义，\n本条目仅约束单条事件的数据结构。\n",
         "operationId": "streamTaskEvents",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "事件流",
             "content": {
@@ -386,6 +529,9 @@
         "description": "仅非终态任务可取消；终态任务返回 `TASK_NOT_CANCELLABLE`。",
         "operationId": "cancelTask",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已转入 cancelled",
             "content": {
@@ -460,6 +606,9 @@
           }
         ],
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "图谱交换格式",
             "content": {
@@ -517,6 +666,9 @@
           }
         ],
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "知识点列表",
             "content": {
@@ -552,6 +704,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "201": {
             "description": "已创建，`source` 固定为 manual、`locked` 固定为 true",
             "content": {
@@ -588,6 +743,9 @@
         "description": "必须返回至少一条 `source_refs`（规格验收条件 5）。",
         "operationId": "getKnowledgePoint",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "知识点详情",
             "content": {
@@ -624,6 +782,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已更新",
             "content": {
@@ -652,6 +813,9 @@
         "summary": "删除知识点及其关系（教师）",
         "operationId": "deleteKnowledgePoint",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "204": {
             "description": "已删除"
           },
@@ -688,6 +852,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "合并后的主节点",
             "content": {
@@ -727,6 +894,9 @@
         "description": "对应规格验收条件 7。结果可缓存，教师审核后固定。",
         "operationId": "generateStudyMaterial",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "学习材料",
             "content": {
@@ -773,6 +943,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "201": {
             "description": "已创建",
             "content": {
@@ -822,6 +995,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已更新",
             "content": {
@@ -850,6 +1026,9 @@
         "summary": "删除关系（教师）",
         "operationId": "deleteRelation",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "204": {
             "description": "已删除"
           },
@@ -876,6 +1055,9 @@
         "description": "三栏：低置信度关系、疑似重复知识点、孤立知识点。每条附原文证据。",
         "operationId": "getReviewQueue",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "审核队列",
             "content": {
@@ -906,6 +1088,9 @@
         "description": "发布前返回图谱质量体检结果；存在环冲突时拒绝发布。",
         "operationId": "publishGraph",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "已发布",
             "content": {
@@ -938,6 +1123,9 @@
         "summary": "历史发布版本列表（教师）",
         "operationId": "listVersions",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "版本列表",
             "content": {
@@ -979,6 +1167,9 @@
         "summary": "回滚到指定版本（教师）",
         "operationId": "rollbackVersion",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "回滚后的版本信息",
             "content": {
@@ -1011,6 +1202,9 @@
         "summary": "当前学生在本课程的掌握状态",
         "operationId": "getProgress",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "掌握状态列表",
             "content": {
@@ -1049,6 +1243,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "更新后的掌握状态",
             "content": {
@@ -1105,6 +1302,9 @@
           }
         ],
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "推荐列表或学习路径",
             "content": {
@@ -1162,6 +1362,9 @@
           }
         },
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
           "200": {
             "description": "回答，或 `not_covered` 状态",
             "content": {
@@ -1199,7 +1402,13 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "令牌载荷含 `sub`（用户 ID）与 `role`（teacher / student）。"
+        "description": "令牌载荷含 `sub`（用户 ID）与 `role`（teacher / student）。\n`role` 仅作前端路由提示；服务端不据此授权，课程内权限每次回查成员关系。\n"
+      },
+      "eventTicket": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "ticket",
+        "description": "任务 SSE 使用的一次性票据；申领与核销规则见 `specs/identity-access.md` §5。"
       }
     },
     "parameters": {
@@ -1214,6 +1423,14 @@
       },
       "TaskId": {
         "name": "tid",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "UserId": {
+        "name": "uid",
         "in": "path",
         "required": true,
         "schema": {
@@ -1309,7 +1526,7 @@
         }
       },
       "RateLimited": {
-        "description": "触发限流（`RATE_LIMITED`）",
+        "description": "请求受限：`RATE_LIMITED` 为限流，可按 `Retry-After` 重试；\n`BUDGET_EXCEEDED` 为预算耗尽，不重试，需等待额度恢复。\n",
         "content": {
           "application/json": {
             "schema": {
@@ -1370,7 +1587,15 @@
           "TASK_NOT_CANCELLABLE",
           "PUBLISH_BLOCKED",
           "RATE_LIMITED",
-          "LLM_UNAVAILABLE"
+          "LLM_UNAVAILABLE",
+          "DOCUMENT_UNREADABLE",
+          "EXTRACTION_INCOMPLETE",
+          "STORAGE_UNAVAILABLE",
+          "INTERNAL_ERROR",
+          "TASK_ATTEMPTS_EXHAUSTED",
+          "PUBLISH_IN_PROGRESS",
+          "COURSE_BUSY",
+          "BUDGET_EXCEEDED"
         ]
       },
       "Role": {
@@ -1456,6 +1681,7 @@
           "id",
           "name",
           "status",
+          "my_role",
           "created_at"
         ],
         "properties": {
@@ -1473,6 +1699,9 @@
           },
           "status": {
             "$ref": "#/components/schemas/CourseStatus"
+          },
+          "my_role": {
+            "$ref": "#/components/schemas/Role"
           },
           "teacher_id": {
             "type": "string"
@@ -1508,6 +1737,43 @@
           "description": {
             "type": "string",
             "maxLength": 1000
+          }
+        }
+      },
+      "CourseMember": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "role",
+          "created_at"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MemberAdd": {
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "目标学生的用户名，不填写调用者身份或成员角色。"
           }
         }
       },

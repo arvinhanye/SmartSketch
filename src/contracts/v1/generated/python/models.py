@@ -27,6 +27,14 @@ class ErrorCode(Enum):
     PUBLISH_BLOCKED = 'PUBLISH_BLOCKED'
     RATE_LIMITED = 'RATE_LIMITED'
     LLM_UNAVAILABLE = 'LLM_UNAVAILABLE'
+    DOCUMENT_UNREADABLE = 'DOCUMENT_UNREADABLE'
+    EXTRACTION_INCOMPLETE = 'EXTRACTION_INCOMPLETE'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+    INTERNAL_ERROR = 'INTERNAL_ERROR'
+    TASK_ATTEMPTS_EXHAUSTED = 'TASK_ATTEMPTS_EXHAUSTED'
+    PUBLISH_IN_PROGRESS = 'PUBLISH_IN_PROGRESS'
+    COURSE_BUSY = 'COURSE_BUSY'
+    BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
 
 
 class Role(Enum):
@@ -60,6 +68,7 @@ class Course(BaseModel):
     name: str
     description: Optional[str] = None
     status: CourseStatus
+    my_role: Role
     teacher_id: Optional[str] = None
     kp_count: Annotated[Optional[int], Field(ge=0)] = None
     published_version: Annotated[
@@ -71,6 +80,22 @@ class Course(BaseModel):
 class CourseCreate(BaseModel):
     name: Annotated[str, Field(max_length=120, min_length=1)]
     description: Annotated[Optional[str], Field(max_length=1000)] = None
+
+
+class CourseMember(BaseModel):
+    user_id: str
+    username: str
+    role: Role
+    created_at: datetime
+
+
+class MemberAdd(BaseModel):
+    username: Annotated[
+        str,
+        Field(
+            description='目标学生的用户名，不填写调用者身份或成员角色。', min_length=1
+        ),
+    ]
 
 
 class DocumentFormat(Enum):

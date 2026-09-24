@@ -86,3 +86,10 @@
 ## 回滚
 
 - 撤销本分支提交即可；无依赖、迁移或外部状态变化。
+
+## 同步更新后的 B02 分支（2026-09-24，PR #28）
+
+- 基线：`claude/b03-b04` `4c4c417` 合并 `claude/frontend-dev-04eee7` `f4b3054`（B02 分支已并入 main `9d2437e`，含 PR #30 的 B08/B09）。
+- 冲突只有 `docs/tasks.md` 一处：两边都在 B02 节之后追加新节。按任务编号保留两边，顺序为 B02、B03/B04、B08/B09，内容不改。
+- 验证（Node 26.4.0，macOS）：`./scripts/verify.sh` exit 0；`npm ci --prefix src/frontend` 后 `type-check` exit 0、`test -- --run` 3 个文件 30 passed、`build` 成功；`git diff --cached --check` exit 0。
+- PR #27 合入后，把 PR #28 的目标分支改为 `main`。

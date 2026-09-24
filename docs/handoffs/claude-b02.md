@@ -68,3 +68,10 @@
 ## 回滚
 
 - 撤销本分支提交即可；无数据库迁移或外部状态。依赖回退后执行 `npm ci --prefix src/frontend` 同步 `node_modules`。
+
+## 同步 main（2026-09-24，解决 PR #27 冲突）
+
+- 基线：分支 `ded0132` 合并 `origin/main` `9d2437e`（含 PR #30 的 B08/B09）。
+- 冲突只有 `docs/tasks.md` 一处：两边都在 B06 节之后追加新节。按任务编号保留两边，B02 在前、B08/B09 在后，内容不改。`docs/architecture.md` 自动合并。
+- 验证（Node 26.4.0，macOS）：`./scripts/verify.sh` exit 0（含 B08 5 项、B09 5 项）；`npm ci --prefix src/frontend` 后 `type-check` exit 0、`test -- --run` 5 passed、`build` 成功；`git diff --cached --check` exit 0。
+- 下游：PR #28（B03/B04）和 PR #29（CI-02）建在本分支上，需要各自再同步一次本分支。
