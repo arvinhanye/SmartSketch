@@ -652,13 +652,14 @@
       "owner": null,
       "depends_on": [
         "C01",
-        "A05"
+        "A05",
+        "C13"
       ],
       "input": "课程/成员字段",
       "output": "scoped CRUD",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/courses.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/002_courses.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_courses.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c02.py"
       ],
       "acceptance": "课程成员唯一；同用户不同课程角色独立；读写外键正确",
@@ -757,7 +758,7 @@
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/materials.py",
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/tasks.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/003_tasks.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_tasks.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c06.py"
       ],
       "acceptance": "数据库写入失败不留孤儿记录；重复请求的幂等键按课程隔离",
@@ -1147,7 +1148,7 @@
       "output": "可查询 Chunk",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/chunks.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/004_chunks.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_chunks.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_d10.py"
       ],
       "acceptance": "重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用",
@@ -1837,7 +1838,7 @@
       "output": "preparing/ready 元数据",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/versions.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/005_versions.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_versions.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_g02.py"
       ],
       "acceptance": "相同幂等键不重复版本；唯一课程版本；失败可查",
@@ -2262,7 +2263,7 @@
       "output": "进度记录",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/progress.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/006_progress.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_progress.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_i01.py"
       ],
       "acceptance": "用户/课程隔离，重复写幂等，未知节点拒绝；版本迁移按 A08",
@@ -2634,7 +2635,7 @@
       "output": "可检索日志",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/chat_logs.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/007_chat_logs.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_chat_logs.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_j10.py"
       ],
       "acceptance": "课程用户隔离、版本/耗时齐全；日志留存与脱敏明确；重试不重复统计",
@@ -3173,7 +3174,7 @@
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/auth.py",
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/services/auth.py",
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/accounts.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/008_accounts.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_accounts.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c13.py",
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/config.py",
         "/Users/arvinhan/Desktop/SmartSketch/.env.example",
@@ -3253,7 +3254,7 @@
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/api/event_tickets.py",
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/event_tickets.py",
-        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/009_event_tickets.sql",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/migrations/NNN_event_tickets.sql",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_c16.py"
       ],
       "acceptance": "仅保存票据哈希；60 秒过期；重复、跨任务或普通 Bearer 查询票据拒绝；迁移可恢复",

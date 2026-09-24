@@ -77,6 +77,7 @@
 | PLAN-D04 | 哪个 worktree 作为集成基线、分批合并顺序与合并权（A10）。**已关闭**：ADR-016 定为以 main 为基线、按批检出文件导入（每批一个 PR、一个功能边界），Agent 只开 PR、由 ArvinHan 合并并交叉审查；批次顺序见 `docs/reviews/branch-integration-map.md` 第 3 节（ArvinHan，2026-09-23 签收） | 项目负责人 | 已完成 |
 | D-08 | 融合自动合并阈值与低置信度阈值的初始取值（沿用 `740adb` 未决问题编号，ADR-016 决定 7） | 技术负责人 | E09/E10 开工前 |
 | D-09 | 前端登录页与会话存储缺少原子任务。**已关闭**：补登 **H13 实现前端登录页与会话存储**（依赖 C13、B15、B03、B04；原子清单增至 141 项），负责登录页、`sessionStorage` 会话读写、401 清会话与课程上下文回登录页，并向 B03 的 `getAccountRole` 注入真实来源（ArvinHan，2026-09-24 确认） | 产品负责人 / 协调 Agent | 已完成 |
+| D-10 | 迁移文件编号何时确定、表间外键如何约束合并顺序。**已关闭**：编号在合并时取「main 最大编号 + 1」，原子清单中 002～009 改为 `NNN_<名称>.sql`；C02 增加对 C13 的依赖（`course_members.user_id` → `users`）。原因：C01 迁移器拒绝应用比已应用版本更小的编号，按旧计划 C13 的 `008` 先合并会使后到的 004～007 无法应用（ArvinHan，2026-09-24） | 技术负责人 | 已完成 |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -205,7 +206,7 @@
   - 细则 1：主节点的显式写入以来源“本次连续归属”的起算版本为界，覆盖来源；
   - 细则 2：谱系作为发布快照节点的 `merged_from` 字段保存。
 - 交出的后续项（均未认领）：
-  - **A04（ADR-012 下一次修订）**：快照节点增加 `merged_from` 并纳入摘要，版本提交事务取共享序列的提交序号。须先于 F10/B11/G04/G06/I01 完成；#16 正在做 ADR-012 修订 2，本项编号排在其后。
+  - **A04（ADR-012 下一次修订）**：快照节点增加 `merged_from` 并纳入摘要，版本提交事务取共享序列的提交序号。**已由 ADR-012 修订 3 完成（2026-09-24 签收，PR #179）。**须先于 F10/B11/G04/G06/I01 完成；#16 正在做 ADR-012 修订 2，本项编号排在其后。
   - **B12**：`ProgressEntry` 新字段、GET/PUT 返回全部节点。
   - **C01/I01**：进度行增加写入序号。
   - **I04**：启动时读取并校验权重。
@@ -484,3 +485,28 @@
 - 风险：迁移必须在 API/worker 停机时执行；后续表迁移需沿用同一备份与租约检查协议。
 - 验证：`python -m pytest tests/backend/test_c01.py -q`、B05/B06 回归、`./scripts/verify.sh`、`git diff --check`。
 - Claude 同步与审查（REVIEW-C01，2026-09-24）：同步 main `6790d22`（本节按编号移到 B13 之后，内容不变）；后端 71 passed、CI 三个 job 通过。P2×3（R01 迁移文件换行影响校验和、R02 启动不检查迁移版本、R03 `embedding_space_state` 建表有两处）已由 Claude 修正（ArvinHan 决定；ADR-012 补注修订 1：建表只在迁移，API 启动先检查迁移版本），后端 76 passed；P3×6 未改；见 `docs/handoffs/claude-review-c01.md`。
+
+## ADR-012 修订 3：快照谱系与共享提交序号（解除 B11 阻塞）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| ADR-012 修订 3 | DONE（ArvinHan 2026-09-24 在会话中签收，PR #179） | 落实 ADR-014 修订 1 决定 9、10 交给 ADR-012 的两项：快照节点 `merged_from` 的形状与摘要纳入、版本提交从共享序列取 `commit_seq` | ArvinHan（Claude 起草） | `claude/adr-012-r3` / base `248b895` | `docs/decisions.md`（ADR-012 修订 3 一节与引言一行）、`specs/teacher-review-publish.md`（V2、V3、V5、V6、V10）、`specs/learning-path.md`（§7 细则 1、2 的指向）、本节、`docs/handoffs/claude-adr-012-r3.md` | `docs/handoffs/claude-adr-012-r3.md`；`./scripts/verify.sh` 通过 |
+
+- 输入：ADR-014 修订 1 决定 9、10 与「后果」；`specs/learning-path.md` §5、LP-9、LP-17～LP-20；`specs/teacher-review-publish.md` V2～V6。
+- 输出：决定 15～25——`merged_from` 为本版本中归属到该节点的全部来源、链已展平；不变式与 `invalid_lineage` 校验；草稿维护规则；纳入摘要、不升 `snapshot_format`；不进 wire DTO；单行表 `commit_sequence` 与 `commit_seq` / `write_seq`。
+- 依赖与风险：已签收，B11、F10、G01、G02、G04、G06、I01 可按本条实现；B11 须同时并入 A02-R01。
+- 验证：`./scripts/verify.sh`、`git diff --check`；LP-9、LP-19、LP-20 三个谱系场景已在交接中逐一推演。
+
+## 2026-09-24 并行批次（Claude）
+
+同一批并行开工的四项，各在独立 worktree 与分支上进行，文件锁互不相交；任务板由协调方（本会话）统一更新，各子任务只写自己的交接文件。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C13 | IN PROGRESS | 实现本地账号登录与访问令牌签发 | Claude（后端子代理） | `claude/c13-auth` / `origin/main` | `src/backend/app/api/auth.py`、`src/backend/app/services/auth.py`、`src/backend/app/repositories/accounts.py`、`src/backend/migrations/NNN_accounts.sql`、`tests/backend/test_c13.py`、`src/backend/app/config.py`、`.env.example`、`docs/integrations.md`；接线所需的 `src/backend/app/main.py`；依赖变化时 `src/backend/pyproject.toml` | 待补 |
+| D01 | IN PROGRESS | 定义解析输出与自编 fixture | Claude（数据子代理） | `claude/d01-parse-model` / `origin/main` | `src/backend/app/services/parsers/`（仅 `__init__.py`、`models.py`）、`tests/fixtures/documents/`、`tests/backend/test_d01.py` | 待补 |
+| E01 | IN PROGRESS | 建立版本化提示词装载器 | Claude（AI 子代理） | `claude/e01-prompts` / `origin/main` | `src/backend/app/services/ai/`（仅 `__init__.py`、`prompts.py`）、`prompts/`、`tests/backend/test_e01.py` | 待补 |
+| C05 | IN PROGRESS | 实现文件落盘边界 | Claude（后端子代理） | `claude/c05-file-storage` / `origin/main` | `src/backend/app/services/file_storage.py`、`tests/backend/test_c05.py` | 待补 |
+
+- 不在本批：B12（与 539210 的 B11 同改 `api.v1.yaml`）、B07（与 C13 可能同改 `pyproject.toml`）、F01（需要本机 Docker/Neo4j）。
+- 并行约束：四项都不改 `docs/tasks.md`、`docs/architecture.md`、`scripts/verify.sh`；需要改共享文件时停下来交给协调方。
