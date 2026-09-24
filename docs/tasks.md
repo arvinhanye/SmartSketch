@@ -7,8 +7,8 @@
 | ID | 状态 | 任务 | 负责人 | 验收条件 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
-| M0-02 | TODO | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | 待补充 |
-| M0-03 | TODO | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | 待补充 |
+| M0-02 | IN PROGRESS（B01 已完成；B02～B04、B15 待做） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01 见下方验收证据；路由与测试配置仍待后续任务 |
+| M0-03 | DONE（B05+B06） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05/B06 测试 38 PASS；基础 verify PASS；`docs/handoffs/codex-b05.md`、`docs/handoffs/codex-b06.md` |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
 
@@ -83,7 +83,7 @@
 | --- | --- | --- | --- | --- |
 | REVIEW-02 | DONE（分批；S-07 尚有待审范围） | A01 文档交付 `88ea517`/`6c19f25`；S-07 本地脚本 `8865686` | Codex | `docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md`；A01 路径映射 22/29 一致；S07-R12～R14 已复现；`docs/handoffs/codex-review-02.md` |
 | REVIEW-A08 | DONE（不建议签收；R02/R03 已签收为 ADR-014；待 Codex 修 R01～R04） | Codex A08 未提交快照（`codex-a08-learning-path` @ `1a47eb2` + dirty，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-2026-09-23.md`：P2×4（R01 `no_graph` 与 A04 V3 冲突、R02 中心度恒 ≤0.5、R03 合并进度倒退未列签收、R04 外课/历史 ID 判定不可实现）、P3×6；R02/R03 的产品决定见 `docs/decisions.md` ADR-014；`docs/handoffs/claude-review-a08.md` |
-| REVIEW-A08-R2 | DONE（R01～R10 已修；R11～R14 由 Codex 修复后第 3 轮复审通过，无新 P1/P2；剩 §7 与 ADR-014 细则待产品签收，R15 待细则 1 签收前写死） | Codex A08 修订稿（`codex-a08-learning-path` @ `1a47eb2` + dirty，规格 `efe23f9e…`，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-r2-2026-09-23.md`：R01～R10 复核通过（R01 在 `atomic-tasks.json` B12 与 I05 仍有“无图”残留）；P2×1（R11 合并继承后进度接口返回原始还是有效状态未定义）、P3×4（R12 谱系终止与不变式、R13 舍入后分量不可还原、R14 任务清单 Markdown/JSON 不一致、R15 细则 1 提案有歧义）；`docs/handoffs/claude-review-a08-r2.md` |
+| REVIEW-A08-R2 | DONE（R01～R10 已修；R11～R14 由 Codex 修复后第 3 轮复审通过，无新 P1/P2；§7 与 ADR-014 两项细则已由 ADR-014 修订 1 签收，R15 按“以本次连续归属起点为界”写死） | Codex A08 修订稿（`codex-a08-learning-path` @ `1a47eb2` + dirty，规格 `efe23f9e…`，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-r2-2026-09-23.md`：R01～R10 复核通过（R01 在 `atomic-tasks.json` B12 与 I05 仍有“无图”残留）；P2×1（R11 合并继承后进度接口返回原始还是有效状态未定义）、P3×4（R12 谱系终止与不变式、R13 舍入后分量不可还原、R14 任务清单 Markdown/JSON 不一致、R15 细则 1 提案有歧义）；`docs/handoffs/claude-review-a08-r2.md` |
 
 ## 原子任务认领（`docs/atomic-task-plan.md`）
 
@@ -187,9 +187,63 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| A08 | IN REVIEW（R01～R14 第 3 轮复审通过；待 §7 产品签收） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（`claude/codex-a08-check-0ae6d7@acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
+| A08 | DONE（ADR-014 及修订 1 已签收；PR #19 `f9dfc8f`） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（PR #17 `acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
 
-- A08 输入：S2 §6.4.7、A04/ADR-012、A02 掌握枚举、Claude 第 1 轮 R01～R10 与第 2 轮 R11～R14 报告、第 3 轮复审、已签收 ADR-014。输出：修订后的可学/评分/跨版本读时继承与批量写入规格；进度接口有效/原始状态及来源提案；B12/I05 的 Markdown 与 JSON 验收同步。依赖：ADR-014 已随 `origin/main@6881ffe` 集成，B12 需在 YAML 真源落地进度响应字段；风险与待决：缺值、权重来源、展示上限、进度响应字段名及 `updated_at` 语义，以及显式降级覆盖继承与谱系存放位置均见 `specs/learning-path.md` §7；R15 未在本轮修订，未改 DTO、仓储或发布快照格式。验证命令：`./scripts/verify.sh`、`git diff --check`、`python3 -m json.tool docs/atomic-tasks.json > /dev/null` 及两项 grep，实际结果见交接。
+- A08 行的历史基线：PR #19 合入时，§7 的参数、进度接口字段与 ADR-014 两项细则仍待签收，R15 未修订。这些均已由下方「A08 签收」行（ADR-014 修订 1）签收，现行规则以该行与 `specs/learning-path.md` 为准，本段不再列待决项。当前依赖：**ADR-012** 的下一次修订（快照节点 `merged_from` 与版本提交序号，A04 负责）、**B12** 在 YAML 真源落地 `ProgressEntry` 字段、**C01/I01** 为进度行增加写入序号。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A08 签收 | DONE（ADR-014 修订 1 及 A08S-R01 补注已签收） | 签收 A08 §7 的参数与进度接口字段，以及 ADR-014 的两项细则 | Claude（协调 Agent） | `.claude/worktrees/codex-a08-check-0ae6d7`（分支 `claude/a08-signoff`）/ base `f9dfc8f` | `docs/decisions.md`（ADR-014 修订 1）、`specs/learning-path.md`（§1、§3、§5、§6、§7）、`docs/integrations.md`（学习推荐权重、启动校验）、`.env.example`、本任务行、`docs/handoffs/claude-sign-a08.md` | `docs/decisions.md` ADR-014 修订 1（决定 5～10）；`specs/learning-path.md` LP-1～20；`docs/handoffs/claude-sign-a08.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
+
+- A08 签收的决定（ArvinHan 2026-09-23，ADR-014 修订 1）：
+  - 缺失属性取 0.5；
+  - 权重来自四个 `RECOMMEND_WEIGHT_*` 环境变量，缺省为 S2 值，只设一部分则拒绝启动，不做课程级配置；
+  - 推荐上限默认 10、最大 50；
+  - 进度接口返回 V 中全部节点，带有效 `status`、`own_status`、`inherited_from[]`、可空 `updated_at`；
+  - 细则 1：主节点的显式写入以来源“本次连续归属”的起算版本为界，覆盖来源；
+  - 细则 2：谱系作为发布快照节点的 `merged_from` 字段保存。
+- 交出的后续项（均未认领）：
+  - **A04（ADR-012 下一次修订）**：快照节点增加 `merged_from` 并纳入摘要，版本提交事务取共享序列的提交序号。须先于 F10/B11/G04/G06/I01 完成；#16 正在做 ADR-012 修订 2，本项编号排在其后。
+  - **B12**：`ProgressEntry` 新字段、GET/PUT 返回全部节点。
+  - **C01/I01**：进度行增加写入序号。
+  - **I04**：启动时读取并校验权重。
+  - **F10**：合并时写入谱系。
+- Codex REVIEW-14 修复（A1～A10 收尾，Claude）：**A08S-R01** 同值写入不能只凭原始值相同跳过，按提交时最终绑定版本上是否仍有未被覆盖的来源判定，LP-16/LP-18 补回归，ADR-014 修订 1 决定 9 加补注（ArvinHan 2026-09-24 签收）；**A08S-R02** A08 行说明段改为历史基线并列出当前依赖。审查报告 `docs/reviews/codex-claude-a08-signoff-f9dfc8f-2026-09-24-0123z.md`（主目录）；验证见 `docs/handoffs/claude-sign-a08.md`「第二轮」。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| FIX-R01/R02 修复 | DONE（ADR-011 修订 3、ADR-012 修订 2 已签收） | 修复 Codex REVIEW-09 的 FIX-R01（响应无 usage 时按 0 计费）与 FIX-R02（向量迁移目标集合与单一空间不变式不一致） | Claude（协调 Agent） | `.claude/worktrees/quirky-dijkstra-eca5de`（分支 `claude/fix-r01-r02`）/ base `1a47eb2` | `docs/integrations.md`（预算、调用记录、模型版本与向量空间、D-02a/b）、`specs/task-processing.md`（§8.4「计费不重复」、LEASE）、`specs/teacher-review-publish.md`（V10、V11、V12）、`docs/decisions.md`（ADR-011 修订 3、ADR-012 修订 2）、`docs/architecture.md`（向量空间一行）、本节、`docs/handoffs/claude-a07.md`、`docs/handoffs/claude-a04.md` | 审查报告 `docs/reviews/codex-claude-a04-fixes-1012b6f-2026-09-23-1215z.md`（主目录）；`docs/integrations.md`「预算」「调用记录」第 5 条；LEASE-28～30；V12 第 3/4/6 步与「空间标识随向量走」、PUB-36～38；ADR-011 修订 3、ADR-012 修订 2；`check_fix.py` 修改前 38 FAIL，修改后 40 项 ALL PASS，6 个负例均 exit 1；`check_a07` 347/347、`check_a07r01`、`check_a06` ALL PASS，`check_a04` 除修改前就存在的 2 项过时断言外，仅新增 1 项脚本边界问题（修订 1 之后多了修订 2，见交接）；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a07.md` 第十节、`docs/handoffs/claude-a04.md` 第十一节 |
+
+- FIX-R01/R02 的修复（ArvinHan 2026-09-23 签收，ADR-011 修订 3、ADR-012 修订 2）：响应不带 usage 时，生成前被拒的错误（`400/401/403/404/413/422/429`）计 0，其余情形按「输入估算 + 输出上限」计，E03 流式请求须请求 usage；重新向量化按 Neo4j 实际存量迁移并按存量核对，缓存与节点外的向量带空间标识，写入按空间标识而非维度拒绝。
+- 交出的后续项（均未认领）：**E03** 错误分类含「生成前被拒」、流式请求 usage；**E04** 按修订 3 汇总计费量；**D-02a/b** 签收时注明供应商是否返回 usage；**E07** 缓存键含空间标识；**F03** 写入向量核对空间标识；**A10** 仍须为重新向量化命令补登叶子任务。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| FIX-R03 修复 | DONE（ADR-012 修订 2 补注已签收） | 修复 Codex REVIEW-10 的 FIX-R03（离线迁移写新空间与「只能写当前空间」冲突），并把 `origin/main` 合入本分支解除 PR #16 冲突 | Claude（协调 Agent，A1～A10 收尾） | `.claude/worktrees/wrap-fix-pr16`（分支 `claude/fix-r01-r02`）/ base `5186e09` + 合入 `f9dfc8f` | `specs/teacher-review-publish.md`（V12 第 3 步、「空间标识随向量走」、PUB-39）、`docs/integrations.md`（写入核对一处）、`docs/architecture.md`（向量空间一行）、`docs/decisions.md`（ADR-012 修订 2 补注）、本节、`docs/handoffs/claude-a04.md` 第十二节 | 审查报告 `docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md`（主目录）；`check_fixr03.py` 修改前 13 FAIL、修改后 ALL PASS，负例见交接；`./scripts/verify.sh`、`git diff --check` 结果见 `docs/handoffs/claude-a04.md` 第十二节 |
+
+- FIX-R03 的修复：空间标识按写入上下文核对。运行时写入只接受当前空间，没有绕过参数；只有重新向量化命令在自己的进程内持有迁移上下文，第 3 步只写本次目标空间、不动旧空间，第 5 步提交后失效。不改变 ADR-012 修订 2 已签收的方向。补注由 ArvinHan 2026-09-24 签收。
+- 交出的后续项（均未认领）：**F03** 写入接口区分运行时与迁移两种上下文并实现 PUB-39；**重新向量化命令**（A10 批 0 补登的叶子任务）建立并持有迁移上下文。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A09 | DONE（ADR-015 已签收） | 定义问答终态和引用撤回协议 | Claude（协调 Agent） | `.claude/worktrees/a09-dev-environment-check-8e5e93`（分支 `claude/a09-dev-environment-check-8e5e93`）/ base `f9dfc8f` | `specs/grounded-qa.md`（main 新建，以 `740adb` `978671e` 草稿桩为底稿）；**范围扩展（用户同意）**：`docs/decisions.md`（新增 ADR-015）、`docs/architecture.md`（问答 SSE 行、`NotCoveredReason` 行加注、用语映射一行）、本节、`docs/handoffs/claude-a09.md` | `specs/grounded-qa.md`「问答终态与引用撤回协议」Q1～Q12（终态矩阵 O1～O15、QA-1～35：成功 5 / 边界 18 / 失败 12）；`docs/decisions.md` ADR-015（ArvinHan 2026-09-23 签收）；`docs/architecture.md` 三处加注与 `ChatLog` 定名；核对脚本 45 项 ALL PASS（对 `740adb` `978671e` 真源、IAM 矩阵、A07 切换矩阵、ADR-012 V8 与原子清单），19 个篡改副本均被对应检查项检出（exit 1、无崩溃）；流内状态机参考模型 19/19 PASS（每例 200 种随机分块结果一致，仅作验证、不入库）；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a09.md` |
+
+- A09 的决定（ArvinHan 2026-09-23 在会话中逐项选定、四节设计逐节确认，ADR-015 同日签收）：检索与阈值判定之后才开流，开流前失败为 HTTP 错误，开流后为 `meta delta* (done | error)`；服务端流内逐引用校验，`answered` 时最终正文恒等于 delta 拼接；模型以 `<<INSUFFICIENT_EVIDENCE>>` 开头声明证据不足，`out_of_course_scope` 改名 `insufficient_evidence`；除 `done` + `answered` 外一律撤回临时正文、不自动重试；输出截断按正常结束判定；历史只用于改写、生成不见历史；回答钉在绑定版本、不追溯撤回；问答记录定名 `ChatLog` / `chat_logs`（关闭 A10 N5）。
+- 交出的后续项（均未认领）：**B13** 改 `NotCoveredReason`，`meta` 与 `final` 加 `graph_version`、`request_id`，定 `details.reason` 闭集，`events.v1.md` §3 指向本规格；**B08** 落实 `STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`BUDGET_EXCEEDED`，改 `RATE_LIMITED` 措辞；**J03～J10、K03** 按规格 Q11 实现（J06 与 J09 共用代码片段夹具）；**A10** 用本规格替换分支桩，并把它加回批 1 门禁扫描清单。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A09-R01/R02 修复 | DONE（ADR-015 修订 1 已签收） | 修复 Codex REVIEW-12 的 A09-R01（一个有效引用即可让无出处的结论成为 `answered`）与 A09-R02（每请求一条日志与鉴权前置顺序冲突） | Claude（协调 Agent，A1～A10 收尾） | `.claude/worktrees/a09-dev-environment-check-8e5e93`（分支 `claude/a09-dev-environment-check-8e5e93`）/ base `1754c96` | `specs/grounded-qa.md`、`docs/decisions.md`（ADR-015 修订 1）、`docs/architecture.md`（`ChatLog` 一处）、本节、`docs/handoffs/claude-a09.md` 第九节 | 审查报告 `docs/reviews/codex-claude-a09-1754c96-2026-09-23-1400z.md`（主目录）；Q3.5、I3、QA-36～38；核对脚本修改前 27 FAIL、修改后 ALL PASS，负例见交接；`./scripts/verify.sh`、`git diff --check` 结果见 `docs/handoffs/claude-a09.md` 第九节 |
+
+- A09-R01/R02 的修复（ArvinHan 2026-09-24 选定方向并签收条文，ADR-015 修订 1）：每个结论单元（句）都须带有效引用，否则整段撤回为 `not_covered` / `all_citations_invalidated`（日志子类 `uncited_sentence`），wire 枚举不变；语义支持度只在 K03 评测中衡量。`chat_logs` 只记通过 P2 的请求，四个必填字段非空；P1/P2 拒绝只写应用日志。
+- 交出的后续项（均未认领）：**J05** 提示要求逐句标注；**J06** 实现 Q3.5；**J10** 按新覆盖范围建表；**K03** 统计 `uncited_sentence` 撤回率；**C03/J07** 的统一错误处理写应用日志。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10-R01/R02 修复 | DONE（ADR-016 修订 1 已签收） | 修复 Codex REVIEW-13 的 A10-R01（批 1 把已合入的学习路径规格移出命名门禁）与 A10-R02（批 5 拟原样导入与现行状态机相反的 ADR-005/006） | Claude（协调 Agent，A1～A10 收尾） | `.claude/worktrees/wrap-a10-fix`（分支 `claude/a10-r01-r02-fix`）/ base `37da669`（PR #18） | `docs/reviews/branch-integration-map.md`（第 3 节批 1/5、第 4 节 ADR-005/006、第 7 节风险 2/6）、`docs/decisions.md`（ADR-016 修订 1）、本节、`docs/handoffs/claude-a10.md` 第十节 | 审查报告 `docs/reviews/codex-claude-a10-37da669-2026-09-23-1403z.md`（主目录）；核对脚本修改前 10 FAIL、修改后 ALL PASS，负例与 `check_a10.py` 回归见交接；`./scripts/verify.sh`、`git diff --check` 结果见 `docs/handoffs/claude-a10.md` 第十节 |
+
+- A10-R01/R02 的修复（ADR-016 修订 1，ArvinHan 2026-09-24 签收）：批 1 的扫描集合按执行时 main 中已存在的规格确定，`learning-path.md` 保留，`grounded-qa.md` 待 A09 合入后加回并补负例；ADR-005/006 在批 5 以 SUPERSEDED 历史记录导入，不得作现行依据。
+- 交出的后续项（均未认领）：**批 1 补**（后端 Agent）：A09 合入后把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例；**批 5**（协调 Agent）按修订 1 导入 ADR-005/006。
 
 ## A10 批 0：规划文档对齐
 
@@ -213,6 +267,87 @@
 - 输出：`api.v1.yaml`、配套语义文档、完整 Python/TypeScript/JSON 生成物、严格契约校验及 CI 安装步骤；N1 的 `Chunk` 命名同步到架构、A04 规格、D10 计划。
 - 依赖与风险：批 0 已在本地提交；A10 与前置 PR 仍未全部进入 `main`，本批不能直接合入主线。`events.v1.md` §2 的旧状态机叙述留给 B10 迁移，已在文首标明现行规范的优先级。远端 CI 尚未运行。
 - 验证命令：`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`python docs/reviews/validate_atomic_plan.py`、生成模型导入、`python -m pip check`、`git diff --check`；具体结果与回滚见交接。
+
+## A1～A10 收尾（2026-09-24）
+
+> 盘点基线 `origin/main@f9dfc8f`；合并后基线 `origin/main@2819701`。本节只登记状态与去向，不代替各 PR 自己的任务行。
+
+| 原子 ID | 决定 | 合入 main | Codex 审查意见 | 余项 |
+| --- | --- | --- | --- | --- |
+| A01 | ADR-004 已签收 | PR #1 | 无未决 | — |
+| A02 | ADR-009 已签收 | PR #2 | **A02-R01**（P2）：YAML 真源 `Relation.required` 未含 `status`、`source`、`source_refs`，与规格「关系至少含」不一致 | 交 **B11**（见下） |
+| A03 | ADR-010 已签收 | PR #5（含 A03-R01/R02 修复） | 无未决 | — |
+| A04 | ADR-012 及修订 1、修订 2（含补注）已签收 | PR #7、#10、#16 | FIX-R02、FIX-R03 已修 | 待 Codex 复核 FIX-R03（`970c582`） |
+| A05 | ADR-013 已签收 | PR #9 | 无未决 | — |
+| A06 | ADR-011 及修订 1 已签收 | PR #6、#11 | 无未决 | — |
+| A07 | 形状已定；ADR-011 修订 2、3 已签收 | PR #8、#12、#16 | A07-R01、FIX-R01 已修 | 取值待 D-02a～f |
+| A08 | ADR-014 及修订 1（含决定 9 补注）已签收 | PR #19、#23 | A08S-R01/R02 已修 | 待 Codex 复核（`39633fe`） |
+| A09 | ADR-015 及修订 1 已签收 | PR #20 | A09-R01/R02 已修 | 待 Codex 复核（`097f248`） |
+| A10 | ADR-016 及修订 1 已签收 | PR #18、#24；批 0/1 为 PR #22 | A10-R01/R02 已修 | 待 Codex 复核（`fae2212`）；批 2～6 未执行 |
+
+- **合并记录**：2026-09-24 由 Claude 按 ArvinHan 在会话中的明确指示依次合并 #16 → #23 → #20 → #18 → #24 → #22（ADR-016 规定由 ArvinHan 合并，本次为其授权的代执行）。每个 PR 合并前先同步 main、解决文末追加冲突，本地 `./scripts/verify.sh` 与 `git diff --check` 通过，且 CI 在新的头提交上成功后才合并；#22 合并前本地运行了含契约门禁（22 项负向测试）的完整 `verify.sh`，exit 0。
+- **四处补注**已由 ArvinHan 于 2026-09-24 签收：ADR-012 修订 2 补注、ADR-014 修订 1 决定 9 补注、ADR-015 修订 1、ADR-016 修订 1。
+- **A 组关闭条件**：仅剩 Codex 复核上表四个修复提交，无新的 P1/P2 即关闭。A 组没有未认领的原子任务。
+- **仍开放、但不阻塞 A 组关闭的决定**：D-01（示例课程资料）、D-02a～f（模型供应商与预算取值）、PLAN-D05（学习材料分支）、D-08（A10 登记）。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A1～A10 收尾 | DONE（修复已合入、四处补注已签收；待 Codex 复核） | 盘点 A01～A10，修复 Codex 未决意见 FIX-R03、A08S-R01/R02、A09-R01/R02、A10-R01/R02，按授权依次合并 PR，登记 A02-R01 去向 | Claude（协调 Agent） | `.claude/worktrees/a1-a10-meta-task-wrap-ddbf4b`（分支 `claude/a1-a10-meta-task-wrap-ddbf4b`）/ base `f9dfc8f`，合并后同步 `2819701` | 本节、`docs/handoffs/claude-a1-a10-wrap.md`；各修复的文件锁见对应任务行 | `docs/handoffs/claude-a1-a10-wrap.md`；各修复的核对脚本先红后绿、篡改负例全部检出；合并后 main 上 `./scripts/verify.sh` exit 0 |
+
+- **A02-R01 → B11**（未认领）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。契约真源已随 PR #22 进入 main，可以开始。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
+- **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
+- Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
+
+## B01 前端构建与单页挂载
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B01 | DONE | 初始化 Vue 3 + TypeScript + Vite 构建及单个挂载页面 | Codex（前端） | `codex/b01-vue-scaffold` / base `50a15c9` | `src/frontend/package.json`、`src/frontend/package-lock.json`、`src/frontend/tsconfig.json`、`src/frontend/vite.config.ts`、`src/frontend/index.html`、`src/frontend/src/main.ts`、`src/frontend/src/App.vue`；文档范围：`src/frontend/README.md`、`docs/architecture.md`、本任务板、`docs/handoffs/codex-b01.md` | `npm ci`、`vue-tsc`、Vite build、浏览器挂载烟测、`./scripts/verify.sh` 均通过；见 `docs/handoffs/codex-b01.md` |
+
+- 输入：A01 已确认的前端技术栈与 `docs/atomic-task-plan.md` B01 验收条件；不新增 REST、SSE 或业务 DTO。
+- 输出：锁定依赖的最小 Vue 应用、严格类型检查、可构建产物与单页挂载烟测。
+- 依赖：A01 已完成；B02 的测试配置与 B03 的角色路由在本轮范围外。
+- 风险：构建工具对 Node 版本有下限；本轮以实际本机版本核验。锁文件和构建产物必须分开，`dist/` 不入库。
+- 验证：`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、浏览器挂载烟测、`./scripts/verify.sh`、`git diff --check`。
+- 实际结果：Node 24.16.0 / npm 11.13.0；锁文件重装成功；类型检查与生产构建 exit 0；本地 Vite 页面在浏览器显示标题和挂载内容；基础 verify 与 diff check exit 0。正式测试脚本归 B02。
+- Claude 审查（REVIEW-B01，2026-09-23）：无 P1/P2；P3×3（B01-R01～R03）不阻塞。合入 `origin/main@548c4f8` 后在合并结果上重跑 `npm ci`、type-check、build、浏览器挂载烟测与 `./scripts/verify.sh` 均通过；见 `docs/handoffs/claude-review-b01.md`。
+
+## B05 后端应用工厂与健康检查
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B05 | DONE | 初始化 FastAPI 应用工厂与匿名 `GET /health` | Codex（后端） | `codex/b05-fastapi-health` / base `50a15c9` | `src/backend/pyproject.toml`、`src/backend/app/main.py`、`src/backend/app/api/health.py`、`tests/backend/test_b05.py`；**范围扩展**：`src/backend/app/api/__init__.py`（包标记）、`src/backend/README.md`（启动与测试说明）、任务板、架构说明和 `docs/handoffs/codex-b05.md` | pytest 3 PASS；基础 verify PASS；Uvicorn 实际启动并返回 HTTP 200；`docs/handoffs/codex-b05.md` |
+
+- 输入：已签收的 ADR-004、ADR-009，以及 `740adb` 分支现有 `/health` 契约（`status = ok`、`version` 为字符串）；B05 不引入第二套契约真源。
+- 输出：可由 Uvicorn 启动的应用工厂、无鉴权健康检查、后端依赖及 pytest 配置、成功/边界/失败测试。
+- 依赖：A01 已完成；A10 导入完整 `api.v1.yaml` 与 B06 配置校验仍是后续任务，不阻塞无密钥健康检查。
+- 风险：当前主分支尚无契约真源或数据库实现；本任务的健康检查只表示 API 进程可响应，不探测 Neo4j、SQLite 或模型服务。
+- 验证：`python -m pytest tests/backend/test_b05.py -q`（本机 Windows 的 `python3` 等价命令）3 PASS；`./scripts/verify.sh` PASS；`git diff --check` PASS；Uvicorn HTTP 冒烟 200，响应含 `status` 与 `version`。详细命令、版本和限制见交接。
+- B05 只完成后端最小启动与健康检查；父任务 M0-03 的 B06 设置加载仍待完成。A10 导入契约真源后，生成 DTO 应替换 B05 的临时响应模型。
+- Claude 审查（REVIEW-B05，2026-09-24）：无 P1/P2；P3×3（B05-R01～R03）。合入 `origin/main@dddafb3` 后 test_b05 3 passed、uvicorn 实测与契约一致、`verify.sh` 通过；见 `docs/handoffs/claude-review-b05.md`。
+
+## B06 后端设置加载与启动验证
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B06 | DONE（审查修复） | 从环境变量加载类型化设置并在启动时校验 | Codex（后端） | `codex/b06-settings` / base `e8ce796` | `src/backend/app/config.py`、`tests/backend/test_b06.py`；范围扩展：`src/backend/app/main.py`（接入启动校验）、`src/backend/README.md`、`docs/architecture.md`、`docs/integrations.md`、`.env.example`（登记发布锁参数）、本任务板、`docs/handoffs/codex-b06.md`；审查修复增加 `src/backend/app/repositories/embedding_space.py`、`src/backend/app/services/startup.py`、`src/backend/app/__main__.py`、`tests/backend/test_b05.py` 与发布规格同步 | B05+B06 47 PASS；基础 verify PASS；`git diff --check` PASS；见 `docs/handoffs/codex-b06.md` |
+
+- 输入：A07 环境变量表及启动校验规则、A03/A06 任务配置、ADR-012 发布锁参数、B05 应用工厂。
+- 输出：只读环境变量的类型化设置、非法值拒绝启动、密钥脱敏、fake 模式无真实模型凭据可启动。
+- 依赖：B05、A07 已完成；真实模型供应商取值 D-02a～f 待签收，不影响 fake 验证。
+- 风险：既有 `.env.example` 未登记 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS`；本轮同步补齐，不改变已签收的默认值。
+- 验证：`python -m pytest tests/backend/test_b06.py -q`、B05 回归、`./scripts/verify.sh`、`git diff --check`。
+- 实际结果：B06 35 PASS、B05 回归 3 PASS；默认 fake、合法 live、非法范围与条件、密钥脱敏、应用导入时拒绝非法配置均有实际测试；基础 verify 与 diff check exit 0。D-02 真实模型取值仍待签收。
+
+### B06 审查修复
+
+- 输入：B06 固定提交 `ca353b1`、审查指出的 PUB-32 启动门禁、URL 漏检和监听参数未接线；`specs/teacher-review-publish.md` V12、ADR-012 修订 1。
+- 输出：SQLite 单行向量空间启动门禁、严格 URL 校验、读取 `API_HOST`/`API_PORT` 的启动入口及回归测试。
+- 依赖：Python 标准库 SQLite；C01 后续迁移须接管并保留引导表，worker 入口须调用同一门禁。
+- 风险：新增 SQLite 引导表；首次启动会写入配置空间，已有空间不一致必须保持旧值并拒绝启动。回滚需停机并从变更前 SQLite 备份恢复，不能删除空间记录绕过检查。
+- 验证：先运行新增负例复现；再运行 B05/B06 pytest、`./scripts/verify.sh`、`git diff --check`。
+- 结果：新增负例先为 5 FAIL；修复后 B05+B06 共 47 PASS、基础 verify PASS、`git diff --check` PASS。API lifespan 已接入门禁；C09 尚无 worker 入口，须复用 `validate_embedding_space()`；离线重新向量化命令仍归后续任务。
+- Claude 审查（REVIEW-B06，2026-09-24）：P2×2 已签收（ArvinHan 2026-09-24，见 `docs/decisions.md`「ADR-012 补注：启动门禁的当前空间记录表与职责拆分」）——**B06-R01** 启动时建 SQLite 表 `embedding_space_state`（超出原子范围的数据模型决定，表名与「C01 接管」约定待签收）；**B06-R02** 修改已签收的 ADR-012 规格两处职责标注。P3×2。同步 main 后补 `RECOMMEND_WEIGHT_*` 四项成组校验（集成修复 `dbfb63d`）；后端 58 passed、启动门禁/密钥脱敏实测通过；见 `docs/handoffs/claude-review-b06.md`。
 
 ## B08 公共错误与来源契约
 

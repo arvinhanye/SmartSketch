@@ -47,11 +47,11 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | **先合** | 在途 PR | #16、#14、#15 | 各自审查通过 | ArvinHan | — | 各 PR 自带 |
 | **0** | 规划文档对齐 | `docs/atomic-tasks.json`、`docs/atomic-task-plan.md`、`docs/reviews/validate_atomic_plan.py` | PLAN-D04 签收 | 协调 Agent | 按 ADR-004 映射改写 B08～B14、O02、O05 的文件白名单（ADR-004 明确交给 A10 导入批次）；按第 6 节补登缺口任务；校验脚本写死的 127 项改为读取实际数量 | `validate_atomic_plan.py` exit 0；`verify.sh` |
-| **1** | 契约真源与生成链（ADR-004 / M0-09 第二步） | `src/contracts/**`、`scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`tests/contracts/**`、`.github/workflows/ci.yml`、`scripts/verify.sh` 一行；交接 s01、s07、m0-04 | 批 0；**N1 签收** | 后端 Agent | ① 按真源重新生成全部产物（含 `python/`、`typescript/`）并入库，删去 `--allow-scaffold`；② main 文档中 `SourceChunk` 按 N1 改名；③ 命名门禁不再把「不得使用」说明行当违规；④ 扫描清单与测试夹具暂不含 `grounded-qa.md`、`learning-path.md`，A08/A09 合入后加回；⑤ `src/contracts/README.md` 的 `not_covered_reason` 改 `reason`；⑥ CI 按 `toolchain.txt` 版本锁安装 `pyyaml`、`openapi-spec-validator`、`jsonschema`、`datamodel-code-generator`、`openapi-typescript`；⑦ main `verify.sh` 加一行调用 `scripts/verify/contracts.sh` | 本机：`gen-contracts.sh --check`、`verify.sh`、21 项负向测试 exit 0；CI 绿；另加负例：临时写回一处 `SourceChunk` 门禁须 exit 1。注意：生成器在独立 venv，门禁依赖在另一个解释器，只把 `datamodel-codegen` 加进 PATH，不要让 venv 的 `python3` 顶替 |
+| **1** | 契约真源与生成链（ADR-004 / M0-09 第二步） | `src/contracts/**`、`scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`tests/contracts/**`、`.github/workflows/ci.yml`、`scripts/verify.sh` 一行；交接 s01、s07、m0-04 | 批 0；**N1 签收** | 后端 Agent | ① 按真源重新生成全部产物（含 `python/`、`typescript/`）并入库，删去 `--allow-scaffold`；② main 文档中 `SourceChunk` 按 N1 改名；③ 命名门禁不再把「不得使用」说明行当违规；④ 扫描清单与测试夹具按**执行时 main** 中实际存在的规格确定：`learning-path.md` 已随 PR #19 合入，保留在清单中；`grounded-qa.md` 在 A09（PR #20）合入前暂缓，合入后加回，每份规格加回时都用一处针对该文件的错误命名负例证明门禁 exit 1（A10-R01）；⑤ `src/contracts/README.md` 的 `not_covered_reason` 改 `reason`；⑥ CI 按 `toolchain.txt` 版本锁安装 `pyyaml`、`openapi-spec-validator`、`jsonschema`、`datamodel-code-generator`、`openapi-typescript`；⑦ main `verify.sh` 加一行调用 `scripts/verify/contracts.sh` | 本机：`gen-contracts.sh --check`、`verify.sh`、21 项负向测试 exit 0；CI 绿；另加负例：临时写回一处 `SourceChunk` 门禁须 exit 1。注意：生成器在独立 venv，门禁依赖在另一个解释器，只把 `datamodel-codegen` 加进 PATH，不要让 venv 的 `python3` 顶替 |
 | **2** | 本地 Neo4j 环境 | `docker-compose.yml`、`scripts/dev-up.sh`、`dev-down.sh`、`_dev-common.sh`、`check-apoc.sh`、`.env.example` 与 `docs/integrations.md` 的存储/Neo4j 容器部分；交接 m0-05 | PLAN-D04 | **F01 执行，随后 K07** | F01 白名单需扩到 `.env.example`、`docs/integrations.md` 两处（A07 已定分段归属） | F01 验收：配置检查、APOC 实测、停启后数据仍在；K07：普通停止保留数据、删卷须确认 |
 | **3** | 资产与参考目录约定 | `prompts/**`、`evaluation/**`、`datasets/**`、`NOTICE`、`.gitignore` 增补、`docs/references.md`、`docs/references/**`、`AGENTS.md` 角色表中数据与 AI 一行、`docs/architecture.md` 模块表两行、`README.md` 目录树；交接 s04 | PLAN-D04 | 协调 Agent | 参考笔记去掉本机绝对路径 | `git check-ignore` 确认 `datasets/raw/x.pdf`、`evaluation/reports/x` 被忽略；`verify.sh` |
 | **4** | 后端分层与测试目录说明 | `src/backend/app/{repositories,schemas,services,workers}/`、`src/backend/app/api/README.md`、`tests/README.md`、`tests/backend/README.md`、`tests/frontend/README.md`、架构模块表 schemas 一行 | **#14（B05）已合入** | 后端 Agent | 不导入 `api/__init__.py`（B05 已建） | B05 的 `tests/backend` 仍通过；`verify.sh` |
-| **5** | ADR 拆分与命名基线 | `docs/decisions/**`、`docs/decisions.md` 改为索引、`AGENTS.md`/`CLAUDE.md` 中 ADR 位置、架构「核心数据模型」、规格节点字段；交接 s03、s05、m0-06 | **S03-1、N1～N4 签收**；没有未合并的 PR 改动 `decisions.md` | 协调 Agent | 拆分文件以 main 已签收正文生成；ADR-005/006 文首加注（指向 ADR-009/010/011），ADR-008 写入 N1～N4 修订；全仓把「见本文件下文」一类引用改成文件链接 | 每个 `ADR-0xx` 引用都能解析到文件；旧核对脚本改读新路径后重跑；`verify.sh` |
+| **5** | ADR 拆分与命名基线 | `docs/decisions/**`、`docs/decisions.md` 改为索引、`AGENTS.md`/`CLAUDE.md` 中 ADR 位置、架构「核心数据模型」、规格节点字段；交接 s03、s05、m0-06 | **S03-1、N1～N4 签收**；没有未合并的 PR 改动 `decisions.md` | 协调 Agent | 拆分文件以 main 已签收正文生成；ADR-005/006 以历史记录导入：状态标为 **SUPERSEDED**（被 ADR-010/011 取代，成环失败另由 ADR-009 收窄），文件首段与索引都写明不得作为现行状态转换或取消规则的依据，现行规范为 `specs/task-processing.md`；正文保留原样仅供追溯（A10-R02）。ADR-008 写入 N1～N4 修订；全仓把「见本文件下文」一类引用改成文件链接 | 每个 `ADR-0xx` 引用都能解析到文件；旧核对脚本改读新路径后重跑；`verify.sh` |
 | **6** | 范围与产品规格 | `docs/product.md`、`specs/course-knowledge-graph.md` 验收 7～10 与关联任务、ADR-007、D-01 选项清单；交接 s06（两份） | **PLAN-D05 签收** | 产品/协调 Agent | 学习材料行去重；验收 9、10 的数值与 S2 核对 | `verify.sh`；逐条对照 S2 |
 
 **批后收尾**（需另行同意）：全部批次合入后，给 `740adb`、`ff30e0`、`209be9` 打归档标签，再移除它们的 worktree 与本地分支。
@@ -78,8 +78,8 @@
 | `docs/decisions/ADR-002-neo4j-sqlite-dual-store.md` | A | 209be9 | main 无 | 导入 | 批 5 | 正文与 main 一致（已逐字比对） |
 | `docs/decisions/ADR-003-answer-source-citation.md` | A | 209be9 | main 无 | 导入 | 批 5 | 正文与 main 一致（已逐字比对） |
 | `docs/decisions/ADR-004-contract-single-source-of-truth.md` | A | 209be9,740adb-merge | main 无 | 不导入 | 批 5 以 main 重建 | 分支版是 740adb 的改判稿；main 的 A01 签收版更完整，以它为准 |
-| `docs/decisions/ADR-005-task-state-machine.md` | A | 209be9,740adb,740adb-merge | main 无 | 导入 | 批 5 | 无签收行；文首加注指向 ADR-009（成环失败收窄）、ADR-010、ADR-011，不改原文 |
-| `docs/decisions/ADR-006-implement-task-cancel.md` | A | 209be9,740adb-merge | main 无 | 导入 | 批 5 | 无签收行；结论已由 ADR-010 复核维持；文首加注指向 ADR-010、ADR-011 |
+| `docs/decisions/ADR-005-task-state-machine.md` | A | 209be9,740adb,740adb-merge | main 无 | 导入 | 批 5 | 无签收行；以 SUPERSEDED 历史记录导入：原文的「任一非终态可转 `failed`」「`cancelled` 预留」与现行 `specs/task-processing.md` 相反，首段与索引写明被 ADR-010/011 取代（成环失败另见 ADR-009），不得作现行依据；正文不改（A10-R02） |
+| `docs/decisions/ADR-006-implement-task-cancel.md` | A | 209be9,740adb-merge | main 无 | 导入 | 批 5 | 无签收行；「实现取消」的方向由 ADR-010 维持，但「只有非终态任务可取消」与 ADR-010 的取消矩阵（`persisting`、`awaiting_review` 不可取消）不一致；以 SUPERSEDED 历史记录导入，首段与索引指向 ADR-010/011，不得作现行依据（A10-R02） |
 | `docs/decisions/ADR-007-study-material-bonus-scope.md` | A | 209be9 | main 无 | 待决 | PLAN-D05 → 批 6 | 无签收行；学习材料加分项范围未拍板 |
 | `docs/decisions/ADR-008-data-model-naming-baseline.md` | A | 740adb-merge | main 无 | 导入 | 批 5 | 须同时写入 N1～N5 命名对齐修订；否则与 ADR-011/012 已签收名称冲突 |
 | `docs/decisions/README.md` | A | 209be9,740adb-merge | main 无 | 导入 | 批 5 | 索引按 main 实际编号 001～014 重建 |
@@ -217,11 +217,11 @@
 ## 7 风险
 
 1. **截止日期**：距 10-08 提交还有 15 天，主链路尚未开始编码。批次本身都只是文档与脚本迁移，但批 1、批 5 各需要一项签收；签收越晚，B08～B13 与 F 组越晚开工。
-2. **契约与规格耦合**：批 1 的门禁要求 A08、A09 的规格存在。临时移出扫描清单会削弱门禁，必须在 A08、A09 合入时加回，并由负例证明。
+2. **契约与规格耦合**：批 1 的门禁要求 A08、A09 的规格存在。`learning-path.md` 已随 PR #19 合入，不得移出；只有 `grounded-qa.md` 在 A09 合入前暂缓，合入后加回并由负例证明（A10-R01）。
 3. **门禁分发器**：若日后原样导入 `scripts/verify/backend.sh`，B05 合入后它会打印占位并 exit 0，形成假绿。B07 须先改掉。
 4. **双解释器**：生成器与门禁依赖分装在两个 Python 里；本机与 CI 的安装方式不同，批 1 要把两处都写清。
 5. **合规**：分支参考笔记与 main 多处文档含本机绝对路径和个人目录名；赛题要求去标识化，归 G-4 的合规自检，批 3 先处理新导入的文件。
-6. **未提交成果**：A08 的新规格仍在 Codex worktree 中未提交；在它合入前，批 1 的扫描清单不能加回 `learning-path.md`。
+6. **未提交成果**：A08 的规格已随 PR #19 合入 main；A08 签收稿（PR #23）与 A09（PR #20）仍在途，批 1 的扫描清单在 A09 合入后加回 `grounded-qa.md`。
 
 ## 8 核对方法与证据
 

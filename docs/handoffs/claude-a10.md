@@ -83,6 +83,34 @@ python3 docs/reviews/validate_atomic_plan.py                  exit 0（脚本写
 - ArvinHan 于 2026-09-23 在会话中回复「按建议全部签收」，覆盖第 2 节 PLAN-D04a～d、S03-1、N1～N5、ID-1～4 的「建议」一栏。
 - ADR 编号取 **016**：另一个会话在 `.claude/worktrees/a09-dev-environment-check-8e5e93` 的 `claude-a09-env-check.md`（未提交）中已计划 A09 使用 ADR-015。把 015 留给它，避免撞号；做法同 A04 避开 A03 改用 012。已核对全部本地与远端分支，均未使用 ADR-015、ADR-016。
 
+## 十、第二轮：Codex 审查修复（A10-R01 / A10-R02）
+
+- **task_id**：A10-R01/R02 修复（Codex REVIEW-13），A1～A10 收尾的一部分
+- **状态**：DONE；ADR-016 修订 1 已由 ArvinHan 2026-09-24 签收（按审查的最小修复建议落实，不改变决定 1～6 的方向）
+- **review_status**：ready_for_review（以交付提交为准）
+- **worktree / 分支**：`.claude/worktrees/wrap-a10-fix`，分支 `claude/a10-r01-r02-fix`，base `37da669`（PR #18 的头）。另开 PR 而不改 #18，因为 PR #22（批 0、批 1）叠在 #18 之上
+- **审查报告**：主目录 `docs/reviews/codex-claude-a10-37da669-2026-09-23-1403z.md`（尚未入库）
+
+| 问题 | 修改 |
+| --- | --- |
+| **A10-R01**（P2）批 1 把已合入的 `learning-path.md` 移出命名门禁 | 第 3 节批 1 第 ④ 项改为按执行时 main 中实际存在的规格确定扫描集合：`learning-path.md` 保留，`grounded-qa.md` 待 A09 合入后加回，每份加回都用错误命名负例证明；第 7 节风险 2、6 同步。PR #22 的 `scripts/check_contracts.py` 已含 `learning-path.md`，实际门禁未受影响，本修复让映射与之一致 |
+| **A10-R02**（P2）批 5 拟原样导入与现行状态机相反的 ADR-005/006 | 批 5 与第 4 节两行改为以 **SUPERSEDED** 历史记录导入：首段与索引写明被 ADR-010/011 取代（成环失败另见 ADR-009），不得作现行依据，现行规范为 `specs/task-processing.md`；逐行写明各自与现行规范相反的条文 |
+
+`docs/decisions.md` 在 ADR-016 之后新增「ADR-016 修订 1」；任务板追加一节，并登记「批 1 补」（A09 合入后加回 `grounded-qa.md`）。
+
+**验证**（本 worktree，脚本在会话草稿区，未入库）：
+
+```text
+python3 check_a10r.py .（修改前）       10 FAIL / exit 1
+python3 check_a10r.py .（修改后）       ALL PASS / exit 0
+python3 neg_a10r.py . <scratch>        5 个篡改副本全部 exit 1，各自命中目标断言
+python3 check_a10.py .（附录 C 原脚本）  修改前、后均 ALL PASS（92 个文件逐行、批次单一边界、签收人等原有断言未被破坏）
+./scripts/verify.sh                     exit 0
+git diff --check                        exit 0
+```
+
+**合并**：本 PR 含 #18 的提交，应在 #18 之后合入；与 #22 只在 `docs/tasks.md` 文末有文本冲突（#22 相对 #18 只改了该文件），保留双方即可。
+
 ## 附录 A：`survey_a10.py`（文件普查）
 
 用法：在仓库根目录运行：`python3 survey_a10.py > a10_survey.tsv`。

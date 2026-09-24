@@ -32,6 +32,25 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
 | `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
 
+## 前端构建入口（B01）
+
+- `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
+- Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。B02 再建立测试命令，B03 再引入教师/学生路由。
+
+## 后端启动与健康检查（B05）
+
+- `src/backend/app/main.py` 暴露 `create_app()` 与 `app`，将路由注册到 FastAPI。创建应用和导入模块时不连接数据库、模型服务或外部网络；B06 从环境变量读取并校验设置，默认 fake 模式不要求真实模型密钥，非法配置使应用创建失败。
+- `GET /health` 是无鉴权的根路径，返回 HTTP 200 和 JSON 对象 `{"status": "ok", "version": "<非空版本字符串>"}`。它只表示 API 进程可响应，不表示 Neo4j、SQLite 或模型服务就绪。响应形状沿用待 A10 导入的 `src/contracts/api.v1.yaml` 现有定义，不新增契约真源。
+- 健康检查不接受写入方法；未知或带 `/api/v1` 前缀的健康路径不注册。B05 的测试须覆盖响应、路径边界、错误方法，以及应用工厂无网络副作用。
+- `src/backend/app/api/health.py` 中的最小响应模型是契约生成物尚未导入 main 时的 B05 过渡实现。A10/B14 接续导入并生成真源 DTO 后，应按 ADR-004 改为消费生成模型，避免手写公共 DTO 长期存在。
+
+## 后端设置与启动校验（B06）
+
+- `src/backend/app/config.py` 定义只从环境变量构造的类型化 `Settings`；`create_app()` 在创建 FastAPI 对象前执行环境校验，并把设置放入 `app.state.settings`。应用构造/模块导入不连接外部服务，也不读取 `.env` 文件。ASGI lifespan 启动阶段执行本地 SQLite 向量空间门禁；后续 worker 入口调用同一门禁。
+- 数值范围、URL、模型模式与条件必填按 `docs/integrations.md`「启动校验」和 `specs/task-processing.md` §8.8 执行；非法配置只报告变量名。密钥使用 Pydantic `SecretStr`，设置对象的 `repr` 不含明文。
+- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`。`embedding_space_state` 是 SQLite 单行引导表：`singleton = 1`，存 `model`、`dimensions`、`is_fake`；fake 独占空间，在线与本地模式按模型 ID + 维度标识空间。启动时在 `BEGIN IMMEDIATE` 事务内建表并在无记录时写入配置空间；已有记录不一致则拒绝启动并报告记录/配置空间及离线重新向量化要求，不改旧记录。C01 的 `001_base.sql` 与迁移运行器须保留并接管此表；回滚时用迁移前 SQLite 备份恢复，不删除此表来绕过门禁。Neo4j 向量/索引完整性仍由 F03/E07 校验。
+- `API_HOST` 与 `API_PORT` 由 `python -m app` 的 Uvicorn 启动入口使用；直接调用 Uvicorn CLI 时，其 `--host`/`--port` 参数由调用者负责。
+
 ## 契约真源与生成物（ADR-004）
 
 下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/decisions.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
@@ -82,7 +101,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
 | `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致 |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
-| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`out_of_course_scope`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | 一致；`ff30e0` 无此枚举 |
+| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`out_of_course_scope`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | 一致；`ff30e0` 无此枚举。A09（ADR-015，已签收）决定把 `out_of_course_scope` 改为 `insufficient_evidence`（生成模型以哨兵声明证据不足），由 B13 改真源后同一次提交更新本行；在此之前本行不改，以免与真源逐值核对失配 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
 
 SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同值）：
@@ -90,7 +109,7 @@ SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同�
 | 流 | 事件名 | 终止事件 |
 | --- | --- | --- |
 | 任务进度 `GET /api/v1/tasks/{tid}/events` | `stage`、`done`、`error`、`cancelled` | 只覆盖处理阶段。每个连接恰好以一条结束事件收尾：`stage = awaiting_review` 快照或 `done` / `error` / `cancelled` 之一（互斥），随后关流；`completed` 不经已有连接送达，通过任务查询或课程发布状态观察（ADR-010） |
-| 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `done` / `error` 互斥且恰好一次 |
+| 问答 `POST /api/v1/courses/{cid}/chat` | `meta`、`delta`、`done`、`error` | `meta` 恰好一条且为首条；`done` / `error` 互斥且恰好一次。客户端断开时服务端停止生成、不再发事件；流未以二者之一结束时客户端本地按错误处理并撤回临时正文（A09，`specs/grounded-qa.md` Q2、Q5、Q6） |
 
 ### 文档用语 → wire 值
 
@@ -99,6 +118,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 文档用语 | wire 表达 | 说明 |
 | --- | --- | --- |
 | `NOT_COVERED`、「资料未覆盖」 | HTTP 200 + `status: "not_covered"` + `reason: NotCoveredReason` + `citations: []` | 概念名。字段名是 `reason`，不是 `not_covered_reason`（740adb 的 `src/contracts/README.md` 写法有误，以 YAML 为准） |
+| 「临时正文」「引用撤回」 | 无独立 wire 字段：临时正文 = 已收到 `delta` 的拼接；撤回 = 结局不是 `done` + `answered` 时客户端清除临时正文 | 答案为 `answered` 时 `final.answer` 恒等于 delta 拼接（A09 不变式 I1，`specs/grounded-qa.md` Q3.3） |
 | `TASK_FAILED`、「任务失败」 | HTTP 200 + `stage: "failed"` + `error: Error` | 同上，领域状态不是 HTTP 错误 |
 | S2「已上传」 | `queued` | |
 | S2「入库中」、前端文案「校验入库」 | `persisting` | 覆盖 DAG 校验与草稿写入 |
@@ -108,7 +128,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 核心数据模型
 
-- SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`QuestionSession`。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
+- SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`ChatLog`（表 `chat_logs`，每个通过鉴权与版本绑定的问答请求一行，服务端不保存会话；命名由 A09 定，ADR-015，A10 N5；覆盖范围见 ADR-015 修订 1）。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
 - Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
 
@@ -122,7 +142,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 快照位置 | SQLite `GraphVersion.snapshot_json` 是版本内容的真相，附 sha256 摘要；Neo4j 按 `version_id` 物化副本供遍历与向量检索 |
 | 文本块固定 | 文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID，一经写入不可变；快照固定修订列表，检索按 `revision_id` 过滤，不按 `material_id`（修订 1） |
 | 向量版本 | 知识点向量随版本复制；文本块向量共享；Neo4j 向量索引「多取再过滤」 |
-| 向量空间 | 运行时只有一个空间（模型 + 维度）；换模型须停机离线重新向量化全部文本块、草稿与已提交版本，配置与记录不一致即拒绝启动；向量是派生数据，重算不产生新版本（修订 1） |
+| 向量空间 | 运行时只有一个空间（模型 + 维度）；换模型须停机离线重新向量化 Neo4j 实际存量中的全部文本块、草稿知识点与已提交版本副本，并按存量核对；缓存与中间产物中的向量带空间标识；运行时写入只接受当前空间，只有迁移命令可写迁移目标空间（修订 2 补注）；配置与记录不一致即拒绝启动；向量是派生数据，重算不产生新版本（修订 1、修订 2） |
 | 提交点 | 唯一：SQLite 中「CAS 切换发布指针 + 分配版本号 + T7 推进任务」的单个事务。之前任一步失败，按 `(course_id, version_id)` 删除 Neo4j 副本并把尝试记为 `failed`，学生继续读旧版本 |
 | 互斥 | 同课程同时至多一个发布/回滚（SQLite 部分唯一索引）；草稿写入与建快照共用 A06 的 SQLite 课程写锁，发布只在读草稿的几秒内持锁 |
 | 回滚编号 | 以历史版本内容前滚为新版本号；目标与当前版本摘要相同则幂等，不产生新号；回滚不改草稿、不推进任务 |

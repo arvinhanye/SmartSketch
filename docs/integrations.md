@@ -22,7 +22,7 @@
 - **占位（D-02x）**：形状已定，取值待「待签收取值（D-02）」对应项签收；签收前不得当作团队决定引用。
 - **本机填写**：密钥，永不入库、不签收。
 
-名称来源：`LLM_FALLBACK_*`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_MAX_CONCURRENCY`、`LLM_MAX_RETRIES`、`EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS` 沿用 `740adb`（M0-05，未合入 main）；`LLM_MODE`、`EMBEDDING_MODE`、`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS`、`LLM_CHAT_TIMEOUT_SECONDS`、`LLM_CIRCUIT_FAILURE_THRESHOLD`、`LLM_CIRCUIT_OPEN_SECONDS`、`LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET`、`EMBEDDING_BATCH_SIZE` 为 A07 新增；任务处理六项来自 ADR-010/011。
+名称来源：`LLM_FALLBACK_*`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_MAX_CONCURRENCY`、`LLM_MAX_RETRIES`、`EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS` 沿用 `740adb`（M0-05，未合入 main）；`LLM_MODE`、`EMBEDDING_MODE`、`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS`、`LLM_CHAT_TIMEOUT_SECONDS`、`LLM_CIRCUIT_FAILURE_THRESHOLD`、`LLM_CIRCUIT_OPEN_SECONDS`、`LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET`、`EMBEDDING_BATCH_SIZE` 为 A07 新增；任务处理六项来自 ADR-010/011；学习推荐权重四项来自 ADR-014 修订 1。
 
 类型记法：「整数 ≥ n」「正数」（可带小数，> 0）「枚举 a \| b」「URL」「密钥」（敏感，日志与 repr 一律打码）「字符串」。校验规则见「启动校验」。
 
@@ -34,7 +34,7 @@
 | `API_HOST` | 字符串 | `127.0.0.1` | FastAPI 监听地址 | 已约定 |
 | `API_PORT` | 整数 1～65535 | `8000` | FastAPI 监听端口 | 已约定 |
 | `WEB_ORIGIN` | URL | `http://localhost:5173` | 允许的前端来源（CORS） | 已约定 |
-| `SQLITE_URL` | 字符串，`sqlite:///` 开头 | `sqlite:///./storage/smartsketch.sqlite3` | SQLite 连接串，不含凭据 | 已约定 |
+| `SQLITE_URL` | 字符串，`sqlite:///` 开头；不得为内存库 | `sqlite:///./storage/smartsketch.sqlite3` | SQLite 连接串，不含凭据；相对路径按进程工作目录解析，API/worker 须指向同一文件 | 已约定 |
 | `NEO4J_URI` | URL，`bolt://` 或 `neo4j://` 开头 | `bolt://localhost:7687` | Neo4j 地址 | 已约定 |
 | `NEO4J_USER` | 字符串 | `neo4j` | Neo4j 用户 | 已约定 |
 | `NEO4J_PASSWORD` | 密钥 | `change-me-locally` | Neo4j 密码 | 本机填写 |
@@ -104,6 +104,19 @@
 | `TASK_MAX_ATTEMPTS` | 整数 ≥ 1 | `3` | 任务级尝试上限（L3，按领取次数计） | 已签收（ADR-011） |
 | `TASK_CHUNK_MAX_ATTEMPTS` | 整数 ≥ 1 | `2` | 块级尝试上限（L2，每次含完整 L1） | 已签收（ADR-011） |
 | `TASK_ARTIFACT_RETENTION_DAYS` | 整数 ≥ 0 | `7` | 中间产物保留天数；`0` 表示进入终态或 `awaiting_review` 即清理 | 已签收（ADR-011） |
+| `PUBLISH_LEASE_SECONDS` | 整数 ≥ 15 | `60` | 发布尝试租约时长 | 已签收（ADR-012） |
+| `COURSE_LOCK_WAIT_SECONDS` | 整数 ≥ 0 | `5` | 草稿写锁最大等待时间 | 已签收（ADR-012） |
+
+### 学习推荐权重
+
+类型、校验与语义以 `specs/learning-path.md` §1 为准，名称与取值来源于 ADR-014 修订 1 决定 6。四项作为一组校验：都不设（或都为空）时使用 S2 缺省值；都设时使用所设值；只设一部分则拒绝启动。所设值须为有限、非负实数，和在 `1 ± 1e-9` 内且至少一项为正，否则拒绝启动。进程启动时读取一次，全站统一，不做课程级配置。
+
+| 变量 | 类型与约束 | 样例 | 用途 | 状态 |
+| --- | --- | --- | --- | --- |
+| `RECOMMEND_WEIGHT_UNLOCK` | 数值 ≥ 0；四项成组 | `0.35` | 解锁度权重 | 已签收（ADR-014 修订 1） |
+| `RECOMMEND_WEIGHT_IMPORTANCE` | 数值 ≥ 0；四项成组 | `0.25` | 重要度权重 | 已签收（ADR-014 修订 1） |
+| `RECOMMEND_WEIGHT_CHAPTER` | 数值 ≥ 0；四项成组 | `0.20` | 章节顺序权重 | 已签收（ADR-014 修订 1） |
+| `RECOMMEND_WEIGHT_EASE` | 数值 ≥ 0；四项成组 | `0.20` | 易学度权重 | 已签收（ADR-014 修订 1） |
 
 ## 模型接入规则（A07）
 
@@ -135,7 +148,7 @@
 
 ### 预算
 
-- **计量**：只计 LLM 调用。每次实际调用（含 L1 重试、备用调用、E05 修复调用）各有一条 `model_calls` 记录、各计一次，记录规则见「调用记录」。计费量：收到响应时为响应 usage 中输入与输出 token 之和（响应不含 usage 记 0）；未收到响应（超时、断线、进程崩溃）时按「输入估算 + 本次请求声明的输出上限」计，并标记为估算（ADR-011 修订 2）。向量调用只记入 `model_calls`，不计入预算（单价低，总量受资料篇幅约束）。fake 模式按确定规则上报模拟 usage，使预算逻辑可测。
+- **计量**：只计 LLM 调用。每次实际调用（含 L1 重试、备用调用、E05 修复调用）各有一条 `model_calls` 记录、各计一次，记录规则见「调用记录」。计费量：响应带可解析的 usage 时，为其中输入与输出 token 之和（错误响应带 usage 也照此计）；响应是生成前被拒的错误且不带 usage 时计 0（见「调用记录」第 5 条）；其余情形，即未收到响应（超时、断线、进程崩溃），或收到响应但缺少可解析的 usage（成功响应、`5xx`、流中途断开、响应无法解析），都按「输入估算 + 本次请求声明的输出上限」计，并标记为估算（ADR-011 修订 2、修订 3）。向量调用只记入 `model_calls`，不计入预算（单价低，总量受资料篇幅约束）。fake 模式按确定规则上报模拟 usage，使预算逻辑可测。
 - **软上限**：发起每次调用前检查「已用 ≥ 上限」，成立则不发；「已用」含在途调用的估算计费量；在途调用照常完成并计入，因此实际用量至多超出「并发数 × 单次调用 token」。`0` 表示不发任何请求（E04 验收）。不提供「不限」写法，需要放开时写一个足够大的数，避免漏配时悄悄无上限。
 - **任务预算**：按任务累计，覆盖该任务的全部尝试（ADR-011 的 L3 接管后继续累计，不清零），数据来自 SQLite `model_calls` 中 `task_id` 等于本任务的记录，按 `call_id` 去重（ADR-011 修订 2）。
 - **每日预算**：按北京时间（UTC+8）自然日汇总 `model_calls` 的全部 LLM 记录（抽取与问答，含无任务 ID 的问答调用），按 `call_id` 去重；日期取记录预写时由 SQLite 求值的时间（与 ADR-011 一致），因此多个进程共享同一额度。
@@ -150,9 +163,10 @@
 ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（LLM 与向量）对应一条记录，以 `call_id` 为唯一身份与去重键。
 
 1. **发请求前预写**：生成 `call_id`（ULID），写入 `status = sent` 的记录，含下表归属字段与两个估算值。**预写失败则不发请求**：worker 按阶段级临时故障（存储不可用）处理，问答返回错误。
-2. **收到响应后回写**：按 `call_id` 更新 `status`（`ok` / `error`）、真实 usage、响应 `model` 字段、耗时与错误分类。重复回写同一 `call_id` 为覆盖，不产生新记录。
+2. **收到响应后回写**：按 `call_id` 更新 `status`（`ok` / `error`）、真实 usage、响应 `model` 字段、耗时与错误分类。响应不带可解析的 usage 时，usage 字段留空，计费量按本节末尾的规则取估算或 0（修订 3）。重复回写同一 `call_id` 为覆盖，不产生新记录。
 3. **未收到响应**：记录停在 `sent`，计费量取估算值并视为 `usage_estimated = true`；之后不再补写。
-4. **E03 的义务**：每个 LLM 请求都必须声明输出 token 上限（按用途设定）；输入 token 用 E03 选定的本地方法估算，只允许偏大。
+4. **E03 的义务**：每个 LLM 请求都必须声明输出 token 上限（按用途设定）；输入 token 用 E03 选定的本地方法估算，只允许偏大。流式请求须请求 usage（OpenAI 兼容接口的 `stream_options: {"include_usage": true}`）；供应商是否在响应（含流式）中返回 usage，在 D-02a/b 签收时注明（修订 3）。
+5. **生成前被拒**（ADR-011 修订 3，Codex FIX-R01）：HTTP `400`、`401`、`403`、`404`、`413`、`422`、`429` 的错误响应，表示供应商在生成前就拒绝了请求，不产生计费用量；E03 把它们归入这一错误分类。`408`、`5xx`、流中途断开、响应无法解析**不**属于此类，因为无法确认供应商是否已开始生成，缺 usage 时按估算计。这类调用本身有界：鉴权与参数错误不重试，`429` 至多重试 `LLM_MAX_RETRIES` 次且计入熔断（见「主备切换矩阵」）。
 
 | 字段 | 说明 |
 | --- | --- |
@@ -165,17 +179,17 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 | `provider_role`、`is_repair` | 主用 / 备用；是否 E05 修复调用 |
 | `model_requested`、`model_responded` | 请求时的模型 ID；响应中的 `model` 字段（未收到响应为空） |
 | `input_tokens_est`、`max_output_tokens` | 预写时的输入估算与声明的输出上限 |
-| `usage_input`、`usage_output` | 响应中的真实 usage；未收到响应为空 |
-| `usage_estimated` | 派生：`status = sent`（未收到响应）即为真，计费量取估算值；不单独写入 |
-| `created_at`、`finished_at`、`error_class` | 预写时间（SQLite 求值，每日预算按此归日）、回写时间、错误分类 |
+| `usage_input`、`usage_output` | 响应中的真实 usage；未收到响应或响应不带可解析的 usage 时为空 |
+| `usage_estimated` | 派生：usage 为空且不属于生成前被拒即为真，包括停在 `sent`（未收到响应）与已回写但无 usage 两种情形，计费量取估算值；不单独写入（修订 3） |
+| `created_at`、`finished_at`、`error_class` | 预写时间（SQLite 求值，每日预算按此归日）、回写时间、错误分类（含「生成前被拒」类，见第 5 条） |
 
-计费量 = 已回写时取真实 usage（无 usage 记 0），停在 `sent` 时取 `input_tokens_est + max_output_tokens`。向量调用同样记录，但不计入预算。
+计费量 = 有 usage 时取真实 usage；无 usage 且属于生成前被拒时取 0；其余（停在 `sent`，或已回写但无 usage）取 `input_tokens_est + max_output_tokens`（修订 3）。向量调用同样记录，但不计入预算。
 
 ### 模型版本与向量空间
 
 - **LLM 版本**不另设变量：配置中的模型 ID 字符串即版本。`model_calls` 同时记录请求时的模型 ID 与响应中的 `model` 字段；缓存键（D09、E 组）包含实际给出结果的模型 ID 与提示词版本，更换模型或提示词即失效。
 - **风险**：供应商若使用会自动升级的别名，模型 ID 不变而行为改变，缓存不会失效。能选带日期或版本号的固定 ID 时优先选用；D-02a 签收时注明所选 ID 是否为别名。
-- **向量空间标识** = `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`（`fake` 模式自成一个空间，不得与真实向量混入同一索引）。任一项变化即新空间：不得与旧向量混用同一索引，须按 `specs/teacher-review-publish.md` V12 离线重新向量化（ADR-012 修订 1：向量是派生数据，重算不产生新的内容版本，全部已提交版本随之迁移）。E07 在首次调用时比对返回长度，F 组写入前比对 Neo4j 索引维度，不一致即拒绝写入并指出两边数值。
+- **向量空间标识** = `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`（`fake` 模式自成一个空间，不得与真实向量混入同一索引）。任一项变化即新空间：不得与旧向量混用同一索引，须按 `specs/teacher-review-publish.md` V12 离线重新向量化（ADR-012 修订 1：向量是派生数据，重算不产生新的内容版本，全部已提交版本随之迁移）。E07 在首次调用时比对返回长度；F 组写入前比对向量的空间标识与当前空间（维度相同的两个模型只比对维度无法区分），不一致即拒绝写入并指出两边数值；唯一例外是重新向量化命令第 3 步的迁移写入：比对的是本次迁移的目标空间，只写目标空间的属性与索引，API 与 worker 不能使用（ADR-012 修订 2 补注，Codex FIX-R03）；E07 的向量缓存键含空间标识（ADR-012 修订 2）。
 
 ### 启动校验（B06）
 
@@ -183,6 +197,7 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 - 条件必填：`LLM_MODE=live` 时主用四项必填；备用四项全空或全填；`EMBEDDING_MODE=online` 时 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 必填，`local` 时 `EMBEDDING_MODEL` 必填。
 - `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake`。
 - `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 必须小于 `LLM_CHAT_TIMEOUT_SECONDS`。
+- `RECOMMEND_WEIGHT_*` 四项成组：都不设或都为空时用缺省值；只设一部分、有负数或非有限值、全为 0、和偏离 1 超过 `1e-9` 时拒绝启动（ADR-014 修订 1 决定 6）。
 - 所有「密钥」类变量在日志、异常信息与设置对象的 repr 中一律打码；日志不输出提示词原文与模型返回正文（E04 验收）。
 
 ### 待签收取值（D-02）
@@ -191,8 +206,8 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 
 | 编号 | 事项 | S2 候选与已核对事实 | 当前占位 | 状态 |
 | --- | --- | --- | --- | --- |
-| D-02a | 主用供应商与 `LLM_EXTRACTION_MODEL`、`LLM_CHAT_MODEL` | S2 §6.1：DeepSeek 为主；§5.1.3 以其轻量模型估价。具体模型 ID、是否别名未核对 | 空 | 未签收 |
-| D-02b | 备用供应商与模型 | S2 §6.1：通义千问备用。模型 ID 未核对 | 空 | 未签收 |
+| D-02a | 主用供应商与 `LLM_EXTRACTION_MODEL`、`LLM_CHAT_MODEL`；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：DeepSeek 为主；§5.1.3 以其轻量模型估价。具体模型 ID、是否别名未核对 | 空 | 未签收 |
+| D-02b | 备用供应商与模型；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：通义千问备用。模型 ID 未核对 | 空 | 未签收 |
 | D-02c | 向量方案（`online` / `local`）、模型、维度、批量 | 在线 `text-embedding-v4`：维度可选 2048 / 1536 / 1024（默认）/ 768 / 512 / 256 / 128 / 64，每请求至多 10 条、每条至多 8192 token，OpenAI 兼容接口支持 `dimensions`（阿里云百炼向量化文档，2026-09-23 核对）。本地 `bge-small-zh-v1.5`：512 维、最大序列 512 token（模型 `config.json`，2026-09-23 核对），**S2 的约 1500 字分块会超长被截断**，选本地方案须先定截断或另行分块 | `fake`、`1024`、`10` | 未签收 |
 | D-02d | `LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET` | S2 表 5.2（估算，以实测为准）：单章约 0.35 元、单门课约 4.2 元、千人一学期问答约 2080 元（约 19 元/天）；价格未在本任务核对 | `500000`（按输出单价上限约 4 元/任务）、`5000000` | 未签收 |
 | D-02e | 超时、并发、重试、熔断取值 | S2 表 6.7：单章 14 块并发 8 路约 20～25 秒；表 3.1：问答首字 ≤ 3 秒、完整 ≤ 10 秒（目标值）、赛题 ≤ 15 秒。样例下单次调用上界约 6 分钟，远大于正常耗时 | 见「调用约束」 | 未签收 |
