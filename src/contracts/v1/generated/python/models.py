@@ -153,6 +153,31 @@ class FailedChunk(RootModel[Union[FailedChunk1, FailedChunk2]]):
     ]
 
 
+class TaskBase(BaseModel):
+    id: str
+    course_id: str
+    document_id: str
+    stage: TaskStage
+    progress: Annotated[float, Field(description='整体进度，0–1', ge=0.0, le=1.0)]
+    cancel_requested: Annotated[
+        bool,
+        Field(
+            description='已受理取消请求。处理中阶段为「取消中」的依据；`cancelled` 时恒为 true，失败任务可能保持 true（TASK-7）。'
+        ),
+    ]
+    counts: Optional[TaskCounts] = None
+    failed_chunks: Annotated[
+        Optional[list[FailedChunk]],
+        Field(description='最终失败的块及定位；无失败块时为空数组或缺省。'),
+    ] = None
+    timings_ms: Annotated[
+        Optional[dict[str, int]],
+        Field(description='各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04）'),
+    ] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class Stage(Enum):
     queued = 'queued'
     parsing = 'parsing'
@@ -162,7 +187,53 @@ class Stage(Enum):
     awaiting_review = 'awaiting_review'
 
 
-class TaskStageEvent(BaseModel):
+class TaskCompleted(TaskBase):
+    stage: Literal['completed'] = 'completed'
+    progress: Literal[1] = 1
+    error: None = None
+
+
+class TaskCancelled(TaskBase):
+    stage: Literal['cancelled'] = 'cancelled'
+    cancel_requested: Literal[True] = True
+    error: None = None
+
+
+class FixedStageProgress(BaseModel):
+    pass
+
+
+class Details(BaseModel):
+    stage: Literal['persisting']
+    reason: Literal['persisting_uninterruptible']
+
+
+class Details1(BaseModel):
+    stage: Literal['awaiting_review']
+    reason: Literal['processing_finished']
+
+
+class Stage1(Enum):
+    completed = 'completed'
+    failed = 'failed'
+    cancelled = 'cancelled'
+
+
+class Details2(BaseModel):
+    stage: Stage1
+    reason: Literal['already_terminal']
+
+
+class Stage2(Enum):
+    queued = 'queued'
+    parsing = 'parsing'
+    extracting = 'extracting'
+    merging = 'merging'
+    persisting = 'persisting'
+    awaiting_review = 'awaiting_review'
+
+
+class TaskStageEvent(FixedStageProgress):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -639,30 +710,21 @@ class Document(BaseModel):
     uploaded_at: datetime
 
 
-class Task(BaseModel):
-    id: str
-    course_id: str
-    document_id: str
-    stage: TaskStage
-    progress: Annotated[float, Field(description='整体进度，0–1', ge=0.0, le=1.0)]
-    cancel_requested: Annotated[
-        bool,
-        Field(
-            description='已受理取消请求。处理中阶段为「取消中」的依据；`cancelled` 时恒为 true，失败任务可能保持 true（TASK-7）。'
-        ),
+class TaskActive(TaskBase, FixedStageProgress):
+    stage: Literal[
+        'queued', 'parsing', 'extracting', 'merging', 'persisting', 'awaiting_review'
     ]
-    counts: Optional[TaskCounts] = None
-    failed_chunks: Annotated[
-        Optional[list[FailedChunk]],
-        Field(description='最终失败的块及定位；无失败块时为空数组或缺省。'),
-    ] = None
-    timings_ms: Annotated[
-        Optional[dict[str, int]],
-        Field(description='各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04）'),
-    ] = None
-    error: Annotated[Optional[Error], Field(description='stage = failed 时必填')] = None
-    created_at: datetime
-    updated_at: datetime
+    error: None = None
+
+
+class TaskFailed(TaskBase):
+    stage: Literal['failed'] = 'failed'
+    error: Error
+
+
+class TaskNotCancellableError(Error):
+    code: Literal['TASK_NOT_CANCELLABLE']
+    details: Union[Details, Details1, Details2]
 
 
 class TaskErrorEvent(BaseModel):
@@ -728,3 +790,13 @@ class StudyMaterial(BaseModel):
     cached: Optional[bool] = None
     reviewed: Annotated[Optional[bool], Field(description='教师是否已审核固定')] = None
     source_refs: Optional[list[SourceRef]] = None
+
+
+class Task(RootModel[Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled]]):
+    root: Annotated[
+        Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled],
+        Field(
+            description='任务快照，按 `stage` 分为四个分支（与 `TaskEvent` 同构，生成的 Pydantic / TypeScript 类型据此收窄）：\n处理中或待审核 `TaskActive`、`TaskCompleted`、`TaskFailed`、`TaskCancelled`。\n`stage = failed` ⇔ `error` 非空（TASK-17）；`cancelled` ⇒ `cancel_requested = true`（I5）；\n固定进度见 `specs/task-processing.md` §1。`failed_chunks` 只在快照中返回，SSE 事件只带计数。\n',
+            discriminator='stage',
+        ),
+    ]

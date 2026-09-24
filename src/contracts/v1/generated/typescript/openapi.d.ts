@@ -704,10 +704,14 @@ export interface components {
             section_path?: string;
             code: components["schemas"]["ErrorCode"];
         } | unknown | unknown;
-        /** @description 任务快照。`stage = failed` ⇔ `error` 非空（TASK-17）：`failed` 时 `error` 必填且不为 null，
-         *     其他阶段 `error` 缺省或为 null。`failed_chunks` 只在快照中返回，SSE 事件只带计数。
+        /** @description 任务快照，按 `stage` 分为四个分支（与 `TaskEvent` 同构，生成的 Pydantic / TypeScript 类型据此收窄）：
+         *     处理中或待审核 `TaskActive`、`TaskCompleted`、`TaskFailed`、`TaskCancelled`。
+         *     `stage = failed` ⇔ `error` 非空（TASK-17）；`cancelled` ⇒ `cancel_requested = true`（I5）；
+         *     固定进度见 `specs/task-processing.md` §1。`failed_chunks` 只在快照中返回，SSE 事件只带计数。
          *      */
-        Task: {
+        Task: components["schemas"]["TaskActive"] | components["schemas"]["TaskCompleted"] | components["schemas"]["TaskFailed"] | components["schemas"]["TaskCancelled"];
+        /** @description 任务快照的公共字段。不单独出现在 wire 上，按 `stage` 由 `Task` 的四个分支各自收窄。 */
+        TaskBase: {
             id: string;
             course_id: string;
             document_id: string;
@@ -723,22 +727,97 @@ export interface components {
             timings_ms?: {
                 [key: string]: number;
             };
-            /** @description stage = failed 时必填 */
-            error?: components["schemas"]["Error"] | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        /** @description 处理中或待审核（`queued`～`awaiting_review`）。`error` 缺省或为 null；`queued`、`awaiting_review` 的进度固定。 */
+        TaskActive: components["schemas"]["TaskBase"] & components["schemas"]["FixedStageProgress"] & {
+            /** @enum {string} */
+            stage?: "queued" | "parsing" | "extracting" | "merging" | "persisting" | "awaiting_review";
+            error?: null;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "queued" | "parsing" | "extracting" | "merging" | "persisting" | "awaiting_review";
+        };
+        /** @description 审核发布后的终态；`progress` 固定为 1，`error` 缺省或为 null。 */
+        TaskCompleted: components["schemas"]["TaskBase"] & {
+            /** @constant */
+            stage?: "completed";
+            /** @constant */
+            progress?: 1;
+            error?: null;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "completed";
+        };
+        /** @description 失败终态；`error` 必填且不为 null（TASK-17）。取消中失败时 `cancel_requested` 保持 true（TASK-7）。 */
+        TaskFailed: components["schemas"]["TaskBase"] & {
+            /** @constant */
+            stage?: "failed";
+            error: components["schemas"]["Error"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "failed";
+        };
+        /** @description 取消终态；取消必然先置标志，`cancel_requested` 恒为 true（I5），`error` 缺省或为 null。 */
+        TaskCancelled: components["schemas"]["TaskBase"] & {
+            /** @constant */
+            stage?: "cancelled";
+            /** @constant */
+            cancel_requested?: true;
+            error?: null;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "cancelled";
+        };
+        /** @description `specs/task-processing.md` §1 的固定进度：`queued` 为 0，`awaiting_review` 为 0.95
+         *     （`completed` 为 1，由对应分支的 `const` 表达）。只约束取值，代码生成器会忽略，
+         *     运行时由 C08 状态迁移纯函数保证。
+         *      */
+        FixedStageProgress: unknown & unknown;
+        /** @description 取消被拒（`specs/task-processing.md` §4）。`details.stage` 为任务实际阶段，前端据此刷新界面（H02）；
+         *     `details.reason` 与 `stage` 的组合是闭集。
+         *      */
+        TaskNotCancellableError: components["schemas"]["Error"] & {
+            /** @constant */
+            code: "TASK_NOT_CANCELLABLE";
+            details: {
+                /** @constant */
+                stage: "persisting";
+                /** @constant */
+                reason: "persisting_uninterruptible";
+            } | {
+                /** @constant */
+                stage: "awaiting_review";
+                /** @constant */
+                reason: "processing_finished";
+            } | {
+                /** @enum {string} */
+                stage: "completed" | "failed" | "cancelled";
+                /** @constant */
+                reason: "already_terminal";
+            };
         };
         /** @description `event: stage`。建连快照（非终态）、进入新阶段、阶段内进度变化、`cancel_requested` 由 false 变 true 时推送。
          *     `stage = awaiting_review`（`progress = 0.95`）是处理期连接的结束事件，推送后服务端关流。
          *      */
         TaskStageEvent: {
             task_id: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
+            /** @enum {string} */
             stage: "queued" | "parsing" | "extracting" | "merging" | "persisting" | "awaiting_review";
             progress: number;
             /** @description 已收到取消请求但 worker 尚未到达块边界（协作式取消）。这是**标志位不是状态**：
@@ -747,7 +826,13 @@ export interface components {
             cancel_requested: boolean;
             counts?: components["schemas"]["TaskCounts"];
             elapsed_ms?: number;
-        };
+        } & (components["schemas"]["FixedStageProgress"] & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "queued" | "parsing" | "extracting" | "merging" | "persisting" | "awaiting_review";
+        });
         /** @description `event: done`。只会作为「任务已 `completed` 后才建立的连接」的首条快照出现，随后关流；
          *     处理期的连接以 `awaiting_review` 收尾，永远收不到它（`specs/task-processing.md` §7）。
          *      */
@@ -1651,7 +1736,14 @@ export interface operations {
              *     `persisting_uninterruptible`（正在入库）、`processing_finished`（`awaiting_review`）、
              *     `already_terminal`（`completed` / `failed` / `cancelled`，`stage` 为实际终态）。
              *      */
-            409: components["responses"]["Conflict"];
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskNotCancellableError"];
+                };
+            };
         };
     };
     getGraph: {

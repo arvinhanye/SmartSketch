@@ -386,3 +386,4 @@
 - 依赖：B08（已合入）、A03、A05。无运行时代码、数据库或环境变量改动。
 - 风险：`events.v1.md` §6 要求破坏性变更升 v2；依据 ADR-010（`specs/task-processing.md` §7）——v1 尚无消费者（C11/C12 未实现），原地修改。
 - 验证：`python3 -m pytest tests/contracts/test_b10.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- Claude 审查（REVIEW-B10，2026-09-24）：P2×4 已修——R01 `Task` 按 `stage` 拆为四个分支（生成器可见 `failed ⇔ error`）、R02 固定进度 `queued = 0` / `awaiting_review = 0.95`、R03 快照补 I5 与 `completed ⇒ progress = 1`、R04 新增 `TaskNotCancellableError` 闭集；P3×4（R05～R08）不阻塞、未改。B10 测试 36 → 45，`verify.sh` 通过；见 `docs/handoffs/claude-review-b10.md`。

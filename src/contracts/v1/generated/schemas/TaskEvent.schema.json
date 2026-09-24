@@ -55,6 +55,49 @@
         "BUDGET_EXCEEDED"
       ]
     },
+    "FixedStageProgress": {
+      "description": "`specs/task-processing.md` §1 的固定进度：`queued` 为 0，`awaiting_review` 为 0.95\n（`completed` 为 1，由对应分支的 `const` 表达）。只约束取值，代码生成器会忽略，\n运行时由 C08 状态迁移纯函数保证。\n",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "queued"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "progress": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "awaiting_review"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "progress": {
+                "const": 0.95
+              }
+            }
+          }
+        }
+      ]
+    },
     "TaskCancelledEvent": {
       "type": "object",
       "description": "`event: cancelled`。任务进入或已处于 `cancelled`；取消必然先置标志，故 `cancel_requested` 恒为 true。发送后关流。",
@@ -232,6 +275,11 @@
         "cancel_requested"
       ],
       "additionalProperties": false,
+      "allOf": [
+        {
+          "$ref": "#/$defs/FixedStageProgress"
+        }
+      ],
       "properties": {
         "task_id": {
           "type": "string",
