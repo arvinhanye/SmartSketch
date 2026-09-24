@@ -36,7 +36,7 @@ Claude 审查 B10 发现 P2×4、P3×4（`docs/handoffs/claude-review-b10.md`）
 | 类别 | 任务 |
 | --- | --- |
 | 已完成 | A01～A10；B01～B06、B08～B10；CI-01、CI-02；HOOK-01；A10 批 0 / 批 1 / 批 1 补 |
-| 有 PR 待合并 | B13（PR #32，见第 4 节） |
+| 有 PR 待合并 | B13（PR #32，见第 4 节）；C01（PR #174，539210 / kongsc，见第 4.1 节） |
 | 阻塞 | B11：等 ADR-012 下一次修订签收（快照节点加 `merged_from` 并纳入摘要；版本提交取共享序列的提交序号，见 `docs/tasks.md` A08 行后续项）；另需并入 A02-R01（`Relation.required` 补 `status`、`source`、`source_refs`） |
 | 依赖已满足、可开工 | 见第 5 节 |
 | 其余 | 依赖未满足，状态为 pending |
@@ -47,7 +47,7 @@ Claude 审查 B10 发现 P2×4、P3×4（`docs/handoffs/claude-review-b10.md`）
 
 - 新建标签 `status:in-review`（已有 PR）与 `status:blocked`。
 - 已关闭：A01～A10、B01～B06、B08～B10，共 19 个；关闭时附合并提交与证据。
-- #55 B13 为 `status:in-review`；#53 B11 为 `status:blocked`，附阻塞原因。
+- #55 B13、#58 C01 为 `status:in-review`（#58 由 539210 随 PR #174 标记）；#53 B11 为 `status:blocked`，附阻塞原因。
 - 新建 #173 H13（前端登录页与会话存储，依赖 C13、B15、B03、B04）。
 - #53 B11、#58 C01 已分配给协作者 539210，本次未改动负责人。
 
@@ -76,11 +76,21 @@ Claude 审查 B10 发现 P2×4、P3×4（`docs/handoffs/claude-review-b10.md`）
   8. `graph_version` / `request_id` 定义在三个 schema 中逐字重复。
 - Claude 的建议是修第 1～7 项后再合并。
 
+## 4.1 PR #174（C01，539210 / kongsc）的状态
+
+交接稿写完后出现的新 PR，合并本交接前核对到：
+
+- 分支 `codex/c01-sqlite`（`38ca0b7`、`121365c`），base `9d2437e`，早于今天的 5 次合并；PR 写有 `Closes #58`。
+- 改动：`src/backend/app/repositories/sqlite.py`（连接与只进迁移运行器：校验和历史、租约保护、WAL、外键、备份）、`src/backend/migrations/001_base.sql`（接管 B06 的 `embedding_space_state`，新建 `model_calls`）、`tests/backend/test_c01.py`、`src/backend/README.md`、`docs/architecture.md`、`docs/tasks.md`、`docs/handoffs/codex-c01.md`。
+- **当前与 main 冲突**：本地试合并只有 `docs/tasks.md` 一处（两边在同一位置追加新节），`docs/architecture.md` 与代码文件可自动合并。需要作者同步 main 后再合并。
+- 它的 CI 只跑了 Repository scaffold（当时 CI-02 未合入）；同步 main 后会新增 Frontend、Backend 两个 job，后端 `pytest tests/backend` 将首次在 CI 中覆盖 C01。
+- 尚无审查记录。按此前 REVIEW-B05/B06/B08-B09 的流程，建议由 Claude 审查；重点看迁移运行器与 ADR-011 租约、ADR-012 补注（`embedding_space_state` 接管）、A07 `model_calls` 字段是否一致。
+
 ## 5. 可开工的任务（依赖均已在 main 完成）
 
 | 任务 | 后续直接依赖数 | 说明 |
 | --- | --- | --- |
-| **C01** SQLite 连接和迁移运行器 | 9 | 持久层起点；issue #58 已分配给 539210，开工前先确认对方进度。须接管 B06 的引导表 `embedding_space_state`（ADR-012 补注） |
+| ~~C01~~ SQLite 连接和迁移运行器 | 9 | **已有 PR #174（见第 4.1 节），不要重复认领**；它合入后 C02、C06、C13 的依赖即全部满足 |
 | **C08** 状态迁移纯函数 | 3 | B10 合入后刚解锁；输入是 `specs/task-processing.md` §2 迁移事件表与 TASK-16 负例 |
 | **D01** 解析输出与自编 fixture | 4 | 文档解析线起点 |
 | **B12** 进度和推荐契约 | 3 | 与 B10/B13 同类契约迁移；A08 交出 `ProgressEntry` 新字段、GET/PUT 返回全部节点 |
@@ -112,8 +122,10 @@ B14（契约导出与漂移检查）要等 B11、B12、B13；B15（前端 HTTP �
 | 命令 | 结果 |
 | --- | --- |
 | `git log --first-parent 9d2437e..bb48429` | 5 个合并提交，与第 1 节一致 |
-| 依赖计算（读 `docs/atomic-tasks.json`，已完成集合按第 2 节） | 可开工 8 项，与第 5 节一致 |
-| `gh issue list` / `gh pr list` | 已关闭 19；in-review 1（#55）；blocked 1（#53）；开放 PR 仅 #32 |
+| 依赖计算（读 `docs/atomic-tasks.json`，已完成集合按第 2 节） | 依赖已满足 8 项，其中 C01 已在 PR #174，实际可认领 7 项 |
+| `gh issue list` / `gh pr list`（合并本交接前复核） | 已关闭 19；in-review 2（#55、#58）；blocked 1（#53）；开放 PR：#32、#174 |
+| `git for-each-ref refs/remotes/origin` 与作者统计 | 除 ArvinHan / arvinhanye 外，只有 kongsc 的提交：`codex/c01-sqlite`（PR #174）及已合入的 B08/B09 |
+| 本地试合并 PR #174 到 main | 仅 `docs/tasks.md` 冲突，已 `--abort`，未推送 |
 | `gh run`（main @ `bb48429`） | Repository scaffold、Frontend、Backend 均 success |
 | `./scripts/verify.sh`（本分支，base `bb48429`） | exit 0 |
 | `git diff --check` | exit 0 |
