@@ -1,13 +1,13 @@
 # Claude 交接：起草 ADR-012 修订 3（快照谱系 `merged_from` 与共享提交序号）
 
 - `task_id`: ADR-012 修订 3（ADR-014 修订 1 决定 9、10 交办；解除 B11 阻塞）
-- `review_status`: 草案，待 ArvinHan 签收；签收前不合并
+- `review_status`: 已签收（ArvinHan 2026-09-24 在会话中签收，未改动决定 15～25），随 PR #179 合并
 - `branch`: `claude/adr-012-r3`，base `248b895`（main）
 - 负责人：ArvinHan（Claude 起草）
 
 ## 交付物
 
-- `docs/decisions.md`：ADR-012 引言加「修订 3（草案，待签收）」一行；新增「ADR-012 修订 3」一节，决定 15～25（接续修订 2 的决定 14）。
+- `docs/decisions.md`：ADR-012 引言加「修订 3」一行；新增「ADR-012 修订 3」一节，决定 15～25（接续修订 2 的决定 14）。
 - `specs/teacher-review-publish.md`：V2 增加 `commit_seq` 列与 `commit_sequence` 表；V3 的发布集合第 2 条、校验表（`invalid_lineage`）、快照示例、字段例外说明与规范化规则加入 `merged_from`；V5 P11 第 1 条与 V6 R7 写明取号；V10 增加交办行。每处都标「ADR-012 修订 3，待签收」。
 - `specs/learning-path.md`：§7 细则 1、2 改为指向修订 3（顺带把细则 1 里写错的「G05」改为 G04 的 P11、G06 的 R7）。
 - `docs/tasks.md`：新增本任务一节。
@@ -45,9 +45,15 @@
 
 ## 未决与风险
 
-- 签收前请重点看决定 15（展平而非直接父子）、20（不上 wire）、22（全库单行计数器）三项取舍。
+- 决定 15（展平而非直接父子）、20（不上 wire）、22（全库单行计数器）三项取舍已随整条签收。
 - `docs/architecture.md`「图谱版本与跨库发布」一节只写结论，本次未改；签收后若需要，可补一句指向修订 3。
 - 签收后 B11 可开工，须同时并入 A02-R01。
+
+## 签收
+
+- ArvinHan 2026-09-24 在会话中签收并要求合并（「签收 #179 并合并」）；决定 15～25 未改动。
+- 签收时把 `docs/decisions.md`、`specs/teacher-review-publish.md`、`specs/learning-path.md`、`docs/tasks.md` 中的「待签收」改为已签收，并在 ADR-014 修订 1「后果」与任务板 A08 行的后续项中注明已完成。
+- B11 由此解除阻塞（issue #53 改回 `status:pending`）。
 
 ## 回滚
 
