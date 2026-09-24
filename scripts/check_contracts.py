@@ -39,6 +39,7 @@ NAMING_DRIFT_DOCS = [
     Path("specs/course-knowledge-graph.md"),
     Path("specs/learning-path.md"),
     Path("specs/teacher-review-publish.md"),
+    Path("specs/grounded-qa.md"),           # A09 合入后加回（ADR-016 修订 1）
     Path("src/contracts/api.v1.yaml"),
     Path("src/contracts/events.v1.md"),
     Path("src/contracts/errors.v1.md"),

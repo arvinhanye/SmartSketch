@@ -6,7 +6,7 @@
 
 OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结构看 yaml，时序看本文件**。
 
-> 任务状态转换、取消条件与处理阶段 SSE 关流已由 [任务处理规格](../../specs/task-processing.md)（ADR-010）签收；下文 §2 的早期转换表和终态事件说明若与该规格冲突，以该规格为准。B10 负责将 §2 全面改为引用该规格，并补齐契约字段。
+> 任务状态转换、取消条件与处理阶段 SSE 关流的唯一规范是 [任务处理规格](../../specs/task-processing.md)（ADR-010）；票据鉴权的唯一规范是 [身份与访问规格](../../specs/identity-access.md) §5（ADR-013）。本文 §2、§4 按二者改写（B10），冲突时以规格为准。
 
 ---
 
@@ -18,59 +18,48 @@ OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结�
 | 缓冲 | 响应头须带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`，否则反向代理会缓冲住流 |
 | 编码 | 每条事件的 `data` 为**单行 JSON**，不换行、不美化 |
 | 心跳 | 服务端每 15 秒发送注释行 `:ping`，客户端忽略，仅用于保活 |
-| 鉴权 | `EventSource` 不支持自定义请求头；令牌通过 `?token=` 查询参数传递，服务端只接受一次性短时效令牌 |
+| 鉴权（任务流） | `EventSource` 不支持自定义请求头，常规访问令牌**绝不**放进 URL。先用 Bearer 调 `POST /api/v1/tasks/{tid}/event-ticket` 申领一次性票据，再以 `?ticket=` 连接；服务端不读取 `Authorization` 头。详见 [身份与访问规格](../../specs/identity-access.md) §5 |
+| 鉴权（问答流） | `fetch` 发起的 POST 流，照常带 `Authorization: Bearer` 头，不使用票据 |
 
-> 鉴权方式是 SSE 的已知限制。查询参数会进入访问日志，因此该令牌**必须**与常规 Bearer 令牌分离、有效期 ≤60 秒且仅对该任务的读取有效。
+> 票据只对该任务有效、只能核销一次、60 秒后过期，服务端只存其 sha256。票据缺失、无效、过期、已用或与任务不符 → 401 `UNAUTHENTICATED`；把常规访问令牌放进 `?ticket=` 或 `?token=` 同样 401。
 
 ---
 
 ## 2. 任务进度事件：`GET /api/v1/tasks/{tid}/events`
 
-### 事件名
+任务 SSE 只覆盖**处理阶段**：从建连到任务进入 `awaiting_review` 或 `failed` / `cancelled` 为止。**审核完成（`completed`）不通过已有连接送达**（`specs/task-processing.md` §7）。
 
-| event | 何时发送 | data |
-| --- | --- | --- |
-| `stage` | 进入新阶段，或同阶段内进度变化 | `TaskEvent` |
-| `done` | 任务进入终态 `completed` | `TaskEvent`，`progress = 1` |
-| `error` | 任务进入终态 `failed` | `TaskEvent`，`error` 必填 |
-| `cancelled` | 任务进入终态 `cancelled` | `TaskEvent` |
+### 事件名与载荷
 
-### 规范转换表
+每种事件有**独立的 `data` schema**，按 `stage` 判别，结构见 `api.v1.yaml` 的 `TaskEvent`（`oneOf` + `discriminator: stage`）。`data` 为 `{}` 或字段与事件不符的载荷会被结构校验拒绝。
 
-状态机的**唯一规范表述**在这里。`docs/architecture.md`、`specs/` 与 `api.v1.yaml` 的
-`TaskStage` 都引用本表，不各写一份——两份表述分头演进正是 codex 审查 R05 的成因。
+| event | 何时发送 | data schema | 必填字段 | 之后 |
+| --- | --- | --- | --- | --- |
+| `stage` | 建连快照（非终态）；进入新阶段；阶段内进度变化；`cancel_requested` 由 false 变 true | `TaskStageEvent` | `task_id`、`stage`（`queued`～`awaiting_review`）、`progress`、`cancel_requested` | `stage = awaiting_review` 时服务端关流，其余保持连接 |
+| `done` | 仅当建连时任务已 `completed`，作为首条快照 | `TaskDoneEvent` | `task_id`、`stage = completed`、`progress = 1` | 关流 |
+| `error` | 处理中进入 `failed`，或建连时已 `failed` | `TaskErrorEvent` | `task_id`、`stage = failed`、`progress`、`error`（非 null） | 关流 |
+| `cancelled` | 处理中进入 `cancelled`，或建连时已 `cancelled` | `TaskCancelledEvent` | `task_id`、`stage = cancelled`、`progress`、`cancel_requested = true` | 关流 |
 
-| 起点 | 终点 | 触发者 | 条件 |
-| --- | --- | --- | --- |
-| （无） | `queued` | API（`POST /api/v1/courses/{cid}/documents`） | 资料落盘、任务记录创建 |
-| `queued` | `parsing` | worker | 领取任务 |
-| `parsing` | `extracting` | worker | 分块完成 |
-| `extracting` | `merging` | worker | 实体与关系抽取完成 |
-| `merging` | `persisting` | worker | 融合消歧完成 |
-| `persisting` | `awaiting_review` | worker | DAG 校验通过且草稿图谱写入成功 |
-| `awaiting_review` | `completed` | **教师**（`POST /api/v1/courses/{cid}/publish`） | 审核通过并发布。worker 不会自行把 `awaiting_review` 推到 `completed` |
-| 任一非终态 | `failed` | worker | 该阶段不可恢复地失败，`error` 必填 |
-| 任一非终态 | `cancelled` | worker | 取消标记已置且 worker 到达阶段边界（ADR-006） |
+- 事件只带计数（`counts`，含 `chunks_failed`），不带 `failed_chunks` 明细；明细见 `GET /api/v1/tasks/{tid}` 的快照。
+- **终态集合**：`completed`、`failed`、`cancelled`。`awaiting_review` 是处理结束的**非终态**，但它是处理期连接的结束事件。
 
-- **终态集合**：`completed`、`failed`、`cancelled`。终态之后不再发送该任务的任何事件。
-- **`queued` 阶段的取消由谁执行**：任务尚未被 worker 领取时，取消端点直接把任务置为 `cancelled`
-  并返回；worker 领取前先检查该标记，已取消的任务不再领取。运行中的取消由 worker 在阶段边界执行。
-- **`cancel_requested` 是标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，事件里带
-  `cancel_requested: true`，前端把按钮显示为「取消中」。它不占用状态枚举，因此不是破坏性变更。
-- **取消与完成竞争**：以先到达终态者为准，取消端点返回任务当前实际状态（ADR-006 第 4 条）。
+### 状态转换
+
+转换表、触发者与取消条件**只在** [`specs/task-processing.md`](../../specs/task-processing.md) §1、§2 与 §4，本文不另写一份（两份表分头演进正是审查 R05 的成因）。主线为：
+
+```
+queued → parsing → extracting → merging → persisting → awaiting_review → completed
+```
+
+`cancel_requested` 是标志位不是状态：取消未生效前 `stage` 仍是当前阶段，事件带 `cancel_requested: true`，前端显示「取消中」。
 
 ### 顺序保证
 
-1. 连接建立后**立即**补发一条 `stage`，反映当前状态。客户端因此不需要先调 `GET /api/v1/tasks/{tid}` 取初始值。
-2. `stage` 的取值只能沿上表前进，**不得回退**：
-
-   ```
-   queued → parsing → extracting → merging → persisting → awaiting_review → completed
-   ```
-
-3. `progress` 单调不减。
-4. 三个终态事件（`done` / `error` / `cancelled`）**互斥且恰好发生一次**，发送后服务端关闭连接。
-5. 客户端收到终态事件后必须主动 `close()`，否则 `EventSource` 会自动重连并再次收到补发的终态事件。
+1. 连接建立后**立即**补发一条当前快照：非终态为 `stage`，终态为对应的 `done` / `error` / `cancelled`。客户端因此不需要先调 `GET /api/v1/tasks/{tid}` 取初始值。
+2. `stage` 只能沿主线前进，**不得回退**；`progress` 单调不减。跨连接同样成立，重连后的快照不小于断开前。
+3. **每个连接恰好以一条结束事件收尾**：`stage = awaiting_review` 的快照，或 `done` / `error` / `cancelled` 之一；同一连接内这几种结束事件互斥，发送后服务端即关流。这是按连接的保证，不是按任务生命周期的保证：一个最终 `completed` 的任务，其处理期的连接都以 `awaiting_review` 收尾，永远收不到 `done`。
+4. 客户端收到任何结束事件后必须主动 `close()`，不得为等待 `done` 保持或重建连接。审核完成用 `GET /api/v1/tasks/{tid}`（`stage = completed`）或课程发布状态观察。
+5. 同一任务允许多个连接，各自先收快照，此后事件广播给全部连接。worker 崩溃时任务停在原阶段，连接照常心跳。
 
 ### 阶段与进度映射
 
@@ -85,6 +74,7 @@ OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结�
 | `persisting` | 0.80 – 0.95 |
 | `awaiting_review` | 0.95 |
 | `completed` | 1.00 |
+| `failed` / `cancelled` | 保持进入终态时的值 |
 
 前端进度条直接使用 `progress`，阶段名单独展示，不要自行换算。
 
@@ -94,17 +84,24 @@ OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结�
 :ping
 
 event: stage
-data: {"task_id":"t_01","stage":"extracting","progress":0.34,"counts":{"chunks_done":5,"chunks_total":14,"kp_count":23,"relation_count":0},"elapsed_ms":18420}
+data: {"task_id":"t_01","stage":"extracting","progress":0.34,"cancel_requested":false,"counts":{"chunks_done":5,"chunks_total":14,"chunks_failed":0,"kp_count":23,"relation_count":0},"elapsed_ms":18420}
 
+event: stage
+data: {"task_id":"t_01","stage":"awaiting_review","progress":0.95,"cancel_requested":false,"counts":{"chunks_done":14,"chunks_total":14,"chunks_failed":1,"kp_count":47,"relation_count":88},"elapsed_ms":43100}
+```
+
+`awaiting_review` 之后服务端关流。任务发布后才建立的连接只收到一条：
+
+```text
 event: done
-data: {"task_id":"t_01","stage":"completed","progress":1,"counts":{"chunks_done":14,"chunks_total":14,"kp_count":47,"relation_count":88},"elapsed_ms":43100}
+data: {"task_id":"t_01","stage":"completed","progress":1}
 ```
 
 失败时：
 
 ```text
 event: error
-data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"LLM_UNAVAILABLE","message":"主备模型均不可用，请稍后重试"}}
+data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"EXTRACTION_INCOMPLETE","message":"抽取失败的块超过阈值","details":{"chunks_failed":3,"chunks_total":10,"threshold":0.2}}}
 ```
 
 > `failed` 是**任务的领域状态**，不是 HTTP 错误。SSE 连接本身仍是 200，`GET /api/v1/tasks/{tid}` 也返回 200。
@@ -113,7 +110,9 @@ data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"LLM_UN
 
 ## 3. 问答流式事件：`POST /api/v1/courses/{cid}/chat`
 
-`POST` 无法用 `EventSource`，前端使用 `fetch` + `ReadableStream` 读取。
+`POST` 无法用 `EventSource`，前端使用 `fetch` + `ReadableStream` 读取，照常带 `Authorization` 头。
+
+时序与文法、终态矩阵、撤回规则、JSON 模式的**唯一规范**是 [可信问答规格](../../specs/grounded-qa.md) Q2、Q5、Q6、Q7（ADR-015）。本节只摘要 wire 形状，冲突时以规格为准。
 
 ### 事件名与载荷
 
@@ -122,48 +121,47 @@ data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"LLM_UN
 
 | event | 何时发送 | data schema | 必填字段 |
 | --- | --- | --- | --- |
-| `meta` | 检索完成、生成开始前 | `ChatMetaEvent` | `event`、`status` |
-| `delta` | 每个 token 增量 | `ChatDeltaEvent` | `event`、`delta`（非空串） |
-| `done` | 生成结束且引用校验完成 | `ChatDoneEvent` | `event`、`final` |
-| `error` | 生成中断 | `ChatErrorEvent` | `event`、`error` |
+| `meta` | 检索与判定完成、开流即发 | `ChatMetaEvent` | `event`、`status`、`retrieved`（`not_covered` 时为 0）、`graph_version`、`request_id` |
+| `delta` | 生成中的正文增量 | `ChatDeltaEvent` | `event`、`delta`（非空串） |
+| `done` | 终态已构造 | `ChatDoneEvent` | `event`、`final`（`ChatResponse`，含 `answer`、`citations`、`graph_version`、`request_id`；`not_covered` 另含 `reason`） |
+| `error` | 开流后的异常终止（Q5 O7～O13） | `ChatErrorEvent` | `event`、`error`（`ChatError`：码只取 `LLM_UNAVAILABLE`、`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`；`details.request_id` 必填；`LLM_UNAVAILABLE` 另须 `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`，其余三码不带 `reason`） |
 
-> `data` 为 `{}` 的事件**不合法**，会被结构校验拒绝。这是 codex 审查 R04 的直接修复：
-> 原先四种事件共用一个没有 `required` 的宽松对象，`{}` 也能通过。
+> `data` 为 `{}` 的事件**不合法**，会被结构校验拒绝（codex 审查 R04）。
 
-### 最终正文的替换协议
+### 事件文法（Q2）
 
-这是本节最容易出错的地方，独立成条：
+```text
+stream := meta(status = not_covered) done(not_covered: no_retrieval_hit | below_similarity_threshold)
+        | meta(status = answered)    delta*  ( done(answered | not_covered: insufficient_evidence | all_citations_invalidated)
+                                             | error )
+```
 
-1. **`done.final` 是唯一权威正文。** 它是一个完整的 `ChatResponse`（`answered` 或
-   `not_covered` 分支），含 `answer`、`citations`、`related_kp_ids`、`latency_ms`。
-2. **前端收到 `done` 后用 `final.answer` 整体替换**累积的 delta 文本，不得把 delta
-   拼接结果当作最终答案。两者可能不同：引用校验会剔除无效编号，正文需相应改写。
-3. **delta 阶段的正文是临时态。** 其中出现的编号可能指向后续被剔除的条目，
-   因此 `delta` 阶段**不得渲染可点击引用**，只能显示为普通文本或占位样式。
-4. **全部引用失效时降级为未覆盖终态。** 若生成完成但引用校验后无一条有效，
-   `done.final` 必须是 `not_covered` 分支，`reason = all_citations_invalidated`，
-   `citations` 为空数组。**前端此时必须清除已显示的 delta 正文**，代之以
-   `final.answer` 的解释——不得留下一段无依据却看起来已完成的答案（ADR-003）。
-5. **`error` 与 `done` 互斥**，各自恰好一次，发送后关闭连接。`error` 表示生成过程
-   异常中断（模型不可用、超时、上游报错），与「资料未覆盖」是两回事：后者是 `done`。
+1. `meta` 恰好一条且恒为首条。`meta.status = not_covered` 当且仅当检索阶段拒答，其后没有 `delta`、没有 `error`，直接发 `done`。
+2. `meta.status = answered` 表示进入生成，**不是承诺**：终态仍可能是 `not_covered`（`insufficient_evidence`、`all_citations_invalidated`）或 `error`。前端不得在 `meta` 阶段锁定结局。
+3. `done` 与 `error` 互斥、恰好一条、恒为末条，发送后关流。`:ping` 心跳可出现在任意位置，不是事件。
+4. `insufficient_evidence` 时 `delta` 恰为 0 条；`error` 前可以有 0 条或多条 `delta`。
+5. 客户端断开后服务端停止生成，不再发送任何事件（O14）。
+6. 首个 `delta`（或 `not_covered` 的 `done`）须在 3 秒内到达，完整响应 ≤15 秒（`specs/course-knowledge-graph.md` 验收条件 9；链路时限见 A07）。
+7. 任意网络分片都必须能解析：每条事件的 `data` 是单行 JSON，跨分片的半条事件要缓冲到完整行再解析。
 
-### 顺序保证
+### 最终正文与撤回（Q6）
 
-1. `meta` 恒为第一条，且**只发一条**。
-2. `meta.status = not_covered` 时**不再发送任何 `delta`**，直接发 `done`。这是检索阈值
-   拒答分支，既防幻觉也省耗时。
-3. `meta.status = answered` 不是承诺——引用校验发生在生成之后，`done.final` 仍可能是
-   `not_covered`（见上条第 4 点）。前端不得在 `meta` 阶段就锁定 UI 分支。
-4. 首个 `delta`（或 `not_covered` 的 `done`）须在 3 秒内到达，完整响应 ≤15 秒
-   （`specs/course-knowledge-graph.md` 验收条件 9）。
-5. 任意网络分片都必须能解析：每条事件的 `data` 是单行 JSON，跨分片的半条事件要缓冲到
-   完整行再解析，不得按分片边界切分。
+1. **临时正文**：从首个 `delta` 起以「生成中」样式显示；其中的 `[n]` 只作普通文本，不可点击；不写入对话历史。
+2. **唯一保留正文的结局是 `done` 且 `final.status = answered`**：此时 `final.answer` 与已下发全部 `delta` 的逐字拼接**完全相等**（不变式 I1），以 `final.answer` 为准显示，标记变为可点击。若两者不一致，显示 `final.answer` 并上报异常。
+3. **其余一切结局整段撤回临时正文**，不保留部分答案：
+   - `not_covered`（任一 `reason`）→ 显示 `final.answer`（服务端固定模板，不含模型输出）；
+   - `error` → 按 `error.code` 与 `details.reason` 显示前端文案；
+   - 用户停止或客户端断开（O14）→「已停止」；
+   - 流未以 `done` / `error` 结束（异常 EOF）、事件 JSON 无法解析、事件不符合上面的文法（**O15**）→ 客户端本地合成 `stream_interrupted` 错误，显示连接中断文案。
+4. 不自动重试，也不自动重放提问；用户点「重试」即新请求（新 `request_id`，重新绑定版本）。同一对话同时最多一个在途请求。
+5. 开流前的错误以非 200 状态与 `Error` JSON 返回：客户端先检查状态码与 `Content-Type`，再读取事件流。
+6. 每个回答属于它的绑定版本 `graph_version`；同一会话中后续回答的版本不同时，前面的回答标注「基于第 N 版」（Q9）。
 
 ### 示例
 
 ```text
 event: meta
-data: {"event":"meta","status":"answered","retrieved":6}
+data: {"event":"meta","status":"answered","retrieved":6,"graph_version":3,"request_id":"01J8ZQ3N6T7W8X9Y0ZABCDEF12"}
 
 event: delta
 data: {"event":"delta","delta":"栈是一种"}
@@ -172,38 +170,61 @@ event: delta
 data: {"event":"delta","delta":"后进先出的线性表[1]。"}
 
 event: done
-data: {"event":"done","final":{"status":"answered","answer":"栈是一种后进先出的线性表[1]。","citations":[{"index":1,"chunk_id":"c_77","document_id":"d_03","section_path":"第3章 > 3.1 栈","page":52,"text":"栈是限定仅在表尾进行插入和删除操作的线性表。"}],"related_kp_ids":["kp_12","kp_15"],"latency_ms":6200}}
+data: {"event":"done","final":{"status":"answered","answer":"栈是一种后进先出的线性表[1]。","citations":[{"index":1,"chunk_id":"c_77","document_id":"d_03","section_path":"第3章 > 3.1 栈","page":52,"text":"栈是限定仅在表尾进行插入和删除操作的线性表。"}],"related_kp_ids":["kp_12","kp_15"],"latency_ms":6200,"graph_version":3,"request_id":"01J8ZQ3N6T7W8X9Y0ZABCDEF12"}}
 ```
 
-资料未覆盖时（检索阶段就拒答，没有 delta）：
+检索阶段拒答（没有 delta）：
 
 ```text
 event: meta
-data: {"event":"meta","status":"not_covered","retrieved":0}
+data: {"event":"meta","status":"not_covered","retrieved":0,"graph_version":3,"request_id":"01J8ZQ4A1B2C3D4E5F6G7H8J9K"}
 
 event: done
-data: {"event":"done","final":{"status":"not_covered","answer":"课程资料未覆盖该问题：本课程资料中未找到与「操作系统进程调度」相关的内容。","citations":[],"reason":"no_retrieval_hit","latency_ms":800}}
+data: {"event":"done","final":{"status":"not_covered","answer":"课程资料中没有找到与这个问题相关的内容。","citations":[],"reason":"no_retrieval_hit","latency_ms":800,"graph_version":3,"request_id":"01J8ZQ4A1B2C3D4E5F6G7H8J9K"}}
 ```
 
-生成完成但引用全部失效（前端必须清除已显示的 delta 正文）：
+模型以哨兵声明证据不足（`insufficient_evidence`，没有 delta）：
 
 ```text
 event: meta
-data: {"event":"meta","status":"answered","retrieved":3}
+data: {"event":"meta","status":"answered","retrieved":3,"graph_version":3,"request_id":"01J8ZQ5B2C3D4E5F6G7H8J9K0M"}
+
+event: done
+data: {"event":"done","final":{"status":"not_covered","answer":"检索到的课程资料不足以回答这个问题。","citations":[],"reason":"insufficient_evidence","latency_ms":2100,"graph_version":3,"request_id":"01J8ZQ5B2C3D4E5F6G7H8J9K0M"}}
+```
+
+生成完成但引用校验不通过（前端必须撤回已显示的 delta 正文）：
+
+```text
+event: meta
+data: {"event":"meta","status":"answered","retrieved":3,"graph_version":3,"request_id":"01J8ZQ6C3D4E5F6G7H8J9K0M1N"}
 
 event: delta
-data: {"event":"delta","delta":"根据资料[1]，"}
+data: {"event":"delta","delta":"根据资料，栈是后进先出的。"}
 
 event: done
-data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答无法与课程资料对应，已撤回。可换一种问法或缩小问题范围。","citations":[],"reason":"all_citations_invalidated","latency_ms":5400}}
+data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答无法与课程资料对应，已撤回。可以换一种问法或缩小问题范围。","citations":[],"reason":"all_citations_invalidated","latency_ms":5400,"graph_version":3,"request_id":"01J8ZQ6C3D4E5F6G7H8J9K0M1N"}}
+```
+
+出字后供应商流中断（撤回已显示的正文）：
+
+```text
+event: meta
+data: {"event":"meta","status":"answered","retrieved":4,"graph_version":3,"request_id":"01J8ZQ7D4E5F6G7H8J9K0M1N2P"}
+
+event: delta
+data: {"event":"delta","delta":"栈的基本操作包括"}
+
+event: error
+data: {"event":"error","error":{"code":"LLM_UNAVAILABLE","message":"回答生成中断，请稍后重试。","details":{"reason":"stream_interrupted","request_id":"01J8ZQ7D4E5F6G7H8J9K0M1N2P"}}}
 ```
 
 ## 4. 重连
 
 | 场景 | 行为 |
 | --- | --- |
-| 任务进度流断开 | `EventSource` 自动重连；服务端在新连接上按第 2 节补发当前状态。**不使用 `Last-Event-ID`**，因为补发当前快照即可恢复，无需重放历史 |
-| 任务已终态后重连 | 立即发送对应终态事件并关闭 |
+| 任务进度流断开 | **不依赖 `EventSource` 自动重连**：票据一次性，自动重连会带着已用票据必然 401，浏览器随后静默停止重试。由 `src/frontend/src/api/` 封装负责：出错即 `close()` → 重新申领票据 → 新建连接；新连接按 §2 先补当前快照。**不使用 `Last-Event-ID`**。建议退避 1、2、4… 秒，上限 30 秒；连续失败 5 次降级为每 5 秒轮询 `GET /api/v1/tasks/{tid}`（C12 可调，非契约） |
+| 任务已 `awaiting_review` 或终态后建连 | 收到快照（`stage = awaiting_review`，或对应的 `done` / `error` / `cancelled`）后被关流，客户端不再重建 |
 | 问答流断开 | **不自动重连**。已消费的 `delta` 不可重放，前端提示用户重新提问 |
 
 ---
@@ -212,8 +233,13 @@ data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答�
 
 - SSE 客户端封装在 `src/frontend/src/api/`，组件不得直接 `new EventSource`（`.claude/rules/frontend.md`）。
 - 组件卸载时必须关闭连接，否则任务页反复进出会累积连接。
+- 丢弃 `task_id` 不等于当前订阅任务的事件：切换资料或课程时，旧流的迟到事件不得污染当前视图。
 - 进度、错误、取消三种终态都要有对应 UI 态；空态与加载态同样必须覆盖。
 
 ## 6. 变更策略
 
 事件名、顺序保证与终态语义属于破坏性变更，必须新增 `events.v2.md` 并在 `api.v2.yaml` 中同步，不得原地修改本文件。新增可选字段不算破坏性变更。
+
+> 例外记录：B10（2026-09-24）按 ADR-010、ADR-013 原地改写了 §1 鉴权、§2 关流语义与 §4 重连，并收紧了 `TaskEvent` 结构。依据是 `specs/task-processing.md` §7：v1 尚无任何消费者（C11/C12 未实现），此时修改迁移成本为零。此后再改须按本节升 v2。
+
+> 例外记录：B13（2026-09-24）按 ADR-015 及修订 1 原地改写了 §3：`meta` 与 `done.final` 增加必填 `graph_version`、`request_id`，`error` 改用 `ChatError`（错误码闭集、`LLM_UNAVAILABLE` 必带 `details.reason`），时序与撤回条文改为指向 `specs/grounded-qa.md`。依据与 B10 相同：问答流尚无消费者（J07/J08/J09 未实现），`specs/grounded-qa.md` Q11 已把这些改动分配给 B13。此后再改须按本节升 v2。

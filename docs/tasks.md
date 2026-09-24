@@ -7,7 +7,7 @@
 | ID | 状态 | 任务 | 负责人 | 验收条件 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
-| M0-02 | IN PROGRESS（B01 已完成；B02～B04、B15 待做） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01 见下方验收证据；路由与测试配置仍待后续任务 |
+| M0-02 | IN PROGRESS（B01～B04 已完成；B15 待 B14） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01～B04 见下方验收证据；HTTP 客户端 B15 仍待契约 B14 |
 | M0-03 | DONE（B05+B06） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05/B06 测试 38 PASS；基础 verify PASS；`docs/handoffs/codex-b05.md`、`docs/handoffs/codex-b06.md` |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
@@ -17,6 +17,7 @@
 | ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | CI-01 | DONE（待 GitHub 首次运行确认） | 为当前仓库建立 GitHub Actions 基础质量门禁 | Codex | push、pull request 和手动触发；只运行仓库现有 `scripts/verify.sh`，不把尚未建立的前后端测试标成通过；工作流语法和本地校验通过 | `.github/workflows/ci.yml`；`./scripts/verify.sh` PASS；YAML 解析/关键字段检查 PASS；`git diff --check` PASS；`docs/handoffs/codex-ci-01.md` |
+| CI-02 | DONE（待审查；PR #29 已合入 `025cbee`） | 把前端与后端测试接入 CI | Claude | 新增 Frontend（`npm ci`、type-check、`test -- --run`、build）与 Backend（`pip install -e src/backend[test]`、`pip check`、`pytest tests/backend`）两个 job；只读权限、无密钥；不跳过、不吞退出码。依赖：B05/B06 已合入 main（PR #14、#21）；B02（PR #27）未合入前 PR 以 B02 分支为目标。K11 仍负责 E2E 接入 | 分支 `claude/ci-02`；YAML 解析三 job PASS；在含 B02～B06 的临时合并树上以干净环境逐条运行 job 命令：前端 30 passed、build 通过，后端（Python 3.11）58 passed、`pip check` 通过；`docs/handoffs/claude-ci-02.md` |
 
 ### CI-01 执行约定
 
@@ -75,6 +76,7 @@
 | PLAN-D03 | worker 队列/租约/取消/重试及部分失败语义（A03/A06）。**已关闭**：取消与部分失败语义由 ADR-010（A03），队列 / 租约 / 重试 / 幂等由 ADR-011（A06）签收（均为 ArvinHan，2026-09-23） | 技术负责人 | 已完成 |
 | PLAN-D04 | 哪个 worktree 作为集成基线、分批合并顺序与合并权（A10）。**已关闭**：ADR-016 定为以 main 为基线、按批检出文件导入（每批一个 PR、一个功能边界），Agent 只开 PR、由 ArvinHan 合并并交叉审查；批次顺序见 `docs/reviews/branch-integration-map.md` 第 3 节（ArvinHan，2026-09-23 签收） | 项目负责人 | 已完成 |
 | D-08 | 融合自动合并阈值与低置信度阈值的初始取值（沿用 `740adb` 未决问题编号，ADR-016 决定 7） | 技术负责人 | E09/E10 开工前 |
+| D-09 | 前端登录页与会话存储缺少原子任务。**已关闭**：补登 **H13 实现前端登录页与会话存储**（依赖 C13、B15、B03、B04；原子清单增至 141 项），负责登录页、`sessionStorage` 会话读写、401 清会话与课程上下文回登录页，并向 B03 的 `getAccountRole` 注入真实来源（ArvinHan，2026-09-24 确认） | 产品负责人 / 协调 Agent | 已完成 |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -298,17 +300,14 @@
 - **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
 - Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
 
-## C01 SQLite 连接与迁移运行器
+## A10 批 1 补：问答规格加回契约门禁
 
-| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 验收 |
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C01 | DONE（审查 P1/P2 已修） | 建立 SQLite 连接和迁移运行器 | Codex（后端） | `codex/c01-sqlite` / `9d2437e` | `src/backend/app/repositories/sqlite.py`、`src/backend/migrations/001_base.sql`、`tests/backend/test_c01.py`；文档：`docs/architecture.md`、`src/backend/README.md`、本任务板、`docs/handoffs/codex-c01.md` | 临时库迁移可重复；单事务失败回滚；活跃及到期秒租约拒绝；迁移前备份及恢复演练；B06 向量空间记录保留。审查修复：`model_calls` 预写、按 `call_id` 重放去重与归属查询；迁移返回后立即移动备份。专项 13 passed、后端 71 passed、`./scripts/verify.sh` exit 0，见交接。 |
+| A10-批1补 | DONE | 把 `specs/grounded-qa.md` 加回契约命名门禁的扫描清单与测试夹具，并为每份被扫描的规格加错误命名负例（ADR-016 修订 1） | Claude（后端 Agent） | `.claude/worktrees/batch1-qa`（分支 `claude/batch1-grounded-qa`）/ base `548c4f8` | `scripts/check_contracts.py`（`NAMING_DRIFT_DOCS`）、`tests/contracts/test_contracts.py`、本节、`docs/handoffs/claude-a10-batch1-supplement.md` | 新增 `test_alias_in_each_guarded_spec_fails`、`test_guarded_spec_missing_fails`：去掉扫描项时两项均只因 `grounded-qa.md` 失败，加回后通过；契约负向测试 24/24；`./scripts/verify.sh` exit 0（命名基线 10 份文档）；`git diff --check` exit 0；`docs/handoffs/claude-a10-batch1-supplement.md` |
 
-- 输入：B06 的 `SQLITE_URL` 与 `embedding_space_state`，ADR-011 的停机迁移协议，ADR-012 的空间记录约束。
-- 输出：WAL/外键/超时连接函数、只向前的版本化迁移、`001_base.sql` 和恢复步骤。
-- 依赖：B06、A04、A06 均已完成；不改 REST/SSE 契约。
-- 风险：迁移必须在 API/worker 停机时执行；后续表迁移需沿用同一备份与租约检查协议。
-- 验证：`python -m pytest tests/backend/test_c01.py -q`、B05/B06 回归、`./scripts/verify.sh`、`git diff --check`。
+- 输入：ADR-016 修订 1 决定 1；A09 已随 PR #20 合入 main。输出：`specs/grounded-qa.md` 进入命名门禁扫描清单与测试工作区；四份受保护规格（课程图谱、学习路径、教师发布、问答）各有一处 `SourceChunk` 注入负例和一处缺文件负例。测试中的受保护清单独立列出，不从门禁导入，避免同源漏扫。
+- 本项关闭 A1～A10 收尾一节登记的「批 1 补」。
 
 ## B01 前端构建与单页挂载
 
@@ -361,6 +360,34 @@
 - 结果：新增负例先为 5 FAIL；修复后 B05+B06 共 47 PASS、基础 verify PASS、`git diff --check` PASS。API lifespan 已接入门禁；C09 尚无 worker 入口，须复用 `validate_embedding_space()`；离线重新向量化命令仍归后续任务。
 - Claude 审查（REVIEW-B06，2026-09-24）：P2×2 已签收（ArvinHan 2026-09-24，见 `docs/decisions.md`「ADR-012 补注：启动门禁的当前空间记录表与职责拆分」）——**B06-R01** 启动时建 SQLite 表 `embedding_space_state`（超出原子范围的数据模型决定，表名与「C01 接管」约定待签收）；**B06-R02** 修改已签收的 ADR-012 规格两处职责标注。P3×2。同步 main 后补 `RECOMMEND_WEIGHT_*` 四项成组校验（集成修复 `dbfb63d`）；后端 58 passed、启动门禁/密钥脱敏实测通过；见 `docs/handoffs/claude-review-b06.md`。
 
+## B02 前端测试配置
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B02 | DONE（待 Codex 审查） | 初始化前端测试配置，使仓库外层 `tests/frontend` 被实际发现 | Claude（前端） | `claude/frontend-dev-04eee7` / base `dddafb3` | `src/frontend/vitest.config.ts`、`src/frontend/package.json`、`src/frontend/package-lock.json`、`tests/frontend/setup.ts`、`tests/frontend/b02.test.ts`；因 B01-R01 需要时扩到 `src/frontend/tsconfig*.json`；文档：`src/frontend/README.md`、`docs/architecture.md`、本任务板、`docs/handoffs/claude-b02.md` | 计划验收命令 exit 0（5 passed）；三处反向篡改（去 setup、`passWithNoTests`、脚本吞退出码）均被检出；类型检查覆盖测试与 Node 侧配置，应用代码不可见 Node 类型；`npm ci`、build、`./scripts/verify.sh`、`git diff --check` 通过；见 `docs/handoffs/claude-b02.md` |
+
+- 输入：B01 已合入的 Vue 3 + Vite 骨架（PR #15）；`docs/atomic-task-plan.md` B02 验收；审查意见 B01-R01（Node 侧配置不得混入浏览器类型）。
+- 输出：Vitest 配置与 `test` 脚本；DOM 测试环境与全局 setup；`tests/frontend/b02.test.ts` 同时验证 SFC 挂载、setup 生效，以及「故意失败用例使命令非 0」「零用例不算通过」两条门禁行为。
+- 依赖：B01；npm 公共源。无后端、契约或环境变量变化。
+- 风险：`tests/frontend` 位于 Vite 根目录外，裸模块解析与类型检查可能找不到 `src/frontend/node_modules`；测试依赖可能抬高 Node 版本下限。
+- 验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b02.test.ts`、`./scripts/verify.sh`、`git diff --check`。
+- 实际结果：新增 `src/frontend/tsconfig.node.json`（文件锁中预留的扩展，处理 B01-R01）；`engines` 收紧为 `^22.22.2 || ^24.15.0 || >=26.0.0`（Vitest 5 / jsdom 30 下限）；B01-R02 的 README 命令块已改为 `bash`。CI 仍未跑前端命令，归 K11。
+
+## B03 / B04 前端路由壳与课程上下文（并行）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B03/B04 准备 | DONE | 安装 `vue-router@5.3.1`、`pinia@4.0.3`，`main.ts` 接入 Pinia；认领两项任务 | Claude（协调） | `claude/b03-b04-prep` / base `8e5b707`（B02，PR #27 未合） | `src/frontend/package.json`、`package-lock.json`、`src/frontend/src/main.ts`、本任务板 | type-check、B02 测试、build 通过 |
+| B03 | DONE（待 Codex 审查） | 建立路由壳和角色入口 | Claude（前端子代理） | `claude/b03-router-shell` / base 准备提交 | `src/frontend/src/router/index.ts`、`src/frontend/src/views/TeacherHome.vue`、`src/frontend/src/views/StudentHome.vue`、`tests/frontend/b03.test.ts`；为接线需改 `src/frontend/src/main.ts`（仅加路由）与 `src/frontend/src/App.vue`；`docs/handoffs/claude-b03.md` | 计划验收命令 exit 0（13 passed）；去守卫/去错角色分支/去提示元素三处篡改均被检出；集成后全量 30 passed、build、`verify.sh` 通过；浏览器访问 `/teacher` 落到 `/?notice=unauthenticated` 并显示提示；`docs/handoffs/claude-b03.md` |
+| B04 | DONE（待 Codex 审查） | 建立 Pinia 课程上下文 | Claude（前端子代理） | `claude/b04-course-store` / base 准备提交 | `src/frontend/src/stores/course.ts`、`tests/frontend/b04.test.ts`、`docs/handoffs/claude-b04.md` | 计划验收命令 exit 0（12 passed）；六处篡改（按 courseId 代替代次、不清空、不中止、去幂等、去 course_id 校验、信任 `isCurrent`）均被检出；store 无 fetch/XHR/HTTP 导入；`docs/handoffs/claude-b04.md` |
+
+- 并行约束：B03、B04 的文件锁互不相交；两者都不改 `package.json`、锁文件、`docs/tasks.md`、`docs/architecture.md`，这些由协调方在集成时统一更新。
+- 依赖：B02（PR #27 待审查）；B03 另依赖 A05（`specs/identity-access.md` §2.4：路由守卫只用 `user.role` 选首页、`Course.my_role` 选课程视图，仅作界面引导）。
+- 风险：原子清单没有前端登录页与会话存储任务（G-1 只列 C13～C16 后端与 H12 成员页），B03 只能以注入方式取得账号类型；缺口在集成时登记。
+- 集成：`claude/b03-b04` = 准备提交 + 两个任务分支的 `--no-ff` 合并 + 本次文档更新；两分支文件锁不相交，合并无冲突。
+- 协调方审查意见（P3，不阻塞）：**B03-R01** `App.vue` 用 `inject(routeLocationKey, null)` 兼容未装路由的挂载，只为让 B02 两个直接挂载 `App` 的用例不改；产品入口总会装路由。若日后改回 `useRoute()`，同批把 B02 两个挂载用例改为装内存路由。**B04-R01** 图谱/问答槽位对组件仍可直接赋值，绕过作用域校验只靠注释与审查约束；H03/J08 接入时可改为只读暴露。
+- 交出的后续项（均未认领）：B15 须把 `scope.signal` 传给 fetch，旧请求才会在网络层真正取消；路由 `cid` 与 `selectCourse` 的接线归 H01；登录页、会话存储与 `getAccountRole` 的真实来源归 H13（D-09）；问答「最新回答与引用」槽位由 J08/J09 决定是否加入并在切课时清空。
+
 ## B08 公共错误与来源契约
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
@@ -386,3 +413,41 @@
 - 验证：`python -m pytest tests/contracts/test_b09.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
 - CI 修复（2026-09-24）：首次 GitHub 运行因 Python 环境未安装 `pytest` 报 `No module named pytest`；`aa1c3e9` 将 `pytest==8.3.5` 加入工作流依赖和工具链清单，随后 GitHub Actions run 35944829534 通过。
 - Claude 审查（REVIEW-B08-B09，2026-09-24）：审查通过；同步 main 后修正 B09-R01（`getCourse` 404 描述与 identity-access §4.1 冲突，先加测试再改并重新生成）；`verify.sh` 通过（B08 5、B09 5）；见 `docs/handoffs/claude-review-b08-b09.md`。自 2026-09-24 起后端由 ArvinHan 接手，B10 起的后端任务负责人记为 ArvinHan（Claude 执行）。
+
+## B10 任务与 SSE 契约
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B10 | DONE（待审查） | 迁移任务与 SSE 契约 | ArvinHan（Claude 执行） | `claude/b10-task-sse-contract` / base `9d2437e` | `src/contracts/api.v1.yaml`、`src/contracts/events.v1.md`、`src/contracts/v1/generated/`、`tests/contracts/test_b10.py`；按 B08/B09 先例接入 `scripts/verify/contracts.sh`；随附状态标注：`specs/task-processing.md` §9、`specs/identity-access.md` §7、`src/contracts/README.md`、`docs/handoffs/claude-b10.md` | `test_b10.py` 先 27 failed 后 36 passed；六处反向篡改均被检出；`gen-contracts.sh --check` 一致；`verify.sh` exit 0（22 负例 + B08 5 + B09 5 + B10 36）；生成的 TS 经 `tsc --strict` 通过；`docs/handoffs/claude-b10.md` |
+
+- 输入：`specs/task-processing.md`「交给后续任务的契约缺口」B10 各行与 §4、§5、§7、TASK-17；`specs/identity-access.md` §5、§7 B10 行、访问矩阵任务行（ADR-010、ADR-013 已签收）。
+- 输出：`TaskEvent` 按事件拆成四个独立 schema（按 `stage` 判别）；`Task` 增加 `cancel_requested`、`failed_chunks`，并约束 `failed ⇔ error`；`TaskCounts.chunks_failed`；`issueEventTicket` 与 `EventTicket`；`streamTaskEvents` 改用 `eventTicket`；取消端点 200/409 描述；任务类 403/404 语义；`events.v1.md` §1、§2、§4 按规格改写。
+- 依赖：B08（已合入）、A03、A05。无运行时代码、数据库或环境变量改动。
+- 风险：`events.v1.md` §6 要求破坏性变更升 v2；依据 ADR-010（`specs/task-processing.md` §7）——v1 尚无消费者（C11/C12 未实现），原地修改。
+- 验证：`python3 -m pytest tests/contracts/test_b10.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- Claude 审查（REVIEW-B10，2026-09-24）：P2×4 已修——R01 `Task` 按 `stage` 拆为四个分支（生成器可见 `failed ⇔ error`）、R02 固定进度 `queued = 0` / `awaiting_review = 0.95`、R03 快照补 I5 与 `completed ⇒ progress = 1`、R04 新增 `TaskNotCancellableError` 闭集；P3×4（R05～R08）不阻塞、未改。B10 测试 36 → 45，`verify.sh` 通过；见 `docs/handoffs/claude-review-b10.md`。
+
+## B13 问答与事件契约
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B13 | DONE（待审查） | 迁移问答与事件契约 | ArvinHan（Claude 执行） | `claude/b13-chat-contract` / 叠在 B10 `3771ae1`（PR #31）上 | `src/contracts/api.v1.yaml`、`src/contracts/events.v1.md` §3、`src/contracts/v1/generated/`、`tests/contracts/test_b13.py`；接入 `scripts/verify/contracts.sh`；随附：`docs/architecture.md` 的 `NotCoveredReason` 行（Q11 要求同一次提交）、`src/contracts/errors.v1.md` 的 `RATE_LIMITED` 措辞（Q11 交 B08 的遗留）、`specs/grounded-qa.md` Q11 状态标注、`docs/handoffs/claude-b13.md` | `test_b13.py` 先 17 failed 后 43 passed；六处反向篡改均被检出；门禁实例级夹具按新必填字段补齐；`gen-contracts.sh --check` 一致；`verify.sh` exit 0；生成的 TS 经 `tsc --strict` 通过；`docs/handoffs/claude-b13.md` |
+
+- 输入：`specs/grounded-qa.md` Q2、Q4、Q5、Q6、Q7、Q9、Q11 B13 行（ADR-015 及修订 1 已签收）。
+- 输出：`NotCoveredReason` 改名为 `insufficient_evidence`；`ChatMetaEvent`、`ChatAnswered`、`ChatNotCovered` 增加 `graph_version`、`request_id`；问答错误事件带 `details.request_id`，`LLM_UNAVAILABLE` 的 `details.reason` 取闭集；问答接口补 404/500；`events.v1.md` §3 改为指向规格。
+- 依赖：B08（已合入）、A09；叠在 B10 上以避免生成物冲突。
+- 风险：同 B10，v1 问答事件尚无消费者（J07/J08 未实现），原地修改。
+- 验证：`python3 -m pytest tests/contracts/test_b13.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- Claude 审查（REVIEW-B13，2026-09-24）：修 R01～R07——`ChatError` 按 `code` 拆为两支、错误码闭集、`reason` 只属于 `LLM_UNAVAILABLE`（R01～R03）；`meta.status = answered ⇒ retrieved ≥ 1`（R04）；问答 503 引用 `ChatUnavailableError`（R05）；`events.v1.md` §6 补登 B13 例外（R06）；`ChatError` 与 B10 取消 409 的 `details` 改为具名 schema（R07）。R08 未改。B13 测试 43 → 52；见 `docs/handoffs/claude-review-b13.md`。
+
+## C01 SQLite 连接与迁移运行器
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 验收 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C01 | DONE（审查 P1/P2 已修） | 建立 SQLite 连接和迁移运行器 | Codex（后端） | `codex/c01-sqlite` / `9d2437e` | `src/backend/app/repositories/sqlite.py`、`src/backend/migrations/001_base.sql`、`tests/backend/test_c01.py`；文档：`docs/architecture.md`、`src/backend/README.md`、本任务板、`docs/handoffs/codex-c01.md` | 临时库迁移可重复；单事务失败回滚；活跃及到期秒租约拒绝；迁移前备份及恢复演练；B06 向量空间记录保留。审查修复：`model_calls` 预写、按 `call_id` 重放去重与归属查询；迁移返回后立即移动备份。专项 13 passed、后端 71 passed、`./scripts/verify.sh` exit 0，见交接。 |
+
+- 输入：B06 的 `SQLITE_URL` 与 `embedding_space_state`，ADR-011 的停机迁移协议，ADR-012 的空间记录约束。
+- 输出：WAL/外键/超时连接函数、只向前的版本化迁移、`001_base.sql` 和恢复步骤。
+- 依赖：B06、A04、A06 均已完成；不改 REST/SSE 契约。
+- 风险：迁移必须在 API/worker 停机时执行；后续表迁移需沿用同一备份与租约检查协议。
+- 验证：`python -m pytest tests/backend/test_c01.py -q`、B05/B06 回归、`./scripts/verify.sh`、`git diff --check`。

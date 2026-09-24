@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, RootModel, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, RootModel, SecretStr
 
 
 class ErrorCode(Enum):
@@ -127,6 +127,167 @@ class TaskCounts(BaseModel):
     chunks_total: Annotated[Optional[int], Field(ge=0)] = None
     kp_count: Annotated[Optional[int], Field(ge=0)] = None
     relation_count: Annotated[Optional[int], Field(ge=0)] = None
+    chunks_failed: Annotated[Optional[int], Field(ge=0)] = None
+
+
+class FailedChunk1(BaseModel):
+    chunk_id: Annotated[str, Field(min_length=1)]
+    page: Annotated[int, Field(ge=1)]
+    section_path: Annotated[Optional[str], Field(min_length=1)] = None
+    code: ErrorCode
+
+
+class FailedChunk2(BaseModel):
+    chunk_id: Annotated[str, Field(min_length=1)]
+    page: Annotated[Optional[int], Field(ge=1)] = None
+    section_path: Annotated[str, Field(min_length=1)]
+    code: ErrorCode
+
+
+class FailedChunk(RootModel[Union[FailedChunk1, FailedChunk2]]):
+    root: Annotated[
+        Union[FailedChunk1, FailedChunk2],
+        Field(
+            description='抽取阶段最终失败的块（L2 尝试耗尽后仍失败，`specs/task-processing.md` §5）。\n与 SourceRef 相同，`page` 与 `section_path` 至少给出一个，供审核页跳到原文。\n'
+        ),
+    ]
+
+
+class TaskBase(BaseModel):
+    id: str
+    course_id: str
+    document_id: str
+    stage: TaskStage
+    progress: Annotated[float, Field(description='整体进度，0–1', ge=0.0, le=1.0)]
+    cancel_requested: Annotated[
+        bool,
+        Field(
+            description='已受理取消请求。处理中阶段为「取消中」的依据；`cancelled` 时恒为 true，失败任务可能保持 true（TASK-7）。'
+        ),
+    ]
+    counts: Optional[TaskCounts] = None
+    failed_chunks: Annotated[
+        Optional[list[FailedChunk]],
+        Field(description='最终失败的块及定位；无失败块时为空数组或缺省。'),
+    ] = None
+    timings_ms: Annotated[
+        Optional[dict[str, int]],
+        Field(description='各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04）'),
+    ] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class Stage(Enum):
+    queued = 'queued'
+    parsing = 'parsing'
+    extracting = 'extracting'
+    merging = 'merging'
+    persisting = 'persisting'
+    awaiting_review = 'awaiting_review'
+
+
+class TaskCompleted(TaskBase):
+    stage: Literal['completed'] = 'completed'
+    progress: Literal[1] = 1
+    error: None = None
+
+
+class TaskCancelled(TaskBase):
+    stage: Literal['cancelled'] = 'cancelled'
+    cancel_requested: Literal[True] = True
+    error: None = None
+
+
+class FixedStageProgress(BaseModel):
+    pass
+
+
+class TaskPersistingDetails(BaseModel):
+    stage: Literal['persisting']
+    reason: Literal['persisting_uninterruptible']
+
+
+class TaskProcessingFinishedDetails(BaseModel):
+    stage: Literal['awaiting_review']
+    reason: Literal['processing_finished']
+
+
+class Stage1(Enum):
+    completed = 'completed'
+    failed = 'failed'
+    cancelled = 'cancelled'
+
+
+class TaskAlreadyTerminalDetails(BaseModel):
+    stage: Stage1
+    reason: Literal['already_terminal']
+
+
+class Stage2(Enum):
+    queued = 'queued'
+    parsing = 'parsing'
+    extracting = 'extracting'
+    merging = 'merging'
+    persisting = 'persisting'
+    awaiting_review = 'awaiting_review'
+
+
+class TaskStageEvent(FixedStageProgress):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[str, Field(min_length=1)]
+    stage: Literal[
+        'queued', 'parsing', 'extracting', 'merging', 'persisting', 'awaiting_review'
+    ]
+    progress: Annotated[float, Field(ge=0.0, le=1.0)]
+    cancel_requested: Annotated[
+        bool,
+        Field(
+            description='已收到取消请求但 worker 尚未到达块边界（协作式取消）。这是**标志位不是状态**：\n取消未生效前 `stage` 仍是当前阶段，前端据此显示「取消中」。\n'
+        ),
+    ]
+    counts: Optional[TaskCounts] = None
+    elapsed_ms: Annotated[Optional[int], Field(ge=0)] = None
+
+
+class TaskDoneEvent(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[str, Field(min_length=1)]
+    stage: Literal['completed']
+    progress: Literal[1]
+    cancel_requested: Optional[bool] = None
+    counts: Optional[TaskCounts] = None
+    elapsed_ms: Annotated[Optional[int], Field(ge=0)] = None
+
+
+class TaskCancelledEvent(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[str, Field(min_length=1)]
+    stage: Literal['cancelled']
+    progress: Annotated[float, Field(ge=0.0, le=1.0)]
+    cancel_requested: Literal[True]
+    counts: Optional[TaskCounts] = None
+    elapsed_ms: Annotated[Optional[int], Field(ge=0)] = None
+
+
+class EventTicket(BaseModel):
+    ticket: Annotated[
+        str,
+        Field(
+            description='至少 128 位密码学随机数的 URL 安全编码；只能用于本任务的一次连接。',
+            min_length=22,
+            pattern='^[A-Za-z0-9_-]+$',
+        ),
+    ]
+    expires_in: Annotated[
+        Literal[60], Field(description='有效期秒数，固定 60，不可配置到更长。')
+    ]
 
 
 class KnowledgePointType(Enum):
@@ -457,7 +618,7 @@ class ChatStatus(Enum):
 class NotCoveredReason(Enum):
     no_retrieval_hit = 'no_retrieval_hit'
     below_similarity_threshold = 'below_similarity_threshold'
-    out_of_course_scope = 'out_of_course_scope'
+    insufficient_evidence = 'insufficient_evidence'
     all_citations_invalidated = 'all_citations_invalidated'
 
 
@@ -470,6 +631,20 @@ class ChatAnswered(BaseModel):
         Field(description='「涉及的知识点」标签，点击跳转图谱并高亮'),
     ] = None
     latency_ms: Annotated[Optional[int], Field(ge=0)] = None
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatNotCovered(BaseModel):
@@ -484,6 +659,20 @@ class ChatNotCovered(BaseModel):
     reason: NotCoveredReason
     related_kp_ids: Optional[list[str]] = None
     latency_ms: Annotated[Optional[int], Field(ge=0)] = None
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatResponse(RootModel[Union[ChatAnswered, ChatNotCovered]]):
@@ -500,11 +689,26 @@ class ChatMetaEvent(BaseModel):
     event: Literal['meta']
     status: ChatStatus
     retrieved: Annotated[
-        Optional[int],
+        int,
         Field(
-            description='进入生成上下文的证据块数量，供前端显示「已检索 N 段」', ge=0
+            description='允许引用集合 A 的大小（进入生成上下文的编号文本块数），供前端显示「已检索 N 段」',
+            ge=0,
         ),
-    ] = None
+    ]
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatDeltaEvent(BaseModel):
@@ -515,6 +719,39 @@ class ChatDeltaEvent(BaseModel):
 class ChatDoneEvent(BaseModel):
     event: Literal['done']
     final: ChatResponse
+
+
+class Code(Enum):
+    BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+    INTERNAL_ERROR = 'INTERNAL_ERROR'
+
+
+class ChatErrorDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(min_length=1)]
+
+
+class ChatLlmUnavailableReason(Enum):
+    upstream = 'upstream'
+    stream_interrupted = 'stream_interrupted'
+    timeout = 'timeout'
+    auth = 'auth'
+
+
+class Code1(Enum):
+    LLM_UNAVAILABLE = 'LLM_UNAVAILABLE'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+
+
+class ChatUnavailableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[Optional[str], Field(min_length=1)] = None
+    reason: Optional[ChatLlmUnavailableReason] = None
 
 
 class Exercise(BaseModel):
@@ -549,35 +786,51 @@ class Document(BaseModel):
     uploaded_at: datetime
 
 
-class Task(BaseModel):
-    id: str
-    course_id: str
-    document_id: str
-    stage: TaskStage
-    progress: Annotated[float, Field(description='整体进度，0–1', ge=0.0, le=1.0)]
-    counts: Optional[TaskCounts] = None
-    timings_ms: Annotated[
-        Optional[dict[str, int]],
-        Field(description='各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04）'),
-    ] = None
-    error: Annotated[Optional[Error], Field(description='stage = failed 时必填')] = None
-    created_at: datetime
-    updated_at: datetime
+class TaskActive(TaskBase, FixedStageProgress):
+    stage: Literal[
+        'queued', 'parsing', 'extracting', 'merging', 'persisting', 'awaiting_review'
+    ]
+    error: None = None
 
 
-class TaskEvent(BaseModel):
-    task_id: str
-    stage: TaskStage
+class TaskFailed(TaskBase):
+    stage: Literal['failed'] = 'failed'
+    error: Error
+
+
+class TaskNotCancellableError(Error):
+    code: Literal['TASK_NOT_CANCELLABLE']
+    details: Union[
+        TaskPersistingDetails, TaskProcessingFinishedDetails, TaskAlreadyTerminalDetails
+    ]
+
+
+class TaskErrorEvent(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[str, Field(min_length=1)]
+    stage: Literal['failed']
+    progress: Annotated[float, Field(ge=0.0, le=1.0)]
+    error: Error
     cancel_requested: Annotated[
         Optional[bool],
-        Field(
-            description='已收到取消请求但 worker 尚未到达阶段边界（ADR-006 的协作式取消）。\n这是**标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，\n前端据此把取消按钮置为「取消中」而不是直接显示已取消。\n'
-        ),
-    ] = False
-    progress: Annotated[float, Field(ge=0.0, le=1.0)]
+        Field(description='取消标志已置、到检查点前失败时保持 true（TASK-7）。'),
+    ] = None
     counts: Optional[TaskCounts] = None
-    elapsed_ms: Optional[int] = None
-    error: Optional[Error] = None
+    elapsed_ms: Annotated[Optional[int], Field(ge=0)] = None
+
+
+class TaskEvent(
+    RootModel[Union[TaskStageEvent, TaskDoneEvent, TaskErrorEvent, TaskCancelledEvent]]
+):
+    root: Annotated[
+        Union[TaskStageEvent, TaskDoneEvent, TaskErrorEvent, TaskCancelledEvent],
+        Field(
+            description='单条任务 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**，`{}` 不合法；\n按 `stage` 判别，与 `event:` 行一一对应（stage / done / error / cancelled）。\n事件名、顺序、关流与重连语义见 `events.v1.md` §2、§4。\n',
+            discriminator='stage',
+        ),
+    ]
 
 
 class KnowledgePointDetail(KnowledgePoint):
@@ -590,9 +843,62 @@ class KnowledgePointDetail(KnowledgePoint):
     related: Optional[list[KnowledgePointRef]] = None
 
 
+class ChatServiceError(Error):
+    code: Literal['BUDGET_EXCEEDED', 'STORAGE_UNAVAILABLE', 'INTERNAL_ERROR']
+    details: ChatErrorDetails
+
+
+class ChatLlmUnavailableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(min_length=1)]
+    reason: ChatLlmUnavailableReason
+
+
+class ChatUnavailableError(Error):
+    code: Code1
+    details: Optional[ChatUnavailableDetails] = None
+
+
+class StudyMaterial(BaseModel):
+    kp_id: str
+    explanation: Annotated[str, Field(description='通俗讲解')]
+    examples: Optional[list[str]] = None
+    exercises: Annotated[list[Exercise], Field(max_length=3, min_length=3)]
+    cached: Optional[bool] = None
+    reviewed: Annotated[Optional[bool], Field(description='教师是否已审核固定')] = None
+    source_refs: Optional[list[SourceRef]] = None
+
+
+class Task(RootModel[Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled]]):
+    root: Annotated[
+        Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled],
+        Field(
+            description='任务快照，按 `stage` 分为四个分支（与 `TaskEvent` 同构，生成的 Pydantic / TypeScript 类型据此收窄）：\n处理中或待审核 `TaskActive`、`TaskCompleted`、`TaskFailed`、`TaskCancelled`。\n`stage = failed` ⇔ `error` 非空（TASK-17）；`cancelled` ⇒ `cancel_requested = true`（I5）；\n固定进度见 `specs/task-processing.md` §1。`failed_chunks` 只在快照中返回，SSE 事件只带计数。\n',
+            discriminator='stage',
+        ),
+    ]
+
+
+class ChatLlmUnavailableError(Error):
+    code: Literal['LLM_UNAVAILABLE']
+    details: ChatLlmUnavailableDetails
+
+
+class ChatError(RootModel[Union[ChatLlmUnavailableError, ChatServiceError]]):
+    root: Annotated[
+        Union[ChatLlmUnavailableError, ChatServiceError],
+        Field(
+            description='问答开流后（P2 之后）的错误，按 `code` 分两支（`specs/grounded-qa.md` Q5 的 O7～O13），码为闭集：\n`LLM_UNAVAILABLE` 必带 `details.reason`；`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` 不带 `reason`。\n两支都必带 `details.request_id`。`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。\n',
+            discriminator='code',
+        ),
+    ]
+
+
 class ChatErrorEvent(BaseModel):
     event: Literal['error']
-    error: Error
+    error: ChatError
 
 
 class ChatEvent(
@@ -605,13 +911,3 @@ class ChatEvent(
             discriminator='event',
         ),
     ]
-
-
-class StudyMaterial(BaseModel):
-    kp_id: str
-    explanation: Annotated[str, Field(description='通俗讲解')]
-    examples: Optional[list[str]] = None
-    exercises: Annotated[list[Exercise], Field(max_length=3, min_length=3)]
-    cached: Optional[bool] = None
-    reviewed: Annotated[Optional[bool], Field(description='教师是否已审核固定')] = None
-    source_refs: Optional[list[SourceRef]] = None

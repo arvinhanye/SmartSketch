@@ -35,7 +35,17 @@ WORKSPACE_FILES = [
     "specs/course-knowledge-graph.md",
     "specs/learning-path.md",
     "specs/teacher-review-publish.md",
+    "specs/grounded-qa.md",
     "AGENTS.md",
+]
+
+# 必须受命名门禁保护的规格（ADR-016 修订 1：按执行时 main 中实际存在的规格确定）。
+# 这里独立列出而不从门禁导入，避免「门禁漏扫、测试也跟着漏」的同源错误。
+NAMING_GUARDED_SPECS = [
+    "specs/course-knowledge-graph.md",
+    "specs/learning-path.md",
+    "specs/teacher-review-publish.md",
+    "specs/grounded-qa.md",
 ]
 
 
@@ -199,6 +209,30 @@ def test_source_chunk_alias_fails():
     assert _gate_with(mutate_text=break_it) != 0, "文本块旧标签必须被命名门禁拒绝（ADR-016 N1）"
 
 
+def test_alias_in_each_guarded_spec_fails():
+    """每份受保护的规格各注入一处旧名，门禁都必须失败（ADR-016 修订 1 的逐文件负例）。"""
+    missed = []
+    for rel in NAMING_GUARDED_SPECS:
+        def break_it(tmp: Path, rel=rel):
+            p = tmp / rel
+            p.write_text(p.read_text(encoding="utf-8") + "\n- 负例：文本块写成 SourceChunk。\n",
+                         encoding="utf-8")
+        if _gate_with(mutate_text=break_it) == 0:
+            missed.append(rel)
+    assert not missed, "以下规格注入旧标签 SourceChunk 后命名门禁仍通过：" + "；".join(missed)
+
+
+def test_guarded_spec_missing_fails():
+    """受保护的规格从工作区消失时门禁必须失败，而不是静默少扫一份。"""
+    missed = []
+    for rel in NAMING_GUARDED_SPECS:
+        def break_it(tmp: Path, rel=rel):
+            (tmp / rel).unlink()
+        if _gate_with(mutate_text=break_it) == 0:
+            missed.append(rel)
+    assert not missed, "缺少以下规格时门禁仍通过：" + "；".join(missed)
+
+
 # ── R05：状态机跨文件一致 ───────────────────────────────────────
 
 def test_spec_missing_stage_fails():
@@ -295,33 +329,37 @@ def test_gencheck_missing_stage_fails_in_every_locale():
 
 # ── 实例级正负例：schema 真的拦得住报告里的两个例子吗 ──────────────
 
+# B13（ADR-015）起，问答终态与 meta 必带绑定版本与请求 ID；各用例都带上，确保负例只因其原本要测的缺陷被拒
+_BOUND = {"graph_version": 3, "request_id": "r_01"}
+
+
 def _instance_cases():
     return [
-        ("ChatResponse", {"status": "answered", "answer": "结论", "citations": []}, False,
+        ("ChatResponse", {"status": "answered", "answer": "结论", "citations": []} | _BOUND, False,
          "R03 报告原例：answered 但没有引用"),
         ("ChatResponse", {"status": "answered", "answer": "栈是后进先出[1]。", "citations": [
-            {"index": 1, "chunk_id": "c_77", "document_id": "d_03", "text": "栈是…"}]}, False,
+            {"index": 1, "chunk_id": "c_77", "document_id": "d_03", "text": "栈是…"}]} | _BOUND, False,
          "R03 报告原例：引用无页码也无章节"),
         ("ChatResponse", {"status": "answered", "answer": "栈是后进先出[1]。", "citations": [
             {"index": 1, "chunk_id": "c_77", "document_id": "d_03", "page": 52,
-             "text": "栈是…"}]}, True, "带页码的真实引用"),
+             "text": "栈是…"}]} | _BOUND, True, "带页码的真实引用"),
         ("ChatResponse", {"status": "answered", "answer": "栈是后进先出[1]。", "citations": [
             {"index": 1, "chunk_id": "c_77", "document_id": "d_03",
-             "section_path": "第3章 > 3.1 栈", "text": "栈是…"}]}, True, "只带章节路径"),
+             "section_path": "第3章 > 3.1 栈", "text": "栈是…"}]} | _BOUND, True, "只带章节路径"),
         ("ChatResponse", {"status": "not_covered", "answer": "课程资料未覆盖该问题。",
-                          "citations": [], "reason": "no_retrieval_hit"}, True,
+                          "citations": [], "reason": "no_retrieval_hit"} | _BOUND, True,
          "未覆盖终态带机读原因"),
-        ("ChatResponse", {"status": "not_covered", "answer": "未覆盖", "citations": []}, False,
+        ("ChatResponse", {"status": "not_covered", "answer": "未覆盖", "citations": []} | _BOUND, False,
          "未覆盖但没给机读原因"),
         ("ChatEvent", {}, False, "R04 报告原例：空事件 {}"),
         ("ChatEvent", {"event": "done", "status": "not_covered", "answer": "未覆盖",
                        "citations": []}, False, "R04 报告原例：done 用文档里并不存在的 answer 字段"),
         ("ChatEvent", {"event": "done", "final": {
             "status": "not_covered", "answer": "生成的回答无法与课程资料对应，已撤回。",
-            "citations": [], "reason": "all_citations_invalidated"}}, True,
+            "citations": [], "reason": "all_citations_invalidated"} | _BOUND}, True,
          "引用全部失效时降级为未覆盖终态"),
         ("ChatEvent", {"event": "delta", "delta": ""}, False, "空 delta"),
-        ("ChatEvent", {"event": "meta", "status": "answered", "retrieved": 6}, True, "meta"),
+        ("ChatEvent", {"event": "meta", "status": "answered", "retrieved": 6} | _BOUND, True, "meta"),
     ]
 
 

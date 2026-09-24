@@ -74,7 +74,7 @@
 
 | 码 | HTTP | 触发条件 | 前端处理 |
 | --- | --- | --- | --- |
-| `TASK_NOT_CANCELLABLE` | 409 | 对已处于终态的任务调用取消 | 刷新任务状态，隐藏取消按钮 |
+| `TASK_NOT_CANCELLABLE` | 409 | 任务正在入库（`persisting`）、已处理结束（`awaiting_review`）或已处于终态时调用取消；`details: {stage, reason}` 为闭集，见 `api.v1.yaml` 的 `TaskNotCancellableError` | 按 `details.stage` 刷新任务状态，隐藏取消按钮 |
 | `PUBLISH_BLOCKED` | 409 | 发布前校验未通过，如存在未解决的环冲突 | `details.reasons` 列出阻塞项，引导至审核队列 |
 | `PUBLISH_IN_PROGRESS` | 409 | 同一课程已有发布或回滚进行中 | 等待当前操作结束后刷新版本列表 |
 | `COURSE_BUSY` | 409 | 获取课程写锁的有界等待超时 | `details.holder` 标明持锁操作；稍后重试 |
@@ -93,7 +93,7 @@
 
 | 码 | HTTP | 触发条件 | 前端处理 |
 | --- | --- | --- | --- |
-| `RATE_LIMITED` | 429 | 触发模型 API 或本服务限流 | 读 `Retry-After`，指数退避后重试 |
+| `RATE_LIMITED` | 429 | 触发本服务限流（如登录失败限流）。供应商返回的 429 不外露：按 A07 矩阵首字前切备用，最终失败为 `LLM_UNAVAILABLE`（问答 `details.reason = upstream`） | 读 `Retry-After`，指数退避后重试 |
 | `LLM_UNAVAILABLE` | 503 | 主模型与备用模型均不可用 | 提示稍后重试；构图场景下任务转 `failed` 并保留已完成的块 |
 | `BUDGET_EXCEEDED` | 429 | 调用前发现任务或当日 token 预算已耗尽；不再发模型请求 | 提示额度耗尽；问答返回错误，抽取按失败块规则处理，不自动重试 |
 | `STORAGE_UNAVAILABLE` | 503 | 同步请求的存储依赖不可用 | 提示稍后重试；异步任务按上表返回 200 快照 |
