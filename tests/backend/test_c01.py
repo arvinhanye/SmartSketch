@@ -37,6 +37,49 @@ def test_base_migration_adopts_existing_embedding_space_and_is_repeatable(tmp_pa
         ).fetchall() == [("001", "001_base.sql", 64)]
 
 
+def test_model_calls_prewrite_replay_and_attribution_query(tmp_path):
+    path = tmp_path / "db.sqlite3"
+    url = _url(path)
+    assert migrate(url) == ["001"]
+    prewrite = (
+        "call-1", "course-1", "task-1", "chunk-1", None,
+        "entity", 1, 2, 1, "primary", 0, "model-a", 120, 50,
+    )
+    sql = """INSERT OR IGNORE INTO model_calls (
+        call_id, course_id, task_id, chunk_id, request_id, purpose,
+        task_attempt, chunk_attempt, call_seq, provider_role, is_repair,
+        model_requested, input_tokens_est, max_output_tokens
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+    with sqlite3.connect(path) as database:
+        database.execute(sql, prewrite)
+        database.execute(sql, prewrite)
+        database.execute(sql, (
+            "call-2", "course-1", None, None, "request-1",
+            "answer", None, None, None, "primary", 0, "model-a", 40, 20,
+        ))
+        assert database.execute(
+            "SELECT call_id, status, input_tokens_est, max_output_tokens "
+            "FROM model_calls WHERE task_id = ?", ("task-1",)
+        ).fetchall() == [("call-1", "sent", 120, 50)]
+        assert database.execute(
+            "SELECT call_id FROM model_calls WHERE request_id = ?", ("request-1",)
+        ).fetchall() == [("call-2",)]
+        assert database.execute("SELECT COUNT(*) FROM model_calls").fetchone() == (2,)
+        with pytest.raises(sqlite3.IntegrityError):
+            database.execute("INSERT INTO model_calls (call_id) VALUES (NULL)")
+
+
+def test_backup_can_be_moved_immediately_after_migration_returns(tmp_path):
+    path = tmp_path / "db.sqlite3"
+    assert migrate(_url(path)) == ["001"]
+    backup = next((tmp_path / "backups").glob("*-before-001.sqlite"))
+    moved = tmp_path / "moved-backup.sqlite"
+    shutil.move(backup, moved)
+    assert moved.is_file()
+    with sqlite3.connect(moved) as database:
+        assert database.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+
+
 def test_failed_migration_rolls_back_schema_and_version(tmp_path):
     path = tmp_path / "db.sqlite3"
     url = _url(path)

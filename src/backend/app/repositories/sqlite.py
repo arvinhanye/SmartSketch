@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -112,7 +112,7 @@ def _backup(database: sqlite3.Connection, path: Path, version: str) -> Path:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     backup = directory / f"{timestamp}-before-{version}.sqlite"
     database.execute("VACUUM INTO ?", (str(backup),))
-    with sqlite3.connect(backup) as copy:
+    with closing(sqlite3.connect(backup)) as copy:
         result = copy.execute("PRAGMA integrity_check").fetchone()
     if result != ("ok",):
         backup.unlink(missing_ok=True)
