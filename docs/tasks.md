@@ -267,3 +267,33 @@
 - 输出：`api.v1.yaml`、配套语义文档、完整 Python/TypeScript/JSON 生成物、严格契约校验及 CI 安装步骤；N1 的 `Chunk` 命名同步到架构、A04 规格、D10 计划。
 - 依赖与风险：批 0 已在本地提交；A10 与前置 PR 仍未全部进入 `main`，本批不能直接合入主线。`events.v1.md` §2 的旧状态机叙述留给 B10 迁移，已在文首标明现行规范的优先级。远端 CI 尚未运行。
 - 验证命令：`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`python docs/reviews/validate_atomic_plan.py`、生成模型导入、`python -m pip check`、`git diff --check`；具体结果与回滚见交接。
+
+## A1～A10 收尾（2026-09-24）
+
+> 盘点基线 `origin/main@f9dfc8f`；合并后基线 `origin/main@2819701`。本节只登记状态与去向，不代替各 PR 自己的任务行。
+
+| 原子 ID | 决定 | 合入 main | Codex 审查意见 | 余项 |
+| --- | --- | --- | --- | --- |
+| A01 | ADR-004 已签收 | PR #1 | 无未决 | — |
+| A02 | ADR-009 已签收 | PR #2 | **A02-R01**（P2）：YAML 真源 `Relation.required` 未含 `status`、`source`、`source_refs`，与规格「关系至少含」不一致 | 交 **B11**（见下） |
+| A03 | ADR-010 已签收 | PR #5（含 A03-R01/R02 修复） | 无未决 | — |
+| A04 | ADR-012 及修订 1、修订 2（含补注）已签收 | PR #7、#10、#16 | FIX-R02、FIX-R03 已修 | 待 Codex 复核 FIX-R03（`970c582`） |
+| A05 | ADR-013 已签收 | PR #9 | 无未决 | — |
+| A06 | ADR-011 及修订 1 已签收 | PR #6、#11 | 无未决 | — |
+| A07 | 形状已定；ADR-011 修订 2、3 已签收 | PR #8、#12、#16 | A07-R01、FIX-R01 已修 | 取值待 D-02a～f |
+| A08 | ADR-014 及修订 1（含决定 9 补注）已签收 | PR #19、#23 | A08S-R01/R02 已修 | 待 Codex 复核（`39633fe`） |
+| A09 | ADR-015 及修订 1 已签收 | PR #20 | A09-R01/R02 已修 | 待 Codex 复核（`097f248`） |
+| A10 | ADR-016 及修订 1 已签收 | PR #18、#24；批 0/1 为 PR #22 | A10-R01/R02 已修 | 待 Codex 复核（`fae2212`）；批 2～6 未执行 |
+
+- **合并记录**：2026-09-24 由 Claude 按 ArvinHan 在会话中的明确指示依次合并 #16 → #23 → #20 → #18 → #24 → #22（ADR-016 规定由 ArvinHan 合并，本次为其授权的代执行）。每个 PR 合并前先同步 main、解决文末追加冲突，本地 `./scripts/verify.sh` 与 `git diff --check` 通过，且 CI 在新的头提交上成功后才合并；#22 合并前本地运行了含契约门禁（22 项负向测试）的完整 `verify.sh`，exit 0。
+- **四处补注**已由 ArvinHan 于 2026-09-24 签收：ADR-012 修订 2 补注、ADR-014 修订 1 决定 9 补注、ADR-015 修订 1、ADR-016 修订 1。
+- **A 组关闭条件**：仅剩 Codex 复核上表四个修复提交，无新的 P1/P2 即关闭。A 组没有未认领的原子任务。
+- **仍开放、但不阻塞 A 组关闭的决定**：D-01（示例课程资料）、D-02a～f（模型供应商与预算取值）、PLAN-D05（学习材料分支）、D-08（A10 登记）。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A1～A10 收尾 | DONE（修复已合入、四处补注已签收；待 Codex 复核） | 盘点 A01～A10，修复 Codex 未决意见 FIX-R03、A08S-R01/R02、A09-R01/R02、A10-R01/R02，按授权依次合并 PR，登记 A02-R01 去向 | Claude（协调 Agent） | `.claude/worktrees/a1-a10-meta-task-wrap-ddbf4b`（分支 `claude/a1-a10-meta-task-wrap-ddbf4b`）/ base `f9dfc8f`，合并后同步 `2819701` | 本节、`docs/handoffs/claude-a1-a10-wrap.md`；各修复的文件锁见对应任务行 | `docs/handoffs/claude-a1-a10-wrap.md`；各修复的核对脚本先红后绿、篡改负例全部检出；合并后 main 上 `./scripts/verify.sh` exit 0 |
+
+- **A02-R01 → B11**（未认领）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。契约真源已随 PR #22 进入 main，可以开始。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
+- **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
+- Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
