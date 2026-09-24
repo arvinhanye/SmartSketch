@@ -300,6 +300,15 @@
 - **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
 - Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
 
+## A10 批 1 补：问答规格加回契约门禁
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10-批1补 | DONE | 把 `specs/grounded-qa.md` 加回契约命名门禁的扫描清单与测试夹具，并为每份被扫描的规格加错误命名负例（ADR-016 修订 1） | Claude（后端 Agent） | `.claude/worktrees/batch1-qa`（分支 `claude/batch1-grounded-qa`）/ base `548c4f8` | `scripts/check_contracts.py`（`NAMING_DRIFT_DOCS`）、`tests/contracts/test_contracts.py`、本节、`docs/handoffs/claude-a10-batch1-supplement.md` | 新增 `test_alias_in_each_guarded_spec_fails`、`test_guarded_spec_missing_fails`：去掉扫描项时两项均只因 `grounded-qa.md` 失败，加回后通过；契约负向测试 24/24；`./scripts/verify.sh` exit 0（命名基线 10 份文档）；`git diff --check` exit 0；`docs/handoffs/claude-a10-batch1-supplement.md` |
+
+- 输入：ADR-016 修订 1 决定 1；A09 已随 PR #20 合入 main。输出：`specs/grounded-qa.md` 进入命名门禁扫描清单与测试工作区；四份受保护规格（课程图谱、学习路径、教师发布、问答）各有一处 `SourceChunk` 注入负例和一处缺文件负例。测试中的受保护清单独立列出，不从门禁导入，避免同源漏扫。
+- 本项关闭 A1～A10 收尾一节登记的「批 1 补」。
+
 ## B01 前端构建与单页挂载
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
