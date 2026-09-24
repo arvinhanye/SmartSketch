@@ -8,7 +8,12 @@ from fastapi.testclient import TestClient
 from app.main import APP_VERSION, create_app
 
 
-def test_factory_needs_no_secrets_or_network(monkeypatch):
+def _isolated_sqlite(tmp_path, monkeypatch):
+    monkeypatch.setenv("SQLITE_URL", f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
+
+
+def test_factory_needs_no_secrets_or_network(tmp_path, monkeypatch):
+    _isolated_sqlite(tmp_path, monkeypatch)
     for name in ("NEO4J_PASSWORD", "LLM_API_KEY", "AUTH_JWT_SECRET"):
         monkeypatch.delenv(name, raising=False)
 
@@ -24,7 +29,8 @@ def test_factory_needs_no_secrets_or_network(monkeypatch):
     assert response.json() == {"status": "ok", "version": APP_VERSION}
 
 
-def test_health_contract_is_public_and_versioned():
+def test_health_contract_is_public_and_versioned(tmp_path, monkeypatch):
+    _isolated_sqlite(tmp_path, monkeypatch)
     application = create_app()
     with TestClient(application) as client:
         response = client.get("/health")
@@ -41,7 +47,8 @@ def test_health_contract_is_public_and_versioned():
     assert schema["properties"]["status"].get("const") == "ok"
 
 
-def test_health_path_and_method_boundaries():
+def test_health_path_and_method_boundaries(tmp_path, monkeypatch):
+    _isolated_sqlite(tmp_path, monkeypatch)
     with TestClient(create_app()) as client:
         assert client.get("/api/v1/health").status_code == 404
         assert client.post("/health").status_code == 405
