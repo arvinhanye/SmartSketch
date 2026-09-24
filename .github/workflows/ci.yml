@@ -29,7 +29,7 @@ jobs:
           package-manager-cache: false
       - name: Install locked contract tools
         run: |
-          python -m pip install 'pyyaml==6.0.2' 'openapi-spec-validator==0.9.0' 'jsonschema==4.26.0' 'datamodel-code-generator==0.26.3'
+          python -m pip install 'pyyaml==6.0.2' 'openapi-spec-validator==0.9.0' 'jsonschema==4.26.0' 'datamodel-code-generator==0.26.3' 'pytest==8.3.5'
           python -m pip check
           npm install --prefix "$RUNNER_TEMP/contract-tools" --no-save --ignore-scripts --no-audit --no-fund 'openapi-typescript@7.4.4'
           echo "$RUNNER_TEMP/contract-tools/node_modules/.bin" >> "$GITHUB_PATH"
