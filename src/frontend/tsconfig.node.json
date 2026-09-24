@@ -1,16 +1,19 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "Bundler",
-    "types": ["vite/client"],
+    "types": ["node"],
+    "paths": {
+      "*": ["./node_modules/@types/*", "./node_modules/*"]
+    },
     "strict": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "src/**/*.vue"]
+  "include": ["vite.config.ts", "vitest.config.ts", "../../tests/frontend/**/*.ts"]
 }
