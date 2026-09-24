@@ -6,7 +6,7 @@
 
 OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结构看 yaml，时序看本文件**。
 
-> 任务状态转换、取消条件与处理阶段 SSE 关流已由 [任务处理规格](../../specs/task-processing.md)（ADR-010）签收；下文 §2 的早期转换表和终态事件说明若与该规格冲突，以该规格为准。B10 负责将 §2 全面改为引用该规格，并补齐契约字段。
+> 任务状态转换、取消条件与处理阶段 SSE 关流的唯一规范是 [任务处理规格](../../specs/task-processing.md)（ADR-010）；票据鉴权的唯一规范是 [身份与访问规格](../../specs/identity-access.md) §5（ADR-013）。本文 §2、§4 按二者改写（B10），冲突时以规格为准。
 
 ---
 
@@ -18,59 +18,48 @@ OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结�
 | 缓冲 | 响应头须带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`，否则反向代理会缓冲住流 |
 | 编码 | 每条事件的 `data` 为**单行 JSON**，不换行、不美化 |
 | 心跳 | 服务端每 15 秒发送注释行 `:ping`，客户端忽略，仅用于保活 |
-| 鉴权 | `EventSource` 不支持自定义请求头；令牌通过 `?token=` 查询参数传递，服务端只接受一次性短时效令牌 |
+| 鉴权（任务流） | `EventSource` 不支持自定义请求头，常规访问令牌**绝不**放进 URL。先用 Bearer 调 `POST /api/v1/tasks/{tid}/event-ticket` 申领一次性票据，再以 `?ticket=` 连接；服务端不读取 `Authorization` 头。详见 [身份与访问规格](../../specs/identity-access.md) §5 |
+| 鉴权（问答流） | `fetch` 发起的 POST 流，照常带 `Authorization: Bearer` 头，不使用票据 |
 
-> 鉴权方式是 SSE 的已知限制。查询参数会进入访问日志，因此该令牌**必须**与常规 Bearer 令牌分离、有效期 ≤60 秒且仅对该任务的读取有效。
+> 票据只对该任务有效、只能核销一次、60 秒后过期，服务端只存其 sha256。票据缺失、无效、过期、已用或与任务不符 → 401 `UNAUTHENTICATED`；把常规访问令牌放进 `?ticket=` 或 `?token=` 同样 401。
 
 ---
 
 ## 2. 任务进度事件：`GET /api/v1/tasks/{tid}/events`
 
-### 事件名
+任务 SSE 只覆盖**处理阶段**：从建连到任务进入 `awaiting_review` 或 `failed` / `cancelled` 为止。**审核完成（`completed`）不通过已有连接送达**（`specs/task-processing.md` §7）。
 
-| event | 何时发送 | data |
-| --- | --- | --- |
-| `stage` | 进入新阶段，或同阶段内进度变化 | `TaskEvent` |
-| `done` | 任务进入终态 `completed` | `TaskEvent`，`progress = 1` |
-| `error` | 任务进入终态 `failed` | `TaskEvent`，`error` 必填 |
-| `cancelled` | 任务进入终态 `cancelled` | `TaskEvent` |
+### 事件名与载荷
 
-### 规范转换表
+每种事件有**独立的 `data` schema**，按 `stage` 判别，结构见 `api.v1.yaml` 的 `TaskEvent`（`oneOf` + `discriminator: stage`）。`data` 为 `{}` 或字段与事件不符的载荷会被结构校验拒绝。
 
-状态机的**唯一规范表述**在这里。`docs/architecture.md`、`specs/` 与 `api.v1.yaml` 的
-`TaskStage` 都引用本表，不各写一份——两份表述分头演进正是 codex 审查 R05 的成因。
+| event | 何时发送 | data schema | 必填字段 | 之后 |
+| --- | --- | --- | --- | --- |
+| `stage` | 建连快照（非终态）；进入新阶段；阶段内进度变化；`cancel_requested` 由 false 变 true | `TaskStageEvent` | `task_id`、`stage`（`queued`～`awaiting_review`）、`progress`、`cancel_requested` | `stage = awaiting_review` 时服务端关流，其余保持连接 |
+| `done` | 仅当建连时任务已 `completed`，作为首条快照 | `TaskDoneEvent` | `task_id`、`stage = completed`、`progress = 1` | 关流 |
+| `error` | 处理中进入 `failed`，或建连时已 `failed` | `TaskErrorEvent` | `task_id`、`stage = failed`、`progress`、`error`（非 null） | 关流 |
+| `cancelled` | 处理中进入 `cancelled`，或建连时已 `cancelled` | `TaskCancelledEvent` | `task_id`、`stage = cancelled`、`progress`、`cancel_requested = true` | 关流 |
 
-| 起点 | 终点 | 触发者 | 条件 |
-| --- | --- | --- | --- |
-| （无） | `queued` | API（`POST /api/v1/courses/{cid}/documents`） | 资料落盘、任务记录创建 |
-| `queued` | `parsing` | worker | 领取任务 |
-| `parsing` | `extracting` | worker | 分块完成 |
-| `extracting` | `merging` | worker | 实体与关系抽取完成 |
-| `merging` | `persisting` | worker | 融合消歧完成 |
-| `persisting` | `awaiting_review` | worker | DAG 校验通过且草稿图谱写入成功 |
-| `awaiting_review` | `completed` | **教师**（`POST /api/v1/courses/{cid}/publish`） | 审核通过并发布。worker 不会自行把 `awaiting_review` 推到 `completed` |
-| 任一非终态 | `failed` | worker | 该阶段不可恢复地失败，`error` 必填 |
-| 任一非终态 | `cancelled` | worker | 取消标记已置且 worker 到达阶段边界（ADR-006） |
+- 事件只带计数（`counts`，含 `chunks_failed`），不带 `failed_chunks` 明细；明细见 `GET /api/v1/tasks/{tid}` 的快照。
+- **终态集合**：`completed`、`failed`、`cancelled`。`awaiting_review` 是处理结束的**非终态**，但它是处理期连接的结束事件。
 
-- **终态集合**：`completed`、`failed`、`cancelled`。终态之后不再发送该任务的任何事件。
-- **`queued` 阶段的取消由谁执行**：任务尚未被 worker 领取时，取消端点直接把任务置为 `cancelled`
-  并返回；worker 领取前先检查该标记，已取消的任务不再领取。运行中的取消由 worker 在阶段边界执行。
-- **`cancel_requested` 是标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，事件里带
-  `cancel_requested: true`，前端把按钮显示为「取消中」。它不占用状态枚举，因此不是破坏性变更。
-- **取消与完成竞争**：以先到达终态者为准，取消端点返回任务当前实际状态（ADR-006 第 4 条）。
+### 状态转换
+
+转换表、触发者与取消条件**只在** [`specs/task-processing.md`](../../specs/task-processing.md) §1、§2 与 §4，本文不另写一份（两份表分头演进正是审查 R05 的成因）。主线为：
+
+```
+queued → parsing → extracting → merging → persisting → awaiting_review → completed
+```
+
+`cancel_requested` 是标志位不是状态：取消未生效前 `stage` 仍是当前阶段，事件带 `cancel_requested: true`，前端显示「取消中」。
 
 ### 顺序保证
 
-1. 连接建立后**立即**补发一条 `stage`，反映当前状态。客户端因此不需要先调 `GET /api/v1/tasks/{tid}` 取初始值。
-2. `stage` 的取值只能沿上表前进，**不得回退**：
-
-   ```
-   queued → parsing → extracting → merging → persisting → awaiting_review → completed
-   ```
-
-3. `progress` 单调不减。
-4. 三个终态事件（`done` / `error` / `cancelled`）**互斥且恰好发生一次**，发送后服务端关闭连接。
-5. 客户端收到终态事件后必须主动 `close()`，否则 `EventSource` 会自动重连并再次收到补发的终态事件。
+1. 连接建立后**立即**补发一条当前快照：非终态为 `stage`，终态为对应的 `done` / `error` / `cancelled`。客户端因此不需要先调 `GET /api/v1/tasks/{tid}` 取初始值。
+2. `stage` 只能沿主线前进，**不得回退**；`progress` 单调不减。跨连接同样成立，重连后的快照不小于断开前。
+3. **每个连接恰好以一条结束事件收尾**：`stage = awaiting_review` 的快照，或 `done` / `error` / `cancelled` 之一；同一连接内这几种结束事件互斥，发送后服务端即关流。这是按连接的保证，不是按任务生命周期的保证：一个最终 `completed` 的任务，其处理期的连接都以 `awaiting_review` 收尾，永远收不到 `done`。
+4. 客户端收到任何结束事件后必须主动 `close()`，不得为等待 `done` 保持或重建连接。审核完成用 `GET /api/v1/tasks/{tid}`（`stage = completed`）或课程发布状态观察。
+5. 同一任务允许多个连接，各自先收快照，此后事件广播给全部连接。worker 崩溃时任务停在原阶段，连接照常心跳。
 
 ### 阶段与进度映射
 
@@ -85,6 +74,7 @@ OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结�
 | `persisting` | 0.80 – 0.95 |
 | `awaiting_review` | 0.95 |
 | `completed` | 1.00 |
+| `failed` / `cancelled` | 保持进入终态时的值 |
 
 前端进度条直接使用 `progress`，阶段名单独展示，不要自行换算。
 
@@ -94,17 +84,24 @@ OpenAPI 无法描述事件流的时序语义，因此二者缺一不可：**结�
 :ping
 
 event: stage
-data: {"task_id":"t_01","stage":"extracting","progress":0.34,"counts":{"chunks_done":5,"chunks_total":14,"kp_count":23,"relation_count":0},"elapsed_ms":18420}
+data: {"task_id":"t_01","stage":"extracting","progress":0.34,"cancel_requested":false,"counts":{"chunks_done":5,"chunks_total":14,"chunks_failed":0,"kp_count":23,"relation_count":0},"elapsed_ms":18420}
 
+event: stage
+data: {"task_id":"t_01","stage":"awaiting_review","progress":0.95,"cancel_requested":false,"counts":{"chunks_done":14,"chunks_total":14,"chunks_failed":1,"kp_count":47,"relation_count":88},"elapsed_ms":43100}
+```
+
+`awaiting_review` 之后服务端关流。任务发布后才建立的连接只收到一条：
+
+```text
 event: done
-data: {"task_id":"t_01","stage":"completed","progress":1,"counts":{"chunks_done":14,"chunks_total":14,"kp_count":47,"relation_count":88},"elapsed_ms":43100}
+data: {"task_id":"t_01","stage":"completed","progress":1}
 ```
 
 失败时：
 
 ```text
 event: error
-data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"LLM_UNAVAILABLE","message":"主备模型均不可用，请稍后重试"}}
+data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"EXTRACTION_INCOMPLETE","message":"抽取失败的块超过阈值","details":{"chunks_failed":3,"chunks_total":10,"threshold":0.2}}}
 ```
 
 > `failed` 是**任务的领域状态**，不是 HTTP 错误。SSE 连接本身仍是 200，`GET /api/v1/tasks/{tid}` 也返回 200。
@@ -202,8 +199,8 @@ data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答�
 
 | 场景 | 行为 |
 | --- | --- |
-| 任务进度流断开 | `EventSource` 自动重连；服务端在新连接上按第 2 节补发当前状态。**不使用 `Last-Event-ID`**，因为补发当前快照即可恢复，无需重放历史 |
-| 任务已终态后重连 | 立即发送对应终态事件并关闭 |
+| 任务进度流断开 | **不依赖 `EventSource` 自动重连**：票据一次性，自动重连会带着已用票据必然 401，浏览器随后静默停止重试。由 `src/frontend/src/api/` 封装负责：出错即 `close()` → 重新申领票据 → 新建连接；新连接按 §2 先补当前快照。**不使用 `Last-Event-ID`**。建议退避 1、2、4… 秒，上限 30 秒；连续失败 5 次降级为每 5 秒轮询 `GET /api/v1/tasks/{tid}`（C12 可调，非契约） |
+| 任务已 `awaiting_review` 或终态后建连 | 收到快照（`stage = awaiting_review`，或对应的 `done` / `error` / `cancelled`）后被关流，客户端不再重建 |
 | 问答流断开 | **不自动重连**。已消费的 `delta` 不可重放，前端提示用户重新提问 |
 
 ---
@@ -212,8 +209,11 @@ data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答�
 
 - SSE 客户端封装在 `src/frontend/src/api/`，组件不得直接 `new EventSource`（`.claude/rules/frontend.md`）。
 - 组件卸载时必须关闭连接，否则任务页反复进出会累积连接。
+- 丢弃 `task_id` 不等于当前订阅任务的事件：切换资料或课程时，旧流的迟到事件不得污染当前视图。
 - 进度、错误、取消三种终态都要有对应 UI 态；空态与加载态同样必须覆盖。
 
 ## 6. 变更策略
 
 事件名、顺序保证与终态语义属于破坏性变更，必须新增 `events.v2.md` 并在 `api.v2.yaml` 中同步，不得原地修改本文件。新增可选字段不算破坏性变更。
+
+> 例外记录：B10（2026-09-24）按 ADR-010、ADR-013 原地改写了 §1 鉴权、§2 关流语义与 §4 重连，并收紧了 `TaskEvent` 结构。依据是 `specs/task-processing.md` §7：v1 尚无任何消费者（C11/C12 未实现），此时修改迁移成本为零。此后再改须按本节升 v2。
