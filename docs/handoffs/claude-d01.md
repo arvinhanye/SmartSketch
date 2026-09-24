@@ -14,7 +14,7 @@
 | --- | --- |
 | `src/backend/app/services/parsers/models.py` | 纯数据模型（stdlib `dataclass(frozen=True, slots=True)`，无新依赖），见下「模型」 |
 | `src/backend/app/services/parsers/__init__.py` | 包入口，重导出全部公共名称 |
-| `tests/backend/test_d01.py` | 83 个用例（含参数化），覆盖成功、边界、失败三类，外加 fixture 检查 |
+| `tests/backend/test_d01.py` | 88 个用例（含参数化；首版 83 个，REVIEW-D01 后 88 个），覆盖成功、边界、失败三类，外加 fixture 检查 |
 | `tests/fixtures/documents/README.md` | 来源与许可（自编）、每份样例用途、DOCX/PDF/GBK 不入库的约定 |
 | `tests/fixtures/documents/stack-queue-notes.md` | 自编 Markdown：标题前段落、两级标题、表格、列表、代码块中的 `#` |
 | `tests/fixtures/documents/linear-list-numbered.txt` | 自编 TXT：中文编号「第一章」「二、」与「1.1」混用 |
@@ -33,12 +33,12 @@
   - `paragraph`：`None` 或 ≥ 1 的整数。
   - `line_start` / `line_end`：同时给或同时空，`1 ≤ start ≤ end`。
   - 三者（`page`、`section_titles`、`paragraph`）至少有一个。
-  - `.section_path`：有标题时为 `" > ".join(section_titles)`（与 `SourceRef` 示例「第3章 > 3.1 栈」一致）；无标题时为 `第N段`；二者皆无时为 `None`。
+  - `.section_path`：标题路径后面接 `第N段`（有段落号时），各级用 `" > "` 连接。无页码格式得到「第3章 > 3.1 栈 > 第2段」或单独的「第N段」；PDF 不填段落号，得到标题路径，或 `None`（REVIEW-D01-R02）。
   - `.to_source_fields()`：返回 `SourceRef` 的定位字段，缺失的键直接省略，不写 `null`。
 - `ParsedBlock(ordinal, text, locator, kind=paragraph)`：`ordinal` ≥ 0 的整数；`text` 去掉空白后必须非空，原文（含首尾空白）原样保存；`kind` 接受枚举值字符串。
 - `ParsedDocument(source_format, parser_version, blocks)`：文档级规则见下；`blocks` 转为元组。
 - `RevisionKey(document_id, content_hash, parser_version)`：资料修订三元组；`content_hash` 必须形如 `sha256:<64 位小写十六进制>`（与快照摘要格式一致）；`parser_version` 为不含空白的非空字符串（如 `txt/1`）。
-- `sha256_digest(bytes)`：对**原始上传字节**求上述格式的哈希；传入 `str` 会被拒绝。
+- ~~`sha256_digest(bytes)`~~：已按 REVIEW-D01-R04 删除。内容哈希的唯一来源是 C05 `StoredFile.content_hash`。
 - `normalize_heading(str)`：合并所有空白为单个空格、去首尾，半角 `>` 改为全角 `＞`，保证 `section_path` 能按连接符无歧义地拆回各级标题。
 - `DocumentUnreadableError(reason, detail="")`：`reason ∈ {corrupted, encrypted, no_text}`，与 `DOCUMENT_UNREADABLE.details.reason` 的 wire 闭集一致；传其他值抛 `ParseModelError`。
 - `ParseModelError(ValueError)`：违反不变量即抛出，说明解析器实现有缺陷。
@@ -46,15 +46,15 @@
 ## 定位规则（ParsedDocument 构造时校验）
 
 1. `ordinal` 必须按顺序从 0 连续编号，不能重复、跳号或乱序。
-2. **PDF**：每块必须有 `page`；`section_titles` 可空（由 D06 给）；不带行号。
+2. **PDF**：每块必须有 `page`；`section_titles` 可空（由 D06 给）；**不填 `paragraph`**（填了即拒绝，REVIEW-D01-R01）；不带行号。
 3. **TXT / Markdown / DOCX（无页码）**：`page` 必须为空，不得编造页码；每块必须有 `paragraph`。
-4. **段落编号**：凡是带 `paragraph` 的块，按相同的 `section_titles` 分组、按 `ordinal` 顺序，编号必须恰为 1、2、3……。同一标题路径在文档中再次出现时接续编号，所以「章节路径 + 段落号」在一份文档内唯一。块前没有标题时，`section_titles = ()`，`section_path` 为 `第N段`。
+4. **段落编号**（只对 TXT/Markdown/DOCX）：按相同的 `section_titles` 分组、按 `ordinal` 顺序，编号必须恰为 1、2、3……。同一标题路径在文档中再次出现时接续编号，所以「章节路径 + 段落号」在一份文档内唯一。`section_path` 为「标题路径 > 第N段」；块前没有标题时为 `第N段`。
 5. **行号**：TXT 与 Markdown 必须带行号（指解码后源文本的物理行号，闭区间），且块与块之间严格递增、不重叠；DOCX 与 PDF 不得带行号。
 6. **空文档**：`blocks` 为空时拒绝构造。解析器应改抛 `DocumentUnreadableError("no_text")`，对应 TASK-14 的 `reason = no_text`。
 
 ## 决定与理由
 
-- **修订信息放在文档级，不放在每个块上**：解析器只拿到字节，不知道 `document_id`。所以 `ParsedDocument` 只带 `parser_version`，D11 编排时用 `RevisionKey(document_id, sha256_digest(原始字节), parsed.parser_version)` 补齐。同一 `ParsedDocument` 的所有块属于同一个修订。`revision_id` 与块 ID 的派生公式留给 D09，本任务不定义，以免抢先做 D09 的决定。
+- **修订信息放在文档级，不放在每个块上**：解析器只拿到字节，不知道 `document_id`。所以 `ParsedDocument` 只带 `parser_version`，D11 编排时用 `RevisionKey(document_id, stored.content_hash, parsed.parser_version)` 补齐，其中 `content_hash` 直接取 C05 `FileStorage.save()` 返回的 `StoredFile`，不重读文件重算（REVIEW-D01-R04）。同一 `ParsedDocument` 的所有块属于同一个修订。`revision_id` 与块 ID 的派生公式留给 D09，本任务不定义，以免抢先做 D09 的决定。
 - **`ordinal` 是解析块的序号，不是文本块（Chunk）的序号**：D08 会把多个解析块合并或切分成约 1500 字的块，规格中「`revision_id` + 块序号」的块序号由 D08/D09 给出。
 - **无页码格式一律要求 `paragraph`，即使已有标题**：保证兜底定位始终存在，也给 D08 的「来源映射回原文」留出比章节更细的位置。
 - **标题禁用半角 `>`**：连接符是 `" > "`，标题里若出现 `>`，路径就无法唯一拆分。由 `normalize_heading` 统一替换，校验只认规范化后的标题。
@@ -81,16 +81,16 @@
 - **D03（Markdown）**：同上。表格、列表、代码分别用 `BlockKind.TABLE`、`LIST`、`CODE`。代码块内以 `#` 开头的行不是标题，fixture `stack-queue-notes.md` 里有这种行。
 - **D04（DOCX）**：不带 `page` 和行号，每块带 `paragraph`。样例在测试中用代码生成，不入库。
 - **D05～D07（PDF）**：D05 的「分页文本行」是 D05 自己的中间结构。最终交给 D08 的 `ParsedBlock` 必须带原始页码；D07 删除页眉页脚后仍保留原页码。扫描件或没有文本层的 PDF 抛 `no_text`，不声称有 OCR。
-- **D08（分块）**：输入 `ParsedDocument.blocks`，不跨 `section_titles` 合块。建议一个 Chunk 的定位取首块的 `SourceLocator`，并记录覆盖的 `ordinal` 区间，以便映射回原文。对于都是 `第N段` 兜底的块，合并后的 `section_path` 取首段还是区间，由 D08 决定。
+- **D08（分块）**：输入 `ParsedDocument.blocks`，不跨 `section_titles` 合块。建议一个 Chunk 的定位取首块的 `SourceLocator`，并记录覆盖的 `ordinal` 区间，以便映射回原文。由于 `section_path` 现在带段落号（REVIEW-D01-R02），合并多段的 Chunk 的 `section_path` 取首段还是写成区间，由 D08 决定。
 - **D09（块身份）**：用 `RevisionKey` 派生 `revision_id`，再用「`revision_id` + 块序号」派生块 ID。`content_hash` 已固定为 `sha256:` 格式。
 - **D10（持久化）**：定位字段用 `SourceLocator.to_source_fields()` 或等价逻辑写入，保证 `page` / `section_path` 至少一个，无页码时不写 `null`。
-- **D11（编排）**：捕获 `DocumentUnreadableError`，映射为 T9 `DOCUMENT_UNREADABLE`，`details.reason = err.reason.value`。`ParseModelError` 属实现缺陷，按 `INTERNAL_ERROR` 处理。建议由 D11 定下这一映射。
+- **D11（编排）**：`RevisionKey.content_hash` 直接用 C05 `StoredFile.content_hash`，不重算。捕获 `DocumentUnreadableError`，映射为 T9 `DOCUMENT_UNREADABLE`，`details.reason = err.reason.value`。`ParseModelError` 属实现缺陷，按 `INTERNAL_ERROR` 处理。建议由 D11 定下这一映射。
 
 ## 未验证项与风险
 
 - 未做任何真实解析；定位规则在 D02～D07 实现时才第一次接触真实资料结构。若发现规则不够用（例如 DOCX 需要表格内定位），需回到本模型修改，并同步本交接和 D01 测试。
 - `paragraph` 在同一 `section_titles` 下连续编号，要求解析器在整个文档范围内按路径计数。重复的同名同级小节会接续编号，这是有意设计，但报告给学生时可能显得不直观。
-- 本任务提出了 `第N段` 兜底格式和 `parser_version` 不含空白的约束，但尚未写入 `specs/` 或 `docs/architecture.md`（不在本任务文件锁内）。建议协调方决定是否在 D 组规格或架构文档中登记。
+- ~~`第N段` 格式等规则未进文档~~：已按 REVIEW-D01-R03 写入 `docs/architecture.md`「解析输出与来源定位（D01）」。
 - `docs/tasks.md` 的 D01 状态与验收证据未更新（不在文件锁内），由协调方在合并时更新。
 - 系统 python3（anaconda，pytest 8.3.4）没有安装后端包。直接运行清单中的单项命令 `python3 -m pytest tests/backend/test_d01.py -q` 会报收集错误 `No module named 'app'`，已有的 `test_c01.py` 也一样，属于环境问题。本任务的 pytest 结果全部来自上面的 venv（先 `pip install -e`）。
 
@@ -100,4 +100,29 @@
 
 ## 回滚
 
-只新增文件，不改任何已有文件。回滚时删除上表中的 8 个新文件和本交接即可，无数据或依赖变更。
+首版只新增文件；REVIEW-D01 另外在 `docs/architecture.md` 加了「解析输出与来源定位（D01）」一小节。回滚时删除上表中的 8 个新文件、本交接和这一小节即可，无数据或依赖变更。
+
+## 审查修正（REVIEW-D01）
+
+依据 PR #183 的审查评论 R01～R05 与 ArvinHan 的决定。先 fetch 并 merge `origin/main`（不 rebase），合并到 `909ce33`（含 C05 `file_storage.py`、E01、C08、D-10、D-11），合并提交为 `83e5338`，无冲突。之后按每条先改测试、记录红灯、再改实现的顺序处理。
+
+| 条目 | 决定 / 改动 | 新增或改写的测试 |
+| --- | --- | --- |
+| R01 PDF 段落号 | PDF 块不填 `paragraph`，`ParsedDocument` 遇到带 `paragraph` 的 PDF 块即拒绝；段落连续性校验只在 TXT/Markdown/DOCX 分支执行 | 新增 `test_pdf_block_with_paragraph_is_rejected`、`test_pdf_paragraph_rejected_even_when_numbered_per_page`；`test_non_text_formats_reject_line_numbers` 的 PDF 定位去掉 `paragraph` |
+| R02 定位粒度 | `section_path` = 标题路径加 `第N段`（有段落号时）。无页码格式得到「第3章 > 3.1 栈 > 第2段」，无标题时为「第N段」；PDF 只取标题路径，无标题时省略该键，只给 `page`。模块说明同步更新 | 改写 `test_pageless_locator_appends_paragraph_to_heading_path`，以及 Markdown、重名小节、DOCX 三个文档用例的期望路径；PDF 文档用例增加 `to_source_fields()` 断言 |
+| R03 规则进文档 | `docs/architecture.md` 新增「解析输出与来源定位（D01）」小节：各格式定位要求表、段落号与 `第N段` 规则、`＞` 替换、空文档、`RevisionKey` 与 `parser_version` 约束、`content_hash` 来源 | 新增 `test_architecture_documents_parse_locator_rules`（小节存在，且含 `第N段`、`＞`、`parser_version`、`paragraph`、`line_start`、`content_hash`） |
+| R04 内容哈希 | 删除 `sha256_digest`（`models.py`、`__init__` 导出、`hashlib` 导入）。`RevisionKey` 仍校验 `sha256:<64 位小写十六进制>`；模块说明与架构小节写明 D11 直接使用 C05 `StoredFile.content_hash` | 删除 `test_sha256_digest_requires_bytes`；新增 `test_parsers_package_does_not_define_its_own_hash`、`test_revision_key_accepts_content_hash_from_c05_file_storage`（用 C05 `FileStorage.save()` 的真实返回值构造 `RevisionKey`）、`test_source_format_values_match_c05_supported_formats` |
+| R05 blocks 必填 | 去掉 `ParsedDocument.blocks` 的默认值 | 新增 `test_blocks_argument_is_required`（漏传 → `TypeError`）；显式传 `()` 仍按 `no_text` 拒绝 |
+
+### 红绿记录（venv：Python 3.13.5，`pip install -e './src/backend[test]'`）
+
+| 步骤 | 结果 |
+| --- | --- |
+| 只改测试后 `pytest tests/backend/test_d01.py -q` | **9 failed** / 79 passed：R01 2 个、R02 4 个、R03 1 个、R04 1 个（`sha256_digest` 仍导出）、R05 1 个（漏传 `blocks` 抛的是 `ParseModelError`，不是 `TypeError`）。两条 C05 一致性用例本来就通过，说明 C05 的哈希格式与 `SourceFormat` 取值和 D01 已经一致 |
+| 改实现与架构文档后 | `test_d01.py` **88 passed** |
+| 全部后端 `pytest tests/backend -q`（重新 `pip install -e` 后） | **416 passed**，1 warning（main 已有的 Starlette `httpx` 弃用提示） |
+| 反向篡改（改坏后跑 D01，再恢复） | 允许 PDF 带 `paragraph` → 2 failed；段落号不进有标题的路径 → 4；取消段落断档检查 → 4；无页码格式允许页码 → 3；恢复后 88 passed |
+| `./scripts/verify.sh`（系统 python3） | exit 0（含命名门禁，新小节没有被禁用的别名） |
+| diff 空白检查（`--check`） | exit 0 |
+
+测试后已 `rm -r src/backend/smartsketch_backend.egg-info`，未提交。本轮仍未改 `docs/tasks.md`。

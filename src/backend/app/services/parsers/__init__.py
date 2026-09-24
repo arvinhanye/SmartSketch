@@ -12,7 +12,6 @@ from app.services.parsers.models import (
     SourceLocator,
     UnreadableReason,
     normalize_heading,
-    sha256_digest,
 )
 
 __all__ = [
@@ -27,5 +26,4 @@ __all__ = [
     "SourceLocator",
     "UnreadableReason",
     "normalize_heading",
-    "sha256_digest",
 ]

@@ -27,10 +27,13 @@ from app.services.parsers import (
     SourceLocator,
     UnreadableReason,
     normalize_heading,
-    sha256_digest,
 )
+from app.services import parsers as parsers_pkg
+from app.services.file_storage import SUPPORTED_FORMATS, FileStorage
 
-FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "documents"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "documents"
+SAMPLE_HASH = "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
 
 def txt_block(ordinal: int, text: str, paragraph: int, lines: tuple[int, int], titles=()):
@@ -60,11 +63,13 @@ def test_pdf_locator_uses_page_and_optional_section():
     assert both.to_source_fields() == {"page": 12, "section_path": "第3章 栈与队列 > 3.1 顺序栈"}
 
 
-def test_pageless_locator_prefers_heading_path_over_paragraph():
-    loc = SourceLocator(section_titles=("第3章 栈与队列", "3.1 顺序栈"), paragraph=2)
-    assert loc.section_path == "第3章 栈与队列" + SECTION_SEPARATOR + "3.1 顺序栈"
+def test_pageless_locator_appends_paragraph_to_heading_path():
+    """R02（ArvinHan 决定）：有标题时 section_path =「标题路径 > 第N段」。"""
+    loc = SourceLocator(section_titles=("第3章", "3.1 栈"), paragraph=2)
+    assert loc.section_path == "第3章" + SECTION_SEPARATOR + "3.1 栈" + SECTION_SEPARATOR + "第2段"
+    assert loc.section_path == "第3章 > 3.1 栈 > 第2段"
     # 无页码的来源不带 page 键（不是 null），与 SourceRef 一致
-    assert loc.to_source_fields() == {"section_path": "第3章 栈与队列 > 3.1 顺序栈"}
+    assert loc.to_source_fields() == {"section_path": "第3章 > 3.1 栈 > 第2段"}
 
 
 def test_pageless_locator_without_headings_falls_back_to_paragraph():
@@ -113,10 +118,10 @@ def test_markdown_document_numbers_paragraphs_per_section():
     )
     assert [b.locator.section_path for b in doc.blocks] == [
         "第1段",
-        "第3章 栈与队列",
-        "第3章 栈与队列",
-        "第3章 栈与队列 > 3.1 顺序栈",
-        "第3章 栈与队列 > 3.1 顺序栈",
+        "第3章 栈与队列 > 第1段",
+        "第3章 栈与队列 > 第2段",
+        "第3章 栈与队列 > 3.1 顺序栈 > 第1段",
+        "第3章 栈与队列 > 3.1 顺序栈 > 第2段",
     ]
     assert doc.blocks[4].kind is BlockKind.TABLE
 
@@ -134,7 +139,11 @@ def test_repeated_identical_section_path_continues_paragraph_numbering():
             txt_block(2, "第二段小结。", 2, (5, 5), sec),
         ),
     )
-    assert len(doc.blocks) == 3
+    assert [b.locator.section_path for b in doc.blocks] == [
+        "第2章 线性表 > 小结 > 第1段",
+        "第2章 线性表 > 2.2 链表 > 第1段",
+        "第2章 线性表 > 小结 > 第2段",
+    ]
 
 
 def test_docx_document_has_sections_but_no_pages_or_lines():
@@ -149,7 +158,7 @@ def test_docx_document_has_sections_but_no_pages_or_lines():
             ),
         ),
     )
-    assert doc.blocks[0].locator.to_source_fields() == {"section_path": "第4章 队列"}
+    assert doc.blocks[0].locator.to_source_fields() == {"section_path": "第4章 队列 > 第1段"}
 
 
 def test_pdf_document_requires_pages_only():
@@ -162,6 +171,11 @@ def test_pdf_document_requires_pages_only():
         ),
     )
     assert [b.locator.page for b in doc.blocks] == [1, 2]
+    # R02：PDF 的 section_path 只取标题路径，无标题则省略该键
+    assert [b.locator.to_source_fields() for b in doc.blocks] == [
+        {"page": 1},
+        {"page": 2, "section_path": "第1章 绪论"},
+    ]
 
 
 def test_normalize_heading_collapses_whitespace_and_replaces_separator_char():
@@ -170,11 +184,22 @@ def test_normalize_heading_collapses_whitespace_and_replaces_separator_char():
     assert normalize_heading("a>b") == "a＞b"
 
 
-def test_revision_key_and_content_digest():
-    digest = sha256_digest(b"abc")
-    assert digest == "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-    key = RevisionKey(document_id="doc_01", content_hash=digest, parser_version="txt/1")
-    assert key.parser_version == "txt/1"
+def test_revision_key_accepts_content_hash_from_c05_file_storage(tmp_path):
+    """R04：内容哈希唯一来源是 C05 FileStorage.save() 的 StoredFile.content_hash，D01 不重算。"""
+    stored = FileStorage(tmp_path, max_bytes=4096).save(
+        "示例讲义.txt", "text/plain", ["第一章 绪论\n".encode("utf-8")]
+    )
+    key = RevisionKey(document_id="doc_01", content_hash=stored.content_hash, parser_version="txt/1")
+    assert key.content_hash == stored.content_hash
+
+
+def test_parsers_package_does_not_define_its_own_hash():
+    assert not hasattr(parsers_pkg, "sha256_digest")
+    assert "sha256_digest" not in parsers_pkg.__all__
+
+
+def test_source_format_values_match_c05_supported_formats():
+    assert {f.value for f in SourceFormat} == set(SUPPORTED_FORMATS)
 
 
 def test_document_unreadable_error_carries_wire_reason():
@@ -297,6 +322,12 @@ def test_empty_document_must_be_reported_as_no_text():
         ParsedDocument(source_format=SourceFormat.TXT, parser_version="txt/1", blocks=())
 
 
+def test_blocks_argument_is_required():
+    """R05：blocks 无默认值，漏传是调用错误而不是空文档。"""
+    with pytest.raises(TypeError):
+        ParsedDocument(source_format=SourceFormat.TXT, parser_version="txt/1")  # type: ignore[call-arg]
+
+
 @pytest.mark.parametrize("version", ["", "  ", "txt 1", 1])
 def test_invalid_parser_version_is_rejected(version):
     with pytest.raises(ParseModelError, match="parser_version"):
@@ -337,6 +368,22 @@ def test_pageless_block_needs_paragraph_even_with_headings():
         ParsedDocument(source_format=SourceFormat.TXT, parser_version="txt/1", blocks=(block,))
 
 
+def test_pdf_block_with_paragraph_is_rejected():
+    """R01（ArvinHan 决定）：PDF 以 page + 可选 section_titles 定位，不填 paragraph。"""
+    block = ParsedBlock(ordinal=0, text="正文", locator=SourceLocator(page=1, paragraph=1))
+    with pytest.raises(ParseModelError, match="paragraph"):
+        ParsedDocument(source_format=SourceFormat.PDF, parser_version="pdf/1", blocks=(block,))
+
+
+def test_pdf_paragraph_rejected_even_when_numbered_per_page():
+    blocks = (
+        ParsedBlock(ordinal=0, text="第一页", locator=SourceLocator(page=1, paragraph=1)),
+        ParsedBlock(ordinal=1, text="第二页", locator=SourceLocator(page=2, paragraph=1)),
+    )
+    with pytest.raises(ParseModelError, match="PDF"):
+        ParsedDocument(source_format=SourceFormat.PDF, parser_version="pdf/1", blocks=blocks)
+
+
 def test_pdf_block_without_page_is_rejected():
     block = ParsedBlock(ordinal=0, text="正文", locator=SourceLocator(section_titles=("第1章",)))
     with pytest.raises(ParseModelError, match="page"):
@@ -355,7 +402,7 @@ def test_non_text_formats_reject_line_numbers(fmt):
     block = ParsedBlock(
         ordinal=0,
         text="正文",
-        locator=SourceLocator(page=1, paragraph=1, line_start=1, line_end=1)
+        locator=SourceLocator(page=1, line_start=1, line_end=1)
         if fmt is SourceFormat.PDF
         else SourceLocator(paragraph=1, line_start=1, line_end=1),
     )
@@ -404,16 +451,11 @@ def test_revision_key_rejects_malformed_content_hash(content_hash):
 
 
 def test_revision_key_rejects_empty_document_id_and_version():
-    digest = sha256_digest(b"x")
+    digest = SAMPLE_HASH
     with pytest.raises(ParseModelError, match="document_id"):
         RevisionKey(document_id=" ", content_hash=digest, parser_version="txt/1")
     with pytest.raises(ParseModelError, match="parser_version"):
         RevisionKey(document_id="doc_01", content_hash=digest, parser_version="")
-
-
-def test_sha256_digest_requires_bytes():
-    with pytest.raises(ParseModelError, match="bytes"):
-        sha256_digest("abc")  # type: ignore[arg-type]
 
 
 def test_unreadable_reason_outside_wire_set_is_rejected():
@@ -471,3 +513,15 @@ def test_fixtures_contain_no_personal_data_markers():
         text = path.read_text(encoding="utf-8")
         for pattern, label in PERSONAL_DATA_PATTERNS:
             assert not pattern.search(text), f"{path.name} 含{label}样式内容"
+
+
+# ── R03：定位规则写入架构文档 ─────────────────────────────
+
+
+def test_architecture_documents_parse_locator_rules():
+    arch = (REPO_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+    heading = "## 解析输出与来源定位（D01）"
+    assert heading in arch
+    section = arch.split(heading, 1)[1].split("\n## ", 1)[0]
+    for needle in ("第N段", "＞", "parser_version", "paragraph", "line_start", "content_hash"):
+        assert needle in section, f"架构文档 D01 小节缺少 {needle}"

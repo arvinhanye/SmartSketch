@@ -7,11 +7,13 @@
 `section_path` 非空至少给出一个，ADR-003）：
 
 1. **PDF**（唯一有页码的格式）：每块必须有 `page ≥ 1`；`section_titles` 可空
-   （由 D06 标题判定给出）；`paragraph` 可选；不带行号。
+   （由 D06 标题判定给出）；**不填 `paragraph`**（REVIEW-D01-R01）；不带行号。
+   `section_path` 只取标题路径，无标题时省略，只给 `page`。
 2. **TXT / Markdown / DOCX**（无页码）：`page` 必须为空，不得编造页码。
    每块必须有 `paragraph`：该块在**同一 `section_titles`** 下按文档顺序的序号，从 1 起、
    连续不断档；同一标题路径在文档中重复出现时接续编号，因此「章节路径 + 段落」在文档内唯一。
-   `section_path` 取标题路径（`" > "` 连接）；块前没有任何标题时，兜底为 `第N段`。
+   `section_path` =「标题路径 > 第N段」（例：`第3章 > 3.1 栈 > 第2段`）；块前没有任何标题时为
+   `第N段`（REVIEW-D01-R02）。
 3. **行号**：TXT 与 Markdown 必须带 `line_start`/`line_end`（解码后源文本的物理行号，
    从 1 起、闭区间），块间按块序号递增且不重叠；DOCX 与 PDF 不带行号。
 4. 块序号 `ordinal` 为文档内从 0 起的连续整数，即 D09「`revision_id` + 块序号」之外的
@@ -20,17 +22,19 @@
    对应任务失败码 `DOCUMENT_UNREADABLE` 的 `reason = no_text`（specs/task-processing.md §6）。
 
 资料修订 `(document_id, 内容哈希, 解析器版本)`（ADR-012 修订 1）由 `RevisionKey` 表示；
-解析器只知道自己的 `parser_version`，`document_id` 与原始字节的哈希由 D11 编排时补齐。
+解析器只知道自己的 `parser_version`，`document_id` 与内容哈希由 D11 编排时补齐。
+内容哈希的唯一来源是 C05 `FileStorage.save()` 返回的 `StoredFile.content_hash`，
+D11 直接使用、不重读文件重算（REVIEW-D01-R04）；本模块只校验其 `sha256:<64 位小写十六进制>` 格式。
+规则同步记录在 `docs/architecture.md`「解析输出与来源定位（D01）」。
 `revision_id` 与块 ID 的派生公式归 D09，本模块不定义。命名按 ADR-016 决定 6
 使用 `document_id`（规格 V2 中的 `material_id` 为同一概念）。
 """
 
 from __future__ import annotations
 
-import hashlib
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 __all__ = [
@@ -45,7 +49,6 @@ __all__ = [
     "SourceLocator",
     "UnreadableReason",
     "normalize_heading",
-    "sha256_digest",
 ]
 
 #: `section_path` 中各级标题的连接符，与 `SourceRef.section_path` 的示例「第3章 > 3.1 栈」一致。
@@ -114,13 +117,6 @@ def normalize_heading(title: str) -> str:
     return _WHITESPACE_RE.sub(" ", title).strip().replace(">", "＞")
 
 
-def sha256_digest(data: bytes) -> str:
-    """资料原始字节的内容哈希，格式与快照摘要一致：`sha256:<64 位小写十六进制>`。"""
-    if not isinstance(data, (bytes, bytearray, memoryview)):
-        raise ParseModelError("sha256_digest 只接受 bytes（对原始上传字节求哈希，不对解码后的文本）")
-    return "sha256:" + hashlib.sha256(data).hexdigest()
-
-
 def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -172,12 +168,15 @@ class SourceLocator:
 
     @property
     def section_path(self) -> str | None:
-        """SourceRef 的 `section_path`：有标题取标题路径，无标题时以 `第N段` 兜底，二者皆无为空。"""
-        if self.section_titles:
-            return SECTION_SEPARATOR.join(self.section_titles)
+        """SourceRef 的 `section_path`：标题路径后接 `第N段`（有段落号时），二者皆无为空。
+
+        无页码格式总有段落号，得到「标题路径 > 第N段」或单独的「第N段」；
+        PDF 不填段落号，得到标题路径或空（此时只靠 `page` 定位）。
+        """
+        parts = list(self.section_titles)
         if self.paragraph is not None:
-            return f"第{self.paragraph}段"
-        return None
+            parts.append(f"第{self.paragraph}段")
+        return SECTION_SEPARATOR.join(parts) if parts else None
 
     def to_source_fields(self) -> dict[str, int | str]:
         """转为 SourceRef 的定位字段；缺失的键直接省略（契约要求不写 null）。"""
@@ -220,7 +219,7 @@ class ParsedDocument:
 
     source_format: SourceFormat
     parser_version: str
-    blocks: tuple[ParsedBlock, ...] = field(default=())
+    blocks: tuple[ParsedBlock, ...]
 
     def __post_init__(self) -> None:
         try:
@@ -254,13 +253,14 @@ class ParsedDocument:
             if fmt.paginated:
                 if loc.page is None:
                     raise ParseModelError(f"{where}：PDF 块必须有 page")
+                if loc.paragraph is not None:
+                    raise ParseModelError(f"{where}：PDF 块以 page 定位，不填 paragraph")
             else:
                 if loc.page is not None:
                     raise ParseModelError(f"{where}：{fmt.value} 没有页码，page 必须为空（不得编造）")
                 if loc.paragraph is None:
                     raise ParseModelError(f"{where}：{fmt.value} 块必须有 paragraph 作为段落定位")
-
-            if loc.paragraph is not None:
+                # 段落连续性只对无页码格式生效（PDF 不填 paragraph）
                 expected = next_paragraph.get(loc.section_titles, 1)
                 if loc.paragraph != expected:
                     raise ParseModelError(
