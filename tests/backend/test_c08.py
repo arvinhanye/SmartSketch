@@ -1,5 +1,12 @@
 """C08: pure document-task state transitions from ADR-010 §2."""
 
+import copy
+import dataclasses
+import json
+import pickle
+import re
+from pathlib import Path
+
 import pytest
 
 from app.services.task_state import Applied, Rejected, TaskError, TaskState, TransitionEvent, apply_event
@@ -132,7 +139,6 @@ def test_failure_requires_nonempty_error_and_other_events_reject_payloads():
     assert_rejected(start, TransitionEvent("fail", error=TaskError("", "broken")))
     assert_rejected(start, TransitionEvent("fail", error=TaskError("INTERNAL_ERROR", "")))
     assert_rejected(start, TransitionEvent("claim", progress=.2))
-    assert_rejected(start, TransitionEvent("made_up"))
 
 
 def test_failed_terminal_error_details_are_deeply_immutable():
@@ -169,3 +175,144 @@ def test_unhashable_stage_is_rejected():
 )
 def test_invalid_input_state_rejected(state):
     assert_rejected(state, TransitionEvent("cancel_request"), "invalid_state")
+
+
+# REVIEW-C08 R01: terminal error details must survive the C09/C11 persistence path.
+def test_failed_error_details_serialize_to_json_and_asdict():
+    details = {"attempts": 3, "stage": "parsing", "history": [{"code": "LLM_UNAVAILABLE", "ratio": .5}], "note": None}
+    result = apply_event(TaskState("parsing", .04), TransitionEvent("fail", error=TaskError("TASK_ATTEMPTS_EXHAUSTED", "exhausted", details)))
+    assert isinstance(result, Applied)
+    error = result.state.error
+    assert json.loads(json.dumps(error.details)) == details
+    assert dataclasses.asdict(result.state)["error"]["details"] == {**details, "history": ({"code": "LLM_UNAVAILABLE", "ratio": .5},)}
+    assert json.loads(json.dumps(dataclasses.asdict(result.state)))["error"]["details"] == details
+    assert pickle.loads(pickle.dumps(result.state)) == result.state
+    assert copy.deepcopy(result.state) == result.state
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda d: d.__setitem__("stage", "x"),
+        lambda d: d.__delitem__("stage"),
+        lambda d: d.update(stage="x"),
+        lambda d: d.setdefault("new", 1),
+        lambda d: d.pop("stage"),
+        lambda d: d.popitem(),
+        lambda d: d.clear(),
+        lambda d: d.__ior__({"stage": "x"}),
+    ],
+)
+def test_error_details_reject_every_mutation(mutate):
+    error = TaskError("INTERNAL_ERROR", "broken", {"stage": "parsing"})
+    with pytest.raises(TypeError):
+        mutate(error.details)
+    assert error.details == {"stage": "parsing"}
+
+
+@pytest.mark.parametrize("details", [{"ratio": float("nan")}, {"ratio": float("inf")}, {"nested": [{1: "x"}]}, {"obj": object()}])
+def test_error_details_must_be_strict_json(details):
+    with pytest.raises(TypeError):
+        TaskError("INTERNAL_ERROR", "broken", details)
+
+
+# REVIEW-C08 R02: failure codes are the closed, stage-bound set in specs/task-processing.md §6.
+FAILURE_CODE_STAGES = {
+    "DOCUMENT_UNREADABLE": {"parsing"},
+    "LLM_UNAVAILABLE": {"extracting"},
+    "EXTRACTION_INCOMPLETE": {"extracting"},
+    "CYCLE_DETECTED": {"persisting"},
+    "STORAGE_UNAVAILABLE": {"parsing", "extracting", "merging", "persisting"},
+    "INTERNAL_ERROR": {"parsing", "extracting", "merging", "persisting"},
+    "TASK_ATTEMPTS_EXHAUSTED": {"parsing", "extracting", "merging", "persisting"},
+}
+PROCESSING = [("parsing", .04), ("extracting", .4), ("merging", .7), ("persisting", .9)]
+
+
+@pytest.mark.parametrize("stage,progress", PROCESSING)
+@pytest.mark.parametrize("code", sorted(FAILURE_CODE_STAGES))
+def test_failure_code_is_bound_to_stage(code, stage, progress):
+    start = TaskState(stage, progress)
+    event = TransitionEvent("fail", error=TaskError(code, "failed"))
+    if stage in FAILURE_CODE_STAGES[code]:
+        assert apply_event(start, event) == Applied(TaskState("failed", progress, False, event.error), changed=True)
+    else:
+        assert_rejected(start, event, "error_stage_mismatch")
+
+
+@pytest.mark.parametrize("code", ["PUBLISH_BLOCKED", "NOT_A_CODE", "VALIDATION_ERROR", "internal_error"])
+def test_failure_code_outside_task_table_rejected(code):
+    assert_rejected(TaskState("merging", .7), TransitionEvent("fail", error=TaskError(code, "failed")), "invalid_error")
+
+
+def test_failed_input_state_with_unknown_code_is_invalid():
+    assert_rejected(TaskState("failed", .4, error=TaskError("NOT_A_CODE", "broken")), TransitionEvent("claim"), "invalid_state")
+
+
+# REVIEW-C08 R03: an unknown event kind is not a legal event in the wrong stage.
+@pytest.mark.parametrize("kind", ["made_up", "resume", "CLAIM", ""])
+def test_unknown_event_kind_is_invalid_event(kind):
+    assert_rejected(TaskState("parsing", .04), TransitionEvent(kind), "invalid_event")
+
+
+def test_known_event_in_wrong_stage_is_invalid_transition():
+    assert_rejected(TaskState("parsing", .04), TransitionEvent("published"), "invalid_transition")
+
+
+# REVIEW-C08 R04: stage names, fixed progress and ranges must not drift from the contracts.
+CONTRACTS = Path(__file__).resolve().parents[2] / "src" / "contracts"
+
+
+def _openapi_schemas():
+    return json.loads((CONTRACTS / "v1" / "generated" / "openapi.json").read_text(encoding="utf-8"))["components"]["schemas"]
+
+
+def _events_stage_table():
+    text = (CONTRACTS / "events.v1.md").read_text(encoding="utf-8")
+    section = text.split("### 阶段与进度映射", 1)[1]
+    rows = {}
+    for stages, cell in re.findall(r"^\| (`[^|]+`) \| ([^|]+) \|$", section, re.M):
+        for stage in re.findall(r"`([a-z_]+)`", stages):
+            numbers = [float(n) for n in re.findall(r"\d+\.\d+", cell)]
+            rows[stage] = tuple(numbers) if numbers else None
+    return rows
+
+
+def test_stage_vocabulary_matches_contract_enum():
+    from app.services.task_state import TASK_STAGES
+
+    assert list(TASK_STAGES) == _openapi_schemas()["TaskStage"]["enum"]
+
+
+def test_stage_ranges_match_events_contract():
+    from app.services.task_state import TASK_STAGES, stage_progress_range
+
+    table = _events_stage_table()
+    assert set(table) == set(TASK_STAGES)
+    for stage, expected in table.items():
+        if expected is None:  # failed / cancelled keep the value at entry
+            continue
+        lower, upper = expected if len(expected) == 2 else (expected[0], expected[0])
+        assert stage_progress_range(stage) == (lower, upper), stage
+
+
+def test_fixed_progress_matches_contract_consts():
+    from app.services.task_state import stage_progress_range
+
+    schemas = _openapi_schemas()
+    fixed = {
+        rule["if"]["properties"]["stage"]["const"]: rule["then"]["properties"]["progress"]["const"]
+        for rule in schemas["FixedStageProgress"]["allOf"]
+    }
+    completed = next(part for part in schemas["TaskCompleted"]["allOf"] if "properties" in part)
+    fixed["completed"] = completed["properties"]["progress"]["const"]
+    assert fixed == {"queued": 0, "awaiting_review": .95, "completed": 1}
+    for stage, value in fixed.items():
+        assert stage_progress_range(stage) == (value, value)
+
+
+def test_failure_codes_exist_in_contract_error_code_enum():
+    from app.services.task_state import FAILURE_CODE_STAGES as implemented
+
+    assert {code: set(stages) for code, stages in implemented.items()} == FAILURE_CODE_STAGES
+    assert set(implemented) <= set(_openapi_schemas()["ErrorCode"]["enum"])

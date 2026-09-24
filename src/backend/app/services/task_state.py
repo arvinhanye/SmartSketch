@@ -7,18 +7,32 @@ emitting an event; this function performs no I/O and does not settle races.
 
 from dataclasses import dataclass
 from math import isfinite
-from types import MappingProxyType
 from typing import Mapping
 
 
+class _FrozenDetails(dict):
+    """A ``dict`` that refuses mutation, so ``json.dumps``/``asdict``/pickle still work."""
+
+    def _readonly(self, *args: object, **kwargs: object) -> None:
+        raise TypeError("error details are immutable")
+
+    __setitem__ = __delitem__ = __ior__ = _readonly
+    clear = pop = popitem = setdefault = update = _readonly
+
+    def __reduce__(self) -> tuple[type, tuple[dict[str, object]]]:
+        return (type(self), (dict(self),))
+
+
 def _freeze_detail(value: object) -> object:
-    """Copy JSON-like error details so terminal errors cannot change by alias."""
+    """Copy strict-JSON error details so terminal errors cannot change by alias."""
     if isinstance(value, Mapping):
         if not all(isinstance(key, str) for key in value):
             raise TypeError("error detail keys must be strings")
-        return MappingProxyType({key: _freeze_detail(item) for key, item in value.items()})
+        return _FrozenDetails({key: _freeze_detail(item) for key, item in value.items()})
     if isinstance(value, (list, tuple)):
         return tuple(_freeze_detail(item) for item in value)
+    if isinstance(value, float) and not isfinite(value):
+        raise TypeError("error details must be finite JSON numbers")
     if isinstance(value, (str, int, float, bool, type(None))):
         return value
     raise TypeError("error details must contain JSON-like values")
@@ -64,6 +78,17 @@ class Rejected:
     reason: str
 
 
+TASK_STAGES = (
+    "queued",
+    "parsing",
+    "extracting",
+    "merging",
+    "persisting",
+    "awaiting_review",
+    "completed",
+    "failed",
+    "cancelled",
+)
 _RANGES = {
     "queued": (0.0, 0.0),
     "parsing": (0.0, 0.10),
@@ -79,6 +104,24 @@ _TERMINAL = frozenset({"completed", "failed", "cancelled"})
 _CANCELLABLE = frozenset({"parsing", "extracting", "merging"})
 _PROCESSING = _CANCELLABLE | {"persisting"}
 _NEXT = {"parsing": "extracting", "extracting": "merging", "merging": "persisting"}
+_EVENT_KINDS = frozenset(
+    {"claim", "stage_done", "checkpoint", "progress", "persisted", "fail", "cancel_request", "published"}
+)
+# specs/task-processing.md §6: closed failure-code set and the stages that may raise each code.
+FAILURE_CODE_STAGES = {
+    "DOCUMENT_UNREADABLE": frozenset({"parsing"}),
+    "LLM_UNAVAILABLE": frozenset({"extracting"}),
+    "EXTRACTION_INCOMPLETE": frozenset({"extracting"}),
+    "CYCLE_DETECTED": frozenset({"persisting"}),
+    "STORAGE_UNAVAILABLE": _PROCESSING,
+    "INTERNAL_ERROR": _PROCESSING,
+    "TASK_ATTEMPTS_EXHAUSTED": _PROCESSING,
+}
+
+
+def stage_progress_range(stage: str) -> tuple[float, float]:
+    """Allowed ``progress`` bounds for a stage (``events.v1.md`` stage table)."""
+    return _RANGES[stage]
 
 
 def _valid_number(value: object) -> bool:
@@ -89,7 +132,7 @@ def _valid_error(error: object) -> bool:
     return (
         isinstance(error, TaskError)
         and isinstance(error.code, str)
-        and bool(error.code.strip())
+        and error.code in FAILURE_CODE_STAGES
         and isinstance(error.message, str)
         and bool(error.message.strip())
         and (error.details is None or isinstance(error.details, Mapping))
@@ -129,7 +172,7 @@ def apply_event(state: TaskState, event: TransitionEvent) -> Applied | Rejected:
         return reject("already_terminal")
 
     kind = event.kind
-    if not isinstance(kind, str):
+    if not isinstance(kind, str) or kind not in _EVENT_KINDS:
         return reject("invalid_event")
     if kind == "progress":
         if event.error is not None or not _valid_number(event.progress):
@@ -171,6 +214,8 @@ def apply_event(state: TaskState, event: TransitionEvent) -> Applied | Rejected:
     if kind == "fail" and state.stage in _PROCESSING:
         if not _valid_error(event.error):
             return reject("invalid_error")
+        if state.stage not in FAILURE_CODE_STAGES[event.error.code]:
+            return reject("error_stage_mismatch")
         return accept(TaskState("failed", state.progress, state.cancel_requested, event.error))
 
     if kind == "published" and state.stage == "awaiting_review":
