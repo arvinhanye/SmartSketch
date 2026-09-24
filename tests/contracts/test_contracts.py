@@ -35,7 +35,17 @@ WORKSPACE_FILES = [
     "specs/course-knowledge-graph.md",
     "specs/learning-path.md",
     "specs/teacher-review-publish.md",
+    "specs/grounded-qa.md",
     "AGENTS.md",
+]
+
+# 必须受命名门禁保护的规格（ADR-016 修订 1：按执行时 main 中实际存在的规格确定）。
+# 这里独立列出而不从门禁导入，避免「门禁漏扫、测试也跟着漏」的同源错误。
+NAMING_GUARDED_SPECS = [
+    "specs/course-knowledge-graph.md",
+    "specs/learning-path.md",
+    "specs/teacher-review-publish.md",
+    "specs/grounded-qa.md",
 ]
 
 
@@ -197,6 +207,30 @@ def test_source_chunk_alias_fails():
         p.write_text(p.read_text(encoding="utf-8").replace("`Chunk`", "`SourceChunk`", 1),
                      encoding="utf-8")
     assert _gate_with(mutate_text=break_it) != 0, "文本块旧标签必须被命名门禁拒绝（ADR-016 N1）"
+
+
+def test_alias_in_each_guarded_spec_fails():
+    """每份受保护的规格各注入一处旧名，门禁都必须失败（ADR-016 修订 1 的逐文件负例）。"""
+    missed = []
+    for rel in NAMING_GUARDED_SPECS:
+        def break_it(tmp: Path, rel=rel):
+            p = tmp / rel
+            p.write_text(p.read_text(encoding="utf-8") + "\n- 负例：文本块写成 SourceChunk。\n",
+                         encoding="utf-8")
+        if _gate_with(mutate_text=break_it) == 0:
+            missed.append(rel)
+    assert not missed, "以下规格注入旧标签 SourceChunk 后命名门禁仍通过：" + "；".join(missed)
+
+
+def test_guarded_spec_missing_fails():
+    """受保护的规格从工作区消失时门禁必须失败，而不是静默少扫一份。"""
+    missed = []
+    for rel in NAMING_GUARDED_SPECS:
+        def break_it(tmp: Path, rel=rel):
+            (tmp / rel).unlink()
+        if _gate_with(mutate_text=break_it) == 0:
+            missed.append(rel)
+    assert not missed, "缺少以下规格时门禁仍通过：" + "；".join(missed)
 
 
 # ── R05：状态机跨文件一致 ───────────────────────────────────────
