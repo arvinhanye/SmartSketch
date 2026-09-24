@@ -168,11 +168,36 @@ export interface paths {
         };
         /**
          * 任务状态快照
-         * @description SSE 不可用时的轮询兜底。`stage = failed` 时 `error` 必填，HTTP 仍为 200。
+         * @description SSE 不可用时的轮询兜底，也是观察审核完成（`completed`）的方式。`stage = failed` 时 `error` 必填，HTTP 仍为 200。
          */
         get: operations["getTask"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{tid}/event-ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 申领任务 SSE 的一次性票据（教师）
+         * @description 浏览器 `EventSource` 不能设置请求头，常规访问令牌不得放进 URL，因此订阅前先用 Bearer
+         *     申领一次性票据。票据仅对本任务有效、只能核销一次、60 秒后过期；服务端只存其 sha256。
+         *     见 `specs/identity-access.md` §5.1。
+         *
+         */
+        post: operations["issueEventTicket"];
         delete?: never;
         options?: never;
         head?: never;
@@ -190,8 +215,11 @@ export interface paths {
         };
         /**
          * 订阅任务进度（SSE）
-         * @description `text/event-stream`。事件名、顺序保证、心跳与重连语义在 `events.v1.md` 中定义，
-         *     本条目仅约束单条事件的数据结构。
+         * @description `text/event-stream`。只覆盖处理阶段：每个连接恰好以一条结束事件收尾（`stage = awaiting_review`
+         *     的快照，或 `done` / `error` / `cancelled`）后关流。事件名、顺序保证、心跳与重连语义在
+         *     `events.v1.md` §2、§4 中定义，本条目仅约束单条事件的数据结构。
+         *     鉴权只用查询参数 `ticket`（`issueEventTicket` 签发），覆盖全局 Bearer，也不读取 `Authorization` 头；
+         *     票据缺失、无效、过期、已用或与任务不符，或票据所属账号已停用 → 401 `UNAUTHENTICATED`。
          *
          */
         get: operations["streamTaskEvents"];
@@ -216,7 +244,10 @@ export interface paths {
         put?: never;
         /**
          * 取消任务（教师）
-         * @description 仅非终态任务可取消；终态任务返回 `TASK_NOT_CANCELLABLE`。
+         * @description 协作式取消，所有受理结果都是 HTTP 200（`specs/task-processing.md` §4）：`queued` 直接转
+         *     `cancelled`；`parsing` / `extracting` / `merging` 置 `cancel_requested = true`，到块边界后才转
+         *     `cancelled`；重复取消幂等。`persisting` 不可中断，`awaiting_review` 与终态不可取消。
+         *
          */
         post: operations["cancelTask"];
         delete?: never;
@@ -650,10 +681,9 @@ export interface components {
             document_id: string;
         };
         /**
-         * @description ADR-005 + ADR-006 的状态机（命名基线 ADR-008）：
-         *     `queued → parsing → extracting → merging → persisting → awaiting_review → completed`；
-         *     任意阶段可转 `failed`，任意非终态可转 `cancelled`。
-         *     终态为 completed、failed、cancelled。
+         * @description 主线 `queued → parsing → extracting → merging → persisting → awaiting_review → completed`（命名基线 ADR-008）。
+         *     各阶段能否转 `failed` / `cancelled`、由谁触发、何时关流，只以 `specs/task-processing.md` §1、§2（ADR-010）为准，
+         *     本契约不另写一份转换规则。终态为 completed、failed、cancelled；`awaiting_review` 是处理结束的非终态。
          *
          * @enum {string}
          */
@@ -663,7 +693,20 @@ export interface components {
             chunks_total?: number;
             kp_count?: number;
             relation_count?: number;
+            chunks_failed?: number;
         };
+        /** @description 抽取阶段最终失败的块（L2 尝试耗尽后仍失败，`specs/task-processing.md` §5）。
+         *     与 SourceRef 相同，`page` 与 `section_path` 至少给出一个，供审核页跳到原文。
+         *      */
+        FailedChunk: {
+            chunk_id: string;
+            page?: number;
+            section_path?: string;
+            code: components["schemas"]["ErrorCode"];
+        } | unknown | unknown;
+        /** @description 任务快照。`stage = failed` ⇔ `error` 非空（TASK-17）：`failed` 时 `error` 必填且不为 null，
+         *     其他阶段 `error` 缺省或为 null。`failed_chunks` 只在快照中返回，SSE 事件只带计数。
+         *      */
         Task: {
             id: string;
             course_id: string;
@@ -671,7 +714,11 @@ export interface components {
             stage: components["schemas"]["TaskStage"];
             /** @description 整体进度，0–1 */
             progress: number;
+            /** @description 已受理取消请求。处理中阶段为「取消中」的依据；`cancelled` 时恒为 true，失败任务可能保持 true（TASK-7）。 */
+            cancel_requested: boolean;
             counts?: components["schemas"]["TaskCounts"];
+            /** @description 最终失败的块及定位；无失败块时为空数组或缺省。 */
+            failed_chunks?: components["schemas"]["FailedChunk"][];
             /** @description 各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04） */
             timings_ms?: {
                 [key: string]: number;
@@ -683,22 +730,83 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
-        /** @description 单条 SSE 事件的 data 载荷；事件名与顺序语义见 `events.v1.md` */
-        TaskEvent: {
+        /** @description `event: stage`。建连快照（非终态）、进入新阶段、阶段内进度变化、`cancel_requested` 由 false 变 true 时推送。
+         *     `stage = awaiting_review`（`progress = 0.95`）是处理期连接的结束事件，推送后服务端关流。
+         *      */
+        TaskStageEvent: {
             task_id: string;
-            stage: components["schemas"]["TaskStage"];
             /**
-             * @description 已收到取消请求但 worker 尚未到达阶段边界（ADR-006 的协作式取消）。
-             *     这是**标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，
-             *     前端据此把取消按钮置为「取消中」而不是直接显示已取消。
-             *
-             * @default false
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
-            cancel_requested: boolean;
+            stage: "queued" | "parsing" | "extracting" | "merging" | "persisting" | "awaiting_review";
             progress: number;
+            /** @description 已收到取消请求但 worker 尚未到达块边界（协作式取消）。这是**标志位不是状态**：
+             *     取消未生效前 `stage` 仍是当前阶段，前端据此显示「取消中」。
+             *      */
+            cancel_requested: boolean;
             counts?: components["schemas"]["TaskCounts"];
             elapsed_ms?: number;
-            error?: components["schemas"]["Error"] | null;
+        };
+        /** @description `event: done`。只会作为「任务已 `completed` 后才建立的连接」的首条快照出现，随后关流；
+         *     处理期的连接以 `awaiting_review` 收尾，永远收不到它（`specs/task-processing.md` §7）。
+         *      */
+        TaskDoneEvent: {
+            task_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "completed";
+            /** @constant */
+            progress: 1;
+            cancel_requested?: boolean;
+            counts?: components["schemas"]["TaskCounts"];
+            elapsed_ms?: number;
+        };
+        /** @description `event: error`。任务进入或已处于 `failed`；`error` 必填且不为 null。发送后关流。 */
+        TaskErrorEvent: {
+            task_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "failed";
+            progress: number;
+            error: components["schemas"]["Error"];
+            /** @description 取消标志已置、到检查点前失败时保持 true（TASK-7）。 */
+            cancel_requested?: boolean;
+            counts?: components["schemas"]["TaskCounts"];
+            elapsed_ms?: number;
+        };
+        /** @description `event: cancelled`。任务进入或已处于 `cancelled`；取消必然先置标志，故 `cancel_requested` 恒为 true。发送后关流。 */
+        TaskCancelledEvent: {
+            task_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            stage: "cancelled";
+            progress: number;
+            /** @constant */
+            cancel_requested: true;
+            counts?: components["schemas"]["TaskCounts"];
+            elapsed_ms?: number;
+        };
+        /** @description 单条任务 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**，`{}` 不合法；
+         *     按 `stage` 判别，与 `event:` 行一一对应（stage / done / error / cancelled）。
+         *     事件名、顺序、关流与重连语义见 `events.v1.md` §2、§4。
+         *      */
+        TaskEvent: components["schemas"]["TaskStageEvent"] | components["schemas"]["TaskDoneEvent"] | components["schemas"]["TaskErrorEvent"] | components["schemas"]["TaskCancelledEvent"];
+        /** @description 任务 SSE 的一次性票据（`specs/identity-access.md` §5.1）。 */
+        EventTicket: {
+            /** @description 至少 128 位密码学随机数的 URL 安全编码；只能用于本任务的一次连接。 */
+            ticket: string;
+            /**
+             * @description 有效期秒数，固定 60，不可配置到更长。
+             * @constant
+             */
+            expires_in: 60;
         };
         /**
          * @description 对应 S2 表 6.3 的五类知识点
@@ -1451,13 +1559,45 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            /** @description 是该课程成员但课程内角色不是教师（`ROLE_FORBIDDEN`）。 */
             403: components["responses"]["Forbidden"];
+            /** @description 任务不存在，或调用者是任务所在课程的非成员（`NOT_FOUND`，二者不可区分，不含任务快照字段）。 */
+            404: components["responses"]["NotFound"];
+        };
+    };
+    issueEventTicket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已签发票据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventTicket"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description 是该课程成员但课程内角色不是教师（`ROLE_FORBIDDEN`）。 */
+            403: components["responses"]["Forbidden"];
+            /** @description 任务不存在，或调用者是任务所在课程的非成员（`NOT_FOUND`，二者不可区分，不含任务快照字段）。 */
             404: components["responses"]["NotFound"];
         };
     };
     streamTaskEvents: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description `issueEventTicket` 签发的一次性票据；不得传常规访问令牌（`specs/identity-access.md` §5.2）。 */
+                ticket: string;
+            };
             header?: never;
             path: {
                 tid: components["parameters"]["TaskId"];
@@ -1476,7 +1616,9 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            /** @description 是该课程成员但课程内角色不是教师（`ROLE_FORBIDDEN`）。 */
             403: components["responses"]["Forbidden"];
+            /** @description 任务不存在，或调用者是任务所在课程的非成员（`NOT_FOUND`，二者不可区分，不含任务快照字段）。 */
             404: components["responses"]["NotFound"];
         };
     };
@@ -1491,7 +1633,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 已转入 cancelled */
+            /** @description 请求已受理，以响应体 `stage` 与 `cancel_requested` 为准（`stage = cancelled` 为已取消；非终态且 `cancel_requested = true` 为取消中）。 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1501,8 +1643,14 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            /** @description 是该课程成员但课程内角色不是教师（`ROLE_FORBIDDEN`）。 */
             403: components["responses"]["Forbidden"];
+            /** @description 任务不存在，或调用者是任务所在课程的非成员（`NOT_FOUND`，二者不可区分，不含任务快照字段）。 */
             404: components["responses"]["NotFound"];
+            /** @description `TASK_NOT_CANCELLABLE`，`details: {stage, reason}`。`reason` 取值：
+             *     `persisting_uninterruptible`（正在入库）、`processing_finished`（`awaiting_review`）、
+             *     `already_terminal`（`completed` / `failed` / `cancelled`，`stage` 为实际终态）。
+             *      */
             409: components["responses"]["Conflict"];
         };
     };

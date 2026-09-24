@@ -419,12 +419,12 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 
 | 缺口 | 负责 |
 | --- | --- |
-| `Task` 增加 `cancel_requested`（当前只在 `TaskEvent` 上） | B10 |
-| 取消端点 200 描述「已转入 cancelled」改为「请求已受理，以响应体 `stage` 与 `cancel_requested` 为准」；409 描述写明三种 `reason` | B10 |
-| `TaskCounts` 增加 `chunks_failed` | B10 |
-| `Task` 增加 `failed_chunks: [{chunk_id, page?, section_path?, code}]`；只在快照中返回，SSE 事件只带计数 | B10 |
-| `stage = failed` ⇔ `error` 非空（`if/then` 或按状态拆分，Codex S07-R09） | B10 |
-| `TaskStage` 描述「任意阶段可转 failed，任意非终态可转 cancelled」改为指向本文 §2 | B10 |
+| `Task` 增加 `cancel_requested`（当前只在 `TaskEvent` 上） | B10 已完成 |
+| 取消端点 200 描述「已转入 cancelled」改为「请求已受理，以响应体 `stage` 与 `cancel_requested` 为准」；409 描述写明三种 `reason` | B10 已完成 |
+| `TaskCounts` 增加 `chunks_failed` | B10 已完成 |
+| `Task` 增加 `failed_chunks: [{chunk_id, page?, section_path?, code}]`；只在快照中返回，SSE 事件只带计数 | B10 已完成 |
+| `stage = failed` ⇔ `error` 非空（`if/then` 或按状态拆分，Codex S07-R09） | B10 已完成 |
+| `TaskStage` 描述「任意阶段可转 failed，任意非终态可转 cancelled」改为指向本文 §2 | B10 已完成 |
 | `ErrorCode` 增加 `DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`TASK_ATTEMPTS_EXHAUSTED`（后者来自 A06 §8.3） | B08 已完成 |
-| `events.v1.md` §2 转换表改为指向本文；§2 顺序保证第 4、5 条（结束事件按连接、`awaiting_review` 关流、只覆盖处理阶段）与 §4 重连按本文 §7 改写 | B10 |
-| SSE 令牌签发端点 | B10 / A05 |
+| `events.v1.md` §2 转换表改为指向本文；§2 顺序保证第 4、5 条（结束事件按连接、`awaiting_review` 关流、只覆盖处理阶段）与 §4 重连按本文 §7 改写 | B10 已完成 |
+| SSE 令牌签发端点 | B10 已完成（`issueEventTicket`，A05 §5） |

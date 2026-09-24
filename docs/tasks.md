@@ -374,3 +374,15 @@
 - 验证：`python -m pytest tests/contracts/test_b09.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
 - CI 修复（2026-09-24）：首次 GitHub 运行因 Python 环境未安装 `pytest` 报 `No module named pytest`；`aa1c3e9` 将 `pytest==8.3.5` 加入工作流依赖和工具链清单，随后 GitHub Actions run 35944829534 通过。
 - Claude 审查（REVIEW-B08-B09，2026-09-24）：审查通过；同步 main 后修正 B09-R01（`getCourse` 404 描述与 identity-access §4.1 冲突，先加测试再改并重新生成）；`verify.sh` 通过（B08 5、B09 5）；见 `docs/handoffs/claude-review-b08-b09.md`。自 2026-09-24 起后端由 ArvinHan 接手，B10 起的后端任务负责人记为 ArvinHan（Claude 执行）。
+
+## B10 任务与 SSE 契约
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B10 | DONE（待审查） | 迁移任务与 SSE 契约 | ArvinHan（Claude 执行） | `claude/b10-task-sse-contract` / base `9d2437e` | `src/contracts/api.v1.yaml`、`src/contracts/events.v1.md`、`src/contracts/v1/generated/`、`tests/contracts/test_b10.py`；按 B08/B09 先例接入 `scripts/verify/contracts.sh`；随附状态标注：`specs/task-processing.md` §9、`specs/identity-access.md` §7、`src/contracts/README.md`、`docs/handoffs/claude-b10.md` | `test_b10.py` 先 27 failed 后 36 passed；六处反向篡改均被检出；`gen-contracts.sh --check` 一致；`verify.sh` exit 0（22 负例 + B08 5 + B09 5 + B10 36）；生成的 TS 经 `tsc --strict` 通过；`docs/handoffs/claude-b10.md` |
+
+- 输入：`specs/task-processing.md`「交给后续任务的契约缺口」B10 各行与 §4、§5、§7、TASK-17；`specs/identity-access.md` §5、§7 B10 行、访问矩阵任务行（ADR-010、ADR-013 已签收）。
+- 输出：`TaskEvent` 按事件拆成四个独立 schema（按 `stage` 判别）；`Task` 增加 `cancel_requested`、`failed_chunks`，并约束 `failed ⇔ error`；`TaskCounts.chunks_failed`；`issueEventTicket` 与 `EventTicket`；`streamTaskEvents` 改用 `eventTicket`；取消端点 200/409 描述；任务类 403/404 语义；`events.v1.md` §1、§2、§4 按规格改写。
+- 依赖：B08（已合入）、A03、A05。无运行时代码、数据库或环境变量改动。
+- 风险：`events.v1.md` §6 要求破坏性变更升 v2；依据 ADR-010（`specs/task-processing.md` §7）——v1 尚无消费者（C11/C12 未实现），原地修改。
+- 验证：`python3 -m pytest tests/contracts/test_b10.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。

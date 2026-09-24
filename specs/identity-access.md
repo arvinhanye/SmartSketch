@@ -261,7 +261,7 @@
 | --- | --- |
 | B08（已完成） | `securitySchemes.bearerAuth` 的说明改为「`role` 仅作前端路由提示，服务端不据此授权」；所有继承 `bearerAuth` 的操作补 `401` 响应；新增 `eventTicket` 方案（`type: apiKey`、`in: query`、`name: ticket`） |
 | B09（已完成） | `Course` 增加必填 `my_role`（`$ref: Role`）；`listCourses` 描述改为 §4.4；`login` 补 `429`；`getCourse` 的 `404` 说明加 `GRAPH_NOT_PUBLISHED`；新增 `listMembers`、`addMember`、`removeMember` 三个操作，`CourseMember`、`MemberAdd` 两个 schema，参数 `uid` |
-| B10 | 新增 `issueEventTicket` 操作与 `EventTicket` schema（`ticket`、`expires_in`）；`streamTaskEvents` 声明 `security: [{eventTicket: []}]` 覆盖全局，并显式声明查询参数 `ticket`；`events.v1.md` §1 的 `token` 改为 `ticket` 并指向本文 §5；任务类操作的 `403` 说明改为仅 `ROLE_FORBIDDEN`，非成员走 `404` |
+| B10（已完成） | 新增 `issueEventTicket` 操作与 `EventTicket` schema（`ticket`、`expires_in`）；`streamTaskEvents` 声明 `security: [{eventTicket: []}]` 覆盖全局，并显式声明查询参数 `ticket`；`events.v1.md` §1 的 `token` 改为 `ticket` 并指向本文 §5；任务类操作的 `403` 说明改为仅 `ROLE_FORBIDDEN`，非成员走 `404` |
 
 ## 8. 验收
 

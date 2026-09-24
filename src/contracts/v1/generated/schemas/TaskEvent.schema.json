@@ -55,6 +55,43 @@
         "BUDGET_EXCEEDED"
       ]
     },
+    "TaskCancelledEvent": {
+      "type": "object",
+      "description": "`event: cancelled`。任务进入或已处于 `cancelled`；取消必然先置标志，故 `cancel_requested` 恒为 true。发送后关流。",
+      "required": [
+        "task_id",
+        "stage",
+        "progress",
+        "cancel_requested"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "string",
+          "const": "cancelled"
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cancel_requested": {
+          "type": "boolean",
+          "const": true
+        },
+        "counts": {
+          "$ref": "#/$defs/TaskCounts"
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "TaskCounts": {
       "type": "object",
       "properties": {
@@ -73,66 +110,161 @@
         "relation_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "chunks_failed": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
-    "TaskEvent": {
+    "TaskDoneEvent": {
       "type": "object",
-      "description": "单条 SSE 事件的 data 载荷；事件名与顺序语义见 `events.v1.md`",
+      "description": "`event: done`。只会作为「任务已 `completed` 后才建立的连接」的首条快照出现，随后关流；\n处理期的连接以 `awaiting_review` 收尾，永远收不到它（`specs/task-processing.md` §7）。\n",
       "required": [
         "task_id",
         "stage",
         "progress"
       ],
+      "additionalProperties": false,
       "properties": {
         "task_id": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "stage": {
-          "$ref": "#/$defs/TaskStage"
+          "type": "string",
+          "const": "completed"
+        },
+        "progress": {
+          "type": "number",
+          "const": 1
         },
         "cancel_requested": {
-          "type": "boolean",
-          "default": false,
-          "description": "已收到取消请求但 worker 尚未到达阶段边界（ADR-006 的协作式取消）。\n这是**标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，\n前端据此把取消按钮置为「取消中」而不是直接显示已取消。\n"
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/TaskCounts"
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "TaskErrorEvent": {
+      "type": "object",
+      "description": "`event: error`。任务进入或已处于 `failed`；`error` 必填且不为 null。发送后关流。",
+      "required": [
+        "task_id",
+        "stage",
+        "progress",
+        "error"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "string",
+          "const": "failed"
         },
         "progress": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
+        "error": {
+          "$ref": "#/$defs/Error"
+        },
+        "cancel_requested": {
+          "type": "boolean",
+          "description": "取消标志已置、到检查点前失败时保持 true（TASK-7）。"
+        },
         "counts": {
           "$ref": "#/$defs/TaskCounts"
         },
         "elapsed_ms": {
-          "type": "integer"
-        },
-        "error": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/Error"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
-    "TaskStage": {
-      "type": "string",
-      "description": "ADR-005 + ADR-006 的状态机（命名基线 ADR-008）：\n`queued → parsing → extracting → merging → persisting → awaiting_review → completed`；\n任意阶段可转 `failed`，任意非终态可转 `cancelled`。\n终态为 completed、failed、cancelled。\n",
-      "enum": [
-        "queued",
-        "parsing",
-        "extracting",
-        "merging",
-        "persisting",
-        "awaiting_review",
-        "completed",
-        "failed",
-        "cancelled"
-      ]
+    "TaskEvent": {
+      "description": "单条任务 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**，`{}` 不合法；\n按 `stage` 判别，与 `event:` 行一一对应（stage / done / error / cancelled）。\n事件名、顺序、关流与重连语义见 `events.v1.md` §2、§4。\n",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TaskStageEvent"
+        },
+        {
+          "$ref": "#/$defs/TaskDoneEvent"
+        },
+        {
+          "$ref": "#/$defs/TaskErrorEvent"
+        },
+        {
+          "$ref": "#/$defs/TaskCancelledEvent"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "stage",
+        "mapping": {
+          "queued": "#/components/schemas/TaskStageEvent",
+          "parsing": "#/components/schemas/TaskStageEvent",
+          "extracting": "#/components/schemas/TaskStageEvent",
+          "merging": "#/components/schemas/TaskStageEvent",
+          "persisting": "#/components/schemas/TaskStageEvent",
+          "awaiting_review": "#/components/schemas/TaskStageEvent",
+          "completed": "#/components/schemas/TaskDoneEvent",
+          "failed": "#/components/schemas/TaskErrorEvent",
+          "cancelled": "#/components/schemas/TaskCancelledEvent"
+        }
+      }
+    },
+    "TaskStageEvent": {
+      "type": "object",
+      "description": "`event: stage`。建连快照（非终态）、进入新阶段、阶段内进度变化、`cancel_requested` 由 false 变 true 时推送。\n`stage = awaiting_review`（`progress = 0.95`）是处理期连接的结束事件，推送后服务端关流。\n",
+      "required": [
+        "task_id",
+        "stage",
+        "progress",
+        "cancel_requested"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "parsing",
+            "extracting",
+            "merging",
+            "persisting",
+            "awaiting_review"
+          ]
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cancel_requested": {
+          "type": "boolean",
+          "description": "已收到取消请求但 worker 尚未到达块边界（协作式取消）。这是**标志位不是状态**：\n取消未生效前 `stage` 仍是当前阶段，前端据此显示「取消中」。\n"
+        },
+        "counts": {
+          "$ref": "#/$defs/TaskCounts"
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   }
 }
