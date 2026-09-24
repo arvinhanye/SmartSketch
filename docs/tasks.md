@@ -73,7 +73,8 @@
 | PLAN-D01 | 两个 Claude 分支 YAML-first/Pydantic-first 唯一源、API 前缀和冲突 ADR 编号如何统一（A01/A02）。**已关闭**：唯一源与 ADR 编号由 ADR-004 签收；API 前缀由 ADR-009（A02）定为 `/api/v1`（均为 ArvinHan，2026-09-22） | 技术负责人 | 已完成 |
 | PLAN-D02 | 发布快照/图与向量版本化/双存储补偿方案（A04）。**已关闭**：由 ADR-012（A04）裁定（ArvinHan，2026-09-23 签收） | 技术负责人 | 已完成 |
 | PLAN-D03 | worker 队列/租约/取消/重试及部分失败语义（A03/A06）。**已关闭**：取消与部分失败语义由 ADR-010（A03），队列 / 租约 / 重试 / 幂等由 ADR-011（A06）签收（均为 ArvinHan，2026-09-23） | 技术负责人 | 已完成 |
-| PLAN-D04 | 哪个 worktree 作为集成基线、分批合并顺序与合并权（A10） | 项目负责人 | 合并前；本轮未代为合并 |
+| PLAN-D04 | 哪个 worktree 作为集成基线、分批合并顺序与合并权（A10）。**已关闭**：ADR-016 定为以 main 为基线、按批检出文件导入（每批一个 PR、一个功能边界），Agent 只开 PR、由 ArvinHan 合并并交叉审查；批次顺序见 `docs/reviews/branch-integration-map.md` 第 3 节（ArvinHan，2026-09-23 签收） | 项目负责人 | 已完成 |
+| D-08 | 融合自动合并阈值与低置信度阈值的初始取值（沿用 `740adb` 未决问题编号，ADR-016 决定 7） | 技术负责人 | E09/E10 开工前 |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -155,6 +156,13 @@
 - A05 的决定（ArvinHan，2026-09-23 签收）：本地账号登录，演示账号由种子脚本创建、口令只来自环境变量，无注册端点；调用者身份只来自已验证的令牌，不读请求中的 `user_id`；`users.role` 只决定首页和能否建课，课程内授权只看 `course_members.role` 并每次回查；教师按用户名添加学生；进度、推荐、问答仅学生成员可用，教师不开放；SSE 改用一次性票据（Codex S07-R07、A03 移交项）。
 - A05 交出的后续项（均未认领）：**B08 / B09 / B10** 按 `specs/identity-access.md` §7 改契约（`my_role`、成员三操作、票据端点与安全方案、补 `401`）；**原子清单缺口**：登录端点与令牌签发、账号命令行与演示种子、成员管理 API、成员管理页面、票据申领端点，清单均无承接任务，需协调 Agent 拆分编号；`event_tickets` 表补登命名基线交 **A10**（`docs/architecture.md` 现由 A04 持锁）；`AUTH_JWT_SECRET` 等三个变量写入 `.env.example` 交 **A07 或 C03**。
 - ADR 编号：ADR-010、011、012 分别由 A03、A06、A04 使用（PR #5、#6、#7；A04 原与 A03 同撞 010，已改用预留的 012），A05 取 013。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10 | DONE（ADR-016 已签收） | 整理已有成果导入顺序与任务映射 | Claude（协调 Agent） | `.claude/worktrees/quirky-dijkstra-eca5de`（分支 `claude/a10-integration-map`）/ base `6881ffe` | `docs/reviews/branch-integration-map.md`（新建）、本节与 PLAN-D04 行、`docs/handoffs/claude-a10.md`；**范围扩展**：`docs/decisions.md`（新增 ADR-016 + ADR-004 指针一行，AGENTS.md §6 要求已确认选择入 ADR）、「待确认决策」新增 D-08 行（ID-4 的决定） | `docs/decisions.md` ADR-016；`docs/reviews/branch-integration-map.md`：92 个文件逐一处置（导入 56、待决 13、不导入 12、随任务导入 6、逐段合并 3、部分导入 2），批 0～6 各一个功能边界，15 项待签收决定各有签收人，任务编号与清单缺口映射；`740adb` 副本补齐生成物后门禁 exit 0，批 1 叠到 main 副本上 exit 1（原因与修法见第 3 节）；`check_a10.py` ALL PASS，8 个负例均 exit 1；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a10.md` |
+
+- A10 的决定（ArvinHan 2026-09-23 签收，ADR-016）：以 main 为集成基线，不对 `740adb` 做 `git merge`，按批检出文件、每批一个 PR；先合在途 PR #16、#14、#15，再按批 0～6 推进。批 1（契约真源）须先签 N1（文本块标签），并同时调整命名门禁与测试夹具；批 5（ADR 拆分与命名基线）须先签 S03-1 与 N1～N4；批 6 须先签 PLAN-D05。
+- A10 交出的后续项（均未认领）：批 0～6 的执行；原子清单缺口 G-1～G-6（登录与成员管理、重新向量化命令、消融实验、参赛材料与合规等）在批 0 补登编号；D-08 已写入「待确认决策」。命名按 ADR-016 决定 6：`Chunk`、`Document`、`model_calls`、`GraphVersion`，问答记录名交 A09。ADR-015 留给 A09。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
