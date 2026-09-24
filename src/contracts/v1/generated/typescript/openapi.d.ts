@@ -1277,7 +1277,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
-            /** @description 资源不存在，或学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`）。 */
+            /** @description 学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`）。课程不存在与非成员同为 403 `COURSE_FORBIDDEN`，见 `specs/identity-access.md` §4.1。 */
             404: components["responses"]["NotFound"];
         };
     };

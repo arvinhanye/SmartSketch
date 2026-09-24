@@ -85,3 +85,12 @@ def test_request_schemas_do_not_declare_caller_identity():
                 if "$ref" in schema:
                     schema = SCHEMAS[schema["$ref"].rsplit("/", 1)[-1]]
                 assert "user_id" not in schema.get("properties", {}), op["operationId"]
+
+
+def test_get_course_404_is_only_unpublished_for_students():
+    # identity-access §4.1：课程不存在与非成员同为 403 COURSE_FORBIDDEN，404 只来自 GRAPH_NOT_PUBLISHED
+    responses = operation("/courses/{cid}", "get")["responses"]
+    assert responses["403"] == {"$ref": "#/components/responses/Forbidden"}
+    not_found = responses["404"]["description"]
+    assert "GRAPH_NOT_PUBLISHED" in not_found
+    assert "不存在" not in not_found.split("GRAPH_NOT_PUBLISHED")[0]

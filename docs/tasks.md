@@ -373,3 +373,4 @@
 - 风险：B09 只定义协议，成员权限和课程过滤须由后续 C03/C04/C15 实现；当前基线 A10 批 1 尚待集成。
 - 验证：`python -m pytest tests/contracts/test_b09.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
 - CI 修复（2026-09-24）：首次 GitHub 运行因 Python 环境未安装 `pytest` 报 `No module named pytest`；`aa1c3e9` 将 `pytest==8.3.5` 加入工作流依赖和工具链清单，随后 GitHub Actions run 35944829534 通过。
+- Claude 审查（REVIEW-B08-B09，2026-09-24）：审查通过；同步 main 后修正 B09-R01（`getCourse` 404 描述与 identity-access §4.1 冲突，先加测试再改并重新生成）；`verify.sh` 通过（B08 5、B09 5）；见 `docs/handoffs/claude-review-b08-b09.md`。自 2026-09-24 起后端由 ArvinHan 接手，B10 起的后端任务负责人记为 ArvinHan（Claude 执行）。
