@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "date": "2026-09-24",
+  "base": "62cbbc7",
+  "scope": "HANDOFF-0924 fixed-range review only",
+  "reviewed": {
+    "B10": {"range": "f00a3e8..bb48429", "report": "docs/reviews/codex-claude-handoff-0924-b10-b02-b03-b04-ci02.md", "new_p1_p2": 0},
+    "B02": {"range": "9d2437e..3fedd4e", "report": "docs/reviews/codex-claude-handoff-0924-b10-b02-b03-b04-ci02.md", "new_p1_p2": 0},
+    "B03_B04": {"range": "3fedd4e..06f33aa", "report": "docs/reviews/codex-claude-handoff-0924-b10-b02-b03-b04-ci02.md", "new_p1_p2": 0},
+    "CI_02": {"range": "06f33aa..025cbee", "report": "docs/reviews/codex-claude-handoff-0924-b10-b02-b03-b04-ci02.md", "new_p1_p2": 0},
+    "B13": {"range": "bb48429..791b1d8", "report": "docs/reviews/codex-claude-handoff-0924-b13-791b1d8.md", "p2": 7, "p3": 2}
+  },
+  "pending": [
+    "B02: Windows native nested npm test",
+    "B13: P2 fixes and review of any new head commit",
+    "C08: implementation and acceptance tests"
+  ],
+  "does_not_close_prior_reviews": true
+}

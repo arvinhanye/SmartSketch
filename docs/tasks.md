@@ -448,3 +448,12 @@
 - 依赖：A03、B10 均已合入；C01（PR #174）与 B13（PR #32）不阻塞 C08。C09、C11、F13 后续消费 C08。
 - 风险：并发 CAS、租约与持久化不属于本轮纯函数；固定进度及 `failed ⇔ error` 必须与 B10 契约一致。原 worktree 的 `verify.sh` 基线因本机缺 `pyyaml`、`openapi-spec-validator`、`pytest` 未通过，属于环境验证缺口，不计作 C08 失败或通过。
 - 当前协作状态：B13 #55 与 C01 #58 均有开放 PR，标签 `status:in-review`；B11 #53 因 ADR-012 下一次修订继续 `status:blocked`；C02 #59 虽已分配 539210，尚待 C01，不在可认领集合。其余本交接列出的 D01、B12、E01、F01、B07、C05 仍需逐项按 issue/文件锁复核后再认领。
+
+### HANDOFF-0924 固定范围复审（本节覆盖上文各任务行的旧「待审查」标记）
+
+| 审查 ID | 状态 | 固定范围 | 负责人 | 验收与证据 |
+| --- | --- | --- | --- | --- |
+| REVIEW-HANDOFF-0924 | DONE（B02 Windows 缺口保留；B13 修复未完成） | B10 `f00a3e8..bb48429`；B02 `9d2437e..3fedd4e`；B03/B04 `3fedd4e..06f33aa`；CI-02 `06f33aa..025cbee`；B13 PR #32 `bb48429..791b1d8` | Codex | B10、B02、B03/B04、CI-02 固定范围未发现新增 P1/P2，见 `docs/reviews/codex-claude-handoff-0924-b10-b02-b03-b04-ci02.md`；B13 固定提交发现 P2×7、P3×2，PR #32 仍为 `status:in-review`，建议修复 P2 后再合并，见 `docs/reviews/codex-claude-handoff-0924-b13-791b1d8.md`；验证与未测范围见 `docs/handoffs/codex-review-handoff-0924.md`。 |
+
+- 复审只检查固定提交与实际运行的命令，不修改 Claude 的源码；B13 结论不等于新头提交已审。旧自动审查状态文件 `docs/reviews/claude-review-state.json` 在主目录有其他 Codex 未提交改动，本分支不覆盖它；本次增量状态另记 `docs/reviews/codex-handoff-0924-state.json`。
+- C08 认领状态保持 `IN PROGRESS`；B10 生成类型忽略固定阶段进度条件的已知限制由 C08 运行时及后续 C11 序列化路径承担。本轮 C08 的实现验收另记在 `docs/handoffs/codex-c08.md`，不与审查完成混算。
