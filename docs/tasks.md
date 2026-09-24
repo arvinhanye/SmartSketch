@@ -185,7 +185,7 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| A08 签收 | DONE（ADR-014 修订 1 已签收；A08S-R01 补注待签收） | 签收 A08 §7 的参数与进度接口字段，以及 ADR-014 的两项细则 | Claude（协调 Agent） | `.claude/worktrees/codex-a08-check-0ae6d7`（分支 `claude/a08-signoff`）/ base `f9dfc8f` | `docs/decisions.md`（ADR-014 修订 1）、`specs/learning-path.md`（§1、§3、§5、§6、§7）、`docs/integrations.md`（学习推荐权重、启动校验）、`.env.example`、本任务行、`docs/handoffs/claude-sign-a08.md` | `docs/decisions.md` ADR-014 修订 1（决定 5～10）；`specs/learning-path.md` LP-1～20；`docs/handoffs/claude-sign-a08.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
+| A08 签收 | DONE（ADR-014 修订 1 及 A08S-R01 补注已签收） | 签收 A08 §7 的参数与进度接口字段，以及 ADR-014 的两项细则 | Claude（协调 Agent） | `.claude/worktrees/codex-a08-check-0ae6d7`（分支 `claude/a08-signoff`）/ base `f9dfc8f` | `docs/decisions.md`（ADR-014 修订 1）、`specs/learning-path.md`（§1、§3、§5、§6、§7）、`docs/integrations.md`（学习推荐权重、启动校验）、`.env.example`、本任务行、`docs/handoffs/claude-sign-a08.md` | `docs/decisions.md` ADR-014 修订 1（决定 5～10）；`specs/learning-path.md` LP-1～20；`docs/handoffs/claude-sign-a08.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
 
 - A08 签收的决定（ArvinHan 2026-09-23，ADR-014 修订 1）：
   - 缺失属性取 0.5；
@@ -200,4 +200,4 @@
   - **C01/I01**：进度行增加写入序号。
   - **I04**：启动时读取并校验权重。
   - **F10**：合并时写入谱系。
-- Codex REVIEW-14 修复（A1～A10 收尾，Claude）：**A08S-R01** 同值写入不能只凭原始值相同跳过，按提交时最终绑定版本上是否仍有未被覆盖的来源判定，LP-16/LP-18 补回归，ADR-014 修订 1 决定 9 加补注（待签收）；**A08S-R02** A08 行说明段改为历史基线并列出当前依赖。审查报告 `docs/reviews/codex-claude-a08-signoff-f9dfc8f-2026-09-24-0123z.md`（主目录）；验证见 `docs/handoffs/claude-sign-a08.md`「第二轮」。
+- Codex REVIEW-14 修复（A1～A10 收尾，Claude）：**A08S-R01** 同值写入不能只凭原始值相同跳过，按提交时最终绑定版本上是否仍有未被覆盖的来源判定，LP-16/LP-18 补回归，ADR-014 修订 1 决定 9 加补注（ArvinHan 2026-09-24 签收）；**A08S-R02** A08 行说明段改为历史基线并列出当前依赖。审查报告 `docs/reviews/codex-claude-a08-signoff-f9dfc8f-2026-09-24-0123z.md`（主目录）；验证见 `docs/handoffs/claude-sign-a08.md`「第二轮」。
