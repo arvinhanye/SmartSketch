@@ -230,10 +230,11 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B09 | DONE（本地，审查问题已修复） | 迁移课程与资料 REST 契约 | Codex（后端） | `kongsc/b09-contracts` / `kongsc/b08-contracts@21253f8`，已纳入 `15dacce` | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b09.py`、`scripts/verify/contracts.sh`；文档为身份规格、任务板与 `docs/handoffs/codex-b09.md` | B09/B08 专项 9 passed；`./scripts/verify.sh` exit 0（含 22 项契约负例、B08 5 项及 B09 4 项）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b09.md` |
+| B09 | DONE（GitHub CI 已验证） | 迁移课程与资料 REST 契约 | Codex（后端） | `kongsc/b09-contracts` / `kongsc/b08-contracts@21253f8`，已纳入 `15dacce` | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b09.py`、`scripts/verify/contracts.sh`、`.github/workflows/ci.yml`、`src/contracts/toolchain.txt`；文档为身份规格、任务板与 `docs/handoffs/codex-b09.md` | B09/B08 专项 9 passed；GitHub Actions [run 35944829534](https://github.com/arvinhanye/SmartSketch/actions/runs/35944829534) 的 `./scripts/verify.sh` 通过（B08 5 项、B09 4 项）；`./scripts/gen-contracts.sh --check` PASS；`docs/handoffs/codex-b09.md` |
 
 - 输入：现有课程/资料 OpenAPI 路径、ADR-013 与 `specs/identity-access.md` §3～§7。
 - 输出：带课程内角色的 Course、成员管理 DTO 与 REST 操作、课程列表可见性及现有资料接口的错误响应契约。
 - 依赖：B08、A05 已完成；B09 分支已纳入 B08 审查修复 `15dacce`，不修改 B05 运行时文件。
 - 风险：B09 只定义协议，成员权限和课程过滤须由后续 C03/C04/C15 实现；当前基线 A10 批 1 尚待集成。
 - 验证：`python -m pytest tests/contracts/test_b09.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- CI 修复（2026-09-24）：首次 GitHub 运行因 Python 环境未安装 `pytest` 报 `No module named pytest`；`aa1c3e9` 将 `pytest==8.3.5` 加入工作流依赖和工具链清单，随后 GitHub Actions run 35944829534 通过。
