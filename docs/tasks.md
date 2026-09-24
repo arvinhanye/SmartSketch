@@ -244,3 +244,26 @@
 
 - A10-R01/R02 的修复（ADR-016 修订 1，ArvinHan 2026-09-24 签收）：批 1 的扫描集合按执行时 main 中已存在的规格确定，`learning-path.md` 保留，`grounded-qa.md` 待 A09 合入后加回并补负例；ADR-005/006 在批 5 以 SUPERSEDED 历史记录导入，不得作现行依据。
 - 交出的后续项（均未认领）：**批 1 补**（后端 Agent）：A09 合入后把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例；**批 5**（协调 Agent）按修订 1 导入 ADR-005/006。
+
+## A10 批 0：规划文档对齐
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10-批0 | DONE（本地，待审查） | 按 ADR-016 更新契约任务白名单并补齐 G-1～G-6 清单缺口 | Codex（协调） | `codex/a10-batch0` / A10 `37da669`，已合入 `origin/main@f9dfc8f` | `docs/atomic-task-plan.md`、`docs/atomic-tasks.json`、`docs/reviews/validate_atomic_plan.py`、本任务板、`docs/handoffs/codex-a10-batch0.md` | 140 项清单校验 PASS；无环、路径与链接检查 PASS；基础 verify PASS；负例（缺依赖）被拒；`docs/handoffs/codex-a10-batch0.md` |
+
+- 输入：A10/ADR-016 的导入映射第 3 节批 0 与第 6 节 G-1～G-6；ADR-004 YAML 真源裁定；A05/ADR-013 身份与票据规则。
+- 输出：B08～B14、O02、O05 的 YAML 真源与生成物白名单；新增 C13～C16、F14、H12、K13～K19 共 13 个叶子任务；验证器动态计数并可在当前 checkout 运行。
+- 依赖：A10 决定已签收；批 1 必须在批 0 验收后开始。
+- 风险：A10 本身尚未进入远端 `main`；本轮只在独立分支工作，不改动 B02/B06 工作区。新增任务均为计划，未声称实现。
+- 验证：`python docs/reviews/validate_atomic_plan.py`、负例、`./scripts/verify.sh`、`git diff --check`。
+
+## A10 批 1：契约真源与生成链
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base | 文件锁 | 验收证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A10-批1 / M0-09 第二步 | DONE（本地，待 PR 与 CI） | 按 ADR-016 导入 OpenAPI 真源、生成类型、契约门禁及 CI 工具链 | Codex（后端） | `codex/a10-batch1` / `codex/a10-batch0@c795741` | `src/contracts/**`、`scripts/{gen-contracts.sh,gen_contracts.py,check_contracts.py,verify.sh,verify/contracts.sh}`、`tests/contracts/**`、`.github/workflows/ci.yml`、`.gitattributes`、命名相关架构/规格/计划段、本任务板与交接 | `docs/handoffs/codex-a10-batch1.md`；`gen-contracts.sh --check`、22 项契约负例、`verify.sh`、计划校验、生成模型导入与 `pip check` 均通过；远端 CI 待 PR |
+
+- 输入：A10 [导入映射](reviews/branch-integration-map.md) 第 3 节批 1、ADR-004/009/010/016、来源分支 `claude/worktree-contract-conflicts-740adb@978671e`。
+- 输出：`api.v1.yaml`、配套语义文档、完整 Python/TypeScript/JSON 生成物、严格契约校验及 CI 安装步骤；N1 的 `Chunk` 命名同步到架构、A04 规格、D10 计划。
+- 依赖与风险：批 0 已在本地提交；A10 与前置 PR 仍未全部进入 `main`，本批不能直接合入主线。`events.v1.md` §2 的旧状态机叙述留给 B10 迁移，已在文首标明现行规范的优先级。远端 CI 尚未运行。
+- 验证命令：`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`python docs/reviews/validate_atomic_plan.py`、生成模型导入、`python -m pip check`、`git diff --check`；具体结果与回滚见交接。
