@@ -1,0 +1,1835 @@
+openapi: 3.1.0
+
+info:
+  title: SmartSketch / 智绘学途 API
+  version: 1.0.0
+  description: |
+    课程知识图谱智能构建与学习导航系统的前后端共享契约。
+
+    命名基线为 ADR-008，不得引入同义别名。本文件是契约的单一真源（ADR-004）：
+    实现代码、Cypher、Pydantic 模型与前端类型全部由它生成或以它为准，不得反向手改。
+
+    两类状态不是 HTTP 错误，必须以 200 返回可机读状态（AGENTS.md 第 4 节、ADR-003）：
+      - 问答证据不足 → `ChatResponse.status = not_covered`
+      - 任务处理失败 → `Task.stage = failed`，附 `Task.error`
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+    description: 登录与角色
+  - name: courses
+    description: 课程管理与多课程隔离
+  - name: documents
+    description: 资料上传与解析
+  - name: tasks
+    description: 图谱生成任务与进度
+  - name: graph
+    description: 图谱读取与教师端修正
+  - name: review
+    description: 审核队列与发布
+  - name: learning
+    description: 学习进度、推荐与路径
+  - name: chat
+    description: 可信问答
+
+paths:
+  /health:
+    get:
+      tags: [auth]
+      summary: 健康检查
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: 服务可用
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  version:
+                    type: string
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: 登录，返回访问令牌与角色
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses:
+    get:
+      tags: [courses]
+      summary: 当前用户可见的课程列表
+      description: 教师返回自己拥有的课程；学生只返回已发布课程。
+      operationId: listCourses
+      responses:
+        '200':
+          description: 课程列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      tags: [courses]
+      summary: 新建课程（教师）
+      operationId: createCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseCreate'
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses/{cid}:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [courses]
+      summary: 课程详情
+      operationId: getCourse
+      responses:
+        '200':
+          description: 课程详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{cid}/documents:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [documents]
+      summary: 课程资料列表
+      operationId: listDocuments
+      responses:
+        '200':
+          description: 资料列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [documents]
+      summary: 上传资料并创建图谱生成任务（教师）
+      description: |
+        仅接受 PDF、DOCX、TXT、Markdown。其他扩展名返回 `UNSUPPORTED_FORMAT`。
+        上传成功立即返回任务 ID，处理过程通过 SSE 观察，见 `events.v1.md`。
+      operationId: uploadDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                contentType: >-
+                  application/pdf,
+                  application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                  text/plain, text/markdown
+      responses:
+        '202':
+          description: 已接受，任务已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAccepted'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedFormat'
+
+  /api/v1/tasks/{tid}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [tasks]
+      summary: 任务状态快照
+      description: SSE 不可用时的轮询兜底。`stage = failed` 时 `error` 必填，HTTP 仍为 200。
+      operationId: getTask
+      responses:
+        '200':
+          description: 任务当前状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tasks/{tid}/events:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [tasks]
+      summary: 订阅任务进度（SSE）
+      description: |
+        `text/event-stream`。事件名、顺序保证、心跳与重连语义在 `events.v1.md` 中定义，
+        本条目仅约束单条事件的数据结构。
+      operationId: streamTaskEvents
+      responses:
+        '200':
+          description: 事件流
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/TaskEvent'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tasks/{tid}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      summary: 取消任务（教师）
+      description: 仅非终态任务可取消；终态任务返回 `TASK_NOT_CANCELLABLE`。
+      operationId: cancelTask
+      responses:
+        '200':
+          description: 已转入 cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/courses/{cid}/graph:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [graph]
+      summary: 读取课程图谱
+      description: |
+        教师读取草稿，学生只能读取已发布版本；学生请求未发布课程返回 `GRAPH_NOT_PUBLISHED`。
+        响应即图谱交换格式（M0-04c），可直接用于前端 G6 适配层与导入导出。
+      operationId: getGraph
+      parameters:
+        - name: chapter_id
+          in: query
+          description: 按章节过滤
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: 按知识点类型过滤
+          schema:
+            $ref: '#/components/schemas/KnowledgePointType'
+        - name: relation_types
+          in: query
+          description: 按关系类型过滤
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/RelationType'
+        - name: version
+          in: query
+          description: 指定已发布版本号；省略时教师取草稿、学生取最新发布版
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 图谱交换格式
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphExchange'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{cid}/kp:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [graph]
+      summary: 知识点列表（卡片/列表视图）
+      description: 支撑规格验收条件 5 的卡片视图，与图谱选中态联动。
+      operationId: listKnowledgePoints
+      parameters:
+        - name: chapter_id
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/KnowledgePointType'
+        - name: q
+          in: query
+          description: 按名称与别名搜索
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 知识点列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KnowledgePoint'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [graph]
+      summary: 新增知识点（教师）
+      operationId: createKnowledgePoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgePointCreate'
+      responses:
+        '201':
+          description: 已创建，`source` 固定为 manual、`locked` 固定为 true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgePoint'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses/{cid}/kp/{kid}:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+      - $ref: '#/components/parameters/KnowledgePointId'
+    get:
+      tags: [graph]
+      summary: 知识点详情与出处
+      description: 必须返回至少一条 `source_refs`（规格验收条件 5）。
+      operationId: getKnowledgePoint
+      responses:
+        '200':
+          description: 知识点详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgePointDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [graph]
+      summary: 修改知识点（教师）
+      description: 修改成功后 `locked` 置为 true，后续自动流程不再覆盖。
+      operationId: updateKnowledgePoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgePointUpdate'
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgePoint'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [graph]
+      summary: 删除知识点及其关系（教师）
+      operationId: deleteKnowledgePoint
+      responses:
+        '204':
+          description: 已删除
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{cid}/kp/merge:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    post:
+      tags: [graph]
+      summary: 合并重复知识点（教师）
+      description: 被合并节点的名称并入 `aliases`，关系与来源取并集后迁移到主节点。
+      operationId: mergeKnowledgePoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeRequest'
+      responses:
+        '200':
+          description: 合并后的主节点
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgePoint'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses/{cid}/kp/{kid}/material:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+      - $ref: '#/components/parameters/KnowledgePointId'
+    post:
+      tags: [learning]
+      summary: 生成学习材料（讲解 + 示例 + 练习题）
+      description: 对应规格验收条件 7。结果可缓存，教师审核后固定。
+      operationId: generateStudyMaterial
+      responses:
+        '200':
+          description: 学习材料
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyMaterial'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+
+  /api/v1/courses/{cid}/relations:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    post:
+      tags: [graph]
+      summary: 新增关系（教师）
+      description: |
+        新增 `PREREQUISITE` 前执行 DAG 环检测；成环返回 `CYCLE_DETECTED`，
+        并在 `details.cycle` 给出导致冲突的节点链路（规格验收条件 4）。
+      operationId: createRelation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationCreate'
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses/{cid}/relations/{rid}:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+      - $ref: '#/components/parameters/RelationId'
+    patch:
+      tags: [graph]
+      summary: 修改关系类型或方向（教师）
+      description: 改为或改动 `PREREQUISITE` 时同样执行环检测。
+      operationId: updateRelation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationUpdate'
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Relation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [graph]
+      summary: 删除关系（教师）
+      operationId: deleteRelation
+      responses:
+        '204':
+          description: 已删除
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{cid}/review:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [review]
+      summary: 审核队列（教师）
+      description: 三栏：低置信度关系、疑似重复知识点、孤立知识点。每条附原文证据。
+      operationId: getReviewQueue
+      responses:
+        '200':
+          description: 审核队列
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewQueue'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/courses/{cid}/publish:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    post:
+      tags: [review]
+      summary: 发布图谱并生成快照（教师）
+      description: 发布前返回图谱质量体检结果；存在环冲突时拒绝发布。
+      operationId: publishGraph
+      responses:
+        '200':
+          description: 已发布
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/courses/{cid}/versions:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [review]
+      summary: 历史发布版本列表（教师）
+      operationId: listVersions
+      responses:
+        '200':
+          description: 版本列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GraphVersion'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/courses/{cid}/versions/{version}/rollback:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    post:
+      tags: [review]
+      summary: 回滚到指定版本（教师）
+      operationId: rollbackVersion
+      responses:
+        '200':
+          description: 回滚后的版本信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{cid}/progress:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [learning]
+      summary: 当前学生在本课程的掌握状态
+      operationId: getProgress
+      responses:
+        '200':
+          description: 掌握状态列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressEntry'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [learning]
+      summary: 更新掌握状态（学生）
+      operationId: updateProgress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProgressUpdate'
+      responses:
+        '200':
+          description: 更新后的掌握状态
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressEntry'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses/{cid}/recommend:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [learning]
+      summary: 下一步推荐，或指定目标的完整学习路径
+      description: |
+        不带 `target` 时返回按优先级排序的可学知识点列表，每条附推荐理由。
+        带 `target` 时返回去除已掌握项后的拓扑有序路径（规格验收条件 8）；
+        目标不可达时 `reachable = false` 并给出 `unreachable_reason`，HTTP 仍为 200。
+      operationId: getRecommendations
+      parameters:
+        - name: target
+          in: query
+          description: 目标知识点 ID
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: 推荐列表或学习路径
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{cid}/chat:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    post:
+      tags: [chat]
+      summary: 可信问答（流式）
+      description: |
+        默认以 `text/event-stream` 流式返回，事件定义见 `events.v1.md`。
+        `Accept: application/json` 时一次性返回完整 `ChatResponse`。
+
+        证据不足时 **不是** HTTP 错误：返回 200，`status = not_covered`，
+        `answer` 为可解释原因，`citations` 为空数组（ADR-003）。
+      operationId: chat
+      parameters:
+        - name: Accept
+          in: header
+          schema:
+            type: string
+            enum: [text/event-stream, application/json]
+            default: text/event-stream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: 回答，或 `not_covered` 状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/ChatEvent'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 令牌载荷含 `sub`（用户 ID）与 `role`（teacher / student）。
+
+  parameters:
+    CourseId:
+      name: cid
+      in: path
+      required: true
+      description: 课程 ID，所有查询的第一隔离条件
+      schema:
+        type: string
+    TaskId:
+      name: tid
+      in: path
+      required: true
+      schema:
+        type: string
+    KnowledgePointId:
+      name: kid
+      in: path
+      required: true
+      schema:
+        type: string
+    RelationId:
+      name: rid
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Unauthenticated:
+      description: 未认证或令牌失效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: 角色不允许，或跨课程访问（`COURSE_FORBIDDEN`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: 资源不存在，或学生读取未发布图谱（`GRAPH_NOT_PUBLISHED`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: 状态冲突，如 `CYCLE_DETECTED`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedFormat:
+      description: 不支持的资料格式（`UNSUPPORTED_FORMAT`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    FileTooLarge:
+      description: 文件超出上限（`FILE_TOO_LARGE`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: 请求体校验失败（`VALIDATION_ERROR`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 触发限流（`RATE_LIMITED`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    LlmUnavailable:
+      description: 主备模型均不可用（`LLM_UNAVAILABLE`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: 面向用户的可读说明
+        details:
+          type: object
+          description: 结构化补充，例如 `CYCLE_DETECTED` 的 `cycle` 节点链路
+          additionalProperties: true
+
+    ErrorCode:
+      type: string
+      description: 错误码全集，逐条说明见 `errors.v1.md`
+      enum:
+        - UNAUTHENTICATED
+        - COURSE_FORBIDDEN
+        - ROLE_FORBIDDEN
+        - NOT_FOUND
+        - GRAPH_NOT_PUBLISHED
+        - UNSUPPORTED_FORMAT
+        - FILE_TOO_LARGE
+        - VALIDATION_ERROR
+        - CYCLE_DETECTED
+        - DANGLING_ENDPOINT
+        - DUPLICATE_RELATION
+        - NODE_LOCKED
+        - TASK_NOT_CANCELLABLE
+        - PUBLISH_BLOCKED
+        - RATE_LIMITED
+        - LLM_UNAVAILABLE
+
+    Role:
+      type: string
+      enum: [teacher, student]
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, user]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+        expires_in:
+          type: integer
+          description: 秒
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [id, username, role]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+
+    CourseStatus:
+      type: string
+      description: draft 未发布；published 已发布；revising 已发布后再修改，学生仍见上一版
+      enum: [draft, published, revising]
+
+    Course:
+      type: object
+      required: [id, name, status, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/CourseStatus'
+        teacher_id:
+          type: string
+        kp_count:
+          type: integer
+          minimum: 0
+        published_version:
+          type: [integer, 'null']
+          description: 学生可见的版本号；从未发布为 null
+        created_at:
+          type: string
+          format: date-time
+
+    CourseCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+
+    DocumentFormat:
+      type: string
+      enum: [pdf, docx, txt, markdown]
+
+    Document:
+      type: object
+      required: [id, course_id, filename, format, parse_status, uploaded_at]
+      properties:
+        id:
+          type: string
+        course_id:
+          type: string
+        filename:
+          type: string
+        format:
+          $ref: '#/components/schemas/DocumentFormat'
+        size_bytes:
+          type: integer
+        parse_status:
+          $ref: '#/components/schemas/TaskStage'
+        uploaded_at:
+          type: string
+          format: date-time
+
+    UploadAccepted:
+      type: object
+      required: [task_id, document_id]
+      properties:
+        task_id:
+          type: string
+        document_id:
+          type: string
+
+    TaskStage:
+      type: string
+      description: |
+        ADR-005 + ADR-006 的状态机（命名基线 ADR-008）：
+        `queued → parsing → extracting → merging → persisting → awaiting_review → completed`；
+        任意阶段可转 `failed`，任意非终态可转 `cancelled`。
+        终态为 completed、failed、cancelled。
+      enum:
+        - queued
+        - parsing
+        - extracting
+        - merging
+        - persisting
+        - awaiting_review
+        - completed
+        - failed
+        - cancelled
+
+    TaskCounts:
+      type: object
+      properties:
+        chunks_done:
+          type: integer
+          minimum: 0
+        chunks_total:
+          type: integer
+          minimum: 0
+        kp_count:
+          type: integer
+          minimum: 0
+        relation_count:
+          type: integer
+          minimum: 0
+
+    Task:
+      type: object
+      required: [id, course_id, document_id, stage, progress, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        course_id:
+          type: string
+        document_id:
+          type: string
+        stage:
+          $ref: '#/components/schemas/TaskStage'
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 整体进度，0–1
+        counts:
+          $ref: '#/components/schemas/TaskCounts'
+        timings_ms:
+          type: object
+          description: 各阶段耗时，键为 TaskStage 值，用于性能实测（M3-04）
+          additionalProperties:
+            type: integer
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/Error'
+            - type: 'null'
+          description: stage = failed 时必填
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskEvent:
+      type: object
+      description: 单条 SSE 事件的 data 载荷；事件名与顺序语义见 `events.v1.md`
+      required: [task_id, stage, progress]
+      properties:
+        task_id:
+          type: string
+        stage:
+          $ref: '#/components/schemas/TaskStage'
+        cancel_requested:
+          type: boolean
+          default: false
+          description: |
+            已收到取消请求但 worker 尚未到达阶段边界（ADR-006 的协作式取消）。
+            这是**标志位不是状态**：取消未生效前 `stage` 仍是当前阶段，
+            前端据此把取消按钮置为「取消中」而不是直接显示已取消。
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+        counts:
+          $ref: '#/components/schemas/TaskCounts'
+        elapsed_ms:
+          type: integer
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/Error'
+            - type: 'null'
+
+    KnowledgePointType:
+      type: string
+      description: 对应 S2 表 6.3 的五类知识点
+      enum: [concept, theorem, formula, method, example]
+
+    KnowledgePointStatus:
+      type: string
+      description: 审核状态；low_confidence 项进入审核队列
+      enum: [draft, low_confidence, approved, rejected]
+
+    NodeSource:
+      type: string
+      enum: [ai, manual]
+
+    RelationType:
+      type: string
+      description: ADR-008 命名基线，四类教学关系，不得引入别名
+      enum: [CONTAINS, PREREQUISITE, RELATED_TO, EXAMPLE_OF]
+
+    SourceRef:
+      type: object
+      description: |
+        证据链的最小单元。必须能把读者带回原文的具体位置：
+        `page`（正整数）与 `section_path`（非空）**至少给出一个**（ADR-003）。
+        该规则写成 anyOf 而不是只写在描述里——描述文字不构成 schema 约束，
+        生成的客户端与结构校验不会因此拦住无法定位的来源。
+      required: [chunk_id, document_id]
+      anyOf:
+        - required: [page]
+        - required: [section_path]
+      properties:
+        chunk_id:
+          type: string
+          minLength: 1
+        document_id:
+          type: string
+          minLength: 1
+        section_path:
+          type: string
+          minLength: 1
+          description: 章节路径，如「第3章 > 3.1 栈」。无页码的来源（MD/TXT）靠它定位
+        page:
+          type: integer
+          minimum: 1
+          description: 页码，从 1 起。无分页的来源不带此字段（不是 null）
+        text:
+          type: string
+          minLength: 1
+          description: 原文片段，供前端高亮
+
+    Chapter:
+      type: object
+      required: [id, title, order]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        order:
+          type: integer
+          minimum: 0
+
+    KnowledgePoint:
+      type: object
+      required:
+        - id
+        - course_id
+        - name
+        - type
+        - definition
+        - level
+        - confidence
+        - status
+        - source
+        - locked
+      properties:
+        id:
+          type: string
+        course_id:
+          type: string
+        chapter_id:
+          type: [string, 'null']
+        name:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        type:
+          $ref: '#/components/schemas/KnowledgePointType'
+        definition:
+          type: string
+        importance:
+          type: number
+          minimum: 0
+          maximum: 1
+        difficulty:
+          type: number
+          minimum: 0
+          maximum: 1
+        level:
+          type: integer
+          minimum: 0
+          description: 前置关系图中的最长前置路径长度，用于层次布局与路径排序
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        status:
+          $ref: '#/components/schemas/KnowledgePointStatus'
+        source:
+          $ref: '#/components/schemas/NodeSource'
+        locked:
+          type: boolean
+          description: true 时不被后续自动抽取/融合流程覆盖
+        source_refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+
+    KnowledgePointDetail:
+      allOf:
+        - $ref: '#/components/schemas/KnowledgePoint'
+        - type: object
+          required: [source_refs]
+          properties:
+            prerequisites:
+              type: array
+              description: 直接前置知识点
+              items:
+                $ref: '#/components/schemas/KnowledgePointRef'
+            successors:
+              type: array
+              description: 直接后继知识点
+              items:
+                $ref: '#/components/schemas/KnowledgePointRef'
+            related:
+              type: array
+              items:
+                $ref: '#/components/schemas/KnowledgePointRef'
+
+    KnowledgePointRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/KnowledgePointType'
+
+    KnowledgePointCreate:
+      type: object
+      required: [name, type, definition]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        aliases:
+          type: array
+          items:
+            type: string
+        type:
+          $ref: '#/components/schemas/KnowledgePointType'
+        definition:
+          type: string
+        chapter_id:
+          type: string
+        importance:
+          type: number
+          minimum: 0
+          maximum: 1
+        difficulty:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    KnowledgePointUpdate:
+      type: object
+      description: 至少提供一个字段
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        type:
+          $ref: '#/components/schemas/KnowledgePointType'
+        definition:
+          type: string
+        importance:
+          type: number
+          minimum: 0
+          maximum: 1
+        difficulty:
+          type: number
+          minimum: 0
+          maximum: 1
+        status:
+          $ref: '#/components/schemas/KnowledgePointStatus'
+
+    MergeRequest:
+      type: object
+      required: [primary_id, merged_ids]
+      properties:
+        primary_id:
+          type: string
+          description: 保留的主节点；其名称成为主名
+        merged_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+
+    Relation:
+      type: object
+      required: [id, course_id, type, from_id, to_id, confidence]
+      properties:
+        id:
+          type: string
+        course_id:
+          type: string
+        type:
+          $ref: '#/components/schemas/RelationType'
+        from_id:
+          type: string
+        to_id:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        status:
+          $ref: '#/components/schemas/KnowledgePointStatus'
+        source:
+          $ref: '#/components/schemas/NodeSource'
+        source_refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+
+    RelationCreate:
+      type: object
+      required: [type, from_id, to_id]
+      properties:
+        type:
+          $ref: '#/components/schemas/RelationType'
+        from_id:
+          type: string
+        to_id:
+          type: string
+
+    RelationUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        type:
+          $ref: '#/components/schemas/RelationType'
+        from_id:
+          type: string
+        to_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/KnowledgePointStatus'
+
+    GraphStats:
+      type: object
+      description: 图谱质量体检，供教师发布前判断可用性
+      required: [node_count, edge_count]
+      properties:
+        node_count:
+          type: integer
+        edge_count:
+          type: integer
+        edges_by_type:
+          type: object
+          additionalProperties:
+            type: integer
+        isolated_count:
+          type: integer
+          description: 无任何关系的孤立知识点数
+        low_confidence_count:
+          type: integer
+        max_level:
+          type: integer
+        chapter_coverage:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 含至少一个知识点的章节占比
+
+    GraphExchange:
+      type: object
+      description: |
+        图谱交换格式（M0-04c）。同时用于 API 响应、前端 G6 适配层输入与图谱导入导出。
+        `nodes` 与 `edges` 已按 `course_id` 隔离，调用方不得跨课程合并。
+      required: [format_version, course_id, generated_at, nodes, edges]
+      properties:
+        format_version:
+          type: string
+          const: '1.0'
+        course_id:
+          type: string
+        graph_version:
+          type: [integer, 'null']
+          description: 已发布版本号；草稿为 null
+        generated_at:
+          type: string
+          format: date-time
+        chapters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Chapter'
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgePoint'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relation'
+        stats:
+          $ref: '#/components/schemas/GraphStats'
+
+    ReviewQueue:
+      type: object
+      required: [low_confidence_relations, suspected_duplicates, isolated_nodes]
+      properties:
+        low_confidence_relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relation'
+        suspected_duplicates:
+          type: array
+          items:
+            type: object
+            required: [candidates, similarity]
+            properties:
+              candidates:
+                type: array
+                minItems: 2
+                items:
+                  $ref: '#/components/schemas/KnowledgePointRef'
+              similarity:
+                type: number
+                minimum: 0
+                maximum: 1
+        isolated_nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgePointRef'
+
+    GraphVersion:
+      type: object
+      required: [version, published_at]
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        published_at:
+          type: string
+          format: date-time
+        node_count:
+          type: integer
+        edge_count:
+          type: integer
+        note:
+          type: [string, 'null']
+
+    PublishResult:
+      type: object
+      required: [version, published_at]
+      properties:
+        version:
+          type: integer
+        published_at:
+          type: string
+          format: date-time
+        stats:
+          $ref: '#/components/schemas/GraphStats'
+
+    MasteryStatus:
+      type: string
+      enum: [unknown, learning, mastered]
+
+    ProgressUpdate:
+      type: object
+      required: [kp_id, status]
+      properties:
+        kp_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/MasteryStatus'
+
+    ProgressEntry:
+      type: object
+      required: [kp_id, status, updated_at]
+      properties:
+        kp_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/MasteryStatus'
+        updated_at:
+          type: string
+          format: date-time
+
+    RecommendFactors:
+      type: object
+      description: 评分四因子的归一化分量，权重见 S2 6.4.7
+      properties:
+        unlock:
+          type: number
+          description: 解锁度，权重 0.35
+        importance:
+          type: number
+          description: 重要度，权重 0.25
+        chapter_order:
+          type: number
+          description: 章节顺序，权重 0.20
+        ease:
+          type: number
+          description: 易学度，权重 0.20
+
+    Recommendation:
+      type: object
+      required: [kp_id, name, score, reason]
+      properties:
+        kp_id:
+          type: string
+        name:
+          type: string
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        reason:
+          type: string
+          description: 一句可读理由，例如「学完它可解锁 4 个知识点」
+        factors:
+          $ref: '#/components/schemas/RecommendFactors'
+
+    PathStep:
+      type: object
+      required: [step, kp_id, name]
+      properties:
+        step:
+          type: integer
+          minimum: 1
+          description: 步骤编号，用于图谱上的路径高亮
+        kp_id:
+          type: string
+        name:
+          type: string
+        reason:
+          type: string
+
+    LearningPath:
+      type: object
+      required: [target_id, reachable, steps]
+      properties:
+        target_id:
+          type: string
+        reachable:
+          type: boolean
+        steps:
+          type: array
+          description: 已去除掌握项的拓扑有序路径；reachable = false 时为空数组
+          items:
+            $ref: '#/components/schemas/PathStep'
+        unreachable_reason:
+          type: [string, 'null']
+          description: reachable = false 时必填，说明为何无法到达
+
+    RecommendResponse:
+      type: object
+      description: 不带 target 时返回 recommendations；带 target 时返回 path
+      properties:
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recommendation'
+        path:
+          oneOf:
+            - $ref: '#/components/schemas/LearningPath'
+            - type: 'null'
+
+    ChatTurn:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+
+    ChatRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+        history:
+          type: array
+          description: 多轮上下文，供问题改写补全指代
+          items:
+            $ref: '#/components/schemas/ChatTurn'
+        kp_id:
+          type: string
+          description: 从知识点详情「问助教」进入时带入
+
+    Citation:
+      type: object
+      description: |
+        引用编号与原文定位；生成后经引用校验，无效编号被剔除。
+        与 `SourceRef` 同样要求可定位：`page` 与 `section_path` 至少给出一个。
+      required: [index, chunk_id, document_id, text]
+      anyOf:
+        - required: [page]
+        - required: [section_path]
+      properties:
+        index:
+          type: integer
+          minimum: 1
+          description: 回答正文中标注的编号
+        chunk_id:
+          type: string
+          minLength: 1
+        document_id:
+          type: string
+          minLength: 1
+        section_path:
+          type: string
+          minLength: 1
+        page:
+          type: integer
+          minimum: 1
+        text:
+          type: string
+          minLength: 1
+
+    ChatStatus:
+      type: string
+      description: |
+        问答的两种终态。结构差异由 `ChatAnswered` / `ChatNotCovered` 两个
+        独立 schema 表达，不靠本枚举的描述文字约束（ADR-003）。
+      enum: [answered, not_covered]
+
+    NotCoveredReason:
+      type: string
+      description: |
+        机读的拒答原因，闭集。前端按此分支给出不同引导文案，
+        不解析 `answer` 的自然语言（AGENTS.md §4「可机读的资料未覆盖状态」）。
+      enum:
+        - no_retrieval_hit          # 检索无命中
+        - below_similarity_threshold # 命中但相似度低于阈值
+        - out_of_course_scope       # 问题超出本课程范围
+        - all_citations_invalidated # 生成完成但引用校验后无一条有效
+
+    ChatAnswered:
+      type: object
+      description: 有依据的回答。**至少一条引用**，每条引用必须可定位。
+      required: [status, answer, citations]
+      properties:
+        status:
+          type: string
+          const: answered
+        answer:
+          type: string
+          minLength: 1
+        citations:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Citation'
+        related_kp_ids:
+          type: array
+          description: 「涉及的知识点」标签，点击跳转图谱并高亮
+          items:
+            type: string
+        latency_ms:
+          type: integer
+          minimum: 0
+
+    ChatNotCovered:
+      type: object
+      description: |
+        资料未覆盖。**引用必须为空数组**，并给出机读原因。
+        这是 200 响应的领域状态，不是 HTTP 错误（ADR-003）。
+      required: [status, answer, citations, reason]
+      properties:
+        status:
+          type: string
+          const: not_covered
+        answer:
+          type: string
+          minLength: 1
+          description: 面向用户的可解释说明，不得包含无依据的结论性内容
+        citations:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/Citation'
+        reason:
+          $ref: '#/components/schemas/NotCoveredReason'
+        related_kp_ids:
+          type: array
+          items:
+            type: string
+        latency_ms:
+          type: integer
+          minimum: 0
+
+    ChatResponse:
+      description: |
+        按 `status` 分支的问答响应。分支存在的原因见 `src/contracts/README.md` §5.4：
+        「answered 至少一条引用」若只写在描述里，生成的客户端会把
+        `{"status":"answered","answer":"结论","citations":[]}` 当成合格响应。
+      oneOf:
+        - $ref: '#/components/schemas/ChatAnswered'
+        - $ref: '#/components/schemas/ChatNotCovered'
+      discriminator:
+        propertyName: status
+        mapping:
+          answered: '#/components/schemas/ChatAnswered'
+          not_covered: '#/components/schemas/ChatNotCovered'
+
+    ChatMetaEvent:
+      type: object
+      description: |
+        检索完成、生成开始前的第一条事件，恒为一条。
+        `status = not_covered` 时后续不再有 delta，直接发 done。
+      required: [event, status]
+      properties:
+        event:
+          type: string
+          const: meta
+        status:
+          $ref: '#/components/schemas/ChatStatus'
+        retrieved:
+          type: integer
+          minimum: 0
+          description: 进入生成上下文的证据块数量，供前端显示「已检索 N 段」
+
+    ChatDeltaEvent:
+      type: object
+      description: |
+        正文增量。**delta 阶段的正文是临时态**：其中出现的引用编号可能在
+        引用校验后被剔除，前端不得在此阶段渲染可点击引用（events.v1.md §3）。
+      required: [event, delta]
+      properties:
+        event:
+          type: string
+          const: delta
+        delta:
+          type: string
+          minLength: 1
+
+    ChatDoneEvent:
+      type: object
+      description: |
+        终态事件，恰好一条，且**携带最终正文**。前端收到后用 `final` 整体
+        替换累积的 delta 文本，而不是把 delta 拼接结果当成答案——两者可能
+        不同（引用校验剔除了编号，或全部引用失效导致降级为 not_covered）。
+      required: [event, final]
+      properties:
+        event:
+          type: string
+          const: done
+        final:
+          $ref: '#/components/schemas/ChatResponse'
+
+    ChatErrorEvent:
+      type: object
+      description: 生成中断的异常终止。与 done 互斥，发送后关闭连接。
+      required: [event, error]
+      properties:
+        event:
+          type: string
+          const: error
+        error:
+          $ref: '#/components/schemas/Error'
+
+    ChatEvent:
+      description: |
+        单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：
+        原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在
+        （codex 审查 R04）。事件名、顺序与终止语义见 `events.v1.md` §3。
+      oneOf:
+        - $ref: '#/components/schemas/ChatMetaEvent'
+        - $ref: '#/components/schemas/ChatDeltaEvent'
+        - $ref: '#/components/schemas/ChatDoneEvent'
+        - $ref: '#/components/schemas/ChatErrorEvent'
+      discriminator:
+        propertyName: event
+        mapping:
+          meta: '#/components/schemas/ChatMetaEvent'
+          delta: '#/components/schemas/ChatDeltaEvent'
+          done: '#/components/schemas/ChatDoneEvent'
+          error: '#/components/schemas/ChatErrorEvent'
+
+    StudyMaterial:
+      type: object
+      required: [kp_id, explanation, exercises]
+      properties:
+        kp_id:
+          type: string
+        explanation:
+          type: string
+          description: 通俗讲解
+        examples:
+          type: array
+          items:
+            type: string
+        exercises:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Exercise'
+        cached:
+          type: boolean
+        reviewed:
+          type: boolean
+          description: 教师是否已审核固定
+        source_refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+
+    Exercise:
+      type: object
+      required: [question, answer, explanation]
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+        explanation:
+          type: string

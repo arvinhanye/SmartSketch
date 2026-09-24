@@ -16,4 +16,5 @@ grep -q 'M0-01 | DONE' docs/tasks.md || { echo 'M0-01 task status is not recorde
 grep -q 'PREREQUISITE' docs/architecture.md || { echo 'Graph prerequisite constraint is undocumented' >&2; exit 1; }
 hook_tests="$(tests/hooks/test_block_dangerous.sh 2>&1)" || { printf '%s\n' "$hook_tests" >&2; echo 'block-dangerous hook regression tests failed' >&2; exit 1; }
 tail -n 1 <<<"$hook_tests"
+scripts/verify/contracts.sh
 echo 'Scaffold verification passed.'
