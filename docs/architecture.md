@@ -32,11 +32,13 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
 | `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
 
-## 前端构建与测试入口（B01、B02）
+## 前端构建、测试与应用外壳（B01～B04）
 
 - `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
-- Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。B03 再引入教师/学生路由。
+- Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。
 - 测试（B02）：`src/frontend/vitest.config.ts` 继承 `vite.config.ts`，收集仓库外层 `tests/frontend/**/*.test.ts`（jsdom 环境，排除点开头目录，零用例即失败）；测试文件中的裸模块从 `src/frontend/node_modules` 解析。类型检查拆为应用（`tsconfig.json`，浏览器类型）与 Node 侧（`tsconfig.node.json`：构建/测试配置与 `tests/frontend`），应用代码不可见 Node 类型。
+- 路由（B03）：`src/frontend/src/router/index.ts` 的 `createAppRouter({ history, getAccountRole })` 按账号类型（`users.role`）把 `/` 引到 `/teacher` 或 `/student`；错角色或未登录时回到对应页面并经 `query.notice` 由 `App.vue` 显示 `role="alert"` 提示。守卫只是界面引导，授权以后端为准（`specs/identity-access.md` §2.4）。账号类型由调用方注入；登录与会话存储由 H13 接入（D-09），在此之前入口恒为未登录。
+- 课程上下文（B04）：`src/frontend/src/stores/course.ts` 的 `useCourseStore` 持有当前课程与课程内图谱（`GraphExchange`）、问答历史（`ChatTurn[]`）。切课即清空并中止旧 `AbortController`；composables 先 `beginRequest()` 取作用域，把 `scope.signal` 交给 HTTP 客户端，再经 `setGraph` / `appendChatTurns` / `commit` 提交，作用域按代次失效，晚到响应被丢弃。store 与组件都不直接发请求。
 
 ## 后端启动与健康检查（B05）
 

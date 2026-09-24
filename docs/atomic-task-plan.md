@@ -1,6 +1,6 @@
 # SmartSketch 单轮可执行原子任务清单
 
-共 **140 个叶子任务**，其中 **132 个主线任务、8 个条件性加分任务**。这是实施计划，不是已完成列表，也不承诺 AI 自动保证正确。每次只选一个依赖已验收的叶子任务；用负例、真实命令、人工决策和独立审查形成可靠性边界。机器可读版见 [atomic-tasks.json](atomic-tasks.json)。
+共 **141 个叶子任务**，其中 **133 个主线任务、8 个条件性加分任务**。这是实施计划，不是已完成列表，也不承诺 AI 自动保证正确。每次只选一个依赖已验收的叶子任务；用负例、真实命令、人工决策和独立审查形成可靠性边界。机器可读版见 [atomic-tasks.json](atomic-tasks.json)。
 
 ## 使用规则
 
@@ -35,7 +35,7 @@
 
 | 缺口 | 承接任务 | 说明 |
 | --- | --- | --- |
-| G-1 本地身份与成员 | C13～C16、H12 | 登录、账号命令、成员 API/页面与 SSE 票据分开验收 |
+| G-1 本地身份与成员 | C13～C16、H12、H13 | 登录、账号命令、成员 API/页面、前端登录与会话（H13，D-09 补登）与 SSE 票据分开验收 |
 | G-2 离线重新向量化 | F14 | 按 ADR-012 修订 1 对存量草稿和已提交版本核对 |
 | G-3 消融实验 | K13 | 三种抽取阶段配置使用同一标注集 |
 | G-4 参赛材料与合规 | K14～K19 | 提示词、图谱示例、S2、S1/PPT/视频、S5、合规分别交付 |
@@ -184,6 +184,7 @@
 | **H10 实现发布历史和回滚 UI** | G06, H09 | 版本 API → 发布/历史/回滚界面 | `src/frontend/src/components/VersionPanel.vue`<br>`src/frontend/src/composables/useVersions.ts` | 发布失败保持旧标识；修订中学生仍见旧版；回滚前显示目标版本 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts` |
 | **H11 实现学生图谱和卡片视图** | H05, H06, G07 | 发布图 → 图/卡片切换 | `src/frontend/src/views/StudentGraphView.vue`<br>`src/frontend/src/components/KnowledgeCards.vue` | 无发布、空图、分页卡片、键盘可用；任何入口不取草稿 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h11.test.ts` |
 | **H12 实现课程成员管理页面** | C15, B15, H01 | 课程成员 API → 教师成员列表与增删操作 | `src/frontend/src/views/MembersView.vue`<br>`src/frontend/src/api/members.ts` | 教师可添加和移除；学生无入口；权限失败明确提示；重复提交不重复成员 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h12.test.ts` |
+| **H13 实现前端登录页与会话存储** | C13, B15, B03, B04 | 登录端点 + A05 §2.4 → 登录页、会话读写与 401 回登录 | `src/frontend/src/views/LoginView.vue`<br>`src/frontend/src/stores/session.ts`<br>`src/frontend/src/api/auth.ts`<br>`src/frontend/src/router/index.ts`<br>`src/frontend/src/main.ts` | 令牌与 LoginResponse.user 只存 sessionStorage（不存 localStorage/Cookie）；登录后按 user.role 进首页；401、429 分别明确提示；收到 401 清会话与课程上下文并回登录页；口令/令牌不写日志；不解析 JWT 做授权 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts` |
 
 ## I 进度与可解释推荐（6 项）
 
