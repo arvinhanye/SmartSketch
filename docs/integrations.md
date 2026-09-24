@@ -22,7 +22,7 @@
 - **占位（D-02x）**：形状已定，取值待「待签收取值（D-02）」对应项签收；签收前不得当作团队决定引用。
 - **本机填写**：密钥，永不入库、不签收。
 
-名称来源：`LLM_FALLBACK_*`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_MAX_CONCURRENCY`、`LLM_MAX_RETRIES`、`EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS` 沿用 `740adb`（M0-05，未合入 main）；`LLM_MODE`、`EMBEDDING_MODE`、`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS`、`LLM_CHAT_TIMEOUT_SECONDS`、`LLM_CIRCUIT_FAILURE_THRESHOLD`、`LLM_CIRCUIT_OPEN_SECONDS`、`LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET`、`EMBEDDING_BATCH_SIZE` 为 A07 新增；任务处理六项来自 ADR-010/011。
+名称来源：`LLM_FALLBACK_*`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_MAX_CONCURRENCY`、`LLM_MAX_RETRIES`、`EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS` 沿用 `740adb`（M0-05，未合入 main）；`LLM_MODE`、`EMBEDDING_MODE`、`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS`、`LLM_CHAT_TIMEOUT_SECONDS`、`LLM_CIRCUIT_FAILURE_THRESHOLD`、`LLM_CIRCUIT_OPEN_SECONDS`、`LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET`、`EMBEDDING_BATCH_SIZE` 为 A07 新增；任务处理六项来自 ADR-010/011；学习推荐权重四项来自 ADR-014 修订 1。
 
 类型记法：「整数 ≥ n」「正数」（可带小数，> 0）「枚举 a \| b」「URL」「密钥」（敏感，日志与 repr 一律打码）「字符串」。校验规则见「启动校验」。
 
@@ -105,6 +105,17 @@
 | `TASK_CHUNK_MAX_ATTEMPTS` | 整数 ≥ 1 | `2` | 块级尝试上限（L2，每次含完整 L1） | 已签收（ADR-011） |
 | `TASK_ARTIFACT_RETENTION_DAYS` | 整数 ≥ 0 | `7` | 中间产物保留天数；`0` 表示进入终态或 `awaiting_review` 即清理 | 已签收（ADR-011） |
 
+### 学习推荐权重
+
+类型、校验与语义以 `specs/learning-path.md` §1 为准，名称与取值来源于 ADR-014 修订 1 决定 6。四项作为一组校验：都不设（或都为空）时使用 S2 缺省值；都设时使用所设值；只设一部分则拒绝启动。所设值须为有限、非负实数，和在 `1 ± 1e-9` 内且至少一项为正，否则拒绝启动。进程启动时读取一次，全站统一，不做课程级配置。
+
+| 变量 | 类型与约束 | 样例 | 用途 | 状态 |
+| --- | --- | --- | --- | --- |
+| `RECOMMEND_WEIGHT_UNLOCK` | 数值 ≥ 0；四项成组 | `0.35` | 解锁度权重 | 已签收（ADR-014 修订 1） |
+| `RECOMMEND_WEIGHT_IMPORTANCE` | 数值 ≥ 0；四项成组 | `0.25` | 重要度权重 | 已签收（ADR-014 修订 1） |
+| `RECOMMEND_WEIGHT_CHAPTER` | 数值 ≥ 0；四项成组 | `0.20` | 章节顺序权重 | 已签收（ADR-014 修订 1） |
+| `RECOMMEND_WEIGHT_EASE` | 数值 ≥ 0；四项成组 | `0.20` | 易学度权重 | 已签收（ADR-014 修订 1） |
+
 ## 模型接入规则（A07）
 
 本节是上面「模型模式」至「向量模型」各变量的行为约定，消费方为 B06（设置加载）、D09（缓存键）、E03（兼容适配器）、E04（重试/熔断/预算）、E07（向量适配）、E12（抽取并发）、J03/J05（问答调用）与 K08（容器环境）。取值未签收不影响按本节形状实现与 fake 测试。
@@ -183,6 +194,7 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 - 条件必填：`LLM_MODE=live` 时主用四项必填；备用四项全空或全填；`EMBEDDING_MODE=online` 时 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 必填，`local` 时 `EMBEDDING_MODEL` 必填。
 - `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake`。
 - `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 必须小于 `LLM_CHAT_TIMEOUT_SECONDS`。
+- `RECOMMEND_WEIGHT_*` 四项成组：都不设或都为空时用缺省值；只设一部分、有负数或非有限值、全为 0、和偏离 1 超过 `1e-9` 时拒绝启动（ADR-014 修订 1 决定 6）。
 - 所有「密钥」类变量在日志、异常信息与设置对象的 repr 中一律打码；日志不输出提示词原文与模型返回正文（E04 验收）。
 
 ### 待签收取值（D-02）

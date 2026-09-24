@@ -82,7 +82,7 @@
 | --- | --- | --- | --- | --- |
 | REVIEW-02 | DONE（分批；S-07 尚有待审范围） | A01 文档交付 `88ea517`/`6c19f25`；S-07 本地脚本 `8865686` | Codex | `docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md`；A01 路径映射 22/29 一致；S07-R12～R14 已复现；`docs/handoffs/codex-review-02.md` |
 | REVIEW-A08 | DONE（不建议签收；R02/R03 已签收为 ADR-014；待 Codex 修 R01～R04） | Codex A08 未提交快照（`codex-a08-learning-path` @ `1a47eb2` + dirty，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-2026-09-23.md`：P2×4（R01 `no_graph` 与 A04 V3 冲突、R02 中心度恒 ≤0.5、R03 合并进度倒退未列签收、R04 外课/历史 ID 判定不可实现）、P3×6；R02/R03 的产品决定见 `docs/decisions.md` ADR-014；`docs/handoffs/claude-review-a08.md` |
-| REVIEW-A08-R2 | DONE（R01～R10 已修；R11～R14 由 Codex 修复后第 3 轮复审通过，无新 P1/P2；剩 §7 与 ADR-014 细则待产品签收，R15 待细则 1 签收前写死） | Codex A08 修订稿（`codex-a08-learning-path` @ `1a47eb2` + dirty，规格 `efe23f9e…`，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-r2-2026-09-23.md`：R01～R10 复核通过（R01 在 `atomic-tasks.json` B12 与 I05 仍有“无图”残留）；P2×1（R11 合并继承后进度接口返回原始还是有效状态未定义）、P3×4（R12 谱系终止与不变式、R13 舍入后分量不可还原、R14 任务清单 Markdown/JSON 不一致、R15 细则 1 提案有歧义）；`docs/handoffs/claude-review-a08-r2.md` |
+| REVIEW-A08-R2 | DONE（R01～R10 已修；R11～R14 由 Codex 修复后第 3 轮复审通过，无新 P1/P2；§7 与 ADR-014 两项细则已由 ADR-014 修订 1 签收，R15 按“以本次连续归属起点为界”写死） | Codex A08 修订稿（`codex-a08-learning-path` @ `1a47eb2` + dirty，规格 `efe23f9e…`，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-r2-2026-09-23.md`：R01～R10 复核通过（R01 在 `atomic-tasks.json` B12 与 I05 仍有“无图”残留）；P2×1（R11 合并继承后进度接口返回原始还是有效状态未定义）、P3×4（R12 谱系终止与不变式、R13 舍入后分量不可还原、R14 任务清单 Markdown/JSON 不一致、R15 细则 1 提案有歧义）；`docs/handoffs/claude-review-a08-r2.md` |
 
 ## 原子任务认领（`docs/atomic-task-plan.md`）
 
@@ -179,6 +179,24 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| A08 | IN REVIEW（R01～R14 第 3 轮复审通过；待 §7 产品签收） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（`claude/codex-a08-check-0ae6d7@acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
+| A08 | DONE（ADR-014 及修订 1 已签收；PR #19 `f9dfc8f`） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（PR #17 `acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
 
 - A08 输入：S2 §6.4.7、A04/ADR-012、A02 掌握枚举、Claude 第 1 轮 R01～R10 与第 2 轮 R11～R14 报告、第 3 轮复审、已签收 ADR-014。输出：修订后的可学/评分/跨版本读时继承与批量写入规格；进度接口有效/原始状态及来源提案；B12/I05 的 Markdown 与 JSON 验收同步。依赖：ADR-014 已随 `origin/main@6881ffe` 集成，B12 需在 YAML 真源落地进度响应字段；风险与待决：缺值、权重来源、展示上限、进度响应字段名及 `updated_at` 语义，以及显式降级覆盖继承与谱系存放位置均见 `specs/learning-path.md` §7；R15 未在本轮修订，未改 DTO、仓储或发布快照格式。验证命令：`./scripts/verify.sh`、`git diff --check`、`python3 -m json.tool docs/atomic-tasks.json > /dev/null` 及两项 grep，实际结果见交接。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A08 签收 | DONE（ADR-014 修订 1 已签收） | 签收 A08 §7 的参数与进度接口字段，以及 ADR-014 的两项细则 | Claude（协调 Agent） | `.claude/worktrees/codex-a08-check-0ae6d7`（分支 `claude/a08-signoff`）/ base `f9dfc8f` | `docs/decisions.md`（ADR-014 修订 1）、`specs/learning-path.md`（§1、§3、§5、§6、§7）、`docs/integrations.md`（学习推荐权重、启动校验）、`.env.example`、本任务行、`docs/handoffs/claude-sign-a08.md` | `docs/decisions.md` ADR-014 修订 1（决定 5～10）；`specs/learning-path.md` LP-1～20；`docs/handoffs/claude-sign-a08.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
+
+- A08 签收的决定（ArvinHan 2026-09-23，ADR-014 修订 1）：
+  - 缺失属性取 0.5；
+  - 权重来自四个 `RECOMMEND_WEIGHT_*` 环境变量，缺省为 S2 值，只设一部分则拒绝启动，不做课程级配置；
+  - 推荐上限默认 10、最大 50；
+  - 进度接口返回 V 中全部节点，带有效 `status`、`own_status`、`inherited_from[]`、可空 `updated_at`；
+  - 细则 1：主节点的显式写入以来源“本次连续归属”的起算版本为界，覆盖来源；
+  - 细则 2：谱系作为发布快照节点的 `merged_from` 字段保存。
+- 交出的后续项（均未认领）：
+  - **A04（ADR-012 下一次修订）**：快照节点增加 `merged_from` 并纳入摘要，版本提交事务取共享序列的提交序号。须先于 F10/B11/G04/G06/I01 完成；#16 正在做 ADR-012 修订 2，本项编号排在其后。
+  - **B12**：`ProgressEntry` 新字段、GET/PUT 返回全部节点。
+  - **C01/I01**：进度行增加写入序号。
+  - **I04**：启动时读取并校验权重。
+  - **F10**：合并时写入谱系。
