@@ -29,3 +29,4 @@ R01～R06 与交接稿 §4 所列问题相符；R07/R08 为其 P3；R09 为本�
 
 - Claude 于 `8a4992c` 修复 R01～R07；PR #32 于 2026-09-24 合入 `main`，issue #55 已关闭并标 `status:done`。这些修复的测试与说明见 `docs/handoffs/claude-review-b13.md`；本报告不冒充对新提交的完整独立重审。
 - 同步 `origin/main@248b895` 后复核：`src/contracts/api.v1.yaml` 的 `ChatDoneEvent` 描述仍称 final 与 delta 拼接可能不同，和 `specs/grounded-qa.md` Q6/I1 中 `answered` 必须逐字相等不符。R09 由 [#178](https://github.com/arvinhanye/SmartSketch/issues/178) 独立跟踪；R08 为原有 P3，不单独阻塞。此前「PR 仍开放」「建议合入前修复」均为旧时点状态，不代表当前 PR 状态。
+- 再同步 `origin/main@1bce2c6` 后确认 PR #177 已按 `answered`/`not_covered` 分述并新增 R09 回归；`test_b13.py` 53 passed、完整 `verify.sh` 通过，[#178](https://github.com/arvinhanye/SmartSketch/issues/178) 已关闭。上述固定提交的原始发现仍保留作审查证据，不代表当前 main 存在 R09。

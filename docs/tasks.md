@@ -429,7 +429,7 @@
 
 ## 2026-09-24 协作状态核对与 C08 认领
 
-状态依据：交接基线 `origin/main@62cbbc7` 已包含 PR #175；PR #176 创建后同步 `origin/main@248b895`（B13 #32、C01 #174 均已合入）。交接稿是当时快照，以下为本轮最新 issue/PR 核对；本轮只认领 C08，不改其他成员的源码。
+状态依据：交接基线 `origin/main@62cbbc7` 已包含 PR #175；PR #176 创建后先同步 `origin/main@248b895`，本轮再同步 `origin/main@1bce2c6`（含 B13 R09 修复 PR #177）。交接稿是当时快照，以下为本轮最新 issue/PR 核对；本轮只认领 C08，不改其他成员的源码。
 
 | 分类 | 当前整理结果 |
 | --- | --- |
@@ -441,7 +441,7 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 验收与证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C08 | IMPLEMENTED（PR #176 待审/合入） | 实现状态迁移纯函数 | Codex（后端） | `codex/c08-task-state` / 初始 `62cbbc7`、已同步 `248b895`；隔离 worktree `c08-task-state` | `src/backend/app/services/task_state.py`、`tests/backend/test_c08.py`；协作文档仅本节和 `docs/handoffs/codex-c08.md` | §2 合法边与 TASK-16 拒绝路径已实现；C08 定向 67 例、最新 main 上后端 143 例通过，`./scripts/verify.sh`、`git diff --check` 通过。证据与边界见 `docs/handoffs/codex-c08.md`；合入前不记为 DONE。 |
+| C08 | IMPLEMENTED（PR #176 待审/合入） | 实现状态迁移纯函数 | Codex（后端） | `codex/c08-task-state` / 初始 `62cbbc7`、已同步 `1bce2c6`；隔离 worktree `c08-task-state` | `src/backend/app/services/task_state.py`、`tests/backend/test_c08.py`；协作文档仅本节和 `docs/handoffs/codex-c08.md` | §2 合法边与 TASK-16 拒绝路径已实现；C08 定向 67 例、最新 main 上后端 143 例通过、B13 53 例通过，`./scripts/verify.sh`、`git diff --check` 通过。证据与边界见 `docs/handoffs/codex-c08.md`；合入前不记为 DONE。 |
 
 - 输入：B10 已合入的 `Task`/事件契约；ADR-010 签收的 `specs/task-processing.md` §1～§4、TASK-16。
 - 输出：无 I/O 的 `(当前任务状态, 事件) → 新任务状态 | 拒绝` 逻辑和定向测试，不变更 API、数据库或既有 DTO。
@@ -453,7 +453,7 @@
 
 | 审查 ID | 状态 | 固定范围 | 负责人 | 验收与证据 |
 | --- | --- | --- | --- | --- |
-| REVIEW-HANDOFF-0924 | DONE（B02 Windows 缺口保留；B13 R09 跟踪于 #178） | B10 `f00a3e8..bb48429`；B02 `9d2437e..3fedd4e`；B03/B04 `3fedd4e..06f33aa`；CI-02 `06f33aa..025cbee`；B13 PR #32 `bb48429..791b1d8` | Codex | B10、B02、B03/B04、CI-02 固定范围未发现新增 P1/P2；B13 固定提交发现 P2×7、P3×2。Claude 在 `8a4992c` 修 R01～R07 后 PR #32 已合入；R09 的 `ChatDoneEvent` 描述仍与 Q6/I1 冲突，另开 [#178](https://github.com/arvinhanye/SmartSketch/issues/178) 跟踪，未在本轮跨文件锁修改。Windows 缺口及原始证据见 `docs/handoffs/codex-review-handoff-0924.md`。 |
+| REVIEW-HANDOFF-0924 | DONE（B02 Windows 缺口保留；B13 R09 已修） | B10 `f00a3e8..bb48429`；B02 `9d2437e..3fedd4e`；B03/B04 `3fedd4e..06f33aa`；CI-02 `06f33aa..025cbee`；B13 PR #32 `bb48429..791b1d8` | Codex | B10、B02、B03/B04、CI-02 固定范围未发现新增 P1/P2；B13 固定提交发现 P2×7、P3×2。Claude 在 `8a4992c` 修 R01～R07 后 PR #32 已合入；R09 后续由 PR #177 修复并合入，[#178](https://github.com/arvinhanye/SmartSketch/issues/178) 已关闭；本轮未跨文件锁修改契约。Windows 缺口及原始证据见 `docs/handoffs/codex-review-handoff-0924.md`。 |
 
 - 复审只检查固定提交与实际运行的命令，不修改 Claude 的源码；B13 结论不等于新头提交已审。旧自动审查状态文件 `docs/reviews/claude-review-state.json` 在主目录有其他 Codex 未提交改动，本分支不覆盖它；本次增量状态另记 `docs/reviews/codex-handoff-0924-state.json`。
 - C08 纯函数已实现并通过本地验证；B10 生成类型忽略固定阶段进度条件的已知限制由 C08 运行时及后续 C11 序列化路径承担。PR #176 与 issue #65 均为待审，合入前不关 issue；实现验收另记在 `docs/handoffs/codex-c08.md`，不与审查完成混算。
@@ -462,15 +462,15 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B13 | DONE（已合入；R09 跟踪） | 迁移问答与事件契约 | ArvinHan（Claude 执行） | `claude/b13-chat-contract` / 叠在 B10 `3771ae1`（PR #31）上 | `src/contracts/api.v1.yaml`、`src/contracts/events.v1.md` §3、`src/contracts/v1/generated/`、`tests/contracts/test_b13.py`；接入 `scripts/verify/contracts.sh`；随附：`docs/architecture.md` 的 `NotCoveredReason` 行（Q11 要求同一次提交）、`src/contracts/errors.v1.md` 的 `RATE_LIMITED` 措辞（Q11 交 B08 的遗留）、`specs/grounded-qa.md` Q11 状态标注、`docs/handoffs/claude-b13.md` | `test_b13.py` 先 17 failed 后 43 passed；六处反向篡改均被检出；门禁实例级夹具按新必填字段补齐；`gen-contracts.sh --check` 一致；`verify.sh` exit 0；生成的 TS 经 `tsc --strict` 通过；`docs/handoffs/claude-b13.md` |
+| B13 | DONE（已合入；R09 已修） | 迁移问答与事件契约 | ArvinHan（Claude 执行） | `claude/b13-chat-contract` / 叠在 B10 `3771ae1`（PR #31）上 | `src/contracts/api.v1.yaml`、`src/contracts/events.v1.md` §3、`src/contracts/v1/generated/`、`tests/contracts/test_b13.py`；接入 `scripts/verify/contracts.sh`；随附：`docs/architecture.md` 的 `NotCoveredReason` 行（Q11 要求同一次提交）、`src/contracts/errors.v1.md` 的 `RATE_LIMITED` 措辞（Q11 交 B08 的遗留）、`specs/grounded-qa.md` Q11 状态标注、`docs/handoffs/claude-b13.md` | `test_b13.py` 先 17 failed 后 43 passed；六处反向篡改均被检出；门禁实例级夹具按新必填字段补齐；`gen-contracts.sh --check` 一致；`verify.sh` exit 0；生成的 TS 经 `tsc --strict` 通过；`docs/handoffs/claude-b13.md` |
 
 - 输入：`specs/grounded-qa.md` Q2、Q4、Q5、Q6、Q7、Q9、Q11 B13 行（ADR-015 及修订 1 已签收）。
 - 输出：`NotCoveredReason` 改名为 `insufficient_evidence`；`ChatMetaEvent`、`ChatAnswered`、`ChatNotCovered` 增加 `graph_version`、`request_id`；问答错误事件带 `details.request_id`，`LLM_UNAVAILABLE` 的 `details.reason` 取闭集；问答接口补 404/500；`events.v1.md` §3 改为指向规格。
 - 依赖：B08（已合入）、A09；叠在 B10 上以避免生成物冲突。
 - 风险：同 B10，v1 问答事件尚无消费者（J07/J08 未实现），原地修改。
 - 验证：`python3 -m pytest tests/contracts/test_b13.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
-- Claude 审查（REVIEW-B13，2026-09-24）：修 R01～R07——`ChatError` 按 `code` 拆为两支、错误码闭集、`reason` 只属于 `LLM_UNAVAILABLE`（R01～R03）；`meta.status = answered ⇒ retrieved ≥ 1`（R04）；问答 503 引用 `ChatUnavailableError`（R05）；`events.v1.md` §6 补登 B13 例外（R06）；`ChatError` 与 B10 取消 409 的 `details` 改为具名 schema（R07）。R08 未改。B13 测试 43 → 52；见 `docs/handoffs/claude-review-b13.md`。
-- Codex 固定头 `791b1d8` 复审另发现 R09：`ChatDoneEvent` 描述仍称最终 answered 正文可能与 delta 拼接不同；同步 `origin/main@248b895` 后该句仍在，和 `specs/grounded-qa.md` Q6/I1 不符。该问题不是 R01～R07 修复范围，由 [#178](https://github.com/arvinhanye/SmartSketch/issues/178) 单独跟踪，不在 C08 分支更改契约文件。
+- Claude 审查（REVIEW-B13，2026-09-24）：修 R01～R07——`ChatError` 按 `code` 拆为两支、错误码闭集、`reason` 只属于 `LLM_UNAVAILABLE`（R01～R03）；`meta.status = answered ⇒ retrieved ≥ 1`（R04）；问答 503 引用 `ChatUnavailableError`（R05）；`events.v1.md` §6 补登 B13 例外（R06）；`ChatError` 与 B10 取消 409 的 `details` 改为具名 schema（R07）。R08 未改。B13 测试 43 → 52；见 `docs/handoffs/claude-review-b13.md`。Codex 另发现 R09（`ChatDoneEvent` 描述与 I1 矛盾），合并后另开 PR 修正，B13 测试 53。
+- Codex 固定头 `791b1d8` 复审另发现 R09；随后 PR #177 已合入 `main@1bce2c6` 并新增回归测试。原跟踪 [#178](https://github.com/arvinhanye/SmartSketch/issues/178) 经回归验证后已标 DONE 并关闭；本 C08 分支只保留历史审查证据，不重改契约文件。
 
 ## C01 SQLite 连接与迁移运行器
 

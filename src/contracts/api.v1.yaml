@@ -2362,9 +2362,10 @@ components:
     ChatDoneEvent:
       type: object
       description: |
-        终态事件，恰好一条，且**携带最终正文**。前端收到后用 `final` 整体
-        替换累积的 delta 文本，而不是把 delta 拼接结果当成答案——两者可能
-        不同（引用校验剔除了编号，或全部引用失效导致降级为 not_covered）。
+        终态事件，恰好一条、恒为末条，**携带最终正文**（`specs/grounded-qa.md` Q4、Q6）。
+        `final.status = answered` 时，`final.answer` 与已下发全部 delta 的逐字拼接完全相等（不变式 I1），
+        前端以 `final.answer` 为准显示并让引用标记变为可点击；两者不一致时仍显示 `final.answer` 并上报异常。
+        `final.status = not_covered` 时撤回已显示的临时正文，改为显示 `final.answer`（服务端固定模板）。
       required: [event, final]
       properties:
         event:

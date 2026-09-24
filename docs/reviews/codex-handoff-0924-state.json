@@ -12,13 +12,12 @@
   },
   "pending": [
     "B02: Windows native nested npm test",
-    "B13-R09: issue #178, ChatDoneEvent description versus Q6/I1 on main@248b895",
     "B13: independent re-review of post-791b1d8 fixes if requested",
     "C08: PR #176 review and merge"
   ],
   "post_review_status": {
-    "main_synced": "248b895",
-    "B13": "PR #32 merged; issue #55 closed; R01-R07 fixed by Claude; R09 tracked in issue #178",
+    "main_synced": "1bce2c6",
+    "B13": "PR #32 merged; issue #55 closed; R01-R07 fixed by Claude; R09 fixed in merged PR #177; issue #178 closed",
     "C01": "PR #174 merged; issue #58 closed",
     "C08": "implemented; PR #176 and issue #65 in review"
   },
