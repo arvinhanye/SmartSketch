@@ -215,3 +215,17 @@
 
 - FIX-R03 的修复：空间标识按写入上下文核对。运行时写入只接受当前空间，没有绕过参数；只有重新向量化命令在自己的进程内持有迁移上下文，第 3 步只写本次目标空间、不动旧空间，第 5 步提交后失效。不改变 ADR-012 修订 2 已签收的方向。补注由 ArvinHan 2026-09-24 签收。
 - 交出的后续项（均未认领）：**F03** 写入接口区分运行时与迁移两种上下文并实现 PUB-39；**重新向量化命令**（A10 批 0 补登的叶子任务）建立并持有迁移上下文。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A09 | DONE（ADR-015 已签收） | 定义问答终态和引用撤回协议 | Claude（协调 Agent） | `.claude/worktrees/a09-dev-environment-check-8e5e93`（分支 `claude/a09-dev-environment-check-8e5e93`）/ base `f9dfc8f` | `specs/grounded-qa.md`（main 新建，以 `740adb` `978671e` 草稿桩为底稿）；**范围扩展（用户同意）**：`docs/decisions.md`（新增 ADR-015）、`docs/architecture.md`（问答 SSE 行、`NotCoveredReason` 行加注、用语映射一行）、本节、`docs/handoffs/claude-a09.md` | `specs/grounded-qa.md`「问答终态与引用撤回协议」Q1～Q12（终态矩阵 O1～O15、QA-1～35：成功 5 / 边界 18 / 失败 12）；`docs/decisions.md` ADR-015（ArvinHan 2026-09-23 签收）；`docs/architecture.md` 三处加注与 `ChatLog` 定名；核对脚本 45 项 ALL PASS（对 `740adb` `978671e` 真源、IAM 矩阵、A07 切换矩阵、ADR-012 V8 与原子清单），19 个篡改副本均被对应检查项检出（exit 1、无崩溃）；流内状态机参考模型 19/19 PASS（每例 200 种随机分块结果一致，仅作验证、不入库）；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；`docs/handoffs/claude-a09.md` |
+
+- A09 的决定（ArvinHan 2026-09-23 在会话中逐项选定、四节设计逐节确认，ADR-015 同日签收）：检索与阈值判定之后才开流，开流前失败为 HTTP 错误，开流后为 `meta delta* (done | error)`；服务端流内逐引用校验，`answered` 时最终正文恒等于 delta 拼接；模型以 `<<INSUFFICIENT_EVIDENCE>>` 开头声明证据不足，`out_of_course_scope` 改名 `insufficient_evidence`；除 `done` + `answered` 外一律撤回临时正文、不自动重试；输出截断按正常结束判定；历史只用于改写、生成不见历史；回答钉在绑定版本、不追溯撤回；问答记录定名 `ChatLog` / `chat_logs`（关闭 A10 N5）。
+- 交出的后续项（均未认领）：**B13** 改 `NotCoveredReason`，`meta` 与 `final` 加 `graph_version`、`request_id`，定 `details.reason` 闭集，`events.v1.md` §3 指向本规格；**B08** 落实 `STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`BUDGET_EXCEEDED`，改 `RATE_LIMITED` 措辞；**J03～J10、K03** 按规格 Q11 实现（J06 与 J09 共用代码片段夹具）；**A10** 用本规格替换分支桩，并把它加回批 1 门禁扫描清单。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A09-R01/R02 修复 | DONE（ADR-015 修订 1 已签收） | 修复 Codex REVIEW-12 的 A09-R01（一个有效引用即可让无出处的结论成为 `answered`）与 A09-R02（每请求一条日志与鉴权前置顺序冲突） | Claude（协调 Agent，A1～A10 收尾） | `.claude/worktrees/a09-dev-environment-check-8e5e93`（分支 `claude/a09-dev-environment-check-8e5e93`）/ base `1754c96` | `specs/grounded-qa.md`、`docs/decisions.md`（ADR-015 修订 1）、`docs/architecture.md`（`ChatLog` 一处）、本节、`docs/handoffs/claude-a09.md` 第九节 | 审查报告 `docs/reviews/codex-claude-a09-1754c96-2026-09-23-1400z.md`（主目录）；Q3.5、I3、QA-36～38；核对脚本修改前 27 FAIL、修改后 ALL PASS，负例见交接；`./scripts/verify.sh`、`git diff --check` 结果见 `docs/handoffs/claude-a09.md` 第九节 |
+
+- A09-R01/R02 的修复（ArvinHan 2026-09-24 选定方向并签收条文，ADR-015 修订 1）：每个结论单元（句）都须带有效引用，否则整段撤回为 `not_covered` / `all_citations_invalidated`（日志子类 `uncited_sentence`），wire 枚举不变；语义支持度只在 K03 评测中衡量。`chat_logs` 只记通过 P2 的请求，四个必填字段非空；P1/P2 拒绝只写应用日志。
+- 交出的后续项（均未认领）：**J05** 提示要求逐句标注；**J06** 实现 Q3.5；**J10** 按新覆盖范围建表；**K03** 统计 `uncited_sentence` 撤回率；**C03/J07** 的统一错误处理写应用日志。
