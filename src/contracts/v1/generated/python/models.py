@@ -203,12 +203,12 @@ class FixedStageProgress(BaseModel):
     pass
 
 
-class Details(BaseModel):
+class TaskPersistingDetails(BaseModel):
     stage: Literal['persisting']
     reason: Literal['persisting_uninterruptible']
 
 
-class Details1(BaseModel):
+class TaskProcessingFinishedDetails(BaseModel):
     stage: Literal['awaiting_review']
     reason: Literal['processing_finished']
 
@@ -219,7 +219,7 @@ class Stage1(Enum):
     cancelled = 'cancelled'
 
 
-class Details2(BaseModel):
+class TaskAlreadyTerminalDetails(BaseModel):
     stage: Stage1
     reason: Literal['already_terminal']
 
@@ -618,7 +618,7 @@ class ChatStatus(Enum):
 class NotCoveredReason(Enum):
     no_retrieval_hit = 'no_retrieval_hit'
     below_similarity_threshold = 'below_similarity_threshold'
-    out_of_course_scope = 'out_of_course_scope'
+    insufficient_evidence = 'insufficient_evidence'
     all_citations_invalidated = 'all_citations_invalidated'
 
 
@@ -631,6 +631,20 @@ class ChatAnswered(BaseModel):
         Field(description='「涉及的知识点」标签，点击跳转图谱并高亮'),
     ] = None
     latency_ms: Annotated[Optional[int], Field(ge=0)] = None
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatNotCovered(BaseModel):
@@ -645,6 +659,20 @@ class ChatNotCovered(BaseModel):
     reason: NotCoveredReason
     related_kp_ids: Optional[list[str]] = None
     latency_ms: Annotated[Optional[int], Field(ge=0)] = None
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatResponse(RootModel[Union[ChatAnswered, ChatNotCovered]]):
@@ -661,11 +689,26 @@ class ChatMetaEvent(BaseModel):
     event: Literal['meta']
     status: ChatStatus
     retrieved: Annotated[
-        Optional[int],
+        int,
         Field(
-            description='进入生成上下文的证据块数量，供前端显示「已检索 N 段」', ge=0
+            description='允许引用集合 A 的大小（进入生成上下文的编号文本块数），供前端显示「已检索 N 段」',
+            ge=0,
         ),
-    ] = None
+    ]
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号（P2 读一次发布指针）；请求途中发布或回滚不影响本请求（Q9）',
+            ge=1,
+        ),
+    ]
+    request_id: Annotated[
+        str,
+        Field(
+            description='P2 生成的请求 ID（ULID），与日志、`model_calls` 及错误 `details.request_id` 对应',
+            min_length=1,
+        ),
+    ]
 
 
 class ChatDeltaEvent(BaseModel):
@@ -676,6 +719,39 @@ class ChatDeltaEvent(BaseModel):
 class ChatDoneEvent(BaseModel):
     event: Literal['done']
     final: ChatResponse
+
+
+class Code(Enum):
+    BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+    INTERNAL_ERROR = 'INTERNAL_ERROR'
+
+
+class ChatErrorDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(min_length=1)]
+
+
+class ChatLlmUnavailableReason(Enum):
+    upstream = 'upstream'
+    stream_interrupted = 'stream_interrupted'
+    timeout = 'timeout'
+    auth = 'auth'
+
+
+class Code1(Enum):
+    LLM_UNAVAILABLE = 'LLM_UNAVAILABLE'
+    STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
+
+
+class ChatUnavailableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[Optional[str], Field(min_length=1)] = None
+    reason: Optional[ChatLlmUnavailableReason] = None
 
 
 class Exercise(BaseModel):
@@ -724,7 +800,9 @@ class TaskFailed(TaskBase):
 
 class TaskNotCancellableError(Error):
     code: Literal['TASK_NOT_CANCELLABLE']
-    details: Union[Details, Details1, Details2]
+    details: Union[
+        TaskPersistingDetails, TaskProcessingFinishedDetails, TaskAlreadyTerminalDetails
+    ]
 
 
 class TaskErrorEvent(BaseModel):
@@ -765,21 +843,22 @@ class KnowledgePointDetail(KnowledgePoint):
     related: Optional[list[KnowledgePointRef]] = None
 
 
-class ChatErrorEvent(BaseModel):
-    event: Literal['error']
-    error: Error
+class ChatServiceError(Error):
+    code: Literal['BUDGET_EXCEEDED', 'STORAGE_UNAVAILABLE', 'INTERNAL_ERROR']
+    details: ChatErrorDetails
 
 
-class ChatEvent(
-    RootModel[Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent]]
-):
-    root: Annotated[
-        Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent],
-        Field(
-            description='单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：\n原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在\n（codex 审查 R04）。事件名、顺序与终止语义见 `events.v1.md` §3。\n',
-            discriminator='event',
-        ),
-    ]
+class ChatLlmUnavailableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(min_length=1)]
+    reason: ChatLlmUnavailableReason
+
+
+class ChatUnavailableError(Error):
+    code: Code1
+    details: Optional[ChatUnavailableDetails] = None
 
 
 class StudyMaterial(BaseModel):
@@ -798,5 +877,37 @@ class Task(RootModel[Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled]
         Field(
             description='任务快照，按 `stage` 分为四个分支（与 `TaskEvent` 同构，生成的 Pydantic / TypeScript 类型据此收窄）：\n处理中或待审核 `TaskActive`、`TaskCompleted`、`TaskFailed`、`TaskCancelled`。\n`stage = failed` ⇔ `error` 非空（TASK-17）；`cancelled` ⇒ `cancel_requested = true`（I5）；\n固定进度见 `specs/task-processing.md` §1。`failed_chunks` 只在快照中返回，SSE 事件只带计数。\n',
             discriminator='stage',
+        ),
+    ]
+
+
+class ChatLlmUnavailableError(Error):
+    code: Literal['LLM_UNAVAILABLE']
+    details: ChatLlmUnavailableDetails
+
+
+class ChatError(RootModel[Union[ChatLlmUnavailableError, ChatServiceError]]):
+    root: Annotated[
+        Union[ChatLlmUnavailableError, ChatServiceError],
+        Field(
+            description='问答开流后（P2 之后）的错误，按 `code` 分两支（`specs/grounded-qa.md` Q5 的 O7～O13），码为闭集：\n`LLM_UNAVAILABLE` 必带 `details.reason`；`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR` 不带 `reason`。\n两支都必带 `details.request_id`。`message` 是固定用户文案，不含模型输出、堆栈、密钥或原文。\n',
+            discriminator='code',
+        ),
+    ]
+
+
+class ChatErrorEvent(BaseModel):
+    event: Literal['error']
+    error: ChatError
+
+
+class ChatEvent(
+    RootModel[Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent]]
+):
+    root: Annotated[
+        Union[ChatMetaEvent, ChatDeltaEvent, ChatDoneEvent, ChatErrorEvent],
+        Field(
+            description='单条问答 SSE 事件的 data 载荷。**每种事件有独立 schema 且 required 非空**：\n原先的宽松对象允许 `{}` 通过校验，且文档里的 `answer` 字段在 schema 中并不存在\n（codex 审查 R04）。事件名、顺序与终止语义见 `events.v1.md` §3。\n',
+            discriminator='event',
         ),
     ]

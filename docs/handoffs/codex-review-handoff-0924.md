@@ -17,3 +17,7 @@
 - **风险**：B13 仍在开放 PR，修复后须按新固定头重审；Windows 缺口须在 Windows runner/机器补测；B10 固定进度条件生成器忽略，C08 实现需覆盖。
 - **下一位 Agent 的首个动作**：B13 作者先在 PR #32 分支为 P2 写失败测试、修契约、重新生成并跑门禁；审查者按新提交复核。C08 由本分支按已批准的纯函数边界和 TDD 继续实现。
 - **回滚**：仅撤销本分支新增审查文件与任务板复审行；不影响外部分支、issue 或数据库。
+
+## 后续同步（2026-09-24）
+
+本交接上文是 `791b1d8` 固定范围的审查快照。PR #32 后续由 Claude 修 R01～R07 并合入 `main`，issue #55 已关闭；C01 PR #174 亦已合入、issue #58 关闭。同步 `origin/main@248b895` 后，B13 R09 的 `ChatDoneEvent` 描述与 Q6/I1 冲突仍在，由 [#178](https://github.com/arvinhanye/SmartSketch/issues/178) 跟踪；Windows 原生 B02 验证缺口未变。C08 已实现并见 `docs/handoffs/codex-c08.md`，PR #176/issue #65 处于待审。

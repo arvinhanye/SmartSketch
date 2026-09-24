@@ -4,6 +4,22 @@ import sqlite3
 
 from app.config import Settings, SettingsError
 from app.repositories.embedding_space import read_or_initialize_space
+from app.repositories.sqlite import MigrationError, pending_migrations
+
+
+def validate_schema_current(settings: Settings) -> None:
+    """Fail startup unless every migration in the codebase has been applied."""
+    try:
+        pending = pending_migrations(settings.SQLITE_URL)
+    except MigrationError as exc:
+        raise SettingsError(f"SQLite schema history is inconsistent: {exc}") from None
+    except (OSError, sqlite3.Error):
+        raise SettingsError("Invalid configuration: SQLITE_URL (database unavailable)") from None
+    if pending:
+        raise SettingsError(
+            f"SQLite schema is not migrated (pending: {', '.join(pending)}); "
+            "stop API and worker, then run: python -m app.repositories.sqlite"
+        )
 
 
 def validate_embedding_space(settings: Settings) -> None:

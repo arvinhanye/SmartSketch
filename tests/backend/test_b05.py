@@ -6,10 +6,13 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import APP_VERSION, create_app
+from app.repositories.sqlite import migrate
 
 
 def _isolated_sqlite(tmp_path, monkeypatch):
-    monkeypatch.setenv("SQLITE_URL", f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
+    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
+    migrate(url)   # REVIEW-C01-R02：API 启动要求迁移已是最新
+    monkeypatch.setenv("SQLITE_URL", url)
 
 
 def test_factory_needs_no_secrets_or_network(tmp_path, monkeypatch):

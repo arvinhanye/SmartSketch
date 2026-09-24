@@ -1,6 +1,6 @@
 # HANDOFF-0924 固定提交审查：B13 PR #32
 
-- 审查者：Codex；日期：2026-09-24；目标：`bb48429..791b1d8`（PR #32 的当前固定头提交）。该 PR 仍开放，本报告只对这一版有效。
+- 审查者：Codex；日期：2026-09-24；目标：`bb48429..791b1d8`（当时 PR #32 的固定头提交）。本报告只对这一版有效；PR #32 后续已修订并合入。
 - 依据：`specs/grounded-qa.md` Q2/Q5/Q6/Q7、ADR-015、`docs/handoffs/claude-b13.md`、`docs/handoffs/claude-handoff-codex-2026-09-24.md` §4。未改 PR 分支与契约真源；建议先处理 P2 再合并。
 
 ## 发现
@@ -24,3 +24,8 @@ R01～R06 与交接稿 §4 所列问题相符；R07/R08 为其 P3；R09 为本�
 - 在 `/private/tmp/smartsketch-b13-review` 解出 `791b1d8` 的只读副本；`test_b13.py` 43 passed、完整 `./scripts/verify.sh` exit 0（24 项门禁负例、B08 5、B09 5、B10 45、B13 43）、`gen-contracts.sh --check` exit 0、`git diff bb48429..791b1d8 --check` exit 0。
 - `jsonschema.Draft202012Validator` 针对 `ChatEvent`/`Error` 的四个负例：外部错误码、非 LLM 的 reason、answered 的零 retrieved、JSON 503 的任意 reason 均返回 `is_valid=True`。直接导入生成 Pydantic `ChatError`：`LLM_UNAVAILABLE` 缺 reason、`INTERNAL_ERROR` 带 timeout reason 均通过。
 - 测试绿只说明现有测试覆盖的行为通过，不覆盖上述反例。建议在 PR #32 原分支按测试先行修复 R01～R06、R09，并在重新生成后重跑全套门禁；本轮不代改 Claude 文件。
+
+## 后续状态核对（不改变上述固定提交审查结论）
+
+- Claude 于 `8a4992c` 修复 R01～R07；PR #32 于 2026-09-24 合入 `main`，issue #55 已关闭并标 `status:done`。这些修复的测试与说明见 `docs/handoffs/claude-review-b13.md`；本报告不冒充对新提交的完整独立重审。
+- 同步 `origin/main@248b895` 后复核：`src/contracts/api.v1.yaml` 的 `ChatDoneEvent` 描述仍称 final 与 delta 拼接可能不同，和 `specs/grounded-qa.md` Q6/I1 中 `answered` 必须逐字相等不符。R09 由 [#178](https://github.com/arvinhanye/SmartSketch/issues/178) 独立跟踪；R08 为原有 P3，不单独阻塞。此前「PR 仍开放」「建议合入前修复」均为旧时点状态，不代表当前 PR 状态。

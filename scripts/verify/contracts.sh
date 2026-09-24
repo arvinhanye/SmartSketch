@@ -60,4 +60,12 @@ else
   fail=1
 fi
 
+# B13 问答终态、问答事件与错误细节契约回归。
+if python3 -m pytest tests/contracts/test_b13.py -q; then
+  echo '  ✓ B13 契约回归通过'
+else
+  echo '  ✗ B13 契约回归失败' >&2
+  fail=1
+fi
+
 exit "$fail"

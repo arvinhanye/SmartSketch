@@ -110,7 +110,9 @@ data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"EXTRAC
 
 ## 3. 问答流式事件：`POST /api/v1/courses/{cid}/chat`
 
-`POST` 无法用 `EventSource`，前端使用 `fetch` + `ReadableStream` 读取。
+`POST` 无法用 `EventSource`，前端使用 `fetch` + `ReadableStream` 读取，照常带 `Authorization` 头。
+
+时序与文法、终态矩阵、撤回规则、JSON 模式的**唯一规范**是 [可信问答规格](../../specs/grounded-qa.md) Q2、Q5、Q6、Q7（ADR-015）。本节只摘要 wire 形状，冲突时以规格为准。
 
 ### 事件名与载荷
 
@@ -119,48 +121,47 @@ data: {"task_id":"t_01","stage":"failed","progress":0.42,"error":{"code":"EXTRAC
 
 | event | 何时发送 | data schema | 必填字段 |
 | --- | --- | --- | --- |
-| `meta` | 检索完成、生成开始前 | `ChatMetaEvent` | `event`、`status` |
-| `delta` | 每个 token 增量 | `ChatDeltaEvent` | `event`、`delta`（非空串） |
-| `done` | 生成结束且引用校验完成 | `ChatDoneEvent` | `event`、`final` |
-| `error` | 生成中断 | `ChatErrorEvent` | `event`、`error` |
+| `meta` | 检索与判定完成、开流即发 | `ChatMetaEvent` | `event`、`status`、`retrieved`（`not_covered` 时为 0）、`graph_version`、`request_id` |
+| `delta` | 生成中的正文增量 | `ChatDeltaEvent` | `event`、`delta`（非空串） |
+| `done` | 终态已构造 | `ChatDoneEvent` | `event`、`final`（`ChatResponse`，含 `answer`、`citations`、`graph_version`、`request_id`；`not_covered` 另含 `reason`） |
+| `error` | 开流后的异常终止（Q5 O7～O13） | `ChatErrorEvent` | `event`、`error`（`ChatError`：码只取 `LLM_UNAVAILABLE`、`BUDGET_EXCEEDED`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`；`details.request_id` 必填；`LLM_UNAVAILABLE` 另须 `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`，其余三码不带 `reason`） |
 
-> `data` 为 `{}` 的事件**不合法**，会被结构校验拒绝。这是 codex 审查 R04 的直接修复：
-> 原先四种事件共用一个没有 `required` 的宽松对象，`{}` 也能通过。
+> `data` 为 `{}` 的事件**不合法**，会被结构校验拒绝（codex 审查 R04）。
 
-### 最终正文的替换协议
+### 事件文法（Q2）
 
-这是本节最容易出错的地方，独立成条：
+```text
+stream := meta(status = not_covered) done(not_covered: no_retrieval_hit | below_similarity_threshold)
+        | meta(status = answered)    delta*  ( done(answered | not_covered: insufficient_evidence | all_citations_invalidated)
+                                             | error )
+```
 
-1. **`done.final` 是唯一权威正文。** 它是一个完整的 `ChatResponse`（`answered` 或
-   `not_covered` 分支），含 `answer`、`citations`、`related_kp_ids`、`latency_ms`。
-2. **前端收到 `done` 后用 `final.answer` 整体替换**累积的 delta 文本，不得把 delta
-   拼接结果当作最终答案。两者可能不同：引用校验会剔除无效编号，正文需相应改写。
-3. **delta 阶段的正文是临时态。** 其中出现的编号可能指向后续被剔除的条目，
-   因此 `delta` 阶段**不得渲染可点击引用**，只能显示为普通文本或占位样式。
-4. **全部引用失效时降级为未覆盖终态。** 若生成完成但引用校验后无一条有效，
-   `done.final` 必须是 `not_covered` 分支，`reason = all_citations_invalidated`，
-   `citations` 为空数组。**前端此时必须清除已显示的 delta 正文**，代之以
-   `final.answer` 的解释——不得留下一段无依据却看起来已完成的答案（ADR-003）。
-5. **`error` 与 `done` 互斥**，各自恰好一次，发送后关闭连接。`error` 表示生成过程
-   异常中断（模型不可用、超时、上游报错），与「资料未覆盖」是两回事：后者是 `done`。
+1. `meta` 恰好一条且恒为首条。`meta.status = not_covered` 当且仅当检索阶段拒答，其后没有 `delta`、没有 `error`，直接发 `done`。
+2. `meta.status = answered` 表示进入生成，**不是承诺**：终态仍可能是 `not_covered`（`insufficient_evidence`、`all_citations_invalidated`）或 `error`。前端不得在 `meta` 阶段锁定结局。
+3. `done` 与 `error` 互斥、恰好一条、恒为末条，发送后关流。`:ping` 心跳可出现在任意位置，不是事件。
+4. `insufficient_evidence` 时 `delta` 恰为 0 条；`error` 前可以有 0 条或多条 `delta`。
+5. 客户端断开后服务端停止生成，不再发送任何事件（O14）。
+6. 首个 `delta`（或 `not_covered` 的 `done`）须在 3 秒内到达，完整响应 ≤15 秒（`specs/course-knowledge-graph.md` 验收条件 9；链路时限见 A07）。
+7. 任意网络分片都必须能解析：每条事件的 `data` 是单行 JSON，跨分片的半条事件要缓冲到完整行再解析。
 
-### 顺序保证
+### 最终正文与撤回（Q6）
 
-1. `meta` 恒为第一条，且**只发一条**。
-2. `meta.status = not_covered` 时**不再发送任何 `delta`**，直接发 `done`。这是检索阈值
-   拒答分支，既防幻觉也省耗时。
-3. `meta.status = answered` 不是承诺——引用校验发生在生成之后，`done.final` 仍可能是
-   `not_covered`（见上条第 4 点）。前端不得在 `meta` 阶段就锁定 UI 分支。
-4. 首个 `delta`（或 `not_covered` 的 `done`）须在 3 秒内到达，完整响应 ≤15 秒
-   （`specs/course-knowledge-graph.md` 验收条件 9）。
-5. 任意网络分片都必须能解析：每条事件的 `data` 是单行 JSON，跨分片的半条事件要缓冲到
-   完整行再解析，不得按分片边界切分。
+1. **临时正文**：从首个 `delta` 起以「生成中」样式显示；其中的 `[n]` 只作普通文本，不可点击；不写入对话历史。
+2. **唯一保留正文的结局是 `done` 且 `final.status = answered`**：此时 `final.answer` 与已下发全部 `delta` 的逐字拼接**完全相等**（不变式 I1），以 `final.answer` 为准显示，标记变为可点击。若两者不一致，显示 `final.answer` 并上报异常。
+3. **其余一切结局整段撤回临时正文**，不保留部分答案：
+   - `not_covered`（任一 `reason`）→ 显示 `final.answer`（服务端固定模板，不含模型输出）；
+   - `error` → 按 `error.code` 与 `details.reason` 显示前端文案；
+   - 用户停止或客户端断开（O14）→「已停止」；
+   - 流未以 `done` / `error` 结束（异常 EOF）、事件 JSON 无法解析、事件不符合上面的文法（**O15**）→ 客户端本地合成 `stream_interrupted` 错误，显示连接中断文案。
+4. 不自动重试，也不自动重放提问；用户点「重试」即新请求（新 `request_id`，重新绑定版本）。同一对话同时最多一个在途请求。
+5. 开流前的错误以非 200 状态与 `Error` JSON 返回：客户端先检查状态码与 `Content-Type`，再读取事件流。
+6. 每个回答属于它的绑定版本 `graph_version`；同一会话中后续回答的版本不同时，前面的回答标注「基于第 N 版」（Q9）。
 
 ### 示例
 
 ```text
 event: meta
-data: {"event":"meta","status":"answered","retrieved":6}
+data: {"event":"meta","status":"answered","retrieved":6,"graph_version":3,"request_id":"01J8ZQ3N6T7W8X9Y0ZABCDEF12"}
 
 event: delta
 data: {"event":"delta","delta":"栈是一种"}
@@ -169,30 +170,53 @@ event: delta
 data: {"event":"delta","delta":"后进先出的线性表[1]。"}
 
 event: done
-data: {"event":"done","final":{"status":"answered","answer":"栈是一种后进先出的线性表[1]。","citations":[{"index":1,"chunk_id":"c_77","document_id":"d_03","section_path":"第3章 > 3.1 栈","page":52,"text":"栈是限定仅在表尾进行插入和删除操作的线性表。"}],"related_kp_ids":["kp_12","kp_15"],"latency_ms":6200}}
+data: {"event":"done","final":{"status":"answered","answer":"栈是一种后进先出的线性表[1]。","citations":[{"index":1,"chunk_id":"c_77","document_id":"d_03","section_path":"第3章 > 3.1 栈","page":52,"text":"栈是限定仅在表尾进行插入和删除操作的线性表。"}],"related_kp_ids":["kp_12","kp_15"],"latency_ms":6200,"graph_version":3,"request_id":"01J8ZQ3N6T7W8X9Y0ZABCDEF12"}}
 ```
 
-资料未覆盖时（检索阶段就拒答，没有 delta）：
+检索阶段拒答（没有 delta）：
 
 ```text
 event: meta
-data: {"event":"meta","status":"not_covered","retrieved":0}
+data: {"event":"meta","status":"not_covered","retrieved":0,"graph_version":3,"request_id":"01J8ZQ4A1B2C3D4E5F6G7H8J9K"}
 
 event: done
-data: {"event":"done","final":{"status":"not_covered","answer":"课程资料未覆盖该问题：本课程资料中未找到与「操作系统进程调度」相关的内容。","citations":[],"reason":"no_retrieval_hit","latency_ms":800}}
+data: {"event":"done","final":{"status":"not_covered","answer":"课程资料中没有找到与这个问题相关的内容。","citations":[],"reason":"no_retrieval_hit","latency_ms":800,"graph_version":3,"request_id":"01J8ZQ4A1B2C3D4E5F6G7H8J9K"}}
 ```
 
-生成完成但引用全部失效（前端必须清除已显示的 delta 正文）：
+模型以哨兵声明证据不足（`insufficient_evidence`，没有 delta）：
 
 ```text
 event: meta
-data: {"event":"meta","status":"answered","retrieved":3}
+data: {"event":"meta","status":"answered","retrieved":3,"graph_version":3,"request_id":"01J8ZQ5B2C3D4E5F6G7H8J9K0M"}
+
+event: done
+data: {"event":"done","final":{"status":"not_covered","answer":"检索到的课程资料不足以回答这个问题。","citations":[],"reason":"insufficient_evidence","latency_ms":2100,"graph_version":3,"request_id":"01J8ZQ5B2C3D4E5F6G7H8J9K0M"}}
+```
+
+生成完成但引用校验不通过（前端必须撤回已显示的 delta 正文）：
+
+```text
+event: meta
+data: {"event":"meta","status":"answered","retrieved":3,"graph_version":3,"request_id":"01J8ZQ6C3D4E5F6G7H8J9K0M1N"}
 
 event: delta
-data: {"event":"delta","delta":"根据资料[1]，"}
+data: {"event":"delta","delta":"根据资料，栈是后进先出的。"}
 
 event: done
-data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答无法与课程资料对应，已撤回。可换一种问法或缩小问题范围。","citations":[],"reason":"all_citations_invalidated","latency_ms":5400}}
+data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答无法与课程资料对应，已撤回。可以换一种问法或缩小问题范围。","citations":[],"reason":"all_citations_invalidated","latency_ms":5400,"graph_version":3,"request_id":"01J8ZQ6C3D4E5F6G7H8J9K0M1N"}}
+```
+
+出字后供应商流中断（撤回已显示的正文）：
+
+```text
+event: meta
+data: {"event":"meta","status":"answered","retrieved":4,"graph_version":3,"request_id":"01J8ZQ7D4E5F6G7H8J9K0M1N2P"}
+
+event: delta
+data: {"event":"delta","delta":"栈的基本操作包括"}
+
+event: error
+data: {"event":"error","error":{"code":"LLM_UNAVAILABLE","message":"回答生成中断，请稍后重试。","details":{"reason":"stream_interrupted","request_id":"01J8ZQ7D4E5F6G7H8J9K0M1N2P"}}}
 ```
 
 ## 4. 重连
@@ -217,3 +241,5 @@ data: {"event":"done","final":{"status":"not_covered","answer":"生成的回答�
 事件名、顺序保证与终态语义属于破坏性变更，必须新增 `events.v2.md` 并在 `api.v2.yaml` 中同步，不得原地修改本文件。新增可选字段不算破坏性变更。
 
 > 例外记录：B10（2026-09-24）按 ADR-010、ADR-013 原地改写了 §1 鉴权、§2 关流语义与 §4 重连，并收紧了 `TaskEvent` 结构。依据是 `specs/task-processing.md` §7：v1 尚无任何消费者（C11/C12 未实现），此时修改迁移成本为零。此后再改须按本节升 v2。
+
+> 例外记录：B13（2026-09-24）按 ADR-015 及修订 1 原地改写了 §3：`meta` 与 `done.final` 增加必填 `graph_version`、`request_id`，`error` 改用 `ChatError`（错误码闭集、`LLM_UNAVAILABLE` 必带 `details.reason`），时序与撤回条文改为指向 `specs/grounded-qa.md`。依据与 B10 相同：问答流尚无消费者（J07/J08/J09 未实现），`specs/grounded-qa.md` Q11 已把这些改动分配给 B13。此后再改须按本节升 v2。
