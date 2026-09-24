@@ -44,7 +44,15 @@
         "TASK_NOT_CANCELLABLE",
         "PUBLISH_BLOCKED",
         "RATE_LIMITED",
-        "LLM_UNAVAILABLE"
+        "LLM_UNAVAILABLE",
+        "DOCUMENT_UNREADABLE",
+        "EXTRACTION_INCOMPLETE",
+        "STORAGE_UNAVAILABLE",
+        "INTERNAL_ERROR",
+        "TASK_ATTEMPTS_EXHAUSTED",
+        "PUBLISH_IN_PROGRESS",
+        "COURSE_BUSY",
+        "BUDGET_EXCEEDED"
       ]
     },
     "TaskCounts": {

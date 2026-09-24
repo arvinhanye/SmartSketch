@@ -47,7 +47,10 @@ export interface paths {
         };
         /**
          * 当前用户可见的课程列表
-         * @description 教师返回自己拥有的课程；学生只返回已发布课程。
+         * @description 仅返回调用者是成员的课程。课程内角色为 student 的课程只在曾经发布过
+         *     （published_version 非空）后出现；每项 my_role 为调用者在该课的成员角色，
+         *     与账号类型无关。见 `specs/identity-access.md` §4.4。
+         *
          */
         get: operations["listCourses"];
         put?: never;
@@ -74,6 +77,55 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        /** 列出课程成员（教师成员） */
+        get: operations["listMembers"];
+        put?: never;
+        /**
+         * 按用户名添加学生成员（教师成员）
+         * @description 新成员的课程内角色固定为 student，返回 201；已是任意角色的成员时
+         *     幂等返回原成员行和 200，不修改角色。用户名不存在或账号停用返回 404。
+         *
+         */
+        post: operations["addMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/members/{uid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 移除学生成员（教师成员）
+         * @description 只能移除学生成员；移除教师成员返回 403 `ROLE_FORBIDDEN`。
+         */
+        delete: operations["removeMember"];
         options?: never;
         head?: never;
         patch?: never;
@@ -527,7 +579,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED";
         /** @enum {string} */
         Role: "teacher" | "student";
         LoginRequest: {
@@ -558,6 +610,7 @@ export interface components {
             name: string;
             description?: string | null;
             status: components["schemas"]["CourseStatus"];
+            my_role: components["schemas"]["Role"];
             teacher_id?: string;
             kp_count?: number;
             /** @description 学生可见的版本号；从未发布为 null */
@@ -568,6 +621,17 @@ export interface components {
         CourseCreate: {
             name: string;
             description?: string;
+        };
+        CourseMember: {
+            user_id: string;
+            username: string;
+            role: components["schemas"]["Role"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        MemberAdd: {
+            /** @description 目标学生的用户名，不填写调用者身份或成员角色。 */
+            username: string;
         };
         /** @enum {string} */
         DocumentFormat: "pdf" | "docx" | "txt" | "markdown";
@@ -1056,7 +1120,9 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description 触发限流（`RATE_LIMITED`） */
+        /** @description 请求受限：`RATE_LIMITED` 为限流，可按 `Retry-After` 重试；
+         *     `BUDGET_EXCEEDED` 为预算耗尽，不重试，需等待额度恢复。
+         *      */
         RateLimited: {
             headers: {
                 [name: string]: unknown;
@@ -1079,6 +1145,7 @@ export interface components {
         /** @description 课程 ID，所有查询的第一隔离条件 */
         CourseId: string;
         TaskId: string;
+        UserId: string;
         KnowledgePointId: string;
         RelationId: string;
     };
@@ -1136,6 +1203,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
         };
     };
     listCourses: {
@@ -1181,6 +1249,7 @@ export interface operations {
                     "application/json": components["schemas"]["Course"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
@@ -1206,6 +1275,98 @@ export interface operations {
                     "application/json": components["schemas"]["Course"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`）。课程不存在与非成员同为 403 `COURSE_FORBIDDEN`，见 `specs/identity-access.md` §4.1。 */
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 课程成员列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseMember"][];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    addMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberAdd"];
+            };
+        };
+        responses: {
+            /** @description 已是成员，原角色不变 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseMember"];
+                };
+            };
+            /** @description 已添加学生成员 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseMember"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    removeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                uid: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 学生成员已移除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1231,6 +1392,7 @@ export interface operations {
                     "application/json": components["schemas"]["Document"][];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };
     };
@@ -1262,6 +1424,7 @@ export interface operations {
                     "application/json": components["schemas"]["UploadAccepted"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             413: components["responses"]["FileTooLarge"];
             415: components["responses"]["UnsupportedFormat"];
@@ -1287,6 +1450,7 @@ export interface operations {
                     "application/json": components["schemas"]["Task"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1311,6 +1475,7 @@ export interface operations {
                     "text/event-stream": components["schemas"]["TaskEvent"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1335,6 +1500,7 @@ export interface operations {
                     "application/json": components["schemas"]["Task"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -1370,6 +1536,7 @@ export interface operations {
                     "application/json": components["schemas"]["GraphExchange"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1400,6 +1567,7 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgePoint"][];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };
     };
@@ -1428,6 +1596,7 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgePoint"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
@@ -1454,6 +1623,7 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgePointDetail"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1478,6 +1648,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1508,6 +1679,7 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgePoint"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
@@ -1538,6 +1710,7 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgePoint"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationError"];
@@ -1565,6 +1738,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyMaterial"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["LlmUnavailable"];
@@ -1595,6 +1769,7 @@ export interface operations {
                     "application/json": components["schemas"]["Relation"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationError"];
@@ -1620,6 +1795,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1650,6 +1826,7 @@ export interface operations {
                     "application/json": components["schemas"]["Relation"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
@@ -1676,6 +1853,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewQueue"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };
     };
@@ -1700,6 +1878,7 @@ export interface operations {
                     "application/json": components["schemas"]["PublishResult"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
         };
@@ -1725,6 +1904,7 @@ export interface operations {
                     "application/json": components["schemas"]["GraphVersion"][];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };
     };
@@ -1750,6 +1930,7 @@ export interface operations {
                     "application/json": components["schemas"]["PublishResult"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1775,6 +1956,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProgressEntry"][];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };
     };
@@ -1803,6 +1985,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProgressEntry"][];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
@@ -1832,6 +2015,7 @@ export interface operations {
                     "application/json": components["schemas"]["RecommendResponse"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
@@ -1864,6 +2048,7 @@ export interface operations {
                     "text/event-stream": components["schemas"]["ChatEvent"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];

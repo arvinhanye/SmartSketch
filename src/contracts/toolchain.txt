@@ -6,6 +6,7 @@
 pyyaml                  pip3 install 'pyyaml==6.0.2'                        解析 api.v1.yaml
 openapi-spec-validator  pip3 install 'openapi-spec-validator==0.9.0'        OpenAPI 3.1 形式校验
 jsonschema              pip3 install 'jsonschema==4.26.0'                   tests/contracts 的正负例校验
+pytest                  pip3 install 'pytest==8.3.5'                       B08/B09 契约回归测试
 
 # ── 生成（scripts/gen-contracts.sh）──────────────────────────────────
 # openapi.json 与独立 JSON Schema 只依赖 pyyaml，随校验依赖一起装。
