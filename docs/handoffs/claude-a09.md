@@ -68,3 +68,35 @@
 ## 八、下一位的首个动作
 
 请 Codex 按 `docs/claude-review-workflow.md` 审查本范围（以交付提交为准）；修复另开一轮。实现方从 B13 开始：先改真源中的 `NotCoveredReason` 与四个字段，再按 Q11 分派 J 组。
+
+## 九、第二轮：Codex 审查修复（A09-R01 / A09-R02）
+
+- **task_id**：A09-R01/R02 修复（Codex REVIEW-12），A1～A10 收尾的一部分
+- **状态**：DONE。A09-R01 的方向由 ArvinHan 于 2026-09-24 在会话中选定（逐句引用，否则撤回）；ADR-015 修订 1 的书面条文与决定 10 **待签收**
+- **review_status**：ready_for_review（以交付提交为准）
+- **worktree / 分支**：同上，base `1754c96`
+- **审查报告**：主目录 `docs/reviews/codex-claude-a09-1754c96-2026-09-23-1400z.md`（尚未入库）
+
+| 问题 | 修改 |
+| --- | --- |
+| **A09-R01**（P2）只要有一个有效编号，无出处的结论也能成为 `answered` | 新增 Q3.5「结论单元与逐句覆盖」：流结束后，在代码片段外以换行与句末标点切分（`3.14` 不切开、句末标点后的标记归属前一单元、标题行与纯代码单元除外），每个结论单元至少带一个有效标记才可 `answered`（新不变式 I3），否则为 `not_covered` / `all_citations_invalidated`，日志子类 `uncited_sentence`，客户端整段撤回。wire 枚举不变。明确验收边界：在线只保证每句有合法出处，语义支持度由 K03 衡量。同步措施②④、Q4、O4～O6、Q11（J05/J06/K03）、QA-2、QA-16、主验收第 2 条，新增 QA-36（审查示例）、QA-37（切分边界） |
+| **A09-R02**（P2）「每请求一条日志」与鉴权前置冲突 | Q10 改为只记通过 P2 的请求，`request_id`、`user_id`、`course_id`、`version_id` 均非空；P1/P2 拒绝不写 `chat_logs`，只写结构化应用日志，不伪造缺失字段。QA-34 限定范围，新增 QA-38；`docs/architecture.md` 的 `ChatLog` 一行同步 |
+
+**为何复用 `all_citations_invalidated`**：前端对它的处理（撤回 + 模板「生成的回答无法与课程资料对应，已撤回」）对逐句未覆盖同样适用；新增 wire 值会让 B13 与前端多一处分支。代价是名称字面上只说「全部引用无效」，因此在 Q4 把 wire 语义写成「未能通过引用校验」，以三个日志子类区分。签收时若要求单独的 wire 值，只需改 Q3.5 第 4 条、Q4、O5 与 B13 一行。
+
+**验证**（本 worktree，脚本在会话草稿区，未入库）：
+
+```text
+python3 check_a09r.py .（修改前）       27 FAIL / exit 1
+python3 check_a09r.py .（修改后）       ALL PASS / exit 0
+python3 neg_a09r.py . <scratch>        9 个篡改副本全部 exit 1，各自命中目标断言
+python3 ref_q35.py                     11/11 PASS：按 Q3.5 条文写的参考切分器，对 QA-1、2、13、16、36、37 的示例得出与规格相同的结局与未覆盖单元数
+./scripts/verify.sh                     exit 0
+git diff --check                        exit 0
+```
+
+参考切分器首跑有 1 项失败（QA-13），原因是参考模型把反引号内的 `[1]` 当成有效标记，属于模型实现缺陷而非规格问题，修正后通过。
+
+**已知局限**（已写入 Q3.5 与推翻条件）：引导句、过渡句也须带引用，模型漏标时会多出 `not_covered`；`e.g. ` 这类缩写后接空格会被切开，J05 提示应避免。K03 统计 `uncited_sentence` 撤回率。
+
+**下一步**：ArvinHan 签收 ADR-015 修订 1 后更新签收状态；请 Codex 按交付提交复核。

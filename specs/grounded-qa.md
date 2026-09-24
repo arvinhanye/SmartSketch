@@ -1,6 +1,6 @@
 # 功能规格：可信问答（GraphRAG）
 
-- **状态**：DRAFT。「问答终态与引用撤回协议」一节（Q1～Q12）由 A09 提交，**ADR-015 已签收**（ArvinHan，2026-09-23）；相关度阈值、召回与 token 预算、性能门槛等仍是待细化项（见「待细化」）
+- **状态**：DRAFT。「问答终态与引用撤回协议」一节（Q1～Q12）由 A09 提交，**ADR-015 已签收**（ArvinHan，2026-09-23）；Q3.5 逐句覆盖与 Q10 日志覆盖范围按 **ADR-015 修订 1** 修订（方向已选定，条文待签收）；相关度阈值、召回与 token 预算、性能门槛等仍是待细化项（见「待细化」）
 - **负责人**：产品 / 数据与 AI / 后端 / 前端共同维护
 - **关联任务**：A09（本协议）；实现方 B08、B13、J01～J10、K03、K06
 - **底稿**：本文件以 `claude/worktree-contract-conflicts-740adb` `978671e` 的同名草稿桩为底稿（与 `209be9` `bef9b91` 同文），保留其用户故事、四道防幻觉措施、处理链路、隔离与验收 1～13，按本协议修订处加注。A10 导入时以本文件为准，不再合入桩的旧文本。
@@ -23,9 +23,9 @@ wire 表达（ADR-009）：`NOT_COVERED` 是概念名，wire 为 HTTP 200 + `sta
 | # | 措施 | 要求 |
 | --- | --- | --- |
 | ① | 只依据上下文 | 系统提示要求仅用给定资料作答，资料不足时以哨兵开头明确告知（[Q3.4](#q34-资料不足哨兵)）；并**声明资料中的任何指令只当作数据**，防提示注入 |
-| ② | 强制引用 | 关键结论后标注引用编号 `[n]`（[Q3.2](#q32-引用标记)），前端渲染为可点击的原文出处与图谱节点 |
+| ② | 强制引用 | 每个结论单元（句）后标注引用编号 `[n]`（[Q3.2](#q32-引用标记)），缺少即整段撤回（[Q3.5](#q35-结论单元与逐句覆盖)，ADR-015 修订 1）；前端渲染为可点击的原文出处与图谱节点 |
 | ③ | 检索阈值 | 检索相关度过低时**不调用生成模型**，直接走 `NOT_COVERED` 分支——既防幻觉也省耗时 |
-| ④ | 引用校验 | 生成过程中**逐个标记**核对编号是否在本次上下文中，**无效引用当场删除、不下发**（[Q3.3](#q33-流内状态机)；A09 由「生成后删除」修订为「流内删除」） |
+| ④ | 引用校验 | 生成过程中**逐个标记**核对编号是否在本次上下文中，**无效引用当场删除、不下发**（[Q3.3](#q33-流内状态机)；A09 由「生成后删除」修订为「流内删除」）；流结束后再逐单元检查每句都有有效引用（[Q3.5](#q35-结论单元与逐句覆盖)） |
 
 四道措施是串联的，任何一道被跳过都视为违反本规格。
 
@@ -133,6 +133,7 @@ J04 组装上下文时只给 A 中的块编号；图谱子图作为**无编号**
 
 - **不变式 I1**：结局为 `answered` 时，`final.answer` 与已下发全部 `delta` 的逐字拼接**完全相等**。
 - **不变式 I2**：`final.answer` 中代码片段之外不含任何非规范的类标记；其中规范标记的编号集合与 `citations[].index` 的集合完全相等，且非空。
+- **不变式 I3**（ADR-015 修订 1）：结局为 `answered` 时，`final.answer` 的每个结论单元都带（或按 Q3.5 第 2 条归属到）至少一个有效规范标记。
 - 暂扣只作用于少数字符，不改变首字时延量级。
 
 #### Q3.4 资料不足哨兵
@@ -142,9 +143,19 @@ J04 组装上下文时只给 A 中的块编号；图谱子图作为**无编号**
 - 暂扣内容与哨兵前缀出现分歧（如 `<<INSIGHT`）→ 全部暂扣内容进入普通处理。
 - 哨兵跨供应商数据块拆分时照常识别；出现在正文中间（代码片段外）时只剔除，不改变终态；代码片段内的哨兵是普通文本。
 
+#### Q3.5 结论单元与逐句覆盖
+
+ADR-015 修订 1（Codex A09-R01）新增。流正常结束（含截断）后、构造终态前，J06 对拼接正文（即将成为 `final.answer` 的文本）做一次逐单元检查。本检查保证**每个结论单元都带合法出处**；它不**判断出处在语义上是否支持该结论**，语义支持度由 K03 离线评测衡量，不作为在线终态条件。检查在流结束后进行，不改变 Q3.3 的暂扣与下发。
+
+1. **切分**：只在代码片段之外切分。边界为换行符，以及句末标点 `。`、`！`、`？`、`!`、`?`；半角 `.` 只在其后紧跟空白或正文结尾时算边界，因此 `3.14` 这类数字不被切开。连续的句末标点（如 `？！`）算一个边界。分号、冒号、逗号不是边界。
+2. **标记归属**：句末标点之后、下一个字母或数字之前出现的规范标记（中间可有空白），归属前一个单元。因此 `栈是线性表。[1]` 与 `栈是线性表[1]。` 等价。
+3. **结论单元**：代码片段之外至少含一个字母或数字（按 Unicode 类别，含汉字）的单元。以下不是结论单元：Markdown 标题行（行首 1～6 个 `#` 后接空格）；除代码片段、标记、空白与标点外不含其他字符的单元。引导句（如「栈的操作如下：」）与列表项都是结论单元。
+4. **判定**：每个结论单元都含有（或按第 2 条归属到）至少一个有效规范标记 → 通过。正文至少有一个有效标记、但有结论单元没有 → 终态 `not_covered` / `all_citations_invalidated`，日志子类 `uncited_sentence`，并记录未覆盖单元数。正文没有有效标记时仍按 `no_markers` / `unknown_only` 记子类，不再做本检查。
+5. **与撤回的关系**：未通过时客户端按 Q6 整段撤回临时正文，与其他非 `answered` 结局相同。截断输出的末尾单元同样须带有效标记。
+
 ### Q4 终态构造
 
-**`answered`**：流正常结束且至少出现一个有效标记。
+**`answered`**：流正常结束，至少出现一个有效标记，且通过 Q3.5 逐单元检查。
 
 | 字段 | 取值 |
 | --- | --- |
@@ -164,7 +175,7 @@ J04 组装上下文时只给 A 中的块编号；图谱子图作为**无编号**
 | `related_kp_ids` | 可为空；也可给图检索命中的知识点作导航提示（全部属于绑定版本），不构成结论 |
 | `graph_version`、`request_id`、`latency_ms` | 同上 |
 
-**`all_citations_invalidated` 的两个子类**只进日志、不上 wire：`no_markers`（模型完全没写类标记）与 `unknown_only`（写了，但无一有效）。
+**`all_citations_invalidated` 的三个子类**只进日志、不上 wire：`no_markers`（模型完全没写类标记）、`unknown_only`（写了，但无一有效）与 `uncited_sentence`（有有效标记，但有结论单元没有，Q3.5；ADR-015 修订 1）。wire 上三者同为 `all_citations_invalidated`，语义为「生成的回答未能通过引用校验」。
 
 **`NotCoveredReason` 改名（ADR-015 决定 3，B13 落实）**：`740adb` 真源中的 `out_of_course_scope` 没有任何环节负责判定，改为 `insufficient_evidence`，语义为「生成模型以哨兵声明已检索证据不足」。改后闭集为 `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated`，前两者不调用生成，后两者调用了生成。
 
@@ -177,9 +188,9 @@ J04 组装上下文时只给 A 中的块编号；图谱子图作为**无编号**
 | O1 | H 为空 | meta(not_covered) → done | `not_covered` / `no_retrieval_hit` | 0 | 无正文 |
 | O2 | H 非空，无候选达到阈值 | meta(not_covered) → done | `not_covered` / `below_similarity_threshold` | 0 | 无正文 |
 | O3 | 模型输出以哨兵开头 | meta(answered) → done | `not_covered` / `insufficient_evidence` | ≥ 1 | 无正文 |
-| O4 | 正常结束，至少一个有效标记 | meta → delta* → done | `answered` | ≥ 1 | 否，标记变为可点击 |
-| O5 | 正常结束，零有效标记（`no_markers` 或 `unknown_only`） | meta → delta* → done | `not_covered` / `all_citations_invalidated` | ≥ 1 | **是** |
-| O6 | 达到输出上限（`finish_reason = length`） | 同 O4 或 O5 | 按 O4 / O5 判定；日志标 `truncated` | ≥ 1 | 同 O4 / O5 |
+| O4 | 正常结束，每个结论单元都有有效标记（Q3.5） | meta → delta* → done | `answered` | ≥ 1 | 否，标记变为可点击 |
+| O5 | 正常结束，零有效标记（`no_markers` 或 `unknown_only`），或有结论单元缺少有效标记（`uncited_sentence`） | meta → delta* → done | `not_covered` / `all_citations_invalidated` | ≥ 1 | **是** |
+| O6 | 达到输出上限（`finish_reason = length`） | 同 O4 或 O5 | 按 O4 / O5 判定，被截断的末尾单元无有效标记即为 `uncited_sentence`；日志标 `truncated` | ≥ 1 | 同 O4 / O5 |
 | O7 | 首字前主用失败或首字超时，已切备用且备用也失败（或主用熔断且无可用备用） | meta → error | `LLM_UNAVAILABLE`，`details.reason = upstream` | ≥ 0 | 无正文 |
 | O8 | 已下发 delta 后供应商流中断（A07：不切备用） | meta → delta+ → error | `LLM_UNAVAILABLE`，`details.reason = stream_interrupted` | ≥ 1 | **是** |
 | O9 | 链路时限到期（无论是否已出字） | meta → delta* → error | `LLM_UNAVAILABLE`，`details.reason = timeout`；已生成部分**不**校验成 `answered` | ≥ 0 | **是**（若已出字） |
@@ -240,7 +251,7 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
 
 ### Q10 日志
 
-每个请求恰好一条问答日志（J10）。实体名 `ChatLog`、SQLite 表名 `chat_logs`（A10 N5 交 A09 定名，ADR-015 决定 8）；服务端不保存会话，因此不设 `QuestionSession`。结局取闭集 `answered`、`not_covered`、`error`、`aborted` 之一，字段至少包括：`request_id`、`user_id`（取自调用者身份，ADR-013）、`course_id`、`version_id`、原问题、结局与 `reason` / `error.code` / `details.reason`、`citations` 的编号与文本块 ID、「未知引用」计数、`all_citations_invalidated` 的子类、`truncated`、`latency_ms` 与首个 delta 的时延。模型用量不在日志中重复，按 `request_id` 从 `model_calls` 汇总。被撤回的临时正文不作为回答记录；是否留存模型原始输出供评测，与留存期、脱敏一并归 J10。用户重试是新请求、新日志行。
+**每个通过 P2 的请求**（已认证、已授权、已绑定版本）恰好一条问答日志（J10）。实体名 `ChatLog`、SQLite 表名 `chat_logs`（A10 N5 交 A09 定名，ADR-015 决定 8）；服务端不保存会话，因此不设 `QuestionSession`。P1 拒绝与 P2 失败的请求没有 `request_id`，也可能没有已认证身份或绑定版本，因此**不写 `chat_logs`**：由统一错误处理写一条结构化应用日志（HTTP 状态、错误码、路径中的课程 ID、已认证时的 `user_id`），不伪造缺失字段（ADR-015 修订 1，Codex A09-R02）。开流前在 P3～P4 失败的请求已通过 P2，照常写 `chat_logs`，结局为 `error`。结局取闭集 `answered`、`not_covered`、`error`、`aborted` 之一，字段至少包括：`request_id`、`user_id`（取自调用者身份，ADR-013）、`course_id`、`version_id`（四者均非空）、原问题、结局与 `reason` / `error.code` / `details.reason`、`citations` 的编号与文本块 ID、「未知引用」计数、`all_citations_invalidated` 的子类与未覆盖单元数、`truncated`、`latency_ms` 与首个 delta 的时延。模型用量不在日志中重复，按 `request_id` 从 `model_calls` 汇总。被撤回的临时正文不作为回答记录；是否留存模型原始输出供评测，与留存期、脱敏一并归 J10。用户重试是新请求、新日志行。
 
 ### Q11 与其他任务的接口
 
@@ -250,13 +261,13 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
 | B08 公共错误码 | 问答使用 `STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`（A03 提议）与 `BUDGET_EXCEEDED`（A07 提议，D-02f）；`errors.v1.md` 中 `RATE_LIMITED` 的「模型 API 限流」措辞与 A07 矩阵不一致，改为仅指本服务限流 | B08 |
 | J03 问题改写 | H2：剔除历史中的类标记与哨兵；改写出错、超时、被预算拒绝均用原问题 | J03 |
 | J04 上下文 | Q3.1 的 A 与编号；图谱上下文无编号；P5 的 `no_retrieval_hit` / `below_similarity_threshold` 判定；H4 | J04 |
-| J05 生成 | 提示要求哨兵（Q3.4）、`[n]` 标记与代码写在反引号内；生成提示不含历史（H3）；首字前切备用、出字后不切（A07） | J05 |
-| J06 引用与终态 | Q3.1 复核、Q3.2 归一化闭集、Q3.3 状态机、Q4 终态构造与模板；与 J09 共用代码片段夹具 | J06 |
+| J05 生成 | 提示要求哨兵（Q3.4）、`[n]` 标记（逐单元标注：每句、每个引导句与列表项都以引用结尾，Q3.5）与代码写在反引号内；生成提示不含历史（H3）；首字前切备用、出字后不切（A07） | J05 |
+| J06 引用与终态 | Q3.1 复核、Q3.2 归一化闭集、Q3.3 状态机、Q3.5 逐单元检查、Q4 终态构造与模板；与 J09 共用代码片段夹具 | J06 |
 | J07 问答 API | Q2 分段与文法、客户端断开、Q7 JSON 模式、链路时限 | J07 |
 | J08 流客户端 | O15 本地合成错误；Q6 第 6 条；不自动重放 | J08 |
 | J09 问答页 | Q6 撤回规则、Q9 版本标注；Markdown 渲染关闭缩进代码块 | J09 |
-| J10 日志 | Q10 结局闭集与字段；表名 `chat_logs`、实体 `ChatLog` | J10 |
-| K03 离线评测 | `insufficient_evidence` 与 `all_citations_invalidated` 两个子类分别统计；「编号有效」不等于「支持结论」 | K03 |
+| J10 日志 | Q10 覆盖范围（只记通过 P2 的请求）、结局闭集与字段；表名 `chat_logs`、实体 `ChatLog` | J10 |
+| K03 离线评测 | `insufficient_evidence` 与 `all_citations_invalidated` 分别统计，后者按三个子类统计，其中 `uncited_sentence` 的撤回率用于评估逐句覆盖的代价；「编号有效」不等于「支持结论」，语义支持度只在评测中衡量（Q3.5） | K03 |
 | A10 导入 | 本文件替换 `740adb` / `209be9` 的桩；N5 定为 `ChatLog` / `chat_logs`（`docs/architecture.md` 核心数据模型已改）；批 1 门禁扫描清单加回本文件；`740adb` `src/contracts/README.md` §5.4 的 `not_covered_reason` 已由 ADR-009 裁定为 `reason` | 导入批次 |
 
 ### Q12 验收（QA-n）
@@ -265,7 +276,7 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
 
 - 成功路径
   - **QA-1**（J06、J07）正常回答：A = {1,2,3}，fake 模型输出「栈是后进先出的线性表[1]。入栈操作见[2]。」→ `meta`（`status = answered`、`retrieved = 3`、带 `graph_version` 与 `request_id`）→ 若干 `delta` → `done`：`answered`，`answer` 等于 delta 拼接（I1），`citations` 编号为 [1, 2] 且按首次出现排序，每条的定位字段与 `text` 取自文本块数据、可定位。
-  - **QA-2**（J06）部分无效：A = {1,2,3}，输出含 `[1]` 与 `[9]` → 任何 `delta` 都不含 `[9]`；`done` 为 `answered`，`citations` 只有 1；日志「未知引用」计数为 1。
+  - **QA-2**（J06）部分无效：A = {1,2,3}，输出「栈是后进先出的线性表[1][9]。」→ 任何 `delta` 都不含 `[9]`；`done` 为 `answered`，`citations` 只有 1；日志「未知引用」计数为 1。
   - **QA-3**（J06）归一化：A = {1,2,3}，`[1,3]` → `[1][3]`；`【2】` → `[2]`；`[1，9]` → `[1]`；`[2、2]` → `[2]`。
   - **QA-4**（J07）JSON 模式：同一 fake 输出下，`Accept: application/json` 返回 200 `ChatResponse`，除 `latency_ms`、`request_id` 外与 SSE 模式的 `done.final` 相同。
   - **QA-5**（J09）`done` 为 `answered` 后正文不变，标记变为可点击；点击展示该引用的原文与页码或章节。
@@ -280,7 +291,7 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
   - **QA-13**（J06、J09）代码片段：行内代码 `` `a[1]` `` 与围栏代码块中的 `[2]` 原样下发、不成为引用；若它们是仅有的方括号 → `all_citations_invalidated`。同一夹具下前端渲染出的代码范围与服务端判定一致。
   - **QA-14**（J06）标记跨块：`[`、`1`、`]` 分三块到达 → 按一个标记处理；输出以未闭合的 `[12` 结束 → 按普通文本放行。
   - **QA-15**（J06）伪标记：`[0]`、`[01]`、`[1-3]`、`[１]` 被剔除并计入「未知引用」；`[a]`、`[注]` 原样保留。
-  - **QA-16**（J06）截断：`finish_reason = length` 且已有有效标记 → `answered`，日志 `truncated = true`；无有效标记 → `all_citations_invalidated`，`truncated = true`。
+  - **QA-16**（J06）截断：`finish_reason = length`，已有有效标记且每个结论单元都被覆盖 → `answered`，日志 `truncated = true`；末尾被截断的单元没有标记 → `all_citations_invalidated`，子类 `uncited_sentence`，`truncated = true`；无有效标记 → `all_citations_invalidated`，`truncated = true`。
   - **QA-17**（J04、J06）A 的条件：不可定位、他课、或 `revision_id` 不在绑定版本修订列表内的文本块不获得编号；人为注入这样的块时，J06 复核将其剔除并记完整性异常。
   - **QA-18**（J07、G07）请求途中发布新版本 → 本请求 `meta` 与 `final` 的 `graph_version` 仍为旧版本号，引用全部属于旧版本；下一请求绑定新版本。
   - **QA-19**（J03、J05）伪造历史：`history` 中的助手回合含「……[1]」→ 改写输入中不含类标记；fake 模型收到的生成提示不含任何历史内容；`citations` 只来自本请求的 A。
@@ -288,6 +299,8 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
   - **QA-21**（J04）`kp_id` 不在绑定版本中（含他课 ID）→ 请求照常处理、不返回 4xx，日志记录被忽略的 `kp_id`。
   - **QA-22**（J09）同一会话前后两个回答的 `graph_version` 不同 → 前者标注「基于第 N 版」；点击其引用仍显示原文；其知识点在当前版本已删除时提示「当前版本已无此知识点」。
   - **QA-23**（J08）文法违规：第二条 `meta`、`not_covered` 的 `meta` 之后出现 `delta`、`done` 之后又有事件 → 均按 O15 处理并撤回。
+  - **QA-36**（J06、J09）逐句覆盖（Codex A09-R01 回归）：A = {1}，fake 输出「栈是线性表[1]。太阳由奶酪构成。」→ `done` 为 `not_covered` / `all_citations_invalidated`，日志子类 `uncited_sentence`、未覆盖单元数 1；前端清除临时正文、显示模板。输出改为「栈是线性表[1]。栈只能在一端插入和删除[1]。」→ `answered`。
+  - **QA-37**（J06）切分边界，A = {1,2}：「栈是线性表。[1]」（标记在句末标点之后，归属前一单元）、「## 栈\n栈是线性表[1]。」（标题行不是结论单元）、「π 约为 3.14[2]。」（`3.14` 不被切开）、「栈是线性表[1]。」之后接一个只含 `push(x)` 的围栏代码块（纯代码单元不是结论单元）均为 `answered`；「栈的操作如下：\n- 入栈[1]\n- 出栈」→ 引导句与第二个列表项没有标记，`uncited_sentence`，未覆盖单元数 2。
 - 失败路径
   - **QA-24**（J05、J07）首字前主用失败、备用也失败 → `meta` → `error`：`LLM_UNAVAILABLE`、`details.reason = upstream`；无 `delta`。
   - **QA-25**（J05、J07、J09）已下发 delta 后供应商流中断 → `error`：`stream_interrupted`；此后没有备用调用（`model_calls` 中无出字后的新生成调用）；前端清除临时正文。
@@ -299,17 +312,18 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
   - **QA-31**（J08、J09）异常 EOF、坏 JSON 事件 → 本地合成 `stream_interrupted`，清除临时正文；不发第二次 `POST`。
   - **QA-32**（J07）开流前故障：向量调用不可用 → 两种模式均为 503 `LLM_UNAVAILABLE` 且未开流；图库不可用 → 503 `STORAGE_UNAVAILABLE`。
   - **QA-33**（J06）模板：四个 `reason` 的 `final.answer` 各等于对应模板；fake 模型输出中嵌入唯一标识串，断言它不出现在任何 `not_covered` 的 `answer` 与任何 `error.message` 中。
-  - **QA-34**（J10）每个请求恰好一条日志，结局属于闭集；用户重试产生新的 `request_id` 与新日志行。
+  - **QA-34**（J10）每个通过 P2 的请求恰好一条 `chat_logs` 行，`request_id`、`user_id`、`course_id`、`version_id` 均非空，结局属于闭集；用户重试产生新的 `request_id` 与新日志行。
   - **QA-35**（C03、J07）访问控制按 `specs/identity-access.md` IAM-12 等条目：教师成员 403 `ROLE_FORBIDDEN`，非成员 403 `COURSE_FORBIDDEN`，从未发布 404 `GRAPH_NOT_PUBLISHED`；均在开流前返回。
+  - **QA-38**（J10、C03、J07）日志覆盖范围（Codex A09-R02 回归）：匿名请求 401、非成员 403、教师成员 403、P2 读发布指针时存储不可用 503 → 均不产生 `chat_logs` 行、不生成 `request_id`，只有一条应用日志（HTTP 状态与错误码；已认证时含 `user_id`）；通过 P2 后在 P4 向量调用失败（503 `LLM_UNAVAILABLE`）→ `chat_logs` 恰好一行，结局 `error`，四个必填字段均非空。
 
-A09 原子验收与本节的对应：「answered 必有定位来源」→ QA-1、QA-17；「临时正文失败后清除」→ QA-12、QA-25、QA-26、QA-31；「空检索不调用生成」→ QA-6、QA-7；「与未知引用区分」→ QA-6、QA-7 与 QA-12 的 `reason` 及生成调用数互不相同。
+A09 原子验收与本节的对应：「answered 必有定位来源」→ QA-1、QA-17、QA-36（每个结论单元都有出处）；「临时正文失败后清除」→ QA-12、QA-25、QA-26、QA-31；「空检索不调用生成」→ QA-6、QA-7；「与未知引用区分」→ QA-6、QA-7 与 QA-12 的 `reason` 及生成调用数互不相同。
 
 ## 验收条件
 
 ### 成功路径
 
 1. 资料覆盖的问题 → 返回至少一个引用，每个引用可定位到 `{document_id, page 或 section}`。（→ QA-1）
-2. 回答中出现的**每个引用编号**都能在本次上下文片段中找到对应项。（→ I2、QA-2）
+2. 回答中出现的**每个引用编号**都能在本次上下文片段中找到对应项；每个结论单元（句）都至少带一个有效引用，否则降级为 `NOT_COVERED` 并撤回（ADR-015 修订 1）。（→ I2、I3、QA-2、QA-36）
 3. 返回「涉及的知识点」列表，每项可定位到**绑定版本**中的实际节点 id。（→ Q4）
 4. 输出为 SSE 流式，可增量渲染。（→ Q2、QA-1）
 
