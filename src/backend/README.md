@@ -32,7 +32,7 @@ $env:PYTHONPATH = (Resolve-Path ./src/backend).Path
 .\.venv\Scripts\python.exe -m app.repositories.sqlite
 ```
 
-迁移器按文件名中的三位版本号顺序执行 `src/backend/migrations/*.sql`，记录版本、文件名和 SHA-256 摘要。重复运行不会再应用已记录的迁移；改动已应用文件、发现旧版缺口或有效任务租约/课程锁时会拒绝执行。连接启用 WAL、外键和 5000 ms `busy_timeout`。C01 的 `001_base.sql` 接管 `embedding_space_state` 表，保留 B06 首次启动写入的空间记录，并创建以 `call_id` 为主键的 `model_calls`；课程、成员和任务表由后续迁移创建。
+新迁移的编号在合并时取「当前 main 最大编号 + 1」，不按计划表预分配（D-10）。迁移器按文件名中的三位版本号顺序执行 `src/backend/migrations/*.sql`，记录版本、文件名和 SHA-256 摘要。重复运行不会再应用已记录的迁移；改动已应用文件、发现旧版缺口或有效任务租约/课程锁时会拒绝执行。连接启用 WAL、外键和 5000 ms `busy_timeout`。C01 的 `001_base.sql` 接管 `embedding_space_state` 表，保留 B06 首次启动写入的空间记录，并创建以 `call_id` 为主键的 `model_calls`；课程、成员和任务表由后续迁移创建。
 
 每项待执行迁移前，迁移器在数据库旁的 `backups/` 目录用 `VACUUM INTO` 生成 `*-before-<版本>.sqlite`，并对副本运行 `PRAGMA integrity_check` 后关闭校验连接；迁移 SQL 与版本记录在同一事务内。迁移失败时原库事务回滚，备份保留。恢复与备份立即移动演练已纳入 `tests/backend/test_c01.py`。
 
