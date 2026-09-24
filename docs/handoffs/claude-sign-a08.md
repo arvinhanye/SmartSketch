@@ -76,3 +76,32 @@
 ## 回滚
 
 对本分支的提交执行 `git revert`，即可撤销 ADR-014 修订 1 以及规格、集成文档、`.env.example`、任务板的相应改动。本次没有数据或依赖变更。
+
+## 第二轮：Codex REVIEW-14 修复（A08S-R01 / A08S-R02）
+
+- **task_id**：A08 签收的审查修复，A1～A10 收尾的一部分
+- **review_status**：ready_for_review（以交付提交为准）
+- **worktree / 分支**：同上，`claude/a08-signoff`。先把 Codex 审查时的未提交差异原样提交为 `445478e`，本轮修改在其上
+- **审查报告**：主目录 `docs/reviews/codex-claude-a08-signoff-f9dfc8f-2026-09-24-0123z.md`（尚未入库）
+
+| 问题 | 修改 |
+| --- | --- |
+| **A08S-R01**（P2）同值 `PUT` 可能被当作幂等跳过，合并前已有 B=`unknown` 时覆盖不了继承 | `specs/learning-path.md` §5 新增「同值写入」：不能只凭原始 `status` 相同跳过；在提交时的最终绑定版本上，节点仍有未被覆盖的来源时，同值写入是一次显式写入，取新写入序号并覆盖来源；没有时才为无操作（不取序号、不改 `updated_at`），因此重放从第二次起为无操作。LP-16 指向该判定；LP-18 补上「合并前 unknown → 继承为 mastered → 同值 PUT → unknown 且 A 被覆盖 → 重放无操作」的串联回归。`docs/decisions.md` 决定 9 下加补注，**待 ArvinHan 签收** |
+| **A08S-R02**（P3）任务板 A08 行已是 DONE，说明段仍列已签收参数为待决 | `docs/tasks.md` 该段改为历史基线，指向「A08 签收」行，当前依赖列为 ADR-012 下一次修订、B12、C01/I01；「A08 签收」行状态注明补注待签收，并追加本轮修复说明 |
+
+补注是从已签收的决定 9（“合并生效后学生对 `p` 的任何显式写入都会覆盖来源”）推导出的：同值写入也是显式写入，只有在确实没有可覆盖的来源时才可以不落库。没有改变决定 9 的方向。
+
+**验证**（本 worktree）：
+
+```text
+python3 check_a08s.py .（修改前）        11 FAIL / exit 1
+python3 check_a08s.py .（修改后）        ALL PASS / exit 0
+python3 neg_a08s.py . <scratch>         6 个篡改副本全部 exit 1，各自命中目标断言
+./scripts/verify.sh                      exit 0
+git diff --check                         exit 0
+python3 -m json.tool docs/atomic-tasks.json   exit 0
+```
+
+两个脚本在会话草稿区，未入库。断言覆盖 §5 判定条文的四个要素（原始值、覆盖关系、写入序号、最终绑定版本）、旧措辞已替换、LP-16/18、LP 编号连续 1～20、ADR 补注、任务板历史段与当前依赖。仍只有规格，没有实现或自动化测试。
+
+**下一步**：ArvinHan 签收补注后，把 ADR 补注与任务行的「待签收」改为已签收；请 Codex 按交付提交复核。

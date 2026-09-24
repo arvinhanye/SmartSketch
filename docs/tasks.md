@@ -181,11 +181,11 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | A08 | DONE（ADR-014 及修订 1 已签收；PR #19 `f9dfc8f`） | 定义推荐评分与进度跨版本规则 | Codex | `.claude/worktrees/codex-a08-learning-path`（`codex/a08-learning-path`）/ base `1a47eb2` | `specs/learning-path.md`、`docs/atomic-task-plan.md` B12/I05 行、`docs/atomic-tasks.json` B12/I05 `acceptance`、本任务行及下方说明、`docs/handoffs/codex-a08.md` | `specs/learning-path.md` LP-1～19；R11～R14 第 3 轮复审通过（PR #17 `acb257c`）；修复映射与验证见 `docs/handoffs/codex-a08.md`；未改 `src/contracts/` |
 
-- A08 输入：S2 §6.4.7、A04/ADR-012、A02 掌握枚举、Claude 第 1 轮 R01～R10 与第 2 轮 R11～R14 报告、第 3 轮复审、已签收 ADR-014。输出：修订后的可学/评分/跨版本读时继承与批量写入规格；进度接口有效/原始状态及来源提案；B12/I05 的 Markdown 与 JSON 验收同步。依赖：ADR-014 已随 `origin/main@6881ffe` 集成，B12 需在 YAML 真源落地进度响应字段；风险与待决：缺值、权重来源、展示上限、进度响应字段名及 `updated_at` 语义，以及显式降级覆盖继承与谱系存放位置均见 `specs/learning-path.md` §7；R15 未在本轮修订，未改 DTO、仓储或发布快照格式。验证命令：`./scripts/verify.sh`、`git diff --check`、`python3 -m json.tool docs/atomic-tasks.json > /dev/null` 及两项 grep，实际结果见交接。
+- A08 行的历史基线：PR #19 合入时，§7 的参数、进度接口字段与 ADR-014 两项细则仍待签收，R15 未修订。这些均已由下方「A08 签收」行（ADR-014 修订 1）签收，现行规则以该行与 `specs/learning-path.md` 为准，本段不再列待决项。当前依赖：**ADR-012** 的下一次修订（快照节点 `merged_from` 与版本提交序号，A04 负责）、**B12** 在 YAML 真源落地 `ProgressEntry` 字段、**C01/I01** 为进度行增加写入序号。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| A08 签收 | DONE（ADR-014 修订 1 已签收） | 签收 A08 §7 的参数与进度接口字段，以及 ADR-014 的两项细则 | Claude（协调 Agent） | `.claude/worktrees/codex-a08-check-0ae6d7`（分支 `claude/a08-signoff`）/ base `f9dfc8f` | `docs/decisions.md`（ADR-014 修订 1）、`specs/learning-path.md`（§1、§3、§5、§6、§7）、`docs/integrations.md`（学习推荐权重、启动校验）、`.env.example`、本任务行、`docs/handoffs/claude-sign-a08.md` | `docs/decisions.md` ADR-014 修订 1（决定 5～10）；`specs/learning-path.md` LP-1～20；`docs/handoffs/claude-sign-a08.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
+| A08 签收 | DONE（ADR-014 修订 1 已签收；A08S-R01 补注待签收） | 签收 A08 §7 的参数与进度接口字段，以及 ADR-014 的两项细则 | Claude（协调 Agent） | `.claude/worktrees/codex-a08-check-0ae6d7`（分支 `claude/a08-signoff`）/ base `f9dfc8f` | `docs/decisions.md`（ADR-014 修订 1）、`specs/learning-path.md`（§1、§3、§5、§6、§7）、`docs/integrations.md`（学习推荐权重、启动校验）、`.env.example`、本任务行、`docs/handoffs/claude-sign-a08.md` | `docs/decisions.md` ADR-014 修订 1（决定 5～10）；`specs/learning-path.md` LP-1～20；`docs/handoffs/claude-sign-a08.md`；`./scripts/verify.sh` exit 0、`git diff --check` exit 0 |
 
 - A08 签收的决定（ArvinHan 2026-09-23，ADR-014 修订 1）：
   - 缺失属性取 0.5；
@@ -200,3 +200,4 @@
   - **C01/I01**：进度行增加写入序号。
   - **I04**：启动时读取并校验权重。
   - **F10**：合并时写入谱系。
+- Codex REVIEW-14 修复（A1～A10 收尾，Claude）：**A08S-R01** 同值写入不能只凭原始值相同跳过，按提交时最终绑定版本上是否仍有未被覆盖的来源判定，LP-16/LP-18 补回归，ADR-014 修订 1 决定 9 加补注（待签收）；**A08S-R02** A08 行说明段改为历史基线并列出当前依赖。审查报告 `docs/reviews/codex-claude-a08-signoff-f9dfc8f-2026-09-24-0123z.md`（主目录）；验证见 `docs/handoffs/claude-sign-a08.md`「第二轮」。
