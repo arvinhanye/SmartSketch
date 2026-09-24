@@ -324,3 +324,15 @@
 - 风险：`tests/frontend` 位于 Vite 根目录外，裸模块解析与类型检查可能找不到 `src/frontend/node_modules`；测试依赖可能抬高 Node 版本下限。
 - 验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b02.test.ts`、`./scripts/verify.sh`、`git diff --check`。
 - 实际结果：新增 `src/frontend/tsconfig.node.json`（文件锁中预留的扩展，处理 B01-R01）；`engines` 收紧为 `^22.22.2 || ^24.15.0 || >=26.0.0`（Vitest 5 / jsdom 30 下限）；B01-R02 的 README 命令块已改为 `bash`。CI 仍未跑前端命令，归 K11。
+
+## B03 / B04 前端路由壳与课程上下文（并行）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B03/B04 准备 | DONE | 安装 `vue-router@5.3.1`、`pinia@4.0.3`，`main.ts` 接入 Pinia；认领两项任务 | Claude（协调） | `claude/b03-b04-prep` / base `8e5b707`（B02，PR #27 未合） | `src/frontend/package.json`、`package-lock.json`、`src/frontend/src/main.ts`、本任务板 | type-check、B02 测试、build 通过 |
+| B03 | IN PROGRESS | 建立路由壳和角色入口 | Claude（前端子代理） | `claude/b03-router-shell` / base 准备提交 | `src/frontend/src/router/index.ts`、`src/frontend/src/views/TeacherHome.vue`、`src/frontend/src/views/StudentHome.vue`、`tests/frontend/b03.test.ts`；为接线需改 `src/frontend/src/main.ts`（仅加路由）与 `src/frontend/src/App.vue`；`docs/handoffs/claude-b03.md` | 待补充 |
+| B04 | IN PROGRESS | 建立 Pinia 课程上下文 | Claude（前端子代理） | `claude/b04-course-store` / base 准备提交 | `src/frontend/src/stores/course.ts`、`tests/frontend/b04.test.ts`、`docs/handoffs/claude-b04.md` | 待补充 |
+
+- 并行约束：B03、B04 的文件锁互不相交；两者都不改 `package.json`、锁文件、`docs/tasks.md`、`docs/architecture.md`，这些由协调方在集成时统一更新。
+- 依赖：B02（PR #27 待审查）；B03 另依赖 A05（`specs/identity-access.md` §2.4：路由守卫只用 `user.role` 选首页、`Course.my_role` 选课程视图，仅作界面引导）。
+- 风险：原子清单没有前端登录页与会话存储任务（G-1 只列 C13～C16 后端与 H12 成员页），B03 只能以注入方式取得账号类型；缺口在集成时登记。
