@@ -257,7 +257,7 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
 
 | 对象 | 本协议的要求 | 去向 |
 | --- | --- | --- |
-| B13 问答契约 | `NotCoveredReason` 把 `out_of_course_scope` 改为 `insufficient_evidence`；`ChatMetaEvent` 增加 `graph_version`、`request_id`；`ChatAnswered`、`ChatNotCovered` 增加 `graph_version`、`request_id`；问答 `LLM_UNAVAILABLE` 的 `details.reason` 闭集；JSON 模式错误的 `details.request_id`；`events.v1.md` §3 的时序、替换与撤回条文改为指向本规格 Q2、Q5、Q6，并补 `error` 后撤回与 O15 | B13 改真源并重新生成；`docs/architecture.md` 的 `NotCoveredReason` 行随同一次提交更新 |
+| B13 问答契约（已完成） | `NotCoveredReason` 把 `out_of_course_scope` 改为 `insufficient_evidence`；`ChatMetaEvent` 增加 `graph_version`、`request_id`；`ChatAnswered`、`ChatNotCovered` 增加 `graph_version`、`request_id`；问答 `LLM_UNAVAILABLE` 的 `details.reason` 闭集；JSON 模式错误的 `details.request_id`；`events.v1.md` §3 的时序、替换与撤回条文改为指向本规格 Q2、Q5、Q6，并补 `error` 后撤回与 O15 | B13 改真源并重新生成；`docs/architecture.md` 的 `NotCoveredReason` 行随同一次提交更新 |
 | B08 公共错误码 | 问答使用 `STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`（A03 提议）与 `BUDGET_EXCEEDED`（A07 提议，D-02f）；`errors.v1.md` 中 `RATE_LIMITED` 的「模型 API 限流」措辞与 A07 矩阵不一致，改为仅指本服务限流 | B08 |
 | J03 问题改写 | H2：剔除历史中的类标记与哨兵；改写出错、超时、被预算拒绝均用原问题 | J03 |
 | J04 上下文 | Q3.1 的 A 与编号；图谱上下文无编号；P5 的 `no_retrieval_hit` / `below_similarity_threshold` 判定；H4 | J04 |

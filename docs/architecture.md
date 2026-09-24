@@ -104,7 +104,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
 | `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致 |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
-| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`out_of_course_scope`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | 一致；`ff30e0` 无此枚举。A09（ADR-015，已签收）决定把 `out_of_course_scope` 改为 `insufficient_evidence`（生成模型以哨兵声明证据不足），由 B13 改真源后同一次提交更新本行；在此之前本行不改，以免与真源逐值核对失配 |
+| `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | `ff30e0` 无此枚举。`insufficient_evidence` 取代 `740adb` 的旧值（语义为生成模型以哨兵声明证据不足），A09 决定（ADR-015 决定 3），B13 落实真源；前两者不调用生成，后两者调用了生成 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
 
 SSE 事件名（`event:` 行；问答流的 `data.event` 判别字段与之同值）：
