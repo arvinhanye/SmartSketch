@@ -426,3 +426,25 @@
 - 风险：`events.v1.md` §6 要求破坏性变更升 v2；依据 ADR-010（`specs/task-processing.md` §7）——v1 尚无消费者（C11/C12 未实现），原地修改。
 - 验证：`python3 -m pytest tests/contracts/test_b10.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
 - Claude 审查（REVIEW-B10，2026-09-24）：P2×4 已修——R01 `Task` 按 `stage` 拆为四个分支（生成器可见 `failed ⇔ error`）、R02 固定进度 `queued = 0` / `awaiting_review = 0.95`、R03 快照补 I5 与 `completed ⇒ progress = 1`、R04 新增 `TaskNotCancellableError` 闭集；P3×4（R05～R08）不阻塞、未改。B10 测试 36 → 45，`verify.sh` 通过；见 `docs/handoffs/claude-review-b10.md`。
+
+## 2026-09-24 协作状态核对与 C08 认领
+
+状态依据：`origin/main@62cbbc7` 已包含 `docs/handoffs/claude-handoff-codex-2026-09-24.md`（PR #175）；GitHub issue/PR 于本轮读取。交接稿是该提交时点的快照，后续状态以本任务板和对应 issue/PR 为准。本轮只认领 C08；不修改 Claude 的 B10/B13 分支，也不接管 539210 的 C01/B11 文件锁。
+
+| 分类 | 当前整理结果 |
+| --- | --- |
+| 已交付并入 main | A01～A10、B01～B06、B08～B10、CI-01/02、HOOK-01、A10 批 0/1/1 补；其中 B02、B03/B04、CI-02、B10 的 Codex 独立审查仍列在交接稿第 3 节，不把「已合入」误记为「已审完」 |
+| 有 PR、尚未并入 | B13 #32（issue #55）、C01 #174（issue #58），均保留 `status:in-review`；C01 属于 539210，不重复认领 |
+| 阻塞 | B11 #53 等 ADR-012 下一次修订；C02 #59 已分配 539210 且依赖未合入的 C01，不列为本轮可接取 |
+| 可接取但未认领 | D01、B12、E01、F01、B07、C05；依赖以交接稿第 5 节为起点，开工前再核对 issue 与文件锁 |
+| 本轮认领 | C08 #65：已分配 `arvinhanye`，标签由 `status:pending` 改为 `status:in-progress`，见 [issue 认领记录](https://github.com/arvinhanye/SmartSketch/issues/65#issuecomment-5817844501) |
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 验收与证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C08 | IN PROGRESS（已认领，未实现） | 实现状态迁移纯函数 | Codex（后端） | `codex/c08-task-state` / `62cbbc7`；隔离 worktree `c08-task-state` | `src/backend/app/services/task_state.py`、`tests/backend/test_c08.py`；协作文档仅本节和 `docs/handoffs/codex-c08.md` | 目标：覆盖 `specs/task-processing.md` §2 的全部合法边及 TASK-16 拒绝路径；`python3 -m pytest tests/backend/test_c08.py -q`、`./scripts/verify.sh`、`git diff --check`。认领与基线记录：`docs/handoffs/codex-c08.md`；实现验收尚未发生。 |
+
+- 输入：B10 已合入的 `Task`/事件契约；ADR-010 签收的 `specs/task-processing.md` §1～§4、TASK-16。
+- 输出：无 I/O 的 `(当前任务状态, 事件) → 新任务状态 | 拒绝` 逻辑和定向测试，不变更 API、数据库或既有 DTO。
+- 依赖：A03、B10 均已合入；C01（PR #174）与 B13（PR #32）不阻塞 C08。C09、C11、F13 后续消费 C08。
+- 风险：并发 CAS、租约与持久化不属于本轮纯函数；固定进度及 `failed ⇔ error` 必须与 B10 契约一致。原 worktree 的 `verify.sh` 基线因本机缺 `pyyaml`、`openapi-spec-validator`、`pytest` 未通过，属于环境验证缺口，不计作 C08 失败或通过。
+- 当前协作状态：B13 #55 与 C01 #58 均有开放 PR，标签 `status:in-review`；B11 #53 因 ADR-012 下一次修订继续 `status:blocked`；C02 #59 虽已分配 539210，尚待 C01，不在可认领集合。其余本交接列出的 D01、B12、E01、F01、B07、C05 仍需逐项按 issue/文件锁复核后再认领。
