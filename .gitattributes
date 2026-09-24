@@ -1,1 +1,3 @@
 src/contracts/v1/generated/** text eol=lf
+# 迁移校验和按内容计算，检出时统一为 LF（REVIEW-C01-R01）
+src/backend/migrations/*.sql text eol=lf

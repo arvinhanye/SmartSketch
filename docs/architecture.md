@@ -51,7 +51,8 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 - `src/backend/app/config.py` 定义只从环境变量构造的类型化 `Settings`；`create_app()` 在创建 FastAPI 对象前执行环境校验，并把设置放入 `app.state.settings`。应用构造/模块导入不连接外部服务，也不读取 `.env` 文件。ASGI lifespan 启动阶段执行本地 SQLite 向量空间门禁；后续 worker 入口调用同一门禁。
 - 数值范围、URL、模型模式与条件必填按 `docs/integrations.md`「启动校验」和 `specs/task-processing.md` §8.8 执行；非法配置只报告变量名。密钥使用 Pydantic `SecretStr`，设置对象的 `repr` 不含明文。
-- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`。`embedding_space_state` 是 SQLite 单行引导表：`singleton = 1`，存 `model`、`dimensions`、`is_fake`；fake 独占空间，在线与本地模式按模型 ID + 维度标识空间。启动时在 `BEGIN IMMEDIATE` 事务内建表并在无记录时写入配置空间；已有记录不一致则拒绝启动并报告记录/配置空间及离线重新向量化要求，不改旧记录。C01 的 `001_base.sql` 与迁移运行器须保留并接管此表；回滚时用迁移前 SQLite 备份恢复，不删除此表来绕过门禁。Neo4j 向量/索引完整性仍由 F03/E07 校验。
+- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`。`embedding_space_state` 是 SQLite 单行引导表：`singleton = 1`，存 `model`、`dimensions`、`is_fake`；fake 独占空间，在线与本地模式按模型 ID + 维度标识空间。表由 C01 迁移 001 创建；启动门禁只在 `BEGIN IMMEDIATE` 事务内读取该行，无记录时写入配置空间（ADR-012 补注修订 1）；已有记录不一致则拒绝启动并报告记录/配置空间及离线重新向量化要求，不改旧记录。C01 的 `001_base.sql` 与迁移运行器须保留并接管此表；回滚时用迁移前 SQLite 备份恢复，不删除此表来绕过门禁。Neo4j 向量/索引完整性仍由 F03/E07 校验。
+- C01 的 SQLite 连接从已校验的 `SQLITE_URL` 取路径，启用 WAL、外键，并将每个连接的 `busy_timeout` 固定为 5000 ms。迁移版本记录在 `schema_migrations(version, filename, checksum, applied_at)`；`001_base.sql` 用 `CREATE TABLE IF NOT EXISTS` 接管 B06 的 `embedding_space_state`，不覆盖现存单行，并建立以 `call_id` 为主键的 `model_calls`（字段见 `docs/integrations.md`「调用记录」）。迁移只向前，逐文件在写事务内应用并记录摘要；已应用文件摘要变化即拒绝；摘要按 LF 归一化后的内容计算，`.gitattributes` 固定迁移文件为 LF。API lifespan 先调用 `validate_schema_current`：有未执行的迁移或历史不一致即拒绝启动（C09 worker 入口须调用同一检查）。每次待执行迁移前，按 `specs/task-processing.md` §8.7 检查有效租约/课程锁、`VACUUM INTO` 备份并验证完整性，校验连接随即关闭；恢复须停机并替换数据库文件。
 - `API_HOST` 与 `API_PORT` 由 `python -m app` 的 Uvicorn 启动入口使用；直接调用 Uvicorn CLI 时，其 `--host`/`--port` 参数由调用者负责。
 
 ## 契约真源与生成物（ADR-004）
