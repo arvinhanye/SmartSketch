@@ -153,16 +153,16 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 
 | 失败情形 | 阶段 | `error.code` | `details` | 契约现状 |
 | --- | --- | --- | --- | --- |
-| 文件损坏 / 加密 / 无可提取文本（含 `chunks_total = 0`） | `parsing` | `DOCUMENT_UNREADABLE` | `reason ∈ {corrupted, encrypted, no_text}` | **提议新增** |
+| 文件损坏 / 加密 / 无可提取文本（含 `chunks_total = 0`） | `parsing` | `DOCUMENT_UNREADABLE` | `reason ∈ {corrupted, encrypted, no_text}` | **已纳入 B08** |
 | 抽取失败块超阈值，且所有失败块的最终错误都是模型不可用 | `extracting` | `LLM_UNAVAILABLE` | `chunks_failed`、`chunks_total`、`threshold` | 已有 |
-| 抽取失败块超阈值，其他或混合原因 | `extracting` | `EXTRACTION_INCOMPLETE` | 同上，另含按错误码的计数 | **提议新增** |
+| 抽取失败块超阈值，其他或混合原因 | `extracting` | `EXTRACTION_INCOMPLETE` | 同上，另含按错误码的计数 | **已纳入 B08** |
 | 自动候选成环且环上无可降级边 | `persisting` | `CYCLE_DETECTED` | `cycle` | 已有（ADR-009） |
-| 图库 / 数据库不可用或写入失败 | `persisting`（及任何需读写存储处） | `STORAGE_UNAVAILABLE` | — | **提议新增** |
-| 其他未预期错误（含 `merging`） | 任意处理中阶段 | `INTERNAL_ERROR` | 不含堆栈、密钥或原文 | **提议新增** |
-| 连续租约过期（崩溃、卡死）导致尝试耗尽 | 任意处理中阶段 | `TASK_ATTEMPTS_EXHAUSTED` | `attempts`、`stage` | **提议新增**（A06，§8.3） |
+| 图库 / 数据库不可用或写入失败 | `persisting`（及任何需读写存储处） | `STORAGE_UNAVAILABLE` | — | **已纳入 B08** |
+| 其他未预期错误（含 `merging`） | 任意处理中阶段 | `INTERNAL_ERROR` | 不含堆栈、密钥或原文 | **已纳入 B08** |
+| 连续租约过期（崩溃、卡死）导致尝试耗尽 | 任意处理中阶段 | `TASK_ATTEMPTS_EXHAUSTED` | `attempts`、`stage` | **已纳入 B08**（A06，§8.3） |
 | 阶段级临时故障导致尝试耗尽 | 任意处理中阶段 | 沿用该故障的码（见上两行） | 另加 `attempts`、`stage` | 见 §8.3 |
 
-五个新码是提议：由 B08 写入 `api.v1.yaml` 的 `ErrorCode` 并重新生成后，`docs/architecture.md` 的 `ErrorCode` 行随同一次提交更新。在此之前该行不改，以免与真源逐值核对失败。
+以上五个新码已由 B08 写入 `api.v1.yaml` 的 `ErrorCode`，并与生成物、`docs/architecture.md` 同步。
 
 ## 7. SSE 推送、关流与重连
 
@@ -261,7 +261,7 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 | 耗尽方式 | `error.code` | `details` |
 | --- | --- | --- |
 | 最后一次失败是已知的阶段级临时故障 | 沿用该故障的码：`STORAGE_UNAVAILABLE` 或 `LLM_UNAVAILABLE` | 另加 `attempts`、`stage` |
-| 原因不明：连续租约过期（崩溃、卡死） | `TASK_ATTEMPTS_EXHAUSTED`（提议新增，交 B08） | `attempts`、`stage` |
+| 原因不明：连续租约过期（崩溃、卡死） | `TASK_ATTEMPTS_EXHAUSTED`（已纳入 B08） | `attempts`、`stage` |
 
 `attempt` 暂不上 wire：前端只需终态与失败原因。若要在进度中展示「第 N 次尝试」，另交 B10 加字段。
 
@@ -425,6 +425,6 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 | `Task` 增加 `failed_chunks: [{chunk_id, page?, section_path?, code}]`；只在快照中返回，SSE 事件只带计数 | B10 |
 | `stage = failed` ⇔ `error` 非空（`if/then` 或按状态拆分，Codex S07-R09） | B10 |
 | `TaskStage` 描述「任意阶段可转 failed，任意非终态可转 cancelled」改为指向本文 §2 | B10 |
-| `ErrorCode` 增加 `DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`TASK_ATTEMPTS_EXHAUSTED`（后者来自 A06 §8.3） | B08 |
+| `ErrorCode` 增加 `DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`TASK_ATTEMPTS_EXHAUSTED`（后者来自 A06 §8.3） | B08 已完成 |
 | `events.v1.md` §2 转换表改为指向本文；§2 顺序保证第 4、5 条（结束事件按连接、`awaiting_review` 关流、只覆盖处理阶段）与 §4 重连按本文 §7 改写 | B10 |
 | SSE 令牌签发端点 | B10 / A05 |

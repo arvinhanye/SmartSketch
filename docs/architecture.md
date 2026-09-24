@@ -32,6 +32,25 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
 | `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
 
+## 前端构建入口（B01）
+
+- `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
+- Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。B02 再建立测试命令，B03 再引入教师/学生路由。
+
+## 后端启动与健康检查（B05）
+
+- `src/backend/app/main.py` 暴露 `create_app()` 与 `app`，将路由注册到 FastAPI。创建应用和导入模块时不连接数据库、模型服务或外部网络；B06 从环境变量读取并校验设置，默认 fake 模式不要求真实模型密钥，非法配置使应用创建失败。
+- `GET /health` 是无鉴权的根路径，返回 HTTP 200 和 JSON 对象 `{"status": "ok", "version": "<非空版本字符串>"}`。它只表示 API 进程可响应，不表示 Neo4j、SQLite 或模型服务就绪。响应形状沿用待 A10 导入的 `src/contracts/api.v1.yaml` 现有定义，不新增契约真源。
+- 健康检查不接受写入方法；未知或带 `/api/v1` 前缀的健康路径不注册。B05 的测试须覆盖响应、路径边界、错误方法，以及应用工厂无网络副作用。
+- `src/backend/app/api/health.py` 中的最小响应模型是契约生成物尚未导入 main 时的 B05 过渡实现。A10/B14 接续导入并生成真源 DTO 后，应按 ADR-004 改为消费生成模型，避免手写公共 DTO 长期存在。
+
+## 后端设置与启动校验（B06）
+
+- `src/backend/app/config.py` 定义只从环境变量构造的类型化 `Settings`；`create_app()` 在创建 FastAPI 对象前执行环境校验，并把设置放入 `app.state.settings`。应用构造/模块导入不连接外部服务，也不读取 `.env` 文件。ASGI lifespan 启动阶段执行本地 SQLite 向量空间门禁；后续 worker 入口调用同一门禁。
+- 数值范围、URL、模型模式与条件必填按 `docs/integrations.md`「启动校验」和 `specs/task-processing.md` §8.8 执行；非法配置只报告变量名。密钥使用 Pydantic `SecretStr`，设置对象的 `repr` 不含明文。
+- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`。`embedding_space_state` 是 SQLite 单行引导表：`singleton = 1`，存 `model`、`dimensions`、`is_fake`；fake 独占空间，在线与本地模式按模型 ID + 维度标识空间。启动时在 `BEGIN IMMEDIATE` 事务内建表并在无记录时写入配置空间；已有记录不一致则拒绝启动并报告记录/配置空间及离线重新向量化要求，不改旧记录。C01 的 `001_base.sql` 与迁移运行器须保留并接管此表；回滚时用迁移前 SQLite 备份恢复，不删除此表来绕过门禁。Neo4j 向量/索引完整性仍由 F03/E07 校验。
+- `API_HOST` 与 `API_PORT` 由 `python -m app` 的 Uvicorn 启动入口使用；直接调用 Uvicorn CLI 时，其 `--host`/`--port` 参数由调用者负责。
+
 ## 契约真源与生成物（ADR-004）
 
 下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/decisions.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
@@ -71,7 +90,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 | schema | 取值 | 大小写 | 用于 | 740adb 核对 / 备注 |
 | --- | --- | --- | --- | --- |
-| `ErrorCode` | `UNAUTHENTICATED`、`COURSE_FORBIDDEN`、`ROLE_FORBIDDEN`、`NOT_FOUND`、`GRAPH_NOT_PUBLISHED`、`UNSUPPORTED_FORMAT`、`FILE_TOO_LARGE`、`VALIDATION_ERROR`、`CYCLE_DETECTED`、`DANGLING_ENDPOINT`、`DUPLICATE_RELATION`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`PUBLISH_BLOCKED`、`RATE_LIMITED`、`LLM_UNAVAILABLE` | UPPER | `Error.code` | 一致。**不含** `NOT_COVERED`、`TASK_FAILED`：它们是领域状态，不是错误码 |
+| `ErrorCode` | `UNAUTHENTICATED`、`COURSE_FORBIDDEN`、`ROLE_FORBIDDEN`、`NOT_FOUND`、`GRAPH_NOT_PUBLISHED`、`UNSUPPORTED_FORMAT`、`FILE_TOO_LARGE`、`VALIDATION_ERROR`、`CYCLE_DETECTED`、`DANGLING_ENDPOINT`、`DUPLICATE_RELATION`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`PUBLISH_BLOCKED`、`RATE_LIMITED`、`LLM_UNAVAILABLE`、`DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`TASK_ATTEMPTS_EXHAUSTED`、`PUBLISH_IN_PROGRESS`、`COURSE_BUSY`、`BUDGET_EXCEEDED` | UPPER | `Error.code` | 一致。**不含** `NOT_COVERED`、`TASK_FAILED`：它们是领域状态，不是错误码 |
 | `RelationType` | `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF` | UPPER | `Relation.type` | 一致。闭集；S2 图 6.3 的 `RELATED`、`APPLIES_TO` 不得使用（ADR-008） |
 | `TaskStage` | `queued`、`parsing`、`extracting`、`merging`、`persisting`、`awaiting_review`、`completed`、`failed`、`cancelled` | lower | `Task.stage`、`TaskEvent.stage`、`Document.parse_status` | 一致。终态为 `completed`、`failed`、`cancelled`；转换、触发者与取消语义见 `specs/task-processing.md`（ADR-010） |
 | `CourseStatus` | `draft`、`published`、`revising` | lower | `Course.status` | 一致 |
@@ -131,7 +150,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 读取绑定 | 学生请求开始时读一次指针，全程使用同一 `version_id`；MVP 不回收已提交版本 |
 | 崩溃恢复 | worker 周期回收步骤清扫过期尝试与 `cleanup_pending`；Neo4j 有而 SQLite 无的版本只告警不删除 |
 
-跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；修订 1 再修订 ADR-011 决定 5、7（块 ID 按资料修订生成、来源块删除保护）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 交 B08，DTO 字段交 B11，配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
+跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；修订 1 再修订 ADR-011 决定 5、7（块 ID 按资料修订生成、来源块删除保护）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 已由 B08 纳入契约，DTO 字段交 B11，配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
 
 ## 数据流
 

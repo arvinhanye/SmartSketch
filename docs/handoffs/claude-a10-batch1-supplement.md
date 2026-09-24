@@ -42,3 +42,9 @@ git diff --check                          exit 0
 ## 四、回滚
 
 `git revert <交付提交>`：只撤销扫描清单一行、测试改动和任务行。不涉及数据或依赖。
+
+## 同步 main（2026-09-24，解决 PR #26 冲突）
+
+- 基线：`claude/batch1-grounded-qa` `3da4f2f` 合并 `origin/main` `9d2437e`（含 B01、B05、B06、B08、B09）。
+- 冲突只有 `docs/tasks.md` 一处：两边都在「A1～A10 收尾」节之后追加新节。按任务编号保留两边，本节在前、B01～B09 在后，内容不改。`scripts/check_contracts.py`、`tests/contracts/test_contracts.py` 自动合并。
+- 验证：`./scripts/verify.sh` exit 0（命名基线 10 份文档、门禁负向测试 24 项、B08/B09 契约回归通过）；`git diff --cached --check` exit 0。
