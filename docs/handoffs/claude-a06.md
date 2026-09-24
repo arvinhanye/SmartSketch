@@ -114,6 +114,46 @@ rm <本 worktree>/docs/handoffs/claude-a06.md
 
 不要使用 reset 或 stash 清理；stash 栈与其他 worktree 共享。
 
+## 九、第二轮：Codex 审查修复（A06-R01 / A06-R02）
+
+- **task_id**：A06-R01/R02 修复
+- **状态**：DONE。修复方案由 ArvinHan 于 2026-09-23 在会话中选择并签收，记为 **ADR-011 修订 1**（决定 9～11）
+- **review_status**：ready_for_review
+- **worktree / 分支**：`.claude/worktrees/a04-f5f479`，分支 `claude/a06-r01-r02-fix`，base `50a15c9`（= 合入 PR #10 后的 `origin/main`）
+- **审查报告**：主目录 `docs/reviews/codex-claude-a03fix-a06-ab04053-2026-09-23-0649z.md`（目标提交 `ab04053`，尚未入库）
+
+**核对结论**：两条均成立，根因相同：`persisting` 先提交 Neo4j、后做 SQLite T6，内容在 T6 前与失败清理完成前都已可见。报告未提及的连带影响：教师读草稿不持锁，崩溃窗口内可看到或编辑未 T6 任务的内容；该任务无 T6 提交序号、本应在任务水位外，其内容却会进入 A04 发布快照（违反 A03 §3）。
+
+| 选择（用户签收） | 否决 | 落点 |
+| --- | --- | --- |
+| 按任务记录贡献（`contrib_tasks`、`contrib_manual`、来源关联带 `task_id`），可见性由 SQLite 有效任务集合 V 决定；清理按贡献撤销 | 隔离暂存区后原子提升；有待清理任务时阻断读取与发布 | `specs/task-processing.md` I6、§8.4、LEASE-12、LEASE-18～23；`docs/decisions.md` ADR-011 修订 1；`specs/teacher-review-publish.md` V2、V3、PUB-35；`docs/architecture.md` 数据流第 2 步 |
+
+**范围扩展**：`specs/teacher-review-publish.md` 的 V2 一句、V3 可见性前提与 PUB-35（A04 条文）、`docs/architecture.md` 数据流一句。原因：A04 发布读取草稿，若不同步写明「只取可见元素」，发布会成为唯一绕过可见性规则的读取方。
+
+**验证**：
+
+```text
+./scripts/verify.sh                          exit 0
+git add … && git diff --cached --check       exit 0
+python3 check_a06.py（第一版）  .  api.v1.yaml
+    修复前基线（origin/main 50a15c9）       exit 1：§8 错误码 ['COURSE_BUSY']
+    本轮修订后                              exit 1：§8 错误码 ['COURSE_BUSY', 'RELATED_TO']
+python3 check_a06.py（第二版，见附录 C）      正例 exit 0，55 项 ALL PASS
+  N1 清理改回按创建标记删除                  exit 1
+  N2 删去仓储必填参数                        exit 1
+  N3 删除 LEASE-19                          exit 1
+  N4 删去 A04 V3 可见性前提                  exit 1
+A04 核对脚本（PUB 范围 1～35）               exit 0，ALL PASS
+```
+
+第一版的两项 FAIL 均为脚本启发式误报，不是规格缺陷：`COURSE_BUSY` 是 A04 提议的错误码（写在 A04 V10，PR #7 合并时在 §8.5 加注引入，main 基线即已失败）；`RELATED_TO` 是关系类型（本轮「已知限制」引用 ADR-009 降级）。第二版把关系类型排除在错误码之外，并承认 A04 V10 提议的错误码，其余断言与第一版相同，另加 11 项修订 1 断言。
+
+**遗留**：
+- 已知限制（写入 §8.4）：失败任务对他任务 AI 边的 ADR-009 降级不撤销；教师删除的关系可能被未提交任务以同一 ID 重新写出（归节点加锁待细化）。
+- 草稿查询多一个必填参数 V，F02 的仓储接口随之变化；尚无实现或自动化测试。
+
+**下一步**：请 Codex 按本轮提交复核 A06-R01/R02；修复另开一轮。
+
 ## 附录 A：`check_a06.py`（核对脚本全文）
 
 用法：`python3 check_a06.py <repo 根目录> <api.v1.yaml>`；依赖 PyYAML。YAML 取自 `git show 978671e:src/contracts/api.v1.yaml`。A03 的检查不在此重复，另跑 `docs/handoffs/claude-a03.md` 附录的 `check_a03.py` 作回归（PLAN-D03 一项按第四节第 4 条放宽）。
@@ -289,4 +329,161 @@ for name, (rel, old, new) in cases.items():
     fails = [l[5:] for l in r.stdout.splitlines() if l.startswith("FAIL ")]
     print(f"{name}: exit={r.returncode} crashed={'Traceback' in r.stderr} fails={len(fails)}")
     for f in fails: print("    -", f)
+```
+
+## 附录 C：`check_a06.py` 第二版（修订 1 核对）
+
+用法同附录 A：`python3 check_a06.py <仓库根目录> <api.v1.yaml>`；第二版另读 `specs/teacher-review-publish.md`。
+
+```python
+"""A06 验收核对：specs/task-processing.md §8 的内部一致性，以及与 §1～§7、ADR-011、架构文档、任务板的一致性。
+
+用法：python3 check_a06.py <repo 根目录> <740adb 978671e 的 api.v1.yaml>
+退出码：0 全部一致；1 有不一致（逐条打印）。依赖 PyYAML。
+A03 的检查不在此重复，另跑 check_a03.py 作回归。
+"""
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+root, yaml_path = Path(sys.argv[1]), sys.argv[2]
+spec = (root / "specs/task-processing.md").read_text(encoding="utf-8")
+arch = (root / "docs/architecture.md").read_text(encoding="utf-8")
+adr = (root / "docs/decisions.md").read_text(encoding="utf-8")
+tasks = (root / "docs/tasks.md").read_text(encoding="utf-8")
+schemas = yaml.safe_load(open(yaml_path, encoding="utf-8"))["components"]["schemas"]
+failures = []
+
+
+def check(ok, label):
+    print(("PASS " if ok else "FAIL ") + label)
+    if not ok:
+        failures.append(label)
+
+
+def section(text, start, end=None):
+    body = text.split(start, 1)[1] if start in text else ""
+    return body.split(end, 1)[0] if end and end in body else body
+
+
+def norm(t):
+    return re.sub(r"\s+", "", t)
+
+
+PROCESSING = {"parsing", "extracting", "merging", "persisting"}
+sec8 = section(spec, "## 8. 租约、重试与幂等", "## 验收矩阵")
+before8 = spec.split("## 8. 租约、重试与幂等", 1)[0]
+subs = {n: section(sec8, f"### 8.{n} ", f"### 8.{n + 1} ") for n in range(1, 10)}
+adr11 = section(adr, "## ADR-011")
+
+# ---------- 结构与占位 ----------
+check(all(subs[n] for n in subs), "§8.1～§8.9 九个小节齐全")
+check("A06 待补" not in spec and "本节由 A06 填写" not in spec, "§8 占位已替换")
+check(not re.search(r"归 A06|由 A06 定|A06（补入|A06/E 组|A04/A06", before8), "§1～§7 不再有「归 A06 / 由 A06 定」一类未决指针")
+check("ADR-011" in spec.split("\n", 5)[2], "规格状态行指向 ADR-011")
+
+# ---------- 验收条款落点 ----------
+s81, s82, s83, s84, s85, s86, s87, s88, s89 = (subs[n] for n in range(1, 10))
+check("跨机器" in s81 and "网络文件系统" in s81 and "WORKER_PROCESSES" in s81 and "**不支持**" in s81, "单机/多进程边界：支持与不支持均写明")
+check("TASK_CHUNK_MAX_ATTEMPTS" in s83 and "TASK_MAX_ATTEMPTS" in s83 and "L1" in s83 and "L2" in s83 and "L3" in s83, "重试上限：三层与上限变量")
+check("model_calls" in s84 and "去重" in s84 and "MERGE" in s84 and "确定性" in s84, "去重：确定性 ID、MERGE、计费去重")
+check("VACUUM INTO" in s87 and "integrity_check" in s87 and "回滚" in s87 and "停机迁移" in s87, "迁移前备份与回滚")
+
+# ---------- 领取条件与回收只涉及合法阶段 ----------
+cond = re.search(r"\*\*可领取条件\*\*.+", s82)
+cond = cond.group(0) if cond else ""
+claim_sets = [set(re.findall(r"([a-z_]+)", m)) for m in re.findall(r"stage ∈ \{([^}]+)\}", cond)]
+claim_stages = set(re.findall(r"stage = ([a-z_]+)", cond)) | set().union(*claim_sets) if claim_sets else set()
+check(claim_stages == {"queued"} | PROCESSING, f"可领取条件只含 queued 与处理中阶段 {sorted(claim_stages)}")
+check("cancel_requested = false" in cond and "attempt < TASK_MAX_ATTEMPTS" in cond and "not_before" in cond, "可领取条件含取消、尝试上限与退避守卫")
+reap = re.search(r"\*\*回收\*\*.+", s82)
+reap_sets = [set(re.findall(r"([a-z_]+)", m)) for m in re.findall(r"stage ∈ \{([^}]+)\}", reap.group(0) if reap else "")]
+check(reap_sets and reap_sets[0] == PROCESSING, "回收只作用于处理中阶段")
+check("T8" in s82 and "T9" in s82 and "stage ≠ persisting" in s82, "回收动作映射到 T8/T9，且写明取消不会落在 persisting")
+check("I1" in sec8.split("### 8.1", 1)[0] and "不改变" in sec8.split("### 8.1", 1)[0], "§8 声明不改变 §1～§7 转换表与不变量")
+
+# ---------- 配置：默认值在 §8.8、正文与 ADR-011 一致 ----------
+cfg = dict(re.findall(r"\| `([A-Z_]+)` \| [^|]+ \| (\d+) \|", s88))
+check(set(cfg) == {"WORKER_PROCESSES", "TASK_LEASE_SECONDS", "TASK_MAX_ATTEMPTS", "TASK_CHUNK_MAX_ATTEMPTS", "TASK_ARTIFACT_RETENTION_DAYS"}, f"§8.8 列出五个变量 {sorted(cfg)}")
+mentioned = set(re.findall(r"`?(WORKER_PROCESSES|TASK_[A-Z_]+)`?", sec8)) - {"TASK_ATTEMPTS_EXHAUSTED", "TASK_MAX_FAILED_CHUNK_RATIO"}
+check(mentioned <= set(cfg), f"§8 正文提到的变量都在 §8.8 {sorted(mentioned - set(cfg))}")
+check(all(v in adr11 for v in cfg), "ADR-011 列出全部五个变量")
+expect = {
+    "WORKER_PROCESSES": [(s81, r"默认 (\d+)"), (adr11, r"`WORKER_PROCESSES` 默认 (\d+)")],
+    "TASK_MAX_ATTEMPTS": [(s83, r"`TASK_MAX_ATTEMPTS`，默认 (\d+)"), (adr11, r"L3 任务，默认 (\d+)")],
+    "TASK_CHUNK_MAX_ATTEMPTS": [(s83, r"`TASK_CHUNK_MAX_ATTEMPTS`，默认 (\d+)"), (adr11, r"L2 块，默认 (\d+)")],
+    "TASK_LEASE_SECONDS": [(adr11, r"`L` 默认 (\d+) 秒")],
+    "TASK_ARTIFACT_RETENTION_DAYS": [(s86, r"默认 (\d+)"), (adr11, r"保留 (\d+) 天")],
+}
+for var, places in expect.items():
+    got = [re.search(pat, txt).group(1) if re.search(pat, txt) else None for txt, pat in places]
+    check(all(g == cfg.get(var) for g in got), f"{var} 默认值一致：§8.8={cfg.get(var)}，其他处={got}")
+check(norm("30 秒 × 2^(attempt − 1)") in norm(s83) and norm("30 秒 × 2^(attempt−1)") in norm(adr11), "退避公式在 §8.3 与 ADR-011 一致")
+
+# ---------- 错误码 ----------
+retryable = {"STORAGE_UNAVAILABLE", "LLM_UNAVAILABLE"}
+no_retry = re.search(r"\*\*不重试、直接 T9 的错误\*\*：(.+)", s83)
+no_retry = set(re.findall(r"`([A-Z_]+)`", no_retry.group(1))) if no_retry else set()
+check(no_retry and not (no_retry & retryable), f"不重试集合与阶段级临时故障不相交 {sorted(no_retry)}")
+code_row = re.search(r"\| `ErrorCode` \| (.+?) \| UPPER \|", arch)
+arch_codes = set(re.findall(r"`([A-Z_]+)`", code_row.group(1))) if code_row else set()
+sec6 = section(spec, "## 6. 失败码", "## 7.")
+proposed = {re.search(r"\| `([A-Z_]+)` \|", l).group(1) for l in sec6.splitlines() if "提议新增" in l and re.search(r"\| `([A-Z_]+)` \|", l)}
+codes8 = set(re.findall(r"`([A-Z][A-Z_]{3,})`", sec8)) - {"WORKER_PROCESSES", "RETURNING", "MERGE"} - {c for c in re.findall(r"`([A-Z][A-Z_]{3,})`", sec8) if c.startswith("TASK_") and c != "TASK_ATTEMPTS_EXHAUSTED"}
+# 第二版：关系类型不是错误码；A04 在 teacher-review-publish V10 提议的错误码也算已提议
+trp = (root / "specs/teacher-review-publish.md").read_text(encoding="utf-8")
+v10 = section(trp, "### V10 ", "### V11 ")
+a04_proposed = {c for c in ("PUBLISH_IN_PROGRESS", "COURSE_BUSY") if c in v10}
+codes8 = codes8 - set(schemas["RelationType"]["enum"])
+check(codes8 <= arch_codes | proposed | a04_proposed, f"§8 用到的错误码都已存在或已在 §6 / A04 V10 提议 {sorted(codes8 - arch_codes - proposed - a04_proposed)}")
+check("TASK_ATTEMPTS_EXHAUSTED" in proposed and "TASK_ATTEMPTS_EXHAUSTED" not in schemas["ErrorCode"]["enum"], "TASK_ATTEMPTS_EXHAUSTED 在 §6 提议且真源尚无（缺口真实）")
+gap = section(spec, "## 交给后续任务的契约缺口")
+check("TASK_ATTEMPTS_EXHAUSTED" in gap, "契约缺口表的 B08 行含 TASK_ATTEMPTS_EXHAUSTED")
+
+# ---------- 验收 LEASE-n ----------
+ids = [int(n) for n in re.findall(r"\*\*LEASE-(\d+)\*\*", s89)]
+check(sorted(ids) == list(range(1, len(ids) + 1)) and len(set(ids)) == len(ids) and len(ids) >= 10, f"LEASE 编号无重复且覆盖 1～{len(ids)}")
+cats = re.split(r"- (成功路径|边界路径|失败路径)\n", s89)
+counts = {cats[i]: len(re.findall(r"\*\*LEASE-", cats[i + 1])) for i in range(1, len(cats) - 1, 2)}
+check(all(counts.get(c, 0) >= 1 for c in ("成功路径", "边界路径", "失败路径")), f"成功/边界/失败各至少一例 {counts}")
+check(all(re.search(r"\*\*LEASE-\d+\*\*（[A-Z0-9、 ]+）", l) for l in s89.splitlines() if "**LEASE-" in l), "每条 LEASE 标注实现方")
+for kw, label in [("同时领取", "并发领取"), ("旧令牌", "旧令牌拒写"), ("熔断", "熔断重排"), ("尝试耗尽", "尝试耗尽"),
+                  ("已请求取消", "过期且已请求取消"), ("清理", "persisting 清理"), ("迁移", "迁移拒绝"), ("integrity_check", "备份完整性"),
+                  ("恢复演练", "恢复演练"), ("课程写锁", "课程写锁")]:
+    check(kw in s89, f"LEASE 覆盖：{label}")
+
+# ---------- 跨文档 ----------
+check(bool(adr11) and "**签收**：ArvinHan 2026-09-23" in adr11 and adr.index("## ADR-010") < adr.index("## ADR-011"), "ADR-011 存在、有签收行、位于 ADR-010 之后")
+plan = tasks.split("PLAN-D03", 1)[1].split("\n", 1)[0] if "PLAN-D03" in tasks else ""
+check("已关闭" in plan and "ADR-011" in plan, "PLAN-D03 已关闭并引用 ADR-011")
+check(re.search(r"\| A06 \| [^|]+ \| 定义 worker 租约和幂等机制", tasks) is not None, "任务板有 A06 认领行")
+wrow = next((l for l in arch.splitlines() if l.startswith("| `src/backend/app/workers/`")), "")
+check("独立进程" in wrow and "§8" in wrow, "architecture workers 行写明独立进程并指向 §8")
+model = next((l for l in arch.splitlines() if l.startswith("- SQLite：")), "").split("。", 1)[0]  # 只看表名列表，不看后半句的说明
+check(all(t in model for t in ("TaskChunkCheckpoint", "CourseLock", "ModelCall")), "architecture SQLite 数据模型列出新表")
+check("A04" in s85 and "何时" in s85, "课程写锁把发布侧持锁时机留给 A04")
+
+# ---------- 第二版：修订 1（Codex A06-R01/R02） ----------
+i6 = next((l for l in spec.splitlines() if l.startswith("- **I6** ")), "")
+check("一律不可见" in i6 and "不依赖清理" in i6, "R02：I6 由可见性保证、不依赖清理")
+check("`contrib_tasks`" in s84 and "`contrib_manual`" in s84, "R01：§8.4 定义贡献字段")
+check("先撤销本任务此前尝试留下的全部贡献" in s84, "R01：persisting 第 1 步先撤销旧贡献")
+check("撤销 `created_by_task` 等于本任务" not in s84 and "再删除已无任何贡献" in s84, "R01：清理按贡献撤销，只删无贡献元素")
+check("**有效任务集合 V**" in s84 and "缺少该参数的草稿查询被拒绝执行" in s84, "R02：有效任务集合 V 与仓储必填参数")
+check(all(k in s84 for k in ("审核队列", "融合候选", "A04 发布")), "R02：可见性过滤覆盖审核、融合与发布")
+l18 = next((l for l in s89.splitlines() if "**LEASE-18**" in l), "")
+l19 = next((l for l in s89.splitlines() if "**LEASE-19**" in l), "")
+check("A06-R01" in l18 and "复用" in l18, "R01 回归用例 LEASE-18")
+check("A06-R02" in l19 and "cleanup_pending" in l19, "R02 回归用例 LEASE-19")
+adr11r = section(adr, "### ADR-011 修订 1", "## ADR-012")
+check(bool(adr11r) and "**签收**：ArvinHan 2026-09-23" in adr11r, "ADR-011 修订 1 存在、位于 ADR-012 之前且已签收")
+v3 = section(trp, "### V3 ", "### V4 ")
+check("**可见性前提**" in v3 and "**PUB-35**" in trp, "A04 V3 可见性前提与 PUB-35")
+
+if failures:
+    print("\n".join(["", "FAILURES:"] + failures))
+    sys.exit(1)
+print("\nALL PASS")
 ```
