@@ -15,6 +15,7 @@ from app.repositories import task_leases, tasks
 from app.repositories.sqlite import MigrationError, connect, migrate
 from app.repositories.task_leases import LeaseLost
 from app.services.file_storage import StoredFile
+from app.services.task_state import Applied, TaskError, TaskState, TransitionEvent, apply_event
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "backend" / "migrations"
 LEASE_SECONDS = 60
@@ -709,12 +710,51 @@ def test_release_only_accepts_the_two_stage_level_transient_faults(db_url, new_t
     assert _row(db_url, task_id) == before
 
 
-def test_exhausting_code_not_allowed_in_the_stage_is_refused_without_writing(db_url, new_task):
-    # C08 失败码表：LLM_UNAVAILABLE 只属于 extracting；merging 中耗尽如何记码待决（见交接）。
+def test_llm_outage_on_the_last_merging_attempt_fails_with_llm_unavailable(db_url, new_task):
+    # ADR-017 决定 6：merging 尝试耗尽、最后一次为模型不可用 → 直接 T9，LLM_UNAVAILABLE，
+    # details = {attempts, stage}；不再报错后等租约过期、由回收改记 TASK_ATTEMPTS_EXHAUSTED。
     task_id = new_task()
     _sql(db_url, "UPDATE processing_tasks SET attempt = 2 WHERE id = ?", task_id)
     lease = _claim(db_url)
+    assert lease.attempt == MAX_ATTEMPTS
     _sql(db_url, "UPDATE processing_tasks SET stage = 'merging', progress = 0.7 WHERE id = ?", task_id)
+    outcome = task_leases.release_after_transient_failure(
+        db_url, task_id, lease.token, code="LLM_UNAVAILABLE", max_attempts=MAX_ATTEMPTS
+    )
+    assert outcome == task_leases.ReleaseOutcome("failed")
+    row = _row(db_url, task_id)
+    assert row["stage"] == "failed" and row["progress"] == pytest.approx(0.7)
+    assert row["error_code"] == "LLM_UNAVAILABLE" and row["error_message"]
+    assert json.loads(row["error_details"]) == {"attempts": MAX_ATTEMPTS, "stage": "merging"}
+    assert row["lease_owner"] is None and row["lease_token"] is None and row["lease_expires_at"] is None
+    # 写入的错误能被 C08 的 fail 事件原样接受（同一张码表与耗尽约束）。
+    error = TaskError(row["error_code"], row["error_message"], json.loads(row["error_details"]))
+    assert isinstance(apply_event(TaskState("merging", 0.7), TransitionEvent("fail", error=error)), Applied)
+    # 已是终态：之后的回收既不改码也不重复报告。
+    result = _reclaim(db_url)
+    assert result.failed == () and result.cancelled == ()
+    assert _row(db_url, task_id)["error_code"] == "LLM_UNAVAILABLE"
+
+
+def test_llm_outage_before_the_last_merging_attempt_backs_off_instead_of_failing(db_url, new_task):
+    task_id = new_task()
+    lease = _claim(db_url)
+    _sql(db_url, "UPDATE processing_tasks SET stage = 'merging', progress = 0.7 WHERE id = ?", task_id)
+    outcome = task_leases.release_after_transient_failure(
+        db_url, task_id, lease.token, code="LLM_UNAVAILABLE", max_attempts=MAX_ATTEMPTS
+    )
+    assert outcome.status == "released"
+    row = _row(db_url, task_id)
+    assert row["stage"] == "merging" and row["error_code"] is None and row["lease_token"] is None
+
+
+@pytest.mark.parametrize(("stage", "progress"), [("parsing", 0.05), ("persisting", 0.85)])
+def test_exhausting_code_not_allowed_in_the_stage_is_refused_without_writing(db_url, new_task, stage, progress):
+    # C08 码表：LLM_UNAVAILABLE 只属于 extracting 与（尝试耗尽时的）merging；parsing、persisting 不调用模型。
+    task_id = new_task()
+    _sql(db_url, "UPDATE processing_tasks SET attempt = 2 WHERE id = ?", task_id)
+    lease = _claim(db_url)
+    _sql(db_url, "UPDATE processing_tasks SET stage = ?, progress = ? WHERE id = ?", stage, progress, task_id)
     before = _row(db_url, task_id)
     with pytest.raises(ValueError):
         task_leases.release_after_transient_failure(

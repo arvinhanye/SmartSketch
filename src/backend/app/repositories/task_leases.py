@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from app.repositories.sqlite import connect
-from app.services.task_state import FAILURE_CODE_STAGES
+from app.services.task_state import failure_code_allowed
 
 PROCESSING_STAGES = ("parsing", "extracting", "merging", "persisting")
 CANCELLABLE_STAGES = ("parsing", "extracting", "merging")
@@ -201,8 +201,8 @@ def leased_transaction(sqlite_url: str, task_id: str, token: str) -> Iterator[sq
         yield database
 
 
-def _error_details(attempts: int, stage: str) -> str:
-    return json.dumps({"attempts": attempts, "stage": stage}, ensure_ascii=False, sort_keys=True)
+def _exhaustion_details(attempts: int, stage: str) -> dict[str, object]:
+    return {"attempts": attempts, "stage": stage}
 
 
 def reclaim_expired(sqlite_url: str, *, max_attempts: int) -> ReclaimResult:
@@ -264,7 +264,9 @@ def release_after_transient_failure(
 
     Clears the lease and sets ``not_before = now + 30 s × 2^(attempt − 1)``; when the
     attempt was the last one it performs T9 with ``code`` and ``details = {attempts, stage}``
-    instead. A stale token changes nothing and returns ``lost``.
+    instead — including LLM_UNAVAILABLE in ``merging`` (ADR-017 decision 6). A code that C08
+    does not allow for the stage (e.g. LLM_UNAVAILABLE in ``parsing``) raises ``ValueError``
+    without writing. A stale token changes nothing and returns ``lost``.
     """
     _non_empty("token", token)
     _positive_int("max_attempts", max_attempts)
@@ -279,7 +281,8 @@ def release_after_transient_failure(
             return ReleaseOutcome("lost")
         attempt, stage = row
         if attempt >= max_attempts:
-            if stage not in FAILURE_CODE_STAGES[code]:
+            details = _exhaustion_details(attempt, stage)
+            if not failure_code_allowed(code, stage, details):
                 raise ValueError(f"{code} is not a failure code for stage {stage}")
             database.execute(
                 f"""UPDATE processing_tasks
@@ -287,7 +290,13 @@ def release_after_transient_failure(
                         lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
                         updated_at = {_NOW_TEXT}
                     WHERE id = ? AND lease_token = ?""",
-                (code, _FAULT_MESSAGES[code], _error_details(attempt, stage), task_id, token),
+                (
+                    code,
+                    _FAULT_MESSAGES[code],
+                    json.dumps(details, ensure_ascii=False, sort_keys=True),
+                    task_id,
+                    token,
+                ),
             )
             return ReleaseOutcome("failed")
         released = database.execute(

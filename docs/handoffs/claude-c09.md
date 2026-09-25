@@ -1,7 +1,7 @@
 # Claude 交接：C09 worker 原子领取与租约
 
 - `task_id`: C09（GitHub issue #66）
-- `review_status`: ready_for_review（「待决」第 1、2 条需 ArvinHan 确认）
+- `review_status`: ready_for_review（「待决」第 1、2 条已由 ADR-017 决定 1、6 解决，见文末「ADR-017 追加」；第 3 条仍待决）
 - `worktree`: `/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/c09-task-leases`，分支 `claude/c09-task-leases`
 - `base`: `54b37d8`（认领提交，基于 main `36670a3`）；`head` 以分支最新提交为准。写交接时 `origin/main` 已到 `5a0bcdb`（D08、B14、#218），迁移最大号仍是 004
 - 依据：`specs/task-processing.md` §2（T2/T8/T9）、§6、§8.1～§8.3、§8.7、§8.9 LEASE-1/4/5/7/8/9/16、TASK-8；ADR-011 决定 2～4；C06 `003_tasks.sql`；C08 `services/task_state.py` 的 `FAILURE_CODE_STAGES`；C01 迁移器 `_check_no_live_leases`；`docs/handoffs/claude-fix-migrate-lease.md`
@@ -14,7 +14,7 @@
 | `src/backend/app/repositories/task_leases.py` | `claim_next`、`renew_lease`、`fence`、`leased_transaction`、`reclaim_expired`、`clear_cleanup_pending`、`release_after_transient_failure`、`release_on_shutdown`；记录类型 `Lease`、`ReclaimedTask`、`ReclaimResult`、`ReleaseOutcome`；异常 `LeaseLost` |
 | `tests/backend/test_c09.py` | 50 个用例（成功、边界、失败路径） |
 
-未改 `repositories/tasks.py`（C03 #216 在改）、`sqlite.py`、`003_tasks.sql`、`pyproject.toml`、`docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`。
+未改 `repositories/tasks.py`（C03 #216 在改）、`sqlite.py`、`003_tasks.sql`、`pyproject.toml`、`docs/integrations.md`、`scripts/verify.sh`。`docs/architecture.md`、C08 `services/task_state.py` 与 `tests/backend/test_c08.py` 由 ADR-017 追加提交修改（见文末）。
 
 ## 表结构（`005_task_leases.sql`，全部为内部字段，不上 wire）
 
@@ -36,7 +36,7 @@
 2. **防旧写**：`fence(连接, task_id, token)` 在调用方已开启的事务里执行 `UPDATE processing_tasks SET lease_token = lease_token WHERE id = ? AND lease_token = ?`，0 行抛 `LeaseLost`，不在事务里调用直接报错。`leased_transaction` 负责 `BEGIN IMMEDIATE`、fence、提交，出任何异常都回滚。fence 放在事务开头：`BEGIN IMMEDIATE` 之后写锁一直持有，别人在事务期间换不了令牌。D11/E12/F13 对任务行和附属表（块检查点、T6 序号）的所有写入都应经过它。
 3. **续约**：`UPDATE … SET lease_expires_at = 现在 + L WHERE id = ? AND lease_token = ? RETURNING`，返回新到期时间，0 行返回 `None`。按规格只校验令牌：租约已过期但还没被接管时，续约仍会成功。
 4. **回收**：`reclaim_expired` 在一个事务里依次执行：① 取消已请求，阶段在 `parsing/extracting/merging`，租约过期或已释放 → `cancelled`（T8），清空租约；② 阶段在处理中四阶段，`attempt ≥ max`，租约过期或已释放 → `failed`，`TASK_ATTEMPTS_EXHAUSTED`，`details = {attempts, stage}`，`progress` 不变，清空租约；③ 其余不动，等待接管；另外列出 `stage = failed AND cleanup_pending = 1` 的任务。① 先于 ②，所以取消优先于耗尽。返回值带 `course_id`，推送 `cancelled`/`error` 事件由调用方（C11）负责。回收条件不看 `not_before`，与规格一致。
-5. **主动释放**：`release_after_transient_failure` 只接受 `STORAGE_UNAVAILABLE`、`LLM_UNAVAILABLE`（§8.3 只有这两种阶段级临时故障）。`attempt < max` 时清空租约，并置 `not_before = 现在 + 30 × 2^(attempt−1)`（依次 30、60 秒）；`attempt ≥ max` 时直接 T9，沿用该故障码，`details = {attempts, stage}`。两条 UPDATE 都带令牌条件；令牌已失效返回 `lost`，不做任何写入。终态码必须在 C08 的 `FAILURE_CODE_STAGES` 里允许用于该阶段，否则抛 `ValueError`，不写入（**见待决 2**）。
+5. **主动释放**：`release_after_transient_failure` 只接受 `STORAGE_UNAVAILABLE`、`LLM_UNAVAILABLE`（§8.3 只有这两种阶段级临时故障）。`attempt < max` 时清空租约，并置 `not_before = 现在 + 30 × 2^(attempt−1)`（依次 30、60 秒）；`attempt ≥ max` 时直接 T9，沿用该故障码，`details = {attempts, stage}`。两条 UPDATE 都带令牌条件；令牌已失效返回 `lost`，不做任何写入。终态码须经 C08 `failure_code_allowed(code, stage, details)` 判定可用，否则抛 `ValueError`，不写入。ADR-017 决定 6 之后，`merging` 中 `LLM_UNAVAILABLE` 耗尽直接写入该码；仍会被拒的只剩 `parsing`、`persisting` 中的 `LLM_UNAVAILABLE`（这两个阶段不调用模型）。
 6. **正常退出**：`release_on_shutdown` 用一条带令牌条件的语句清空租约，置 `not_before = 现在`、`attempt − 1`。
 7. **失败码与消息**：`error_message` 用中文面向用户（与 `errors.v1.md` 示例一致），不含堆栈或原文。
 8. **配置**：LEASE-16（`TASK_MAX_ATTEMPTS=0`、`TASK_LEASE_SECONDS=5` 被拒并指出变量名）已由 B06 的 `load_settings` 实现，本任务只补回归用例；worker 启动时调用它归 D11/K08。仓储函数另外把 `lease_seconds`、`max_attempts` 限为正整数（排除 bool）。
@@ -98,8 +98,8 @@
 
 ## 待决（需 ArvinHan 决定）
 
-1. **任务错误列不在「租约列」范围内，但本任务加了。** 回收（§8.2 第 2 步）和主动释放（§8.3）都要执行 T9，而 I4 要求 `failed` 必须带 `error`。C06 建表时没有错误列，规划中也没有任务负责这几列。本任务在 005 中加了 `error_code`、`error_message`、`error_details`（JSON），并用 CHECK 在数据库层强制 I4。请确认：列名和 JSON 编码可以接受（C11 返回 `Task.error` 时要读这几列）；I4 放在数据库层，之后任何写入路径都绕不过。若不接受，替代方案是拆一个独立任务加错误列，C09 暂缓回收的 T9 分支。
-2. **`LLM_UNAVAILABLE` 在 `merging` 阶段耗尽时用什么码。** §8.3 写「沿用该故障的码」，§6 耗尽行写「任意处理中阶段」，但 §6 的 `LLM_UNAVAILABLE` 行和 C08 的 `FAILURE_CODE_STAGES` 只允许 `extracting`。而 `merging` 也调用模型（E10）。当前实现：抛 `ValueError`，不写入；租约自然过期后，由回收按 `TASK_ATTEMPTS_EXHAUSTED` 置为失败。需要决定是放宽 C08 表，还是 `merging` 的熔断不走主动释放。
+1. **（已由 ADR-017 决定 1 解决）任务错误列不在「租约列」范围内，但本任务加了。** ADR-017 决定 1 确认三列并入 C09、列名与 JSON 编码保持、I4 在数据库层强制；`docs/architecture.md` 数据模型已登记。以下为原始记录： 回收（§8.2 第 2 步）和主动释放（§8.3）都要执行 T9，而 I4 要求 `failed` 必须带 `error`。C06 建表时没有错误列，规划中也没有任务负责这几列。本任务在 005 中加了 `error_code`、`error_message`、`error_details`（JSON），并用 CHECK 在数据库层强制 I4。请确认：列名和 JSON 编码可以接受（C11 返回 `Task.error` 时要读这几列）；I4 放在数据库层，之后任何写入路径都绕不过。若不接受，替代方案是拆一个独立任务加错误列，C09 暂缓回收的 T9 分支。
+2. **（已由 ADR-017 决定 6 解决）`LLM_UNAVAILABLE` 在 `merging` 阶段耗尽时用什么码。** ADR-017 决定 6：写入 `LLM_UNAVAILABLE`，C08 码表放开 `merging`（仅限尝试耗尽）。实现见文末。以下为原始记录： §8.3 写「沿用该故障的码」，§6 耗尽行写「任意处理中阶段」，但 §6 的 `LLM_UNAVAILABLE` 行和 C08 的 `FAILURE_CODE_STAGES` 只允许 `extracting`。而 `merging` 也调用模型（E10）。当前实现：抛 `ValueError`，不写入；租约自然过期后，由回收按 `TASK_ATTEMPTS_EXHAUSTED` 置为失败。需要决定是放宽 C08 表，还是 `merging` 的熔断不走主动释放。
 3. **`materials.parse_status` 不随任务阶段同步。** C06 建了这一列，初值 `queued`。领取和回收都没有改它，因为规格没说谁维护。建议 C07 或 C11 确认它是否需要跟随 `stage`。
 
 ## 风险与下一步
@@ -110,3 +110,59 @@
 - **清理重试**：`reclaim_expired().cleanup_pending` 列出待清理的任务，清理成功后调用 `clear_cleanup_pending(按课程)`；置 `cleanup_pending = 1` 的写入由 F13 在 T9 事务里完成。
 - LEASE-2/3/6/10～15/17～30 分属 E12、F13、G04、C01、E04 等任务，本任务不覆盖。
 - 合并前若 main 已有 005，按 D-10 改号：重命名迁移文件，并改文件头注释和本交接；测试按后缀查找文件，不需要改。
+
+## ADR-017 追加（2026-09-25）
+
+依据 `docs/decisions.md` ADR-017 决定 1、6 与「后果」第 1 条。C08 的 `task_state.py` 属范围扩展，由该 ADR 授权。
+
+### 改动
+
+| 文件 | 内容 |
+| --- | --- |
+| `src/backend/app/services/task_state.py` | `FAILURE_CODE_STAGES["LLM_UNAVAILABLE"]` 放开为 `{extracting, merging}`；新增 `EXHAUSTION_ONLY_FAILURES = {("LLM_UNAVAILABLE", "merging")}` 与 `failure_code_allowed(code, stage, details)`；`apply_event` 的 `fail` 分支改用它判定，拒绝理由仍为 `error_stage_mismatch` |
+| `src/backend/app/repositories/task_leases.py` | 耗尽分支先构造 `details = {attempts, stage}`，再用 `failure_code_allowed` 判定后写入；`merging` 的 `LLM_UNAVAILABLE` 直接 T9，不再抛 `ValueError`、等租约过期后由回收改记 `TASK_ATTEMPTS_EXHAUSTED` |
+| `tests/backend/test_c08.py` | 期望码表改为 `LLM_UNAVAILABLE: {extracting, merging}`；新增 15 个用例（见下） |
+| `tests/backend/test_c09.py` | 原「`merging` 耗尽报 `ValueError`」用例改为正例；拒绝用例改用 `parsing`、`persisting` 两个阶段；新增 `merging` 未耗尽时退避的回归 |
+| `specs/task-processing.md` | §6 `LLM_UNAVAILABLE` 行「契约现状」列补注：`merging` 尝试耗尽时也用此码，依据 ADR-017 决定 6。其他规则未改 |
+| `docs/architecture.md` | 「核心数据模型」新增一行：`processing_tasks` 的租约六列、错误三列与 `failed` ⇔ `error_code` 非空，引用 ADR-017 决定 1 |
+
+### 额外约束：为什么加了 `failure_code_allowed`
+
+C08 码表是「码 → 允许的阶段集合」，只能按阶段放开，无法表达 ADR-017 要求的「仅限尝试耗尽」。只改码表会让任何调用 `apply_event` 的代码（D11/E10）在 `merging` 遇到第一次模型故障就直接以 `LLM_UNAVAILABLE` 终结任务，跳过 §8.3 要求的主动释放与退避。所以保持码表结构不变，另加一张「仅限耗尽」的 `(码, 阶段)` 表：命中时 `details` 必须是映射，且 `attempts` 为 ≥ 1 的整数（排除 bool、浮点、字符串）、`stage` 等于当前阶段。`extracting` 的 `LLM_UNAVAILABLE`（超阈值，`details` 为块计数）不受影响。C09 与 C08 共用这一个函数，写入库的错误必然能被 `fail` 事件接受（`test_c09` 正例里有交叉断言）。
+
+### C08 旧断言的变化
+
+`test_c08.py` 原先的期望码表 `"LLM_UNAVAILABLE": {"extracting"}`（REVIEW-C08 R02）等于断言「`LLM_UNAVAILABLE` 只能用于 `extracting`」。已按 ADR-017 改为 `{"extracting", "merging"}`。参数化用例 `test_failure_code_is_bound_to_stage` 对 `(LLM_UNAVAILABLE, merging)` 不带 `details` 的事件仍期望 `error_stage_mismatch`，因为缺耗尽细节。
+
+### 新增用例
+
+- `test_c08.py`（+15）：`test_exhaustion_only_pairs_match_implementation`；`test_llm_unavailable_in_merging_is_allowed_when_attempts_are_exhausted`；`test_llm_unavailable_in_merging_without_exhaustion_details_is_rejected` × 10（无 details、空、缺 stage、缺 attempts、stage 不符、attempts 为 0/True/"3"/3.0、块计数式 details）；`test_llm_unavailable_in_extracting_keeps_its_threshold_meaning`；`test_llm_unavailable_stays_out_of_parsing_and_persisting_even_when_exhausted` × 2。
+- `test_c09.py`（净 +3，共 53）：`test_llm_outage_on_the_last_merging_attempt_fails_with_llm_unavailable`（`failed`、进度不变、`details = {attempts: 3, stage: merging}`、租约清空、C08 接受该错误、之后回收不改码）；`test_llm_outage_before_the_last_merging_attempt_backs_off_instead_of_failing`；`test_exhausting_code_not_allowed_in_the_stage_is_refused_without_writing[parsing|persisting]`（替换原 `merging` 版本）。
+
+### 验证（实际结果）
+
+测试环境：scratchpad 下新建 venv `venv-c09-adr017`（Python 3.13.5），只按 `pyproject.toml` 的固定版本安装依赖与 test 依赖，未安装本包、未 editable；运行时 `PYTHONPATH=<worktree>/src/backend`。
+
+| 命令 | 结果 |
+| --- | --- |
+| 基线 `pytest tests/backend -q`（ADR-017 合入后、本次改动前） | 1100 passed |
+| 红灯：先改测试，`pytest tests/backend/test_c08.py -q` | 3 failed、134 passed（新增正例 2 个 + 改后的码表断言 1 个；新增的 10 个拒绝用例与 3 个其他用例在旧实现下已通过，它们是放开后防止过度放开的守卫） |
+| 红灯：`pytest tests/backend/test_c09.py -q` | 1 failed、52 passed（`merging` 正例） |
+| 实现后 `pytest tests/backend/test_c09.py -q` | 53 passed，exit 0 |
+| 实现后 `pytest tests/backend/test_c08.py -q` | 137 passed，exit 0 |
+| `pytest tests/backend -q` | 1118 passed，exit 0（1 条 warning 基线就有） |
+| `./scripts/verify.sh` | exit 0，`Scaffold verification passed.` |
+| `git diff --check` | exit 0 |
+
+反向篡改（改前备份，改后运行 `test_c08.py` + `test_c09.py`，再用备份恢复并 `cmp` 确认一致）：
+
+| # | 篡改 | 结果 |
+| --- | --- | --- |
+| A1 | 码表不放开 `merging`（`LLM_UNAVAILABLE` 回到 `{extracting}`） | 3 failed（C08 正例、码表一致性、C09 `merging` 正例） |
+| A2 | C09 耗尽 `details` 去掉 `stage` | 2 failed（C09 `merging` 正例因 C08 拒绝而抛 `ValueError`；`STORAGE_UNAVAILABLE` 耗尽的 details 断言） |
+| A3 | C08 去掉「仅限耗尽」约束（码表放开即通过） | 11 failed（10 个拒绝用例 + 参数化 `LLM_UNAVAILABLE-merging`） |
+
+### 仍待决
+
+- 原待决 3（`materials.parse_status` 不随任务阶段同步）未变。
+- `merging` 中单次模型故障（熔断器打开、未耗尽）仍走主动释放退避；E10/D11 调用 `apply_event` 以 `LLM_UNAVAILABLE` 失败 `merging` 时须带 `details = {attempts, stage}`，否则被拒。
