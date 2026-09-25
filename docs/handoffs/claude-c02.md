@@ -108,4 +108,3 @@
 - `test_c13.py`：C06 把断言写死为 `["002", "003"]` / `["001", "002", "003"]`，合并时取本分支「只含 001、002 的临时目录」写法并把 `schema_migrations` 断言恢复为 `["001", "002"]`。
 - `test_c06.py`（范围扩展）：夹具 `assert migrate(url) == ["001", "002", "003"]` 改为只断言前三项，否则 004 加入后 C06 全部用例报错。
 - 同步时发现 main 缺陷：C01 迁移器对无 `lease_expires_at` 列的 `processing_tasks`（C06 建、C09 才加租约列）报 `Cannot inspect processing_tasks lease state`，使 003 之后任何迁移都无法应用。已在 `claude/fix-migrate-lease-guard` 单独修复（先写复现测试），并并入本分支；见 `docs/handoffs/claude-fix-migrate-lease.md`。
-
