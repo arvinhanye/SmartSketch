@@ -698,7 +698,7 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C09 | IN PROGRESS | 实现 worker 原子领取与租约 | ArvinHan（Claude 子代理） | `claude/c09-task-leases` / `36670a3` | `src/backend/app/repositories/task_leases.py`、`src/backend/migrations/NNN_task_leases.sql`（D-10：现取 005）、`tests/backend/test_c09.py`、`docs/handoffs/claude-c09.md`；不改 `repositories/tasks.py`（C03 #216 在改） | 待补 |
+| C09 | DONE（待 PR 审查/合并） | 实现 worker 原子领取与租约 | ArvinHan（Claude 子代理） | `claude/c09-task-leases` / `36670a3` | `src/backend/app/repositories/task_leases.py`、`src/backend/migrations/NNN_task_leases.sql`（D-10：现取 005）、`tests/backend/test_c09.py`、`docs/handoffs/claude-c09.md`；不改 `repositories/tasks.py`（C03 #216 在改） | `docs/handoffs/claude-c09.md`；迁移 `005_task_leases.sql`（租约六列，另加任务错误三列与 I4 约束，见交接待决 1）；红灯 3 failed + 45 errors（签名桩）→ C09 50 passed；后端 1052 passed；反向篡改 8 处全部检出；#212 要求的「有效租约阻止迁移」真实表回归已补；`verify.sh`、`git diff --check` exit 0；待决 3 项见交接 |
 
 - C09 验收：两个连接争同一任务只有一个成功；旧租约 token 禁止续写；到期可接管。验证：`python3 -m pytest tests/backend/test_c09.py -q`。
 
