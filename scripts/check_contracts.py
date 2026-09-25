@@ -54,6 +54,7 @@ BANNED_ALIASES = [
 REQUIRED_MODULES = [
     ("yaml", "pyyaml", "解析 api.v1.yaml"),
     ("openapi_spec_validator", "openapi-spec-validator", "OpenAPI 3.1 形式校验"),
+    ("jsonschema", "jsonschema", "运行契约正负例"),
 ]
 
 failures: list[str] = []
@@ -251,13 +252,13 @@ def main(argv: list[str]) -> int:
         lines = [f"  - {pkg}（{why}）" for _, pkg, why in missing]
         pkgs = " ".join(pkg for _, pkg, _ in missing)
         if not args.allow_scaffold:
-            print("契约校验缺少依赖，门禁失败：", file=sys.stderr)
+            print("FAIL contracts: 契约校验缺少依赖，门禁失败：", file=sys.stderr)
             print("\n".join(lines), file=sys.stderr)
             print(f"  安装：pip3 install {pkgs}", file=sys.stderr)
             print(f"  版本锁见 {TOOLCHAIN}", file=sys.stderr)
             print("  仅骨架阶段可用 --allow-scaffold 降级（会打印未完成验收标记）。", file=sys.stderr)
             return 1
-        print("INCOMPLETE 契约校验未执行：缺依赖 " + pkgs)
+        print("SKIP contracts: INCOMPLETE 契约校验未执行：缺依赖 " + pkgs)
         print("  本次结果不构成契约验收。安装依赖后重跑，去掉 --allow-scaffold。")
         return 0
 
@@ -265,31 +266,40 @@ def main(argv: list[str]) -> int:
     from openapi_spec_validator import validate
 
     if not SPEC.exists():
-        print(f"契约校验失败：{SPEC} 不存在", file=sys.stderr)
+        print(f"FAIL contracts: 契约校验失败：{SPEC} 不存在", file=sys.stderr)
         return 1
 
     try:
         spec = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        print(f"契约校验失败：{SPEC} 不是合法 YAML：{exc}", file=sys.stderr)
+        print(f"FAIL contracts: 契约校验失败：{SPEC} 不是合法 YAML：{exc}", file=sys.stderr)
         return 1
-    if not isinstance(spec, dict) or "components" not in spec or "paths" not in spec:
-        print(f"契约校验失败：{SPEC} 缺 paths 或 components", file=sys.stderr)
+    if (not isinstance(spec, dict)
+            or not isinstance(spec.get("components"), dict)
+            or not isinstance(spec.get("paths"), dict)):
+        print(f"FAIL contracts: 契约校验失败：{SPEC} 的 paths 与 components 必须是对象", file=sys.stderr)
+        return 1
+
+    schemas = spec.get("components", {}).get("schemas", {})
+    if not isinstance(schemas, dict) or any(not isinstance(item, dict) for item in schemas.values()):
+        print(f"FAIL contracts: 契约校验失败：{SPEC} 的 components.schemas 必须是对象映射", file=sys.stderr)
         return 1
 
     refs: list[str] = []
-    collect_refs(spec, refs)
-    broken = sorted({r for r in refs if not resolve(spec, r)})
-    if broken:
-        fail(f"无法解析的 $ref：{broken}")
+    try:
+        collect_refs(spec, refs)
+        broken = sorted({r for r in refs if not resolve(spec, r)})
+        if broken:
+            fail(f"无法解析的 $ref：{broken}")
 
-    schemas = spec.get("components", {}).get("schemas", {})
-    check_paths(spec)
-    check_enums(schemas)
-    check_citation_constraints(schemas)
-    check_chat_events(schemas)
-    check_state_machine_consistency(schemas)
-    check_naming_drift()
+        check_paths(spec)
+        check_enums(schemas)
+        check_citation_constraints(schemas)
+        check_chat_events(schemas)
+        check_state_machine_consistency(schemas)
+        check_naming_drift()
+    except Exception as exc:  # noqa: BLE001 - malformed nested YAML must fail closed
+        fail(f"契约结构校验异常：{type(exc).__name__}: {exc}")
 
     try:
         validate(spec)
@@ -297,12 +307,12 @@ def main(argv: list[str]) -> int:
         fail(f"OpenAPI 形式校验不通过：{exc}")
 
     if failures:
-        print(f"契约校验失败（{len(failures)} 项）：", file=sys.stderr)
+        print(f"FAIL contracts: 契约校验失败（{len(failures)} 项）：", file=sys.stderr)
         for item in failures:
             print(f"  ✗ {item}", file=sys.stderr)
         return 1
 
-    print(f"  ✓ 契约校验通过：OpenAPI {spec['openapi']}，"
+    print(f"PASS contracts: 契约校验通过：OpenAPI {spec['openapi']}，"
           f"{len(spec['paths'])} 条路径 / {len(schemas)} 个 schema / {len(refs)} 处 $ref")
     print(f"  ✓ 不变量：关系类型 4 类、状态机 {len(TASK_STAGES)} 态（终态 {len(TERMINAL_STAGES)}）、"
           "来源可定位、问答事件分类型载荷")

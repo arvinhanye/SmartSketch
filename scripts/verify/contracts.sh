@@ -20,7 +20,7 @@ python3 scripts/check_contracts.py || fail=1
 if [[ -x scripts/gen-contracts.sh ]]; then
   scripts/gen-contracts.sh --check || fail=1
 else
-  echo "  ✗ 缺少可执行的 scripts/gen-contracts.sh；按 ADR-004，生成物必须可重现校验" >&2
+  echo "FAIL contracts generator: 缺少可执行的 scripts/gen-contracts.sh；按 ADR-004，生成物必须可重现校验" >&2
   fail=1
 fi
 
@@ -68,4 +68,9 @@ else
   fail=1
 fi
 
+if [[ "$fail" -eq 0 ]]; then
+  echo "PASS contracts gate"
+else
+  echo "FAIL contracts gate" >&2
+fi
 exit "$fail"
