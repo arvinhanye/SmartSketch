@@ -17,6 +17,19 @@
 - 风险：在线/本地客户端由 E03 接入；E07 通过注入 `EmbeddingClient` 验证模式切换，不引入未经签收的真实供应商依赖。当前工作区的 C03 文件不在 E07 范围内。
 - 审查修复：同一次 `embed` 调用按空间与文本哈希合并缓存未命中项，跨批重复只请求一次；LRU 有限缓存超限后重算旧文本。先新增 4 个失败用例复现，再修复为 16 passed；后端全量 1035 passed。
 - 验证：项目虚拟环境中 `python -m pytest tests/backend/test_e07.py -q`；通过 Git Bash（设置虚拟环境和前端工具路径）运行 `./scripts/verify.sh`；`git diff --check`。详见交接。
+## 2026-09-25 Codex 认领：C04
+
+| 原子 ID | 状态 | 任务 | 负责人 | 基线与文件锁 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| C04 | DONE（PR #225 待负责人审查/合并） | 实现课程列表和创建 API | Codex（后端） | `origin/main@130e6b6`（含 C03 PR #216）/ `codex/c04-courses-api`；独占 `src/backend/app/api/courses.py`、`src/backend/app/services/courses.py`、`tests/backend/test_c04.py`；扩围 `src/backend/app/main.py` 作路由注册、`src/backend/app/schemas/contracts.py` 加载生成 DTO | C04+C03 29 passed、后端 1060 passed、生成物检查 exit 0、`verify.sh` exit 0（UTF-8 输出环境）；[PR #225](https://github.com/arvinhanye/SmartSketch/pull/225) 初次 CI 六项通过；待负责人合并 |
+
+- 输入：C02 课程仓储、C03 身份依赖、ADR-013、`specs/identity-access.md` §3.2/§4.4、`specs/teacher-review-publish.md` V7、`src/contracts/api.v1.yaml`。输出：GET/POST `/api/v1/courses`，只列可见课程；创建课程和创建者教师成员同事务。
+- 调用链：H01 页面/状态经 B15 API 客户端消费生成的 `Course`/`CourseCreate`；路由用 C03 `current_user`/`teacher_account`；课程服务调 C02 仓储；SQLite `courses`/`course_members` 持有数据。无 worker、Neo4j、SSE。路径、字段、枚举、错误码和鉴权均沿用 v1 契约；不改真源或生成物。
+- 风险：C03 PR #216 已合入 `main@130e6b6`，C04 在该基线上复验；生成 Python DTO 不在后端安装包的导入路径，扩围 `app/schemas/contracts.py` 加载仓库已生成文件，部署打包须由后续 K08 保证携带该文件。无数据库迁移；回滚仅撤销 C04 提交，不触碰 C03。
+- 验收命令：`python -m pytest tests/backend/test_c04.py -q`、`python -m pytest tests/backend -q`、`./scripts/gen-contracts.sh --check`（核对契约未漂移）、`./scripts/verify.sh`、`git diff --check`。测试用隔离 SQLite 与 fake 身份数据，覆盖成功、边界、错误、课程隔离和生成 DTO 匹配。
+- 实测：C03 基线 17 passed；C04 首个测试先以 404 失败，接入后 9 passed；独立审查指出显式 `description: null` 被生成 Python 模型放宽，新增先失败 HTTP 用例并在路由拒绝，最终 C04 10 passed、后端全量 1029 passed；`gen-contracts.sh --check` exit 0；`verify.sh` 首次因 Windows GBK 控制台无法输出 ✓ 字符 exit 1，设置 `PYTHONIOENCODING=utf-8` 后 exit 0（契约负例 24 项通过）。无前端功能修改，前端类型检查/构建、CI 和合并后验证未运行。
+- 集成基线复验（`origin/main@130e6b6`）：C04+C03 定向 29 passed；后端全量 1060 passed；`gen-contracts.sh --check` exit 0；`verify.sh` exit 0（契约负例 25 项通过）。B14 的 3 个用例在本机出现 6 条 GBK 子进程读取警告但均通过。前端功能未改；本机前端类型检查/构建未运行，PR CI 结果见下。
+- PR 证据：[C04 PR #225](https://github.com/arvinhanye/SmartSketch/pull/225) 以 main 为目标、差异仅 C04；首次两次 CI 运行的 Repository scaffold、Frontend、Backend 共六项均通过。本文档证据提交后须再次检查最新 CI，不将此视为合并后验证。
 
 ## 2026-09-25 Codex 认领：C03
 
