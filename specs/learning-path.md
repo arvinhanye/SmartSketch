@@ -1,6 +1,6 @@
 # 功能规格：学习进度与下一步推荐（A08）
 
-- **状态**：A08 领域规格，已签收。中心度与合并继承按 ADR-014 执行；§7 的参数、进度接口字段和两项细则按 ADR-014 修订 1 执行（ArvinHan，2026-09-23）。B12 wire 契约与后端尚未实现；谱系落库须先修订 ADR-012。
+- **状态**：A08 领域规格，已签收。中心度与合并继承按 ADR-014 执行；§7 的参数、进度接口字段和两项细则按 ADR-014 修订 1 执行（ArvinHan，2026-09-23）。B12 wire 契约已落实（见 §7 标注），后端尚未实现；谱系落库须先修订 ADR-012。
 - **依据**：S2 解决方案 §6.4.7（四项公式与可学条件）；`specs/teacher-review-publish.md` V1～V9（ADR-012，稳定 `kp_id`、不可变发布版、发布空图被阻断、请求绑定单一版本）；`docs/architecture.md` 的 `MasteryStatus`；`specs/identity-access.md` 的学生成员边界；已签收并集成的 ADR-014（`8901371`）。
 - **承接**：B12 定 DTO，I01/I02 定进度持久化与写入，I03 定可学集合，I04 定评分与理由，I05 定查询空态，I06 定展示。目标导向完整路径是 O01～O04 的条件性加分项，不属于 A08 的推荐列表。
 
@@ -121,6 +121,8 @@ score(k) = w_u × u(k) + w_i × i(k) + w_c × c(k) + w_e × e(k)
   - `GET`/`PUT` 都返回 V 中每个节点。
 
   未发布使用 A04 的 404，已提交空图使用 5xx 完整性错误，不新增 `no_graph`。当前 `RecommendResponse` 和 `ProgressEntry` 还不足以表达这些语义，本 A08 不改接口文件。B08 须确定学生读路径完整性错误的公开错误码，响应只含诊断 ID。
+
+  > **B12 已落实（2026-09-25，分支 `claude/b12-progress-contract`，仅状态标注，不改上文规则）**：`src/contracts/api.v1.yaml` 已定义 `ProgressEntry`（有效 `status`、可空 `own_status`、`inherited_from[]`、可空 `updated_at`）与 `ProgressResponse{graph_version, entries}`，`GET`/`PUT /progress` 都返回绑定版本 V 的每个节点；`RecommendResponse` 按 `state` 判别为 `recommendations` / `all_mastered`，无 `no_graph`；分量与 `score` 为未舍入 double，按 u→i→c→e 逐位求和；未发布为 404，已提交版完整性故障（含 V=∅）为 500 `LearningIntegrityError`（`details` 只含 `diagnostic_id`）。完整性错误的专用公开码与 `PUT` 中非发布版 `kp_id` 的错误码仍待决，暂用既有 `INTERNAL_ERROR`，见 `docs/handoffs/claude-b12.md`。验收见 `tests/contracts/test_b12.py`。
 - **数值与参数**（决定 5～7）：`importance/difficulty` 的 `[0,1]` 范围沿用既有候选契约与 A04 快照。属性缺失时取中性值 0.5。权重来自四个 `RECOMMEND_WEIGHT_*` 环境变量，缺省为 S2 值，全站统一，不做课程级配置（见 §1）。推荐显示上限默认 10、最大 50。环境变量登记在 `.env.example` 与 `docs/integrations.md`。
 - **细则 1：显式写入覆盖继承**（决定 9）：以来源“本次连续归属”的起算版本为界，规则见 §5，验收见 LP-18、LP-20。实现依赖：进度行增加写入序号 `write_seq`（I01），版本提交事务从同一序列 `commit_sequence` 取提交序号 `commit_seq`（G04 的 P11、G06 的 R7），规则见 ADR-012 修订 3 决定 22～24（2026-09-24 签收）。
 - **细则 2：谱系存放位置**（决定 10）：谱系作为发布快照节点的 `merged_from` 字段保存，按绑定 `version_id` 读取，回滚复制源快照时谱系随之回退。字段形状、摘要纳入方式与提交序号由 **ADR-012 修订 3**（2026-09-24 签收）规定：`merged_from` 为本版本中归属到该节点的全部来源、链已展平（决定 15），纳入摘要（决定 19），直接父子关系只在 F12 审计日志；F10/B11/G04/G06/I01 可按此实现。不能由 I01 从当前草稿或名称推断谱系。

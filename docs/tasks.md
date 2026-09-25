@@ -4,12 +4,17 @@
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B12 | IN PROGRESS | 迁移进度和推荐契约 | ArvinHan（Claude 子代理执行） | `claude/b12-progress-contract` / base `8eeac3b` | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`；按 B08～B13 先例接入 `scripts/verify/contracts.sh`；随附 `specs/learning-path.md` 状态标注与 `docs/handoffs/claude-b12.md` | 待补 |
+| B12 | DONE（待 PR 审查/合并） | 迁移进度和推荐契约 | ArvinHan（Claude 子代理执行） | `claude/b12-progress-contract` / base `8eeac3b` | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`；按 B08～B13 先例接入 `scripts/verify/contracts.sh`；随附 `specs/learning-path.md` 状态标注与 `docs/handoffs/claude-b12.md` | 改真源前 B12 65 failed / 28 passed，改后 93 passed；契约全量 255 passed；`./scripts/gen-contracts.sh --check` exit 0；`./scripts/verify.sh` exit 0（含 B12 回归）；生成 TS `tsc --noEmit --strict` exit 0；`git diff --check` exit 0；反向篡改 6 处均被检出；范围扩展：`src/contracts/errors.v1.md` 登记 `details.diagnostic_id`；`docs/handoffs/claude-b12.md` |
 
 - 输入：`specs/learning-path.md`（LP-1～19、§7）、ADR-014 及修订 1、`docs/atomic-task-plan.md` B12 行；输出：`ProgressEntry` 新字段、GET/PUT 返回全部节点、推荐 DTO 与未发布错误/全部掌握空态区分。
 - 依赖：B08、A08 已完成；B11 已合入并释放 YAML 锁（issue #54）。
 - 风险：已提交空图按发布快照完整性故障处理，不增加 `no_graph` wire 状态；未舍入 double 分量按 `u→i→c→e` 求和须逐位等于评分。
 - 验证：`python3 -m pytest tests/contracts/test_b12.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- 待决（需 ArvinHan 决定，I02/I05 实现前）：
+  1. 学生读路径完整性错误的公开码：契约暂用既有 `INTERNAL_ERROR` + 闭合 `details.diagnostic_id`（`LearningIntegrityError`）；是否新增专用码、字段名是否与问答 `details.request_id` 统一。
+  2. `PUT /progress` 中 `kp_id` 不在绑定发布版（草稿独有、已删除、他课、发布指针变化后复核失败）时整批拒绝的公开码（422/404/409）与 `details` 形状；契约描述暂写“待定”。
+- 待审查的契约决定：进度响应改为 `ProgressResponse{graph_version, entries}`；移除推荐 `target`/`path`（§7，交 O02）；重复 `kp_id` 归 422 `VALIDATION_ERROR`。详见交接。
+- 观察：`tests/contracts/test_b11.py` 未接入 `scripts/verify/contracts.sh`，不在 B12 范围内，未改。
 
 ## B11 图谱编辑与版本契约（2026-09-24）
 
