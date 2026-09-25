@@ -81,27 +81,31 @@ def people(make_user):
 # --- migration --------------------------------------------------------------------------
 
 
-def test_migration_adds_course_tables_after_002_and_keeps_a_restorable_backup(tmp_path):
+def test_migration_adds_course_tables_after_003_and_keeps_a_restorable_backup(tmp_path):
     path = tmp_path / "state.sqlite3"
-    earlier = tmp_path / "up-to-002"
+    earlier = tmp_path / "up-to-003"
     earlier.mkdir()
-    for name in ("001_base.sql", "002_accounts.sql"):
+    for name in ("001_base.sql", "002_accounts.sql", "003_tasks.sql"):
         shutil.copyfile(MIGRATIONS / name, earlier / name)
-    assert migrate(_url(path), earlier) == ["001", "002"]
+    assert migrate(_url(path), earlier) == ["001", "002", "003"]
     user_id = _new_id()
     insert_account(
         _url(path), account_id=user_id, username="t_keep", password_hash=VALID_HASH, role="teacher"
     )
 
-    assert migrate(_url(path)) == ["003"]
-    assert migrate(_url(path)) == []
+    # 只放到 004：后续迁移不影响本用例对 004 的断言。
+    through_004 = tmp_path / "through-004"
+    shutil.copytree(earlier, through_004)
+    shutil.copyfile(MIGRATIONS / "004_courses.sql", through_004 / "004_courses.sql")
+    assert migrate(_url(path), through_004) == ["004"]
+    assert migrate(_url(path), through_004) == []
 
     with connect(_url(path)) as database:
         assert database.execute("SELECT id FROM users").fetchall() == [(user_id,)]
         assert database.execute(
-            "SELECT version, filename FROM schema_migrations WHERE version = '003'"
-        ).fetchone() == ("003", "003_courses.sql")
-    backup = next((tmp_path / "backups").glob("*-before-003.sqlite"))
+            "SELECT version, filename FROM schema_migrations WHERE version = '004'"
+        ).fetchone() == ("004", "004_courses.sql")
+    backup = next((tmp_path / "backups").glob("*-before-004.sqlite"))
     with sqlite3.connect(backup) as copy:
         assert copy.execute("PRAGMA integrity_check").fetchone() == ("ok",)
         assert copy.execute(

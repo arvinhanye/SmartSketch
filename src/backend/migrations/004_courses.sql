@@ -1,6 +1,6 @@
 -- C02: courses and course members (specs/identity-access.md §3, ADR-013).
--- D-10: numbered as main's max (002) + 1; renumber to the new max + 1 before merge if main
--- already has 003. Rollback: restore backups/*-before-003.sqlite (src/backend/README.md).
+-- D-10: numbered as main's max (003, C06) + 1; renumber to the new max + 1 before merge if main
+-- already has 004. Rollback: restore backups/*-before-004.sqlite (src/backend/README.md).
 --
 -- Course columns follow Course/CourseCreate in src/contracts/api.v1.yaml; the publish
 -- pointer columns follow specs/teacher-review-publish.md「courses 增加」 and are only

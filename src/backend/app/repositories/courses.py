@@ -1,4 +1,4 @@
-"""Persistence for courses and course members (migration 003, specs/identity-access.md §3).
+"""Persistence for courses and course members (migration 004, specs/identity-access.md §3).
 
 Every member read and write is keyed by ``course_id`` first. The in-course role stored here
 is the only input to course authorization; ``users.role`` (account type) only limits who may
