@@ -190,3 +190,57 @@ def test_invalid_wait_setting_fails_before_start(tmp_path: Path):
     assert result.returncode != 0
     assert "NEO4J_WAIT_SECONDS" in result.stderr
     assert not any(call.startswith("compose up") for call in calls(log))
+
+
+def test_unquoted_storage_inline_comment_is_not_part_of_directory(tmp_path: Path):
+    content = ENV_BYTES.replace(b"STORAGE_DIR=./custom-storage\r\n", b"STORAGE_DIR=./data # note\r\n")
+    root, env, _ = sandbox(tmp_path, env_bytes=content)
+
+    result = run_script(root, env, "dev-up.sh")
+
+    assert result.returncode == 0, result.stderr
+    assert (root / "data").is_dir()
+    assert not (root / "data # note").exists()
+    assert (root / ".env").read_bytes() == content
+
+
+def test_unquoted_wait_inline_comment_is_accepted(tmp_path: Path):
+    content = ENV_BYTES + b"NEO4J_WAIT_SECONDS=30 # note\r\n"
+    root, env, log = sandbox(tmp_path, env_bytes=content)
+
+    result = run_script(root, env, "dev-up.sh")
+
+    assert result.returncode == 0, result.stderr
+    assert any(call.startswith("compose up -d neo4j") for call in calls(log))
+    assert (root / ".env").read_bytes() == content
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [
+        b'STORAGE_DIR="./data # literal" # note\r\n',
+        b"STORAGE_DIR='./data # literal' # note\r\n",
+    ],
+)
+def test_quoted_storage_keeps_hash_and_strips_comment_after_quote(
+    tmp_path: Path, setting: bytes,
+):
+    content = ENV_BYTES.replace(b"STORAGE_DIR=./custom-storage\r\n", setting)
+    root, env, _ = sandbox(tmp_path, env_bytes=content)
+
+    result = run_script(root, env, "dev-up.sh")
+
+    assert result.returncode == 0, result.stderr
+    assert (root / "data # literal").is_dir()
+    assert (root / ".env").read_bytes() == content
+
+
+def test_hash_without_preceding_space_stays_literal(tmp_path: Path):
+    content = ENV_BYTES.replace(b"STORAGE_DIR=./custom-storage\r\n", b"STORAGE_DIR=./data#tag\r\n")
+    root, env, _ = sandbox(tmp_path, env_bytes=content)
+
+    result = run_script(root, env, "dev-up.sh")
+
+    assert result.returncode == 0, result.stderr
+    assert (root / "data#tag").is_dir()
+    assert (root / ".env").read_bytes() == content

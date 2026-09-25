@@ -25,3 +25,9 @@
 - `.env` 中与 Compose 有关的变量插值仍由 Compose 自行处理。脚本仅按字面量读取少数非敏感本地设置；如依赖高级 Compose 插值表达式设置 `STORAGE_DIR`，需检查创建目录是否符合预期。
 - 回滚：还原本提交的三个脚本并删除新测试/交接文件；绑定数据目录和个人 `.env` 均无需迁移或改动。
 - `docs/integrations.md` 已同步实际启停命令、确认词和绑定数据仍保留的范围。
+
+## 审查修复：`.env` 行尾注释（P3）
+
+- 原 `env_setting` 把未加引号的 `STORAGE_DIR=./data # note` 整行当路径，把 `NEO4J_WAIT_SECONDS=30 # note` 当非法整数。[Docker Compose 官方 `.env` 规则](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)是：未加引号的值只有在空白后遇到 `#` 才进入注释；引号内 `#` 属于值，引号后可有注释。
+- 修复仍只按字面值读取，不 source `.env`；处理空白、CRLF、单/双引号和空白后的行尾注释，保留无空白前缀的 `#`。值中的 shell 代码依旧不会执行。
+- 临时目录假 Docker 回归先见 **3 failed / 13 passed**（两个未加引号的注释与双引号的注释），修复后新测试覆盖单引号及无空白 `#`。修复未改 Compose、真实数据或 `.env` 字节。

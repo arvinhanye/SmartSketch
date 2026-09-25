@@ -36,13 +36,21 @@ require_env_file() {
 # 值按字面量读取，支持完整单/双引号和 CRLF；密码由 Compose 自己解析，绝不经此函数读取。
 env_setting() {
   local key="$1" fallback="$2" line value
+  local double_quoted='^"([^"]*)"[[:space:]]*(#.*)?$'
+  local single_quoted="^'([^']*)'[[:space:]]*(#.*)?$"
   if [[ -n ${!key:-} ]]; then printf '%s\n' "${!key}"; return; fi
   while IFS= read -r line || [[ -n $line ]]; do
     [[ $line == "$key="* ]] || continue
     value="${line#*=}"
     value="${value%$'\r'}"
-    if [[ ${#value} -ge 2 ]]; then
-      if [[ $value == \"*\" || $value == \'*\' ]]; then value="${value:1:${#value}-2}"; fi
+    value="${value#"${value%%[![:space:]]*}"}"
+    if [[ $value =~ $double_quoted || $value =~ $single_quoted ]]; then
+      value="${BASH_REMATCH[1]}"
+    else
+      # Compose: 未加引号的值仅在空白后遇到 # 才把余下部分视为注释。
+      value="${value%% \#*}"
+      value="${value%%$'\t'\#*}"
+      value="${value%"${value##*[![:space:]]}"}"
     fi
     [[ -n $value ]] && { printf '%s\n' "$value"; return; }
   done < .env
