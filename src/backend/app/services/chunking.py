@@ -16,6 +16,9 @@ import re
 from app.services.parsers.models import ParsedBlock, SourceLocator
 
 
+#: 分块规则版本（ADR-018 决定 2）。分块输出规则（切分、重叠、前缀拼接等）任何变化都必须递增，
+#: 否则同一块 ID 会对应不同文本。参数不在此处体现，由 ``chunking_version`` 附加实际值。
+CHUNKER_VERSION = "chunk/1"
 DEFAULT_TARGET_CHARS = 1500
 DEFAULT_OVERLAP_CHARS = 200
 _SENTENCE_END = re.compile(
@@ -151,6 +154,25 @@ def _chunk_run(
     return result
 
 
+def _check_chunk_parameters(target_chars: object, overlap_chars: object) -> None:
+    if type(target_chars) is not int or target_chars < 1:
+        raise ValueError("target_chars must be a positive integer")
+    if type(overlap_chars) is not int or not 0 <= overlap_chars < target_chars:
+        raise ValueError("overlap_chars must be a nonnegative integer smaller than target_chars")
+
+
+def chunking_version(
+    target_chars: int = DEFAULT_TARGET_CHARS, overlap_chars: int = DEFAULT_OVERLAP_CHARS
+) -> str:
+    """分块版本 ``chunk/<规则版本>@<target_chars>-<overlap_chars>``（ADR-018 决定 2）。
+
+    参数须与本次 ``chunk_blocks`` 实际使用的值相同；校验与 ``chunk_blocks`` 一致。
+    D09 ``revision_parser_version`` 把它并入资料修订的 ``parser_version``。
+    """
+    _check_chunk_parameters(target_chars, overlap_chars)
+    return f"{CHUNKER_VERSION}@{target_chars}-{overlap_chars}"
+
+
 def chunk_blocks(
     blocks: Iterable[ParsedBlock],
     *,
@@ -164,10 +186,7 @@ def chunk_blocks(
     Empty iterables return an empty tuple, independently of ``ParsedDocument``'s
     non-empty invariant. ``overlap_chars`` must be smaller than ``target_chars``.
     """
-    if type(target_chars) is not int or target_chars < 1:
-        raise ValueError("target_chars must be a positive integer")
-    if type(overlap_chars) is not int or not 0 <= overlap_chars < target_chars:
-        raise ValueError("overlap_chars must be a nonnegative integer smaller than target_chars")
+    _check_chunk_parameters(target_chars, overlap_chars)
 
     ordered = list(blocks)
     if not all(isinstance(block, ParsedBlock) for block in ordered):

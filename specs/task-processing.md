@@ -15,7 +15,7 @@
 | --- | --- |
 | SSE 一次性令牌的签发端点与作用域（Codex S07-R07） | B10 / A05 |
 | 发布快照、发布指针与跨库补偿（串行化所用的课程写锁由 §8.5 提供，发布方何时持锁归 A04） | A04 |
-| 失败/取消后「再处理」的入口（重新上传或新增端点） | C06 / C07（本文只规定必须是新任务） |
+| 失败/取消后「再处理」的入口（重新上传或新增端点） | **已定（D-16）**：MVP 只靠重新上传（新资料、新任务）；再处理端点留作后续任务。`Document.parse_status` 读时取该资料最新创建任务的 `stage` |
 | 阈值与 §8.8 的环境变量登记到 `.env.example` 与 `docs/integrations.md` | A07 |
 | 模型调用结果缓存的键与失效策略（§8.4 `merging` 依赖它） | E 组 |
 
@@ -154,7 +154,7 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 | 失败情形 | 阶段 | `error.code` | `details` | 契约现状 |
 | --- | --- | --- | --- | --- |
 | 文件损坏 / 加密 / 无可提取文本（含 `chunks_total = 0`） | `parsing` | `DOCUMENT_UNREADABLE` | `reason ∈ {corrupted, encrypted, no_text}` | **已纳入 B08** |
-| 抽取失败块超阈值，且所有失败块的最终错误都是模型不可用 | `extracting` | `LLM_UNAVAILABLE` | `chunks_failed`、`chunks_total`、`threshold` | 已有 |
+| 抽取失败块超阈值，且所有失败块的最终错误都是模型不可用 | `extracting` | `LLM_UNAVAILABLE` | `chunks_failed`、`chunks_total`、`threshold` | 已有。补注：`merging` 尝试耗尽且最后一次为模型不可用时也用此码，`details` 为 `attempts`、`stage`（见本表末行与 §8.3；依据 ADR-017 决定 6） |
 | 抽取失败块超阈值，其他或混合原因 | `extracting` | `EXTRACTION_INCOMPLETE` | 同上，另含按错误码的计数 | **已纳入 B08** |
 | 自动候选成环且环上无可降级边 | `persisting` | `CYCLE_DETECTED` | `cycle` | 已有（ADR-009） |
 | 图库 / 数据库不可用或写入失败 | `persisting`（及任何需读写存储处） | `STORAGE_UNAVAILABLE` | — | **已纳入 B08** |

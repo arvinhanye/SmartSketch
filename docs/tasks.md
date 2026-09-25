@@ -17,6 +17,19 @@
 - 风险：在线/本地客户端由 E03 接入；E07 通过注入 `EmbeddingClient` 验证模式切换，不引入未经签收的真实供应商依赖。当前工作区的 C03 文件不在 E07 范围内。
 - 审查修复：同一次 `embed` 调用按空间与文本哈希合并缓存未命中项，跨批重复只请求一次；LRU 有限缓存超限后重算旧文本。先新增 4 个失败用例复现，再修复为 16 passed；后端全量 1035 passed。
 - 验证：项目虚拟环境中 `python -m pytest tests/backend/test_e07.py -q`；通过 Git Bash（设置虚拟环境和前端工具路径）运行 `./scripts/verify.sh`；`git diff --check`。详见交接。
+## 2026-09-25 Codex 认领：C04
+
+| 原子 ID | 状态 | 任务 | 负责人 | 基线与文件锁 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| C04 | DONE（PR #225 `64e643a`） | 实现课程列表和创建 API | Codex（后端） | `origin/main@130e6b6`（含 C03 PR #216）/ `codex/c04-courses-api`；独占 `src/backend/app/api/courses.py`、`src/backend/app/services/courses.py`、`tests/backend/test_c04.py`；扩围 `src/backend/app/main.py` 作路由注册、`src/backend/app/schemas/contracts.py` 加载生成 DTO | C04+C03 29 passed、后端 1060 passed、生成物检查 exit 0、`verify.sh` exit 0（UTF-8 输出环境）；[PR #225](https://github.com/arvinhanye/SmartSketch/pull/225) 初次 CI 六项通过；待负责人合并 |
+
+- 输入：C02 课程仓储、C03 身份依赖、ADR-013、`specs/identity-access.md` §3.2/§4.4、`specs/teacher-review-publish.md` V7、`src/contracts/api.v1.yaml`。输出：GET/POST `/api/v1/courses`，只列可见课程；创建课程和创建者教师成员同事务。
+- 调用链：H01 页面/状态经 B15 API 客户端消费生成的 `Course`/`CourseCreate`；路由用 C03 `current_user`/`teacher_account`；课程服务调 C02 仓储；SQLite `courses`/`course_members` 持有数据。无 worker、Neo4j、SSE。路径、字段、枚举、错误码和鉴权均沿用 v1 契约；不改真源或生成物。
+- 风险：C03 PR #216 已合入 `main@130e6b6`，C04 在该基线上复验；生成 Python DTO 不在后端安装包的导入路径，扩围 `app/schemas/contracts.py` 加载仓库已生成文件，部署打包须由后续 K08 保证携带该文件。无数据库迁移；回滚仅撤销 C04 提交，不触碰 C03。
+- 验收命令：`python -m pytest tests/backend/test_c04.py -q`、`python -m pytest tests/backend -q`、`./scripts/gen-contracts.sh --check`（核对契约未漂移）、`./scripts/verify.sh`、`git diff --check`。测试用隔离 SQLite 与 fake 身份数据，覆盖成功、边界、错误、课程隔离和生成 DTO 匹配。
+- 实测：C03 基线 17 passed；C04 首个测试先以 404 失败，接入后 9 passed；独立审查指出显式 `description: null` 被生成 Python 模型放宽，新增先失败 HTTP 用例并在路由拒绝，最终 C04 10 passed、后端全量 1029 passed；`gen-contracts.sh --check` exit 0；`verify.sh` 首次因 Windows GBK 控制台无法输出 ✓ 字符 exit 1，设置 `PYTHONIOENCODING=utf-8` 后 exit 0（契约负例 24 项通过）。无前端功能修改，前端类型检查/构建、CI 和合并后验证未运行。
+- 集成基线复验（`origin/main@130e6b6`）：C04+C03 定向 29 passed；后端全量 1060 passed；`gen-contracts.sh --check` exit 0；`verify.sh` exit 0（契约负例 25 项通过）。B14 的 3 个用例在本机出现 6 条 GBK 子进程读取警告但均通过。前端功能未改；本机前端类型检查/构建未运行，PR CI 结果见下。
+- PR 证据：[C04 PR #225](https://github.com/arvinhanye/SmartSketch/pull/225) 以 main 为目标、差异仅 C04；首次两次 CI 运行的 Repository scaffold、Frontend、Backend 共六项均通过。本文档证据提交后须再次检查最新 CI，不将此视为合并后验证。
 
 ## 2026-09-25 Codex 认领：C03
 
@@ -65,7 +78,7 @@
 | ID | 状态 | 任务 | 负责人 | 验收条件 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | M0-01 | DONE | 建立多 Agent 协作、文档、规格、源码目录骨架 | Codex | 必需文件齐全；基础校验通过 | `scripts/verify.sh`；`docs/handoffs/codex-m0-project-scaffold.md` |
-| M0-02 | IN PROGRESS（B01～B04 已完成；B15 待 B14） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01～B04 见下方验收证据；HTTP 客户端 B15 仍待契约 B14 |
+| M0-02 | DONE（B01～B04 已完成；B15 PR #228 `f37262c`） | 初始化 Vue 3 + TypeScript + Vite 前端 | Frontend Agent | 可启动；具备最小路由、类型检查与测试命令 | B01～B04 见下方验收证据；HTTP 客户端 B15 仍待契约 B14 |
 | M0-03 | DONE（B05+B06） | 初始化 FastAPI 后端与健康检查 | Backend Agent | 可启动；`GET /health` 有契约和测试 | B05/B06 测试 38 PASS；基础 verify PASS；`docs/handoffs/codex-b05.md`、`docs/handoffs/codex-b06.md` |
 | M0-04 | TODO | 定义第一版 API、SSE 任务事件与图谱 DTO | Backend + Frontend Agent | `src/contracts/` 有版本化契约；双方确认 | 待补充 |
 | M0-05 | TODO | 定义 Neo4j/SQLite 开发环境与本地启动方式 | Data/Backend Agent | 无密钥可启动依赖；环境变量文档完整 | 待补充 |
@@ -141,6 +154,7 @@
 | D-13 | 解析器只把标题放进章节路径、标题文字不在块正文里，抽取（D12）看不到标题。**已关闭**：由 D08 分块时在每块正文前拼上章节路径（`section_path`），解析器输出与 D01 模型不变（ArvinHan，2026-09-24） | 技术负责人 | 已完成（D08 实现） |
 | D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
 | D-15 | 赛题「知识抽取准确率不低于 70%」是否同时约束关系（REQ-01）。**已关闭**：实体和关系分别计算、各自不低于 70%，写入 `specs/course-knowledge-graph.md` 验收 7 与 K01/K02（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
+| D-16 | C07 资料列表的 `Document.parse_status` 取自哪里、失败/取消后的「再处理」入口（A03 交出项）。**已关闭**：`parse_status` 在读时取该资料**最新创建任务**的 `stage`（单一事实来源，worker 不另写）；`materials.parse_status` 列不再维护，保留默认值待后续迁移清理。MVP 的再处理只靠**重新上传**（新资料、新任务），不新增端点、不改契约；再处理端点留作后续任务（ArvinHan，2026-09-25） | 技术负责人 | 已完成（C07 落实） |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -744,3 +758,106 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 | E07-P3 | P3 | PR #217 审查（Claude） | `EmbeddingAdapter.embed` 末尾的 `if vector is not None` 过滤，一旦有向量漏填，结果会静默变短并与输入错位 | 改为断言全部填满；可在 E03 接入时顺手修 |
 
 C03-R01（P1，PR #216 审查）：拒绝错误是模块级的单例异常，反复 raise 会累积 `__traceback__` 并持有每次请求的令牌。已在合并前修复（`fe5ae64`，交接 `docs/handoffs/claude-c03-r01-fix.md`），不再是遗留项。
+
+## 2026-09-25 第二批并行（Claude）
+
+C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共享文件：539210 的 C03（#216，改 `repositories/tasks.py`）、C04、E07（#217，`ai/embeddings.py`），以及 arvinhanye 的 B14（#214）、D08（#215）、F02、K07。三项各在独立 worktree 与分支上进行。各子任务只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C09 | DONE（PR #220 `b174b2f`） | 实现 worker 原子领取与租约 | ArvinHan（Claude 子代理） | `claude/c09-task-leases` / `36670a3` | `src/backend/app/repositories/task_leases.py`、`src/backend/migrations/NNN_task_leases.sql`（D-10：现取 005）、`tests/backend/test_c09.py`、`docs/handoffs/claude-c09.md`；不改 `repositories/tasks.py`（C03 #216 在改） | `docs/handoffs/claude-c09.md`；迁移 `005_task_leases.sql`（租约六列，另加任务错误三列与 I4 约束，见交接待决 1）；红灯 3 failed + 45 errors（签名桩）→ C09 50 passed；后端 1052 passed；反向篡改 8 处全部检出；#212 要求的「有效租约阻止迁移」真实表回归已补；`verify.sh`、`git diff --check` exit 0；待决 3 项见交接。**ADR-017 追加（2026-09-25）**：决定 1 登记 `docs/architecture.md` 数据模型；决定 6 C08 码表 `LLM_UNAVAILABLE` 放开 `merging`（`failure_code_allowed` 限定为尝试耗尽，`details` 须含 `attempts`、`stage`），C09 耗尽直接写 `LLM_UNAVAILABLE`，§6 补注；红灯 C08 3 failed、C09 1 failed → C08 137 passed、C09 53 passed；后端 1118 passed；篡改 3 处全部检出；`verify.sh`、`git diff --check` exit 0；待决 1、2 已由 ADR-017 解决，待决 3 仍开 |
+
+- C09 验收：两个连接争同一任务只有一个成功；旧租约 token 禁止续写；到期可接管。验证：`python3 -m pytest tests/backend/test_c09.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E03 | DONE（PR #221 `7c891eb`） | 实现兼容 API 适配器 | ArvinHan（Claude 子代理） | `claude/e03-compatible-api` / `36670a3` | `src/backend/app/services/ai/compatible.py`、`tests/backend/test_e03.py`、`docs/handoffs/claude-e03.md`；不改 `ai/embeddings.py`（E07 #217 在改） | `test_e03.py` 先红（无模块 exit 2；名字桩 171 failed）后 173 passed；`tests/backend` 全量 1175 passed（基线 1002）；5 处篡改均检出（2/7/2/1/1 failed），恢复后 `cmp` 一致；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；不联网、无密钥；待决 10 项（含向量 HTTP 归属、`max_tokens` 字段名、流式 usage 实测）见 `docs/handoffs/claude-e03.md`；**ADR-017 追加**（决定 2、3）：`CompatibleEmbeddingClient`（`POST /embeddings` 带 `dimensions`/`encoding_format`，按 `EMBEDDING_BATCH_SIZE` 分批且不超过供应商上限（默认 10，取自 D-02c，可传参），按 `index` 还原顺序，逐条核对维度），`integrations.md` D-02a/b 补注输出上限字段与冒烟实测项；新增 118 条先红（桩 117 failed、另 1 条实现中补）后 `test_e03.py` 291 passed，`test_e07.py` 16 passed，`tests/backend` 全量 1341 passed（基线 1223）；3 处篡改（不还原顺序/不核对维度/不分批）检出 3/6/6 failed，恢复后 `cmp` 一致；`./scripts/verify.sh`、`git diff --check` exit 0；待决 1、2 已解决，新增待决 11～14 |
+
+- E03 验收：按 OpenAI 兼容协议实现；用模拟传输测超时、错误与结构；真实调用需另行配置（供应商取值待 D-02a）。验证：`python3 -m pytest tests/backend/test_e03.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I03 | DONE（PR #219 `0c8389b`） | 实现可学集合纯函数 | ArvinHan（Claude 子代理） | `claude/i03-eligible-set` / `36670a3` | `src/backend/app/services/learning/eligible.py`、`tests/backend/test_i03.py`、`docs/handoffs/claude-i03.md` | 新增 `services/learning/__init__.py`（包原不存在）。红：先收集错误（无模块），桩函数 79 failed/1 passed；绿：`test_i03.py` 80 passed；`tests/backend` 全量 1082 passed（基线 1002）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；6 处反向篡改均检出（36/19/3/3/28/2 failed），恢复后 `cmp` 一致。有环、自环、悬空端点（含外课边）、重复 ID、`V=∅` 抛 `GraphIntegrityError`；`mastered` 含外课 ID 抛 `ProgressOutsideGraphError`（§1）；结果按 `kp_id` UTF-8 字节序。见 `docs/handoffs/claude-i03.md` |
+
+- I03 验收：已掌握集合为空、全部掌握、孤立点、多前置、有环、外课 ID；不修改用户的掌握集合。验证：`python3 -m pytest tests/backend/test_i03.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B12-R1 | DONE（PR #224 `c1b812e`） | 进度契约错误细节修订（ADR-017 决定 4、5） | ArvinHan（Claude 子代理） | `claude/b12-r1-progress-errors` / ADR-017 提交 | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`、`specs/learning-path.md`、`docs/handoffs/claude-b12-r1.md` | 改真源前 B12 34 failed / 88 passed，首版 `75a3775` 后 122 passed；追加提交按 ADR-017 勘误把 `field` 改为点路径 `<i>.kp_id`（先 8 failed / 117 passed，后 125 passed），并补 `tests/tooling/test_b07.py` 夹具 `test_b14.py`（tooling 修前 1 failed / 13 passed，修后 14 passed；ADR-017 与 test_b07 属协调方授权的范围扩展）；`tests/contracts tests/tooling` 305 passed；`./scripts/gen-contracts.sh --check` exit 0；`./scripts/verify.sh` exit 0（含 B12 125 项）；生成 TS `tsc --noEmit --strict` exit 0；`git diff --check` exit 0；反向篡改 5 处均被检出；`docs/handoffs/claude-b12-r1.md` |
+
+- B12-R1 验收：`LearningIntegrityDetails` 只含 `request_id`；`PUT /progress` 422 的 `details.fields[].reason = not_in_published_version` 与 `details.graph_version` 有正负例；重新生成且 `gen-contracts.sh --check`、`tests/tooling` 通过。
+- ADR-017 同时追加到 C09（#220：决定 1、6）与 E03（#221：决定 2、3），各自在本节表内更新证据。
+
+- 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925b-claims` 上解决一次，再并入三个分支，保证三者的解决结果一致。
+- 进展（2026-09-25）：四项均已合并（#219 `0c8389b`、#220 `b174b2f`、#221 `7c891eb`、#224 `c1b812e`，按此顺序），合并前四者一起试合无冲突。ADR-017 随 #220 入库，勘误行随 #224 入库。
+
+## 2026-09-25 第三批并行（Claude）
+
+D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10；B15：B02、B14），issue 无人认领、无远端分支。已核对在途工作并避开：539210 的 C04（课程 API）；arvinhanye 的 F02、K07；本人待合并的 I03 #219、C09 #220（迁移 005）、E03 #221、B12-R1 #224。本认领提交基于第二批认领提交 `6a93cf3`，与上述 PR 无文本冲突。三项各在独立分支上进行，各子任务只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D09 | DONE（PR #226 `abc914d`） | 实现块身份与缓存键 | ArvinHan（Claude 子代理） | `claude/d09-chunk-identity` / 本认领提交 | `src/backend/app/services/chunk_identity.py`、`tests/backend/test_d09.py`、`docs/handoffs/claude-d09.md` | 红：实现前收集错误 `ModuleNotFoundError`；绿：`tests/backend/test_d09.py` 96 passed；后端全量 1146 passed（基线 1050）；反向篡改 5 处（去 course_id、去 model_id、序号补零、修订哈希输入换序、模型 ID 改取响应字段）均变红，改回后 `cmp` 一致；`verify.sh` exit 1 仅因本机缺 `openapi-typescript`（B14 生成类 2 条 + 负例 1 条），base `9116315` 同命令日志逐行相同；`git diff --check` 通过；待决 5 项见 `docs/handoffs/claude-d09.md`；**ADR-018 追加**（`686f57c` ADR 本文 + 其后实现提交）：`chunking.py` 增 `CHUNKER_VERSION`/`chunking_version()`，`chunk_identity.py` 增 `revision_parser_version()` 且修订键拒绝缺分块段的 `parser_version`；红：先改测试时收集错误 `ImportError`；绿：`test_d09.py` 154 passed、`test_d08.py` 13 passed；后端全量 1204 passed；篡改 3 处（不校验分块段 11 failed、分块版本丢参数 4 failed、组合换序 6 failed）改回后 `cmp` 一致；`verify.sh` exit 0；`git diff --check` 通过 |
+
+- D09 验收：同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效（缓存键用实际给出结果的模型 ID，见 `docs/integrations.md`）；`revision_id` 与块 ID 按 ADR-012 修订 1 确定性派生。验证：`python3 -m pytest tests/backend/test_d09.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C16 | DONE（PR #227 `7f9eaf1`） | 实现 SSE 一次性票据申领 | ArvinHan（Claude 子代理） | `claude/c16-event-tickets` / 本认领提交 | `src/backend/app/api/event_tickets.py`、`src/backend/app/repositories/event_tickets.py`、`src/backend/migrations/006_event_tickets.sql`（D-10：005 已由 C09 #220 占用）、`tests/backend/test_c16.py`、`docs/handoffs/claude-c16.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 红灯：仅有测试时收集报 `ImportError`（`app.repositories.event_tickets` 不存在）；绿灯：`tests/backend/test_c16.py` 23 passed；后端全量 1073 passed（基线 1050 + 23）；contracts+tooling 4 failed / 269 passed，与基线 `9116315` 相同，均因环境缺 `openapi-typescript`；反向篡改 5 处（存明文、去 `task_id`、去过期、去 `used_at`、去旧行清理）全部检出，改回后 `cmp` 一致；`verify.sh` 退出 1（contracts gate 的 B14 生成回归缺 `openapi-typescript`，基线同样失败）；`git diff --check` 通过；交接 `docs/handoffs/claude-c16.md` |
+
+- C16 验收（`specs/identity-access.md` §5）：仅保存票据哈希；60 秒过期；重复、跨任务或普通 Bearer 查询票据拒绝；迁移可恢复。验证：`python3 -m pytest tests/backend/test_c16.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B15 | DONE（PR #228 `f37262c`） | 建立前端 HTTP 客户端 | ArvinHan（Claude 子代理） | `claude/b15-http-client` / 本认领提交 | `src/frontend/src/api/http.ts`、`tests/frontend/b15.test.ts`、`docs/handoffs/claude-b15.md` | 红灯：实现前 exit 1（无法解析 `api/http`）；绿灯：type-check + B15 23 passed，前端全量 4 files / 53 passed，build 通过；7 处反向篡改（不传 signal、401 不回调、超时并入取消、不解析错误体、令牌进 URL、登录 401 回调、参数不编码）均使测试失败，恢复后 `cmp` 一致；`verify.sh` 在补 `openapi-typescript@7.4.4`（仓库外临时安装）后 exit 0，缺该工具时 B14 两例失败与基线相同；待决 8 项见 `docs/handoffs/claude-b15.md` |
+
+- B15 验收：类型化错误、超时/取消、认证失败处理；组件不自行拼路径；把 `scope.signal` 传给 fetch（B04 交出项）。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts`。
+
+- 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925c-claims` 上解决一次，再并入三个分支。C16 的迁移 006 以 C09 #220 的 005 先合并为前提；若 C09 未合并而 C16 先合，按 D-10 改号。
+- 进展（2026-09-25）：三项均已合并（#226 `abc914d`、#227 `7f9eaf1`、#228 `f37262c`）。合并前各分支并入新 main 并等 CI 转绿：D09 在 `docs/decisions.md` 末尾与 ADR-017 勘误行冲突（按编号保留两段），C16 在 `main.py` 路由注册处与 C04 #225 冲突（两行都保留）；迁移 005（C09）先于 006（C16）入库。合并后 main@`f37262c` 复核：后端 1676 passed、契约与工具 305 passed、前端 53 passed、`./scripts/verify.sh` exit 0；收尾交接见 `docs/handoffs/claude-batch-0925f-closeout.md`。
+
+## 2026-09-25 第四批（Claude）
+
+C07 前置 C03、C05、C06、B09 均已合并，issue #64 无人认领、无远端分支；规格缺口已由 D-16 关闭（本提交同时补注 `specs/task-processing.md`）。其余新任务的前置均在待合并 PR 中（E04←E03 #221、E05←D09 #226、I04←I03 #219、C10←C09 #220），本轮不领。已核对在途工作：539210 的 C04（课程 API，可能同样改 `main.py` 路由注册）；arvinhanye 的 F02、K07；待合并的 #219、#220、#221、#224、#226、#227、#228。本认领提交基于第三批认领提交 `9116315`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C07 | DONE（PR #230 `e8e9787`；移植 539210 #229 的先授权后解析） | 实现上传及资料列表 API | ArvinHan（Claude 子代理） | `claude/c07-materials-api` / 本认领提交 | `src/backend/app/api/materials.py`、`src/backend/app/services/materials.py`、`src/backend/app/schemas/materials.py`、`tests/backend/test_c07.py`、`docs/handoffs/claude-c07.md`；范围扩展：`src/backend/app/repositories/materials.py` 仅新增列表查询（按 D-16 关联最新任务），`src/backend/app/main.py` 仅加路由注册 | `docs/handoffs/claude-c07.md`；红：仅测试时收集错误（无 `app.services.materials`），服务桩 39 failed；绿：`test_c07.py` 39 passed；`tests/backend` 1089 passed（基线 1050）；contracts+tooling 272 passed、1 failed 为已知基线 `test_b07[0-PASS]`（#224）；6 处反向篡改（去课程隔离、parse_status 取列、取最早任务、去补偿删除、忽略 `UPLOAD_MAX_BYTES`、去重放删除）全部检出，恢复后 `cmp` 一致；`./scripts/verify.sh`、`git diff --check` exit 0；依赖 `python-multipart==0.0.32` 按 ADR-019（`6bc2ec4`）；待决见交接（契约无幂等键、列表排序、请求体上限前置、无任务回退）；**移植 #229（539210，`8514ecc`）先授权再有界解析**：红 3 failed、绿 `test_c07.py` 42 passed，`tests/backend` 1718 passed，contracts+tooling 305 passed，3 处篡改（恢复 `UploadFile` 参数、去实收字节计数、去 `Content-Length` 预检）全部检出且 `cmp` 一致，`verify.sh`、`git diff --check` exit 0；ADR-019 决定 2 同步改写 |
+
+- C07 验收：非法格式/课程越权拒绝；存盘或建任务失败可补偿（删除新落盘的未引用文件）；长处理不堵请求（只建任务、立即返回 202 `UploadAccepted`）；列表 `parse_status` 按 D-16 取最新任务 `stage`。验证：`python3 -m pytest tests/backend/test_c07.py -q`。
+
+## 2026-09-25 第五批并行（Claude）
+
+D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #226、C01；E04：E03 #221、C01；E05：E02、D09 #226；C10：C09 #220、C03；I04：I03 #219），issue 无人认领、无远端分支。已核对在途工作并避开：arvinhanye（Codex）的 F02 #231（`repositories/neo4j.py`、`pyproject.toml`）、K07 #232（`scripts/`）；本人待合并的 C07 #230（`api/materials.py`、`main.py`）。本认领提交基于第四批认领提交并入 main 后的结果。五项各在独立分支上进行，各子任务只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D10 | DONE（待 PR 审查/合并） | 实现来源块持久化 | ArvinHan（Claude 子代理） | `claude/d10-chunk-store` / 本认领提交 | `src/backend/app/repositories/chunks.py`、`src/backend/migrations/007_chunks.sql`（D-10：main 最大 006）、`tests/backend/test_d10.py`、`docs/handoffs/claude-d10.md` | 交接 `docs/handoffs/claude-d10.md`；迁移 007 新增 `material_revisions`/`task_revisions`/`chunks`（库层不可变触发器，回滚步骤已测）。红灯：仅有测试时收集 `ImportError`（1 error）；绿灯：`test_d10.py` 36 passed（PUB-28/29/30、课程隔离、V2 删除保护）；后端全量 1712 passed（基线 1676 + 36）；contracts+tooling 305 passed；反向篡改 5 处分别 1/4/1/1/1 failed，改回 `cmp` 一致；`verify.sh` exit 0；`git diff --check` 通过。待决 5 项（已提交版本判定注入待 G02、在途任务共享修订的保守保护等）见交接 |
+
+- D10 验收：重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用；块 ID 按 D09/ADR-018 派生，已存在 ID 内容哈希不一致即拒绝（PUB-30）。验证：`python3 -m pytest tests/backend/test_d10.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E04 | DONE（待 PR 审查/合并） | 实现模型调用预算与退避 | ArvinHan（Claude 子代理） | `claude/e04-call-policy` / 本认领提交 | `src/backend/app/services/ai/policy.py`、`src/backend/app/repositories/model_calls.py`、`tests/backend/test_e04.py`、`docs/handoffs/claude-e04.md`（`model_calls` 表已在 001，无迁移） | 红灯：实现前收集 `ImportError`；绿灯 `tests/backend/test_e04.py` 66 passed（47 个函数）；全量 `tests/backend` 1742 passed（基线 1676 + 66），`tests/contracts tests/tooling` 305 passed；反向篡改 5 处（鉴权被重试、`Retry-After` 不封顶、任务预算 `>=` 改 `>`、预写失败仍发请求、日志输出提示词）各被检出（5/2/1/2/1 failed），改回 `cmp` 一致；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；待决 9 项（含退避变量登记、生成前被拒的 `error_class` 格式）见 `docs/handoffs/claude-e04.md` |
+
+- E04 验收：429/5xx 有界退避，鉴权错误不重试；预算零不发请求；日志无 token/原文；退避参数有上限（A07 交出项）。验证：`python3 -m pytest tests/backend/test_e04.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E05 | DONE（待 PR 审查/合并） | 实现块级实体抽取 | ArvinHan（Claude 子代理） | `claude/e05-entity-extraction` / 本认领提交 | `src/backend/app/services/ai/entities.py`、`prompts/extract_entities.yaml`、`tests/backend/test_e05.py`、`docs/handoffs/claude-e05.md` | `docs/handoffs/claude-e05.md`；红灯：实现前收集错误（模块不存在），绿灯 `test_e05.py` 63 passed；后端全量 1739 passed（基线 1676 + 63），contracts/tooling 305 passed；反向篡改 6 处（证据子串、修复一次、修复不超过一次、类型闭集、长度边界、截断）全被抓到；`./scripts/verify.sh` 与 `git diff --check` 通过；提示词升 v2，越锁改 `prompts/MANIFEST.md` 一行（E01 规则要求同提交更新摘要），待协调方确认；长度上限、修复模板、失败块错误码、缓存存储等见交接待决 |
+
+- E05 验收：五类实体、字段范围、证据必须来自输入；坏 JSON 修复最多一次；只用 E02 fake 客户端测试，不需要密钥。验证：`python3 -m pytest tests/backend/test_e05.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C10 | DONE（待 PR 审查/合并） | 实现任务取消服务与 API | ArvinHan（Claude 子代理） | `claude/c10-task-cancel` / 本认领提交 | `src/backend/app/services/task_cancel.py`、`src/backend/app/api/task_cancel.py`、`tests/backend/test_c10.py`、`docs/handoffs/claude-c10.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | `test_c10.py` 先收集错误（ImportError）后 33 passed；`tests/backend` 1709 passed（基线 1676）；`tests/contracts tests/tooling` 305 passed；六处反向篡改（去比较并交换条件、终态可再取消、跳过授权、取消清租约、延迟 BEGIN、去 course_id）均被检出；`verify.sh` exit 0；`git diff --check` 通过；待决 5 项（本地响应模型、SQL 所在层、B10F-R01 影响、快照可选字段、SSE 投递）见 `docs/handoffs/claude-c10.md` |
+
+- C10 验收：queued/运行中/完成后/重复取消；取消和写入竞争有确定结果（与 C09 租约令牌同一写入序列）。审查遗留 B10F-R01/R02（取消快照 `cancel_requested` 非必填）若影响响应校验，写入交接待决，不在本任务改契约。验证：`python3 -m pytest tests/backend/test_c10.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I04 | DONE（待 PR 审查/合并） | 实现四项评分和结构化理由 | ArvinHan（Claude 子代理） | `claude/i04-ranking` / 本认领提交 | `src/backend/app/services/learning/ranking.py`、`tests/backend/test_i04.py`、`docs/handoffs/claude-i04.md` | 红：仅测试时收集错误 `ModuleNotFoundError`（exit 2）；绿：`test_i04.py` 115 passed；全量 `tests/backend` 1791 passed（基线 1676 + 115）、`tests/contracts tests/tooling` 305 passed；反向篡改 8 处（解锁数改出度 24 failed、同分章节秩颠倒 1、去零分母保护 32、求和顺序颠倒 2、去权重校验 3、排序前舍入 1、kp_id 降序 2；单删"至少一项为正"0 failed，因和校验已覆盖），均 `cmp` 恢复；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；待决 4 项见 `docs/handoffs/claude-i04.md` |
+
+- I04 验收：零分母、全零权重、同分、真实解锁数；分量求和等于 score；理由不用 LLM。验证：`python3 -m pytest tests/backend/test_i04.py -q`。
+
+- 合并约定：五个分支共用本认领提交。只有 D10 新增迁移（007）；C10 与 C07 #230 都改 `main.py` 路由注册，后合者解决一行冲突。

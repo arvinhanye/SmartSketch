@@ -896,7 +896,16 @@ class LearningIntegrityDetails(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    diagnostic_id: Annotated[str, Field(min_length=1)]
+    request_id: Annotated[str, Field(min_length=1)]
+
+
+class ProgressNotInPublishedVersionField(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    in_: Annotated[Literal['body'], Field(alias='in')]
+    field: Annotated[str, Field(pattern='^(0|[1-9][0-9]*)\\.kp_id$')]
+    reason: Literal['not_in_published_version']
 
 
 class Role1(Enum):
@@ -1230,6 +1239,30 @@ class PublishResult(BaseModel):
 class LearningIntegrityError(Error):
     code: Literal['INTERNAL_ERROR']
     details: LearningIntegrityDetails
+
+
+class ProgressValidationError(Error):
+    code: Literal['VALIDATION_ERROR']
+
+
+class ProgressNotInPublishedVersionDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    fields: Annotated[
+        list[ProgressNotInPublishedVersionField],
+        Field(
+            description='每个不在发布版中的请求项一项；不与其他 `reason` 混排。',
+            min_length=1,
+        ),
+    ]
+    graph_version: Annotated[
+        int,
+        Field(
+            description='请求事务所见的当前发布版本号（发布指针途中变化时为复核所用的新版本）',
+            ge=1,
+        ),
+    ]
 
 
 class ChatServiceError(Error):
