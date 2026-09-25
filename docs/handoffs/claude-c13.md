@@ -54,7 +54,7 @@
 
 ## 接口 / 数据 / 配置变化
 
-- **接口**：新增 `POST /api/v1/auth/login`，实现契约既有的 `login` 操作；契约未改。422 目前是 FastAPI 默认的 `{"detail": [...]}`，不是契约的 `Error` 形状。这是全局问题，`/health` 以外的首个业务路由就会遇到，应由统一异常处理器解决，本任务未做。
+- **接口**：新增 `POST /api/v1/auth/login`，实现契约既有的 `login` 操作；契约未改。422 已按 REVIEW-C13 R01 统一为契约 `Error`（见文末「审查修正」）。
 - **数据**：迁移 `002_accounts.sql` 新建 `users`。迁移前 C01 迁移器自动生成 `backups/*-before-002.sqlite` 并做完整性检查，测试已验证备份中没有 `users`、原有数据保留。回滚按 `src/backend/README.md`「SQLite 迁移与恢复」，用 before-002 备份恢复；不写 down 脚本。
 - **配置**：新增 `AUTH_JWT_SECRET`（API 必需）、`AUTH_ACCESS_TOKEN_TTL_SECONDS`。**升级后首次启动 API 前必须在本机设置 `AUTH_JWT_SECRET`**，否则 `python -m app` 拒绝启动。
 - **依赖**：新增 `argon2-cffi==25.1.0`。
@@ -64,15 +64,16 @@
 1. **越锁文件 `tests/backend/conftest.py`（新增）**：服务入口在导入时强制密钥，而 B05、B06、C01 的测试模块在收集阶段就会 `from app.main import create_app`，所以必须在会话级预置一个测试专用密钥（`os.environ.setdefault`，不覆盖外部已设的值）。没有它，所有后端测试在收集阶段就会失败。放在单独的提交里，可以审查后保留或另行处理。
 2. **越锁文件 `tests/backend/test_c01.py`**：`test_base_migration_adopts_existing_embedding_space_and_is_repeatable`、`test_model_calls_prewrite_replay_and_attribution_query`、`test_backup_can_be_moved_immediately_after_migration_returns`、`test_pending_migrations_is_read_only_and_validates_history` 断言「真实迁移目录只有 `001`」，**任何新增迁移的任务（C13、C02、C06…）都会让它们失败**。改法是新增辅助函数 `_base_only()`，把这四个用例改为对只含真实 `001_base.sql` 的临时目录断言，原有意图不变。与上一条在同一个单独提交里。若不接受，需要 C01 负责人按同样思路修改。
 3. **`SEED_DEMO_PASSWORD` 没有写成 `.env.example` 的有效行**：B06 的 `test_env_example_covers_every_setting` 要求 `.env.example` 中的变量与 `Settings` 字段集合完全相等，而该变量只给种子脚本用，不应进入 `Settings`。所以写成注释行，并在 `docs/integrations.md` 登记。C14 可以沿用，或调整 B06 的这条断言。
-4. **`src/backend/README.md` 未更新**（不在锁内）：启动步骤需要补一句「先设置 `AUTH_JWT_SECRET`」。
+4. ~~`src/backend/README.md` 未更新~~：已按 REVIEW-C13 R06 补写（审查明确要求，越出原文件锁）。
 5. **`docs/tasks.md` 的 C13 行**：由协调方更新为待审查，证据指向本交接。
+6. **`src/contracts/errors.v1.md` 补 `details.fields` 结构**（不在锁内）：本任务定为 `[{in, field, reason}]`，见文末「审查修正」R01。
 
 ## 未验证项与风险
 
 - **限流有竞态**：检查与记录之间不加锁，并发请求可能让同一用户名在锁生效前多试几次，最多多出并发数次。规格已说明进程内计数只是缓解手段。
-- **LRU 可被冲掉**：攻击者用大量不同用户名可以把已锁定的键挤出上限，使锁提前解除。规格接受按最久未用淘汰。
+- ~~LRU 可被冲掉~~：已按 R04 修正；只有表中全部是有效锁时，才会提前解除最先到期的那个锁。
 - **格式不合法的用户名不查库**：这条路径比合法用户名少一次 SQLite 查询，时间差在亚毫秒级，而 argon2 一次约几十毫秒。用户名格式是公开规则，这点差别不会泄露账号是否存在。
-- 没有对超长请求体做上限：超长口令仍会完整做一次 argon2 校验。请求体大小限制属于部署或全局中间件，未做。
+- 用户名与口令已有长度上限（R03），但请求体整体大小仍未限制；这属于部署或全局中间件，未做。
 - 没有做「参数变更后登录时重新哈希」（`check_needs_rehash`）。
 - 没有在 Windows 或 CRLF 检出上运行；`002_accounts.sql` 的 `eol: lf` 已由 `.gitattributes` 覆盖（`git check-attr` 已核对）。
 - `argon2-cffi-bindings` 需要平台 wheel。本机 macOS 从 wheel 安装成功，其他平台未验证。
@@ -82,3 +83,27 @@
 - **C03**：实现 Bearer 校验，只接受 HS256，拒绝 `alg: none`、其他算法、过期和缺字段；按 `sub` 回查 `users`，已停用则 401，账号类型取数据库中的值。可复用 `app.services.auth` 的 `issue_access_token` 构造测试令牌。
 - **C14**：账号命令与演示种子复用 `create_account`（已含用户名、口令、角色校验，以及对大小写不同的重名报 `DuplicateUsername`）；停用即写入 `disabled_at`。
 - **C02**：`course_members.user_id` 外键引用本任务的 `users(id)`；迁移编号按 D-10 在合并时取 main 最大编号 + 1。
+
+## 审查修正（REVIEW-C13，审查 `347ee46`）
+
+由后端子代理实现 R01～R05。子代理的会话不能写入本 worktree，所以 R06、本节与提交由协调会话在本 worktree 获授权后完成，并复核了全部改动。
+
+| 项 | 处理 |
+| --- | --- |
+| R01（P2）422 形状 | `create_app` 注册全局 `RequestValidationError` 处理器，返回契约 `Error`：`code = VALIDATION_ERROR`，`details.fields = [{in, field, reason}]`。`in` 是请求部位（body/query/path/header/cookie）；`field` 是点路径，缺整个请求体或 JSON 无法解析时为空串；`reason` 是 Pydantic 错误类型。不回显 `input` 与 `msg`，口令不会出现。登录 OpenAPI 的 422 改为引用 `Error` |
+| R02 假哈希预生成 | 新增 `prepare_timing_dummy_hash()`，由 `create_app` 调用；首个不存在用户名的登录只做一次校验、不再生成哈希 |
+| R03 长度上限 | `LoginRequest` 限用户名 ≤32、口令 ≤128（规格 §1.1、§1.4），超限返回 422，不做哈希、不计限流。只设上限：过短或格式不对的输入仍返回统一的 401。口令超长的 `reason` 为 `too_long`（SecretStr），用户名为 `string_too_long` |
+| R04 限流淘汰 | 限流表分为「未锁定」和「锁定中」两组。表满时依次淘汰：已过期的锁 → 最久未失败的未锁定条目 → 全部都是有效锁时，最先到期的锁。刚记录的用户名不会当场被淘汰。取舍：全部锁定时如果拒绝记录新用户名，等于让攻击者锁住全站，所以宁可提前解除剩余时间最短的那个锁 |
+| R05 模型分层 | 登录 DTO 移入 `app/schemas/auth.py`，`Error` 放入 `app/schemas/errors.py`；`api/auth.py` 不再定义模型 |
+| R06 README | `src/backend/README.md` 启动步骤补上设置 `AUTH_JWT_SECRET`（≥32 字节、随机生成示例、换密钥后旧令牌全部失效） |
+
+测试：先写用例，得到 11 个红灯，再改实现。三个旧用例按新语义调整：422 用例补充断言；限流键长度用例移到服务层，因为超长用户名在 API 层就返回 422；LRU 用例原本断言锁会被挤掉，现改为验证 R04 的新行为。
+
+| 命令（macOS，Python 3.13.5，基线 `347ee46`） | 结果 |
+| --- | --- |
+| `pytest tests/backend/test_c13.py -q` | 58 passed |
+| `pytest tests/backend -q` | 386 passed（修正前 373） |
+| `./scripts/verify.sh` | `Scaffold verification passed.`，exit 0 |
+| `git diff --check` | exit 0 |
+
+需协调方处理：在 `src/contracts/errors.v1.md` 登记 `details.fields` 的 `[{in, field, reason}]` 结构。

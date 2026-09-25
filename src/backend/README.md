@@ -11,10 +11,13 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pytest tests/backend/test_b06.py -q
 ```
 
-从仓库根目录启动；相对 `SQLITE_URL` 路径以这个目录为基准，API 和后续 worker 必须使用同一个 SQLite 文件。首次启动前先执行迁移（见下方「SQLite 迁移与恢复」），否则 API 会以「SQLite schema is not migrated」拒绝启动：
+从仓库根目录启动；相对 `SQLITE_URL` 路径以这个目录为基准，API 和后续 worker 必须使用同一个 SQLite 文件。首次启动前先执行迁移（见下方「SQLite 迁移与恢复」），否则 API 会以「SQLite schema is not migrated」拒绝启动。
+
+启动前还须设置 `AUTH_JWT_SECRET`（登录令牌的 HS256 签名密钥，至少 32 字节）。缺失或过短时 `python -m app` 与 `app.main:app` 非 0 退出，错误只含变量名，不回退默认密钥。下面每次随机生成，仅适合本机试用；需要令牌跨重启有效时，把固定值放在个人本地环境中，不要提交。更换密钥会使已签发的令牌全部失效：
 
 ```powershell
 $env:PYTHONPATH = (Resolve-Path ./src/backend).Path
+$env:AUTH_JWT_SECRET = .\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
 .\.venv\Scripts\python.exe -m app.repositories.sqlite
 .\.venv\Scripts\python.exe -m app
 ```
