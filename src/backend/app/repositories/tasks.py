@@ -164,3 +164,12 @@ def get_task(
             (task_id, course_id),
         ).fetchone()
     return _task_from_row(row) if row else None
+
+
+def find_task_course_id(sqlite_url: str, task_id: str) -> str | None:
+    """Resolve ownership before C03 checks membership; never expose task details."""
+    with connect(sqlite_url) as database:
+        row = database.execute(
+            "SELECT course_id FROM processing_tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    return row[0] if row else None
