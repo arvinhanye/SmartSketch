@@ -33,7 +33,9 @@ LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_SECONDS = 60
 LOGIN_LIMITER_CAPACITY = 10_000
 
-USERNAME_PATTERN = re.compile(r"[a-z0-9_.-]{3,32}")
+USERNAME_MIN_LENGTH = 3
+USERNAME_MAX_LENGTH = 32
+USERNAME_PATTERN = re.compile(rf"[a-z0-9_.-]{{{USERNAME_MIN_LENGTH},{USERNAME_MAX_LENGTH}}}")
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 128
 ROLES = ("teacher", "student")
@@ -84,6 +86,15 @@ def _timing_dummy_hash() -> str:
         return _dummy_hash
 
 
+def prepare_timing_dummy_hash() -> None:
+    """Build the dummy hash ahead of the first request (called from ``create_app``).
+
+    Generating it lazily made the first unknown-username login pay one hash plus one
+    verification — about twice the usual time — which is itself a timing signal.
+    """
+    _timing_dummy_hash()
+
+
 # --- accounts -----------------------------------------------------------------------------
 
 
@@ -127,8 +138,11 @@ class LoginRateLimiter:
 
     After ``max_failures`` consecutive failures the key is locked for ``lock_seconds``;
     when the lock expires the streak starts over, and a successful login clears it.
-    Unknown usernames are counted too. At most ``capacity`` keys are kept (least recently
-    failed evicted first). Each API process counts separately: a mitigation, not a guarantee.
+    Unknown usernames are counted too. At most ``capacity`` keys are kept. When full, the
+    evicted entry is, in order of preference: an expired lock; the least recently failed
+    unlocked streak; and only when every entry is an active lock, the lock expiring first.
+    Flooding with fresh usernames therefore cannot lift a lock while any unlocked entry
+    remains. Each API process counts separately: a mitigation, not a guarantee.
     """
 
     def __init__(
@@ -143,47 +157,66 @@ class LoginRateLimiter:
         self._max_failures = max_failures
         self._lock_seconds = lock_seconds
         self._capacity = capacity
-        self._streaks: OrderedDict[str, _Streak] = OrderedDict()
+        # Unlocked streaks in least-recently-failed order.
+        self._open: OrderedDict[str, _Streak] = OrderedDict()
+        # Active locks in lock order; every lock lasts ``lock_seconds``, so this is also
+        # expiry order and the first entry is always the one expiring soonest.
+        self._locked: OrderedDict[str, _Streak] = OrderedDict()
         self._mutex = threading.Lock()
 
     def __len__(self) -> int:
-        return len(self._streaks)
+        return len(self._open) + len(self._locked)
+
+    def _drop_expired_locks(self, now: float) -> None:
+        while self._locked:
+            key, streak = next(iter(self._locked.items()))
+            if streak.locked_until is not None and streak.locked_until > now:
+                break
+            del self._locked[key]
 
     def retry_after(self, key: str) -> int | None:
         """Whole seconds until ``key`` may try again, or None when it is not locked."""
         with self._mutex:
-            streak = self._streaks.get(key)
+            self._drop_expired_locks(self._clock())
+            streak = self._locked.get(key)
             if streak is None or streak.locked_until is None:
                 return None
-            remaining = streak.locked_until - self._clock()
-            if remaining <= 0:
-                del self._streaks[key]
-                return None
-            return max(1, math.ceil(remaining))
+            return max(1, math.ceil(streak.locked_until - self._clock()))
 
     def record_failure(self, key: str) -> None:
         with self._mutex:
             now = self._clock()
-            streak = self._streaks.get(key)
-            if streak is None or (streak.locked_until is not None and now >= streak.locked_until):
-                streak = _Streak()
+            self._drop_expired_locks(now)
+            if key in self._locked:
+                return  # callers check retry_after first; a locked key is never re-counted
+            streak = self._open.pop(key, None) or _Streak()
             streak.failures += 1
-            if streak.failures >= self._max_failures and streak.locked_until is None:
+            if streak.failures >= self._max_failures:
                 streak.locked_until = now + self._lock_seconds
-            self._streaks[key] = streak
-            self._streaks.move_to_end(key)
-            while len(self._streaks) > self._capacity:
-                self._streaks.popitem(last=False)
+                self._locked[key] = streak
+            else:
+                self._open[key] = streak
+            while len(self) > self._capacity:
+                # The key just recorded is never the victim, or a table full of locks would
+                # leave every new username uncounted.
+                if self._open and next(iter(self._open)) != key:
+                    self._open.popitem(last=False)
+                elif self._locked and next(iter(self._locked)) != key:
+                    self._locked.popitem(last=False)
+                else:
+                    break  # only reachable with capacity < 1
 
     def reset(self, key: str) -> None:
         with self._mutex:
-            self._streaks.pop(key, None)
+            self._open.pop(key, None)
+            self._locked.pop(key, None)
 
 
 def _limiter_key(normalized_username: str) -> str:
     # Valid usernames are at most 32 characters, so truncating at 33 keeps every real key
-    # distinct while bounding the memory an attacker can make each key occupy.
-    return normalized_username[: 32 + 1]
+    # distinct while bounding the memory an attacker can make each key occupy. The API already
+    # rejects longer usernames with 422; this guards any other caller of AuthService.
+    return normalized_username[: USERNAME_MAX_LENGTH + 1]
 
 
 # --- access token -------------------------------------------------------------------------

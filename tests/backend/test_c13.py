@@ -310,10 +310,112 @@ def test_disabled_account_cannot_log_in_after_previous_success(client, teacher, 
     assert response.json()["code"] == "UNAUTHENTICATED"
 
 
-def test_request_shape_errors_are_rejected_before_authentication(client):
+def test_request_shape_errors_are_rejected_before_authentication(client, monkeypatch):
+    verifications = _count_verifications(monkeypatch)
     assert client.post(LOGIN, json={"username": "demo_teacher"}).status_code == 422
     assert client.post(LOGIN, json={"password": PASSWORD}).status_code == 422
     assert client.get(LOGIN).status_code == 405
+    assert verifications == []
+    assert len(client.app.state.login_limiter) == 0
+
+
+# --- 422 in the contract Error shape (REVIEW-C13 R01, R03) --------------------------------
+
+
+def _validation_error(response) -> list[dict]:
+    """Assert the contract ``Error`` shape for 422 and return ``details.fields``."""
+    assert response.status_code == 422
+    body = response.json()
+    assert set(body) == {"code", "message", "details"}
+    assert body["code"] == "VALIDATION_ERROR"
+    assert isinstance(body["message"], str) and body["message"]
+    assert set(body["details"]) == {"fields"}
+    for entry in body["details"]["fields"]:
+        assert set(entry) == {"in", "field", "reason"}
+    return body["details"]["fields"]
+
+
+def test_missing_login_fields_return_contract_error_naming_each_field(client):
+    assert _validation_error(client.post(LOGIN, json={"username": "demo_teacher"})) == [
+        {"in": "body", "field": "password", "reason": "missing"}
+    ]
+    assert _validation_error(client.post(LOGIN, json={})) == [
+        {"in": "body", "field": "username", "reason": "missing"},
+        {"in": "body", "field": "password", "reason": "missing"},
+    ]
+
+
+def test_malformed_or_missing_login_body_returns_contract_error(client):
+    malformed = client.post(
+        LOGIN, content=b'{"username": "canary-user", "password": ', headers={"Content-Type": "application/json"}
+    )
+    assert [entry["reason"] for entry in _validation_error(malformed)] == ["json_invalid"]
+    assert b"canary-user" not in malformed.content
+
+    missing = client.post(LOGIN)
+    assert _validation_error(missing) == [{"in": "body", "field": "", "reason": "missing"}]
+
+
+def test_validation_error_never_echoes_submitted_values(client, caplog):
+    caplog.set_level(logging.DEBUG)
+    canary = "password-canary-" + "p" * 120  # 136 characters, over the 128 limit
+    response = client.post(LOGIN, json={"username": ["user-canary"], "password": canary})
+
+    assert {(entry["field"], entry["reason"]) for entry in _validation_error(response)} == {
+        ("username", "string_type"),
+        ("password", "too_long"),  # Pydantic's type for SecretStr; str fields say string_too_long
+    }
+    assert b"canary" not in response.content
+    assert "canary" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("body", "field", "reason"),
+    [
+        ({"username": "u" * 33, "password": PASSWORD}, "username", "string_too_long"),
+        ({"username": "demo_teacher", "password": "p" * 129}, "password", "too_long"),
+    ],
+)
+def test_overlong_credentials_are_rejected_before_hashing(
+    client, teacher, monkeypatch, body, field, reason
+):
+    verifications = _count_verifications(monkeypatch)
+    response = client.post(LOGIN, json=body)
+
+    assert _validation_error(response) == [{"in": "body", "field": field, "reason": reason}]
+    assert verifications == []
+    assert len(client.app.state.login_limiter) == 0
+
+
+def test_credentials_at_the_length_limits_still_reach_authentication(client, teacher):
+    at_limit = [
+        {"username": "u" * 32, "password": PASSWORD},
+        {"username": "demo_teacher", "password": "p" * 128},
+    ]
+    for body in at_limit:
+        response = client.post(LOGIN, json=body)
+        assert response.status_code == 401
+        assert response.json()["code"] == "UNAUTHENTICATED"
+
+
+def test_validation_handler_is_global_for_query_parameters(db_url, monkeypatch):
+    monkeypatch.setenv("SQLITE_URL", db_url)
+    application = create_app()
+
+    @application.get("/c13-probe")
+    def probe(limit: int) -> dict[str, int]:
+        return {"limit": limit}
+
+    with TestClient(application) as test_client:
+        response = test_client.get("/c13-probe", params={"limit": "not-a-number-canary"})
+    assert _validation_error(response) == [{"in": "query", "field": "limit", "reason": "int_parsing"}]
+    assert b"canary" not in response.content
+
+
+def test_login_documents_422_as_contract_error(client):
+    operation = client.app.openapi()["paths"][LOGIN]["post"]
+    schema = operation["responses"]["422"]["content"]["application/json"]["schema"]
+    assert schema["$ref"].split("/")[-1] == "Error"
 
 
 # --- rate limiting ------------------------------------------------------------------------
@@ -382,18 +484,112 @@ def test_limiter_lock_expires_and_capacity_evicts_least_recently_used():
     limiter.record_failure("a")  # a fresh streak after the lock expired
     assert limiter.retry_after("a") is None
 
-    for _ in range(5):
-        limiter.record_failure("b")
     limiter.record_failure("c")
-    limiter.record_failure("d")  # evicts the least recently used key ("b")
-    assert limiter.retry_after("b") is None
+    limiter.record_failure("d")  # evicts the least recently failed unlocked key ("a")
     assert len(limiter) == 2
+    for _ in range(4):
+        limiter.record_failure("a")
+    assert limiter.retry_after("a") is None  # "a" restarted from zero after eviction
 
 
-def test_limiter_bounds_key_length_for_impossible_usernames(client):
+def test_limiter_never_evicts_a_lock_while_unlocked_keys_remain():
+    """REVIEW-C13 R04: flooding with fresh usernames must not lift an active lock."""
+    clock = FakeClock(0.0)
+    limiter = LoginRateLimiter(clock=clock, capacity=3)
+    for _ in range(5):
+        limiter.record_failure("victim")
+    for index in range(1000):
+        clock.now = index * 0.01
+        limiter.record_failure(f"flood{index}")
+    clock.now = 10.0
+
+    assert limiter.retry_after("victim") == 50
+    assert len(limiter) == 3
+
+
+def test_limiter_drops_expired_locks_before_unlocked_streaks():
+    clock = FakeClock(0.0)
+    limiter = LoginRateLimiter(clock=clock, capacity=2)
+    limiter.record_failure("pending")  # the least recently failed key
+    clock.now = 1.0
+    for _ in range(5):
+        limiter.record_failure("expired")
+    clock.now = 61.0
+    limiter.record_failure("newcomer")  # the expired lock goes first; "pending" keeps its count
+
+    for _ in range(3):
+        limiter.record_failure("pending")
+    assert limiter.retry_after("pending") is None
+    limiter.record_failure("pending")
+    assert limiter.retry_after("pending") == 60
+
+
+def test_limiter_full_of_locks_evicts_the_lock_expiring_first():
+    clock = FakeClock(0.0)
+    limiter = LoginRateLimiter(clock=clock, capacity=2)
+    for when, key in ((0.0, "first"), (10.0, "second")):
+        clock.now = when
+        for _ in range(5):
+            limiter.record_failure(key)
+    clock.now = 20.0
+    limiter.record_failure("third")  # the new key is counted, never dropped on arrival
+
+    assert limiter.retry_after("first") is None
+    assert limiter.retry_after("second") == 50
+    assert len(limiter) == 2
+    for _ in range(4):
+        limiter.record_failure("third")
+    assert limiter.retry_after("third") == 60
+
+
+def test_limiter_bounds_key_length_for_impossible_usernames(db_url):
+    # The API rejects usernames over 32 characters with 422; the service still bounds keys
+    # for any other caller.
+    limiter = LoginRateLimiter()
+    service = auth_service.AuthService(
+        load_settings({"SQLITE_URL": db_url, "AUTH_JWT_SECRET": SECRET}), limiter
+    )
     for index in range(3):
-        client.post(LOGIN, json={"username": "z" * 40 + str(index), "password": "wrong-password"})
-    assert len(client.app.state.login_limiter) == 1
+        with pytest.raises(auth_service.InvalidCredentials):
+            service.login("z" * 40 + str(index), "wrong-password")
+    assert len(limiter) == 1
+
+
+# --- start-up work and module layout (REVIEW-C13 R02, R05) --------------------------------
+
+
+def test_timing_dummy_hash_is_prepared_when_the_app_is_created(db_url, monkeypatch):
+    monkeypatch.setattr(auth_service, "_dummy_hash", None)
+    monkeypatch.setenv("SQLITE_URL", db_url)
+    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
+    application = create_app()
+    assert auth_service._dummy_hash is not None
+    assert auth_service._dummy_hash.startswith("$argon2id$")
+
+    hashed: list[str] = []
+    monkeypatch.setattr(auth_service, "hash_password", lambda password: hashed.append("x") or "")
+    with TestClient(application) as test_client:
+        response = test_client.post(LOGIN, json={"username": "first_unknown", "password": PASSWORD})
+    assert response.status_code == 401
+    assert hashed == []  # the first unknown username pays exactly one verification, no hashing
+
+
+def test_login_models_live_in_the_schemas_package():
+    import app.api.auth as auth_api
+    from pydantic import BaseModel
+
+    from app.schemas import auth as auth_schemas
+
+    for name in ("LoginRequest", "LoginResponse", "User"):
+        assert getattr(auth_schemas, name).__module__ == "app.schemas.auth"
+    defined_in_route_module = [
+        value
+        for value in vars(auth_api).values()
+        if isinstance(value, type)
+        and issubclass(value, BaseModel)
+        and value.__module__ == auth_api.__name__
+    ]
+    assert defined_in_route_module == []
 
 
 # --- configuration and startup ------------------------------------------------------------

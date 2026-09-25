@@ -1,43 +1,16 @@
 """POST /api/v1/auth/login — protocol translation only (contract operation ``login``).
 
-Request/response models mirror ``LoginRequest``/``LoginResponse``/``User``/``Error`` in
-src/contracts/api.v1.yaml; they are declared here, as health.py does, until the generated
-DTO package is importable from the backend.
+Request/response models live in ``app.schemas.auth``; malformed requests are answered by the
+application-wide ``VALIDATION_ERROR`` handler registered in ``app.main``.
 """
-
-from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, SecretStr
 
 from app.config import SettingsError
+from app.schemas.auth import LoginRequest, LoginResponse, User
+from app.schemas.errors import Error
 from app.services.auth import AuthService, InvalidCredentials, LoginRateLimited
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: SecretStr  # masked in repr, validation errors and logs
-
-
-class User(BaseModel):
-    id: str
-    username: str
-    role: Literal["teacher", "student"]
-
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"]
-    # optional in the contract (generated model: Optional[int]); this endpoint always sends it
-    expires_in: int | None = Field(default=None, description="秒")
-    user: User
-
-
-class Error(BaseModel):
-    code: str
-    message: str
-
 
 _UNAUTHENTICATED = {"code": "UNAUTHENTICATED", "message": "用户名或口令错误"}
 _RATE_LIMITED = {"code": "RATE_LIMITED", "message": "登录失败次数过多，请稍后再试"}
@@ -61,6 +34,7 @@ def get_auth_service(request: Request) -> AuthService | None:
     response_model=LoginResponse,
     responses={
         401: {"model": Error, "description": "未认证或令牌失效"},
+        422: {"model": Error, "description": "请求体校验失败（`VALIDATION_ERROR`）"},
         429: {"model": Error, "description": "请求受限：`RATE_LIMITED`，可按 `Retry-After` 重试"},
     },
 )
