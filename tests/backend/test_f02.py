@@ -93,7 +93,7 @@ def test_parameterized_read_preserves_query_and_authoritative_scope(api):
     assert params["course_id"] == "other"
 
 
-@pytest.mark.parametrize("reader", ["teacher", "student"])
+@pytest.mark.parametrize("reader", ["teacher", "student", "worker"])
 def test_published_reads_need_no_effective_task_set(api, reader):
     driver = FakeDriver()
     assert api.Neo4jRepository(driver).read(
@@ -110,7 +110,7 @@ def test_student_draft_is_rejected_even_with_effective_tasks(api):
     assert driver.calls == []
 
 
-@pytest.mark.parametrize("reader", [None, "admin", "", "Teacher"])
+@pytest.mark.parametrize("reader", [None, "admin", "", "Teacher", "Worker", "service"])
 def test_unknown_read_intent_is_rejected(api, reader):
     driver = FakeDriver()
     with pytest.raises(api.GraphScopeError):
@@ -118,11 +118,11 @@ def test_unknown_read_intent_is_rejected(api, reader):
     assert driver.calls == []
 
 
-@pytest.mark.parametrize("method", ["read", "write"])
-def test_draft_without_sqlite_effective_task_set_is_rejected(api, method):
+@pytest.mark.parametrize("method,reader", [("read", "teacher"), ("read", "worker"), ("write", None)])
+def test_draft_without_sqlite_effective_task_set_is_rejected(api, method, reader):
     driver = FakeDriver()
-    kwargs = {"reader": "teacher"} if method == "read" else {}
-    with pytest.raises(api.GraphScopeError):
+    kwargs = {"reader": reader} if method == "read" else {}
+    with pytest.raises(api.GraphScopeError, match="effective_task_ids"):
         getattr(api.Neo4jRepository(driver), method)(
             DRAFT_QUERY, api.GraphScope("c", "draft"),
             parameters={"effective_task_ids": ["caller-cannot-supply-V"]}, **kwargs
@@ -132,23 +132,25 @@ def test_draft_without_sqlite_effective_task_set_is_rejected(api, method):
 
 @pytest.mark.parametrize("suffix", ["", " // $effective_task_ids", " /* $effective_task_ids */",
                                      " + '$effective_task_ids'"])
-def test_draft_query_must_reference_effective_task_parameter(api, suffix):
+@pytest.mark.parametrize("reader", ["teacher", "worker"])
+def test_draft_query_must_reference_effective_task_parameter(api, suffix, reader):
     driver = FakeDriver()
-    with pytest.raises(api.GraphScopeError):
+    with pytest.raises(api.GraphScopeError, match="required scope parameters"):
         api.Neo4jRepository(driver).read(
-            QUERY + suffix, api.GraphScope("c", "draft", ()), reader="teacher"
+            QUERY + suffix, api.GraphScope("c", "draft", ()), reader=reader
         )
     assert driver.calls == []
 
 
 @pytest.mark.parametrize("tasks", [(), ("task-a", "task-b")])
-def test_draft_accepts_empty_V_and_binds_authoritative_snapshot(api, tasks):
+@pytest.mark.parametrize("reader", ["teacher", "worker"])
+def test_draft_accepts_empty_V_and_binds_authoritative_snapshot(api, tasks, reader):
     driver = FakeDriver()
     task_snapshot = list(tasks)
     scope = api.GraphScope("c", "draft", task_snapshot)
     task_snapshot.append("later-task")
     api.Neo4jRepository(driver).read(
-        DRAFT_QUERY, scope, reader="teacher",
+        DRAFT_QUERY, scope, reader=reader,
         parameters={"effective_task_ids": ["failed-task"]},
     )
     assert driver.calls[0][1] == {"course_id": "c", "version_id": "draft",

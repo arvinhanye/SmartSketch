@@ -9,7 +9,7 @@
 
 - `src/backend/app/repositories/neo4j.py`: synchronous, injectable driver boundary; no import-time connections.
 - `src/backend/pyproject.toml`: exact official `neo4j==5.28.2` dependency.
-- `tests/backend/test_f02.py`: 64 offline cases.
+- `tests/backend/test_f02.py`: 74 offline cases after review fix 1.
 - This handoff; no other source, schema, configuration, migrations or data changes.
 
 ```python
@@ -17,7 +17,7 @@ GraphScope(course_id: str, version_id: str,
            effective_task_ids: Sequence[str] | None = None)
 Neo4jRepository(driver: GraphDriver)
 Neo4jRepository.from_settings(settings: Settings) -> Neo4jRepository
-repo.read(query: str, scope: GraphScope, *, reader: Literal["teacher", "student"],
+repo.read(query: str, scope: GraphScope, *, reader: Literal["teacher", "student", "worker"],
           parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]
 repo.write(query: str, scope: GraphScope, *,
            parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]
@@ -35,8 +35,8 @@ Sources: atomic F02 row; task-processing §8.4 / LEASE-23; teacher-review-publis
 1. Every business query must contain actual `$course_id` and `$version_id` parameter tokens. Quoted strings, backtick identifiers, comments and suffix lookalikes do not satisfy this check. Values are passed separately and never interpolated by the repository. Repository scope overrides caller extras.
 2. Every draft query requires both a non-`None` V in `GraphScope` and an executable `$effective_task_ids` token. Empty V is valid. Scope copies V into an immutable tuple and sends a new list to the driver, so later caller mutation does not alter the snapshot. Extra parameters never supply/override V.
 3. Conservative interpretation of LEASE-23's “draft query”: draft writes require V too, because writes can read via `MATCH`/`MERGE` or cycle checks. This avoids an alternate draft-read entrance; even a pure draft write carries V.
-4. The service reads V **once from SQLite** for the same course (`awaiting_review` / `completed`, and watermarked for publication), authenticates teacher membership, and passes it explicitly. The repository does not query SQLite or claim to prove V's provenance. Existing task schema/lifecycle work and published-version resolution remain their owning tasks.
-5. Reads require explicit teacher/student intent; student `draft` reads are rejected even with V. Published reads do not need V. `write` is an internal teacher/worker API, not a student route.
+4. The service reads V **once from SQLite** for the same course (`awaiting_review` / `completed`, and watermarked for publication), authenticates teacher membership for teacher-facing reads (or derives scope from a validated internal task for worker reads), and passes it explicitly. The repository does not query SQLite or claim to prove V's provenance. Existing task schema/lifecycle work and published-version resolution remain their owning tasks.
+5. Reads require explicit teacher/student/worker intent; student `draft` reads are rejected even with V. Internal `reader="worker"` supports merging candidate lookup and persisting cycle checks under the same mandatory draft V/token guards; worker intent is not accepted from a client request. Published reads for all three intents do not need V. `write` is an internal teacher/worker API, not a student route.
 6. Cypher must be trusted repository code, not user-supplied text. Token checks detect omissions, **not semantic authorization**: callers still implement course/version predicates, per-contribution visibility, relationship endpoint visibility, and evidence visibility. F04/F07/F13/G04 own those domain queries and integration acceptance (LEASE-19/20, PUB-35). No speculative domain schema was added here.
 
 ## Dependency compatibility
@@ -75,3 +75,13 @@ Environment: default Python 3.11 lacked test dependencies. Existing Anaconda Pyt
 - Live Neo4j authentication, routing, failover, Cypher syntax and query semantics remain unverified here by design; tests perform no network I/O or graph writes. Arbitrary-Cypher authorization and multi-query transaction APIs are out of scope.
 - Returning eager records may be inappropriate for unbounded queries; callers should parameterize pagination/limits.
 - Rollback: revert the F02 commit, reinstall backend dependencies from the reverted `pyproject.toml`, and restart consumers. There are no migrations or database changes to reverse. Retain existing Neo4j data untouched.
+
+## Review fix 1 — worker read intent
+
+- Confirmed task-processing §8.4 explicitly requires worker draft reads for merging candidate lookup and persisting cycle checks. Added internal `reader="worker"` rather than making workers claim teacher identity. Teacher and worker drafts share the existing mandatory V/token validation; student drafts are still rejected.
+- Tests added first: published worker reads, empty/populated-V worker drafts, worker draft missing V, teacher/worker missing or quoted/comment-only V tokens, and invalid `Worker`/`service` intents. Error-message matching ensures an invalid-intent rejection does not falsely satisfy a missing-V test.
+- RED: `python3 -m pytest tests/backend/test_f02.py -q` → **8 failed, 66 passed in 1.07s** (old worker-intent rejection). GREEN after fix: **74 passed in 1.24s**.
+- `python3 -m pytest tests/backend -q` → **1124 passed, 1 warning in 108.68s**; same upstream Starlette/httpx deprecation warning. Runtime/environment is the scratch setup above; no network/graph I/O.
+- `./scripts/verify.sh` → **exit 0** (25 negative checks, B14 3 cases and other contract suites 201 cases).
+- Full offline `python3 -m pytest -q` → **1405 passed, 3 skipped, 1 failed, 1 warning in 518.90s**. Sole failure remains the clean-base-confirmed B07 fake-workspace omission of `tests/contracts/test_b14.py` noted above; no F02 failure. Real Docker tests remain skipped.
+- Self-review: worker uses the same `_execute`/scope validator as teacher/student, no bypass flag or new driver route; student draft guard is unchanged. `git diff --check` and final staged check passed. This round changes only repository, F02 tests and this handoff; shared task records remain with the coordinator.

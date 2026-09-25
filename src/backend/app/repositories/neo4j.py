@@ -117,9 +117,11 @@ class Neo4jRepository:
     """Own a synchronous driver and return eager plain-dict records.
 
     Reads require explicit caller intent; the upstream service authenticates
-    course membership and resolves the published version. Writes are internal
-    teacher/worker operations, not a student-facing escape hatch. Each method is
-    one managed transaction; multi-query atomic operations belong to later work.
+    course membership and resolves the published version. Internal workers use
+    worker intent for V-scoped merging candidates and persisting cycle checks.
+    Writes are internal teacher/worker operations, not a student-facing escape
+    hatch. Each method is one managed transaction; multi-query atomic operations
+    belong to later work.
     """
 
     def __init__(self, driver: GraphDriver) -> None:
@@ -149,11 +151,11 @@ class Neo4jRepository:
         query: str,
         scope: GraphScope,
         *,
-        reader: Literal["teacher", "student"],
+        reader: Literal["teacher", "student", "worker"],
         parameters: Mapping[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        if reader not in {"teacher", "student"}:
-            raise GraphScopeError("Read intent must be teacher or student")
+        if reader not in {"teacher", "student", "worker"}:
+            raise GraphScopeError("Read intent must be teacher, student or worker")
         if reader == "student" and scope.version_id == "draft":
             raise GraphScopeError("Student reads require a published version")
         return self._execute(query, scope, parameters, "r")
