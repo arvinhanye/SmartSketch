@@ -760,3 +760,27 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 - I03 验收：已掌握集合为空、全部掌握、孤立点、多前置、有环、外课 ID；不修改用户的掌握集合。验证：`python3 -m pytest tests/backend/test_i03.py -q`。
 
 - 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925b-claims` 上解决一次，再并入三个分支，保证三者的解决结果一致。
+
+## 2026-09-25 第三批并行（Claude）
+
+D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10；B15：B02、B14），issue 无人认领、无远端分支。已核对在途工作并避开：539210 的 C04（课程 API）；arvinhanye 的 F02、K07；本人待合并的 I03 #219、C09 #220（迁移 005）、E03 #221、B12-R1 #224。本认领提交基于第二批认领提交 `6a93cf3`，与上述 PR 无文本冲突。三项各在独立分支上进行，各子任务只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D09 | IN PROGRESS | 实现块身份与缓存键 | ArvinHan（Claude 子代理） | `claude/d09-chunk-identity` / 本认领提交 | `src/backend/app/services/chunk_identity.py`、`tests/backend/test_d09.py`、`docs/handoffs/claude-d09.md` | 待补 |
+
+- D09 验收：同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效（缓存键用实际给出结果的模型 ID，见 `docs/integrations.md`）；`revision_id` 与块 ID 按 ADR-012 修订 1 确定性派生。验证：`python3 -m pytest tests/backend/test_d09.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C16 | IN PROGRESS | 实现 SSE 一次性票据申领 | ArvinHan（Claude 子代理） | `claude/c16-event-tickets` / 本认领提交 | `src/backend/app/api/event_tickets.py`、`src/backend/app/repositories/event_tickets.py`、`src/backend/migrations/006_event_tickets.sql`（D-10：005 已由 C09 #220 占用）、`tests/backend/test_c16.py`、`docs/handoffs/claude-c16.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+
+- C16 验收（`specs/identity-access.md` §5）：仅保存票据哈希；60 秒过期；重复、跨任务或普通 Bearer 查询票据拒绝；迁移可恢复。验证：`python3 -m pytest tests/backend/test_c16.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B15 | IN PROGRESS | 建立前端 HTTP 客户端 | ArvinHan（Claude 子代理） | `claude/b15-http-client` / 本认领提交 | `src/frontend/src/api/http.ts`、`tests/frontend/b15.test.ts`、`docs/handoffs/claude-b15.md` | 待补 |
+
+- B15 验收：类型化错误、超时/取消、认证失败处理；组件不自行拼路径；把 `scope.signal` 传给 fetch（B04 交出项）。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts`。
+
+- 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925c-claims` 上解决一次，再并入三个分支。C16 的迁移 006 以 C09 #220 的 005 先合并为前提；若 C09 未合并而 C16 先合，按 D-10 改号。
