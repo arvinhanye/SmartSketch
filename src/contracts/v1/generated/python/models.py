@@ -667,35 +667,166 @@ class MasteryStatus(Enum):
 
 
 class ProgressUpdate(BaseModel):
-    kp_id: str
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kp_id: Annotated[str, Field(min_length=1)]
+    status: MasteryStatus
+
+
+class ProgressInheritedSource(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kp_id: Annotated[
+        str, Field(description='来源知识点 ID（不在绑定版本 V 中）', min_length=1)
+    ]
     status: MasteryStatus
 
 
 class ProgressEntry(BaseModel):
-    kp_id: str
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kp_id: Annotated[str, Field(min_length=1)]
     status: MasteryStatus
-    updated_at: datetime
+    own_status: Annotated[
+        Optional[MasteryStatus],
+        Field(description='该学生在此 `kp_id` 的原始状态；无自身行为 `null`'),
+    ] = None
+    inherited_from: Annotated[
+        list[ProgressInheritedSource],
+        Field(
+            description='未被覆盖的继承来源，按 `kp_id` 的 UTF-8 字节序排列；无则为空数组'
+        ),
+    ]
+    updated_at: Annotated[
+        Optional[datetime],
+        Field(
+            description='自身原始行的更新时间；无自身行为 `null`。同值写入判定为无操作时不变'
+        ),
+    ] = None
+
+
+class ProgressResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    graph_version: Annotated[int, Field(ge=1)]
+    entries: Annotated[list[ProgressEntry], Field(min_length=1)]
 
 
 class RecommendFactors(BaseModel):
-    unlock: Annotated[Optional[float], Field(description='解锁度，权重 0.35')] = None
-    importance: Annotated[Optional[float], Field(description='重要度，权重 0.25')] = (
-        None
+    model_config = ConfigDict(
+        extra='forbid',
     )
+    unlock: Annotated[
+        float,
+        Field(
+            description='解锁度 u = unlock_count / 全部候选的最大 unlock_count；最大值为 0 时为 0',
+            ge=0.0,
+            le=1.0,
+        ),
+    ]
+    importance: Annotated[
+        float,
+        Field(
+            description='重要度 i = 0.5 × importance + 0.5 × centrality（ADR-014 决定 1）',
+            ge=0.0,
+            le=1.0,
+        ),
+    ]
     chapter_order: Annotated[
-        Optional[float], Field(description='章节顺序，权重 0.20')
+        float,
+        Field(
+            description='章节顺序 c = 1 − r/(C−1)；C=1 且属于该章为 1；无章节为 0',
+            ge=0.0,
+            le=1.0,
+        ),
+    ]
+    ease: Annotated[
+        float,
+        Field(
+            description='易学度 e = 1 − difficulty；缺难度时 difficulty 取 0.5',
+            ge=0.0,
+            le=1.0,
+        ),
+    ]
+
+
+class RecommendWeightedFactors(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    unlock: Annotated[float, Field(ge=0.0)]
+    importance: Annotated[float, Field(ge=0.0)]
+    chapter_order: Annotated[float, Field(ge=0.0)]
+    ease: Annotated[float, Field(ge=0.0)]
+
+
+class PrimaryFactor(Enum):
+    unlock = 'unlock'
+    importance = 'importance'
+    chapter_order = 'chapter_order'
+    ease = 'ease'
+
+
+class RecommendReasonFacts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    primary_factor: PrimaryFactor
+    chapter_id: Annotated[Optional[str], Field(min_length=1)] = None
+    chapter_name: Optional[str] = None
+    chapter_rank: Annotated[
+        Optional[int], Field(description='发布版章节树前序遍历秩 r（0 起）', ge=0)
     ] = None
-    ease: Annotated[Optional[float], Field(description='易学度，权重 0.20')] = None
+    importance: Annotated[
+        float,
+        Field(description='参与计算的重要度属性；缺失时为中性值 0.5', ge=0.0, le=1.0),
+    ]
+    centrality: Annotated[
+        float,
+        Field(
+            description='(in_degree + out_degree) / (N−1)；N ≤ 1 时为 0', ge=0.0, le=1.0
+        ),
+    ]
+    difficulty: Annotated[
+        float, Field(description='参与计算的难度；缺失时为中性值 0.5', ge=0.0, le=1.0)
+    ]
 
 
 class Recommendation(BaseModel):
-    kp_id: str
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kp_id: Annotated[str, Field(min_length=1)]
     name: str
-    score: Annotated[float, Field(ge=0.0, le=1.0)]
-    reason: Annotated[
-        str, Field(description='一句可读理由，例如「学完它可解锁 4 个知识点」')
+    graph_version: Annotated[int, Field(ge=1)]
+    score: Annotated[
+        float,
+        Field(
+            description='四个加权分量按 u→i→c→e 固定顺序依次求和的未舍入 double，与 wire 中 `weighted` 的求和结果逐位相等；\n排序与同分判定都用未舍入值，只有前端展示时舍入，不得用展示值重算。\n',
+            ge=0.0,
+        ),
     ]
-    factors: Optional[RecommendFactors] = None
+    factors: RecommendFactors
+    weighted: RecommendWeightedFactors
+    unlock_count: Annotated[
+        int,
+        Field(
+            description='学完此点后立即变为可学的不同直接后继数（不计已掌握、还缺其他前置或多跳到达的点）',
+            ge=0,
+        ),
+    ]
+    reason: Annotated[
+        str,
+        Field(
+            description='由 `reason_facts` 与分量生成的一句理由，例如「完成该点可立即解锁 2 个知识点（解锁度 1.0000）」',
+            min_length=1,
+        ),
+    ]
+    reason_facts: RecommendReasonFacts
 
 
 class PathStep(BaseModel):
@@ -717,9 +848,55 @@ class LearningPath(BaseModel):
     ] = None
 
 
-class RecommendResponse(BaseModel):
-    recommendations: Optional[list[Recommendation]] = None
-    path: Optional[LearningPath] = None
+class RecommendListResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    state: Literal['recommendations']
+    graph_version: Annotated[
+        int,
+        Field(
+            description='本请求绑定的发布版本号；图、进度投影、理由均按此版本计算', ge=1
+        ),
+    ]
+    total_eligible: Annotated[int, Field(ge=1)]
+    recommendations: Annotated[
+        list[Recommendation],
+        Field(
+            description='按 `(-score, chapter_rank, kp_id)` 稳定排序后截断的至多 `limit` 条',
+            max_length=50,
+            min_length=1,
+        ),
+    ]
+
+
+class RecommendAllMasteredResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    state: Literal['all_mastered']
+    graph_version: Annotated[int, Field(ge=1)]
+    total_eligible: Literal[0]
+    recommendations: Annotated[list[Recommendation], Field(max_length=0)]
+
+
+class RecommendResponse(
+    RootModel[Union[RecommendListResponse, RecommendAllMasteredResponse]]
+):
+    root: Annotated[
+        Union[RecommendListResponse, RecommendAllMasteredResponse],
+        Field(
+            description='下一步推荐结果，按 `state` 判别，闭集只有 `recommendations` 与 `all_mastered`（`specs/learning-path.md` §4）。\n未发布走 404 `GRAPH_NOT_PUBLISHED`，已提交空图走 500 完整性错误，均不以 200 状态表达；不存在 `no_graph`。\n',
+            discriminator='state',
+        ),
+    ]
+
+
+class LearningIntegrityDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    diagnostic_id: Annotated[str, Field(min_length=1)]
 
 
 class Role1(Enum):
@@ -1048,6 +1225,11 @@ class PublishResult(BaseModel):
     ]
     excluded: PublishExcluded
     stats: Optional[GraphStats] = None
+
+
+class LearningIntegrityError(Error):
+    code: Literal['INTERNAL_ERROR']
+    details: LearningIntegrityDetails
 
 
 class ChatServiceError(Error):

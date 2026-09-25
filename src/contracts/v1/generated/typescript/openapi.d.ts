@@ -540,9 +540,25 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** 当前学生在本课程的掌握状态 */
+        /**
+         * 当前学生在本课程的掌握状态
+         * @description 请求开始时绑定一个已提交发布版 V（`specs/learning-path.md` §5），按 V 返回**每个节点**的进度项，
+         *     而非只返回有原始行的节点；`status` 是与同版本推荐同一投影的有效状态（ADR-014 修订 1 决定 8）。
+         *     响应的 `graph_version` 即绑定版本。只读当前发布版，无按历史版本查询的参数。
+         *
+         */
         get: operations["getProgress"];
-        /** 更新掌握状态（学生） */
+        /**
+         * 批量更新掌握状态（学生）
+         * @description 请求体为非空 `ProgressUpdate[]`，身份只取自已认证学生，请求中不接受 `user_id`（`specs/learning-path.md` §5）。
+         *     先对整批做鉴权、字段与 ID 校验：任一项非法、同批 `kp_id` 重复，或 `kp_id` 不在提交时绑定的发布版中
+         *     （草稿独有、已删除、他课；发布指针变化后按新版本复核整批）时**整批拒绝、零写入**。
+         *     合法批次在一个事务内全部写入。同值写入按 §5「同值写入」判定：仍有未被覆盖的继承来源时是一次显式写入，
+         *     否则为无操作（不取写入序号、不改 `updated_at`）。
+         *     成功后按最终绑定版本重新投影，返回该版本**每个节点**的进度项；发布指针途中变化且目标全部仍在时，
+         *     `graph_version` 为新版本。
+         *
+         */
         put: operations["updateProgress"];
         post?: never;
         delete?: never;
@@ -562,10 +578,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 下一步推荐，或指定目标的完整学习路径
-         * @description 不带 `target` 时返回按优先级排序的可学知识点列表，每条附推荐理由。
-         *     带 `target` 时返回去除已掌握项后的拓扑有序路径（规格验收条件 8）；
-         *     目标不可达时 `reachable = false` 并给出 `unreachable_reason`，HTTP 仍为 200。
+         * 下一步推荐
+         * @description 在请求开始绑定的单一已提交发布版上，对**全部**可学候选按 `specs/learning-path.md` §3 计算四项分量并按
+         *     `(-score, chapter_rank, kp_id)` 稳定排序后截断为至多 `limit` 条；`total_eligible` 报告截断前的候选总数。
+         *     理由由结构化事实生成，不调用 LLM。空态与错误按 §4 判定顺序区分：
+         *     未发布为 404 `GRAPH_NOT_PUBLISHED`；已提交版损坏（含 V=∅）为 500 完整性错误；
+         *     V 非空且全部掌握为 200 `state = all_mastered`；其余为 200 `state = recommendations`。不存在 `no_graph` 状态。
+         *     目标导向完整路径属于 O01～O04 条件性加分项，本接口不提供（§7）。
          *
          */
         get: operations["getRecommendations"];
@@ -1177,37 +1196,167 @@ export interface components {
             low_confidence_edges: number;
             cascaded_edges: number;
         };
-        /** @enum {string} */
+        /**
+         * @description 掌握状态，序为 `unknown < learning < mastered`；无记录等于 `unknown`。不设 `skipped` 等第四种状态（`specs/learning-path.md` §2）。
+         * @enum {string}
+         */
         MasteryStatus: "unknown" | "learning" | "mastered";
+        /** @description 单项写入；身份只取自已认证学生，不接受 `user_id` 等多余字段。 */
         ProgressUpdate: {
             kp_id: string;
             status: components["schemas"]["MasteryStatus"];
         };
+        /** @description 归属到本节点、有原始行且未被显式写入覆盖的合并来源（ADR-014 修订 1 决定 8、9）。内部写入序号与提交序号不上 wire。 */
+        ProgressInheritedSource: {
+            /** @description 来源知识点 ID（不在绑定版本 V 中） */
+            kp_id: string;
+            status: components["schemas"]["MasteryStatus"];
+        };
+        /** @description 绑定版本 V 中一个节点的进度项（`specs/learning-path.md` §5，ADR-014 修订 1 决定 8）。
+         *     `status` 是有效状态，与同版本推荐使用同一投影，等于 `own_status`（`null` 按 `unknown`）与
+         *     `inherited_from[].status` 中的最高者；`own_status` 与 `updated_at` 只描述该学生在此 `kp_id` 的自身原始行，
+         *     无自身行时二者同为 `null`，不冒充继承来源的时间。`inherited_from[]` 只列未被覆盖的来源，
+         *     按 `kp_id` 的 UTF-8 字节序排列、`kp_id` 不重复，不含自身记录。
+         *      */
         ProgressEntry: {
             kp_id: string;
             status: components["schemas"]["MasteryStatus"];
-            /** Format: date-time */
-            updated_at: string;
+            /** @description 该学生在此 `kp_id` 的原始状态；无自身行为 `null` */
+            own_status: components["schemas"]["MasteryStatus"] | null;
+            /** @description 未被覆盖的继承来源，按 `kp_id` 的 UTF-8 字节序排列；无则为空数组 */
+            inherited_from: components["schemas"]["ProgressInheritedSource"][];
+            /**
+             * Format: date-time
+             * @description 自身原始行的更新时间；无自身行为 `null`。同值写入判定为无操作时不变
+             */
+            updated_at: string | null;
+        } & (unknown & unknown & unknown & unknown & unknown);
+        /** @description `GET /progress` 与成功的 `PUT /progress` 的响应：`graph_version` 是本请求绑定（`PUT` 为提交时最终绑定）的发布版本号，
+         *     `entries` 列出该版本 V 中**每个节点**的进度项，每个 `kp_id` 恰好一项，包括无原始行的节点。
+         *     V=∅ 是已提交版完整性故障（500），因此正常响应至少一项。
+         *      */
+        ProgressResponse: {
+            graph_version: number;
+            entries: components["schemas"]["ProgressEntry"][];
         };
-        /** @description 评分四因子的归一化分量，权重见 S2 6.4.7 */
+        /** @description 四项原始分量（`specs/learning-path.md` §3），各在 [0,1]：解锁度 u、重要度 i、章节顺序 c、易学度 e。
+         *     属性顺序即固定求和顺序 u→i→c→e。wire 上传未舍入的 double，只有前端展示时舍入。
+         *      */
         RecommendFactors: {
-            /** @description 解锁度，权重 0.35 */
-            unlock?: number;
-            /** @description 重要度，权重 0.25 */
-            importance?: number;
-            /** @description 章节顺序，权重 0.20 */
-            chapter_order?: number;
-            /** @description 易学度，权重 0.20 */
-            ease?: number;
+            /**
+             * Format: double
+             * @description 解锁度 u = unlock_count / 全部候选的最大 unlock_count；最大值为 0 时为 0
+             */
+            unlock: number;
+            /**
+             * Format: double
+             * @description 重要度 i = 0.5 × importance + 0.5 × centrality（ADR-014 决定 1）
+             */
+            importance: number;
+            /**
+             * Format: double
+             * @description 章节顺序 c = 1 − r/(C−1)；C=1 且属于该章为 1；无章节为 0
+             */
+            chapter_order: number;
+            /**
+             * Format: double
+             * @description 易学度 e = 1 − difficulty；缺难度时 difficulty 取 0.5
+             */
+            ease: number;
         };
+        /** @description 四个加权分量 w × x，权重来自启动时读取的 `RECOMMEND_WEIGHT_*`（ADR-014 修订 1 决定 6），校验后原样使用。
+         *     属性顺序即固定求和顺序 u→i→c→e：`score` 逐位等于 `((unlock + importance) + chapter_order) + ease` 的 IEEE 754 double 结果。
+         *     未舍入 double，只有前端展示时舍入。权重和允许 1 ± 1e-9，因此不设上限。
+         *      */
+        RecommendWeightedFactors: {
+            /** Format: double */
+            unlock: number;
+            /** Format: double */
+            importance: number;
+            /** Format: double */
+            chapter_order: number;
+            /** Format: double */
+            ease: number;
+        };
+        /** @description 生成理由所用的结构化事实，与同条推荐的分量同源，不调用 LLM（`specs/learning-path.md` §4）。
+         *     `primary_factor` 是加权贡献最大的分量，同贡献按 unlock → importance → chapter_order → ease。
+         *     无章节时 `chapter_id`、`chapter_name`、`chapter_rank` 同为 `null`。
+         *      */
+        RecommendReasonFacts: {
+            /** @enum {string} */
+            primary_factor: "unlock" | "importance" | "chapter_order" | "ease";
+            chapter_id: string | null;
+            chapter_name: string | null;
+            /** @description 发布版章节树前序遍历秩 r（0 起） */
+            chapter_rank: number | null;
+            /**
+             * Format: double
+             * @description 参与计算的重要度属性；缺失时为中性值 0.5
+             */
+            importance: number;
+            /**
+             * Format: double
+             * @description (in_degree + out_degree) / (N−1)；N ≤ 1 时为 0
+             */
+            centrality: number;
+            /**
+             * Format: double
+             * @description 参与计算的难度；缺失时为中性值 0.5
+             */
+            difficulty: number;
+        } & unknown;
+        /**
+         * @description 单条下一步推荐（`specs/learning-path.md` §1、§3、§4）；`graph_version` 与所在响应相同。
+         * @example {
+         *       "kp_id": "kp_12",
+         *       "name": "栈",
+         *       "graph_version": 3,
+         *       "score": 0.725,
+         *       "factors": {
+         *         "unlock": 0.5,
+         *         "importance": 1,
+         *         "chapter_order": 1,
+         *         "ease": 0.5
+         *       },
+         *       "weighted": {
+         *         "unlock": 0.175,
+         *         "importance": 0.25,
+         *         "chapter_order": 0.2,
+         *         "ease": 0.1
+         *       },
+         *       "unlock_count": 1,
+         *       "reason": "该点重要度最高（重要度 1.0000，中心度 1.0000）",
+         *       "reason_facts": {
+         *         "primary_factor": "importance",
+         *         "chapter_id": "ch_1",
+         *         "chapter_name": "第一章 线性表",
+         *         "chapter_rank": 0,
+         *         "importance": 1,
+         *         "centrality": 1,
+         *         "difficulty": 0.5
+         *       }
+         *     }
+         */
         Recommendation: {
             kp_id: string;
             name: string;
+            graph_version: number;
+            /**
+             * Format: double
+             * @description 四个加权分量按 u→i→c→e 固定顺序依次求和的未舍入 double，与 wire 中 `weighted` 的求和结果逐位相等；
+             *     排序与同分判定都用未舍入值，只有前端展示时舍入，不得用展示值重算。
+             *
+             */
             score: number;
-            /** @description 一句可读理由，例如「学完它可解锁 4 个知识点」 */
+            factors: components["schemas"]["RecommendFactors"];
+            weighted: components["schemas"]["RecommendWeightedFactors"];
+            /** @description 学完此点后立即变为可学的不同直接后继数（不计已掌握、还缺其他前置或多跳到达的点） */
+            unlock_count: number;
+            /** @description 由 `reason_facts` 与分量生成的一句理由，例如「完成该点可立即解锁 2 个知识点（解锁度 1.0000）」 */
             reason: string;
-            factors?: components["schemas"]["RecommendFactors"];
-        };
+            reason_facts: components["schemas"]["RecommendReasonFacts"];
+        } & (unknown & unknown);
+        /** @description 目标导向路径步骤。属于 O01～O04 条件性加分项，O02 定稿前不被任何接口引用（`specs/learning-path.md` §7）。 */
         PathStep: {
             /** @description 步骤编号，用于图谱上的路径高亮 */
             step: number;
@@ -1215,6 +1364,7 @@ export interface components {
             name: string;
             reason?: string;
         };
+        /** @description 目标导向完整路径。属于 O01～O04 条件性加分项，O02 定稿前不被任何接口引用（`specs/learning-path.md` §7）。 */
         LearningPath: {
             target_id: string;
             reachable: boolean;
@@ -1223,10 +1373,48 @@ export interface components {
             /** @description reachable = false 时必填，说明为何无法到达 */
             unreachable_reason?: string | null;
         };
-        /** @description 不带 target 时返回 recommendations；带 target 时返回 path */
-        RecommendResponse: {
-            recommendations?: components["schemas"]["Recommendation"][];
-            path?: components["schemas"]["LearningPath"] | null;
+        /** @description 有可学候选时的推荐列表；`total_eligible` 为截断前的全部候选数（≥ 列表长度）。 */
+        RecommendListResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "recommendations";
+            /** @description 本请求绑定的发布版本号；图、进度投影、理由均按此版本计算 */
+            graph_version: number;
+            total_eligible: number;
+            /** @description 按 `(-score, chapter_rank, kp_id)` 稳定排序后截断的至多 `limit` 条 */
+            recommendations: components["schemas"]["Recommendation"][];
+        };
+        /** @description V 非空且全部掌握（M = V）时的正常空态；不是错误，也不同于未发布（404）或已提交空图（500）。 */
+        RecommendAllMasteredResponse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            state: "all_mastered";
+            graph_version: number;
+            /** @constant */
+            total_eligible: 0;
+            recommendations: components["schemas"]["Recommendation"][];
+        };
+        /** @description 下一步推荐结果，按 `state` 判别，闭集只有 `recommendations` 与 `all_mastered`（`specs/learning-path.md` §4）。
+         *     未发布走 404 `GRAPH_NOT_PUBLISHED`，已提交空图走 500 完整性错误，均不以 200 状态表达；不存在 `no_graph`。
+         *      */
+        RecommendResponse: components["schemas"]["RecommendListResponse"] | components["schemas"]["RecommendAllMasteredResponse"];
+        /** @description 学习进度与推荐读路径遇到已提交版完整性故障（`specs/learning-path.md` §1、§4、§5）：V=∅、重复 ID、自环、环、
+         *     悬空端点、章节树损坏、非法数值或绑定版本谱系违反不变式；也用于这些接口的其他未预期异常。
+         *     公开错误码暂用既有 `INTERNAL_ERROR`（专用码待定，见 `docs/handoffs/claude-b12.md`）；`details` 是闭合对象，
+         *     只含诊断 ID，具体节点 ID 与环路只进服务端日志。已提交空图属于本错误，不增加 `no_graph` 状态。
+         *      */
+        LearningIntegrityError: components["schemas"]["Error"] & {
+            /** @constant */
+            code: "INTERNAL_ERROR";
+            details: components["schemas"]["LearningIntegrityDetails"];
+        };
+        /** @description 完整性错误的细节，闭合对象；`diagnostic_id` 与服务端日志、告警对应。 */
+        LearningIntegrityDetails: {
+            diagnostic_id: string;
         };
         ChatTurn: {
             /** @enum {string} */
@@ -2408,17 +2596,30 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 掌握状态列表 */
+            /** @description 绑定版本 V 中每个节点的进度项 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProgressEntry"][];
+                    "application/json": components["schemas"]["ProgressResponse"];
                 };
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            /** @description 学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`），不做进度投影。 */
+            404: components["responses"]["NotFound"];
+            /** @description 已提交版完整性故障（`specs/learning-path.md` §1、§4）：V=∅、重复 ID、环、悬空端点、章节树损坏、
+             *     非法数值或绑定版本谱系违反不变式。只返回诊断 ID，不输出部分进度、内部节点 ID 或环路。
+             *      */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningIntegrityError"];
+                };
+            };
         };
     };
     updateProgress: {
@@ -2437,25 +2638,40 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 更新后的掌握状态 */
+            /** @description 写入后按最终绑定版本 V 重新投影的每个节点的进度项 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProgressEntry"][];
+                    "application/json": components["schemas"]["ProgressResponse"];
                 };
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            /** @description 学生成员写入从未发布的课程（`GRAPH_NOT_PUBLISHED`），零写入。 */
+            404: components["responses"]["NotFound"];
+            /** @description 请求体不满足 schema（空批次、缺字段、非法状态、带 `user_id` 等多余字段）或同批 `kp_id` 重复（`VALIDATION_ERROR`），整批零写入。
+             *     `kp_id` 不在绑定发布版中的整批拒绝也是零写入，其公开错误码与 `details` 形状待定（见 `docs/handoffs/claude-b12.md` 待决）。
+             *      */
             422: components["responses"]["ValidationError"];
+            /** @description 已提交版完整性故障（`specs/learning-path.md` §1、§4）：V=∅、重复 ID、环、悬空端点、章节树损坏、
+             *     非法数值或绑定版本谱系违反不变式。只返回诊断 ID，不输出部分进度、内部节点 ID 或环路。
+             *      */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningIntegrityError"];
+                };
+            };
         };
     };
     getRecommendations: {
         parameters: {
             query?: {
-                /** @description 目标知识点 ID */
-                target?: string;
+                /** @description 返回条数上限，正整数，默认 10、最大 50；超出范围整请求拒绝（ADR-014 修订 1 决定 7） */
                 limit?: number;
             };
             header?: never;
@@ -2467,7 +2683,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 推荐列表或学习路径 */
+            /** @description 推荐列表（`state = recommendations`），或 V 非空且全部掌握的空态（`state = all_mastered`） */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2478,7 +2694,21 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            /** @description 学生成员请求从未发布的课程（`GRAPH_NOT_PUBLISHED`），不运行推荐函数；与 `all_mastered` 空态不同。 */
             404: components["responses"]["NotFound"];
+            /** @description `limit` 不是 1～50 的整数（`VALIDATION_ERROR`）。 */
+            422: components["responses"]["ValidationError"];
+            /** @description 已提交版完整性故障（`specs/learning-path.md` §1、§4）：V=∅、重复 ID、自环、环、悬空端点、章节树损坏、
+             *     非法数值或绑定版本谱系违反不变式。只返回诊断 ID，不返回部分推荐、内部节点 ID 或环路。
+             *      */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningIntegrityError"];
+                };
+            };
         };
     };
     chat: {
