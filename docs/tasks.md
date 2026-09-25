@@ -773,7 +773,7 @@ D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C16 | IN PROGRESS | 实现 SSE 一次性票据申领 | ArvinHan（Claude 子代理） | `claude/c16-event-tickets` / 本认领提交 | `src/backend/app/api/event_tickets.py`、`src/backend/app/repositories/event_tickets.py`、`src/backend/migrations/006_event_tickets.sql`（D-10：005 已由 C09 #220 占用）、`tests/backend/test_c16.py`、`docs/handoffs/claude-c16.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+| C16 | DONE（待 PR 审查/合并） | 实现 SSE 一次性票据申领 | ArvinHan（Claude 子代理） | `claude/c16-event-tickets` / 本认领提交 | `src/backend/app/api/event_tickets.py`、`src/backend/app/repositories/event_tickets.py`、`src/backend/migrations/006_event_tickets.sql`（D-10：005 已由 C09 #220 占用）、`tests/backend/test_c16.py`、`docs/handoffs/claude-c16.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 红灯：仅有测试时收集报 `ImportError`（`app.repositories.event_tickets` 不存在）；绿灯：`tests/backend/test_c16.py` 23 passed；后端全量 1073 passed（基线 1050 + 23）；contracts+tooling 4 failed / 269 passed，与基线 `9116315` 相同，均因环境缺 `openapi-typescript`；反向篡改 5 处（存明文、去 `task_id`、去过期、去 `used_at`、去旧行清理）全部检出，改回后 `cmp` 一致；`verify.sh` 退出 1（contracts gate 的 B14 生成回归缺 `openapi-typescript`，基线同样失败）；`git diff --check` 通过；交接 `docs/handoffs/claude-c16.md` |
 
 - C16 验收（`specs/identity-access.md` §5）：仅保存票据哈希；60 秒过期；重复、跨任务或普通 Bearer 查询票据拒绝；迁移可恢复。验证：`python3 -m pytest tests/backend/test_c16.py -q`。
 
