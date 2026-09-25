@@ -276,6 +276,9 @@ def test_hash_directly_followed_by_non_ascii_is_a_heading():
 def test_loose_heading_can_interrupt_paragraph_like_atx():
     doc = md("前言。\n#第一章\n正文。\n")
     assert shape(doc) == [(P, "第1段", 1, 1), (P, "第一章 > 第1段", 3, 3)]
+    # 缩进 4 格的行在段落后是懒惰续行，与 `    # 标题` 一样不打断段落
+    doc = md("前言。\n    #第一章\n")
+    assert shape(doc) == [(P, "第1段", 1, 2)]
 
 
 def test_loose_heading_text_is_plain_and_normalized():

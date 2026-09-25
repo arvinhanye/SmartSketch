@@ -15,6 +15,12 @@
   行内代码等标记，图片取替代文本），再经 `normalize_heading`。层级跳跃时只保留真实祖先
   （如 `#` 后接 `###`，路径为两级）；新标题关闭所有同级及更深的标题。空标题忽略。
   引用块、列表项内部的标题不改变章节路径，随所在块保留在文本中。
+- **放宽的无空格标题**（ArvinHan 决定，仍为 `markdown/1`）：CommonMark 要求 `#` 后有空格；本解析器另外
+  接受「行首 1～6 个 `#`，紧跟一个非 ASCII、非空白、非 `#` 的字符」的写法，如 `#第一章`、`##概述`、
+  `#（一）背景`，层级按 `#` 数量。紧跟 ASCII 字符的行（`#include`、`#1`、`#tag`、`#!/bin/sh`、
+  `###1.1顺序表`）、紧跟全角空格的行、`\\#` 转义、结尾 `#` 紧贴文字的话题标签（`#话题#`）都不放宽。
+  实现为 markdown-it 块规则，出现位置与标准 ATX 标题相同（可打断段落，缩进 4 格为代码），
+  不改源文本，token 行号不变。
 - **块类型**：段落 → PARAGRAPH；有序/无序列表（含嵌套）整体 → LIST；表格 → TABLE；
   围栏与缩进代码块 → CODE；引用块整体 → PARAGRAPH；HTML 块 → PARAGRAPH（纯 HTML 注释丢弃）；
   分隔线、链接引用定义不成块；去掉空白后为空的块（空代码块、全角空格行）丢弃。
@@ -31,6 +37,7 @@ import re
 from collections.abc import Sequence
 
 from markdown_it import MarkdownIt
+from markdown_it.rules_block import StateBlock
 from markdown_it.token import Token
 
 from app.services.parsers.models import (
@@ -49,7 +56,53 @@ __all__ = ["PARSER_VERSION", "parse_markdown"]
 #: 解析器版本，进入 `RevisionKey.parser_version`。解析规则或依赖版本变化导致输出不同时递增。
 PARSER_VERSION = "markdown/1"
 
+#: 放宽的 ATX 标题：行首 1～6 个 `#`，紧跟一个非 ASCII、非空白、非 `#` 的字符（如 `#第一章`）。
+_LOOSE_HEADING_RE = re.compile(r"(#{1,6})([^\x00-\x7f\s#].*)\Z", re.DOTALL)
+#: 标准 ATX 的收尾序列：空白后接若干 `#`（`#标题 ##` → `标题`）。
+_CLOSING_SEQUENCE_RE = re.compile(r"[ \t]+#+\Z")
+
+
+def _loose_heading(state: StateBlock, start_line: int, end_line: int, silent: bool) -> bool:
+    """markdown-it 块规则：把 `#第一章` 这类无空格写法当作 ATX 标题（ArvinHan 决定放宽）。
+
+    与内置 `heading` 规则同样判断缩进代码块、同样可以打断段落/引用块，因此只在标准 ATX 标题能出现的
+    位置生效；围栏代码块的行由 `fence` 规则整体吃掉，不会走到这里。引用块、列表项内部产生的标题
+    token 位于嵌套层级，`parse_markdown` 只看顶层 token，不改变章节路径。
+    """
+    if state.is_code_block(start_line):
+        return False
+    pos = state.bMarks[start_line] + state.tShift[start_line]
+    line = state.src[pos : state.eMarks[start_line]]
+    match = _LOOSE_HEADING_RE.match(line)
+    if match is None:
+        return False
+    content = match.group(2).rstrip()
+    closing = _CLOSING_SEQUENCE_RE.search(content)
+    if closing is not None:
+        content = content[: closing.start()]
+    elif content.endswith("#"):
+        return False  # `#话题#` 形式的话题标签，不当标题
+    if silent:
+        return True
+
+    level = len(match.group(1))
+    state.line = start_line + 1
+    token = state.push("heading_open", f"h{level}", 1)
+    token.markup = match.group(1)
+    token.map = [start_line, state.line]
+    token = state.push("inline", "", 0)
+    token.content = content.strip()
+    token.map = [start_line, state.line]
+    token.children = []
+    token = state.push("heading_close", f"h{level}", -1)
+    token.markup = match.group(1)
+    return True
+
+
 _MD = MarkdownIt("commonmark", {"html": True}).enable("table")
+_MD.block.ruler.before(
+    "heading", "loose_heading", _loose_heading, {"alt": ["paragraph", "reference", "blockquote"]}
+)
 
 _BLOCK_KINDS: dict[str, BlockKind] = {
     "paragraph_open": BlockKind.PARAGRAPH,
