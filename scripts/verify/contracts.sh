@@ -24,6 +24,14 @@ else
   fail=1
 fi
 
+# B14 生成物确定性、--check 只读与缺失/篡改检测回归。
+if python3 -m pytest tests/contracts/test_b14.py -q; then
+  echo '  ✓ B14 生成与漂移回归通过'
+else
+  echo '  ✗ B14 生成与漂移回归失败' >&2
+  fail=1
+fi
+
 # ── 3. 门禁自身的负向测试 ──────────────────────────────
 # 门禁曾经在缺依赖时静默 exit 0（R02）。没有负向测试就察觉不到同类回归。
 log="$(mktemp)"

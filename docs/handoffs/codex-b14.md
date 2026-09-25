@@ -2,18 +2,21 @@
 
 ## Delivered
 - Added `tests/contracts/test_b14.py` covering deterministic repeated generation, tamper detection without `--check` mutation, missing-stage detection, and canonical restoration by regeneration.
-- Existing generator behavior already satisfies these invariants; no generated output was hand-edited and no generator logic change was necessary.
+- Existing generator implementation already satisfies these invariants; no generated output was hand-edited and no generator logic change was necessary.
+- Review fix: `scripts/verify/contracts.sh` now runs the B14 regression suite in the normal CI/scaffold gate. `tests/contracts/test_contracts.py` asserts the gate keeps this invocation.
+- Scope expansion: wiring the new B14 suite into the existing contract gate and adding its self-gate assertion; required so deterministic/read-only/missing-output regressions run continuously rather than only by manual command.
 
 ## Verification
-- Focused regression: 3 passed using the documented contracts venv for generator subprocesses and the available pytest executable (`/opt/anaconda3/bin/pytest -q -p no:cacheprovider tests/contracts/test_b14.py`).
-- `./scripts/gen-contracts.sh --check`: passed before and after repeat generation.
-- Two full regeneration SHA-256 aggregate hashes matched exactly: `5e7b1b6ab76ebd3ca93e6f9aaa1b83227f46132fec94cfe2a9361269383a0757`.
-- `./scripts/verify.sh`: contracts gate reports missing `openapi-spec-validator` and `jsonschema` in the interpreter environment; generated-output check passed.
-- `git diff --check`: run separately as part of final commit review.
+- Focused B14 suite: `PATH="$HOME/.local/share/smartsketch/contracts-venv/bin:$PATH" /opt/anaconda3/bin/pytest -q -p no:cacheprovider tests/contracts/test_b14.py` — **3 passed**.
+- Gate integration regression was first observed failing because `scripts/verify/contracts.sh` omitted the suite, then passed after wiring: **1 passed**.
+- `PATH="/private/tmp/c06-venv/bin:$PATH" PYTHONPATH="$PWD/src/backend" PYTEST_ADDOPTS="-p no:cacheprovider" ./scripts/verify.sh` — **exit 0**, including B14 3 passed, 25 gate negative checks, B08 5, B09 5, B10 45, B12 93, B13 53, and `Scaffold verification passed`.
+- `PATH="$HOME/.local/share/smartsketch/contracts-venv/bin:$PATH" ./scripts/gen-contracts.sh --check` — passed.
+- `git diff --check` — passed.
 
 ## Contract/interface changes and risks
 - None. `src/contracts/api.v1.yaml` and generated contract exports are unchanged.
-- Local default `python3` lacks the generator/test dependencies; use the pinned contracts environment in `PATH` for generation. Full scaffold verification remains environment-limited until the missing validators are installed.
+- The system default Python lacks contract validation packages; the complete gate passed when run with `/private/tmp/c06-venv` and an absolute backend `PYTHONPATH` as shown above.
+- Two accidental tracked `.superpowers/sdd` report/ledger files were removed from the PR index while their local scratch copies were preserved.
 
 ## Next step
-- No follow-up implementation needed; install the missing pinned validation dependencies in the intended Python environment before treating `scripts/verify.sh` as green.
+- B14 implementation and regression coverage are ready for coordinator integration.
