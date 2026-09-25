@@ -70,6 +70,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - REST 路径前缀与 wire 枚举已由 A02 裁定（ADR-009），见下一节。
 - 生成器及版本锁在 `src/contracts/toolchain.txt`；CI 按其安装。缺工具时生成脚本必须非 0 退出，只有显式降级才允许跳过并打印未完成验收标记。
 - `scripts/verify.sh` 调用 `scripts/verify/contracts.sh`，依次校验真源结构、生成物同步和门禁负例；缺依赖或生成物漂移均失败。
+- 契约校验输出显式 `PASS` / `FAIL`；仅直接传入 `--allow-scaffold` 时，缺依赖可输出 `SKIP` 与 `INCOMPLETE`，该结果不构成验收。仓库门禁不传降级参数；后端测试额外依赖须包含 `toolchain.txt` 锁定的 PyYAML、OpenAPI 校验器与 JSON Schema 校验器。
 - 契约的**表达方式**由 ADR-004 裁定，契约的**内容正确性**不由它保证：来源非空、事件判别联合等约束仍须各自的负例测试复验；「引用确属同一课程同一发布版本」schema 表达不了，必须在服务层校验。
 
 ## API 前缀与 wire 枚举（A02 / ADR-009）
