@@ -600,3 +600,12 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 
 - 输入：D-11（50 MiB、变量名 `UPLOAD_MAX_BYTES`）；`STORAGE_DIR=./storage` 沿用 740adb（A10 导入映射「批 2 只取 `STORAGE_DIR`」）。输出：`Settings.STORAGE_DIR`、`Settings.UPLOAD_MAX_BYTES`，C06/C07 按 `FileStorage(settings.STORAGE_DIR, max_bytes=settings.UPLOAD_MAX_BYTES)` 使用。
 - 验收：缺省值与 D-11 一致；0、负数、小数、带单位、空串拒绝并指出变量名；空白 `STORAGE_DIR` 拒绝；设置值能直接构造 `FileStorage` 并在超限时给出 `limit_bytes`；`.env.example` 覆盖全部设置（B06 回归）。
+
+## 2026-09-25 Codex 认领：C06
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 验收条件 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C06 | IN PROGRESS（已认领；实现待开始） | 实现资料和任务创建事务 | Codex（后端） | `.claude/worktrees/c06-material-task-transaction`，分支 `codex/c06-material-task-transaction` / `origin/main@8eeac3b` | `src/backend/app/repositories/materials.py`、`src/backend/app/repositories/tasks.py`、`src/backend/migrations/NNN_tasks.sql`、`tests/backend/test_c06.py`、`tests/backend/test_c13.py`（仅更新默认迁移序列断言，范围扩展：新增 003 后原断言过窄）、`docs/handoffs/codex-c06.md` | 合法文件元数据在同一 SQLite 事务内创建 material 与 queued task；任一写入失败均无孤儿记录；重复请求按课程隔离幂等键；`python3 -m pytest tests/backend/test_c06.py -q`、`./scripts/verify.sh`、`git diff --check`。迁移编号按 D-10 在合并时重定为当时 main 的最大编号 + 1。 |
+
+- 输入 / 输出：接收已校验的文件元数据，原子地产生 material 与 queued task。依赖 C01、B10 均已合入 `origin/main`；C05 已合入，上传 API 留给 C07。
+- 风险 / 回滚：仅写入上列文件；迁移需遵循 C01 的停机、备份与恢复流程；合并前若迁移编号冲突，按 D-10 改号并重跑迁移测试。
