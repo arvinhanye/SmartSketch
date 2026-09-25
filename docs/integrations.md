@@ -143,6 +143,10 @@
 
 `cryptography` 是 pdfminer.six 的强制依赖，本项目代码不调用它解密。
 
+### 上传解析依赖（C07）
+
+FastAPI 的 `multipart/form-data` 文件字段使用 `python-multipart==0.0.32`（Apache-2.0），固定在 `src/backend/pyproject.toml` 的运行依赖中。上传处理由 FastAPI 在工作线程调用 C05 的流式落盘边界；长时解析与抽取由后续 worker 消费数据库中的 `queued` 任务。
+
 账号命令（C14，均从仓库根目录运行，读取与 API 相同的环境变量；数据库须已迁移，否则非 0 退出并提示先运行 `python -m app.repositories.sqlite`）：
 
 | 命令 | 作用 |

@@ -736,3 +736,15 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 | E07-P3 | P3 | PR #217 审查（Claude） | `EmbeddingAdapter.embed` 末尾的 `if vector is not None` 过滤，一旦有向量漏填，结果会静默变短并与输入错位 | 改为断言全部填满；可在 E03 接入时顺手修 |
 
 C03-R01（P1，PR #216 审查）：拒绝错误是模块级的单例异常，反复 raise 会累积 `__traceback__` 并持有每次请求的令牌。已在合并前修复（`fe5ae64`，交接 `docs/handoffs/claude-c03-r01-fix.md`），不再是遗留项。
+
+## 2026-09-25 Codex 认领：C07
+
+| ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| C07 | DONE（2026-09-26） | 实现上传及资料列表 API | Codex（后端） | 教师上传只接受四格式并立即返回 `task_id`；授权隔离；存盘或建任务失败补偿；列表按课程限定；鉴权及请求体大小检查先于 multipart 解析 | C07 9 passed；后端 1059 passed；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；`docs/handoffs/codex-c07.md` |
+
+- 输入：现有 OpenAPI `GET/POST /api/v1/courses/{cid}/documents`、C03 课程授权、C05 `FileStorage`、C06 `create_material_task`、D-11 配置。
+- 输出：课程资料列表、上传 `202` 响应与持久 `queued` 任务。上传只做落盘和建任务；解析由 worker 异步执行。
+- 依赖：C03、C05、C06、B09 均已合入。为注册路由、查询列表及支持 multipart，请求范围扩到 `app/main.py`、`repositories/materials.py`、`src/backend/pyproject.toml`，不改变 REST 契约。
+- 风险与后续决策：现有契约未提供再处理或下线旧修订端点；本任务只实现新资料上传，后续产品/契约任务需决定是否新增入口。`parse_status` 初始为 `queued`，列表读取资料记录的当前值；后续 worker 状态同步需在 C09/C10 明确。失败补偿删除本次刚落盘的文件；若删除也失败，则返回 `STORAGE_UNAVAILABLE`，孤儿文件需由运维清理。
+- 验证命令：`.venv/Scripts/python.exe -m pytest tests/backend/test_c07.py -q`、`.venv/Scripts/python.exe -m pytest tests/backend -q`、`./scripts/verify.sh`、`git diff --check`。

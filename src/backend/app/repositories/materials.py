@@ -77,3 +77,14 @@ def get_material_in_connection(
         (material_id, course_id),
     ).fetchone()
     return MaterialRecord(*row) if row else None
+
+
+def list_materials(sqlite_url: str, *, course_id: str) -> list[MaterialRecord]:
+    """List only one course's materials, newest first with a stable tie-breaker."""
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            f"SELECT {_COLUMNS} FROM materials WHERE course_id = ? "
+            "ORDER BY uploaded_at DESC, id DESC",
+            (course_id,),
+        ).fetchall()
+    return [MaterialRecord(*row) for row in rows]

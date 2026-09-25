@@ -184,6 +184,10 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 数据流
 
+### C07 课程资料 API
+
+`GET /api/v1/courses/{cid}/documents` 复用 C03 的课程读取授权，仓储按 `course_id` 查询并按上传时间倒序返回契约 `Document`；未发布课程的学生仍按 C03 规则拒绝。`POST` 先完成课程教师授权，再解析 multipart；解析时对实际收到的请求体计数，超过 `UPLOAD_MAX_BYTES + 16 KiB` 即中止（额外字节用于表单边界和文件名），文件内容仍由 C05 按 `UPLOAD_MAX_BYTES` 精确校验。同步请求仅校验与落盘文件、原子创建 `materials` 和 `processing_tasks` 的 `queued` 记录，返回 `202 UploadAccepted`；解析和抽取不在请求内执行。文件已落盘但建任务失败或 C06 返回幂等重放时，服务只删除本次新文件。C07 不新增 REST 字段；每次 HTTP 上传生成独立幂等键。资料列表的 `parse_status` 读取 `materials` 当前值，任务推进后的同步由后续 worker 任务实现。
+
 1. 上传资料 → SQLite 创建任务/资料记录 → Worker 进程经租约领取任务 → 解析和分块。
 2. Worker 调用模型抽取候选节点/关系 → 融合消歧 → DAG 校验 → 写入草稿图谱。草稿按任务记录贡献，T6 提交后才可见，失败任务的内容从失败起即不可见（ADR-011 修订 1）。DAG 校验在 `persisting` 阶段：自动候选成环时把环上未经教师确认的 `ai` 边中置信度最低者降级为 `RELATED_TO` 并送审核，任务不因此失败；人工编辑成环直接 409 拒绝。两者区别见 `specs/course-knowledge-graph.md`「前置关系成环处理」。
 3. Worker 更新任务状态，API 经 SSE 发送进度；教师审核并发布不可变图谱版本：持课程写锁读取草稿建快照 → SQLite 写快照 → Neo4j 按 `version_id` 物化并核对摘要 → SQLite 单事务切换发布指针（唯一提交点）。协议见上节「图谱版本与跨库发布」。

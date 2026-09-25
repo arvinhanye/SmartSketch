@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app.api.auth import router as auth_router
 from app.api.dependencies import access_error_response
 from app.api.health import router as health_router
+from app.api.materials import router as materials_router
 from app.config import check_auth_settings, load_settings
 from app.schemas.errors import Error
 from app.services.auth import LoginRateLimiter, prepare_timing_dummy_hash
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(materials_router)
     return application
 
 
