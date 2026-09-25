@@ -515,6 +515,22 @@ def test_truncated_pdf_is_corrupted(keep: float) -> None:
     assert_unreadable(data[: int(len(data) * keep)], UnreadableReason.CORRUPTED)
 
 
+@pytest.mark.parametrize("fill", [None, b"\x00"], ids=["middle-cut", "middle-zeroed"])
+def test_damaged_middle_with_intact_tail_is_corrupted_not_no_text(fill: bytes | None) -> None:
+    # 末尾的 xref/trailer/%%EOF 完好，但中段对象丢失：不能把缺内容的页误报为扫描件。
+    data = _three_page_pdf()
+    n = len(data)
+    middle = b"" if fill is None else fill * (n // 3)
+    assert_unreadable(data[: n // 3] + middle + data[2 * n // 3 :], UnreadableReason.CORRUPTED)
+
+
+def test_page_referencing_a_missing_object_is_corrupted() -> None:
+    data = build_pdf([text_op("Only page")])
+    broken = re.sub(rb"/Contents \d+ 0 R", b"/Contents 999 0 R", data)
+    assert broken != data
+    assert_unreadable(broken, UnreadableReason.CORRUPTED)
+
+
 def test_pdf_missing_eof_marker_is_corrupted() -> None:
     data = _three_page_pdf()
     assert data.rstrip().endswith(b"%%EOF")
