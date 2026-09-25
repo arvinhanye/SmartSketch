@@ -252,10 +252,38 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 | D-02e | 超时、并发、重试、熔断取值 | S2 表 6.7：单章 14 块并发 8 路约 20～25 秒；表 3.1：问答首字 ≤ 3 秒、完整 ≤ 10 秒（目标值）、赛题 ≤ 15 秒。样例下单次调用上界约 6 分钟，远大于正常耗时 | 见「调用约束」 | 未签收 |
 | D-02f | 新错误码 `BUDGET_EXCEEDED` | — | 已纳入 `ErrorCode`；同步请求 HTTP 429 | B08 已完成 |
 
+## 本地依赖环境（F01）
+
+本地只有 Neo4j 需要容器；SQLite 是嵌入式文件，由后端直接打开。编排在仓库根目录 `docker-compose.yml`，脚本在 `scripts/`。
+
+| 项 | 取值 |
+| --- | --- |
+| 镜像 | `neo4j:5.26-community`（5.26 LTS；`NEO4J_IMAGE_TAG` 可改）。2026-09-25 实测拉到 Neo4j 5.26.31，镜像约 986 MB |
+| APOC | `NEO4J_PLUGINS=["apoc"]`，启用镜像自带、与版本匹配的 APOC Core（实测 `apoc-5.26.31-core.jar`，不联网）；只放开 `apoc.*`，不设 allowlist，以免挡住 `db.index.vector.*` |
+| 端口 | 只绑本机回环：Bolt `127.0.0.1:${NEO4J_BOLT_PORT:-7687}`，HTTP `127.0.0.1:${NEO4J_HTTP_PORT:-7474}` |
+| 数据 | 绑定挂载 `./neo4j/data`、`./neo4j/logs`（都在 `.gitignore` 里）；路径不做成变量，避免指到会被提交的位置 |
+| 凭据 | `NEO4J_AUTH` 由 `.env` 的 `NEO4J_USER`/`NEO4J_PASSWORD` 插值；未设口令时 compose 直接报错 |
+| 容器名 | 不固定，随 compose 项目名（默认取目录名，可用 `COMPOSE_PROJECT_NAME` 覆盖），测试沙箱和其他 worktree 能各起一个实例 |
+
+用法（仓库根目录）：
+
+```bash
+cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
+./scripts/dev-up.sh           # 建目录 → 启动 → 等健康（上限 NEO4J_WAIT_SECONDS，默认 180 秒）→ 验证 APOC；可重复执行
+./scripts/check-apoc.sh       # 单独验证 APOC
+docker compose stop neo4j     # 停止，保留数据（docker compose down 也保留：数据在绑定目录里）
+```
+
+- 健康检查和 APOC 检查都在容器内从 `NEO4J_AUTH` 取出凭据，通过 `cypher-shell` 认识的 `NEO4J_USERNAME`/`NEO4J_PASSWORD` 环境变量传入，口令不出现在宿主机或容器内的任何命令行参数里。
+- 健康状态必须完整等于 `healthy` 才算就绪；`unhealthy` 或容器已退出时立即失败，并提示查看 `docker compose logs neo4j`。
+- Docker Desktop 装好后如果终端里找不到 `docker`，把 `~/.docker/bin` 加进 `PATH`，或者重开终端。
+- 停止与销毁脚本（`dev-down.sh`，普通停止保留数据、删卷须确认）由 K07 导入并审查；在那之前用上面的 `docker compose` 命令。
+- 验收测试：`python3 -m pytest tests/integration/test_f01.py -q`。没有 Docker 守护进程时，真实容器用例自动跳过；设 `SMARTSKETCH_SKIP_DOCKER=1` 也可跳过。
+
 ## 计划集成
 
 | 集成 | 用途 | 接入前置条件 |
 | --- | --- | --- |
-| Neo4j | 课程知识图谱、向量索引、前置关系遍历 | 明确本地容器/服务版本与备份策略；向量索引维度须等于签收后的 `EMBEDDING_DIMENSIONS` |
+| Neo4j | 课程知识图谱、向量索引、前置关系遍历 | 本地容器已由 F01 落地（见「本地依赖环境（F01）」）；备份策略未定；向量索引维度须等于签收后的 `EMBEDDING_DIMENSIONS` |
 | OpenAI 兼容 LLM API | 抽取、问答、改写、裁决 | 配置形状与切换/预算规则见「模型接入规则（A07）」；取值待 D-02a、D-02b、D-02d、D-02e 签收；脱敏策略未定 |
 | 向量模型 API / 本地模型 | 知识点融合与来源片段检索 | 方案、模型与维度待 D-02c 签收；维度定稿后才能建 Neo4j 向量索引 |

@@ -5,7 +5,7 @@ Two layers:
 * Script behaviour runs everywhere against a fake ``docker`` on PATH that records every call,
   so the checks (missing .env, unhealthy container, missing APOC, password never on a
   command line) need no container engine.
-* ``TestRealContainer`` starts a real Neo4j in an isolated sandbox (its own compose project,
+* The ``real_sandbox`` tests start a real Neo4j in an isolated sandbox (its own compose project,
   free ports and data directory) and is skipped when no Docker daemon answers. It pulls the
   ``neo4j:5.26-community`` image on first run. Set ``SMARTSKETCH_SKIP_DOCKER=1`` to skip it.
 """
@@ -13,6 +13,7 @@ Two layers:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import socket
 import stat
@@ -162,7 +163,8 @@ def test_password_never_appears_on_a_host_command_line(tmp_path):
 def test_compose_file_keeps_data_in_ignored_paths_and_has_no_fixed_container_name():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
-    assert "container_name" not in compose  # sandboxes and worktrees need their own project
+    # sandboxes and worktrees each need their own container, named after the compose project
+    assert not re.search(r"^\s*container_name\s*:", compose, re.M)
     assert "./neo4j/data:/data" in compose and "./neo4j/logs:/logs" in compose
     assert "NEO4J_PLUGINS" in compose and "apoc" in compose
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
@@ -200,61 +202,65 @@ def test_compose_config_requires_a_password(tmp_path):
     assert "NEO4J_PASSWORD" in result.stderr
 
 
+@pytest.fixture(scope="module")
+def real_sandbox(tmp_path_factory):
+    """One isolated Neo4j (own compose project, free ports, data dir) shared by the tests below."""
+    tmp_path = tmp_path_factory.mktemp("f01")
+    project = f"smartsketch-f01-{uuid.uuid4().hex[:8]}"
+    root = _sandbox(
+        tmp_path,
+        {
+            "NEO4J_PASSWORD": PASSWORD,
+            "NEO4J_BOLT_PORT": str(_free_port()),
+            "NEO4J_HTTP_PORT": str(_free_port()),
+            "COMPOSE_PROJECT_NAME": project,
+        },
+    )
+    env = _env(COMPOSE_PROJECT_NAME=project)
+    yield root, env
+    subprocess.run(
+        ["docker", "compose", "down", "-v", "--remove-orphans"],
+        cwd=root, env=env, capture_output=True, timeout=120,
+    )
+
+
+def _cypher(root: Path, env: dict[str, str], query: str) -> str:
+    result = subprocess.run(
+        [
+            "docker", "compose", "exec", "-T", "neo4j", "sh", "-c",
+            'NEO4J_USERNAME="${NEO4J_AUTH%%/*}" NEO4J_PASSWORD="${NEO4J_AUTH#*/}" '
+            'exec cypher-shell --format plain "$1"',
+            "cypher", query,
+        ],
+        cwd=root, env=env, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
 @needs_docker
-class TestRealContainer:
-    @pytest.fixture(scope="class")
-    def sandbox(self, tmp_path_factory):
-        tmp_path = tmp_path_factory.mktemp("f01")
-        project = f"smartsketch-f01-{uuid.uuid4().hex[:8]}"
-        root = _sandbox(
-            tmp_path,
-            {
-                "NEO4J_PASSWORD": PASSWORD,
-                "NEO4J_BOLT_PORT": str(_free_port()),
-                "NEO4J_HTTP_PORT": str(_free_port()),
-                "COMPOSE_PROJECT_NAME": project,
-            },
-        )
-        env = _env(COMPOSE_PROJECT_NAME=project)
-        yield root, env
-        subprocess.run(
-            ["docker", "compose", "down", "-v", "--remove-orphans"],
-            cwd=root, env=env, capture_output=True, timeout=120,
-        )
+def test_dev_up_starts_healthy_neo4j_with_apoc(real_sandbox):
+    root, env = real_sandbox
 
-    def _cypher(self, root: Path, env: dict[str, str], query: str) -> str:
-        result = subprocess.run(
-            [
-                "docker", "compose", "exec", "-T", "neo4j", "sh", "-c",
-                'NEO4J_USERNAME="${NEO4J_AUTH%%/*}" NEO4J_PASSWORD="${NEO4J_AUTH#*/}" '
-                'exec cypher-shell --format plain "$1"',
-                "cypher", query,
-            ],
-            cwd=root, env=env, capture_output=True, text=True, timeout=60,
-        )
-        assert result.returncode == 0, result.stderr
-        return result.stdout
+    result = _run(root, "dev-up.sh", env, timeout=600)
 
-    def test_dev_up_starts_healthy_neo4j_with_apoc(self, sandbox):
-        root, env = sandbox
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "APOC" in result.stdout and "5.26" in result.stdout
+    assert PASSWORD not in result.stdout + result.stderr
 
-        result = _run(root, "dev-up.sh", env, timeout=600)
 
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert "APOC" in result.stdout and "5.26" in result.stdout
-        assert PASSWORD not in result.stdout + result.stderr
+@needs_docker
+def test_data_survives_stop_and_start(real_sandbox):
+    root, env = real_sandbox
+    marker = uuid.uuid4().hex
+    _cypher(root, env, f"CREATE (:F01Probe {{marker: '{marker}'}})")
 
-    def test_data_survives_stop_and_start(self, sandbox):
-        root, env = sandbox
-        marker = uuid.uuid4().hex
-        self._cypher(root, env, f"CREATE (:F01Probe {{marker: '{marker}'}})")
+    down = subprocess.run(
+        ["docker", "compose", "down"], cwd=root, env=env, capture_output=True, timeout=120
+    )
+    assert down.returncode == 0
+    again = _run(root, "dev-up.sh", env, timeout=600)
+    assert again.returncode == 0, again.stdout + again.stderr
 
-        down = subprocess.run(
-            ["docker", "compose", "down"], cwd=root, env=env, capture_output=True, timeout=120
-        )
-        assert down.returncode == 0
-        again = _run(root, "dev-up.sh", env, timeout=600)
-        assert again.returncode == 0, again.stdout + again.stderr
-
-        out = self._cypher(root, env, f"MATCH (p:F01Probe {{marker: '{marker}'}}) RETURN count(p)")
-        assert out.strip().splitlines()[-1] == "1"
+    out = _cypher(root, env, f"MATCH (p:F01Probe {{marker: '{marker}'}}) RETURN count(p)")
+    assert out.strip().splitlines()[-1] == "1"
