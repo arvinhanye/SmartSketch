@@ -12,6 +12,7 @@ dependencies = [
   "fastapi==0.141.1",
   "markdown-it-py==4.2.0",
   "pdfminer.six==20260107",
+  "python-multipart==0.0.32",
   "uvicorn==0.53.0",
 ]
 
