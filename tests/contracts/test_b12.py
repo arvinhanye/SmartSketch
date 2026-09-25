@@ -1,4 +1,7 @@
-"""B12：学习进度与下一步推荐的 wire 契约（specs/learning-path.md §3～§5、§7；ADR-014 修订 1 决定 7、8）。"""
+"""B12：学习进度与下一步推荐的 wire 契约（specs/learning-path.md §3～§5、§7；ADR-014 修订 1 决定 7、8）。
+
+B12-R1：完整性错误 `details.request_id` 与 `PUT /progress` 的 422 `not_in_published_version`（ADR-017 决定 4、5）。
+"""
 
 import copy
 import importlib.util
@@ -319,26 +322,141 @@ def test_recommendation_example_sums_bitwise_in_fixed_order():
 
 # ── 已提交版完整性故障（§1、§4，LP-11、LP-12）─────────────────────────────────
 
-def test_integrity_error_carries_only_a_diagnostic_id():
-    ok = {"code": "INTERNAL_ERROR", "message": "课程图谱数据异常，请联系教师", "details": {"diagnostic_id": "diag_01"}}
+def test_integrity_error_carries_only_a_request_id():
+    ok = {"code": "INTERNAL_ERROR", "message": "课程图谱数据异常，请联系教师",
+          "details": {"request_id": "01J8Z3K4M5N6P7Q8R9S0T1V2W3"}}
     assert is_valid("LearningIntegrityError", ok)
+    rid = ok["details"]["request_id"]
     for bad in (
         _without(ok, "details"),
         ok | {"details": {}},
-        ok | {"details": {"diagnostic_id": ""}},
-        ok | {"details": {"diagnostic_id": "diag_01", "cycle": ["kp_1", "kp_2", "kp_1"]}},   # 不外露环路
-        ok | {"details": {"diagnostic_id": "diag_01", "kp_id": "kp_1"}},                     # 不外露节点 ID
+        ok | {"details": {"request_id": ""}},
+        ok | {"details": {"diagnostic_id": rid}},                                   # ADR-017 决定 4：旧字段名不再接受
+        ok | {"details": {"request_id": rid, "diagnostic_id": rid}},                # 闭合对象：不并存旧名
+        ok | {"details": {"request_id": rid, "cycle": ["kp_1", "kp_2", "kp_1"]}},   # 不外露环路
+        ok | {"details": {"request_id": rid, "kp_id": "kp_1"}},                     # 不外露节点 ID
         ok | {"code": "GRAPH_NOT_PUBLISHED"},
-        ok | {"code": "CYCLE_DETECTED"},                                                     # 教师草稿的 409 不用于学生读路径
+        ok | {"code": "CYCLE_DETECTED"},                                            # 教师草稿的 409 不用于学生读路径
     ):
         assert not is_valid("LearningIntegrityError", bad), bad
+
+
+def test_integrity_request_id_matches_chat_request_id():
+    """ADR-017 决定 4：与问答的 `details.request_id` 同名同型，作为全平台日志关联编号。"""
+    details = SCHEMAS["LearningIntegrityDetails"]
+    assert details["required"] == ["request_id"]
+    assert details["additionalProperties"] is False
+    assert set(details["properties"]) == {"request_id"}
+    assert details["properties"]["request_id"] == SCHEMAS["ChatErrorDetails"]["properties"]["request_id"]
+    assert "ADR-017" in details["description"] and "request_id" in details["description"]
+    error_description = SCHEMAS["LearningIntegrityError"]["description"]
+    assert "request_id" in error_description and "专用码待定" not in error_description
+    assert "ProgressOutsideGraphError" in error_description
+
+
+def test_diagnostic_id_is_gone_from_source_and_generated():
+    assert "diagnostic_id" not in (ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8")
+    for rel in ("openapi.json", "python/models.py", "typescript/openapi.d.ts"):
+        assert "diagnostic_id" not in (GENERATED / rel).read_text(encoding="utf-8"), rel
 
 
 def test_integrity_500_covers_empty_committed_graph_on_every_learning_read():
     for op in (PROGRESS["get"], PROGRESS["put"], RECOMMEND):
         description = op["responses"]["500"]["description"]
-        assert "V=∅" in description and "诊断" in description
+        assert "V=∅" in description and "request_id" in description
+        assert "诊断 ID" not in description
     assert "no_graph" in SCHEMAS["LearningIntegrityError"]["description"]
+
+
+# ── PUT /progress 目标不在当前发布版（ADR-017 决定 5）─────────────────────────
+
+NOT_PUBLISHED = {
+    "code": "VALIDATION_ERROR",
+    "message": "部分知识点不在当前发布的课程图谱中，请刷新后重试",
+    "details": {
+        "fields": [
+            {"in": "body", "field": "[0].kp_id", "reason": "not_in_published_version"},
+            {"in": "body", "field": "[12].kp_id", "reason": "not_in_published_version"},
+        ],
+        "graph_version": 4,
+    },
+}
+_ITEM = NOT_PUBLISHED["details"]["fields"][0]
+
+
+def _details(**changes) -> dict:
+    return NOT_PUBLISHED | {"details": NOT_PUBLISHED["details"] | changes}
+
+
+def test_progress_put_422_uses_progress_validation_error():
+    response = PROGRESS["put"]["responses"]["422"]
+    assert _json_schema(response) == {"$ref": "#/components/schemas/ProgressValidationError"}
+    for needle in ("not_in_published_version", "graph_version", "草稿独有", "已删除", "他课",
+                   "发布指针", "重复", "零写入", "ADR-017"):
+        assert needle in response["description"], needle
+    assert "待定" not in response["description"]
+    for needle in ("not_in_published_version", "ADR-017"):
+        assert needle in PROGRESS["put"]["description"], needle
+
+
+@pytest.mark.parametrize("payload", [
+    NOT_PUBLISHED,
+    _details(fields=[_ITEM]),
+    _details(graph_version=1),
+])
+def test_progress_not_in_published_version_is_accepted(payload):
+    assert is_valid("ProgressValidationError", payload)
+
+
+@pytest.mark.parametrize("payload", [
+    # 请求体 schema 校验与同批重复仍是 B12 已定的普通 VALIDATION_ERROR，不被本修订收窄
+    {"code": "VALIDATION_ERROR", "message": "m", "details": {"fields": [{"in": "body", "field": "0.status", "reason": "enum"}]}},
+    {"code": "VALIDATION_ERROR", "message": "m", "details": {"fields": [{"in": "body", "field": "", "reason": "json_invalid"}]}},
+    {"code": "VALIDATION_ERROR", "message": "m"},
+], ids=["schema-enum", "json-invalid", "no-details"])
+def test_progress_generic_validation_errors_stay_open(payload):
+    assert is_valid("ProgressValidationError", payload)
+
+
+@pytest.mark.parametrize("payload", [
+    NOT_PUBLISHED | {"details": _without(NOT_PUBLISHED["details"], "graph_version")},
+    _details(graph_version=0),
+    _details(graph_version="4"),
+    _details(course_id="c_other"),                                                  # details 闭合
+    _details(fields=[_ITEM | {"input": "kp_x"}]),                                   # 不回显输入
+    _details(fields=[_ITEM | {"reason": "not_found"}]),                             # reason 闭合
+    _details(fields=[_ITEM | {"reason": "missing"}]),
+    _details(fields=[_ITEM, {"in": "body", "field": "[1].status", "reason": "enum"}]),  # 不与其他 reason 混排
+    _details(fields=[_ITEM | {"in": "query"}]),
+    _details(fields=[_ITEM | {"field": "[0].status"}]),
+    _details(fields=[_ITEM | {"field": "[-1].kp_id"}]),
+    _details(fields=[_ITEM | {"field": "[01].kp_id"}]),
+    _details(fields=[]),
+    NOT_PUBLISHED | {"code": "NOT_FOUND"},                                          # 不用 404
+    NOT_PUBLISHED | {"code": "PUBLISH_IN_PROGRESS"},                                # 不用 409
+    # 缺 graph_version 时仍由 reason 触发专用结构
+    {"code": "VALIDATION_ERROR", "message": "m", "details": {"fields": [_ITEM]}},
+    # 带 graph_version 而 reason 取别的值
+    {"code": "VALIDATION_ERROR", "message": "m",
+     "details": {"fields": [{"in": "body", "field": "[0].kp_id", "reason": "string_too_short"}], "graph_version": 4}},
+], ids=["no-graph-version", "graph-version-0", "graph-version-str", "extra-details", "extra-item-field",
+        "reason-not-found", "reason-missing", "mixed-reasons", "in-query", "field-status", "field-negative",
+        "field-leading-zero", "empty-fields", "code-404", "code-409", "reason-without-version",
+        "version-with-other-reason"])
+def test_progress_not_in_published_version_rejects(payload):
+    assert not is_valid("ProgressValidationError", payload)
+
+
+def test_not_in_published_version_details_are_closed_and_minimal():
+    details = SCHEMAS["ProgressNotInPublishedVersionDetails"]
+    assert details["additionalProperties"] is False
+    assert set(details["required"]) == {"fields", "graph_version"} == set(details["properties"])
+    item = SCHEMAS["ProgressNotInPublishedVersionField"]
+    assert item["additionalProperties"] is False
+    assert set(item["required"]) == {"in", "field", "reason"} == set(item["properties"])
+    assert item["properties"]["in"]["const"] == "body"
+    assert item["properties"]["reason"]["const"] == "not_in_published_version"
+    assert "ADR-017" in SCHEMAS["ProgressValidationError"]["description"]
 
 
 # ── 接口参数（决定 7；§7 目标路径不属于 B12）──────────────────────────────────
@@ -374,10 +492,17 @@ def test_generated_pydantic_models_enforce_shape():
         with pytest.raises(Exception):
             models.RecommendResponse.model_validate(bad)
     models.LearningIntegrityError.model_validate(
-        {"code": "INTERNAL_ERROR", "message": "m", "details": {"diagnostic_id": "d1"}})
-    with pytest.raises(Exception):
-        models.LearningIntegrityError.model_validate(
-            {"code": "INTERNAL_ERROR", "message": "m", "details": {"diagnostic_id": "d1", "cycle": []}})
+        {"code": "INTERNAL_ERROR", "message": "m", "details": {"request_id": "r1"}})
+    for bad_details in ({"request_id": "r1", "cycle": []}, {"diagnostic_id": "d1"}):
+        with pytest.raises(Exception):
+            models.LearningIntegrityError.model_validate({"code": "INTERNAL_ERROR", "message": "m", "details": bad_details})
+    models.ProgressNotInPublishedVersionDetails.model_validate(NOT_PUBLISHED["details"])
+    for bad_details in (_without(NOT_PUBLISHED["details"], "graph_version"),
+                        NOT_PUBLISHED["details"] | {"course_id": "c1"},
+                        NOT_PUBLISHED["details"] | {"fields": [_ITEM | {"reason": "missing"}]},
+                        NOT_PUBLISHED["details"] | {"fields": [_ITEM | {"field": "[0].status"}]}):
+        with pytest.raises(Exception):
+            models.ProgressNotInPublishedVersionDetails.model_validate(bad_details)
 
 
 def test_generated_typescript_keeps_nullable_fields_required():
@@ -390,6 +515,12 @@ def test_generated_typescript_keeps_nullable_fields_required():
     assert re.search(r"^\s+inherited_from: ", body, re.M)
     assert "own_status?" not in body and "updated_at?" not in body
     assert '"all_mastered"' in ts and '"no_graph"' not in ts
+    block = re.search(r"^        LearningIntegrityDetails: \{(.*?)^        \}", ts, re.M | re.S)
+    assert block and re.search(r"^\s+request_id: string;", block.group(1), re.M)
+    block = re.search(r"^        ProgressNotInPublishedVersionField: \{(.*?)^        \}", ts, re.M | re.S)
+    assert block, "ProgressNotInPublishedVersionField 类型缺失"
+    assert re.search(r'^\s+in: "body";', block.group(1), re.M)
+    assert re.search(r'^\s+reason: "not_in_published_version";', block.group(1), re.M)
 
 
 def test_generated_openapi_json_matches_source_for_b12_schemas():
@@ -398,7 +529,8 @@ def test_generated_openapi_json_matches_source_for_b12_schemas():
     for name in ("MasteryStatus", "ProgressUpdate", "ProgressInheritedSource", "ProgressEntry", "ProgressResponse",
                  "RecommendFactors", "RecommendWeightedFactors", "RecommendReasonFacts", "Recommendation",
                  "RecommendListResponse", "RecommendAllMasteredResponse", "RecommendResponse",
-                 "LearningIntegrityError", "LearningIntegrityDetails"):
+                 "LearningIntegrityError", "LearningIntegrityDetails", "ProgressValidationError",
+                 "ProgressNotInPublishedVersionDetails", "ProgressNotInPublishedVersionField"):
         assert generated[name] == SCHEMAS[name], name
 
 
@@ -408,3 +540,27 @@ def test_learning_path_spec_marks_b12_gap_as_landed():
     text = (ROOT / "specs/learning-path.md").read_text(encoding="utf-8")
     section = text.split("## 7. 接口与已签收事项", 1)[1]
     assert "B12 已落实" in section and "tests/contracts/test_b12.py" in section
+
+
+def test_learning_path_spec_records_b12_r1():
+    text = (ROOT / "specs/learning-path.md").read_text(encoding="utf-8")
+    section5 = text.split("## 5. 进度跨版本投影与写入", 1)[1].split("## 6.", 1)[0]
+    for needle in ("422", "VALIDATION_ERROR", "not_in_published_version", "[<i>].kp_id", "graph_version", "ADR-017"):
+        assert needle in section5, needle
+    lp12 = next(line for line in text.splitlines() if line.startswith("| LP-12 "))
+    for needle in ("投影到当前发布版节点集", "ProgressOutsideGraphError", "INTERNAL_ERROR", "ADR-017"):
+        assert needle in lp12, needle
+    section7 = text.split("## 7. 接口与已签收事项", 1)[1]
+    assert "B12-R1 已落实" in section7 and "request_id" in section7
+
+
+# ── 错误码文档（errors.v1.md 实现约束：details 结构须在该文件登记）───────────────
+
+def test_errors_doc_registers_request_id_and_not_in_published_version():
+    doc = (ROOT / "src/contracts/errors.v1.md").read_text(encoding="utf-8")
+    assert "diagnostic_id" not in doc
+    http_rows = [line for line in doc.splitlines() if line.startswith("| `INTERNAL_ERROR` | 500 |")]
+    assert len(http_rows) == 1 and "request_id" in http_rows[0] and "ADR-017" in http_rows[0]
+    validation = doc.split("`VALIDATION_ERROR` 的 `details`", 1)[1].split("### 图谱编辑", 1)[0]
+    for needle in ("not_in_published_version", "graph_version", "[<i>].kp_id", "PUT /progress", "ADR-017"):
+        assert needle in validation, needle

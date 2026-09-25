@@ -84,6 +84,8 @@ score(k) = w_u × u(k) + w_i × i(k) + w_c × c(k) + w_e × e(k)
 
 写入进度只对请求事务所见的**当前已发布版**且其中存在的节点有效；草稿独有、已删除、他课节点拒绝。`PUT /progress` 的请求体是 `ProgressUpdate[]`：先对整批做鉴权、非空/字段与 ID 校验，任一项非法或同批 `kp_id` 重复则**整批拒绝、零写入**；合法批次在一个 SQLite 事务中全写入，同值写入按下文判定；身份只从已认证学生取得，不能信任请求中的 `user_id`。发布指针在写入期间变化时，提交前重新核对版本，若任一目标已不在新发布版则整批拒绝；若全部仍在则按新版本提交并回传新 `graph_version`。读请求中的进度快照与图版本一旦固定，不因途中发布或改标记而混算；后续请求可观察新状态。当前 `GET /progress` 只读当前发布版，无按历史版本查询参数；历史状态保留由仓储层验收，不虚构历史读接口。
 
+**目标不在当前发布版的拒绝码**（ADR-017 决定 5）：上述「草稿独有、已删除、他课」三种情况，以及发布指针在写入期间变化、复核时目标不在新版本的情况，一律返回 422 `VALIDATION_ERROR`，整批零写入。`details` 为闭合对象：`fields` 中每个不在发布版中的请求项一项 `{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}`（`<i>` 为请求数组下标，三种情况同一 `reason`，不暴露他课节点是否存在）；`graph_version` 为请求事务所见的当前发布版。同批 `kp_id` 重复仍按 B12 已定的通用 422 处理。
+
 **同值写入**（A08S-R01，由 ADR-014 修订 1 决定 9 推导）：写入项的 `status` 等于该节点原始 `status` 时，不能只凭原始值相同就跳过，须在提交时的最终绑定版本上判定这次写入是否还会改变覆盖关系。若当前归属到该节点且未被覆盖的来源为空（没有来源，或自身写入序号已大于全部来源的界 `T`），则为无操作：不取新写入序号、不改 `updated_at`，响应照常按投影返回。否则它是一次显式写入，照常取新写入序号并刷新 `updated_at`，从而覆盖这些来源（决定 9）。由此，同一绑定版本下重放同一请求时，第二次起都是无操作，有效状态、原始行与 `updated_at` 均不变。
 
 ## 6. A08 验收矩阵（交后续任务实现）
@@ -101,7 +103,7 @@ score(k) = w_u × u(k) + w_i × i(k) + w_c × c(k) + w_e × e(k)
 | LP-9 | A 已掌握、B 未知（B 无记录，或记录写于合并之前），A 并入 B 且原后继迁到 B | B 有效为 mastered，原后继按新前置可学；A/B 原始进度行字节不变。B 的 learning 记录写于合并之前、A 为 mastered 时，B 仍是 mastered；A→B→C 链式合并时 C 继承 A/B 的最高状态；回滚使 A 重现时 A 用自身记录、B 不再从 A 继承，近期写入也不被回滚覆盖。 |
 | LP-10 | 推荐已绑定 v1 时 v2 提交 | 本请求的图、进度投影、理由和响应版本均为 v1；下一请求可读 v2。 |
 | LP-11 | 未发布、全部掌握、损坏的已提交 `V=∅` 快照 | 分别为 404 `GRAPH_NOT_PUBLISHED`、`state=all_mastered`、5xx 完整性错误与诊断 ID；无 `no_graph` wire 状态。A04 V3 的 `empty_graph` 阻断正常空图发布。 |
-| LP-12 | 已提交版有环/悬空端点；原始进度有历史 dormant 行或从未属于本课程的脏 ID；写入夹带外课 ID | 图错误为 5xx 与诊断 ID，具体 ID/环仅入服务端日志；历史行保留并投影排除；脏行告警后忽略而不中断读取；外课写入整批拒绝，均不输出部分排名。 |
+| LP-12 | 已提交版有环/悬空端点；原始进度有历史 dormant 行或从未属于本课程的脏 ID；写入夹带外课 ID | 图错误为 5xx 与诊断 ID，具体 ID/环仅入服务端日志；历史行保留并投影排除；脏行告警后忽略而不中断读取；外课写入整批拒绝，均不输出部分排名。读路径先投影到当前发布版节点集再计算，I03 的 `ProgressOutsideGraphError` 若仍被抛出视为缺陷，按 `INTERNAL_ERROR` 返回（ADR-017 决定 4）。 |
 | LP-13 | 原始 `unlock_count=2` 且归一化 `u=1` | 理由写“解锁 2 个”，结构事实/分量与评分一致，不用模型生成。 |
 | LP-14 | 2～5 点的前置星形 DAG，中心点连接其余所有点 | 中心点 `centrality=1`，每个叶子 `centrality=1/(N−1)`；`N=1` 为 0。 |
 | LP-15 | 章节树含根 1 的子 1.1、根 2 的子 2.1，两个子章 `order` 都为 1 | 章节秩按前序为 `1,1.1,2,2.1`，不把同级序号误作全局序号；节点只引用一个章节，`chapter_id=null` 得 `c=0`。 |
@@ -123,6 +125,8 @@ score(k) = w_u × u(k) + w_i × i(k) + w_c × c(k) + w_e × e(k)
   未发布使用 A04 的 404，已提交空图使用 5xx 完整性错误，不新增 `no_graph`。当前 `RecommendResponse` 和 `ProgressEntry` 还不足以表达这些语义，本 A08 不改接口文件。B08 须确定学生读路径完整性错误的公开错误码，响应只含诊断 ID。
 
   > **B12 已落实（2026-09-25，分支 `claude/b12-progress-contract`，仅状态标注，不改上文规则）**：`src/contracts/api.v1.yaml` 已定义 `ProgressEntry`（有效 `status`、可空 `own_status`、`inherited_from[]`、可空 `updated_at`）与 `ProgressResponse{graph_version, entries}`，`GET`/`PUT /progress` 都返回绑定版本 V 的每个节点；`RecommendResponse` 按 `state` 判别为 `recommendations` / `all_mastered`，无 `no_graph`；分量与 `score` 为未舍入 double，按 u→i→c→e 逐位求和；未发布为 404，已提交版完整性故障（含 V=∅）为 500 `LearningIntegrityError`（`details` 只含 `diagnostic_id`）。完整性错误的专用公开码与 `PUT` 中非发布版 `kp_id` 的错误码仍待决，暂用既有 `INTERNAL_ERROR`，见 `docs/handoffs/claude-b12.md`。验收见 `tests/contracts/test_b12.py`。
+
+  > **B12-R1 已落实（2026-09-25，分支 `claude/b12-r1-progress-errors`，仅状态标注，不改上文规则）**：上条两项待决已由 ADR-017 决定 4、5 定案。完整性错误保留 `INTERNAL_ERROR`，不新增专用码，`LearningIntegrityDetails` 的字段改名为 `request_id`（与问答同名同型；本规格所称「诊断 ID」在 wire 上即 `details.request_id`）；`PUT /progress` 目标不在当前发布版返回 422 `ProgressValidationError`，`details` 为 `ProgressNotInPublishedVersionDetails{fields, graph_version}`，见 §5。验收见 `tests/contracts/test_b12.py`。
 - **数值与参数**（决定 5～7）：`importance/difficulty` 的 `[0,1]` 范围沿用既有候选契约与 A04 快照。属性缺失时取中性值 0.5。权重来自四个 `RECOMMEND_WEIGHT_*` 环境变量，缺省为 S2 值，全站统一，不做课程级配置（见 §1）。推荐显示上限默认 10、最大 50。环境变量登记在 `.env.example` 与 `docs/integrations.md`。
 - **细则 1：显式写入覆盖继承**（决定 9）：以来源“本次连续归属”的起算版本为界，规则见 §5，验收见 LP-18、LP-20。实现依赖：进度行增加写入序号 `write_seq`（I01），版本提交事务从同一序列 `commit_sequence` 取提交序号 `commit_seq`（G04 的 P11、G06 的 R7），规则见 ADR-012 修订 3 决定 22～24（2026-09-24 签收）。
 - **细则 2：谱系存放位置**（决定 10）：谱系作为发布快照节点的 `merged_from` 字段保存，按绑定 `version_id` 读取，回滚复制源快照时谱系随之回退。字段形状、摘要纳入方式与提交序号由 **ADR-012 修订 3**（2026-09-24 签收）规定：`merged_from` 为本版本中归属到该节点的全部来源、链已展平（决定 15），纳入摘要（决定 19），直接父子关系只在 F12 审计日志；F10/B11/G04/G06/I01 可按此实现。不能由 I01 从当前草稿或名称推断谱系。

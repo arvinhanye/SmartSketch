@@ -553,6 +553,8 @@ export interface paths {
          * @description 请求体为非空 `ProgressUpdate[]`，身份只取自已认证学生，请求中不接受 `user_id`（`specs/learning-path.md` §5）。
          *     先对整批做鉴权、字段与 ID 校验：任一项非法、同批 `kp_id` 重复，或 `kp_id` 不在提交时绑定的发布版中
          *     （草稿独有、已删除、他课；发布指针变化后按新版本复核整批）时**整批拒绝、零写入**。
+         *     最后一种返回 422 `VALIDATION_ERROR`，`details.fields[].reason = not_in_published_version` 并带 `details.graph_version`
+         *     （ADR-017 决定 5）。
          *     合法批次在一个事务内全部写入。同值写入按 §5「同值写入」判定：仍有未被覆盖的继承来源时是一次显式写入，
          *     否则为无操作（不取写入序号、不改 `updated_at`）。
          *     成功后按最终绑定版本重新投影，返回该版本**每个节点**的进度项；发布指针途中变化且目标全部仍在时，
@@ -1404,17 +1406,47 @@ export interface components {
         RecommendResponse: components["schemas"]["RecommendListResponse"] | components["schemas"]["RecommendAllMasteredResponse"];
         /** @description 学习进度与推荐读路径遇到已提交版完整性故障（`specs/learning-path.md` §1、§4、§5）：V=∅、重复 ID、自环、环、
          *     悬空端点、章节树损坏、非法数值或绑定版本谱系违反不变式；也用于这些接口的其他未预期异常。
-         *     公开错误码暂用既有 `INTERNAL_ERROR`（专用码待定，见 `docs/handoffs/claude-b12.md`）；`details` 是闭合对象，
-         *     只含诊断 ID，具体节点 ID 与环路只进服务端日志。已提交空图属于本错误，不增加 `no_graph` 状态。
+         *     公开错误码为既有 `INTERNAL_ERROR`，不新增专用码（ADR-017 决定 4）；`details` 是闭合对象，
+         *     只含 `request_id`，具体节点 ID 与环路只进服务端日志。已提交空图属于本错误，不增加 `no_graph` 状态。
+         *     读路径先把原始进度投影到当前发布版节点集（LP-12，脏行告警后忽略）再计算；若可学集合计算仍抛出
+         *     `ProgressOutsideGraphError`，视为缺陷，同样按本错误返回。
          *      */
         LearningIntegrityError: components["schemas"]["Error"] & {
             /** @constant */
             code: "INTERNAL_ERROR";
             details: components["schemas"]["LearningIntegrityDetails"];
         };
-        /** @description 完整性错误的细节，闭合对象；`diagnostic_id` 与服务端日志、告警对应。 */
+        /** @description 完整性错误的细节，闭合对象。`request_id` 是本请求的请求 ID，与服务端日志、告警对应；
+         *     与问答错误的 `details.request_id` 同名同型，作为全平台日志关联编号（ADR-017 决定 4）。
+         *      */
         LearningIntegrityDetails: {
-            diagnostic_id: string;
+            request_id: string;
+        };
+        /** @description `PUT /progress` 的 422（`VALIDATION_ERROR`）。请求体 schema 校验失败与同批 `kp_id` 重复沿用通用
+         *     `details.fields` 形状，不在此收窄；当 `details.fields` 含 `reason = not_in_published_version` 或 `details`
+         *     带 `graph_version` 时，`details` 必须是 `ProgressNotInPublishedVersionDetails`（ADR-017 决定 5）。
+         *      */
+        ProgressValidationError: components["schemas"]["Error"] & {
+            /** @constant */
+            code: "VALIDATION_ERROR";
+        };
+        /** @description `PUT /progress` 目标不在请求事务所见的当前发布版时的 422 细节，闭合对象（ADR-017 决定 5）。
+         *     草稿独有、已删除、他课三种情况同一 `reason`；写入期间发布指针变化、目标不在新版本时同样使用。
+         *     不回显 `kp_id` 的值，只以请求数组下标定位。
+         *      */
+        ProgressNotInPublishedVersionDetails: {
+            /** @description 每个不在发布版中的请求项一项；不与其他 `reason` 混排。 */
+            fields: components["schemas"]["ProgressNotInPublishedVersionField"][];
+            /** @description 请求事务所见的当前发布版本号（发布指针途中变化时为复核所用的新版本） */
+            graph_version: number;
+        };
+        /** @description 单个不在当前发布版中的请求项，闭合对象；`field` 为 `[<i>].kp_id`，`<i>` 为请求数组下标。 */
+        ProgressNotInPublishedVersionField: {
+            /** @constant */
+            in: "body";
+            field: string;
+            /** @constant */
+            reason: "not_in_published_version";
         };
         ChatTurn: {
             /** @enum {string} */
@@ -2610,7 +2642,8 @@ export interface operations {
             /** @description 学生成员读取从未发布的课程（`GRAPH_NOT_PUBLISHED`），不做进度投影。 */
             404: components["responses"]["NotFound"];
             /** @description 已提交版完整性故障（`specs/learning-path.md` §1、§4）：V=∅、重复 ID、环、悬空端点、章节树损坏、
-             *     非法数值或绑定版本谱系违反不变式。只返回诊断 ID，不输出部分进度、内部节点 ID 或环路。
+             *     非法数值或绑定版本谱系违反不变式。只返回请求 ID（`details.request_id`，ADR-017 决定 4），
+             *     不输出部分进度、内部节点 ID 或环路。
              *      */
             500: {
                 headers: {
@@ -2651,12 +2684,26 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             /** @description 学生成员写入从未发布的课程（`GRAPH_NOT_PUBLISHED`），零写入。 */
             404: components["responses"]["NotFound"];
-            /** @description 请求体不满足 schema（空批次、缺字段、非法状态、带 `user_id` 等多余字段）或同批 `kp_id` 重复（`VALIDATION_ERROR`），整批零写入。
-             *     `kp_id` 不在绑定发布版中的整批拒绝也是零写入，其公开错误码与 `details` 形状待定（见 `docs/handoffs/claude-b12.md` 待决）。
+            /** @description `VALIDATION_ERROR`，整批零写入。两类情形：
+             *     1. 请求体不满足 schema（空批次、缺字段、非法状态、带 `user_id` 等多余字段）或同批 `kp_id` 重复：
+             *        按 B12 已定的通用 422 处理，`details.fields` 形状见 `errors.v1.md`。
+             *     2. 目标 `kp_id` 不在请求事务所见的当前发布版中（ADR-017 决定 5）：草稿独有、已删除、他课三种情况
+             *        同一 `reason = not_in_published_version`，不暴露他课节点是否存在；写入期间发布指针变化、复核时目标
+             *        不在新版本中同样返回此错误。`details.fields` 每个不在发布版中的请求项一项
+             *        `{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}`（`<i>` 为请求数组下标），
+             *        `details.graph_version` 为请求事务所见的当前发布版。客户端处置：重新 `GET /progress` 后再提交。
              *      */
-            422: components["responses"]["ValidationError"];
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressValidationError"];
+                };
+            };
             /** @description 已提交版完整性故障（`specs/learning-path.md` §1、§4）：V=∅、重复 ID、环、悬空端点、章节树损坏、
-             *     非法数值或绑定版本谱系违反不变式。只返回诊断 ID，不输出部分进度、内部节点 ID 或环路。
+             *     非法数值或绑定版本谱系违反不变式。只返回请求 ID（`details.request_id`，ADR-017 决定 4），
+             *     不输出部分进度、内部节点 ID 或环路。
              *      */
             500: {
                 headers: {
@@ -2699,7 +2746,8 @@ export interface operations {
             /** @description `limit` 不是 1～50 的整数（`VALIDATION_ERROR`）。 */
             422: components["responses"]["ValidationError"];
             /** @description 已提交版完整性故障（`specs/learning-path.md` §1、§4）：V=∅、重复 ID、自环、环、悬空端点、章节树损坏、
-             *     非法数值或绑定版本谱系违反不变式。只返回诊断 ID，不返回部分推荐、内部节点 ID 或环路。
+             *     非法数值或绑定版本谱系违反不变式。只返回请求 ID（`details.request_id`，ADR-017 决定 4），
+             *     不返回部分推荐、内部节点 ID 或环路。
              *      */
             500: {
                 headers: {

@@ -81,6 +81,28 @@
 - `reason` 的取值随校验库而定，不是闭集。前端按 `in` 与 `field` 定位字段，遇到不认识的 `reason` 显示通用提示。
 - 由后端全局请求校验处理器统一产生（C13 引入），所有路由都用这个形状。
 
+**领域校验 reason `not_in_published_version`**（`PUT /progress`，ADR-017 决定 5）：请求体通过 schema 校验后，若有目标 `kp_id` 不在请求事务所见的当前发布版中，整批拒绝、零写入，返回 422 `VALIDATION_ERROR`，`details` 为闭合对象（`api.v1.yaml` 的 `ProgressValidationError` / `ProgressNotInPublishedVersionDetails`）：
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `fields[]` | array | 每个不在发布版中的请求项一项，固定为 `{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}`，`<i>` 为请求数组下标；不与其他 `reason` 混排 |
+| `graph_version` | integer | 请求事务所见的当前发布版本号；写入期间发布指针变化时为复核所用的新版本 |
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "部分知识点不在当前发布的课程图谱中，请刷新后重试",
+  "details": {
+    "fields": [{ "in": "body", "field": "[0].kp_id", "reason": "not_in_published_version" }],
+    "graph_version": 4
+  }
+}
+```
+
+- 草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课节点是否存在；写入期间发布指针变化、目标不在新版本时同样返回此错误。
+- 不用 404（`/progress` 资源本身存在）也不用 409：客户端处置都是重新 `GET /progress` 后再提交。
+- 同批 `kp_id` 重复仍是上文的通用 `VALIDATION_ERROR`，不带 `graph_version`。
+
 ### 图谱编辑
 
 | 码 | HTTP | 触发条件 | `details` | 前端处理 |
@@ -117,7 +139,7 @@
 | `LLM_UNAVAILABLE` | 503 | 主模型与备用模型均不可用 | 提示稍后重试；构图场景下任务转 `failed` 并保留已完成的块 |
 | `BUDGET_EXCEEDED` | 429 | 调用前发现任务或当日 token 预算已耗尽；不再发模型请求 | 提示额度耗尽；问答返回错误，抽取按失败块规则处理，不自动重试 |
 | `STORAGE_UNAVAILABLE` | 503 | 同步请求的存储依赖不可用 | 提示稍后重试；异步任务按上表返回 200 快照 |
-| `INTERNAL_ERROR` | 500 | 同步请求遇到未预期错误；学习进度与推荐接口遇到已提交版完整性故障（含 V=∅）也用此码（`LearningIntegrityError`，专用码待定，B12） | 显示通用失败提示，服务端日志保留诊断信息；进度与推荐接口的 `details` 为闭合对象，只含 `diagnostic_id`，不含节点 ID 或环路 |
+| `INTERNAL_ERROR` | 500 | 同步请求遇到未预期错误；学习进度与推荐接口遇到已提交版完整性故障（含 V=∅）也用此码（`LearningIntegrityError`，不新增专用码，ADR-017 决定 4） | 显示通用失败提示，服务端日志保留诊断信息；进度与推荐接口的 `details` 为闭合对象，只含 `request_id`（与问答 `details.request_id` 同名同型，用于日志关联），不含节点 ID 或环路 |
 
 ---
 
