@@ -848,7 +848,7 @@ D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #22
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| I04 | IN PROGRESS | 实现四项评分和结构化理由 | ArvinHan（Claude 子代理） | `claude/i04-ranking` / 本认领提交 | `src/backend/app/services/learning/ranking.py`、`tests/backend/test_i04.py`、`docs/handoffs/claude-i04.md` | 待补 |
+| I04 | DONE（待 PR 审查/合并） | 实现四项评分和结构化理由 | ArvinHan（Claude 子代理） | `claude/i04-ranking` / 本认领提交 | `src/backend/app/services/learning/ranking.py`、`tests/backend/test_i04.py`、`docs/handoffs/claude-i04.md` | 红：仅测试时收集错误 `ModuleNotFoundError`（exit 2）；绿：`test_i04.py` 115 passed；全量 `tests/backend` 1791 passed（基线 1676 + 115）、`tests/contracts tests/tooling` 305 passed；反向篡改 8 处（解锁数改出度 24 failed、同分章节秩颠倒 1、去零分母保护 32、求和顺序颠倒 2、去权重校验 3、排序前舍入 1、kp_id 降序 2；单删"至少一项为正"0 failed，因和校验已覆盖），均 `cmp` 恢复；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；待决 4 项见 `docs/handoffs/claude-i04.md` |
 
 - I04 验收：零分母、全零权重、同分、真实解锁数；分量求和等于 score；理由不用 LLM。验证：`python3 -m pytest tests/backend/test_i04.py -q`。
 
