@@ -156,6 +156,21 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；修订 1 再修订 ADR-011 决定 5、7（块 ID 按资料修订生成、来源块删除保护）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 已由 B08 纳入契约，DTO 字段交 B11，配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
 
+## 解析输出与来源定位（D01）
+
+各格式解析器（D02～D07）统一输出 `src/backend/app/services/parsers/models.py` 的 `ParsedDocument`：块按 `ordinal` 从 0 起连续编号，每块带 `SourceLocator`。D08～D11 只消费这一结构。以下规则在构造时校验，违反即抛 `ParseModelError`（属实现缺陷）。定位字段最终写入 `SourceRef`：`page` 与 `section_path` 至少一个（ADR-003）。
+
+| 格式 | `page` | `paragraph` | `line_start` / `line_end` | `section_path` |
+| --- | --- | --- | --- | --- |
+| PDF | 必填，≥ 1 | 不填（填了即拒绝） | 不填 | 只取标题路径；无标题时省略该键，只靠 `page` |
+| TXT、Markdown | 不填（不编造页码） | 必填 | 必填：解码后源文本的物理行号，闭区间，块间递增不重叠 | 「标题路径 > 第N段」；无标题时为「第N段」 |
+| DOCX | 不填（不编造页码） | 必填 | 不填 | 同上 |
+
+- **段落号**：`paragraph` 是该块在同一组标题（`section_titles`）下按文档顺序的序号，从 1 起、连续不断档。同一标题路径在文档中再次出现时接续编号，因此「标题路径 + 第N段」在一份文档内唯一。例：`第3章 > 3.1 栈 > 第2段`。
+- **标题规范化**：各级标题以 `" > "` 连接。标题先合并空白、去首尾，再把半角 `>` 替换为全角 `＞`，保证路径能无歧义地拆回各级标题。标题本身不成块。
+- **空文档**：没有可提取文本（含扫描件无文本层）时不构造结果，抛 `DocumentUnreadableError`。`reason ∈ {corrupted, encrypted, no_text}`，对应任务错误 `DOCUMENT_UNREADABLE`。
+- **资料修订**：`RevisionKey(document_id, content_hash, parser_version)`。其中 `parser_version` 由解析器给出，为不含空白的非空字符串（如 `txt/1`）。`content_hash` 形如 `sha256:<64 位小写十六进制>`，唯一来源是 C05 `FileStorage.save()` 返回的 `StoredFile.content_hash`，D11 直接使用、不重算。`revision_id` 与块 ID 的派生公式归 D09。
+
 ## 数据流
 
 1. 上传资料 → SQLite 创建任务/资料记录 → Worker 进程经租约领取任务 → 解析和分块。
