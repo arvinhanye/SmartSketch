@@ -869,3 +869,33 @@ D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #22
 | K07 | IN REVIEW（PR #232） | 复用并审查环境启停脚本 | ArvinHan（Codex） | `codex/k07-dev-scripts` / `130e6b6` | `scripts/_dev-common.sh`、`scripts/dev-up.sh`、`scripts/dev-down.sh`、`tests/tooling/test_k07.py`、`docs/integrations.md`、`docs/handoffs/codex-k07.md`、本节 | `docs/handoffs/codex-k07.md`；K07 **18 passed**，F01 假 Docker **9 passed / 3 skipped**，`./scripts/verify.sh` exit 0，`git diff --check` 通过；review P3 修复后复审无新发现。普通停止保留数据；显式销毁只在精确交互确认后执行 `compose down -v`，绑定目录保留；未运行真实 Compose。PR #232 |
 
 - 验收：缺失 `.env` 时明确报错、不 source 或改写个人 `.env`；默认停止保留数据；销毁须明确交互确认。验证：`python3 -m pytest tests/tooling/test_k07.py -q`、`SMARTSKETCH_SKIP_DOCKER=1 python3 -m pytest tests/integration/test_f01.py -q`、`./scripts/verify.sh`。
+
+## 2026-09-25 第六批并行（Claude）
+
+D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C10 #237、D10 #234；E08：E05 #236；C11：C08 #176、C03 #216、B10、C16 #227；J03：E04 #235、E01 #182）。issue #80（D11）、#88（E08）、#132（J03）无人认领、无远端分支；#68（C11）由 539210 于 2026-09-25 16:53 自行分配并标 `status:in-progress`，远端无分支或 PR，经 ArvinHan 授权转由 Claude 执行（同 C02、C10 先例），已在 #68 留言说明。已核对在途工作：main 无未合并 PR；四项文件互不重叠。本认领提交为四个分支共用的 base，各分支只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D11 | IN PROGRESS | 实现解析阶段 worker 编排 | ArvinHan（Claude） | `claude/d11-parse-worker` / 本认领提交 | `src/backend/app/workers/__init__.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_d11.py`、`docs/handoffs/claude-d11.md` | 待补 |
+
+- D11 验收：已领取任务（C09 租约）经解析 → 分块 → 块身份（D09）→ 来源块持久化（D10）到 `parsing` 完成检查点（T4 `parsing → extracting`，带令牌条件）；解析失败 T9 `DOCUMENT_UNREADABLE`、取消在检查点 T8、租约丢失即停、重启重跑不产生新块；只做解析阶段，不接真实 LLM。验证：`python3 -m pytest tests/backend/test_d11.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E08 | IN PROGRESS | 实现名称归一和重复候选 | ArvinHan（Claude） | `claude/e08-name-normalize` / 本认领提交 | `src/backend/app/services/fusion/__init__.py`、`src/backend/app/services/fusion/normalize.py`、`tests/backend/test_e08.py`、`docs/handoffs/claude-e08.md` | 待补 |
+
+- E08 验收：全半角、空白、括号（含中英文括号内的别名/缩写）归一为确定性键；归一键相同才列为同键候选，名称包含只列候选、不自动合并；误合并反例（如「栈」与「栈帧」、「树」与「二叉树」）保持独立。纯函数、不调模型。验证：`python3 -m pytest tests/backend/test_e08.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C11 | IN PROGRESS | 实现任务查询与 GET SSE | ArvinHan（Claude） | `claude/c11-task-events` / 本认领提交 | `src/backend/app/api/tasks.py`、`src/backend/app/services/task_events.py`、`tests/backend/test_c11.py`、`docs/handoffs/claude-c11.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+
+- C11 验收：`GET /api/v1/tasks/{tid}` 与 `GET /api/v1/tasks/{tid}/events` 先验证课程权限（C03，越权同形拒绝、不含快照）；SSE 用 C16 一次性票据；建连首条为当前快照，`awaiting_review` 与终态推送后关流，每连接恰好一条结束事件；15 秒心跳；客户端断开释放监听器（`specs/task-processing.md` §7、TASK-1/3/11/19/20）。验证：`python3 -m pytest tests/backend/test_c11.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J03 | IN PROGRESS | 实现多轮问题改写 | ArvinHan（Claude） | `claude/j03-query-rewrite` / 本认领提交 | `src/backend/app/services/qa/__init__.py`、`src/backend/app/services/qa/rewrite.py`、`prompts/rewrite_query.yaml`、`tests/backend/test_j03.py`、`docs/handoffs/claude-j03.md`；范围扩展：`prompts/MANIFEST.md` 仅 `rewrite_query` 一行（E01 规则要求升版本同提交更新摘要） | 待补 |
+
+- J03 验收：历史按轮数/长度裁剪；只接受 `user`/`assistant` 角色，改写前剔除类标记与哨兵（`specs/grounded-qa.md` H2、QA-19）；改写出错、超时、被预算拒绝、输出为空或不合规均保留原问题；问答调用带 `request_id`、不带 `task_id`（ADR-011 修订 2）；只用 E02 fake 客户端测试。验证：`python3 -m pytest tests/backend/test_j03.py -q`。
+
+- 合并约定：四个分支共用本认领提交。无迁移；只有 C11 改 `main.py` 路由注册。
