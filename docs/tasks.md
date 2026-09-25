@@ -704,7 +704,7 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E03 | IN PROGRESS | 实现兼容 API 适配器 | ArvinHan（Claude 子代理） | `claude/e03-compatible-api` / `36670a3` | `src/backend/app/services/ai/compatible.py`、`tests/backend/test_e03.py`、`docs/handoffs/claude-e03.md`；不改 `ai/embeddings.py`（E07 #217 在改） | 待补 |
+| E03 | DONE（待 PR 审查/合并） | 实现兼容 API 适配器 | ArvinHan（Claude 子代理） | `claude/e03-compatible-api` / `36670a3` | `src/backend/app/services/ai/compatible.py`、`tests/backend/test_e03.py`、`docs/handoffs/claude-e03.md`；不改 `ai/embeddings.py`（E07 #217 在改） | `test_e03.py` 先红（无模块 exit 2；名字桩 171 failed）后 173 passed；`tests/backend` 全量 1175 passed（基线 1002）；5 处篡改均检出（2/7/2/1/1 failed），恢复后 `cmp` 一致；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；不联网、无密钥；待决 10 项（含向量 HTTP 归属、`max_tokens` 字段名、流式 usage 实测）见 `docs/handoffs/claude-e03.md` |
 
 - E03 验收：按 OpenAI 兼容协议实现；用模拟传输测超时、错误与结构；真实调用需另行配置（供应商取值待 D-02a）。验证：`python3 -m pytest tests/backend/test_e03.py -q`。
 
