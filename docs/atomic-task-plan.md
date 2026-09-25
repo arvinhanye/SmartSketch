@@ -143,7 +143,7 @@
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
 | **F01 复用本地 Neo4j 环境并验证** | A10 | 分支 Compose/脚本 → 可启动依赖 | `docker-compose.yml`<br>`scripts/dev-up.sh`<br>`scripts/check-apoc.sh` | 先审原脚本；配置检查、健康检查、停启数据仍在；真实容器命令需环境满足 | `python3 -m pytest tests/integration/test_f01.py -q` |
-| **F02 实现 Neo4j 驱动与作用域仓储** | F01, B06, A04 | 连接设置 → 参数化图查询入口 | `src/backend/app/repositories/neo4j.py` | 所有业务 query 接收 course/version；断线明确错误；不把凭据写日志 | `python3 -m pytest tests/backend/test_f02.py -q` |
+| **F02 实现 Neo4j 驱动与作用域仓储** | F01, B06, A04 | 连接设置 → 参数化图查询入口 | `src/backend/app/repositories/neo4j.py`<br>`src/backend/pyproject.toml` | 所有业务 query 接收 course/version；断线明确错误；不把凭据写日志 | `python3 -m pytest tests/backend/test_f02.py -q` |
 | **F03 建立图唯一约束和索引迁移** | F02, B11 | 图模型 → 可重复执行迁移 | `src/backend/migrations/neo4j/001_constraints.cypher`<br>`src/backend/app/repositories/graph_migrations.py` | 同作用域 ID 唯一；版本不同可共存；迁移失败有回滚/修复说明 | `python3 -m pytest tests/integration/test_f03.py -q` |
 | **F04 实现草稿节点和来源批写** | F03, E12 | 实体候选 → 草稿节点/来源关联 | `src/backend/app/repositories/graph_nodes.py` | 重试幂等；教师锁不覆盖；跨课程源被拒绝；批量部分失败有记录 | `python3 -m pytest tests/integration/test_f04.py -q` |
 | **F05 实现 DAG 环检测纯函数** | B11 | 节点/前置边 + 候选边 → 合法或环路径 | `src/backend/app/services/graph/dag.py` | 自环、三节点环、反转造环、断开图、大链条；复杂度边界明确 | `python3 -m pytest tests/backend/test_f05.py -q` |

@@ -1517,6 +1517,7 @@
       "output": "参数化图查询入口",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/src/backend/app/repositories/neo4j.py",
+        "/Users/arvinhan/Desktop/SmartSketch/src/backend/pyproject.toml",
         "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_f02.py"
       ],
       "acceptance": "所有业务 query 接收 course/version；断线明确错误；不把凭据写日志",
