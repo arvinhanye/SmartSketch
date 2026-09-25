@@ -21,16 +21,31 @@ from app.services.chunk_identity import (
     derive_revision_id,
     extraction_cache_key,
     revision_id_for,
+    revision_parser_version,
     split_chunk_id,
     text_sha256,
 )
-from app.services.chunking import ChunkSource, SemanticChunk, chunk_blocks
+from app.services import chunking
+from app.services.chunking import (
+    CHUNKER_VERSION,
+    DEFAULT_OVERLAP_CHARS,
+    DEFAULT_TARGET_CHARS,
+    ChunkSource,
+    SemanticChunk,
+    chunk_blocks,
+    chunking_version,
+)
 from app.services.parsers.models import ParsedBlock, RevisionKey, SourceLocator
 
 HASH_A = "sha256:" + "a" * 64
 HASH_B = "sha256:" + "b" * 64
 PROMPT_SHA = "c" * 64
 PROMPT_SHA_2 = "d" * 64
+# ADR-018：修订键里的 parser_version 是「解析器版本+分块版本」复合版本。
+CHUNK_V = "chunk/1@1500-200"
+PV_PDF = f"pdf/1+{CHUNK_V}"
+PV_PDF2 = f"pdf/2+{CHUNK_V}"
+PV_TXT = f"txt/1+{CHUNK_V}"
 
 
 def _canon(parts: list[object]) -> bytes:
@@ -54,7 +69,7 @@ def _pdf_chunk(ordinal: int, text: str, page: int) -> SemanticChunk:
     )
 
 
-def _key(document_id: str = "doc-1", content_hash: str = HASH_A, parser: str = "pdf/1") -> RevisionKey:
+def _key(document_id: str = "doc-1", content_hash: str = HASH_A, parser: str = PV_PDF) -> RevisionKey:
     return RevisionKey(document_id=document_id, content_hash=content_hash, parser_version=parser)
 
 
@@ -73,48 +88,49 @@ def _cache_key(identity: ChunkIdentity, **overrides: object) -> str:
 
 
 def test_revision_id_follows_documented_formula():
-    assert derive_revision_id("doc-1", HASH_A, "pdf/1") == _expected_revision_id("doc-1", HASH_A, "pdf/1")
+    assert derive_revision_id("doc-1", HASH_A, PV_PDF) == _expected_revision_id("doc-1", HASH_A, PV_PDF)
 
 
 def test_identity_values_are_pinned_across_releases():
     # 固定值：公式或编码一旦改变，已持久化的块 ID 与缓存全部失配，必须显式升级方案版本。
-    assert derive_revision_id("doc-1", HASH_A, "pdf/1") == (
-        "rev_2a6650fb9e9cb9d3c7c1383debbef6e503a2753f2cfb7baf2dd6d5c8f4b2afb0"
+    # ADR-018 后输入改为复合版本 "pdf/1+chunk/1@1500-200"（公式未变，仅输入变化），值已按公式重算。
+    assert derive_revision_id("doc-1", HASH_A, PV_PDF) == (
+        "rev_228fb4b57b9a53afa4c58d1a61e4d5b50a646dc3f39fc4953ebaeb383926ab4e"
     )
     identity = assign_chunk_identities("course-1", _key(), [_pdf_chunk(0, "甲。", 1)])[0]
-    assert identity.chunk_id == "rev_2a6650fb9e9cb9d3c7c1383debbef6e503a2753f2cfb7baf2dd6d5c8f4b2afb0-0"
-    assert _cache_key(identity) == "xc_a94e56b127a9f96fc42d3583c9949b9115259148f63c546c6aee9911f038833c"
+    assert identity.chunk_id == "rev_228fb4b57b9a53afa4c58d1a61e4d5b50a646dc3f39fc4953ebaeb383926ab4e-0"
+    assert _cache_key(identity) == "xc_8395acd0e6641e421398c46705345b6b295ef2bf21ac30eec73bb2b5d9b520ac"
 
 
 def test_revision_id_accepts_revision_key():
-    assert revision_id_for(_key()) == derive_revision_id("doc-1", HASH_A, "pdf/1")
+    assert revision_id_for(_key()) == derive_revision_id("doc-1", HASH_A, PV_PDF)
 
 
 @pytest.mark.parametrize(
     "other",
-    [("doc-2", HASH_A, "pdf/1"), ("doc-1", HASH_B, "pdf/1"), ("doc-1", HASH_A, "pdf/2")],
+    [("doc-2", HASH_A, PV_PDF), ("doc-1", HASH_B, PV_PDF), ("doc-1", HASH_A, PV_PDF2)],
     ids=["document", "content", "parser"],
 )
 def test_revision_id_changes_with_each_component(other):
-    assert derive_revision_id(*other) != derive_revision_id("doc-1", HASH_A, "pdf/1")
+    assert derive_revision_id(*other) != derive_revision_id("doc-1", HASH_A, PV_PDF)
 
 
 def test_revision_components_cannot_be_shifted_across_field_boundaries():
     # 编码必须区分字段边界：拼接相同但分段不同的输入不得同 ID。
-    assert derive_revision_id("a|b", HASH_A, "c") != derive_revision_id("a", HASH_A, "b|c")
+    assert derive_revision_id("a|b", HASH_A, f"c+{CHUNK_V}") != derive_revision_id("a", HASH_A, f"b|c+{CHUNK_V}")
 
 
 def test_revision_id_is_stable_across_processes():
     code = (
         "from app.services.chunk_identity import derive_revision_id;"
-        f"print(derive_revision_id('doc-1', {HASH_A!r}, 'pdf/1'))"
+        f"print(derive_revision_id('doc-1', {HASH_A!r}, {PV_PDF!r}))"
     )
     outputs = set()
     for seed in ("0", "1", "12345"):
         env = dict(os.environ, PYTHONHASHSEED=seed)
         out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
         outputs.add(out.stdout.strip())
-    assert outputs == {derive_revision_id("doc-1", HASH_A, "pdf/1")}
+    assert outputs == {derive_revision_id("doc-1", HASH_A, PV_PDF)}
 
 
 @pytest.mark.parametrize(
@@ -133,7 +149,7 @@ def test_revision_id_is_stable_across_processes():
 )
 def test_bad_content_hash_rejected(content_hash):
     with pytest.raises(ChunkIdentityError, match="content_hash"):
-        derive_revision_id("doc-1", content_hash, "pdf/1")  # type: ignore[arg-type]
+        derive_revision_id("doc-1", content_hash, PV_PDF)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("parser_version", ["", " ", "pdf /1", "pdf/1\n", "\tpdf/1", None, 1])
@@ -145,36 +161,182 @@ def test_bad_parser_version_rejected(parser_version):
 @pytest.mark.parametrize("document_id", ["", "   ", None, 7])
 def test_bad_document_id_rejected(document_id):
     with pytest.raises(ChunkIdentityError, match="document_id"):
-        derive_revision_id(document_id, HASH_A, "pdf/1")  # type: ignore[arg-type]
+        derive_revision_id(document_id, HASH_A, PV_PDF)  # type: ignore[arg-type]
 
 
 def test_revision_id_for_rejects_non_revision_key():
     with pytest.raises(TypeError):
-        revision_id_for(("doc-1", HASH_A, "pdf/1"))  # type: ignore[arg-type]
+        revision_id_for(("doc-1", HASH_A, PV_PDF))  # type: ignore[arg-type]
 
 
 def test_chunk_identity_error_is_value_error():
     assert issubclass(ChunkIdentityError, ValueError)
 
 
+# ---------------------------------------------------------------- ADR-018 复合版本
+
+
+def test_chunker_version_constant_and_default_chunking_version():
+    assert CHUNKER_VERSION == "chunk/1"
+    assert chunking_version() == f"chunk/1@{DEFAULT_TARGET_CHARS}-{DEFAULT_OVERLAP_CHARS}"
+    assert chunking_version() == "chunk/1@1500-200"
+
+
+def test_chunking_version_carries_actual_parameters():
+    assert chunking_version(200, 20) == "chunk/1@200-20"
+    assert chunking_version(target_chars=1, overlap_chars=0) == "chunk/1@1-0"
+    assert chunking_version(overlap_chars=0) == f"chunk/1@{DEFAULT_TARGET_CHARS}-0"
+
+
+def test_chunking_version_reads_chunker_version(monkeypatch):
+    monkeypatch.setattr(chunking, "CHUNKER_VERSION", "chunk/2")
+    assert chunking_version() == f"chunk/2@{DEFAULT_TARGET_CHARS}-{DEFAULT_OVERLAP_CHARS}"
+
+
+@pytest.mark.parametrize(
+    ("target", "overlap"),
+    [(0, 0), (-1, 0), (100, 100), (100, 101), (100, -1), (True, 0), (100, False), (1.5, 0), ("100", 0), (100, None)],
+)
+def test_chunking_version_rejects_parameters_chunk_blocks_rejects(target, overlap):
+    block = ParsedBlock(ordinal=0, text="甲。", locator=SourceLocator(paragraph=1))
+    with pytest.raises(ValueError) as from_blocks:
+        chunk_blocks([block], target_chars=target, overlap_chars=overlap)
+    with pytest.raises(ValueError) as from_version:
+        chunking_version(target, overlap)
+    assert str(from_version.value) == str(from_blocks.value)
+
+
+def test_revision_parser_version_format():
+    assert revision_parser_version("pdf/1", "chunk/1@1500-200") == "pdf/1+chunk/1@1500-200"
+    assert revision_parser_version("txt/1", chunking_version(200, 20)) == "txt/1+chunk/1@200-20"
+    assert revision_parser_version("docx/3", chunking_version()) == f"docx/3+{chunking_version()}"
+
+
+@pytest.mark.parametrize("parser_version", ["", " ", "pdf /1", "pdf/1\n", "pdf+1", "+", "pdf/1+", None, 1])
+def test_revision_parser_version_rejects_bad_parser_segment(parser_version):
+    with pytest.raises(ChunkIdentityError, match="parser_version"):
+        revision_parser_version(parser_version, CHUNK_V)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "chunk_version",
+    [
+        "",
+        "chunk/1",
+        "chunk/1@1500",
+        "chunk/1@1500-",
+        "chunk/@1500-200",
+        "chunk/1@0-0",
+        "chunk/1@01500-200",
+        "chunk/1@1500-0200",
+        "chunk/1@1500--1",
+        "chunk/1@-1500-200",
+        "chunk/1@1500-200 ",
+        " chunk/1@1500-200",
+        "chunk/1 @1500-200",
+        "chunker/1@1500-200",
+        "Chunk/1@1500-200",
+        "chunk/1@1500-200+x",
+        "chunk/1@１５００-200",
+        "chunk/1@1500-200-1",
+        None,
+        1,
+    ],
+)
+def test_revision_parser_version_rejects_bad_chunking_segment(chunk_version):
+    with pytest.raises(ChunkIdentityError, match="chunking_version"):
+        revision_parser_version("pdf/1", chunk_version)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "parser_version",
+    [
+        "pdf/1",
+        "txt/1",
+        "pdf/1+",
+        f"+{CHUNK_V}",
+        "pdf/1+chunk/1",
+        "pdf/1+chunk/1@1500",
+        "pdf/1+chunk/1@0-0",
+        f"pdf+1+{CHUNK_V}",
+        f"{CHUNK_V}+pdf/1",
+        f"pdf/1+{CHUNK_V}+x",
+        f"pdf/1+{CHUNK_V}+{CHUNK_V}",
+    ],
+)
+def test_revision_id_rejects_parser_version_without_valid_chunking_segment(parser_version):
+    with pytest.raises(ChunkIdentityError, match="parser_version"):
+        derive_revision_id("doc-1", HASH_A, parser_version)
+    key = RevisionKey(document_id="doc-1", content_hash=HASH_A, parser_version=parser_version)
+    with pytest.raises(ChunkIdentityError, match="parser_version"):
+        revision_id_for(key)
+    with pytest.raises(ChunkIdentityError, match="parser_version"):
+        assign_chunk_identities("course-1", key, [_pdf_chunk(0, "甲。", 1)])
+
+
+def test_revision_id_accepts_composed_version():
+    pv = revision_parser_version("pdf/1", chunking_version())
+    assert pv == PV_PDF
+    assert derive_revision_id("doc-1", HASH_A, pv) == _expected_revision_id("doc-1", HASH_A, "pdf/1+chunk/1@1500-200")
+
+
+def _txt_blocks() -> list[ParsedBlock]:
+    return [
+        ParsedBlock(ordinal=i, text=t, locator=SourceLocator(section_titles=("第1章",), paragraph=i + 1))
+        for i, t in enumerate(["第一段。" * 30, "第二段。" * 30, "第三段。" * 30])
+    ]
+
+
+@pytest.mark.parametrize(("left", "right"), [((200, 20), (300, 20)), ((200, 20), (200, 40))], ids=["target", "overlap"])
+def test_chunking_parameters_change_revision_and_chunk_ids(left, right):
+    # 同一资料、同一内容、同一解析器，仅分块参数不同 → 修订与块 ID 都不同（ADR-018 决定 2）。
+    blocks = _txt_blocks()
+    ids = []
+    for target, overlap in (left, right):
+        key = _key(parser=revision_parser_version("txt/1", chunking_version(target, overlap)))
+        identities = assign_chunk_identities(
+            "course-1", key, chunk_blocks(blocks, target_chars=target, overlap_chars=overlap)
+        )
+        ids.append((revision_id_for(key), {i.chunk_id for i in identities}))
+    (rev_a, chunks_a), (rev_b, chunks_b) = ids
+    assert rev_a != rev_b
+    assert chunks_a.isdisjoint(chunks_b)
+
+
+def test_chunker_rule_version_change_yields_new_revision(monkeypatch):
+    # 仅 CHUNKER_VERSION 不同（参数与内容相同）→ 修订与块 ID 不同（ADR-018 决定 2）。
+    chunks = [_pdf_chunk(0, "甲。", 1)]
+    old_key = _key(parser=revision_parser_version("pdf/1", chunking_version()))
+    monkeypatch.setattr(chunking, "CHUNKER_VERSION", "chunk/2")
+    new_key = _key(parser=revision_parser_version("pdf/1", chunking_version()))
+    assert new_key.parser_version == "pdf/1+chunk/2@1500-200"
+    old = assign_chunk_identities("course-1", old_key, chunks)[0]
+    new = assign_chunk_identities("course-1", new_key, chunks)[0]
+    assert old.revision_id != new.revision_id
+    assert old.chunk_id != new.chunk_id
+    assert derive_revision_id("doc-1", HASH_A, "pdf/1+chunk/1@1500-200") != derive_revision_id(
+        "doc-1", HASH_A, "pdf/1+chunk/2@1500-200"
+    )
+
+
 # ---------------------------------------------------------------- chunk_id
 
 
 def test_chunk_id_is_revision_id_plus_decimal_ordinal():
-    rev = derive_revision_id("doc-1", HASH_A, "pdf/1")
+    rev = derive_revision_id("doc-1", HASH_A, PV_PDF)
     assert derive_chunk_id(rev, 0) == f"{rev}-0"
     assert derive_chunk_id(rev, 12) == f"{rev}-12"
 
 
 def test_chunk_id_round_trips():
-    rev = derive_revision_id("doc-1", HASH_A, "pdf/1")
+    rev = derive_revision_id("doc-1", HASH_A, PV_PDF)
     for ordinal in (0, 1, 9, 10, 12345):
         assert split_chunk_id(derive_chunk_id(rev, ordinal)) == (rev, ordinal)
 
 
 @pytest.mark.parametrize("ordinal", [-1, True, False, 1.0, "1", None])
 def test_bad_ordinal_rejected(ordinal):
-    rev = derive_revision_id("doc-1", HASH_A, "pdf/1")
+    rev = derive_revision_id("doc-1", HASH_A, PV_PDF)
     with pytest.raises(ChunkIdentityError, match="ordinal"):
         derive_chunk_id(rev, ordinal)  # type: ignore[arg-type]
 
@@ -246,8 +408,9 @@ def test_rerun_with_same_inputs_is_stable():
         ParsedBlock(ordinal=i, text=t, locator=SourceLocator(section_titles=("第1章",), paragraph=i + 1))
         for i, t in enumerate(["第一段。" * 30, "第二段。" * 30, "第三段。" * 30])
     ]
-    a = assign_chunk_identities("course-1", _key(parser="txt/1"), chunk_blocks(blocks, target_chars=200, overlap_chars=20))
-    b = assign_chunk_identities("course-1", _key(parser="txt/1"), chunk_blocks(blocks, target_chars=200, overlap_chars=20))
+    pv = revision_parser_version("txt/1", chunking_version(200, 20))
+    a = assign_chunk_identities("course-1", _key(parser=pv), chunk_blocks(blocks, target_chars=200, overlap_chars=20))
+    b = assign_chunk_identities("course-1", _key(parser=pv), chunk_blocks(blocks, target_chars=200, overlap_chars=20))
     assert len(a) > 1
     assert a == b
     assert [_cache_key(x) for x in a] == [_cache_key(x) for x in b]
@@ -255,8 +418,8 @@ def test_rerun_with_same_inputs_is_stable():
 
 def test_parser_upgrade_yields_new_chunk_ids():
     chunks = [_pdf_chunk(0, "甲。", 1)]
-    old = assign_chunk_identities("course-1", _key(parser="pdf/1"), chunks)[0]
-    new = assign_chunk_identities("course-1", _key(parser="pdf/2"), chunks)[0]
+    old = assign_chunk_identities("course-1", _key(parser=PV_PDF), chunks)[0]
+    new = assign_chunk_identities("course-1", _key(parser=PV_PDF2), chunks)[0]
     assert old.revision_id != new.revision_id
     assert old.chunk_id != new.chunk_id
 
@@ -311,7 +474,7 @@ def test_chunk_without_source_or_text_rejected():
 
 def test_assign_rejects_wrong_types():
     with pytest.raises(TypeError):
-        assign_chunk_identities("course-1", ("doc-1", HASH_A, "pdf/1"), [_pdf_chunk(0, "甲。", 1)])  # type: ignore[arg-type]
+        assign_chunk_identities("course-1", ("doc-1", HASH_A, PV_PDF), [_pdf_chunk(0, "甲。", 1)])  # type: ignore[arg-type]
     with pytest.raises(TypeError):
         assign_chunk_identities("course-1", _key(), ["甲。"])  # type: ignore[list-item]
 

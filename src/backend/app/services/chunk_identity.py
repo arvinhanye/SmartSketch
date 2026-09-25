@@ -9,6 +9,8 @@
   的 UTF-8 字节。按 JSON 数组编码，字段边界无歧义，与字段内容无关。
 - ``revision_id`` = ``"rev_" + sha256(canon(["smartsketch.revision/1", document_id,
   content_hash, parser_version])).hexdigest()``。资料修订即 ``RevisionKey`` 三元组；
+  其中 ``parser_version`` 是 ADR-018 规定的复合版本 ``<解析器版本>+<分块版本>``
+  （如 ``pdf/1+chunk/1@1500-200``），由 ``revision_parser_version`` 统一拼接（见下）；
   ``document_id`` 与规格 V2 的 ``material_id`` 为同一概念（ADR-016 决定 6），
   SQLite ``materials.id`` 为全库主键，因此修订 ID 天然不跨课程复用。
 - 块 ID = ``f"{revision_id}-{ordinal}"``，``ordinal`` 为 D08 ``SemanticChunk.ordinal``
@@ -17,6 +19,15 @@
   text_sha256, prompt_purpose, prompt_version, prompt_sha256, model_id])).hexdigest()``。
   含 ``course_id``（缓存不跨课程命中）、块文本哈希（即便块不可变被破坏也不误命中）、
   提示词用途/版本/模板哈希与实际给出结果的模型 ID（任一变化即失效）。
+
+复合版本（ADR-018）：
+
+- 解析器段取解析器模块的 ``PARSER_VERSION``（只表示解析器自身），须非空、不含空白、不含 ``+``。
+- 分块段取 D08 ``chunking_version(target_chars, overlap_chars)``，形如
+  ``chunk/<规则版本>@<target_chars>-<overlap_chars>``：规则版本来自 ``CHUNKER_VERSION``，
+  参数为本次实际值（正整数与非负整数，十进制、无前导零）。分块规则或参数一变即新修订、新块 ID。
+- 拼接只在本模块 ``revision_parser_version`` 一处；``derive_revision_id``/``revision_id_for``/
+  ``assign_chunk_identities`` 拒绝不含合法分块段的 ``parser_version``，防止 D11 编排遗漏。
 
 本模块只做纯计算：不读写存储、不调用模型、不记录日志。块文本不进入任何 ``repr``。
 """
@@ -44,6 +55,7 @@ __all__ = [
     "derive_revision_id",
     "extraction_cache_key",
     "revision_id_for",
+    "revision_parser_version",
     "split_chunk_id",
     "text_sha256",
 ]
@@ -58,6 +70,9 @@ _REVISION_ID_RE = re.compile(r"rev_[0-9a-f]{64}")
 _CHUNK_ID_RE = re.compile(r"(rev_[0-9a-f]{64})-(0|[1-9][0-9]*)")
 _PROMPT_SHA_RE = re.compile(r"[0-9a-f]{64}")
 _PURPOSE_RE = re.compile(r"[a-z][a-z0-9_]*")
+# 分块段：chunk/<规则版本>@<target_chars>-<overlap_chars>。规则版本不含空白、``@``、``+``，
+# 使复合版本可无歧义拆分；数字只收 ASCII、无前导零。
+_CHUNKING_VERSION_RE = re.compile(r"chunk/[^\s@+]+@[1-9][0-9]*-(?:0|[1-9][0-9]*)")
 
 
 class ChunkIdentityError(ValueError):
@@ -84,9 +99,22 @@ def _check_content_hash(value: object) -> str:
     return value
 
 
+def _is_parser_segment(value: object) -> bool:
+    return isinstance(value, str) and bool(value) and "+" not in value and not any(ch.isspace() for ch in value)
+
+
+def _is_chunking_segment(value: object) -> bool:
+    return isinstance(value, str) and _CHUNKING_VERSION_RE.fullmatch(value) is not None
+
+
 def _check_parser_version(value: object) -> str:
-    if not isinstance(value, str) or not value or any(ch.isspace() for ch in value):
-        raise ChunkIdentityError(f"parser_version 必须是不含空白的非空字符串，收到 {value!r}")
+    """修订键的 ``parser_version`` 必须是复合版本 ``<解析器版本>+<分块版本>``（ADR-018）。"""
+    parser, sep, chunking = value.partition("+") if isinstance(value, str) else ("", "", "")
+    if not sep or not _is_parser_segment(parser) or not _is_chunking_segment(chunking):
+        raise ChunkIdentityError(
+            "parser_version 必须是复合版本 <解析器版本>+chunk/<规则版本>@<target>-<overlap>"
+            f"（ADR-018，用 revision_parser_version 组合），收到 {value!r}"
+        )
     return value
 
 
@@ -103,6 +131,21 @@ def _check_ordinal(value: object) -> int:
 
 
 # ---------------------------------------------------------------- 修订与块 ID
+
+
+def revision_parser_version(parser_version: str, chunking_version: str) -> str:
+    """组合资料修订键用的复合版本 ``f"{parser_version}+{chunking_version}"``（ADR-018 决定 3）。
+
+    ``parser_version`` 取解析器给出的版本（非空、无空白、不含 ``+``）；``chunking_version`` 取
+    D08 ``chunking_version(...)`` 的返回值，参数须与实际分块所用一致。
+    """
+    if not _is_parser_segment(parser_version):
+        raise ChunkIdentityError(f"parser_version 必须是不含空白与 '+' 的非空字符串，收到 {parser_version!r}")
+    if not _is_chunking_segment(chunking_version):
+        raise ChunkIdentityError(
+            f"chunking_version 必须形如 chunk/<规则版本>@<正整数>-<非负整数>，收到 {chunking_version!r}"
+        )
+    return f"{parser_version}+{chunking_version}"
 
 
 def derive_revision_id(document_id: str, content_hash: str, parser_version: str) -> str:
