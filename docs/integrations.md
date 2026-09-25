@@ -232,3 +232,14 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 | OpenAI 兼容 LLM API | 抽取、问答、改写、裁决 | 配置形状与切换/预算规则见「模型接入规则（A07）」；取值待 D-02a、D-02b、D-02d、D-02e 签收；脱敏策略未定 |
 | 向量模型 API / 本地模型 | 知识点融合与来源片段检索 | 方案、模型与维度待 D-02c 签收；维度定稿后才能建 Neo4j 向量索引 |
 | 文档解析库 | PDF/DOCX/TXT/Markdown 解析 | 确认页码/标题定位保留方式 |
+
+### 文档解析库（D02～D05）
+
+只选 MIT/BSD/Apache 类许可，禁用 AGPL（如 PyMuPDF）；版本用 `==` 固定在 `src/backend/pyproject.toml` 的 `dependencies`。升级解析库可能改变块切分或行号，须同步提升 `PARSER_VERSION`。
+
+| 格式 | 任务 | 依赖 | 许可 | 状态 |
+| --- | --- | --- | --- | --- |
+| TXT | D02 | 仅标准库 | PSF | 已合入（PR #190） |
+| Markdown | D03 | `markdown-it-py==4.2.0`（传递依赖 `mdurl` 0.1.x） | MIT | 已合入（PR #191）；选型理由见 `docs/handoffs/claude-d03.md` |
+| DOCX | D04 | 仅标准库（`zipfile` + `xml.etree`） | PSF | 已合入（PR #193）；选型理由见 `docs/handoffs/claude-d04.md` |
+| PDF | D05 | 待 PR #197 合入后登记 | — | 进行中 |
