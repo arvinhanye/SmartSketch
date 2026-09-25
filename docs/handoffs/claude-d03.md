@@ -2,7 +2,7 @@
 
 - `task_id`: D03（GitHub issue #72，协调方已在 `claude/claim-d02-d05` 认领）
 - `review_status`: ready_for_review
-- 分支：`claude/d03-markdown-parser`，base `origin/main` `588d00a`（PR #188 合入后）
+- 分支：`claude/d03-markdown-parser`，base `origin/main` `588d00a`（PR #188 合入后）；放宽标题前已合并 `origin/main`（`6ba260d`，含 D02）
 - 依赖：D01（`ParsedDocument` 等模型，已在 main）
 - 依据：`docs/atomic-task-plan.md` D03 行；`docs/architecture.md`「解析输出与来源定位（D01）」；`docs/handoffs/claude-d01.md`
 
@@ -11,7 +11,7 @@
 | 文件 | 内容 |
 | --- | --- |
 | `src/backend/app/services/parsers/markdown.py` | `PARSER_VERSION = "markdown/1"`；`parse_markdown(data: bytes) -> ParsedDocument` |
-| `tests/backend/test_d03.py` | 48 个用例（含参数化），覆盖成功、边界、失败三类，外加固定种子随机组合检查 |
+| `tests/backend/test_d03.py` | 66 个用例（含参数化；首版 48 个，放宽无空格标题后 66 个），覆盖成功、边界、失败三类，外加固定种子随机组合检查 |
 | `src/backend/pyproject.toml` | `dependencies` 新增一行 `"markdown-it-py==4.2.0"`，其余未动 |
 | `docs/handoffs/claude-d03.md` | 本交接 |
 
@@ -42,7 +42,11 @@
 6. **front matter**：只有第 1 行（去 BOM 后）是 `---`，且后面某行是 `---` 或 `...` 时，才把这一段当作 YAML front matter，替换成空行后再交给 markdown-it，不成块、不参与标题，行号不偏移。未闭合的 `---` 按 CommonMark 处理（分隔线）。不支持 TOML `+++`。代价：以分隔线开头、之后又出现单独 `---` 行的文档，开头这一段会被当作 front matter 丢掉。
 7. **解码与换行**：严格 UTF-8，允许开头 BOM 并去掉。解码失败 → `DocumentUnreadableError("corrupted", "不是有效的 UTF-8：第 N 字节起无法解码")`；含 NUL 字节 → `corrupted`（疑似二进制）。不做 GBK 回退：Markdown 生态默认 UTF-8，编码探测属于 D02 的 TXT。`\r\n` 和单独的 `\r` 统一为 `\n`（与 markdown-it 自身的规范化一致）后按 `\n` 计物理行，所以 CRLF/CR 文件的行号与 LF 相同。块文本中不含 `\r`。
 8. **空文**：空文件、只有空白（含全角空格、只有 BOM）、只有标题、只有 front matter / HTML 注释 / 分隔线 / 空代码块 / 链接引用定义 → `DocumentUnreadableError("no_text")`。只有标题时 `detail` 为「只有标题，没有正文」，其他为「没有可提取的正文」。
-9. **`#标题`（`#` 后无空格）不是标题**：遵循 CommonMark。中文笔记里常见这种写法，见「风险」。
+9. **放宽「`#` 后无空格」的标题写法**（ArvinHan 决定，2026-09-24；PR 合并前补入，没有资料按旧规则入库，所以 `PARSER_VERSION` 仍为 `markdown/1`）：
+   - **规则**：行首（最多 3 格缩进）1～6 个 `#`，紧跟一个**非 ASCII、非空白、非 `#`** 的字符，按 ATX 标题处理，层级等于 `#` 的个数。例：`#第一章 绪论` → 一级「第一章 绪论」；`##概述` → 二级；`###（一）背景 ###` → 三级「（一）背景」（和标准 ATX 一样，空白后的收尾 `#` 会去掉）。标题文本同样取行内纯文本，再经 `normalize_heading`。
+   - **不放宽的情况**：紧跟 ASCII 字符的行，如 `#include <stdio.h>`、`#1`、`#tag`、`#!/bin/sh`，以及 `###1.1顺序表`（首字符是 ASCII 数字；为了不误伤 `#1` 这类写法，宁可漏判）；7 个及以上 `#`；`#` 后紧跟全角空格（`#　第一章`，全角空格属空白）；`\#第一章`（转义）；结尾 `#` 紧贴文字的话题标签（`#话题#`）；缩进 4 格（缩进代码块）。
+   - **实现**：在 markdown-it 里注册块规则 `loose_heading`，排在内置 `heading` 之前，产出与内置规则相同的 `heading_open / inline / heading_close` token 和 `map`。不改源文本，行号和块文本都不受影响。它能打断段落和引用块的懒惰续行（`alt = paragraph, reference, blockquote`，与内置 ATX 规则相同），所以 `前言。\n#第一章` 和 `前言。\n# 第一章` 结果一致。
+   - **只影响顶层**：围栏代码块内的行由 `fence` 规则整体吃掉，不会走到这条规则。引用块、列表项内部的 `#第一章` 可能在嵌套层级生成标题 token，但 `parse_markdown` 只看顶层 token，这些行不改变章节路径，原样留在所在的 `PARAGRAPH` 或 `LIST` 块文本里。这和嵌套位置的 `# 标题` 处理一致。没有给规则加「只在顶层」的限制，是为了让列表、引用块的结束位置与标准 ATX 标题一样，不因写法不同而把后面一行吞进列表。
 10. **输入类型**：接受 `bytes`、`bytearray`、`memoryview`；`str` 等其他类型抛 `TypeError`（调用方缺陷，不是资料问题）。
 
 ## 接口说明（给 D08 / D11）
@@ -80,11 +84,25 @@ for block in doc.blocks:                 # 按 ordinal 0.. 排列
 | 反向篡改（逐项改坏 `markdown.py` 后跑 D03，再恢复） | 标题/块不限顶层 → 28 failed；不跳过 front matter → 2；不去尾部空行 → 3；不丢弃 HTML 注释 → 2；不丢弃空代码块 → 2；不检查 NUL → 1；同级标题不出栈 → 4；不去 BOM → 3；标题直接用原始行内文本 → 1；不统一 CR → 2；不启用表格 → 3；恢复后 48 passed |
 | 随机组合检查（临时脚本，20000 份随机拼接的 Markdown，含 CRLF） | 19391 份得到合法 `ParsedDocument`，609 份 `no_text`，无 `ParseModelError`，块文本全部能按行号映射回原文。测试文件里保留了 1500 份的固定种子版本 |
 
+### 放宽无空格标题（ArvinHan 决定后补入同一 PR）
+
+先把 `origin/main`（含 D02 PR #190、任务板 PR #189、B07 PR #192）合并进分支，合并提交为 `6ba260d`，无冲突。B07 改了 `test` 组，因此重新在 `venv-d03` 里执行了 `pip install -e './src/backend[test]'`。
+
+| 命令 | 结果 |
+| --- | --- |
+| 红灯：只加用例后跑 `pytest tests/backend/test_d03.py -q`（提交 `b070825`） | **3 failed** / 63 passed。失败的是 3 个正向用例：`#第一章`、`##概述` 成为标题，打断段落，标题文本规范化。`#include`、`#1`、`#tag`、容器内 `#第一章` 等反向用例本来就通过，保留作回归护栏 |
+| 绿灯：`pytest tests/backend/test_d03.py -q` | **66 passed** |
+| 全部后端 `pytest tests/backend -q` | **634 passed**，1 warning（同上，Starlette `httpx` 弃用提示） |
+| `./scripts/verify.sh`（输出写入文件后单独取 `$?`） | **exit 0** |
+| `git diff --check origin/main...HEAD` | **exit 0** |
+| 反向篡改（逐项改坏放宽规则后跑 D03，再恢复） | 不注册规则 → 3 failed；允许 ASCII 首字符 → 6；不排除话题标签 → 1；不能打断段落 → 1；不去收尾 `#` → 1；允许 7 个 `#` → 1。去掉 `is_code_block` 检查后测试仍全过：缩进 4 格的行在顶层先被 `code` 规则吃掉，在段落里又被 `paragraph` 规则直接当作续行，这条检查只是与内置规则保持一致的防御，去掉它是等价改动 |
+| 随机组合检查（临时脚本 20000 份，加入 `##概述`、`#话题#`、`#include x`、`> #引用`、`- #项` 等片段） | 19344 份合法、656 份 `no_text`，无 `ParseModelError`，块文本全部能按行号映射回原文。测试里固定种子的 1500 份版本也加入了 `##概述`、`#话题#`、`#include x`、`> #引用` |
+
 说明：系统 python3 没有安装后端包，直接运行 `python3 -m pytest tests/backend/test_d03.py -q` 会报 `No module named 'app'`（D01 交接已记录的环境问题）；上述 pytest 结果都来自 venv。
 
 ## 风险
 
-- **`#标题` 不识别为标题**：CommonMark 规定 `#` 后必须有空格或行尾。中文课程笔记里若大量使用 `#标题`，这些行会变成正文段落，章节路径变浅。放宽需改变 markdown-it 的规则并提升 `parser_version`，请产品/协调方决定是否需要。
+- **放宽标题的边界**：`###1.1顺序表`、`#　第一章`（全角空格）这类写法仍按正文处理，章节路径会变浅。以后如果要继续放宽，属于解析规则变化，届时须把版本升到 `markdown/2`。非 ASCII 首字符的误判面较小，但像 `#话题` 这样没有收尾 `#` 的中文话题标签，会被当成标题。
 - **front matter 误判**：见关键决定 6。以分隔线开头的讲义较少见，暂接受。
 - **HTML 块原样保留**：`<div>`、`<table>` 等 HTML 以源码形式进入 `PARAGRAPH` 块，HTML 表格不会标为 `TABLE`。课程资料若大量内嵌 HTML，D08/抽取阶段可能需要剥离标签。
 - **引用块内的表格或代码**整体标为 `PARAGRAPH`，D08 可能从中间切开。
