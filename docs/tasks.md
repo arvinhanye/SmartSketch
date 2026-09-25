@@ -672,6 +672,16 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 
 - 并行约束：各子任务只写自己的文件锁与交接文件，并只改本节自己那一张表的状态与证据；不改 `docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`、`parsers/__init__.py`、`parsers/models.py` 等共享文件，需要时停下交协调方。
 
+## F01 复用本地 Neo4j 环境并验证
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F01 | DONE（PR #211） | 复用本地 Neo4j 环境并验证 | Claude | `claude/f01-neo4j-env` / `a80519c` | `docker-compose.yml`、`scripts/dev-up.sh`、`scripts/check-apoc.sh`、`tests/integration/test_f01.py`；按导入映射「批 2」扩到 `scripts/_dev-common.sh`（dev-up 依赖它）、`.env.example`（仅容器变量注释行）、`docs/integrations.md`（本地依赖环境一节与计划集成 Neo4j 行）；本节、`docs/handoffs/claude-f01.md` | `docs/handoffs/claude-f01.md`；真实 Docker 12 passed（Neo4j 5.26.31 + APOC 5.26.31 可用，停启后数据仍在）；原脚本红灯 4 failed，两处缺陷（unhealthy 被判就绪、口令出现在宿主机命令行）已单独取证并修复；反向篡改 5 处全被抓到；后端 756 passed |
+
+- 输入：740adb `978671e` 的 compose 与脚本（M0-05，当时因 APOC 未实测而 BLOCKED）；ArvinHan 本机 Docker Desktop 29.8、Compose v5.5。输出：可启动、可健康检查、已验证 APOC、停启后数据仍在的本地 Neo4j。
+- 验收：先审原脚本（审查结论与两处缺陷的取证见交接）；缺 `.env`、容器不健康、APOC 缺失都以非 0 退出并给出提示；口令不出现在任何命令行参数里；真实容器上 APOC 可用、停启后数据仍在。
+- 不在本任务：`dev-down.sh` 与启停行为审查（K07）；Neo4j 驱动与仓储（F02）；约束与索引迁移（F03）。
+
 ## FIX-MIGRATE-LEASE 迁移器租约检查与 C06 任务表不兼容（2026-09-25）
 
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
