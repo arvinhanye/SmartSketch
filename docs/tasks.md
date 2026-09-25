@@ -4,11 +4,12 @@
 
 | ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
 | --- | --- | --- | --- | --- | --- |
-| B11 | DONE（待 PR 审查/合并） | 迁移图谱编辑、关系降级及版本发布契约 | Codex（`arvinhanye`） | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b11.py`、相关规格；补节点修订号与编辑前置条件、关系来源及降级解释、发布/回滚结构化响应；负例与生成一致性 | B11 30 passed、契约全量 162 passed、`./scripts/verify.sh` exit 0、`./scripts/gen-contracts.sh --check` exit 0、`git diff --check` exit 0；`docs/handoffs/codex-b11.md` |
+| B11 | DONE（PR #194 `2de97ba`） | 迁移图谱编辑、关系降级及版本发布契约 | Codex（`arvinhanye`） | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b11.py`、相关规格；补节点修订号与编辑前置条件、关系来源及降级解释、发布/回滚结构化响应；负例与生成一致性 | B11 30 passed、契约全量 162 passed、`./scripts/verify.sh` exit 0、`./scripts/gen-contracts.sh --check` exit 0、`git diff --check` exit 0；`docs/handoffs/codex-b11.md`；协调方把 #196、#194 依次临时合到 `a08bd5b` 上复核：生成物一致、契约与工具 176 passed（B11 30）、后端 720 passed、`verify.sh` exit 0；CI 6 项通过；#53 已关闭 |
 
 - 输入：ADR-009、ADR-012（含修订 3）、A02-R01、B08 真源；输出：B11 YAML 真源、全量生成物、契约测试与交接。
 - 依赖：B08、A04 已入 main；B12 暂不占用 YAML 锁。风险：新增必填响应字段影响未来实现方；`merged_from` 与 `commit_seq` 只属内部快照/存储，不泄露到 wire DTO。
 - 验证：`python3 -m pytest tests/contracts/test_b11.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- 合并后（2026-09-25）：B12 现可占用 YAML 与生成物文件锁。遗留：`downgrade_cycle` 与 `PUBLISH_BLOCKED` 的 `cycle` 首尾同 ID 由 F13、G04 在服务层校验（契约以 `x-closed-cycle: true` 标记）。
 
 > 状态：`TODO` → `IN PROGRESS` → `BLOCKED` / `DONE`。认领或完成任务时更新本表；每个 DONE 项必须指向验收证据和交接文件。
 
@@ -311,7 +312,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | A1～A10 收尾 | DONE（修复已合入、四处补注已签收；待 Codex 复核） | 盘点 A01～A10，修复 Codex 未决意见 FIX-R03、A08S-R01/R02、A09-R01/R02、A10-R01/R02，按授权依次合并 PR，登记 A02-R01 去向 | Claude（协调 Agent） | `.claude/worktrees/a1-a10-meta-task-wrap-ddbf4b`（分支 `claude/a1-a10-meta-task-wrap-ddbf4b`）/ base `f9dfc8f`，合并后同步 `2819701` | 本节、`docs/handoffs/claude-a1-a10-wrap.md`；各修复的文件锁见对应任务行 | `docs/handoffs/claude-a1-a10-wrap.md`；各修复的核对脚本先红后绿、篡改负例全部检出；合并后 main 上 `./scripts/verify.sh` exit 0 |
 
-- **A02-R01 → B11**（未认领）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。契约真源已随 PR #22 进入 main，可以开始。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
+- **A02-R01 → B11**（已由 B11 完成，PR #194 `2de97ba`）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。契约真源已随 PR #22 进入 main，可以开始。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
 - **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
 - Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
 
