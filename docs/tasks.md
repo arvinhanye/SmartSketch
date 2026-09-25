@@ -7,6 +7,17 @@
 | B14 | READY FOR REVIEW（PR #214） | 建立契约导出与漂移检查 | ArvinHan（Codex 子代理） | `codex/b14-contract-drift` / base `a7a0be0` | `scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b14.py`、`docs/handoffs/codex-b14.md` | 依赖 B09–B13 已在基线；定向 3 passed，`./scripts/verify.sh` exit 0（25 项负例及 B08/B09/B10/B12/B13 回归），`gen-contracts.sh --check`、`git diff --check` 通过；审查修复 `0b1fb6c`；Issue #56 已分配并标记 `status:in-review`；[PR #214](https://github.com/arvinhanye/SmartSketch/pull/214)。
 | D08 | READY FOR REVIEW（PR #215） | 实现章节内语义分块 | ArvinHan（Codex 子代理） | `codex/d08-semantic-chunking` / base `a7a0be0` | `src/backend/app/services/chunking.py`、`tests/backend/test_d08.py`、`docs/handoffs/codex-d08.md` | 依赖 D02/D03/D04/D06/D07 已在基线，D-13 章节路径前缀已实现；定向 13 passed、后端 1015 passed（1 条既有弃用警告），`./scripts/verify.sh` 与 `git diff --check` 通过；审查修复 `d675d2b`；Issue #77 已分配并标记 `status:in-review`；[PR #215](https://github.com/arvinhanye/SmartSketch/pull/215)。
 
+## 2026-09-25 Codex 认领：E07
+
+| 原子 ID | 状态 | 任务 | 负责人 | 基线与文件范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| E07 | DONE（已修复审查 P2） | 实现向量适配与维度检查 | Codex（数据与 AI） | `main@a7a0be0`；`src/backend/app/services/ai/embeddings.py`、`tests/backend/test_e07.py`、相关架构与交接 | 同批/跨批重复请求去重，进程内缓存默认 1024 条 LRU；E07 16 passed；后端全量 1035 passed；`./scripts/verify.sh` exit 0；`docs/handoffs/codex-e07.md` |
+
+- 输入：E02 的 `EmbeddingClient` 与 A07 的模型配置；输出：逐条携带模型和空间标识的向量。依赖 E02、A07 已在当前基线。
+- 风险：在线/本地客户端由 E03 接入；E07 通过注入 `EmbeddingClient` 验证模式切换，不引入未经签收的真实供应商依赖。当前工作区的 C03 文件不在 E07 范围内。
+- 审查修复：同一次 `embed` 调用按空间与文本哈希合并缓存未命中项，跨批重复只请求一次；LRU 有限缓存超限后重算旧文本。先新增 4 个失败用例复现，再修复为 16 passed；后端全量 1035 passed。
+- 验证：项目虚拟环境中 `python -m pytest tests/backend/test_e07.py -q`；通过 Git Bash（设置虚拟环境和前端工具路径）运行 `./scripts/verify.sh`；`git diff --check`。详见交接。
+
 ## 2026-09-25 Codex 认领：C03
 
 | 原子 ID | 状态 | 任务 | 负责人 | 基线与文件范围 | 验收 |

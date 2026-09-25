@@ -53,6 +53,10 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 健康检查不接受写入方法；未知或带 `/api/v1` 前缀的健康路径不注册。B05 的测试须覆盖响应、路径边界、错误方法，以及应用工厂无网络副作用。
 - `src/backend/app/api/health.py` 中的最小响应模型是契约生成物尚未导入 main 时的 B05 过渡实现。A10/B14 接续导入并生成真源 DTO 后，应按 ADR-004 改为消费生成模型，避免手写公共 DTO 长期存在。
 
+## E07 向量适配边界
+
+E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，并把请求维度传给客户端。输出逐条附 `model`、`dimensions`、`space`；空间格式为 `fake/<dimensions>` 或 `real/<model>/<dimensions>`，即使真实模型 ID 为 `fake` 也不与 fake 模式碰撞。响应数量、每条维度、有限数值及显式响应模型须在缓存前核对。同一次调用先按 `(space, sha256(text))` 合并待计算文本，跨批重复只请求模型一次，再按原输入位置展开。进程内缓存使用相同键，默认最多保留 1024 条向量并按最近使用顺序淘汰；淘汰后再次读取会重新计算。失败批次不写缓存，已完成批次可供重试复用。在线/本地客户端由 E03 注入，E07 不自行切换供应商或空间。
+
 ## 后端设置与启动校验（B06）
 
 - `src/backend/app/config.py` 定义只从环境变量构造的类型化 `Settings`；`create_app()` 在创建 FastAPI 对象前执行环境校验，并把设置放入 `app.state.settings`。应用构造/模块导入不连接外部服务，也不读取 `.env` 文件。ASGI lifespan 启动阶段执行本地 SQLite 向量空间门禁；后续 worker 入口调用同一门禁。
