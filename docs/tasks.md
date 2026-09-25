@@ -89,7 +89,7 @@
 | D-08 | 融合自动合并阈值与低置信度阈值的初始取值（沿用 `740adb` 未决问题编号，ADR-016 决定 7） | 技术负责人 | E09/E10 开工前 |
 | D-09 | 前端登录页与会话存储缺少原子任务。**已关闭**：补登 **H13 实现前端登录页与会话存储**（依赖 C13、B15、B03、B04；原子清单增至 141 项），负责登录页、`sessionStorage` 会话读写、401 清会话与课程上下文回登录页，并向 B03 的 `getAccountRole` 注入真实来源（ArvinHan，2026-09-24 确认） | 产品负责人 / 协调 Agent | 已完成 |
 | D-10 | 迁移文件编号何时确定、表间外键如何约束合并顺序。**已关闭**：编号在合并时取「main 最大编号 + 1」，原子清单中 002～009 改为 `NNN_<名称>.sql`；C02 增加对 C13 的依赖（`course_members.user_id` → `users`）。原因：C01 迁移器拒绝应用比已应用版本更小的编号，按旧计划 C13 的 `008` 先合并会使后到的 004～007 无法应用（ArvinHan，2026-09-24） | 技术负责人 | 已完成 |
-| D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（C13 已合并，配置落地待认领） |
+| D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（配置已落地，见「D-11 上传配置落地」） |
 | D-12 | Markdown 中 `#` 后不加空格的写法（如 `#第一章`）是否算标题。**已关闭**：放宽，由 D03 在 PR #191 中实现；规则保守，只作用于顶层行，不误伤 `#include`、`#1`、`#tag` 这类行，边界见 `docs/handoffs/claude-d03.md`。D03 首次合并前完成，`parser_version` 仍为 `markdown/1`（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
 | D-13 | 解析器只把标题放进章节路径、标题文字不在块正文里，抽取（D12）看不到标题。**已关闭**：由 D08 分块时在每块正文前拼上章节路径（`section_path`），解析器输出与 D01 模型不变（ArvinHan，2026-09-24） | 技术负责人 | 已完成（D08 实现） |
 | D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
@@ -103,6 +103,30 @@
 | REVIEW-02 | DONE（分批；S-07 尚有待审范围） | A01 文档交付 `88ea517`/`6c19f25`；S-07 本地脚本 `8865686` | Codex | `docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md`；A01 路径映射 22/29 一致；S07-R12～R14 已复现；`docs/handoffs/codex-review-02.md` |
 | REVIEW-A08 | DONE（不建议签收；R02/R03 已签收为 ADR-014；待 Codex 修 R01～R04） | Codex A08 未提交快照（`codex-a08-learning-path` @ `1a47eb2` + dirty，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-2026-09-23.md`：P2×4（R01 `no_graph` 与 A04 V3 冲突、R02 中心度恒 ≤0.5、R03 合并进度倒退未列签收、R04 外课/历史 ID 判定不可实现）、P3×6；R02/R03 的产品决定见 `docs/decisions.md` ADR-014；`docs/handoffs/claude-review-a08.md` |
 | REVIEW-A08-R2 | DONE（R01～R10 已修；R11～R14 由 Codex 修复后第 3 轮复审通过，无新 P1/P2；§7 与 ADR-014 两项细则已由 ADR-014 修订 1 签收，R15 按“以本次连续归属起点为界”写死） | Codex A08 修订稿（`codex-a08-learning-path` @ `1a47eb2` + dirty，规格 `efe23f9e…`，指纹见报告） | Claude | `docs/reviews/claude-codex-a08-r2-2026-09-23.md`：R01～R10 复核通过（R01 在 `atomic-tasks.json` B12 与 I05 仍有“无图”残留）；P2×1（R11 合并继承后进度接口返回原始还是有效状态未定义）、P3×4（R12 谱系终止与不变式、R13 舍入后分量不可还原、R14 任务清单 Markdown/JSON 不一致、R15 细则 1 提案有歧义）；`docs/handoffs/claude-review-a08-r2.md` |
+| REVIEW-03 | DONE（仅 R06 修复；S-07 仍待审） | S-07 `978671e` 的 UTF-8 生成物缺失假绿修复 | Codex | `docs/reviews/codex-claude-s07-r06-978671e-2026-09-23-0305z.md`；定向回归 PASS；`verify.sh` 因生成物未入库 exit 1；`docs/handoffs/codex-review-03.md` |
+| REVIEW-04 | DONE（固定提交批次；活跃会话与 S-07 仍待审） | A02 `13d586e` 文档决定；HOOK-01 `3c2dfab` 命令提取修复 | Codex | `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`；A02-R01 P2；HOOK-01 回归 14 PASS；`docs/handoffs/codex-review-04.md` |
+| REVIEW-05 | DONE（A03 固定提交；S-07 仍待审） | A03 `2049129` 生命周期规范；CI-01 交接 `43a278c`/`25d96cf`；S-07 四个生成物 | Codex | `docs/reviews/codex-claude-a03-ci01-s07-2026-09-23-0606z.md`；A03-R01/R02 P2；A03 骨架门禁 PASS；`docs/handoffs/codex-review-05.md` |
+| REVIEW-06 | DONE（A06 发现 P1；其他旧范围仍待审） | A03 `6345ce1` 修复复核；A06 `ab04053` 租约/清理规范 | Codex | `docs/reviews/codex-claude-a03fix-a06-ab04053-2026-09-23-0649z.md`；A03-R01/R02 文字冲突已修；A06-R01/R02 P1；骨架门禁 PASS；`docs/handoffs/codex-review-06.md` |
+| REVIEW-07 | DONE（A04 发现 P1/P2；A05/A07 仍待稳定） | A04 `110f243` 发布协议与合并冲突 `4b2ccb5` | Codex | `docs/reviews/codex-claude-a04-4b2ccb5-2026-09-23-0730z.md`；A04-R01 P1、A04-R02 P2；文档结构检查及 diff check PASS；`docs/handoffs/codex-review-07.md` |
+| REVIEW-08 | DONE（A05 无新问题；A07 发现 P2；其他旧范围仍待审） | A05 `e0b7ccd` 身份边界；A07 `af9ff7d` 模型配置 | Codex | `docs/reviews/codex-claude-a05-a07-2026-09-23-0804z.md`；A07-R01 P2；两目标骨架门禁与 diff check PASS；`docs/handoffs/codex-review-08.md` |
+| REVIEW-09 | DONE（固定修订复核；新增 2 项 P2；旧待审范围保留） | A04 `02bc228`、A06 `d426170`、A07 `1012b6f` 文档修订 | Codex | `docs/reviews/codex-claude-a04-fixes-1012b6f-2026-09-23-1215z.md`；FIX-R01/R02 P2；目标骨架门禁与 diff check PASS；`docs/handoffs/codex-review-09.md` |
+| REVIEW-10 | DONE（FIX-R01/R02 原缺口文档层关闭；新增 FIX-R03 P2） | FIX-R01/R02 修复提交 `5186e09` 的文档复核 | Codex | `docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md`；固定提交目标 `./scripts/verify.sh` PASS、`git diff 1a47eb2..5186e09 --check` PASS；主目录 `./scripts/verify.sh` 与 `git diff --check` PASS；`docs/handoffs/codex-review-10.md`。仅文档、无运行时测试；旧待审范围保留 |
+| REVIEW-11 | DONE（仅 S-07 DAG 任务/规格批次；其余待审） | S-07 `978671e` 的合并任务与课程图谱前置关系验收 | Codex | `docs/reviews/codex-claude-s07-dag-plan-2026-09-23-1304z.md`；S07-R15 P2；目标两次稳定，`git diff 05d214c..978671e --check` PASS；`docs/handoffs/codex-review-11.md` |
+| REVIEW-12 | DONE（仅 A09 固定文档批次；A10 与旧范围待审） | A09 `1754c96` 问答终态/引用协议 | Codex | `docs/reviews/codex-claude-a09-1754c96-2026-09-23-1400z.md`；A09-R01/R02 P2；目标两次稳定，`./scripts/verify.sh` 与 `git diff f9dfc8f..1754c96 --check` PASS；`docs/handoffs/codex-review-12.md` |
+| REVIEW-13 | DONE（仅 A10 固定文档批次；A08 签收与旧范围待审） | A10 `37da669` 导入映射与 ADR-016 | Codex | `docs/reviews/codex-claude-a10-37da669-2026-09-23-1403z.md`；A10-R01/R02 P2；目标稳定，骨架门禁、diff check、映射核对及 8 个负例 PASS；`docs/handoffs/codex-review-13.md` |
+| REVIEW-14 | DONE（仅 A08 签收六文件差异；旧范围仍待审） | A08 签收 `f9dfc8f` 上稳定未提交文档 | Codex | `docs/reviews/codex-claude-a08-signoff-f9dfc8f-2026-09-24-0123z.md`；A08S-R01 P2、A08S-R02 P3；目标 `./scripts/verify.sh`、`git diff HEAD --check`、任务 JSON 语法均 PASS；`docs/handoffs/codex-review-14.md` |
+| REVIEW-15 | DONE（仅 A09 修复文档批次；旧范围仍待审） | A09 `1754c96..68b1aaf` 逐句引用与日志规则复核 | Codex | `docs/reviews/codex-claude-a09-fix-68b1aaf-2026-09-24-0200z.md`；A09-R02 文档层关闭，A09F-R01/R02 两项 P2；目标 `./scripts/verify.sh` 与 diff check PASS；`docs/handoffs/codex-review-15.md` |
+| REVIEW-16 | DONE（仅 A10 批 1 补；其余待审） | `batch1-qa@3da4f2f` 问答规格命名门禁与逐规格负例 | Codex | `docs/reviews/codex-claude-batch1-qa-3da4f2f-2026-09-24-0446z.md`；无新问题；目标 `verify.sh`（24/24 契约负例）与 diff check PASS；`docs/handoffs/codex-review-16.md` |
+| REVIEW-17 | DONE（仅 FIX-R03 规格补注；其余待审） | `wrap-fix-pr16@8dcd7b2` 迁移与运行时空间写入边界 | Codex | `docs/reviews/codex-claude-fix-r03-8dcd7b2-2026-09-24-0451z.md`；FIX-R03 文档层关闭，无新问题；目标骨架门禁、diff check PASS；F03/PUB-39 运行时未实现；`docs/handoffs/codex-review-17.md` |
+| REVIEW-18 | DONE（仅 B02 固定提交；B03/B04 与旧范围待审） | `a09-dev-environment-check-8e5e93@8e5b707` 前端测试配置 | Codex | `docs/reviews/codex-claude-b02-8e5b707-2026-09-24-0504z.md`；11 个改动文件已审、无新增问题；隔离副本类型检查、5 用例、构建 PASS；`verify.sh` 因本机缺契约依赖 FAIL（验证缺口）；`docs/handoffs/codex-review-18.md` |
+| REVIEW-19 | DONE（B03/B04 固定提交审查；集成与旧范围待审） | B03 `8153186`、B04 `225f102` 与共用准备 `9dddcb4` | Codex | `docs/reviews/codex-claude-b03-b04-2026-09-24-0605z.md`；B03-R01、B04-R01 两项 P2；两隔离副本类型检查、定向/全量测试、构建 PASS；`verify.sh` 缺契约依赖 FAIL；`docs/handoffs/codex-review-19.md` |
+| REVIEW-20 | DONE（仅 B10 固定提交；B13 与旧范围待审） | B10 `3771ae1` 任务快照、SSE 与票据契约 | Codex | `docs/reviews/codex-claude-b10-3771ae1-2026-09-24-0703z.md`；B10-R01/R02 两项 P2；隔离副本 36 用例与生成物一致性 PASS；`docs/handoffs/codex-review-20.md` |
+| REVIEW-21 | DONE（仅 B13 固定提交；发现 2 项 P2） | B13 `14d405d` 问答与事件契约 | Codex | `docs/reviews/codex-claude-b13-14d405d-2026-09-24-1104z.md`；B13-R01/R02；隔离副本 B13 43 用例和 `verify.sh` PASS；`docs/handoffs/codex-review-21.md` |
+| REVIEW-22 | DONE（仅 B10 修正固定提交；集成与旧范围待审） | B10 `21de627` 的 R01～R04 契约修正 | Codex | `docs/reviews/codex-claude-b10-fix-21de627-2026-09-24-1556z.md`；旧 B10-R01/R02 在 JSON Schema 层关闭，新增 B10F-R01 P2、B10F-R02 P3；隔离副本 B10 45 用例 PASS，完整门禁最终输出 PASS 但退出码因中断未确认；`docs/handoffs/codex-review-22.md` |
+| REVIEW-23 | DONE（仅 A08 修复固定提交；集成与旧范围待审） | A08 `445478e..2f2e4ce` 同值进度写入与任务板修复 | Codex | `docs/reviews/codex-claude-a08-fix-2f2e4ce-2026-09-24-1603z.md`；A08S-R01/R02 文档层关闭、无新问题；目标 `./scripts/verify.sh` 与 diff check PASS；`docs/handoffs/codex-review-23.md` |
+| REVIEW-24 | DONE（仅 D02 固定提交；其他新 worktree 与集成待审） | D02 `588d00a..4651700` TXT 解析器三文件 | Codex | `docs/reviews/codex-claude-d02-4651700-2026-09-25-0403z.md`；D02-R01 P2；目标两次稳定，定向 94 PASS，控制字节反例复现，diff check PASS；`docs/handoffs/codex-review-24.md` |
+| REVIEW-25 | DONE（仅 C05 固定提交；C06/C07 与集成待审） | C05 `68affa8..d3b7a6c` 文件落盘边界三文件 | Codex | `docs/reviews/codex-claude-c05-d3b7a6c-2026-09-25-0502z.md`；本批无新增问题；两次指纹稳定，定向 61 PASS，diff check PASS；`docs/handoffs/codex-review-25.md` |
+| REVIEW-26 | DONE（仅 D01 固定提交；其他新 worktree 与集成待审） | D01 `909ce33..74be60d` 解析模型与 fixture 十文件 | Codex | `docs/reviews/codex-claude-d01-74be60d-2026-09-25-0503z.md`；D01-R01 P3；目标两次稳定，定向 88 PASS，Anaconda 环境完整门禁 PASS，末尾换行反例复现；`docs/handoffs/codex-review-26.md` |
 
 ## 原子任务认领（`docs/atomic-task-plan.md`）
 
@@ -315,7 +339,7 @@
 
 - **A02-R01 → B11**（已由 B11 完成，PR #194 `2de97ba`）：在 `src/contracts/api.v1.yaml` 把 `status`、`source`、`source_refs` 加入 `Relation.required`（若允许空来源，须写明适用场景并与 `specs/course-knowledge-graph.md` 对齐），重新生成并加「缺任一字段即拒绝」的 schema 负例；`RelationCreate` 仍可由服务端补齐这三个字段。契约真源已随 PR #22 进入 main，可以开始。审查报告：主目录 `docs/reviews/codex-claude-a02-hook01-2026-09-23-0528z.md`。
 - **批 1 补**（未认领，后端 Agent）：A09 已合入，现可把 `specs/grounded-qa.md` 加回 `scripts/check_contracts.py` 扫描清单与 `tests/contracts/test_contracts.py` 夹具，并加该文件的错误命名负例（ADR-016 修订 1）。
-- Codex 在主目录有未入库的审查记录（REVIEW-03～14 的任务行、报告与交接），由 Codex 自行提交；本节引用的报告路径均指主目录。
+- Codex 在主目录未入库的审查记录（REVIEW-03～26 的任务行、`docs/reviews/codex-claude-*.md` 报告 24 份、`docs/handoffs/codex-review-*.md` 交接 24 份与 `claude-review-state.json`）已于 2026-09-25 经 ArvinHan 同意由 Claude 原样代为入库（见 `docs/handoffs/claude-archive-codex-reviews.md`）；各交接中「主目录 `docs/reviews/…`」的引用现在按仓库内同名路径解析。
 
 ## A10 批 1 补：问答规格加回契约门禁
 
@@ -536,7 +560,7 @@
 | C05 | DONE（PR #181 `3f1f059`） | 实现文件落盘边界 | Claude（后端子代理） | `claude/c05-file-storage` / `origin/main` | `src/backend/app/services/file_storage.py`、`tests/backend/test_c05.py` | `docs/handoffs/claude-c05.md`；C05 61 passed、后端全部通过；CI 三个 job 通过；配置项待补（D-11） |
 
 - 进展（2026-09-24）：C05、E01、D01、C13 均已合并，本批完成。C13 引入的全局 422 处理器输出 `details.fields = [{in, field, reason}]`，已登记到 `src/contracts/errors.v1.md`。
-- 待认领：按 D-11 把 `UPLOAD_MAX_BYTES`、`STORAGE_DIR` 补进 `config.py`、`.env.example`、`docs/integrations.md`（C13 已释放这三个文件的锁）；D02～D05 现可并行认领（只依赖 D01）；C02、C03、C14、H13 的前置 C13 已满足。
+- ~~待认领：按 D-11 把 `UPLOAD_MAX_BYTES`、`STORAGE_DIR` 补进 `config.py`、`.env.example`、`docs/integrations.md`~~（已完成，见「D-11 上传配置落地」）；D02～D05 现可并行认领（只依赖 D01）；C02、C03、C14、H13 的前置 C13 已满足。
 - 不在本批：B12（与 539210 的 B11 同改 `api.v1.yaml`）、B07（与 C13 可能同改 `pyproject.toml`）、F01（需要本机 Docker/Neo4j）。
 - 并行约束：四项都不改 `docs/tasks.md`、`docs/architecture.md`、`scripts/verify.sh`；需要改共享文件时停下来交给协调方。
 
@@ -567,6 +591,15 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 输出：验收 7 规定了基准材料、实体数、准确率、判定对象、报告内容和失败路径；K01 负责口径与一章量的标注材料，K02 负责计算、判定并新增 `evaluation/reports/extraction-accuracy.md`。
 - 核对：赛题其余指标已有覆盖——格式 ≥ 2 种、关系 ≥ 3 种（四格式、四关系）；问答 ≤ 15 秒（`LLM_CHAT_TIMEOUT_SECONDS`、K04）；讲解与练习题（O05/O06）；赛题不要求训练模型。
 - 决策 D-15（ArvinHan，2026-09-24 确认；原拟编号 D-14 已被 PR #199 的 PDF 权限决策占用，合并时改号）：70% 按「实体、关系分别达标」执行。
+
+## D-11 上传配置落地
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D-11 落地 | DONE（待 PR 审查/合并） | 把 `STORAGE_DIR`、`UPLOAD_MAX_BYTES` 补进设置、示例与集成登记 | Claude（协调方） | `claude/d11-upload-config` / `04f8ac6` | `src/backend/app/config.py`、`.env.example`、`docs/integrations.md`（应用运行与存储表、启动校验）、`tests/backend/test_d11_upload_config.py`、本节与 D-11 行、`docs/handoffs/claude-d11-upload-config.md` | `docs/handoffs/claude-d11-upload-config.md`；先红 10 failed，后绿 D-11 10 passed；后端全量 730 passed |
+
+- 输入：D-11（50 MiB、变量名 `UPLOAD_MAX_BYTES`）；`STORAGE_DIR=./storage` 沿用 740adb（A10 导入映射「批 2 只取 `STORAGE_DIR`」）。输出：`Settings.STORAGE_DIR`、`Settings.UPLOAD_MAX_BYTES`，C06/C07 按 `FileStorage(settings.STORAGE_DIR, max_bytes=settings.UPLOAD_MAX_BYTES)` 使用。
+- 验收：缺省值与 D-11 一致；0、负数、小数、带单位、空串拒绝并指出变量名；空白 `STORAGE_DIR` 拒绝；设置值能直接构造 `FileStorage` 并在超限时给出 `limit_bytes`；`.env.example` 覆盖全部设置（B06 回归）。
 
 ## 2026-09-25 并行批次（Claude）
 

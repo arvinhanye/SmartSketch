@@ -40,3 +40,6 @@ neo4j/logs/
 .DS_Store
 .idea/
 .vscode/
+
+# Office lock files (e.g. ~$foo.docx while Word has the file open)
+~$*
