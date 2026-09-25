@@ -338,6 +338,17 @@
 - B05 只完成后端最小启动与健康检查；父任务 M0-03 的 B06 设置加载仍待完成。A10 导入契约真源后，生成 DTO 应替换 B05 的临时响应模型。
 - Claude 审查（REVIEW-B05，2026-09-24）：无 P1/P2；P3×3（B05-R01～R03）。合入 `origin/main@dddafb3` 后 test_b05 3 passed、uvicorn 实测与契约一致、`verify.sh` 通过；见 `docs/handoffs/claude-review-b05.md`。
 
+## B07 契约门禁缺依赖假绿
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B07 | DONE（待 PR 合并） | 校验结果显式 PASS/SKIP/FAIL，缺依赖与坏契约失败 | Codex（后端） | `b07-main` / `origin/main@28b09b4` | `scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`src/backend/pyproject.toml`、`tests/tooling/test_b07.py`；文档 `docs/architecture.md`、本节、`docs/handoffs/codex-b07.md` | B07 14 PASS；最终 `./scripts/verify.sh` exit 0；全仓 218 PASS（审查补丁前）；`docs/handoffs/codex-b07.md` |
+
+- 输入：R02 审查结论与已导入 main 的契约门禁；输出：一套门禁的显式状态及后端测试依赖声明，不引入第二套校验入口。
+- 依赖：A01、B05 已合入；基线为最新集成 main。风险：C13 并行任务可能也改 `src/backend/pyproject.toml`，合并时需逐行保留双方依赖，不覆写其改动。
+- 验收：缺依赖、坏 `$ref`、坏关系枚举均非 0；显式骨架降级标为 `SKIP` / `INCOMPLETE`；运行 `python3 -m pytest tests/tooling/test_b07.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 结果：定向 14 项覆盖正常通过、PyYAML/OpenAPI 校验器/JSON Schema 缺依赖、显式骨架跳过、坏引用、坏枚举、畸形结构的显式 FAIL、聚合门禁状态与测试依赖；全仓 218 项在审查补丁前通过。测试 venv 随后被临时目录清理，最终补丁用 conda Python 完成定向与契约门禁验证。
+
 ## B06 后端设置加载与启动验证
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
