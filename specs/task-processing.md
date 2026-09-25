@@ -154,7 +154,7 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 | 失败情形 | 阶段 | `error.code` | `details` | 契约现状 |
 | --- | --- | --- | --- | --- |
 | 文件损坏 / 加密 / 无可提取文本（含 `chunks_total = 0`） | `parsing` | `DOCUMENT_UNREADABLE` | `reason ∈ {corrupted, encrypted, no_text}` | **已纳入 B08** |
-| 抽取失败块超阈值，且所有失败块的最终错误都是模型不可用 | `extracting` | `LLM_UNAVAILABLE` | `chunks_failed`、`chunks_total`、`threshold` | 已有 |
+| 抽取失败块超阈值，且所有失败块的最终错误都是模型不可用 | `extracting` | `LLM_UNAVAILABLE` | `chunks_failed`、`chunks_total`、`threshold` | 已有。补注：`merging` 尝试耗尽且最后一次为模型不可用时也用此码，`details` 为 `attempts`、`stage`（见本表末行与 §8.3；依据 ADR-017 决定 6） |
 | 抽取失败块超阈值，其他或混合原因 | `extracting` | `EXTRACTION_INCOMPLETE` | 同上，另含按错误码的计数 | **已纳入 B08** |
 | 自动候选成环且环上无可降级边 | `persisting` | `CYCLE_DETECTED` | `cycle` | 已有（ADR-009） |
 | 图库 / 数据库不可用或写入失败 | `persisting`（及任何需读写存储处） | `STORAGE_UNAVAILABLE` | — | **已纳入 B08** |
