@@ -35,6 +35,8 @@
 | `API_PORT` | 整数 1～65535 | `8000` | FastAPI 监听端口 | 已约定 |
 | `WEB_ORIGIN` | URL | `http://localhost:5173` | 允许的前端来源（CORS） | 已约定 |
 | `SQLITE_URL` | 字符串，`sqlite:///` 开头；不得为内存库 | `sqlite:///./storage/smartsketch.sqlite3` | SQLite 连接串，不含凭据；相对路径按进程工作目录解析，API/worker 须指向同一文件 | 已约定 |
+| `STORAGE_DIR` | 字符串，非空白 | `./storage` | 原始课程资料落盘根目录，C06/C07 作为 `FileStorage` 的 `root` 传入；相对路径按进程工作目录解析，API/worker 须指向同一目录；`storage/` 已被 `.gitignore` 忽略，目录内是真实资料，不得提交；须支持硬链接（C05 发布方式），网络盘或 exFAT 会报 `STORAGE_UNAVAILABLE` | 已约定（沿用 740adb，D-11） |
+| `UPLOAD_MAX_BYTES` | 整数 ≥ 1 | `52428800` | 上传单文件上限（字节，50 MiB），C06/C07 作为 `FileStorage` 的 `max_bytes` 传入；超过即 413 `FILE_TOO_LARGE`，`details.limit_bytes` 为该值 | 已签收（D-11） |
 | `NEO4J_URI` | URL，`bolt://` 或 `neo4j://` 开头 | `bolt://localhost:7687` | Neo4j 地址 | 已约定 |
 | `NEO4J_USER` | 字符串 | `neo4j` | Neo4j 用户 | 已约定 |
 | `NEO4J_PASSWORD` | 密钥 | `change-me-locally` | Neo4j 密码 | 本机填写 |
@@ -231,6 +233,7 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 - 类型或范围不合法时拒绝启动并指出变量名，不静默回落默认值（与 `specs/task-processing.md` §8.8 一致）。
 - 条件必填：`LLM_MODE=live` 时主用四项必填；备用四项全空或全填；`EMBEDDING_MODE=online` 时 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 必填，`local` 时 `EMBEDDING_MODEL` 必填。
 - `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake`。
+- `STORAGE_DIR` 不得为空或全空白；启动校验不创建目录也不检查可写，目录由 `FileStorage` 首次构造时创建（C05）。
 - `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 必须小于 `LLM_CHAT_TIMEOUT_SECONDS`。
 - `RECOMMEND_WEIGHT_*` 四项成组：都不设或都为空时用缺省值；只设一部分、有负数或非有限值、全为 0、和偏离 1 超过 `1e-9` 时拒绝启动（ADR-014 修订 1 决定 6）。
 - API 服务入口另行要求 `AUTH_JWT_SECRET` 存在且 ≥ 32 字节（C13，IAM-23）；`create_app()` 工厂本身不要求，以便测试在无密钥时构造应用，但工厂构造的应用在缺密钥时登录一律返回 500 `INTERNAL_ERROR`，不签发令牌。
