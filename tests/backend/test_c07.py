@@ -453,7 +453,7 @@ def test_parse_status_follows_latest_created_task_not_column(client, world):
         world,
         world.course.id,
         material,
-        stage="failed",
+        stage="completed",  # 不用 failed：C09 迁移 005 要求 failed 行带 error_code
         created_at="2026-09-25T01:00:00.000Z",
         updated_at="2026-09-25T09:00:00.000Z",  # 最近更新的是旧任务
     )
