@@ -592,7 +592,7 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D07 | IN PROGRESS | 实现重复页眉页脚清洗 | ArvinHan（Claude 子代理） | `claude/d07-header-footer` / `8eeac3b` | `src/backend/app/services/parsers/cleanup.py`、`tests/backend/test_d07.py`、`docs/handoffs/claude-d07.md` | 待补 |
+| D07 | DONE（待 PR 审查/合并） | 实现重复页眉页脚清洗 | ArvinHan（Claude 子代理） | `claude/d07-header-footer` / `8eeac3b` | `src/backend/app/services/parsers/cleanup.py`、`tests/backend/test_d07.py`、`docs/handoffs/claude-d07.md` | `docs/handoffs/claude-d07.md`；标准库、无新依赖；先红（收集错误 exit 2）后绿 D07 43 passed；6 处反向篡改均被检出；后端 763 passed（venv，Python 3.13.5）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
 
 - D07 验收：重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗。验证：`python3 -m pytest tests/backend/test_d07.py -q`。
 
