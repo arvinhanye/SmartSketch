@@ -7,8 +7,8 @@
 1. 以 UTF-8 BOM（EF BB BF）开头：视为声明了 UTF-8，去掉 BOM 后严格按 UTF-8 解码；
    解不开即 `corrupted`，不再尝试 GBK。
 2. 否则严格按 UTF-8 解码，成功即为 UTF-8。
-3. UTF-8 失败时，若按 UTF-8 宽松解码得到的合法非 ASCII 字符数 ≥ 坏字节数 × 8，判定为
-   「夹了坏字节的 UTF-8」并报 `corrupted`，避免回退 GBK 后得到整篇乱码。
+3. UTF-8 失败时，若第一个错误就是文末被截断的多字节字符、且此前已有合法的非 ASCII 字符，
+   判定为被截断的 UTF-8 并报 `corrupted`：这类字节常常恰好能按 GBK 解码，回退 GBK 只会得到乱码。
 4. 否则严格按 GBK 解码，成功即为 GBK；仍失败则 `corrupted`。
 5. 解码结果含 NUL（U+0000）时报 `corrupted`：通常是改了扩展名的二进制或 UTF-16。
 
@@ -68,7 +68,6 @@ __all__ = ["PARSER_VERSION", "DecodedText", "decode_txt", "heading_rank", "parse
 PARSER_VERSION = "txt/1"
 
 _UTF8_BOM = b"\xef\xbb\xbf"
-_DAMAGED_UTF8_RATIO = 8
 _EOF_MARKER = "\x1a"
 _FULL_WIDTH_SPACE = "\u3000"
 _NEWLINE_RE = re.compile(r"\r\n|\r|\n")
@@ -101,11 +100,11 @@ def _corrupted(detail: str) -> DocumentUnreadableError:
     return DocumentUnreadableError(UnreadableReason.CORRUPTED, detail)
 
 
-def _looks_like_damaged_utf8(data: bytes) -> bool:
-    lossy = data.decode("utf-8", errors="replace")
-    bad = lossy.count("\ufffd")
-    good = sum(1 for ch in lossy if ch > "\x7f" and ch != "\ufffd")
-    return good >= _DAMAGED_UTF8_RATIO * bad
+def _is_truncated_utf8(data: bytes, error: UnicodeDecodeError) -> bool:
+    """第一个 UTF-8 错误就是文末被截断的多字节字符，且此前已有合法的非 ASCII 字符。"""
+    if error.reason != "unexpected end of data" or error.end != len(data):
+        return False
+    return any(ch > "\x7f" for ch in data[: error.start].decode("utf-8"))
 
 
 def decode_txt(data: bytes) -> DecodedText:
@@ -125,8 +124,8 @@ def decode_txt(data: bytes) -> DecodedText:
         try:
             decoded = DecodedText(data.decode("utf-8"), "utf-8")
         except UnicodeDecodeError as exc:
-            if _looks_like_damaged_utf8(data):
-                raise _corrupted(f"UTF-8 文本在第 {exc.start} 字节处损坏") from None
+            if _is_truncated_utf8(data, exc):
+                raise _corrupted(f"UTF-8 文本在第 {exc.start} 字节处被截断") from None
             try:
                 decoded = DecodedText(data.decode("gbk"), "gbk")
             except UnicodeDecodeError:

@@ -141,6 +141,14 @@ def test_mixed_newlines_count_each_physical_line_once():
     assert doc.blocks[1].text == "第二段第一行\n第二段第二行"
 
 
+def test_only_cr_and_lf_break_lines():
+    """换页符、NEL、行/段分隔符不算换行：行号与编辑器按 CR/LF 看到的一致。"""
+    text = "甲\f乙\n丙\x85丁\u2028戊\u2029己\v庚\n\n辛"
+    doc = parse_txt(text.encode())
+    assert summary(doc) == [("第1段", 1, 2), ("第2段", 4, 4)]
+    assert doc.blocks[0].text == "甲\f乙\n丙\x85丁\u2028戊\u2029己\v庚"
+
+
 def test_heading_hierarchy_textbook_style():
     text = "\n".join(
         [
@@ -404,8 +412,8 @@ def test_undecodable_bytes_are_corrupted(data):
     assert err.detail
 
 
-def test_damaged_utf8_is_corrupted_not_misread_as_gbk():
-    """UTF-8 正文中夹一个坏字节：不回退 GBK 产生乱码，而是报 corrupted。"""
+def test_damaged_utf8_is_corrupted():
+    """UTF-8 正文中夹一个坏字节，或文末截断在多字节字符中间：报 corrupted。"""
     text = PLAIN.read_text(encoding="utf-8")
     raw = text.encode("utf-8")
     cut = raw.index("冒泡".encode())
@@ -413,6 +421,15 @@ def test_damaged_utf8_is_corrupted_not_misread_as_gbk():
     assert_unreadable(damaged, UnreadableReason.CORRUPTED)
     # 截断在多字节字符中间同样如此
     truncated = raw[: raw.index("插入".encode()) + 1]
+    assert_unreadable(truncated, UnreadableReason.CORRUPTED)
+
+
+def test_truncated_utf8_that_happens_to_be_valid_gbk_is_corrupted():
+    """截断的 UTF-8 恰好能按 GBK 解码（得到乱码）时，仍按损坏的 UTF-8 报 corrupted。"""
+    truncated = NUMBERED.read_bytes()[:14]  # 「示例数据」+ 半个字符
+    with pytest.raises(UnicodeDecodeError):
+        truncated.decode("utf-8")
+    assert truncated.decode("gbk")  # 前提：直接回退 GBK 会得到一串乱码而不报错
     assert_unreadable(truncated, UnreadableReason.CORRUPTED)
 
 
