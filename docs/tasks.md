@@ -787,13 +787,13 @@ D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D09 | IN PROGRESS | 实现块身份与缓存键 | ArvinHan（Claude 子代理） | `claude/d09-chunk-identity` / 本认领提交 | `src/backend/app/services/chunk_identity.py`、`tests/backend/test_d09.py`、`docs/handoffs/claude-d09.md` | 待补 |
+| D09 | DONE（待 PR 审查/合并） | 实现块身份与缓存键 | ArvinHan（Claude 子代理） | `claude/d09-chunk-identity` / 本认领提交 | `src/backend/app/services/chunk_identity.py`、`tests/backend/test_d09.py`、`docs/handoffs/claude-d09.md` | 红：实现前收集错误 `ModuleNotFoundError`；绿：`tests/backend/test_d09.py` 96 passed；后端全量 1146 passed（基线 1050）；反向篡改 5 处（去 course_id、去 model_id、序号补零、修订哈希输入换序、模型 ID 改取响应字段）均变红，改回后 `cmp` 一致；`verify.sh` exit 1 仅因本机缺 `openapi-typescript`（B14 生成类 2 条 + 负例 1 条），base `9116315` 同命令日志逐行相同；`git diff --check` 通过；待决 5 项见 `docs/handoffs/claude-d09.md`；**ADR-018 追加**（`686f57c` ADR 本文 + 其后实现提交）：`chunking.py` 增 `CHUNKER_VERSION`/`chunking_version()`，`chunk_identity.py` 增 `revision_parser_version()` 且修订键拒绝缺分块段的 `parser_version`；红：先改测试时收集错误 `ImportError`；绿：`test_d09.py` 154 passed、`test_d08.py` 13 passed；后端全量 1204 passed；篡改 3 处（不校验分块段 11 failed、分块版本丢参数 4 failed、组合换序 6 failed）改回后 `cmp` 一致；`verify.sh` exit 0；`git diff --check` 通过 |
 
 - D09 验收：同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效（缓存键用实际给出结果的模型 ID，见 `docs/integrations.md`）；`revision_id` 与块 ID 按 ADR-012 修订 1 确定性派生。验证：`python3 -m pytest tests/backend/test_d09.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C16 | IN PROGRESS | 实现 SSE 一次性票据申领 | ArvinHan（Claude 子代理） | `claude/c16-event-tickets` / 本认领提交 | `src/backend/app/api/event_tickets.py`、`src/backend/app/repositories/event_tickets.py`、`src/backend/migrations/006_event_tickets.sql`（D-10：005 已由 C09 #220 占用）、`tests/backend/test_c16.py`、`docs/handoffs/claude-c16.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+| C16 | DONE（待 PR 审查/合并） | 实现 SSE 一次性票据申领 | ArvinHan（Claude 子代理） | `claude/c16-event-tickets` / 本认领提交 | `src/backend/app/api/event_tickets.py`、`src/backend/app/repositories/event_tickets.py`、`src/backend/migrations/006_event_tickets.sql`（D-10：005 已由 C09 #220 占用）、`tests/backend/test_c16.py`、`docs/handoffs/claude-c16.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 红灯：仅有测试时收集报 `ImportError`（`app.repositories.event_tickets` 不存在）；绿灯：`tests/backend/test_c16.py` 23 passed；后端全量 1073 passed（基线 1050 + 23）；contracts+tooling 4 failed / 269 passed，与基线 `9116315` 相同，均因环境缺 `openapi-typescript`；反向篡改 5 处（存明文、去 `task_id`、去过期、去 `used_at`、去旧行清理）全部检出，改回后 `cmp` 一致；`verify.sh` 退出 1（contracts gate 的 B14 生成回归缺 `openapi-typescript`，基线同样失败）；`git diff --check` 通过；交接 `docs/handoffs/claude-c16.md` |
 
 - C16 验收（`specs/identity-access.md` §5）：仅保存票据哈希；60 秒过期；重复、跨任务或普通 Bearer 查询票据拒绝；迁移可恢复。验证：`python3 -m pytest tests/backend/test_c16.py -q`。
 
