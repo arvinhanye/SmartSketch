@@ -18,6 +18,18 @@
 - 审查修复：同一次 `embed` 调用按空间与文本哈希合并缓存未命中项，跨批重复只请求一次；LRU 有限缓存超限后重算旧文本。先新增 4 个失败用例复现，再修复为 16 passed；后端全量 1035 passed。
 - 验证：项目虚拟环境中 `python -m pytest tests/backend/test_e07.py -q`；通过 Git Bash（设置虚拟环境和前端工具路径）运行 `./scripts/verify.sh`；`git diff --check`。详见交接。
 
+## 2026-09-25 Codex 认领：C03
+
+| 原子 ID | 状态 | 任务 | 负责人 | 基线与文件范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| C03 | DONE（待审查/集成） | 实现身份边界与课程访问依赖 | Codex（后端） | `main@a7a0be0`；`app/api/dependencies.py`、`app/services/access.py`、账号/任务仓储只读入口、`tests/backend/test_c03.py`、相关架构与交接 | C03 17 passed；后端 1019 passed；`./scripts/verify.sh` exit 0；交接 `docs/handoffs/codex-c03.md` |
+
+- 输入：`specs/identity-access.md` §2、§4 访问矩阵；输出：可复用的身份/课程/任务访问依赖。依赖 C02、B09、C13 已在当前基线。
+- 风险：下游路由尚未接入，C03 提供依赖接口和测试用路由，不代替 C04/C07 等任务实现；仅持有任务 ID 时需仓储先解析归属课程。
+- 验证：`python -m pytest tests/backend/test_c03.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 验收证据：Bearer 身份、停用实时失效、请求身份字段无效、课程内角色、未发布和任务越权同形错误均有定向用例；`.venv/Scripts/python.exe -m pytest tests/backend/test_c03.py -q` 17 passed；后端全量 1019 passed；Git Bash 运行 `./scripts/verify.sh` exit 0（契约负向 24 项、B08/B09/B10/B12/B13 回归）；详见交接。
+
+
 ## B12 进度与推荐契约（2026-09-25）
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
