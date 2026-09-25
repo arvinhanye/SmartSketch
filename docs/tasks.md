@@ -586,7 +586,7 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D06 | IN PROGRESS | 实现 PDF 标题判定 | ArvinHan（Claude 子代理） | `claude/d06-pdf-headings` / `8eeac3b` | `src/backend/app/services/parsers/pdf_headings.py`、`tests/backend/test_d06.py`、`docs/handoffs/claude-d06.md` | 待补 |
+| D06 | DONE（待 PR 审查/合并） | 实现 PDF 标题判定 | ArvinHan（Claude 子代理） | `claude/d06-pdf-headings` / `8eeac3b` | `src/backend/app/services/parsers/pdf_headings.py`、`tests/backend/test_d06.py`、`docs/handoffs/claude-d06.md` | `docs/handoffs/claude-d06.md`；无新依赖；先红（模块缺失，收集错误 exit 2）后绿：D06 34 passed，后端 754 passed，6 项反向篡改均被检出；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
 
 - D06 验收：正文加粗不误做所有标题；标题跨页、无字号层级有退路。验证：`python3 -m pytest tests/backend/test_d06.py -q`。
 
