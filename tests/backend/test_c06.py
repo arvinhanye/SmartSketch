@@ -28,7 +28,8 @@ def _stored_file(tmp_path: Path, *, storage_name: str = "a" * 32 + ".txt") -> St
 @pytest.fixture
 def db_url(tmp_path: Path) -> str:
     url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    assert migrate(url) == ["001", "002", "003"]
+    # 只断言 001～003 依序应用；后续迁移（如 C02 的 004）不影响本任务。
+    assert migrate(url)[:3] == ["001", "002", "003"]
     return url
 
 
