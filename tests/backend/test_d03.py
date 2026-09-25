@@ -4,7 +4,7 @@
 - 成功：自编 fixture 的完整块序列（类型、章节路径、行号）；ATX 与 Setext 标题；标题层级跳跃；
   表格、嵌套列表、围栏/缩进代码块保留为独立块；front matter、HTML 块、引用块、分隔线的处理；
   CRLF/CR 换行与 BOM 不改变行号；块文本等于原文对应行。
-- 边界：代码块与引用块中的 `#` 不当标题；`#标题`（无空格）按 CommonMark 不是标题；
+- 边界：代码块与引用块中的 `#` 不当标题；`#标题`（无空格、紧跟非 ASCII）放宽为标题，`#include`、`#1` 等不放宽；
   空标题被忽略；标题中的行内标记与半角 `>`；同一路径重复出现时段落号接续；未闭合的 front matter。
 - 失败：空文件、只有空白（含全角空格与 BOM）、只有标题/front matter/HTML 注释/分隔线/空代码块
   → `DocumentUnreadableError(no_text)`；非 UTF-8 字节与 NUL 字节 → `corrupted`；非 bytes 输入 → TypeError。
@@ -261,10 +261,74 @@ def test_empty_heading_is_ignored():
     assert [b.locator.section_path for b in doc.blocks] == ["第1章 > 第1段", "第1章 > 第2段"]
 
 
-def test_hash_without_space_is_not_a_heading_per_commonmark():
-    doc = md("#不是标题\n")
-    assert shape(doc) == [(P, "第1段", 1, 1)]
-    assert doc.blocks[0].text == "#不是标题"
+def test_hash_directly_followed_by_non_ascii_is_a_heading():
+    """放宽规则（ArvinHan 决定）：`#` 后无空格、紧跟非 ASCII 非空白字符时按 ATX 标题处理。"""
+    src = "#第一章 绪论\n\n甲。\n\n##概述\n\n乙。\n\n###（一）背景 ###\n\n丙。\n\n#第二章\n\n丁。\n"
+    doc = md(src)
+    assert shape(doc) == [
+        (P, "第一章 绪论 > 第1段", 3, 3),
+        (P, "第一章 绪论 > 概述 > 第1段", 7, 7),
+        (P, "第一章 绪论 > 概述 > （一）背景 > 第1段", 11, 11),
+        (P, "第二章 > 第1段", 15, 15),
+    ]
+
+
+def test_loose_heading_can_interrupt_paragraph_like_atx():
+    doc = md("前言。\n#第一章\n正文。\n")
+    assert shape(doc) == [(P, "第1段", 1, 1), (P, "第一章 > 第1段", 3, 3)]
+
+
+def test_loose_heading_text_is_plain_and_normalized():
+    doc = md("#第 **1** 章 x>0\n\n甲。\n")
+    assert doc.blocks[0].locator.section_titles == ("第 1 章 x＞0",)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "#include <stdio.h>",
+        "#1",
+        "#tag",
+        "#!/bin/sh",
+        "###1.1顺序表",  # 紧跟 ASCII 数字：不放宽，避免误伤 #1 一类
+        "#######第七级",  # 超过 6 个 #
+        "#\u3000第一章",  # 紧跟全角空格（空白字符）
+        "#话题#",  # 形如话题标签：结尾 # 紧贴文字
+        "\\#第一章",  # 转义的 #
+        "    #第一章",  # 缩进 4 格是代码块
+    ],
+)
+def test_hash_lines_not_eligible_for_loose_heading_stay_body_text(line):
+    doc = md(f"# 第1章\n\n{line}\n")
+    assert [b.locator.section_titles for b in doc.blocks] == [("第1章",)]
+    assert doc.blocks[0].text == line
+
+
+@pytest.mark.parametrize(
+    "src, kind, lines",
+    [
+        ("```\n#第一章\n```\n", C, (3, 5)),
+        ("~~~\n##概述\n~~~\n", C, (3, 5)),
+        ("> #第一章\n> 引用正文。\n", P, (3, 4)),
+        ("- #第一章\n- 项\n", L, (3, 4)),
+        ("1. 项\n   ##概述\n", L, (3, 4)),
+    ],
+    ids=["fence", "tilde-fence", "blockquote", "bullet-list", "ordered-list-item"],
+)
+def test_loose_heading_inside_containers_is_not_a_section(src, kind, lines):
+    doc = md("# 第1章\n\n" + src)
+    assert shape(doc) == [(kind, "第1章 > 第1段", *lines)]
+    assert "第一章" in doc.blocks[0].text or "概述" in doc.blocks[0].text
+
+
+def test_standard_atx_heading_behavior_unchanged():
+    src = "# 第1章\n\n甲。\n\n## 1.1 节 ##\n\n乙。\n\n#tag 这一行仍是正文。\n"
+    doc = md(src)
+    assert [b.locator.section_path for b in doc.blocks] == [
+        "第1章 > 第1段",
+        "第1章 > 1.1 节 > 第1段",
+        "第1章 > 1.1 节 > 第2段",
+    ]
 
 
 def test_repeated_section_path_continues_paragraph_numbering():
@@ -332,7 +396,7 @@ _FUZZ_PIECES = [
     "# 标题", "## 小节 > x", "###", "正文一行", "  缩进正文", "    code", "\t# tab", "```", "~~~",
     "- 项", "  - 子项", "1. 有序", "> 引用", "> # 引用标题", "| a | b |", "| - | - |", "| 1 | 2 |",
     "---", "===", "***", "<!-- c -->", "<div>", "</div>", "<!--", "-->", "[r]: #x", "", "", "",
-    "\u3000", "\r", "   ", "#不是", "+ 加号", "1) 括号", "...",
+    "\u3000", "\r", "   ", "#不是", "##概述", "#话题#", "#include x", "> #引用", "+ 加号", "1) 括号", "...",
 ]
 
 
