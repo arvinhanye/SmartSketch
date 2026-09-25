@@ -78,7 +78,9 @@
 | D-08 | 融合自动合并阈值与低置信度阈值的初始取值（沿用 `740adb` 未决问题编号，ADR-016 决定 7） | 技术负责人 | E09/E10 开工前 |
 | D-09 | 前端登录页与会话存储缺少原子任务。**已关闭**：补登 **H13 实现前端登录页与会话存储**（依赖 C13、B15、B03、B04；原子清单增至 141 项），负责登录页、`sessionStorage` 会话读写、401 清会话与课程上下文回登录页，并向 B03 的 `getAccountRole` 注入真实来源（ArvinHan，2026-09-24 确认） | 产品负责人 / 协调 Agent | 已完成 |
 | D-10 | 迁移文件编号何时确定、表间外键如何约束合并顺序。**已关闭**：编号在合并时取「main 最大编号 + 1」，原子清单中 002～009 改为 `NNN_<名称>.sql`；C02 增加对 C13 的依赖（`course_members.user_id` → `users`）。原因：C01 迁移器拒绝应用比已应用版本更小的编号，按旧计划 C13 的 `008` 先合并会使后到的 004～007 无法应用（ArvinHan，2026-09-24） | 技术负责人 | 已完成 |
-| D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（配置落地待 C13 合并） |
+| D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（C13 已合并，配置落地待认领） |
+| D-12 | Markdown 中 `#` 后不加空格的写法（如 `#第一章`）是否算标题。**已关闭**：放宽，由 D03 在 PR #191 中实现；规则保守，只作用于顶层行，不误伤 `#include`、`#1`、`#tag` 这类行，边界见 `docs/handoffs/claude-d03.md`。D03 首次合并前完成，`parser_version` 仍为 `markdown/1`（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
+| D-13 | 解析器只把标题放进章节路径、标题文字不在块正文里，抽取（D12）看不到标题。**已关闭**：由 D08 分块时在每块正文前拼上章节路径（`section_path`），解析器输出与 D01 模型不变（ArvinHan，2026-09-24） | 技术负责人 | 已完成（D08 实现） |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -339,6 +341,17 @@
 - B05 只完成后端最小启动与健康检查；父任务 M0-03 的 B06 设置加载仍待完成。A10 导入契约真源后，生成 DTO 应替换 B05 的临时响应模型。
 - Claude 审查（REVIEW-B05，2026-09-24）：无 P1/P2；P3×3（B05-R01～R03）。合入 `origin/main@dddafb3` 后 test_b05 3 passed、uvicorn 实测与契约一致、`verify.sh` 通过；见 `docs/handoffs/claude-review-b05.md`。
 
+## B07 契约门禁缺依赖假绿
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B07 | DONE（PR #187 已合入 `1d3e20c`） | 校验结果显式 PASS/SKIP/FAIL，缺依赖与坏契约失败 | Codex（后端） | `b07-main` / 初始 `origin/main@28b09b4` | `scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`src/backend/pyproject.toml`、`tests/tooling/test_b07.py`；文档 `docs/architecture.md`、本节、`docs/handoffs/codex-b07.md` | 最新主线临时合并副本：B07 14 PASS、全量 620 PASS、`./scripts/verify.sh` exit 0、diff check PASS；PR 六项 CI 全绿；[审查复核](reviews/codex-b07-pr187-2026-09-25.md)；[PR #187](https://github.com/arvinhanye/SmartSketch/pull/187)；`docs/handoffs/codex-b07.md` |
+
+- 输入：R02 审查结论与已导入 main 的契约门禁；输出：一套门禁的显式状态及后端测试依赖声明，不引入第二套校验入口。
+- 依赖：A01、B05、C13 已合入；实际合并保留 C13 的 `argon2-cffi==25.1.0` 和 B07 的三项测试依赖。
+- 验收：缺依赖、坏 `$ref`、坏关系枚举均非 0；显式骨架降级标为 `SKIP` / `INCOMPLETE`；运行 `python3 -m pytest tests/tooling/test_b07.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 结果：定向 14 项覆盖正常通过、PyYAML/OpenAPI 校验器/JSON Schema 缺依赖、显式骨架跳过、坏引用、坏枚举、畸形结构的显式 FAIL、聚合门禁状态与测试依赖；最新主线临时合并副本全仓 620 项通过，`./scripts/verify.sh` 通过。PR #187 于 2026-09-25 UTC 合入 `main@1d3e20c`。
+
 ## B06 后端设置加载与启动验证
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
@@ -504,14 +517,30 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C13 | IN PROGRESS | 实现本地账号登录与访问令牌签发 | Claude（后端子代理） | `claude/c13-auth` / `origin/main` | `src/backend/app/api/auth.py`、`src/backend/app/services/auth.py`、`src/backend/app/repositories/accounts.py`、`src/backend/migrations/NNN_accounts.sql`、`tests/backend/test_c13.py`、`src/backend/app/config.py`、`.env.example`、`docs/integrations.md`；接线所需的 `src/backend/app/main.py`；依赖变化时 `src/backend/pyproject.toml` | 待补 |
-| D01 | IN REVIEW（PR #183） | 定义解析输出与自编 fixture | Claude（数据子代理） | `claude/d01-parse-model` / `origin/main` | `src/backend/app/services/parsers/`（仅 `__init__.py`、`models.py`）、`tests/fixtures/documents/`、`tests/backend/test_d01.py` | `docs/handoffs/claude-d01.md`（PR 分支）；D01 83 passed、后端 159 passed |
+| C13 | DONE（PR #186 `6639e16`） | 实现本地账号登录与访问令牌签发 | Claude（后端子代理） | `claude/c13-auth` / `origin/main` | `src/backend/app/api/auth.py`、`src/backend/app/services/auth.py`、`src/backend/app/repositories/accounts.py`、`src/backend/migrations/NNN_accounts.sql`、`tests/backend/test_c13.py`、`src/backend/app/config.py`、`.env.example`、`docs/integrations.md`；接线所需的 `src/backend/app/main.py`；依赖变化时 `src/backend/pyproject.toml` | `docs/handoffs/claude-c13.md`；REVIEW-C13 R01～R06 已修（`9265580`、`7d8deb7`）；C13 58 passed，合入 main 后后端 474 passed，`verify.sh` exit 0；CI 三个 job 通过；#160 已关闭 |
+| D01 | DONE（PR #183 `cfec20e`） | 定义解析输出与自编 fixture | Claude（数据子代理） | `claude/d01-parse-model` / `origin/main` | `src/backend/app/services/parsers/`（仅 `__init__.py`、`models.py`）、`tests/fixtures/documents/`、`tests/backend/test_d01.py` | `docs/handoffs/claude-d01.md`；REVIEW-D01 R01～R05 已修（`74be60d`）；D01 88 passed，合并前复核后端 416 passed、`verify.sh` exit 0；CI 通过；#70 已关闭 |
 | E01 | DONE（PR #182 `dc20326`） | 建立版本化提示词装载器 | Claude（AI 子代理） | `claude/e01-prompts` / `origin/main` | `src/backend/app/services/ai/`（仅 `__init__.py`、`prompts.py`）、`prompts/`、`tests/backend/test_e01.py` | `docs/handoffs/claude-e01.md`；E01 69 passed、后端全部通过；CI 三个 job 通过 |
 | C05 | DONE（PR #181 `3f1f059`） | 实现文件落盘边界 | Claude（后端子代理） | `claude/c05-file-storage` / `origin/main` | `src/backend/app/services/file_storage.py`、`tests/backend/test_c05.py` | `docs/handoffs/claude-c05.md`；C05 61 passed、后端全部通过；CI 三个 job 通过；配置项待补（D-11） |
 
-- 进展（2026-09-24）：C05、E01 已合并；D01 已开 PR #183；C13 进行中。上传上限按 D-11 在 C13 合并后补进配置。
+- 进展（2026-09-24）：C05、E01、D01、C13 均已合并，本批完成。C13 引入的全局 422 处理器输出 `details.fields = [{in, field, reason}]`，已登记到 `src/contracts/errors.v1.md`。
+- 待认领：按 D-11 把 `UPLOAD_MAX_BYTES`、`STORAGE_DIR` 补进 `config.py`、`.env.example`、`docs/integrations.md`（C13 已释放这三个文件的锁）；D02～D05 现可并行认领（只依赖 D01）；C02、C03、C14、H13 的前置 C13 已满足。
 - 不在本批：B12（与 539210 的 B11 同改 `api.v1.yaml`）、B07（与 C13 可能同改 `pyproject.toml`）、F01（需要本机 Docker/Neo4j）。
 - 并行约束：四项都不改 `docs/tasks.md`、`docs/architecture.md`、`scripts/verify.sh`；需要改共享文件时停下来交给协调方。
+
+## 2026-09-24 解析并行批次（Claude）
+
+D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree 与分支上进行。任务板由协调方统一更新，各子任务只写自己的交接文件。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D02 | DONE（PR #190 `d2c465e`） | 实现 TXT 编码与标题解析 | Claude（数据子代理） | `claude/d02-txt-parser` / `origin/main` | `src/backend/app/services/parsers/txt.py`、`tests/backend/test_d02.py`、`docs/handoffs/claude-d02.md` | `docs/handoffs/claude-d02.md`；标准库、无新依赖；D02 94 passed，协调方复核后端 568 passed；CI 通过；#71 已关闭 |
+| D03 | IN PROGRESS | 实现 Markdown AST 解析 | Claude（数据子代理） | `claude/d03-markdown-parser` / `origin/main` | `src/backend/app/services/parsers/markdown.py`、`tests/backend/test_d03.py`、`docs/handoffs/claude-d03.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | 待补 |
+| D04 | IN PROGRESS | 实现 DOCX 段落和表格解析 | Claude（数据子代理） | `claude/d04-docx-parser` / `origin/main` | `src/backend/app/services/parsers/docx.py`、`tests/backend/test_d04.py`、`docs/handoffs/claude-d04.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | 待补 |
+| D05 | IN PROGRESS | 实现 PDF 正文与页码提取 | Claude（数据子代理） | `claude/d05-pdf-parser` / `origin/main` | `src/backend/app/services/parsers/pdf.py`、`tests/backend/test_d05.py`、`docs/handoffs/claude-d05.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | 待补 |
+
+- 依赖约定：D02 只用标准库。D03～D05 如需解析库，只选 MIT/BSD/Apache 类许可，禁用 AGPL（如 PyMuPDF），版本固定为 `==`，只在 `dependencies` 加一行，不动 `test` 组（B07 PR #187 在改 `test` 组）。三者在 `pyproject.toml` 若有文本冲突，由协调方在合并时顺序解决。选库理由写入各自交接，由协调方统一登记到 `docs/integrations.md`。
+- 共享文件不改：`parsers/__init__.py`、`parsers/models.py`、`tests/fixtures/documents/`、`docs/tasks.md`、`docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`。测试用的 DOCX/PDF 在测试里生成到 `tmp_path`，不入库。需要改共享文件时，停下来交给协调方。
+- D05 须给 D06（PDF 标题判定）留下逐行的字号和字重信息，D07 需要的逐页行也要能取到；接口形状写入 D05 交接。
 
 ## REQ-01 赛题抽取硬指标补登
 
