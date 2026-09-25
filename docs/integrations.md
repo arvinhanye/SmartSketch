@@ -128,6 +128,19 @@
 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 整数 ≥ 1 | `28800` | 访问令牌有效期（秒），即 `LoginResponse.expires_in` 与 `exp - iat`；无刷新令牌 | 已签收（ADR-013） |
 | `SEED_DEMO_PASSWORD` | 密钥；仅种子脚本读取 | 不设（`.env.example` 中为注释行） | 演示账号口令；未设置时种子脚本非 0 退出，不回退仓库内默认口令。由 C14 实现；不是 API 设置，因此不进 `Settings` | 本机填写 |
 
+### 文档解析依赖（D02～D05）
+
+解析器统一输出 D01 的 `ParsedDocument`，定位规则见 `docs/architecture.md`「解析输出与来源定位（D01）」。版本固定在 `src/backend/pyproject.toml` 的 `dependencies`，只选 MIT、BSD、Apache 类许可，禁用 AGPL（如 PyMuPDF）。
+
+| 格式 | 解析器 | 依赖与许可 | 说明 |
+| --- | --- | --- | --- |
+| TXT | `parsers/txt.py`（`txt/1`） | 仅标准库 | UTF-8（含 BOM）优先，失败再严格按 GBK 解码 |
+| Markdown | `parsers/markdown.py`（`markdown/1`） | `markdown-it-py==4.2.0`（MIT），连带 `mdurl`（MIT） | CommonMark 加 GFM 表格；D-12 放宽 `#` 后无空格的标题写法 |
+| DOCX | `parsers/docx.py`（`docx/1`） | 仅标准库（`zipfile`、`xml.etree`） | 拒绝 DOCTYPE，单个部件解压后上限 64 MiB；不用 python-docx，因为标题要按样式 ID、`outlineLvl`、`basedOn` 判定 |
+| PDF | `parsers/pdf.py`（`pdf/1`） | `pdfminer.six==20260107`（MIT），连带 `cryptography`（Apache-2.0 或 BSD-3-Clause）、`charset-normalizer`（MIT） | 版面分析给出逐行字号、字重和坐标，供 D06、D07 使用；不解密，带加密字典即报 `encrypted`（D-14 待定）；无 OCR |
+
+`cryptography` 是 pdfminer.six 的强制依赖，本项目代码不调用它解密。
+
 ## 模型接入规则（A07）
 
 本节是上面「模型模式」至「向量模型」各变量的行为约定，消费方为 B06（设置加载）、D09（缓存键）、E03（兼容适配器）、E04（重试/熔断/预算）、E07（向量适配）、E12（抽取并发）、J03/J05（问答调用）与 K08（容器环境）。取值未签收不影响按本节形状实现与 fake 测试。
@@ -231,4 +244,3 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 | Neo4j | 课程知识图谱、向量索引、前置关系遍历 | 明确本地容器/服务版本与备份策略；向量索引维度须等于签收后的 `EMBEDDING_DIMENSIONS` |
 | OpenAI 兼容 LLM API | 抽取、问答、改写、裁决 | 配置形状与切换/预算规则见「模型接入规则（A07）」；取值待 D-02a、D-02b、D-02d、D-02e 签收；脱敏策略未定 |
 | 向量模型 API / 本地模型 | 知识点融合与来源片段检索 | 方案、模型与维度待 D-02c 签收；维度定稿后才能建 Neo4j 向量索引 |
-| 文档解析库 | PDF/DOCX/TXT/Markdown 解析 | 确认页码/标题定位保留方式 |
