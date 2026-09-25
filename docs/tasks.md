@@ -1,5 +1,13 @@
 # 任务看板
 
+## 2026-09-25 并行认领批次
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（唯一写入者） | 证据 / 同步状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B14 | IN PROGRESS | 建立契约导出与漂移检查 | ArvinHan（Codex 子代理） | `codex/b14-contract-drift` / `8c94e46` | `scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b14.py`、`docs/handoffs/codex-b14.md` | 依赖 B09–B13 在基线中存在；Issue #56 打开、未分配；GitHub issue 更新返回 403，认领暂记入本地任务板。
+| D08 | IN PROGRESS | 实现章节内语义分块 | ArvinHan（Codex 子代理） | `codex/d08-semantic-chunking` / `8c94e46` | `src/backend/app/services/chunking.py`、`tests/backend/test_d08.py`、`docs/handoffs/codex-d08.md` | 依赖 D02/D03/D04/D06/D07 在基线中存在；D-13 已定章节路径前缀；Issue #77 打开、未分配；GitHub issue 更新返回 403，认领暂记入本地任务板。
+
+
 ## B12 进度与推荐契约（2026-09-25）
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
