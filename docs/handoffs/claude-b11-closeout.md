@@ -9,7 +9,7 @@
 | PR | 审查结论 | 结果 |
 | --- | --- | --- |
 | #194 B11 图谱编辑与版本契约 | 通过。`Relation`、`GraphVersion` 拆成的两个分支互斥（`additionalProperties: false` 加上各自的必填或常量字段）；`KnowledgePointUpdate` 必须带 `expected_revision` 和至少一个修改字段；`PUBLISH_BLOCKED` 返回结构化原因；草稿写入端点和回滚端点声明了 409 | 已合并，`2de97ba` |
-| #196 REQ-01 补登抽取硬指标 | 通过（只改文档） | **未合并**：合并前 PR #199 抢先入 main，占用了决策编号 D-14，#196 与 main 在 `docs/tasks.md` 冲突。解决方案见下 |
+| #196 REQ-01 补登抽取硬指标 | 通过（只改文档） | 已合并，`a83ddd0`。合并前 PR #199 抢先入 main，占用了决策编号 D-14，#196 与 main 在 `docs/tasks.md` 冲突；按下文「#196 冲突处理」解决后合并 |
 
 合并前验证：把 #196、#194 依次临时合到 `a08bd5b` 上（scratchpad 独立副本，已包含 D05）：
 
@@ -29,12 +29,13 @@
 - `docs/tasks.md`：B11 → `DONE（PR #194 2de97ba）`，补协调方复核证据和合并后遗留事项；「A02-R01 → B11」标为已完成。B11 这一节仍在文件开头（Codex 放的位置），为了不和 #196 在文件末尾再冲突，这次不挪。
 - GitHub：关闭 issue #53（B11）；关闭 PR #198（内容已被 #199 完整取代）。
 
-## #196 待办（需人工决定）
+## #196 冲突处理（已完成）
 
-冲突解决方案已在 scratchpad 做好，但推送到 #196 的分支 `claude/pdf-course-model-training-0b0f46` 时被权限拦下（该分支正被另一个工作目录 `worktree-meaning-7a61bc` 检出）：
+经 ArvinHan 授权，推送到 #196 的分支 `claude/pdf-course-model-training-0b0f46`（快进推送，`b8de6a3` → `2f1d3d6`）。该分支同时被工作目录 `worktree-meaning-7a61bc` 检出，那边需要 `git pull` 才能跟上：
 
 1. 合并 `origin/main` 到 #196，`docs/tasks.md` 两处冲突都保留双方内容：main 的内容在前，REQ-01 的在后。
 2. REQ-01 的决策从 D-14 改号为 **D-15**，同步修改 `docs/tasks.md` 的决策表行和 REQ-01 节，`specs/course-knowledge-graph.md` 验收 7，以及 `docs/handoffs/claude-req-01.md`。
+3. 再合入含 B11 的 `origin/main@2de97ba`，没有冲突。合并后的树：`./scripts/verify.sh` exit 0，`validate_atomic_plan.py` PASS（141 项），`git diff --check` 通过；PR CI 6 项通过。
 
 ## 风险
 
