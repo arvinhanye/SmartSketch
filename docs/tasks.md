@@ -596,7 +596,7 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D-11 落地 | DONE（待 PR 审查/合并） | 把 `STORAGE_DIR`、`UPLOAD_MAX_BYTES` 补进设置、示例与集成登记 | Claude（协调方） | `claude/d11-upload-config` / `04f8ac6` | `src/backend/app/config.py`、`.env.example`、`docs/integrations.md`（应用运行与存储表、启动校验）、`tests/backend/test_d11_upload_config.py`、本节与 D-11 行、`docs/handoffs/claude-d11-upload-config.md` | `docs/handoffs/claude-d11-upload-config.md`；先红 10 failed，后绿 D-11 10 passed；后端全量 730 passed |
+| D-11 落地 | DONE（PR #205 `50dca8c`） | 把 `STORAGE_DIR`、`UPLOAD_MAX_BYTES` 补进设置、示例与集成登记 | Claude（协调方） | `claude/d11-upload-config` / `04f8ac6` | `src/backend/app/config.py`、`.env.example`、`docs/integrations.md`（应用运行与存储表、启动校验）、`tests/backend/test_d11_upload_config.py`、本节与 D-11 行、`docs/handoffs/claude-d11-upload-config.md` | `docs/handoffs/claude-d11-upload-config.md`；先红 10 failed，后绿 D-11 10 passed；后端全量 730 passed |
 
 - 输入：D-11（50 MiB、变量名 `UPLOAD_MAX_BYTES`）；`STORAGE_DIR=./storage` 沿用 740adb（A10 导入映射「批 2 只取 `STORAGE_DIR`」）。输出：`Settings.STORAGE_DIR`、`Settings.UPLOAD_MAX_BYTES`，C06/C07 按 `FileStorage(settings.STORAGE_DIR, max_bytes=settings.UPLOAD_MAX_BYTES)` 使用。
 - 验收：缺省值与 D-11 一致；0、负数、小数、带单位、空串拒绝并指出变量名；空白 `STORAGE_DIR` 拒绝；设置值能直接构造 `FileStorage` 并在超限时给出 `limit_bytes`；`.env.example` 覆盖全部设置（B06 回归）。
@@ -605,7 +605,17 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 验收条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C06 | READY FOR REVIEW（PR #209） | 实现资料和任务创建事务 | Codex（后端） | `.claude/worktrees/c06-material-task-transaction`，分支 `codex/c06-material-task-transaction` / `origin/main@50dca8c` | `src/backend/app/repositories/materials.py`、`src/backend/app/repositories/tasks.py`、`src/backend/migrations/003_tasks.sql`、`tests/backend/test_c06.py`、`tests/backend/test_c13.py`（范围扩展：仅更新新增 003 后的默认迁移序列断言）、`docs/handoffs/codex-c06.md` | 原子创建、回滚、课程隔离幂等与按课程限定读取已验证；C06 7 passed；后端 737 passed（1 条既有 Starlette/httpx 弃用警告）；`./scripts/verify.sh` 与 `git diff --check` 通过。交接：`docs/handoffs/codex-c06.md`；实现锚点 `7117683`；课程隔离评审修正 `34c73c9`；PR #209。迁移编号按 D-10 于合并时复核。 |
+| C06 | READY FOR REVIEW（PR #209） | 实现资料和任务创建事务 | Codex（后端） | `.claude/worktrees/c06-material-task-transaction`，分支 `codex/c06-material-task-transaction` / `origin/main@a80519c` | `src/backend/app/repositories/materials.py`、`src/backend/app/repositories/tasks.py`、`src/backend/migrations/003_tasks.sql`、`tests/backend/test_c06.py`、`tests/backend/test_c13.py`（范围扩展：仅更新新增 003 后的默认迁移序列断言）、`docs/handoffs/codex-c06.md` | 原子创建、回滚、课程隔离幂等与按课程限定读取已验证；C06 7 passed；后端 763 passed（1 条既有 Starlette/httpx 弃用警告）；`./scripts/verify.sh` 与 `git diff --check` 通过。交接：`docs/handoffs/codex-c06.md`；实现锚点 `7117683`；课程隔离评审修正 `34c73c9`；PR #209。迁移编号按 D-10 已对 `origin/main@a80519c` 复核，最大版本仍为 002。 |
 
 - 输入 / 输出：接收已校验的文件元数据，原子地产生 material 与 queued task。依赖 C01、B10 均已合入 `origin/main`；C05 已合入，上传 API 留给 C07。
 - 风险 / 回滚：C13 默认迁移序列测试随新增 003 更新，范围扩展仅限其期望序列；其余只写入上列文件。迁移需遵循 C01 停机、备份与恢复流程；合并前若编号冲突，按 D-10 改号并重跑迁移测试。C07 需在幂等重放时删除新落盘的未引用文件；再处理与 parse_status 语义留待 C07。
+
+## C14 账号管理命令与演示账号种子
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C14 | DONE（PR #210） | 实现账号管理命令与演示账号种子 | Claude | `claude/c14-account-seed` / `04f8ac6` | `scripts/manage-accounts.py`、`scripts/seed-demo-accounts.py`、`tests/backend/test_c14.py`；**范围扩展**（后端分层规则要求业务放 services、持久化放 repositories，#161 已登记）：`src/backend/app/services/account_admin.py`（新建）、`src/backend/app/repositories/accounts.py`（只追加函数）；`docs/integrations.md`（本地账号登录节）、本节、`docs/handoffs/claude-c14.md` | `docs/handoffs/claude-c14.md`；C14 26 passed（先红：缺模块收集失败，后续逐步转绿）；9 处反向篡改中 7 处被抓到，另 2 处是等价变异（原因见交接）；后端全量 746 passed；`verify.sh` exit 0 |
+
+- 输入：`specs/identity-access.md` §1.1、§1.2（ADR-013）；C13 的 `create_account` 与 `users` 表。输出：两个命令脚本，以及服务函数 `set_disabled`、`reset_password`、`list_accounts`、`seed_demo_accounts`。
+- 验收：创建和停用都能用 `list` 复查；重复停用保留首次时间；重复种子不新增、不改已有口令和停用状态；缺少或空白的 `SEED_DEMO_PASSWORD` 非 0 退出且不写库；同名账号类型不符整批拒绝；未迁移的库非 0 退出且不建库文件；口令不作为命令行参数，也不出现在任何输出里。
+- 不在本任务：协作教师经命令行加入课程（§3.3）需要 C02 的课程和成员表，交 C02/C15。

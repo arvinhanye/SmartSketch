@@ -5,7 +5,8 @@
 - `pull_request`: https://github.com/arvinhanye/SmartSketch/pull/209
 - `worktree`: `/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/c06-material-task-transaction`
 - `branch`: `codex/c06-material-task-transaction`
-- `base_commit`: `50dca8c`（评审时最新 `origin/main`；已将分支 rebase 到此基线）
+- `base_commit`: `50dca8c`（先 rebase 到该基线）
+- `integration_main`: `a80519c`（PR #210 已合入后同步；分支含该 main 提交）
 - `review_commit`: `7117683`（rebase 后 C06 实现与测试）；课程隔离评审修正：`34c73c9`
 - `scope`: 资料仓储、任务仓储、`003_tasks.sql`、C06 测试；另将 C13 迁移测试中的默认迁移序列断言同步到 003，并将材料/任务读取强制限定到 `course_id`；原因和文件锁扩展已写入 `docs/tasks.md`。
 
@@ -16,12 +17,12 @@
 - `003_tasks.sql` 建立 `materials` 与 `processing_tasks`，任务对资料使用 `(course_id, document_id)` 外键，并以 `UNIQUE(course_id, idempotency_key)` 隔离幂等键。
 - 同课程重复键返回既有 material/task，并标记 `created=False`；不同课程可使用相同键创建各自记录。上传调用方遇到重放时，应删除这次新落盘但未被引用的存储文件。
 - 资料初始 `parse_status` 为 `queued`。再处理入口及 `Document.parse_status` 后续跟随哪个任务仍留给 C07 范围决议；本任务没有加再处理路径。
-- 迁移号按 D-10 以 `origin/main@50dca8c` 的最大迁移 `002` 选为 `003`；若合并前 main 新增更高编号，按 D-10 重新编号并重跑迁移测试。
+- 迁移号按 D-10 以 `origin/main@a80519c` 的最大迁移 `002` 选为 `003`；若合并前 main 新增更高编号，按 D-10 重新编号并重跑迁移测试。
 
 ## 验证（实际结果）
 
 - `PATH=/private/tmp/c06-venv/bin:$PATH PYTHONPATH=src/backend python3 -m pytest -p no:cacheprovider tests/backend/test_c06.py -q`：`7 passed`（包括读取必须带课程范围及跨课程不可见）。
-- `PATH=/private/tmp/c06-venv/bin:$PATH PYTHONPATH=src/backend python3 -m pytest -p no:cacheprovider tests/backend -q`：`737 passed, 1 warning`。警告为现有 Starlette/httpx TestClient 弃用提示。
+- `PATH=/private/tmp/c06-venv/bin:$PATH PYTHONPATH=src/backend python3 -m pytest -p no:cacheprovider tests/backend -q`：`763 passed, 1 warning`。警告为现有 Starlette/httpx TestClient 弃用提示。
 - `PATH=/private/tmp/c06-venv/bin:$PATH ./scripts/verify.sh`：`Scaffold verification passed`；契约门禁、24 项负例、B08/B09/B10/B13 回归均通过。
 - 代码审查发现并修正 I7 读取范围缺口；目标测试先按预期失败，再通过。
 - `git diff --check`：通过。
