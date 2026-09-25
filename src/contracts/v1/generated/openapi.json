@@ -760,6 +760,7 @@
           "graph"
         ],
         "summary": "新增知识点（教师）",
+        "description": "草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。",
         "operationId": "createKnowledgePoint",
         "requestBody": {
           "required": true,
@@ -787,6 +788,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
@@ -837,7 +841,7 @@
           "graph"
         ],
         "summary": "修改知识点（教师）",
-        "description": "修改成功后 `locked` 置为 true，后续自动流程不再覆盖。",
+        "description": "请求必须携带节点级 `expected_revision`；与当前 `revision` 不一致时 409，\n不覆盖先前写入。修改成功后修订号递增，`locked` 置为 true，后续自动流程不再覆盖。\n",
         "operationId": "updateKnowledgePoint",
         "requestBody": {
           "required": true,
@@ -869,6 +873,9 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
           "422": {
             "$ref": "#/components/responses/ValidationError"
           }
@@ -879,6 +886,7 @@
           "graph"
         ],
         "summary": "删除知识点及其关系（教师）",
+        "description": "草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。",
         "operationId": "deleteKnowledgePoint",
         "responses": {
           "401": {
@@ -892,6 +900,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -998,7 +1009,7 @@
           "graph"
         ],
         "summary": "新增关系（教师）",
-        "description": "新增 `PREREQUISITE` 前执行 DAG 环检测；成环返回 `CYCLE_DETECTED`，\n并在 `details.cycle` 给出导致冲突的节点链路（规格验收条件 4）。\n",
+        "description": "草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。\n新增 `PREREQUISITE` 前执行 DAG 环检测；成环返回 `CYCLE_DETECTED`，\n并在 `details.cycle` 给出导致冲突的节点链路（规格验收条件 4）。\n",
         "operationId": "createRelation",
         "requestBody": {
           "required": true,
@@ -1050,7 +1061,7 @@
           "graph"
         ],
         "summary": "修改关系类型或方向（教师）",
-        "description": "改为或改动 `PREREQUISITE` 时同样执行环检测。",
+        "description": "草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。改为或改动 `PREREQUISITE` 时同样执行环检测。",
         "operationId": "updateRelation",
         "requestBody": {
           "required": true,
@@ -1092,6 +1103,7 @@
           "graph"
         ],
         "summary": "删除关系（教师）",
+        "description": "草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。",
         "operationId": "deleteRelation",
         "responses": {
           "401": {
@@ -1105,6 +1117,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -1173,7 +1188,21 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "`PUBLISH_BLOCKED`（发布集合校验失败）返回结构化 `details.reasons`；\n`PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 保持通用冲突响应。\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PublishBlockedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublishConflictError"
+                    }
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -1253,6 +1282,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -1690,6 +1722,132 @@
           "COURSE_BUSY",
           "BUDGET_EXCEEDED"
         ]
+      },
+      "PublishBlockedReason": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PublishBlockedCycleReason"
+          },
+          {
+            "$ref": "#/components/schemas/PublishBlockedOtherReason"
+          }
+        ]
+      },
+      "PublishBlockedCycleReason": {
+        "type": "object",
+        "description": "ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。",
+        "required": [
+          "kind",
+          "cycle"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "cycle"
+          },
+          "cycle": {
+            "type": "array",
+            "minItems": 2,
+            "x-closed-cycle": true,
+            "description": "首尾为同一个知识点 ID。",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "PublishBlockedOtherReason": {
+        "type": "object",
+        "description": "ADR-012 V3 的其他发布校验原因；可附对象 ID 定位。",
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "dangling_endpoint",
+              "invalid_source_ref",
+              "empty_graph",
+              "invalid_lineage"
+            ]
+          },
+          "relation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kp_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "chunk_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "PublishBlockedError": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "PUBLISH_BLOCKED"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "details": {
+            "$ref": "#/components/schemas/PublishBlockedDetails"
+          }
+        }
+      },
+      "PublishBlockedDetails": {
+        "type": "object",
+        "required": [
+          "reasons"
+        ],
+        "properties": {
+          "reasons": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PublishBlockedReason"
+            }
+          }
+        }
+      },
+      "PublishConflictError": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "PUBLISH_IN_PROGRESS",
+              "COURSE_BUSY"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
       },
       "Role": {
         "type": "string",
@@ -2663,7 +2821,8 @@
           "confidence",
           "status",
           "source",
-          "locked"
+          "locked",
+          "revision"
         ],
         "properties": {
           "id": {
@@ -2723,6 +2882,11 @@
             "type": "boolean",
             "description": "true 时不被后续自动抽取/融合流程覆盖"
           },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "节点级乐观并发修订号；不同于课程 draft_revision。"
+          },
           "source_refs": {
             "type": "array",
             "items": {
@@ -2742,6 +2906,13 @@
               "source_refs"
             ],
             "properties": {
+              "source_refs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/components/schemas/SourceRef"
+                }
+              },
               "prerequisites": {
                 "type": "array",
                 "description": "直接前置知识点",
@@ -2824,39 +2995,138 @@
         }
       },
       "KnowledgePointUpdate": {
-        "type": "object",
-        "description": "至少提供一个字段",
-        "minProperties": 1,
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
+        "description": "必带 expected_revision，且至少提供一个可修改字段。",
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "expected_revision"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "expected_revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "type": {
+                "$ref": "#/components/schemas/KnowledgePointType"
+              },
+              "definition": {
+                "type": "string"
+              },
+              "importance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "difficulty": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "status": {
+                "$ref": "#/components/schemas/KnowledgePointStatus"
+              }
             }
           },
-          "type": {
-            "$ref": "#/components/schemas/KnowledgePointType"
-          },
-          "definition": {
-            "type": "string"
-          },
-          "importance": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "difficulty": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "status": {
-            "$ref": "#/components/schemas/KnowledgePointStatus"
+          {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "aliases"
+                ],
+                "properties": {
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "$ref": "#/components/schemas/KnowledgePointType"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "definition"
+                ],
+                "properties": {
+                  "definition": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "importance"
+                ],
+                "properties": {
+                  "importance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "difficulty"
+                ],
+                "properties": {
+                  "difficulty": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/KnowledgePointStatus"
+                  }
+                }
+              }
+            ]
           }
-        }
+        ]
       },
       "MergeRequest": {
         "type": "object",
@@ -2879,6 +3149,16 @@
         }
       },
       "Relation": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RelationStandard"
+          },
+          {
+            "$ref": "#/components/schemas/RelationDowngraded"
+          }
+        ]
+      },
+      "RelationStandard": {
         "type": "object",
         "required": [
           "id",
@@ -2886,8 +3166,12 @@
           "type",
           "from_id",
           "to_id",
-          "confidence"
+          "confidence",
+          "status",
+          "source",
+          "source_refs"
         ],
+        "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
@@ -2899,10 +3183,12 @@
             "$ref": "#/components/schemas/RelationType"
           },
           "from_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "to_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "confidence": {
             "type": "number",
@@ -2923,6 +3209,77 @@
           }
         }
       },
+      "RelationDowngraded": {
+        "type": "object",
+        "required": [
+          "id",
+          "course_id",
+          "type",
+          "from_id",
+          "to_id",
+          "confidence",
+          "status",
+          "source",
+          "source_refs",
+          "downgraded_from_type",
+          "downgrade_cycle"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "course_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "const": "RELATED_TO"
+          },
+          "from_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "status": {
+            "type": "string",
+            "const": "low_confidence"
+          },
+          "source": {
+            "type": "string",
+            "const": "ai"
+          },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            }
+          },
+          "downgraded_from_type": {
+            "type": "string",
+            "const": "PREREQUISITE",
+            "description": "仅自动成环降级时返回；原关系类型。"
+          },
+          "downgrade_cycle": {
+            "type": "array",
+            "minItems": 2,
+            "x-closed-cycle": true,
+            "description": "仅自动成环降级时返回；触发降级的知识点 ID 环路。",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
       "RelationCreate": {
         "type": "object",
         "required": [
@@ -2935,10 +3292,12 @@
             "$ref": "#/components/schemas/RelationType"
           },
           "from_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "to_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         }
       },
@@ -2950,10 +3309,12 @@
             "$ref": "#/components/schemas/RelationType"
           },
           "from_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "to_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "status": {
             "$ref": "#/components/schemas/KnowledgePointStatus"
@@ -3004,6 +3365,7 @@
         "required": [
           "format_version",
           "course_id",
+          "graph_version",
           "generated_at",
           "nodes",
           "edges"
@@ -3097,11 +3459,23 @@
         }
       },
       "GraphVersion": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PublishedGraphVersion"
+          },
+          {
+            "$ref": "#/components/schemas/RollbackGraphVersion"
+          }
+        ]
+      },
+      "PublishedGraphVersion": {
         "type": "object",
         "required": [
           "version",
-          "published_at"
+          "published_at",
+          "kind"
         ],
+        "additionalProperties": false,
         "properties": {
           "version": {
             "type": "integer",
@@ -3110,6 +3484,51 @@
           "published_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "const": "publish"
+          },
+          "node_count": {
+            "type": "integer"
+          },
+          "edge_count": {
+            "type": "integer"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RollbackGraphVersion": {
+        "type": "object",
+        "required": [
+          "version",
+          "published_at",
+          "kind",
+          "source_version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "const": "rollback"
+          },
+          "source_version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "被回滚到的历史版本号。"
           },
           "node_count": {
             "type": "integer"
@@ -3129,7 +3548,9 @@
         "type": "object",
         "required": [
           "version",
-          "published_at"
+          "published_at",
+          "unchanged",
+          "excluded"
         ],
         "properties": {
           "version": {
@@ -3139,8 +3560,37 @@
             "type": "string",
             "format": "date-time"
           },
+          "unchanged": {
+            "type": "boolean",
+            "description": "内容摘要与当前发布版本相同时为 true，不分配新版本号。"
+          },
+          "excluded": {
+            "$ref": "#/components/schemas/PublishExcluded"
+          },
           "stats": {
             "$ref": "#/components/schemas/GraphStats"
+          }
+        }
+      },
+      "PublishExcluded": {
+        "type": "object",
+        "required": [
+          "low_confidence_nodes",
+          "low_confidence_edges",
+          "cascaded_edges"
+        ],
+        "properties": {
+          "low_confidence_nodes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "low_confidence_edges": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cascaded_edges": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },

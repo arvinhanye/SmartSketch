@@ -1,5 +1,15 @@
 # 任务看板
 
+## B11 图谱编辑与版本契约（2026-09-24）
+
+| ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| B11 | DONE（待 PR 审查/合并） | 迁移图谱编辑、关系降级及版本发布契约 | Codex（`arvinhanye`） | `src/contracts/api.v1.yaml`、生成物、`tests/contracts/test_b11.py`、相关规格；补节点修订号与编辑前置条件、关系来源及降级解释、发布/回滚结构化响应；负例与生成一致性 | B11 30 passed、契约全量 162 passed、`./scripts/verify.sh` exit 0、`./scripts/gen-contracts.sh --check` exit 0、`git diff --check` exit 0；`docs/handoffs/codex-b11.md` |
+
+- 输入：ADR-009、ADR-012（含修订 3）、A02-R01、B08 真源；输出：B11 YAML 真源、全量生成物、契约测试与交接。
+- 依赖：B08、A04 已入 main；B12 暂不占用 YAML 锁。风险：新增必填响应字段影响未来实现方；`merged_from` 与 `commit_seq` 只属内部快照/存储，不泄露到 wire DTO。
+- 验证：`python3 -m pytest tests/contracts/test_b11.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+
 > 状态：`TODO` → `IN PROGRESS` → `BLOCKED` / `DONE`。认领或完成任务时更新本表；每个 DONE 项必须指向验收证据和交接文件。
 
 ## 当前里程碑：M0 协作与应用骨架

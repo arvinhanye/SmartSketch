@@ -71,6 +71,7 @@
 ## 待细化
 
 - API 前缀已定为 `/api/v1`（A02 / ADR-009）；状态 DTO 与错误码以 `src/contracts/api.v1.yaml` 为准（目前在 `740adb` 分支，随 A10 导入 main）。
-- **降级边的来源标记（交 B11）**：`Relation` 目前没有字段记录「原为 `PREREQUISITE`、因哪条环降级」，审核队列无法向教师解释为何出现一条 `RELATED_TO`。须先在 `api.v1.yaml` 增加字段（例如原类型与环路）并重新生成，F13 才能实现降级；不得用 `definition` 等自由文本字段临时承载。
-- 降级条数是否计入任务统计：`TaskCounts` 暂无对应字段，随上一条同批决定。
+- **B11 降级边来源标记**：仅自动成环降级的关系返回 `downgraded_from_type: PREREQUISITE` 与 `downgrade_cycle`（首尾同节点的 `kp_id` 链，至少两项）；普通关系不带这两个字段。审核队列复用 `Relation`，教师可据此解释 `RELATED_TO` 的来源；不把环路塞进自由文本。F13 写入两字段并送审。
+- `downgrade_cycle` 首尾同 ID 是跨数组元素等值约束，JSON Schema 不负责比较；F13 在持久化与序列化前必须验证，契约以 `x-closed-cycle: true` 标记这一服务端不变量。
+- 降级条数不纳入 `TaskCounts`：审核队列可按上述标记统计，任务阶段计数仍只表示处理量，避免重复的派生计数。
 - 节点融合阈值、低置信度阈值和版本回滚交互由 M1 设计时补入。

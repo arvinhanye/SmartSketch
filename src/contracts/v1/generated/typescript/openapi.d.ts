@@ -297,7 +297,10 @@ export interface paths {
          */
         get: operations["listKnowledgePoints"];
         put?: never;
-        /** 新增知识点（教师） */
+        /**
+         * 新增知识点（教师）
+         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         */
         post: operations["createKnowledgePoint"];
         delete?: never;
         options?: never;
@@ -323,13 +326,18 @@ export interface paths {
         get: operations["getKnowledgePoint"];
         put?: never;
         post?: never;
-        /** 删除知识点及其关系（教师） */
+        /**
+         * 删除知识点及其关系（教师）
+         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         */
         delete: operations["deleteKnowledgePoint"];
         options?: never;
         head?: never;
         /**
          * 修改知识点（教师）
-         * @description 修改成功后 `locked` 置为 true，后续自动流程不再覆盖。
+         * @description 请求必须携带节点级 `expected_revision`；与当前 `revision` 不一致时 409，
+         *     不覆盖先前写入。修改成功后修订号递增，`locked` 置为 true，后续自动流程不再覆盖。
+         *
          */
         patch: operations["updateKnowledgePoint"];
         trace?: never;
@@ -395,7 +403,8 @@ export interface paths {
         put?: never;
         /**
          * 新增关系（教师）
-         * @description 新增 `PREREQUISITE` 前执行 DAG 环检测；成环返回 `CYCLE_DETECTED`，
+         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         *     新增 `PREREQUISITE` 前执行 DAG 环检测；成环返回 `CYCLE_DETECTED`，
          *     并在 `details.cycle` 给出导致冲突的节点链路（规格验收条件 4）。
          *
          */
@@ -420,13 +429,16 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** 删除关系（教师） */
+        /**
+         * 删除关系（教师）
+         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         */
         delete: operations["deleteRelation"];
         options?: never;
         head?: never;
         /**
          * 修改关系类型或方向（教师）
-         * @description 改为或改动 `PREREQUISITE` 时同样执行环检测。
+         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。改为或改动 `PREREQUISITE` 时同样执行环检测。
          */
         patch: operations["updateRelation"];
         trace?: never;
@@ -615,6 +627,39 @@ export interface components {
          * @enum {string}
          */
         ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED";
+        PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
+        /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
+        PublishBlockedCycleReason: {
+            /** @constant */
+            kind: "cycle";
+            /** @description 首尾为同一个知识点 ID。 */
+            cycle: string[];
+        };
+        /** @description ADR-012 V3 的其他发布校验原因；可附对象 ID 定位。 */
+        PublishBlockedOtherReason: {
+            /** @enum {string} */
+            kind: "dangling_endpoint" | "invalid_source_ref" | "empty_graph" | "invalid_lineage";
+            relation_id?: string;
+            kp_id?: string;
+            chunk_id?: string;
+        };
+        PublishBlockedError: {
+            /** @constant */
+            code: "PUBLISH_BLOCKED";
+            message: string;
+            details: components["schemas"]["PublishBlockedDetails"];
+        };
+        PublishBlockedDetails: {
+            reasons: components["schemas"]["PublishBlockedReason"][];
+        };
+        PublishConflictError: {
+            /** @enum {string} */
+            code: "PUBLISH_IN_PROGRESS" | "COURSE_BUSY";
+            message: string;
+            details?: {
+                [key: string]: unknown;
+            };
+        };
         /** @enum {string} */
         Role: "teacher" | "student";
         LoginRequest: {
@@ -957,9 +1002,12 @@ export interface components {
             source: components["schemas"]["NodeSource"];
             /** @description true 时不被后续自动抽取/融合流程覆盖 */
             locked: boolean;
+            /** @description 节点级乐观并发修订号；不同于课程 draft_revision。 */
+            revision: number;
             source_refs?: components["schemas"]["SourceRef"][];
         };
         KnowledgePointDetail: components["schemas"]["KnowledgePoint"] & {
+            source_refs: components["schemas"]["SourceRef"][];
             /** @description 直接前置知识点 */
             prerequisites?: components["schemas"]["KnowledgePointRef"][];
             /** @description 直接后继知识点 */
@@ -980,8 +1028,9 @@ export interface components {
             importance?: number;
             difficulty?: number;
         };
-        /** @description 至少提供一个字段 */
+        /** @description 必带 expected_revision，且至少提供一个可修改字段。 */
         KnowledgePointUpdate: {
+            expected_revision: number;
             name?: string;
             aliases?: string[];
             type?: components["schemas"]["KnowledgePointType"];
@@ -989,22 +1038,58 @@ export interface components {
             importance?: number;
             difficulty?: number;
             status?: components["schemas"]["KnowledgePointStatus"];
-        };
+        } & ({
+            name: string;
+        } | {
+            aliases: string[];
+        } | {
+            type: components["schemas"]["KnowledgePointType"];
+        } | {
+            definition: string;
+        } | {
+            importance: number;
+        } | {
+            difficulty: number;
+        } | {
+            status: components["schemas"]["KnowledgePointStatus"];
+        });
         MergeRequest: {
             /** @description 保留的主节点；其名称成为主名 */
             primary_id: string;
             merged_ids: string[];
         };
-        Relation: {
+        Relation: components["schemas"]["RelationStandard"] | components["schemas"]["RelationDowngraded"];
+        RelationStandard: {
             id: string;
             course_id: string;
             type: components["schemas"]["RelationType"];
             from_id: string;
             to_id: string;
             confidence: number;
-            status?: components["schemas"]["KnowledgePointStatus"];
-            source?: components["schemas"]["NodeSource"];
-            source_refs?: components["schemas"]["SourceRef"][];
+            status: components["schemas"]["KnowledgePointStatus"];
+            source: components["schemas"]["NodeSource"];
+            source_refs: components["schemas"]["SourceRef"][];
+        };
+        RelationDowngraded: {
+            id: string;
+            course_id: string;
+            /** @constant */
+            type: "RELATED_TO";
+            from_id: string;
+            to_id: string;
+            confidence: number;
+            /** @constant */
+            status: "low_confidence";
+            /** @constant */
+            source: "ai";
+            source_refs: components["schemas"]["SourceRef"][];
+            /**
+             * @description 仅自动成环降级时返回；原关系类型。
+             * @constant
+             */
+            downgraded_from_type: "PREREQUISITE";
+            /** @description 仅自动成环降级时返回；触发降级的知识点 ID 环路。 */
+            downgrade_cycle: string[];
         };
         RelationCreate: {
             type: components["schemas"]["RelationType"];
@@ -1039,7 +1124,7 @@ export interface components {
             format_version: "1.0";
             course_id: string;
             /** @description 已发布版本号；草稿为 null */
-            graph_version?: number | null;
+            graph_version: number | null;
             /** Format: date-time */
             generated_at: string;
             chapters?: components["schemas"]["Chapter"][];
@@ -1055,10 +1140,25 @@ export interface components {
             }[];
             isolated_nodes: components["schemas"]["KnowledgePointRef"][];
         };
-        GraphVersion: {
+        GraphVersion: components["schemas"]["PublishedGraphVersion"] | components["schemas"]["RollbackGraphVersion"];
+        PublishedGraphVersion: {
             version: number;
             /** Format: date-time */
             published_at: string;
+            /** @constant */
+            kind: "publish";
+            node_count?: number;
+            edge_count?: number;
+            note?: string | null;
+        };
+        RollbackGraphVersion: {
+            version: number;
+            /** Format: date-time */
+            published_at: string;
+            /** @constant */
+            kind: "rollback";
+            /** @description 被回滚到的历史版本号。 */
+            source_version: number;
             node_count?: number;
             edge_count?: number;
             note?: string | null;
@@ -1067,7 +1167,15 @@ export interface components {
             version: number;
             /** Format: date-time */
             published_at: string;
+            /** @description 内容摘要与当前发布版本相同时为 true，不分配新版本号。 */
+            unchanged: boolean;
+            excluded: components["schemas"]["PublishExcluded"];
             stats?: components["schemas"]["GraphStats"];
+        };
+        PublishExcluded: {
+            low_confidence_nodes: number;
+            low_confidence_edges: number;
+            cascaded_edges: number;
         };
         /** @enum {string} */
         MasteryStatus: "unknown" | "learning" | "mastered";
@@ -1936,6 +2044,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -1989,6 +2098,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     updateKnowledgePoint: {
@@ -2020,6 +2130,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -2136,6 +2247,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     updateRelation: {
@@ -2218,7 +2330,17 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
+            /** @description `PUBLISH_BLOCKED`（发布集合校验失败）返回结构化 `details.reasons`；
+             *     `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 保持通用冲突响应。
+             *      */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishBlockedError"] | components["schemas"]["PublishConflictError"];
+                };
+            };
         };
     };
     listVersions: {
@@ -2271,6 +2393,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getProgress: {

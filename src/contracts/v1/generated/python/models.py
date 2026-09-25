@@ -37,6 +37,48 @@ class ErrorCode(Enum):
     BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
 
 
+class CycleItem(RootModel[str]):
+    root: Annotated[str, Field(min_length=1)]
+
+
+class PublishBlockedCycleReason(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['cycle']
+    cycle: Annotated[
+        list[CycleItem], Field(description='首尾为同一个知识点 ID。', min_length=2)
+    ]
+
+
+class Kind(Enum):
+    dangling_endpoint = 'dangling_endpoint'
+    invalid_source_ref = 'invalid_source_ref'
+    empty_graph = 'empty_graph'
+    invalid_lineage = 'invalid_lineage'
+
+
+class PublishBlockedOtherReason(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Kind
+    relation_id: Annotated[Optional[str], Field(min_length=1)] = None
+    kp_id: Annotated[Optional[str], Field(min_length=1)] = None
+    chunk_id: Annotated[Optional[str], Field(min_length=1)] = None
+
+
+class Code(Enum):
+    PUBLISH_IN_PROGRESS = 'PUBLISH_IN_PROGRESS'
+    COURSE_BUSY = 'COURSE_BUSY'
+
+
+class PublishConflictError(BaseModel):
+    code: Code
+    message: Annotated[str, Field(min_length=1)]
+    details: Optional[dict[str, Any]] = None
+
+
 class Role(Enum):
     teacher = 'teacher'
     student = 'student'
@@ -390,6 +432,10 @@ class KnowledgePoint(BaseModel):
     status: KnowledgePointStatus
     source: NodeSource
     locked: Annotated[bool, Field(description='true 时不被后续自动抽取/融合流程覆盖')]
+    revision: Annotated[
+        int,
+        Field(description='节点级乐观并发修订号；不同于课程 draft_revision。', ge=1),
+    ]
     source_refs: Optional[list[SourceRef]] = None
 
 
@@ -409,7 +455,36 @@ class KnowledgePointCreate(BaseModel):
     difficulty: Annotated[Optional[float], Field(ge=0.0, le=1.0)] = None
 
 
-class KnowledgePointUpdate(BaseModel):
+class KnowledgePointUpdate1(BaseModel):
+    name: str
+
+
+class KnowledgePointUpdate2(BaseModel):
+    aliases: list[str]
+
+
+class KnowledgePointUpdate3(BaseModel):
+    type: KnowledgePointType
+
+
+class KnowledgePointUpdate4(BaseModel):
+    definition: str
+
+
+class KnowledgePointUpdate5(BaseModel):
+    importance: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class KnowledgePointUpdate6(BaseModel):
+    difficulty: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class KnowledgePointUpdate7(BaseModel):
+    status: KnowledgePointStatus
+
+
+class KnowledgePointUpdate8(BaseModel):
+    expected_revision: Annotated[int, Field(ge=1)]
     name: Optional[str] = None
     aliases: Optional[list[str]] = None
     type: Optional[KnowledgePointType] = None
@@ -419,33 +494,119 @@ class KnowledgePointUpdate(BaseModel):
     status: Optional[KnowledgePointStatus] = None
 
 
+class KnowledgePointUpdate9(KnowledgePointUpdate1, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate10(KnowledgePointUpdate2, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate11(KnowledgePointUpdate3, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate12(KnowledgePointUpdate4, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate13(KnowledgePointUpdate5, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate14(KnowledgePointUpdate6, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate15(KnowledgePointUpdate7, KnowledgePointUpdate8):
+    pass
+
+
+class KnowledgePointUpdate(
+    RootModel[
+        Union[
+            KnowledgePointUpdate9,
+            KnowledgePointUpdate10,
+            KnowledgePointUpdate11,
+            KnowledgePointUpdate12,
+            KnowledgePointUpdate13,
+            KnowledgePointUpdate14,
+            KnowledgePointUpdate15,
+        ]
+    ]
+):
+    root: Annotated[
+        Union[
+            KnowledgePointUpdate9,
+            KnowledgePointUpdate10,
+            KnowledgePointUpdate11,
+            KnowledgePointUpdate12,
+            KnowledgePointUpdate13,
+            KnowledgePointUpdate14,
+            KnowledgePointUpdate15,
+        ],
+        Field(description='必带 expected_revision，且至少提供一个可修改字段。'),
+    ]
+
+
 class MergeRequest(BaseModel):
     primary_id: Annotated[str, Field(description='保留的主节点；其名称成为主名')]
     merged_ids: Annotated[list[str], Field(min_length=1)]
 
 
-class Relation(BaseModel):
+class RelationStandard(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     id: str
     course_id: str
     type: RelationType
-    from_id: str
-    to_id: str
+    from_id: Annotated[str, Field(min_length=1)]
+    to_id: Annotated[str, Field(min_length=1)]
     confidence: Annotated[float, Field(ge=0.0, le=1.0)]
-    status: Optional[KnowledgePointStatus] = None
-    source: Optional[NodeSource] = None
-    source_refs: Optional[list[SourceRef]] = None
+    status: KnowledgePointStatus
+    source: NodeSource
+    source_refs: list[SourceRef]
+
+
+class DowngradeCycleItem(RootModel[str]):
+    root: Annotated[str, Field(min_length=1)]
+
+
+class RelationDowngraded(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str
+    course_id: str
+    type: Literal['RELATED_TO']
+    from_id: Annotated[str, Field(min_length=1)]
+    to_id: Annotated[str, Field(min_length=1)]
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
+    status: Literal['low_confidence']
+    source: Literal['ai']
+    source_refs: list[SourceRef]
+    downgraded_from_type: Annotated[
+        Literal['PREREQUISITE'], Field(description='仅自动成环降级时返回；原关系类型。')
+    ]
+    downgrade_cycle: Annotated[
+        list[DowngradeCycleItem],
+        Field(
+            description='仅自动成环降级时返回；触发降级的知识点 ID 环路。', min_length=2
+        ),
+    ]
 
 
 class RelationCreate(BaseModel):
     type: RelationType
-    from_id: str
-    to_id: str
+    from_id: Annotated[str, Field(min_length=1)]
+    to_id: Annotated[str, Field(min_length=1)]
 
 
 class RelationUpdate(BaseModel):
     type: Optional[RelationType] = None
-    from_id: Optional[str] = None
-    to_id: Optional[str] = None
+    from_id: Annotated[Optional[str], Field(min_length=1)] = None
+    to_id: Annotated[Optional[str], Field(min_length=1)] = None
     status: Optional[KnowledgePointStatus] = None
 
 
@@ -463,42 +624,40 @@ class GraphStats(BaseModel):
     ] = None
 
 
-class GraphExchange(BaseModel):
-    format_version: Literal['1.0']
-    course_id: str
-    graph_version: Annotated[
-        Optional[int], Field(description='已发布版本号；草稿为 null')
-    ] = None
-    generated_at: datetime
-    chapters: Optional[list[Chapter]] = None
-    nodes: list[KnowledgePoint]
-    edges: list[Relation]
-    stats: Optional[GraphStats] = None
-
-
 class SuspectedDuplicate(BaseModel):
     candidates: Annotated[list[KnowledgePointRef], Field(min_length=2)]
     similarity: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
-class ReviewQueue(BaseModel):
-    low_confidence_relations: list[Relation]
-    suspected_duplicates: list[SuspectedDuplicate]
-    isolated_nodes: list[KnowledgePointRef]
-
-
-class GraphVersion(BaseModel):
+class PublishedGraphVersion(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     version: Annotated[int, Field(ge=1)]
     published_at: datetime
+    kind: Literal['publish']
     node_count: Optional[int] = None
     edge_count: Optional[int] = None
     note: Optional[str] = None
 
 
-class PublishResult(BaseModel):
-    version: int
+class RollbackGraphVersion(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    version: Annotated[int, Field(ge=1)]
     published_at: datetime
-    stats: Optional[GraphStats] = None
+    kind: Literal['rollback']
+    source_version: Annotated[int, Field(description='被回滚到的历史版本号。', ge=1)]
+    node_count: Optional[int] = None
+    edge_count: Optional[int] = None
+    note: Optional[str] = None
+
+
+class PublishExcluded(BaseModel):
+    low_confidence_nodes: Annotated[int, Field(ge=0)]
+    low_confidence_edges: Annotated[int, Field(ge=0)]
+    cascaded_edges: Annotated[int, Field(ge=0)]
 
 
 class MasteryStatus(Enum):
@@ -721,7 +880,7 @@ class ChatDoneEvent(BaseModel):
     final: ChatResponse
 
 
-class Code(Enum):
+class Code1(Enum):
     BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
     STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
     INTERNAL_ERROR = 'INTERNAL_ERROR'
@@ -741,7 +900,7 @@ class ChatLlmUnavailableReason(Enum):
     auth = 'auth'
 
 
-class Code1(Enum):
+class Code2(Enum):
     LLM_UNAVAILABLE = 'LLM_UNAVAILABLE'
     STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE'
 
@@ -767,6 +926,16 @@ class Error(BaseModel):
         Optional[dict[str, Any]],
         Field(description='结构化补充，例如 `CYCLE_DETECTED` 的 `cycle` 节点链路'),
     ] = None
+
+
+class PublishBlockedReason(
+    RootModel[Union[PublishBlockedCycleReason, PublishBlockedOtherReason]]
+):
+    root: Union[PublishBlockedCycleReason, PublishBlockedOtherReason]
+
+
+class PublishBlockedDetails(BaseModel):
+    reasons: Annotated[list[PublishBlockedReason], Field(min_length=1)]
 
 
 class LoginResponse(BaseModel):
@@ -834,6 +1003,7 @@ class TaskEvent(
 
 
 class KnowledgePointDetail(KnowledgePoint):
+    source_refs: Annotated[list[SourceRef], Field(min_length=1)]
     prerequisites: Annotated[
         Optional[list[KnowledgePointRef]], Field(description='直接前置知识点')
     ] = None
@@ -841,6 +1011,43 @@ class KnowledgePointDetail(KnowledgePoint):
         Optional[list[KnowledgePointRef]], Field(description='直接后继知识点')
     ] = None
     related: Optional[list[KnowledgePointRef]] = None
+
+
+class Relation(RootModel[Union[RelationStandard, RelationDowngraded]]):
+    root: Union[RelationStandard, RelationDowngraded]
+
+
+class GraphExchange(BaseModel):
+    format_version: Literal['1.0']
+    course_id: str
+    graph_version: Annotated[
+        Optional[int], Field(description='已发布版本号；草稿为 null')
+    ] = None
+    generated_at: datetime
+    chapters: Optional[list[Chapter]] = None
+    nodes: list[KnowledgePoint]
+    edges: list[Relation]
+    stats: Optional[GraphStats] = None
+
+
+class ReviewQueue(BaseModel):
+    low_confidence_relations: list[Relation]
+    suspected_duplicates: list[SuspectedDuplicate]
+    isolated_nodes: list[KnowledgePointRef]
+
+
+class GraphVersion(RootModel[Union[PublishedGraphVersion, RollbackGraphVersion]]):
+    root: Union[PublishedGraphVersion, RollbackGraphVersion]
+
+
+class PublishResult(BaseModel):
+    version: int
+    published_at: datetime
+    unchanged: Annotated[
+        bool, Field(description='内容摘要与当前发布版本相同时为 true，不分配新版本号。')
+    ]
+    excluded: PublishExcluded
+    stats: Optional[GraphStats] = None
 
 
 class ChatServiceError(Error):
@@ -857,7 +1064,7 @@ class ChatLlmUnavailableDetails(BaseModel):
 
 
 class ChatUnavailableError(Error):
-    code: Code1
+    code: Code2
     details: Optional[ChatUnavailableDetails] = None
 
 
@@ -869,6 +1076,12 @@ class StudyMaterial(BaseModel):
     cached: Optional[bool] = None
     reviewed: Annotated[Optional[bool], Field(description='教师是否已审核固定')] = None
     source_refs: Optional[list[SourceRef]] = None
+
+
+class PublishBlockedError(BaseModel):
+    code: Literal['PUBLISH_BLOCKED']
+    message: Annotated[str, Field(min_length=1)]
+    details: PublishBlockedDetails
 
 
 class Task(RootModel[Union[TaskActive, TaskCompleted, TaskFailed, TaskCancelled]]):
