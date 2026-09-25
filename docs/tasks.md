@@ -4,8 +4,8 @@
 
 | ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（唯一写入者） | 证据 / 同步状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B14 | READY FOR REVIEW（PR 创建待办） | 建立契约导出与漂移检查 | ArvinHan（Codex 子代理） | `codex/b14-contract-drift` / base `a7a0be0` | `scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b14.py`、`docs/handoffs/codex-b14.md` | 依赖 B09–B13 已在基线；B14 定向 3 passed，`./scripts/verify.sh` exit 0（含 25 项负例及 B08/B09/B10/B12/B13 回归），`gen-contracts.sh --check` 与 `git diff --check` 通过；审查修复 `0b1fb6c`；Issue #56 已分配 `arvinhanye` 并标记 `status:in-progress`。
-| D08 | READY FOR REVIEW（PR 创建待办） | 实现章节内语义分块 | ArvinHan（Codex 子代理） | `codex/d08-semantic-chunking` / base `a7a0be0` | `src/backend/app/services/chunking.py`、`tests/backend/test_d08.py`、`docs/handoffs/codex-d08.md` | 依赖 D02/D03/D04/D06/D07 已在基线，D-13 章节路径前缀已实现；D08 定向 13 passed、后端 1015 passed（1 条既有弃用警告），`./scripts/verify.sh` 与 `git diff --check` 通过；审查修复 `d675d2b`；Issue #77 已分配 `arvinhanye` 并标记 `status:in-progress`。
+| B14 | READY FOR REVIEW（PR #214） | 建立契约导出与漂移检查 | ArvinHan（Codex 子代理） | `codex/b14-contract-drift` / base `a7a0be0` | `scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b14.py`、`docs/handoffs/codex-b14.md` | 依赖 B09–B13 已在基线；定向 3 passed，`./scripts/verify.sh` exit 0（25 项负例及 B08/B09/B10/B12/B13 回归），`gen-contracts.sh --check`、`git diff --check` 通过；审查修复 `0b1fb6c`；Issue #56 已分配并标记 `status:in-review`；[PR #214](https://github.com/arvinhanye/SmartSketch/pull/214)。
+| D08 | READY FOR REVIEW（PR #215） | 实现章节内语义分块 | ArvinHan（Codex 子代理） | `codex/d08-semantic-chunking` / base `a7a0be0` | `src/backend/app/services/chunking.py`、`tests/backend/test_d08.py`、`docs/handoffs/codex-d08.md` | 依赖 D02/D03/D04/D06/D07 已在基线，D-13 章节路径前缀已实现；定向 13 passed、后端 1015 passed（1 条既有弃用警告），`./scripts/verify.sh` 与 `git diff --check` 通过；审查修复 `d675d2b`；Issue #77 已分配并标记 `status:in-review`；[PR #215](https://github.com/arvinhanye/SmartSketch/pull/215)。
 
 
 ## B12 进度与推荐契约（2026-09-25）
