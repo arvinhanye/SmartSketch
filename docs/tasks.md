@@ -598,7 +598,7 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C02 | DONE（待 PR 审查/合并；合并前须先决 `test_c13` 越锁适配） | 实现课程和成员仓储 | ArvinHan（Claude 子代理；原 539210） | `claude/c02-course-repo` / `8eeac3b` | `src/backend/app/repositories/courses.py`、`src/backend/migrations/NNN_courses.sql`（D-10：合并时取 main 最大编号 + 1）、`tests/backend/test_c02.py`、`docs/handoffs/claude-c02.md` | 迁移取 `003_courses.sql`（合并前若 main 已有 003 须改号）。`test_c02.py`：实现前收集失败（ImportError，0 passed），实现后 21 passed；4 处反向篡改分别 2/2/1/2 failed，恢复后全绿。`tests/backend`：1 failed / 740 passed，唯一失败是 `test_c13.py` 断言迁移目录只到 002（越锁，待协调，见交接「需协调方处理」1）。`./scripts/verify.sh` exit 0；`git diff --check` exit 0。交接 `docs/handoffs/claude-c02.md` |
+| C02 | DONE（待 PR 审查/合并） | 实现课程和成员仓储 | ArvinHan（Claude 子代理；原 539210） | `claude/c02-course-repo` / `8eeac3b` | `src/backend/app/repositories/courses.py`、`src/backend/migrations/NNN_courses.sql`（D-10：合并时取 main 最大编号 + 1）、`tests/backend/test_c02.py`、`docs/handoffs/claude-c02.md` | 迁移取 `003_courses.sql`（合并前若 main 已有 003 须改号）。`test_c02.py`：实现前收集失败（ImportError，0 passed），实现后 21 passed；4 处反向篡改分别 2/2/1/2 failed，恢复后全绿。`tests/backend` 初为 1 failed / 740 passed（`test_c13.py` 断言迁移目录只到 002）；协调方以单独提交把该用例改为只含 001、002 的临时目录（范围扩展），复跑 741 passed。`./scripts/verify.sh` exit 0；`git diff --check` exit 0。交接 `docs/handoffs/claude-c02.md` |
 
 - C02 验收：课程成员唯一；同用户不同课程角色独立；读写外键正确（`course_members.user_id` → C13 的 `users`）。验证：`python3 -m pytest tests/backend/test_c02.py -q`。
 

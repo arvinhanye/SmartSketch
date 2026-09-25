@@ -82,7 +82,9 @@
    assert migrate(_url(path), upto_002) == []
    ```
 
-   用例的其余断言不变。须由 C13 负责人或协调方决定：是作为单独提交并入本分支，还是另开任务处理。**处理之前 `pytest tests/backend -q` 不会全绿，不宜合并。**
+   用例的其余断言不变。
+
+   **已处理（协调方，2026-09-25，范围扩展）**：按上述方案以单独提交并入本分支，只改该用例的迁移目录（`through-002`），其余断言不变；协调方复跑 `tests/backend` 741 passed（venv，`PYTHONPATH=src/backend`）。
 2. **`docs/architecture.md` 未改**：「核心数据模型」SQLite 一行没有单列 `course_members`、`users`（ADR-013 后果里记着「`users`、`course_members` 已在 ADR-008 命名基线内」）。按共享文件规则不改，交 A10/协调方判断是否补登。
 3. **`published_version_id` 的外键**：G02 建 `graph_versions` 后，要不要让 `courses.published_version_id` 引用它，由 G02 决定。SQLite 不能给已有列加外键，只能重建表，所以尽早决定为好；不加也行，发布指针靠 CAS 事务维护。
 
