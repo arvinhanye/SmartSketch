@@ -58,3 +58,41 @@ def insert_account(
             raise ValueError("account row rejected by the users table constraints") from exc
         row = database.execute(f"SELECT {_COLUMNS} FROM users WHERE id = ?", (account_id,)).fetchone()
     return AccountRecord(*row)
+
+
+def list_accounts(sqlite_url: str) -> list[AccountRecord]:
+    """All accounts, oldest first, for the account command's listing (C14)."""
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            f"SELECT {_COLUMNS} FROM users ORDER BY created_at, username"
+        ).fetchall()
+    return [AccountRecord(*row) for row in rows]
+
+
+def set_disabled(sqlite_url: str, username: str, disabled: bool) -> AccountRecord | None:
+    """Disable (keeping the first timestamp) or re-enable; ``None`` if the username is unknown."""
+    with connect(sqlite_url) as database:
+        database.execute(
+            "UPDATE users SET disabled_at = CASE WHEN ? THEN"
+            " COALESCE(disabled_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ELSE NULL END"
+            " WHERE username = ?",
+            (disabled, username),
+        )
+        row = database.execute(
+            f"SELECT {_COLUMNS} FROM users WHERE username = ?", (username,)
+        ).fetchone()
+    return AccountRecord(*row) if row else None
+
+
+def update_password_hash(
+    sqlite_url: str, username: str, password_hash: str
+) -> AccountRecord | None:
+    """Replace the stored hash; ``None`` if the username is unknown."""
+    with connect(sqlite_url) as database:
+        database.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?", (password_hash, username)
+        )
+        row = database.execute(
+            f"SELECT {_COLUMNS} FROM users WHERE username = ?", (username,)
+        ).fetchone()
+    return AccountRecord(*row) if row else None
