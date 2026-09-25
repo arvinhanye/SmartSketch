@@ -743,7 +743,7 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C09 | IN PROGRESS | 实现 worker 原子领取与租约 | ArvinHan（Claude 子代理） | `claude/c09-task-leases` / `36670a3` | `src/backend/app/repositories/task_leases.py`、`src/backend/migrations/NNN_task_leases.sql`（D-10：现取 005）、`tests/backend/test_c09.py`、`docs/handoffs/claude-c09.md`；不改 `repositories/tasks.py`（C03 #216 在改） | 待补 |
+| C09 | DONE（待 PR 审查/合并） | 实现 worker 原子领取与租约 | ArvinHan（Claude 子代理） | `claude/c09-task-leases` / `36670a3` | `src/backend/app/repositories/task_leases.py`、`src/backend/migrations/NNN_task_leases.sql`（D-10：现取 005）、`tests/backend/test_c09.py`、`docs/handoffs/claude-c09.md`；不改 `repositories/tasks.py`（C03 #216 在改） | `docs/handoffs/claude-c09.md`；迁移 `005_task_leases.sql`（租约六列，另加任务错误三列与 I4 约束，见交接待决 1）；红灯 3 failed + 45 errors（签名桩）→ C09 50 passed；后端 1052 passed；反向篡改 8 处全部检出；#212 要求的「有效租约阻止迁移」真实表回归已补；`verify.sh`、`git diff --check` exit 0；待决 3 项见交接。**ADR-017 追加（2026-09-25）**：决定 1 登记 `docs/architecture.md` 数据模型；决定 6 C08 码表 `LLM_UNAVAILABLE` 放开 `merging`（`failure_code_allowed` 限定为尝试耗尽，`details` 须含 `attempts`、`stage`），C09 耗尽直接写 `LLM_UNAVAILABLE`，§6 补注；红灯 C08 3 failed、C09 1 failed → C08 137 passed、C09 53 passed；后端 1118 passed；篡改 3 处全部检出；`verify.sh`、`git diff --check` exit 0；待决 1、2 已由 ADR-017 解决，待决 3 仍开 |
 
 - C09 验收：两个连接争同一任务只有一个成功；旧租约 token 禁止续写；到期可接管。验证：`python3 -m pytest tests/backend/test_c09.py -q`。
 
@@ -758,5 +758,12 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 | I03 | DONE（待 PR 审查/合并） | 实现可学集合纯函数 | ArvinHan（Claude 子代理） | `claude/i03-eligible-set` / `36670a3` | `src/backend/app/services/learning/eligible.py`、`tests/backend/test_i03.py`、`docs/handoffs/claude-i03.md` | 新增 `services/learning/__init__.py`（包原不存在）。红：先收集错误（无模块），桩函数 79 failed/1 passed；绿：`test_i03.py` 80 passed；`tests/backend` 全量 1082 passed（基线 1002）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；6 处反向篡改均检出（36/19/3/3/28/2 failed），恢复后 `cmp` 一致。有环、自环、悬空端点（含外课边）、重复 ID、`V=∅` 抛 `GraphIntegrityError`；`mastered` 含外课 ID 抛 `ProgressOutsideGraphError`（§1）；结果按 `kp_id` UTF-8 字节序。见 `docs/handoffs/claude-i03.md` |
 
 - I03 验收：已掌握集合为空、全部掌握、孤立点、多前置、有环、外课 ID；不修改用户的掌握集合。验证：`python3 -m pytest tests/backend/test_i03.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B12-R1 | IN PROGRESS | 进度契约错误细节修订（ADR-017 决定 4、5） | ArvinHan（Claude 子代理） | `claude/b12-r1-progress-errors` / ADR-017 提交 | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`、`specs/learning-path.md`、`docs/handoffs/claude-b12-r1.md` | 待补 |
+
+- B12-R1 验收：`LearningIntegrityDetails` 只含 `request_id`；`PUT /progress` 422 的 `details.fields[].reason = not_in_published_version` 与 `details.graph_version` 有正负例；重新生成且 `gen-contracts.sh --check`、`tests/tooling` 通过。
+- ADR-017 同时追加到 C09（#220：决定 1、6）与 E03（#221：决定 2、3），各自在本节表内更新证据。
 
 - 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925b-claims` 上解决一次，再并入三个分支，保证三者的解决结果一致。

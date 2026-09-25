@@ -144,6 +144,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## 核心数据模型
 
 - SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`ChatLog`（表 `chat_logs`，每个通过鉴权与版本绑定的问答请求一行，服务端不保存会话；命名由 A09 定，ADR-015，A10 N5；覆盖范围见 ADR-015 修订 1）。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
+- SQLite `processing_tasks`（C09 迁移 005，ADR-017 决定 1）：租约六列 `lease_owner`、`lease_token`、`lease_expires_at`、`attempt`、`not_before`、`cleanup_pending`，与任务错误三列 `error_code`、`error_message`、`error_details`（JSON 对象文本，与契约 `Error{code, message, details}` 同构）；数据库 CHECK 强制 `stage = 'failed'` ⇔ `error_code` 非空。均为内部字段，经 `Task.error` 对外；可用码与阶段见 `specs/task-processing.md` §6 与 C08 `FAILURE_CODE_STAGES`。
 - Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
 
