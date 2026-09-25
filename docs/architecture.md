@@ -42,10 +42,20 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 ## 后端启动与健康检查（B05）
 
+### C03 身份与访问依赖
+
+- `services/access.py` 校验 C13 的 HS256 JWT，严格检查四个载荷字段及有效期，并按 `sub` 每次回查 `users`；账号类型取数据库。`api/dependencies.py` 从 Bearer 头取得调用者，不读取自定义身份头或请求体 `user_id`。
+- 课程访问由 `course_members` 的实时课程角色决定。按 `specs/identity-access.md` §4.1 顺序检查成员、角色、发布状态。课程不存在与非成员同为 403；任务 ID 通过仓储只读归属查询定位，任务不存在或非成员同为 404。下游路由应直接复用依赖，不自行检查 JWT 或信任令牌 `role`。
+- 身份/访问拒绝由统一异常处理器输出契约 `Error` 形状；认证错误只返回 `UNAUTHENTICATED`，不输出令牌与请求输入。
+
 - `src/backend/app/main.py` 暴露 `create_app()` 与 `app`，将路由注册到 FastAPI。创建应用和导入模块时不连接数据库、模型服务或外部网络；B06 从环境变量读取并校验设置，默认 fake 模式不要求真实模型密钥，非法配置使应用创建失败。
 - `GET /health` 是无鉴权的根路径，返回 HTTP 200 和 JSON 对象 `{"status": "ok", "version": "<非空版本字符串>"}`。它只表示 API 进程可响应，不表示 Neo4j、SQLite 或模型服务就绪。响应形状沿用待 A10 导入的 `src/contracts/api.v1.yaml` 现有定义，不新增契约真源。
 - 健康检查不接受写入方法；未知或带 `/api/v1` 前缀的健康路径不注册。B05 的测试须覆盖响应、路径边界、错误方法，以及应用工厂无网络副作用。
 - `src/backend/app/api/health.py` 中的最小响应模型是契约生成物尚未导入 main 时的 B05 过渡实现。A10/B14 接续导入并生成真源 DTO 后，应按 ADR-004 改为消费生成模型，避免手写公共 DTO 长期存在。
+
+## E07 向量适配边界
+
+E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，并把请求维度传给客户端。输出逐条附 `model`、`dimensions`、`space`；空间格式为 `fake/<dimensions>` 或 `real/<model>/<dimensions>`，即使真实模型 ID 为 `fake` 也不与 fake 模式碰撞。响应数量、每条维度、有限数值及显式响应模型须在缓存前核对。同一次调用先按 `(space, sha256(text))` 合并待计算文本，跨批重复只请求模型一次，再按原输入位置展开。进程内缓存使用相同键，默认最多保留 1024 条向量并按最近使用顺序淘汰；淘汰后再次读取会重新计算。失败批次不写缓存，已完成批次可供重试复用。在线/本地客户端由 E03 注入，E07 不自行切换供应商或空间。
 
 ## 后端设置与启动校验（B06）
 

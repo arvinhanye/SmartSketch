@@ -4,8 +4,30 @@
 
 | ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（唯一写入者） | 证据 / 同步状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B14 | READY FOR REVIEW（PR #214） | 建立契约导出与漂移检查 | ArvinHan（Codex 子代理） | `codex/b14-contract-drift` / base `a7a0be0` | `scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b14.py`、`docs/handoffs/codex-b14.md` | 依赖 B09–B13 已在基线；定向 3 passed，`./scripts/verify.sh` exit 0（25 项负例及 B08/B09/B10/B12/B13 回归），`gen-contracts.sh --check`、`git diff --check` 通过；审查修复 `0b1fb6c`；Issue #56 已分配并标记 `status:in-review`；[PR #214](https://github.com/arvinhanye/SmartSketch/pull/214)。
-| D08 | READY FOR REVIEW（PR #215） | 实现章节内语义分块 | ArvinHan（Codex 子代理） | `codex/d08-semantic-chunking` / base `a7a0be0` | `src/backend/app/services/chunking.py`、`tests/backend/test_d08.py`、`docs/handoffs/codex-d08.md` | 依赖 D02/D03/D04/D06/D07 已在基线，D-13 章节路径前缀已实现；定向 13 passed、后端 1015 passed（1 条既有弃用警告），`./scripts/verify.sh` 与 `git diff --check` 通过；审查修复 `d675d2b`；Issue #77 已分配并标记 `status:in-review`；[PR #215](https://github.com/arvinhanye/SmartSketch/pull/215)。
+| B14 | DONE（PR #214 `342cc3e`；Claude 审查通过；#56 已关闭） | 建立契约导出与漂移检查 | ArvinHan（Codex 子代理） | `codex/b14-contract-drift` / base `a7a0be0` | `scripts/gen-contracts.sh`、`scripts/gen_contracts.py`、`src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b14.py`、`docs/handoffs/codex-b14.md` | 依赖 B09–B13 已在基线；定向 3 passed，`./scripts/verify.sh` exit 0（25 项负例及 B08/B09/B10/B12/B13 回归），`gen-contracts.sh --check`、`git diff --check` 通过；审查修复 `0b1fb6c`；Issue #56 已分配并标记 `status:in-review`；[PR #214](https://github.com/arvinhanye/SmartSketch/pull/214)。
+| D08 | DONE（PR #215 `5a0bcdb`；Claude 审查通过，P3 见下；#77 已关闭） | 实现章节内语义分块 | ArvinHan（Codex 子代理） | `codex/d08-semantic-chunking` / base `a7a0be0` | `src/backend/app/services/chunking.py`、`tests/backend/test_d08.py`、`docs/handoffs/codex-d08.md` | 依赖 D02/D03/D04/D06/D07 已在基线，D-13 章节路径前缀已实现；定向 13 passed、后端 1015 passed（1 条既有弃用警告），`./scripts/verify.sh` 与 `git diff --check` 通过；审查修复 `d675d2b`；Issue #77 已分配并标记 `status:in-review`；[PR #215](https://github.com/arvinhanye/SmartSketch/pull/215)。
+
+## 2026-09-25 Codex 认领：E07
+
+| 原子 ID | 状态 | 任务 | 负责人 | 基线与文件范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| E07 | DONE（PR #217 `8b2c33c`；Claude 审查通过，P3 见下；#87 已关闭） | 实现向量适配与维度检查 | Codex（数据与 AI） | `main@a7a0be0`；`src/backend/app/services/ai/embeddings.py`、`tests/backend/test_e07.py`、相关架构与交接 | 同批/跨批重复请求去重，进程内缓存默认 1024 条 LRU；E07 16 passed；后端全量 1035 passed；`./scripts/verify.sh` exit 0；`docs/handoffs/codex-e07.md` |
+
+- 输入：E02 的 `EmbeddingClient` 与 A07 的模型配置；输出：逐条携带模型和空间标识的向量。依赖 E02、A07 已在当前基线。
+- 风险：在线/本地客户端由 E03 接入；E07 通过注入 `EmbeddingClient` 验证模式切换，不引入未经签收的真实供应商依赖。当前工作区的 C03 文件不在 E07 范围内。
+- 审查修复：同一次 `embed` 调用按空间与文本哈希合并缓存未命中项，跨批重复只请求一次；LRU 有限缓存超限后重算旧文本。先新增 4 个失败用例复现，再修复为 16 passed；后端全量 1035 passed。
+- 验证：项目虚拟环境中 `python -m pytest tests/backend/test_e07.py -q`；通过 Git Bash（设置虚拟环境和前端工具路径）运行 `./scripts/verify.sh`；`git diff --check`。详见交接。
+
+## 2026-09-25 Codex 认领：C03
+
+| 原子 ID | 状态 | 任务 | 负责人 | 基线与文件范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| C03 | DONE（PR #216 `81aa691`；Claude 审查发现 P1 C03-R01，已修复后合并；#60 已关闭） | 实现身份边界与课程访问依赖 | Codex（后端） | `main@a7a0be0`；`app/api/dependencies.py`、`app/services/access.py`、账号/任务仓储只读入口、`tests/backend/test_c03.py`、相关架构与交接 | C03 17 passed；后端 1019 passed；`./scripts/verify.sh` exit 0；交接 `docs/handoffs/codex-c03.md` |
+
+- 输入：`specs/identity-access.md` §2、§4 访问矩阵；输出：可复用的身份/课程/任务访问依赖。依赖 C02、B09、C13 已在当前基线。
+- 风险：下游路由尚未接入，C03 提供依赖接口和测试用路由，不代替 C04/C07 等任务实现；仅持有任务 ID 时需仓储先解析归属课程。
+- 验证：`python -m pytest tests/backend/test_c03.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 验收证据：Bearer 身份、停用实时失效、请求身份字段无效、课程内角色、未发布和任务越权同形错误均有定向用例；`.venv/Scripts/python.exe -m pytest tests/backend/test_c03.py -q` 17 passed；后端全量 1019 passed；Git Bash 运行 `./scripts/verify.sh` exit 0（契约负向 24 项、B08/B09/B10/B12/B13 回归）；详见交接。
 
 
 ## B12 进度与推荐契约（2026-09-25）
@@ -710,6 +732,10 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 | B04-R01 | P2 | 同上 | `stores/course.ts` 的 `selectCourse` 遇到相同课程 ID 直接返回；同一标签页里换账号后，旧 `graph`、`chatHistory` 和已签发的作用域仍然有效 | H13：增加会话重置入口，在登出、401、换账号时调用；或者把用户身份纳入作用域键 |
 | B10F-R01 | P2 | REVIEW-22（`docs/reviews/codex-claude-b10-fix-21de627-2026-09-24-1556z.md`） | 生成的 `TaskCancelled.cancel_requested` 是 `Literal[True] = True`（有默认值、非必填），缺字段的取消快照能通过 `Task.model_validate`，而 JSON Schema 会拒绝 | 契约修复，建议在 C10/C11 实现取消响应前完成：让生成模型把该字段设为必填，并补缺字段与 `exclude_unset` 的回归测试 |
 | B10F-R02 | P3 | 同上 | `TaskNotCancellableError.details` 的三个分支没有 `additionalProperties: false`，`{stage, reason, secret}` 能通过 JSON Schema | 与 B10F-R01 一起修：三个分支加 `additionalProperties: false`，并补负例 |
+| D08-P3 | P3 | PR #215 审查（Claude） | `chunking._render` 给窗口里的每个来源段落各拼一次 `section_path`；同一窗口里有多个短段落时，路径重复出现，抽取时多耗 token。D-13「在每块正文前拼上章节路径」对「块」的理解存在歧义 | D12 接入抽取时一并确认：每个窗口拼一次，还是每个来源段落拼一次 |
+| E07-P3 | P3 | PR #217 审查（Claude） | `EmbeddingAdapter.embed` 末尾的 `if vector is not None` 过滤，一旦有向量漏填，结果会静默变短并与输入错位 | 改为断言全部填满；可在 E03 接入时顺手修 |
+
+C03-R01（P1，PR #216 审查）：拒绝错误是模块级的单例异常，反复 raise 会累积 `__traceback__` 并持有每次请求的令牌。已在合并前修复（`fe5ae64`，交接 `docs/handoffs/claude-c03-r01-fix.md`），不再是遗留项。
 
 ## 2026-09-25 第二批并行（Claude）
 
@@ -732,5 +758,12 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 | I03 | IN PROGRESS | 实现可学集合纯函数 | ArvinHan（Claude 子代理） | `claude/i03-eligible-set` / `36670a3` | `src/backend/app/services/learning/eligible.py`、`tests/backend/test_i03.py`、`docs/handoffs/claude-i03.md` | 待补 |
 
 - I03 验收：已掌握集合为空、全部掌握、孤立点、多前置、有环、外课 ID；不修改用户的掌握集合。验证：`python3 -m pytest tests/backend/test_i03.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B12-R1 | IN PROGRESS | 进度契约错误细节修订（ADR-017 决定 4、5） | ArvinHan（Claude 子代理） | `claude/b12-r1-progress-errors` / ADR-017 提交 | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`、`specs/learning-path.md`、`docs/handoffs/claude-b12-r1.md` | 待补 |
+
+- B12-R1 验收：`LearningIntegrityDetails` 只含 `request_id`；`PUT /progress` 422 的 `details.fields[].reason = not_in_published_version` 与 `details.graph_version` 有正负例；重新生成且 `gen-contracts.sh --check`、`tests/tooling` 通过。
+- ADR-017 同时追加到 C09（#220：决定 1、6）与 E03（#221：决定 2、3），各自在本节表内更新证据。
 
 - 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925b-claims` 上解决一次，再并入三个分支，保证三者的解决结果一致。
