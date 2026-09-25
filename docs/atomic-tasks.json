@@ -2658,13 +2658,13 @@
         "J06",
         "I04"
       ],
-      "input": "自编材料",
+      "input": "自编材料（至少一章完整课程量）",
       "output": "标注格式与指标定义",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/evaluation/README.md",
         "/Users/arvinhan/Desktop/SmartSketch/evaluation/fixtures/synthetic.json"
       ],
-      "acceptance": "区分实体/关系准确召回、引用有效/支持度、未覆盖混淆矩阵；阈值不在测试集调",
+      "acceptance": "区分实体/关系准确召回、引用有效/支持度、未覆盖混淆矩阵；阈值不在测试集调；含赛题抽取硬指标口径（一章基准、实体≥20、实体与关系人工抽样准确率各≥70%、判定标准与固定种子抽样），见 course-knowledge-graph 验收 7",
       "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
       "verification_command": "git diff --check；逐条核对 K01 验收矩阵与源文档，人工决策保留未签收标记",
       "verification_status": "NOT_RUN_PLANNED",
@@ -2686,9 +2686,10 @@
       "output": "分项指标报告",
       "allowed_files": [
         "/Users/arvinhan/Desktop/SmartSketch/evaluation/evaluate_extraction.py",
-        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_k02.py"
+        "/Users/arvinhan/Desktop/SmartSketch/tests/backend/test_k02.py",
+        "/Users/arvinhan/Desktop/SmartSketch/evaluation/reports/extraction-accuracy.md"
       ],
-      "acceptance": "空分母、ID匹配、四类型分组；固定输入重复结果一致；假模型不充真实效果",
+      "acceptance": "空分母、ID匹配、四类型分组；固定输入重复结果一致；假模型不充真实效果；报告计算并判定赛题两项硬指标（恰为 20 个或 70% 视为达标，不足如实写未达标），列错误类型与改进方向；真实模型判定结果另记于报告文件",
       "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
       "verification_command": "python3 -m pytest tests/backend/test_k02.py -q",
       "verification_status": "NOT_RUN_PLANNED",
