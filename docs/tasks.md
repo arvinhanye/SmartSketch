@@ -894,7 +894,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| J03 | IN PROGRESS | 实现多轮问题改写 | ArvinHan（Claude） | `claude/j03-query-rewrite` / 本认领提交 | `src/backend/app/services/qa/__init__.py`、`src/backend/app/services/qa/rewrite.py`、`prompts/rewrite_query.yaml`、`tests/backend/test_j03.py`、`docs/handoffs/claude-j03.md`；范围扩展：`prompts/MANIFEST.md` 仅 `rewrite_query` 一行（E01 规则要求升版本同提交更新摘要） | 待补 |
+| J03 | DONE（待 PR 审查/合并） | 实现多轮问题改写 | ArvinHan（Claude） | `claude/j03-query-rewrite` / 本认领提交 | `src/backend/app/services/qa/__init__.py`、`src/backend/app/services/qa/rewrite.py`、`prompts/rewrite_query.yaml`、`tests/backend/test_j03.py`、`docs/handoffs/claude-j03.md`；范围扩展：`prompts/MANIFEST.md` 仅 `rewrite_query` 一行（E01 规则要求升版本同提交更新摘要） | `test_j03.py` 94 passed（与 `test_e01.py` 合计 163 passed）；后端全量 2199 passed（基线 2105 + 94）；`verify.sh` 通过；`git diff --check` 通过；反向篡改 8 处均检出；提示词 v2（草稿）；保留轮数等暂定值与 E04 重试不感知截止时刻等待决见 `docs/handoffs/claude-j03.md` |
 
 - J03 验收：历史按轮数/长度裁剪；只接受 `user`/`assistant` 角色，改写前剔除类标记与哨兵（`specs/grounded-qa.md` H2、QA-19）；改写出错、超时、被预算拒绝、输出为空或不合规均保留原问题；问答调用带 `request_id`、不带 `task_id`（ADR-011 修订 2）；只用 E02 fake 客户端测试。验证：`python3 -m pytest tests/backend/test_j03.py -q`。
 
