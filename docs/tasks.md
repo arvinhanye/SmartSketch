@@ -81,7 +81,8 @@
 | D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（C13 已合并，配置落地待认领） |
 | D-12 | Markdown 中 `#` 后不加空格的写法（如 `#第一章`）是否算标题。**已关闭**：放宽，由 D03 在 PR #191 中实现；规则保守，只作用于顶层行，不误伤 `#include`、`#1`、`#tag` 这类行，边界见 `docs/handoffs/claude-d03.md`。D03 首次合并前完成，`parser_version` 仍为 `markdown/1`（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
 | D-13 | 解析器只把标题放进章节路径、标题文字不在块正文里，抽取（D12）看不到标题。**已关闭**：由 D08 分块时在每块正文前拼上章节路径（`section_path`），解析器输出与 D01 模型不变（ArvinHan，2026-09-24） | 技术负责人 | 已完成（D08 实现） |
-| D-14 | 赛题「知识抽取准确率不低于 70%」是否同时约束关系（REQ-01）。**已关闭**：实体和关系分别计算、各自不低于 70%，写入 `specs/course-knowledge-graph.md` 验收 7 与 K01/K02（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
+| D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
+| D-15 | 赛题「知识抽取准确率不低于 70%」是否同时约束关系（REQ-01）。**已关闭**：实体和关系分别计算、各自不低于 70%，写入 `specs/course-knowledge-graph.md` 验收 7 与 K01/K02（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -535,13 +536,15 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | D02 | DONE（PR #190 `d2c465e`） | 实现 TXT 编码与标题解析 | Claude（数据子代理） | `claude/d02-txt-parser` / `origin/main` | `src/backend/app/services/parsers/txt.py`、`tests/backend/test_d02.py`、`docs/handoffs/claude-d02.md` | `docs/handoffs/claude-d02.md`；标准库、无新依赖；D02 94 passed，协调方复核后端 568 passed；CI 通过；#71 已关闭 |
-| D03 | IN PROGRESS | 实现 Markdown AST 解析 | Claude（数据子代理） | `claude/d03-markdown-parser` / `origin/main` | `src/backend/app/services/parsers/markdown.py`、`tests/backend/test_d03.py`、`docs/handoffs/claude-d03.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | 待补 |
-| D04 | IN PROGRESS | 实现 DOCX 段落和表格解析 | Claude（数据子代理） | `claude/d04-docx-parser` / `origin/main` | `src/backend/app/services/parsers/docx.py`、`tests/backend/test_d04.py`、`docs/handoffs/claude-d04.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | 待补 |
-| D05 | IN PROGRESS | 实现 PDF 正文与页码提取 | Claude（数据子代理） | `claude/d05-pdf-parser` / `origin/main` | `src/backend/app/services/parsers/pdf.py`、`tests/backend/test_d05.py`、`docs/handoffs/claude-d05.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | 待补 |
+| D03 | DONE（PR #191 `2694e3e`） | 实现 Markdown AST 解析 | Claude（数据子代理） | `claude/d03-markdown-parser` / `origin/main` | `src/backend/app/services/parsers/markdown.py`、`tests/backend/test_d03.py`、`docs/handoffs/claude-d03.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | `docs/handoffs/claude-d03.md`；`markdown-it-py==4.2.0`（MIT）；含 D-12 放宽；D03 66 passed，协调方复核后端 634 passed；CI 通过；#72 已关闭 |
+| D04 | DONE（PR #193 `ebed3cd`） | 实现 DOCX 段落和表格解析 | Claude（数据子代理） | `claude/d04-docx-parser` / `origin/main` | `src/backend/app/services/parsers/docx.py`、`tests/backend/test_d04.py`、`docs/handoffs/claude-d04.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | `docs/handoffs/claude-d04.md`；标准库自解析、无新依赖；D04 53 passed，协调方复核后端 527 passed，billion-laughs 样例被拒；CI 通过；#73 已关闭 |
+| D05 | DONE（PR #197 `a08bd5b`） | 实现 PDF 正文与页码提取 | Claude（数据子代理） | `claude/d05-pdf-parser` / `origin/main` | `src/backend/app/services/parsers/pdf.py`、`tests/backend/test_d05.py`、`docs/handoffs/claude-d05.md`；新增依赖时 `src/backend/pyproject.toml` 的 `dependencies` 一行 | `docs/handoffs/claude-d05.md`；`pdfminer.six==20260107`（MIT）；协调方解决依赖行冲突（`93d5971`）；D05 33 passed，协调方从 PyPI 完整安装后复核后端 720 passed，CI 中 `pip check` 无冲突；#74 已关闭 |
 
 - 依赖约定：D02 只用标准库。D03～D05 如需解析库，只选 MIT/BSD/Apache 类许可，禁用 AGPL（如 PyMuPDF），版本固定为 `==`，只在 `dependencies` 加一行，不动 `test` 组（B07 PR #187 在改 `test` 组）。三者在 `pyproject.toml` 若有文本冲突，由协调方在合并时顺序解决。选库理由写入各自交接，由协调方统一登记到 `docs/integrations.md`。
 - 共享文件不改：`parsers/__init__.py`、`parsers/models.py`、`tests/fixtures/documents/`、`docs/tasks.md`、`docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`。测试用的 DOCX/PDF 在测试里生成到 `tmp_path`，不入库。需要改共享文件时，停下来交给协调方。
 - D05 须给 D06（PDF 标题判定）留下逐行的字号和字重信息，D07 需要的逐页行也要能取到；接口形状写入 D05 交接。
+- 进展（2026-09-25）：D02～D05 均已合并，本批完成。解析依赖已登记到 `docs/integrations.md`「文档解析依赖（D02～D05）」。D06、D07 现可认领（依赖 D05，中间结构见 `docs/handoffs/claude-d05.md`）；D08 须按 D-13 在块前拼章节路径。
+- 遗留风险：PDF 解析没有限制页数与耗时，恶意文件可能拖慢 worker，由后续 worker 超时机制兜底；DOCX 主文档路径固定为 `word/document.xml`，不按关系文件解析。
 
 ## REQ-01 赛题抽取硬指标补登
 
@@ -552,4 +555,4 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 输入：赛题原文 `【A10】基于AIGC的课程知识图谱智能构建与学习导航系统【金扬智能】.docx`（在主目录，不入库）第 6 节「技术要求与指标（一）」与第 7 节。
 - 输出：验收 7 规定了基准材料、实体数、准确率、判定对象、报告内容和失败路径；K01 负责口径与一章量的标注材料，K02 负责计算、判定并新增 `evaluation/reports/extraction-accuracy.md`。
 - 核对：赛题其余指标已有覆盖——格式 ≥ 2 种、关系 ≥ 3 种（四格式、四关系）；问答 ≤ 15 秒（`LLM_CHAT_TIMEOUT_SECONDS`、K04）；讲解与练习题（O05/O06）；赛题不要求训练模型。
-- 决策 D-14（ArvinHan，2026-09-24 确认）：70% 按「实体、关系分别达标」执行。
+- 决策 D-15（ArvinHan，2026-09-24 确认；原拟编号 D-14 已被 PR #199 的 PDF 权限决策占用，合并时改号）：70% 按「实体、关系分别达标」执行。
