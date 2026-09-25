@@ -379,6 +379,13 @@ def test_instance_level_cases():
     assert not bad, "实例级用例不符预期：\n  " + "\n  ".join(bad)
 
 
+def test_contract_gate_runs_b14_regression_suite():
+    """The CI gate must run B14's determinism and drift regression tests."""
+    gate = (REPO / "scripts/verify/contracts.sh").read_text(encoding="utf-8")
+    assert "python3 -m pytest tests/contracts/test_b14.py -q" in gate, \
+        "the contract gate must run the B14 generator/drift regression suite"
+
+
 def main() -> int:
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]
