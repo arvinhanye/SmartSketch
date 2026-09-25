@@ -863,7 +863,7 @@
   2. **向量 HTTP 客户端归 E03**：在 `services/ai/compatible.py` 新增 `CompatibleEmbeddingClient`，实现 E02 的 `EmbeddingClient`，复用 E03 的传输、错误分类与密钥防泄露；请求 `POST /embeddings` 带 `dimensions`，按 `EMBEDDING_BATCH_SIZE` 分批，逐条核对返回维度。E07 保持只做切换、维度校验与缓存。随 #221 追加提交。
   3. **输出上限字段默认 `max_tokens`**，可切换为 `max_completion_tokens`。流式 usage、`finish_reason` 扩展值、缺 `[DONE]` 的处理，在拿到密钥后用手工冒烟脚本（不进 CI）对 D-02a/b 候选各测一次普通与流式请求，结果填入 `docs/integrations.md` D-02a/b 签收栏；不阻塞 E03 合并。缺 usage 按 ADR-011 修订 3 回退估算。
   4. **学习读路径完整性错误保留 `INTERNAL_ERROR`，不新增专用码**；`details.diagnostic_id` 改名为 **`details.request_id`**，与问答一致，作为全平台日志关联编号。读路径先按 LP-12 把原始进度投影到当前发布版节点集（脏行告警后忽略），再调用 I03；若 `ProgressOutsideGraphError` 仍被抛出，视为缺陷，按 `INTERNAL_ERROR` 返回。
-  5. **`PUT /progress` 目标不在当前发布版 → 422 `VALIDATION_ERROR`**：`details.fields = [{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}]`，并带 `details.graph_version`（请求事务所见的当前发布版）。草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课是否存在；写入期间发布指针变化、目标不在新版本时同样返回此错误。不用 404（`identity-access` §4 的 404 针对路径参数，`/progress` 资源本身存在），不用 409（客户端处置与 422 相同：重新 `GET /progress`）。
+  5. **`PUT /progress` 目标不在当前发布版 → 422 `VALIDATION_ERROR`**：`details.fields = [{in: "body", field: "<i>.kp_id", reason: "not_in_published_version"}]`，并带 `details.graph_version`（请求事务所见的当前发布版）。草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课是否存在；写入期间发布指针变化、目标不在新版本时同样返回此错误。不用 404（`identity-access` §4 的 404 针对路径参数，`/progress` 资源本身存在），不用 409（客户端处置与 422 相同：重新 `GET /progress`）。
   6. **`merging` 阶段尝试耗尽、最后一次为模型不可用 → `LLM_UNAVAILABLE`**（`details` 含 `attempts`、`stage`）。§6 表 `LLM_UNAVAILABLE` 行补注；C08 码表放开 `LLM_UNAVAILABLE` 用于 `merging`（仅此情形）；C09 直接写入该码，不再报错后等租约过期。
 - **后果**：
   - C09（#220）追加：决定 1 的架构登记、决定 6 的码表与规格补注及测试。C08 的 `task_state.py` 属范围扩展，由本 ADR 授权。
@@ -871,6 +871,24 @@
   - 新增契约修订任务 **B12-R1**：`api.v1.yaml` 中 `LearningIntegrityDetails.diagnostic_id` → `request_id`，`PUT /progress` 422 的 `details` 结构，`errors.v1.md` 同步，重新生成，`test_b12.py` 与 `specs/learning-path.md` 同步。进度接口目前无消费者，原地修改。
   - I03（#219）无需代码改动；I05 须按决定 4 先投影再调用。
 - **推翻条件**：供应商实测表明默认字段或向量协议与决定 2、3 不兼容；或前端需要区分「版本已变」与「非法 ID」以提供不同处置时，重开决定 5。
+- **签收**：ArvinHan 2026-09-25
+- **勘误**（2026-09-25）：决定 5 的 `field` 原写作 `[<i>].kp_id`，与 C13 全局校验处理器的点路径不一致，按签收时“沿用 C13 已有格式”的原意改为 `<i>.kp_id`（B12-R1 落实）
+
+## ADR-018：分块版本并入解析器版本，块 ID 随分块规则或参数变化而更新
+
+> **签收状态：已签收（ACCEPTED）**，ArvinHan，2026-09-25（在会话中选定「并入 `parser_version`」）。本条由协调方在 D09（#226）合并前记录。
+
+- **日期**：2026-09-25
+- **背景**：ADR-012 修订 1 决定 9 规定资料修订为 `(material_id, 内容哈希, 解析器版本)`，块 ID = `revision_id` + 块序号，块一经写入不可变。D09（#226）实现时发现：块序号和块文本由 D08 分块器决定，而分块规则与参数（`target_chars`、`overlap_chars`）不在修订键中。只改分块、不改解析器版本时，同一块 ID 会对应不同文本，D10 的不可变检查会拒绝写入，处理失败。可选方案：分块版本并入 `parser_version`；或在修订键中另加字段。
+- **决定**：
+  1. **修订键里的 `parser_version` 是复合版本**：`<解析器版本>+<分块版本>`，例如 `pdf/1+chunk/1@1500-200`。修订键的字段、`revision_id` 公式与块 ID 公式都不变，不另加字段。
+  2. **分块版本 = 分块规则版本 + 实际参数**：形如 `chunk/<规则版本>@<target_chars>-<overlap_chars>`。规则版本由 D08 `chunking.py` 的 `CHUNKER_VERSION` 常量给出，分块输出规则变化时递增；参数取本次实际使用的值，因此改默认值或传入非默认参数都会得到新修订。
+  3. **拼接只在 D09 一处**：D09 提供组合函数，D11 编排时用解析器给出的 `parser_version` 和分块版本组合后写入修订键；各解析器模块的 `PARSER_VERSION` 仍只表示解析器自身。`revision_id` 拒绝不含分块段的 `parser_version`，防止编排时遗漏。
+- **后果**：
+  - D09（#226）追加：组合与校验函数及测试；D08 的 `chunking.py` 增加 `CHUNKER_VERSION` 与分块版本函数，属范围扩展，由本 ADR 授权。
+  - `docs/architecture.md`「资料修订」一行与 `specs/teacher-review-publish.md` 资料修订一条补注复合版本；D10/D11 按本 ADR 写入。
+  - 分块规则或参数一变，已有资料再处理即产生新修订与新块 ID，抽取缓存随块 ID 失效；已发布版本按修订固定，不受影响（与 PUB-29 同理）。
+- **推翻条件**：分块参数需要按课程或按资料频繁调整，导致修订数量失控时，重开决定 2，改为参数只进缓存键。
 - **签收**：ArvinHan 2026-09-25
 
 ## ADR-019：后端加入 `python-multipart` 解析资料上传

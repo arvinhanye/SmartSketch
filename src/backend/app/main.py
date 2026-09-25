@@ -9,7 +9,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.courses import router as courses_router
 from app.api.dependencies import access_error_response
+from app.api.event_tickets import router as event_tickets_router
 from app.api.health import router as health_router
 from app.api.materials import router as materials_router
 from app.config import check_auth_settings, load_settings
@@ -75,6 +77,8 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(event_tickets_router)
+    application.include_router(courses_router)
     application.include_router(materials_router)
     return application
 
