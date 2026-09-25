@@ -168,6 +168,17 @@ def test_create_rejects_invalid_name_with_contract_error(scenario, name):
         assert db.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0
 
 
+def test_explicit_null_description_is_rejected_by_wire_contract(scenario):
+    client, url, teacher, _, _ = scenario
+    response = client.post(
+        "/api/v1/courses", headers=auth(teacher),
+        json={"name": "Algebra", "description": None},
+    )
+    assert (response.status_code, response.json()["code"]) == (422, "VALIDATION_ERROR")
+    with connect(url) as db:
+        assert db.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0
+
+
 def test_list_requires_token(scenario):
     client, _, _, _, _ = scenario
     response = client.get("/api/v1/courses")

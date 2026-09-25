@@ -21,13 +21,13 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 基线与文件锁 | 验收 |
 | --- | --- | --- | --- | --- | --- |
-| C04 | DONE（本分支验证；待 C03 集成后复验/PR） | 实现课程列表和创建 API | Codex（后端） | `main@a7a0be0` + C03 提交 `44f77cf` 的独立工作树 `codex/c04-courses-api`；独占 `src/backend/app/api/courses.py`、`src/backend/app/services/courses.py`、`tests/backend/test_c04.py`；扩围 `src/backend/app/main.py` 作路由注册、`src/backend/app/schemas/contracts.py` 加载生成 DTO | C04 9 passed、后端 1028 passed、生成物检查 exit 0、`verify.sh` exit 0（UTF-8 输出环境）；C03 合并后须在 main 集成状态复验 |
+| C04 | DONE（本分支验证；待 C03 集成后复验/PR） | 实现课程列表和创建 API | Codex（后端） | `main@a7a0be0` + C03 提交 `44f77cf` 的独立工作树 `codex/c04-courses-api`；独占 `src/backend/app/api/courses.py`、`src/backend/app/services/courses.py`、`tests/backend/test_c04.py`；扩围 `src/backend/app/main.py` 作路由注册、`src/backend/app/schemas/contracts.py` 加载生成 DTO | C04 10 passed、后端 1029 passed、生成物检查 exit 0、`verify.sh` exit 0（UTF-8 输出环境）；C03 合并后须在 main 集成状态复验 |
 
 - 输入：C02 课程仓储、C03 身份依赖、ADR-013、`specs/identity-access.md` §3.2/§4.4、`specs/teacher-review-publish.md` V7、`src/contracts/api.v1.yaml`。输出：GET/POST `/api/v1/courses`，只列可见课程；创建课程和创建者教师成员同事务。
 - 调用链：H01 页面/状态经 B15 API 客户端消费生成的 `Course`/`CourseCreate`；路由用 C03 `current_user`/`teacher_account`；课程服务调 C02 仓储；SQLite `courses`/`course_members` 持有数据。无 worker、Neo4j、SSE。路径、字段、枚举、错误码和鉴权均沿用 v1 契约；不改真源或生成物。
 - 风险：C03 PR #216 尚未集成，C04 分支仅供条件审查，不能声称 main 跨模块集成通过；生成 Python DTO 不在后端安装包的导入路径，扩围 `app/schemas/contracts.py` 加载仓库已生成文件，部署打包须由后续 K08 保证携带该文件。无数据库迁移；回滚仅撤销 C04 提交，不触碰 C03。
 - 验收命令：`python -m pytest tests/backend/test_c04.py -q`、`python -m pytest tests/backend -q`、`./scripts/gen-contracts.sh --check`（核对契约未漂移）、`./scripts/verify.sh`、`git diff --check`。测试用隔离 SQLite 与 fake 身份数据，覆盖成功、边界、错误、课程隔离和生成 DTO 匹配。
-- 实测：C03 基线 17 passed；C04 首个测试先以 404 失败，接入后 9 passed；后端全量 1028 passed；`gen-contracts.sh --check` exit 0；`verify.sh` 首次因 Windows GBK 控制台无法输出 ✓ 字符 exit 1，设置 `PYTHONIOENCODING=utf-8` 后 exit 0（契约负例 24 项通过）。无前端功能修改，前端类型检查/构建、CI 和合并后验证未运行。
+- 实测：C03 基线 17 passed；C04 首个测试先以 404 失败，接入后 9 passed；独立审查指出显式 `description: null` 被生成 Python 模型放宽，新增先失败 HTTP 用例并在路由拒绝，最终 C04 10 passed、后端全量 1029 passed；`gen-contracts.sh --check` exit 0；`verify.sh` 首次因 Windows GBK 控制台无法输出 ✓ 字符 exit 1，设置 `PYTHONIOENCODING=utf-8` 后 exit 0（契约负例 24 项通过）。无前端功能修改，前端类型检查/构建、CI 和合并后验证未运行。
 
 ## 2026-09-25 Codex 认领：C03
 
