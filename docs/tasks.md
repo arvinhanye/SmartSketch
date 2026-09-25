@@ -4,7 +4,7 @@
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B12 | DONE（待 PR 审查/合并） | 迁移进度和推荐契约 | ArvinHan（Claude 子代理执行） | `claude/b12-progress-contract` / base `8eeac3b` | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`；按 B08～B13 先例接入 `scripts/verify/contracts.sh`；随附 `specs/learning-path.md` 状态标注与 `docs/handoffs/claude-b12.md` | 改真源前 B12 65 failed / 28 passed，改后 93 passed；契约全量 255 passed；`./scripts/gen-contracts.sh --check` exit 0；`./scripts/verify.sh` exit 0（含 B12 回归）；生成 TS `tsc --noEmit --strict` exit 0；`git diff --check` exit 0；反向篡改 6 处均被检出；范围扩展：`src/contracts/errors.v1.md` 登记 `details.diagnostic_id`；`docs/handoffs/claude-b12.md` |
+| B12 | DONE（PR #202 `d633160`） | 迁移进度和推荐契约 | ArvinHan（Claude 子代理执行） | `claude/b12-progress-contract` / base `8eeac3b` | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`；按 B08～B13 先例接入 `scripts/verify/contracts.sh`；随附 `specs/learning-path.md` 状态标注与 `docs/handoffs/claude-b12.md` | 改真源前 B12 65 failed / 28 passed，改后 93 passed；契约全量 255 passed；`./scripts/gen-contracts.sh --check` exit 0；`./scripts/verify.sh` exit 0（含 B12 回归）；生成 TS `tsc --noEmit --strict` exit 0；`git diff --check` exit 0；反向篡改 6 处均被检出；范围扩展：`src/contracts/errors.v1.md` 登记 `details.diagnostic_id`；`docs/handoffs/claude-b12.md` |
 
 - 输入：`specs/learning-path.md`（LP-1～19、§7）、ADR-014 及修订 1、`docs/atomic-task-plan.md` B12 行；输出：`ProgressEntry` 新字段、GET/PUT 返回全部节点、推荐 DTO 与未发布错误/全部掌握空态区分。
 - 依赖：B08、A08 已完成；B11 已合入并释放 YAML 锁（issue #54）。
@@ -15,6 +15,7 @@
   2. `PUT /progress` 中 `kp_id` 不在绑定发布版（草稿独有、已删除、他课、发布指针变化后复核失败）时整批拒绝的公开码（422/404/409）与 `details` 形状；契约描述暂写“待定”。
 - 待审查的契约决定：进度响应改为 `ProgressResponse{graph_version, entries}`；移除推荐 `target`/`path`（§7，交 O02）；重复 `kp_id` 归 422 `VALIDATION_ERROR`。详见交接。
 - 观察：`tests/contracts/test_b11.py` 未接入 `scripts/verify/contracts.sh`，不在 B12 范围内，未改。
+- 合并（2026-09-25）：PR #202。合并前协调方补修 `tests/tooling/test_b07.py` 门禁夹具缺 `test_b12.py` 占位（`verify.sh` 与 CI 均不跑 `tests/tooling`，未检出）。B14 现可占用 YAML 与生成物文件锁。
 
 ## B11 图谱编辑与版本契约（2026-09-24）
 
@@ -642,34 +643,35 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F05 | DONE（待 PR 审查/合并） | 实现 DAG 环检测纯函数 | ArvinHan（Claude 子代理） | `claude/f05-dag-cycle` / `8eeac3b` | `src/backend/app/services/graph/dag.py`、`tests/backend/test_f05.py`、`docs/handoffs/claude-f05.md` | 红：仅测试时收集错误（无 `app.services.graph`）；桩函数 72 failed。绿：`test_f05.py` 73 passed；`tests/backend` 793 passed（基线 720）；5 处篡改全部被检出（其中旋转篡改首轮漏检，已补测试）；`./scripts/verify.sh`、`git diff --check` exit 0。另补 `services/graph/__init__.py`。见 `docs/handoffs/claude-f05.md` |
+| F05 | DONE（PR #203 `b4ed883`） | 实现 DAG 环检测纯函数 | ArvinHan（Claude 子代理） | `claude/f05-dag-cycle` / `8eeac3b` | `src/backend/app/services/graph/dag.py`、`tests/backend/test_f05.py`、`docs/handoffs/claude-f05.md` | 红：仅测试时收集错误（无 `app.services.graph`）；桩函数 72 failed。绿：`test_f05.py` 73 passed；`tests/backend` 793 passed（基线 720）；5 处篡改全部被检出（其中旋转篡改首轮漏检，已补测试）；`./scripts/verify.sh`、`git diff --check` exit 0。另补 `services/graph/__init__.py`。见 `docs/handoffs/claude-f05.md` |
 
 - F05 验收：自环、三节点环、反转造环、断开图、大链条；复杂度边界明确。验证：`python3 -m pytest tests/backend/test_f05.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E02 | DONE（待 PR 审查/合并） | 建立模型接口和 fake 适配器 | ArvinHan（Claude 子代理） | `claude/e02-ai-client` / `8eeac3b` | `src/backend/app/services/ai/client.py`、`src/backend/app/services/ai/fake.py`、`tests/backend/test_e02.py`、`docs/handoffs/claude-e02.md` | `docs/handoffs/claude-e02.md`；实现 `c87ae5c`；E02 先红（收集错误 exit 2）后 65 passed；后端 785 passed；`verify.sh` exit 0；`git diff --check` exit 0；5 处篡改均被检出；无新依赖；待决见交接（fake 模式模型 ID、缓存键取哪个模型 ID） |
+| E02 | DONE（PR #207 `aaae534`） | 建立模型接口和 fake 适配器 | ArvinHan（Claude 子代理） | `claude/e02-ai-client` / `8eeac3b` | `src/backend/app/services/ai/client.py`、`src/backend/app/services/ai/fake.py`、`tests/backend/test_e02.py`、`docs/handoffs/claude-e02.md` | `docs/handoffs/claude-e02.md`；实现 `c87ae5c`；E02 先红（收集错误 exit 2）后 65 passed；后端 785 passed；`verify.sh` exit 0；`git diff --check` exit 0；5 处篡改均被检出；无新依赖；待决见交接（fake 模式模型 ID、缓存键取哪个模型 ID） |
 
 - E02 验收：固定输入输出可复现；超时/坏 JSON/限流可模拟；无需密钥。验证：`python3 -m pytest tests/backend/test_e02.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D06 | DONE（待 PR 审查/合并） | 实现 PDF 标题判定 | ArvinHan（Claude 子代理） | `claude/d06-pdf-headings` / `8eeac3b` | `src/backend/app/services/parsers/pdf_headings.py`、`tests/backend/test_d06.py`、`docs/handoffs/claude-d06.md` | `docs/handoffs/claude-d06.md`；无新依赖；先红（模块缺失，收集错误 exit 2）后绿：D06 34 passed，后端 754 passed，6 项反向篡改均被检出；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
+| D06 | DONE（PR #208 `1ffda90`） | 实现 PDF 标题判定 | ArvinHan（Claude 子代理） | `claude/d06-pdf-headings` / `8eeac3b` | `src/backend/app/services/parsers/pdf_headings.py`、`tests/backend/test_d06.py`、`docs/handoffs/claude-d06.md` | `docs/handoffs/claude-d06.md`；无新依赖；先红（模块缺失，收集错误 exit 2）后绿：D06 34 passed，后端 754 passed，6 项反向篡改均被检出；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
 
 - D06 验收：正文加粗不误做所有标题；标题跨页、无字号层级有退路。验证：`python3 -m pytest tests/backend/test_d06.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D07 | DONE（待 PR 审查/合并） | 实现重复页眉页脚清洗 | ArvinHan（Claude 子代理） | `claude/d07-header-footer` / `8eeac3b` | `src/backend/app/services/parsers/cleanup.py`、`tests/backend/test_d07.py`、`docs/handoffs/claude-d07.md` | `docs/handoffs/claude-d07.md`；标准库、无新依赖；先红（收集错误 exit 2）后绿 D07 43 passed；6 处反向篡改均被检出；后端 763 passed（venv，Python 3.13.5）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
+| D07 | DONE（PR #204 `003dd20`） | 实现重复页眉页脚清洗 | ArvinHan（Claude 子代理） | `claude/d07-header-footer` / `8eeac3b` | `src/backend/app/services/parsers/cleanup.py`、`tests/backend/test_d07.py`、`docs/handoffs/claude-d07.md` | `docs/handoffs/claude-d07.md`；标准库、无新依赖；先红（收集错误 exit 2）后绿 D07 43 passed；6 处反向篡改均被检出；后端 763 passed（venv，Python 3.13.5）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
 
 - D07 验收：重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗。验证：`python3 -m pytest tests/backend/test_d07.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C02 | DONE（待 PR 审查/合并） | 实现课程和成员仓储 | ArvinHan（Claude 子代理；原 539210） | `claude/c02-course-repo` / `8eeac3b` | `src/backend/app/repositories/courses.py`、`src/backend/migrations/NNN_courses.sql`（D-10：合并时取 main 最大编号 + 1）、`tests/backend/test_c02.py`、`docs/handoffs/claude-c02.md` | 迁移取 `004_courses.sql`（C06 #209 先占 003，按 D-10 改号；同步适配 `test_c13.py`、`test_c06.py` 迁移断言）。`test_c02.py`：实现前收集失败（ImportError，0 passed），实现后 21 passed；4 处反向篡改分别 2/2/1/2 failed，恢复后全绿。`tests/backend` 初为 1 failed / 740 passed（`test_c13.py` 断言迁移目录只到 002）；协调方以单独提交把该用例改为只含 001、002 的临时目录（范围扩展），复跑 741 passed。`./scripts/verify.sh` exit 0；`git diff --check` exit 0。交接 `docs/handoffs/claude-c02.md` |
+| C02 | DONE（PR #206 `a7a0be0`） | 实现课程和成员仓储 | ArvinHan（Claude 子代理；原 539210） | `claude/c02-course-repo` / `8eeac3b` | `src/backend/app/repositories/courses.py`、`src/backend/migrations/NNN_courses.sql`（D-10：合并时取 main 最大编号 + 1）、`tests/backend/test_c02.py`、`docs/handoffs/claude-c02.md` | 迁移取 `004_courses.sql`（C06 #209 先占 003，按 D-10 改号；同步适配 `test_c13.py`、`test_c06.py` 迁移断言）。`test_c02.py`：实现前收集失败（ImportError，0 passed），实现后 21 passed；4 处反向篡改分别 2/2/1/2 failed，恢复后全绿。`tests/backend` 初为 1 failed / 740 passed（`test_c13.py` 断言迁移目录只到 002）；协调方以单独提交把该用例改为只含 001、002 的临时目录（范围扩展），复跑 741 passed。`./scripts/verify.sh` exit 0；`git diff --check` exit 0。交接 `docs/handoffs/claude-c02.md` |
 
 - C02 验收：课程成员唯一；同用户不同课程角色独立；读写外键正确（`course_members.user_id` → C13 的 `users`）。验证：`python3 -m pytest tests/backend/test_c02.py -q`。
 
+- 进展（2026-09-25）：五项均已合并，本批完成。合并前协调方统一了本节五行、把 C02 迁移改号为 004（C06 #209 先占 003），并修复 C01 迁移器与 C06 任务表不兼容（FIX-MIGRATE-LEASE，#212）。合并后 main 复核：后端 1002 passed、契约与工具 269 passed、`verify.sh` exit 0；收尾交接见 `docs/handoffs/claude-batch-0925-closeout.md`。
 - 并行约束：各子任务只写自己的文件锁与交接文件，并只改本节自己那一张表的状态与证据；不改 `docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`、`parsers/__init__.py`、`parsers/models.py` 等共享文件，需要时停下交协调方。
 
 ## F01 复用本地 Neo4j 环境并验证
@@ -686,6 +688,6 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| FIX-MIGRATE-LEASE | DONE（待 PR 审查/合并） | C01 迁移器只对有租约列的表检查租约，解除 C06 `processing_tasks`（无租约列）对 003 之后所有迁移的阻塞 | ArvinHan（Claude 协调方） | `claude/fix-migrate-lease-guard` / `1ffda90` | `src/backend/app/repositories/sqlite.py`、`tests/backend/test_c01.py`、`docs/handoffs/claude-fix-migrate-lease.md` | 复现用例 3 个修前 failed、修后 C01 21 passed；后端 981 passed；`docs/handoffs/claude-fix-migrate-lease.md` |
+| FIX-MIGRATE-LEASE | DONE（PR #212 `4e42a5d`） | C01 迁移器只对有租约列的表检查租约，解除 C06 `processing_tasks`（无租约列）对 003 之后所有迁移的阻塞 | ArvinHan（Claude 协调方） | `claude/fix-migrate-lease-guard` / `1ffda90` | `src/backend/app/repositories/sqlite.py`、`tests/backend/test_c01.py`、`docs/handoffs/claude-fix-migrate-lease.md` | 复现用例 3 个修前 failed、修后 C01 21 passed；后端 981 passed；`docs/handoffs/claude-fix-migrate-lease.md` |
 
 - 后续：C09 加租约列时，补一条真实表上“有效租约阻止迁移”的回归。
