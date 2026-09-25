@@ -138,7 +138,7 @@ def shell_workspace(tmp_path: Path) -> Path:
     negative = tmp_path / "tests/contracts/test_contracts.py"
     negative.parent.mkdir(parents=True)
     negative.write_text("print('✓ negative checks passed')\n", encoding="utf-8")
-    for name in ("test_b08.py", "test_b09.py", "test_b10.py", "test_b12.py", "test_b13.py"):
+    for name in ("test_b08.py", "test_b09.py", "test_b10.py", "test_b12.py", "test_b13.py", "test_b14.py"):
         (negative.parent / name).write_text("def test_contract_placeholder(): pass\n", encoding="utf-8")
     return tmp_path
 
