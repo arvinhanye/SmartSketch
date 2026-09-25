@@ -59,7 +59,27 @@
 | --- | --- | --- | --- |
 | `UNSUPPORTED_FORMAT` | 415 | 扩展名或嗅探结果不属于 PDF/DOCX/TXT/Markdown | 在上传组件内高亮该文件，列出支持格式 |
 | `FILE_TOO_LARGE` | 413 | 超出单文件上限 | 提示上限值，`details.limit_bytes` 给出数值 |
-| `VALIDATION_ERROR` | 422 | 请求体不满足 schema | 定位到具体字段，`details.fields` 给出字段级说明 |
+| `VALIDATION_ERROR` | 422 | 请求体、查询、路径、请求头或 Cookie 参数不满足 schema | 按 `details.fields` 定位到具体字段，结构见下 |
+
+`VALIDATION_ERROR` 的 `details` 固定为 `{"fields": [...]}`，每个出错位置一项，顺序与校验器报告的顺序相同：
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `in` | string | 出错的请求部位：`body`、`query`、`path`、`header`、`cookie`；无法归入任何部位时为空串 |
+| `field` | string | 该部位内的字段点路径，如 `password`、`items.0.name`；整个部位出错（缺少请求体、JSON 无法解析）时为空串 |
+| `reason` | string | 机读原因，取 Pydantic 错误类型，如 `missing`、`string_too_long`、`too_long`、`int_parsing`、`json_invalid` |
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "请求参数不符合要求，请检查标注的字段",
+  "details": { "fields": [{ "in": "body", "field": "password", "reason": "missing" }] }
+}
+```
+
+- **不回显输入**：`details` 不含提交的值或校验器的原文说明，口令等敏感字段只以字段名出现。
+- `reason` 的取值随校验库而定，不是闭集。前端按 `in` 与 `field` 定位字段，遇到不认识的 `reason` 显示通用提示。
+- 由后端全局请求校验处理器统一产生（C13 引入），所有路由都用这个形状。
 
 ### 图谱编辑
 

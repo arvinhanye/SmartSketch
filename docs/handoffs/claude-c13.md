@@ -66,7 +66,7 @@
 3. **`SEED_DEMO_PASSWORD` 没有写成 `.env.example` 的有效行**：B06 的 `test_env_example_covers_every_setting` 要求 `.env.example` 中的变量与 `Settings` 字段集合完全相等，而该变量只给种子脚本用，不应进入 `Settings`。所以写成注释行，并在 `docs/integrations.md` 登记。C14 可以沿用，或调整 B06 的这条断言。
 4. ~~`src/backend/README.md` 未更新~~：已按 REVIEW-C13 R06 补写（审查明确要求，越出原文件锁）。
 5. **`docs/tasks.md` 的 C13 行**：由协调方更新为待审查，证据指向本交接。
-6. **`src/contracts/errors.v1.md` 补 `details.fields` 结构**（不在锁内）：本任务定为 `[{in, field, reason}]`，见文末「审查修正」R01。
+6. ~~`src/contracts/errors.v1.md` 补 `details.fields` 结构~~：C13 合并后由协调方在任务板 PR 中登记（「上传与解析」节 `VALIDATION_ERROR` 下）。
 
 ## 未验证项与风险
 
@@ -106,4 +106,4 @@
 | `./scripts/verify.sh` | `Scaffold verification passed.`，exit 0 |
 | `git diff --check` | exit 0 |
 
-需协调方处理：在 `src/contracts/errors.v1.md` 登记 `details.fields` 的 `[{in, field, reason}]` 结构。
+~~需协调方处理：在 `src/contracts/errors.v1.md` 登记 `details.fields` 的结构~~：已登记。
