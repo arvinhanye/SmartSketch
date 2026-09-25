@@ -29,13 +29,32 @@ resolve_compose() {
 
 require_env_file() {
   [[ -f .env ]] || die "缺少 .env。先执行：cp .env.example .env，再按 docs/integrations.md 填写 NEO4J_PASSWORD。"
-  set -a
-  # shellcheck disable=SC1091
-  . ./.env
-  set +a
-  : "${NEO4J_USER:?.env 缺少 NEO4J_USER}"
-  : "${NEO4J_PASSWORD:?.env 缺少 NEO4J_PASSWORD}"
-  : "${STORAGE_DIR:=./storage}"
+  # Compose 自行读取 .env；绝不把它当 shell 脚本执行（值可能含 $、空格或命令替换）。
+}
+
+# 仅供本机目录/提示读取非敏感设置。环境变量优先级与 Compose 一致；不导出、不改写 .env。
+# 值按字面量读取，支持完整单/双引号和 CRLF；密码由 Compose 自己解析，绝不经此函数读取。
+env_setting() {
+  local key="$1" fallback="$2" line value
+  local double_quoted='^"([^"]*)"[[:space:]]*(#.*)?$'
+  local single_quoted="^'([^']*)'[[:space:]]*(#.*)?$"
+  if [[ -n ${!key:-} ]]; then printf '%s\n' "${!key}"; return; fi
+  while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line == "$key="* ]] || continue
+    value="${line#*=}"
+    value="${value%$'\r'}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    if [[ $value =~ $double_quoted || $value =~ $single_quoted ]]; then
+      value="${BASH_REMATCH[1]}"
+    else
+      # Compose: 未加引号的值仅在空白后遇到 # 才把余下部分视为注释。
+      value="${value%% \#*}"
+      value="${value%%$'\t'\#*}"
+      value="${value%"${value##*[![:space:]]}"}"
+    fi
+    [[ -n $value ]] && { printf '%s\n' "$value"; return; }
+  done < .env
+  printf '%s\n' "$fallback"
 }
 
 # 输出 neo4j 服务容器的健康状态：healthy / starting / unhealthy / none（无健康检查）/ missing（未创建）。

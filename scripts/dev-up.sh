@@ -5,16 +5,17 @@ set -euo pipefail
 # shellcheck source=scripts/_dev-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/_dev-common.sh"
 
-resolve_compose
 require_env_file
+storage_dir="$(env_setting STORAGE_DIR ./storage)"
+wait_seconds="$(env_setting NEO4J_WAIT_SECONDS 180)"
+[[ $wait_seconds =~ ^[0-9]+$ ]] || die "NEO4J_WAIT_SECONDS 必须是非负整数。"
+resolve_compose
 
 echo "→ 创建本地数据目录（均在 .gitignore 忽略范围内）"
-mkdir -p "$STORAGE_DIR" neo4j/data neo4j/logs
+mkdir -p "$storage_dir" neo4j/data neo4j/logs
 
 echo "→ 启动 Neo4j"
 "${COMPOSE[@]}" up -d neo4j
-
-wait_seconds="${NEO4J_WAIT_SECONDS:-180}"
 echo "→ 等待健康检查通过（最多 ${wait_seconds} 秒；首次启动要初始化数据目录，较慢）"
 deadline=$((SECONDS + wait_seconds))
 while :; do
@@ -31,6 +32,6 @@ done
 "$REPO_ROOT/scripts/check-apoc.sh"
 
 echo
-echo "Neo4j Browser： http://localhost:${NEO4J_HTTP_PORT:-7474}"
-echo "Bolt 地址    ： bolt://localhost:${NEO4J_BOLT_PORT:-7687}（后端读 .env 的 NEO4J_URI）"
-echo "停止（保留数据）：${COMPOSE[*]} stop neo4j   或   ${COMPOSE[*]} down"
+echo "Neo4j Browser： http://localhost:$(env_setting NEO4J_HTTP_PORT 7474)"
+echo "Bolt 地址    ： bolt://localhost:$(env_setting NEO4J_BOLT_PORT 7687)（后端读 .env 的 NEO4J_URI）"
+echo "停止（保留数据）：$REPO_ROOT/scripts/dev-down.sh"
