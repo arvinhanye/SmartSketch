@@ -9,10 +9,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.dependencies import access_error_response
 from app.api.health import router as health_router
 from app.config import check_auth_settings, load_settings
 from app.schemas.errors import Error
 from app.services.auth import LoginRateLimiter, prepare_timing_dummy_hash
+from app.services.access import AccessDenied
 from app.services.startup import validate_embedding_space, validate_schema_current
 
 
@@ -69,6 +71,7 @@ def create_app() -> FastAPI:
     application.state.auth_clock = time.time
     prepare_timing_dummy_hash()  # never let the first unknown-user login take twice as long
     application.add_exception_handler(RequestValidationError, _validation_error_handler)
+    application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
     return application

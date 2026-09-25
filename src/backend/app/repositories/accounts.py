@@ -40,6 +40,15 @@ def find_by_username(sqlite_url: str, username: str) -> AccountRecord | None:
     return AccountRecord(*row) if row else None
 
 
+def find_by_id(sqlite_url: str, user_id: str) -> AccountRecord | None:
+    """Resolve a verified token subject on every request (C03)."""
+    with connect(sqlite_url) as database:
+        row = database.execute(
+            f"SELECT {_COLUMNS} FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    return AccountRecord(*row) if row else None
+
+
 def insert_account(
     sqlite_url: str, *, account_id: str, username: str, password_hash: str, role: str
 ) -> AccountRecord:
