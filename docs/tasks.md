@@ -68,7 +68,7 @@
 
 | ID | 问题 | 决策人 | 需要在何时确认 |
 | --- | --- | --- | --- |
-| D-01 | MVP 首批课程示例和脱敏资料来源 | 产品负责人 | M1 开始前 |
+| D-01 | MVP 首批课程示例和脱敏资料来源。所选材料须覆盖一门完整课程的一章，作为赛题抽取硬指标的基准（REQ-01，`specs/course-knowledge-graph.md` 验收 7）；按赛题第 7 节，只用自编示例或许可允许使用的开源教材 | 产品负责人 | M1 开始前 |
 | D-02 | 首个 OpenAI 兼容模型供应商与预算上限。A07 已拆为 D-02a～f 六项，签收入口见 `docs/integrations.md`「待签收取值（D-02）」；配置形状与规则已定，取值均未签收 | 技术负责人 | 接入抽取服务前（fake 实现可先行） |
 | D-03 | 登录是否先采用本地演示角色。**已关闭**：ADR-013（A05）定为本地账号 + 预置演示账号，不采用纯演示角色；账号类型与课程内角色分离；教师按用户名添加学生（ArvinHan，2026-09-23 签收） | 产品负责人 | 已完成 |
 | PLAN-D01 | 两个 Claude 分支 YAML-first/Pydantic-first 唯一源、API 前缀和冲突 ADR 编号如何统一（A01/A02）。**已关闭**：唯一源与 ADR 编号由 ADR-004 签收；API 前缀由 ADR-009（A02）定为 `/api/v1`（均为 ArvinHan，2026-09-22） | 技术负责人 | 已完成 |
@@ -512,3 +512,14 @@
 - 进展（2026-09-24）：C05、E01 已合并；D01 已开 PR #183；C13 进行中。上传上限按 D-11 在 C13 合并后补进配置。
 - 不在本批：B12（与 539210 的 B11 同改 `api.v1.yaml`）、B07（与 C13 可能同改 `pyproject.toml`）、F01（需要本机 Docker/Neo4j）。
 - 并行约束：四项都不改 `docs/tasks.md`、`docs/architecture.md`、`scripts/verify.sh`；需要改共享文件时停下来交给协调方。
+
+## REQ-01 赛题抽取硬指标补登
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| REQ-01 | DONE（文档补登；指标尚未实测） | 把赛题「技术要求与指标（一）」的两项硬指标（单章实体 ≥ 20、人工抽样准确率 ≥ 70%）补进规格和原子任务 | ArvinHan（Claude 执行） | `claude/pdf-course-model-training-0b0f46` / `6639e16` | `specs/course-knowledge-graph.md`（关联任务、验收 7）、`docs/product.md`（MVP 表「抽取质量」行）、`docs/atomic-task-plan.md` 与 `docs/atomic-tasks.json`（K01、K02 行，人工决策门 D-01 行）、本节与 D-01 行、`docs/handoffs/claude-req-01.md` | `validate_atomic_plan.py` PASS（141 项，MD/JSON 一致）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；`docs/handoffs/claude-req-01.md` |
+
+- 输入：赛题原文 `【A10】基于AIGC的课程知识图谱智能构建与学习导航系统【金扬智能】.docx`（在主目录，不入库）第 6 节「技术要求与指标（一）」与第 7 节。
+- 输出：验收 7 规定了基准材料、实体数、准确率、判定对象、报告内容和失败路径；K01 负责口径与一章量的标注材料，K02 负责计算、判定并新增 `evaluation/reports/extraction-accuracy.md`。
+- 核对：赛题其余指标已有覆盖——格式 ≥ 2 种、关系 ≥ 3 种（四格式、四关系）；问答 ≤ 15 秒（`LLM_CHAT_TIMEOUT_SECONDS`、K04）；讲解与练习题（O05/O06）；赛题不要求训练模型。
+- 需人工确认：70% 按「实体、关系分别达标」这一较严理解写入；若产品负责人认为只需实体或合并计算，改验收 7 与 K01/K02 这三处即可。
