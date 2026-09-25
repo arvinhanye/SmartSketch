@@ -10,7 +10,7 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `src/backend/migrations/003_courses.sql` | 新表 `courses`、`course_members`，索引 `idx_course_members_user_id`，两个 IAM-24 触发器 |
+| `src/backend/migrations/004_courses.sql`（原 003，见下「合并前改号」） | 新表 `courses`、`course_members`，索引 `idx_course_members_user_id`，两个 IAM-24 触发器 |
 | `src/backend/app/repositories/courses.py` | `create_course`、`get_course`、`list_member_courses`、`get_member`、`list_members`、`add_member`、`remove_member`；记录类型 `CourseRecord`、`MemberRecord`；异常 `UnknownUser`、`UnknownCourse`、`RoleNotAllowed`（均继承 `ValueError`） |
 | `tests/backend/test_c02.py` | 21 个用例（成功、边界、失败路径） |
 
@@ -100,3 +100,12 @@
 - **C03**：`get_member(course_id, user_id)` 返回 `None` 即非成员（403 `COURSE_FORBIDDEN`），否则按 `.role` 判定课程内角色；课程不存在同样返回 `None`，满足 IAM-16「不存在的课程也给 403」。
 - **C04**：建课调用 `create_course`（先检查账号类型是教师）；列课程用 `list_member_courses`，再过滤掉「角色为 `student` 且 `published_version is None`」的项（§4.4）；`my_role` 就是返回的角色。`status` 按 ADR-012 决定 7 从三个修订列推导。
 - **C15**：添加学生前用 `accounts.find_by_username` 查出用户，停用或不存在就返回 404，再调用 `add_member(role="student", added_by=调用者)`，按 `created` 返回 201 或 200；移除前用 `get_member` 确认目标是学生。
+
+## 合并前改号与同步（协调方，2026-09-25）
+
+- Codex 的 C06（PR #209）先合入 main，占用 `003_tasks.sql`。按 D-10，本任务迁移改名为 **`004_courses.sql`**；上文「003」「before-003」在合并后均应读作「004」「before-004」（回滚用 `backups/*-before-004.sqlite`）。
+- `test_c02.py` 迁移用例改为：先用只含 001～003 的目录迁移，再用只含 001～004 的目录断言只应用 `004`，后续迁移不再影响该用例。
+- `test_c13.py`：C06 把断言写死为 `["002", "003"]` / `["001", "002", "003"]`，合并时取本分支「只含 001、002 的临时目录」写法并把 `schema_migrations` 断言恢复为 `["001", "002"]`。
+- `test_c06.py`（范围扩展）：夹具 `assert migrate(url) == ["001", "002", "003"]` 改为只断言前三项，否则 004 加入后 C06 全部用例报错。
+- 同步时发现 main 缺陷：C01 迁移器对无 `lease_expires_at` 列的 `processing_tasks`（C06 建、C09 才加租约列）报 `Cannot inspect processing_tasks lease state`，使 003 之后任何迁移都无法应用。已在 `claude/fix-migrate-lease-guard` 单独修复（先写复现测试），并并入本分支；见 `docs/handoffs/claude-fix-migrate-lease.md`。
+
