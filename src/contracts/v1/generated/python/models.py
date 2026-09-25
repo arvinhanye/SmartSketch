@@ -904,7 +904,7 @@ class ProgressNotInPublishedVersionField(BaseModel):
         extra='forbid',
     )
     in_: Annotated[Literal['body'], Field(alias='in')]
-    field: Annotated[str, Field(pattern='^\\[(0|[1-9][0-9]*)\\]\\.kp_id$')]
+    field: Annotated[str, Field(pattern='^(0|[1-9][0-9]*)\\.kp_id$')]
     reason: Literal['not_in_published_version']
 
 

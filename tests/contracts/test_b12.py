@@ -375,8 +375,8 @@ NOT_PUBLISHED = {
     "message": "部分知识点不在当前发布的课程图谱中，请刷新后重试",
     "details": {
         "fields": [
-            {"in": "body", "field": "[0].kp_id", "reason": "not_in_published_version"},
-            {"in": "body", "field": "[12].kp_id", "reason": "not_in_published_version"},
+            {"in": "body", "field": "0.kp_id", "reason": "not_in_published_version"},
+            {"in": "body", "field": "12.kp_id", "reason": "not_in_published_version"},
         ],
         "graph_version": 4,
     },
@@ -426,11 +426,13 @@ def test_progress_generic_validation_errors_stay_open(payload):
     _details(fields=[_ITEM | {"input": "kp_x"}]),                                   # 不回显输入
     _details(fields=[_ITEM | {"reason": "not_found"}]),                             # reason 闭合
     _details(fields=[_ITEM | {"reason": "missing"}]),
-    _details(fields=[_ITEM, {"in": "body", "field": "[1].status", "reason": "enum"}]),  # 不与其他 reason 混排
+    _details(fields=[_ITEM, {"in": "body", "field": "1.status", "reason": "enum"}]),    # 不与其他 reason 混排
     _details(fields=[_ITEM | {"in": "query"}]),
-    _details(fields=[_ITEM | {"field": "[0].status"}]),
-    _details(fields=[_ITEM | {"field": "[-1].kp_id"}]),
-    _details(fields=[_ITEM | {"field": "[01].kp_id"}]),
+    _details(fields=[_ITEM | {"field": "0.status"}]),
+    _details(fields=[_ITEM | {"field": "-1.kp_id"}]),
+    _details(fields=[_ITEM | {"field": "01.kp_id"}]),
+    _details(fields=[_ITEM | {"field": "[0].kp_id"}]),                              # ADR-017 勘误：点路径，不用方括号
+    _details(fields=[_ITEM | {"field": "body.0.kp_id"}]),                           # 部位在 `in` 中，不进 field
     _details(fields=[]),
     NOT_PUBLISHED | {"code": "NOT_FOUND"},                                          # 不用 404
     NOT_PUBLISHED | {"code": "PUBLISH_IN_PROGRESS"},                                # 不用 409
@@ -438,13 +440,22 @@ def test_progress_generic_validation_errors_stay_open(payload):
     {"code": "VALIDATION_ERROR", "message": "m", "details": {"fields": [_ITEM]}},
     # 带 graph_version 而 reason 取别的值
     {"code": "VALIDATION_ERROR", "message": "m",
-     "details": {"fields": [{"in": "body", "field": "[0].kp_id", "reason": "string_too_short"}], "graph_version": 4}},
+     "details": {"fields": [{"in": "body", "field": "0.kp_id", "reason": "string_too_short"}], "graph_version": 4}},
 ], ids=["no-graph-version", "graph-version-0", "graph-version-str", "extra-details", "extra-item-field",
         "reason-not-found", "reason-missing", "mixed-reasons", "in-query", "field-status", "field-negative",
-        "field-leading-zero", "empty-fields", "code-404", "code-409", "reason-without-version",
+        "field-leading-zero", "field-bracket-index", "field-with-source", "empty-fields", "code-404", "code-409", "reason-without-version",
         "version-with-other-reason"])
 def test_progress_not_in_published_version_rejects(payload):
     assert not is_valid("ProgressValidationError", payload)
+
+
+def test_field_path_matches_c13_dot_path():
+    """ADR-017 勘误：`field` 与全局 422 处理器 `main.py::_field_reason` 的点路径一致（`<i>.kp_id`）。"""
+    pattern = SCHEMAS["ProgressNotInPublishedVersionField"]["properties"]["field"]["pattern"]
+    assert pattern == r"^(0|[1-9][0-9]*)\.kp_id$"
+    loc = ("body", 3, "kp_id")                                   # Pydantic 对顶层数组请求体第 3 项的 loc
+    assert re.fullmatch(pattern, ".".join(str(part) for part in loc[1:]))
+    assert "[<i>]" not in (ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8")
 
 
 def test_not_in_published_version_details_are_closed_and_minimal():
@@ -500,7 +511,7 @@ def test_generated_pydantic_models_enforce_shape():
     for bad_details in (_without(NOT_PUBLISHED["details"], "graph_version"),
                         NOT_PUBLISHED["details"] | {"course_id": "c1"},
                         NOT_PUBLISHED["details"] | {"fields": [_ITEM | {"reason": "missing"}]},
-                        NOT_PUBLISHED["details"] | {"fields": [_ITEM | {"field": "[0].status"}]}):
+                        NOT_PUBLISHED["details"] | {"fields": [_ITEM | {"field": "[0].kp_id"}]}):
         with pytest.raises(Exception):
             models.ProgressNotInPublishedVersionDetails.model_validate(bad_details)
 
@@ -545,8 +556,9 @@ def test_learning_path_spec_marks_b12_gap_as_landed():
 def test_learning_path_spec_records_b12_r1():
     text = (ROOT / "specs/learning-path.md").read_text(encoding="utf-8")
     section5 = text.split("## 5. 进度跨版本投影与写入", 1)[1].split("## 6.", 1)[0]
-    for needle in ("422", "VALIDATION_ERROR", "not_in_published_version", "[<i>].kp_id", "graph_version", "ADR-017"):
+    for needle in ("422", "VALIDATION_ERROR", "not_in_published_version", "<i>.kp_id", "graph_version", "ADR-017"):
         assert needle in section5, needle
+    assert "[<i>]" not in section5, "ADR-017 勘误：field 为点路径"
     lp12 = next(line for line in text.splitlines() if line.startswith("| LP-12 "))
     for needle in ("投影到当前发布版节点集", "ProgressOutsideGraphError", "INTERNAL_ERROR", "ADR-017"):
         assert needle in lp12, needle
@@ -562,5 +574,6 @@ def test_errors_doc_registers_request_id_and_not_in_published_version():
     http_rows = [line for line in doc.splitlines() if line.startswith("| `INTERNAL_ERROR` | 500 |")]
     assert len(http_rows) == 1 and "request_id" in http_rows[0] and "ADR-017" in http_rows[0]
     validation = doc.split("`VALIDATION_ERROR` 的 `details`", 1)[1].split("### 图谱编辑", 1)[0]
-    for needle in ("not_in_published_version", "graph_version", "[<i>].kp_id", "PUT /progress", "ADR-017"):
+    for needle in ("not_in_published_version", "graph_version", "<i>.kp_id", "PUT /progress", "ADR-017"):
         assert needle in validation, needle
+    assert "[<i>]" not in validation and "[0].kp_id" not in validation, "ADR-017 勘误：field 为点路径"

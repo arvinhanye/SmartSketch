@@ -1,6 +1,7 @@
 # Claude 交接：B12-R1 进度契约错误细节修订
 
 - `task_id`: B12-R1（issue #223）
+- 提交：首版 `75a3775`；追加提交（ADR-017 勘误 + tooling 基线，协调方决定）见下文“追加提交”。
 - `review_status`: ready_for_review（待 PR 审查/合并）
 - `worktree`: `/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/b12-r1-progress-errors`，分支 `claude/b12-r1-progress-errors`
 - `base_commit`: `d446ecc`（ADR-017 提交）
@@ -16,7 +17,7 @@
   - **决定 5**：`PUT /progress` 的 422 不再引用通用 `ValidationError` 响应，改为 `ProgressValidationError`。新增 3 个 schema，命名沿用 B10 `TaskNotCancellableError`/`Task*Details` 与 B13 `Chat*Error`/`Chat*Details` 的先例：
     - `ProgressValidationError`：`Error` + `code = VALIDATION_ERROR` + `if/then`。只有当 `details.fields` 含 `reason = not_in_published_version`，或 `details` 带 `graph_version` 时，`details` 才必须是下述专用结构。schema 校验失败、同批重复等通用 422 不收窄（写法同 B13 `ChatUnavailableError`）。
     - `ProgressNotInPublishedVersionDetails{fields, graph_version}`：闭合；`fields` 至少 1 项；`graph_version ≥ 1`。
-    - `ProgressNotInPublishedVersionField{in, field, reason}`：闭合；`in = "body"`；`field` 匹配 `^\[(0|[1-9][0-9]*)\]\.kp_id$`；`reason = "not_in_published_version"`。
+    - `ProgressNotInPublishedVersionField{in, field, reason}`：闭合；`in = "body"`；`field` 匹配 `^(0|[1-9][0-9]*)\.kp_id$`（点路径 `<i>.kp_id`，追加提交按 ADR-017 勘误从 `[<i>].kp_id` 改来）；`reason = "not_in_published_version"`。
     - 操作描述与 422 描述写明：草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课是否存在；写入期间发布指针变化同样返回此错误；同批 `kp_id` 重复仍按 B12 已定的通用 422；客户端处置为重新 `GET /progress`。
 - `src/contracts/errors.v1.md`：
   - HTTP `INTERNAL_ERROR` 行：`diagnostic_id` 改为 `request_id`，“专用码待定”改为“不新增专用码，ADR-017 决定 4”。
@@ -26,7 +27,7 @@
   - §5 末尾加“目标不在当前发布版的拒绝码”一段，写明 422 与 `details` 结构。
   - LP-12 期望列补一句：先投影到当前发布版节点集再计算；`ProgressOutsideGraphError` 视为缺陷，按 `INTERNAL_ERROR` 返回。
   - §7 B12 标注下新增“B12-R1 已落实”说明：规格所称“诊断 ID”在 wire 上即 `details.request_id`。
-- `tests/contracts/test_b12.py`：93 个用例增至 122 个，见下。
+- `tests/contracts/test_b12.py`：93 个用例增至 122 个（追加提交后 125 个），见下。
 
 ## 测试（先红后绿）
 
@@ -68,7 +69,7 @@
 | T3 `reason` 的 `const` 放宽为 `enum [not_in_published_version, not_found]` | 3 failed |
 | T4 删去 `if` 中“带 `graph_version` 即触发专用结构”的分支 | 5 failed |
 
-## 实际验证（macOS，Python 3，datamodel-codegen 0.26.3，openapi-typescript 7.4.4，tsc 5.9.3）
+## 首版实际验证（`75a3775`；macOS，Python 3，datamodel-codegen 0.26.3，openapi-typescript 7.4.4，tsc 5.9.3）
 
 | 命令 | 结果 |
 | --- | --- |
@@ -78,6 +79,30 @@
 | `./scripts/gen-contracts.sh --check` | “生成物与真源一致”（exit 0） |
 | `./scripts/verify.sh` | exit 0：B14 3、门禁负向 25 项，B08 5、B09 5、B10 45、B12 122、B13 53 passed，`PASS contracts gate` |
 | `tsc --noEmit --strict openapi.d.ts b12r1_narrow.ts`（借用 `a09-dev-environment-check-8e5e93` worktree 的 `src/frontend/node_modules/.bin/tsc`，文件复制到会话临时目录） | exit 0。正例：`request_id`、完整 422 细节；`@ts-expect-error` 捕获 4 个负例：`diagnostic_id`、`reason: "not_found"`、缺 `graph_version`、`code: "NOT_FOUND"` |
+| `git diff --check` | exit 0 |
+
+## 追加提交（协调方决定：ADR-017 勘误与 tooling 基线）
+
+1. **`field` 改为点路径**：ArvinHan 签收决定 5 的原意是“沿用 C13 已有的 `details.fields` 格式”，ADR 原文 `[<i>].kp_id` 是协调方笔误。现统一为全局 422 处理器 `main.py::_field_reason` 的点路径 `<i>.kp_id`（如 `0.kp_id`）。
+   - `api.v1.yaml`：`pattern` 改为 `^(0|[1-9][0-9]*)\.kp_id$`，422 描述与 `ProgressNotInPublishedVersionField` 描述同步。
+   - `errors.v1.md` 的字段表与示例、`specs/learning-path.md` §5 同步。
+   - `docs/decisions.md` ADR-017：决定 5 原文改为 `<i>.kp_id`，末尾加“勘误”一行。属范围扩展，由协调方授权。
+   - `test_b12.py`：夹具改为点路径。新增负例：`[0].kp_id`、`body.0.kp_id`（部位只写在 `in` 中，不进 `field`）。新增 `test_field_path_matches_c13_dot_path`：`pattern` 与 Pydantic `loc` 按点拼接后的结果一致，真源中不再出现 `[<i>]`。
+   - 先红后绿：只改测试时 8 failed / 117 passed，改真源并重新生成后 125 passed。
+   - 反向篡改 T5：`pattern` 放宽为同时接受方括号与点路径，3 failed；用 `cmp` 核对恢复结果 exit 0，恢复后 125 passed。
+2. **tooling 基线修复**（范围扩展，协调方授权）：`tests/tooling/test_b07.py` 的 `shell_workspace` 占位清单补 `"test_b14.py"`，一行。
+   - 修前 `python3 -m pytest tests/tooling -q`：1 failed / 13 passed（exit 1），失败项为 `test_dispatcher_reports_aggregate_status[0-PASS]`。
+   - 修后：14 passed（exit 0）。
+
+追加提交后的验证：
+
+| 命令 | 结果 |
+| --- | --- |
+| `python3 -m pytest tests/contracts/test_b12.py -q` | 125 passed（exit 0） |
+| `python3 -m pytest tests/contracts tests/tooling -q` | 305 passed（exit 0），tooling 与契约全绿 |
+| `./scripts/gen-contracts.sh --check` | “生成物与真源一致”（exit 0） |
+| `./scripts/verify.sh` | exit 0：B14 3、门禁负向 25 项，B08 5、B09 5、B10 45、B12 125、B13 53 passed，`PASS contracts gate` |
+| `tsc --noEmit --strict openapi.d.ts b12r1_narrow.ts`（同上借用 tsc 5.9.3；夹具改用 `0.kp_id`） | exit 0 |
 | `git diff --check` | exit 0 |
 
 ## API / 数据变更
@@ -90,14 +115,8 @@
 
 ## 风险
 
-1. **`tests/tooling` 在基线上已失败（与本任务无关，未修，超出文件锁）**：
-   - 现象：B14 把 `tests/contracts/test_b14.py` 接入 `scripts/verify/contracts.sh`，但 `tests/tooling/test_b07.py` 第 141 行 `shell_workspace` 夹具的占位清单只有 B08/B09/B10/B12/B13，没有 `test_b14.py`。于是门禁在夹具里报 “file or directory not found: tests/contracts/test_b14.py”，返回 1。
-   - 已在临时 worktree 中按基线 `d446ecc` 复现同样的失败；`origin/main@130e6b6` 的夹具清单也缺这一项。
-   - 修复只需一行：清单加 `"test_b14.py"`。与 B12 合并前复核补丁同类，请协调方另行处理。
-2. **`field` 路径写法与 C13 全局校验处理器不一致**：
-   - ADR-017 决定 5 原文为 `[<i>].kp_id`，本任务按原文实现：`pattern ^\[(0|[1-9][0-9]*)\]\.kp_id$`。
-   - 但 `errors.v1.md` 对 `field` 的定义是“字段点路径，如 `items.0.name`”；`src/backend/app/main.py` 的 `_field_reason` 用 `".".join(loc[1:])` 生成路径。因此同一接口上，第 0 项的 schema 错误会是 `0.kp_id`，发布版校验错误却是 `[0].kp_id`。
-   - 前端若按 `field` 定位，需要处理两种写法。建议协调方决定：保持 ADR 原文，还是勘误为 `<i>.kp_id`（统一为点路径）。若勘误，只需改 `ProgressNotInPublishedVersionField.field` 的 `pattern`、3 处描述、`errors.v1.md`、规格 §5 与测试夹具。
+1. ~~`tests/tooling` 基线失败~~ **已处理**（追加提交）：`test_b07.py` 夹具清单缺 `test_b14.py`。基线 `d446ecc` 与 `origin/main@130e6b6` 都能复现，现已补上，tooling 14 passed。
+2. ~~`field` 路径写法与 C13 不一致~~ **已处理**（追加提交）：协调方决定按 ADR-017 勘误改为点路径 `<i>.kp_id`，与 `main.py::_field_reason` 一致。
 3. **`if/then` 不进生成物**（与 B12、B13 相同）：
    - `ProgressValidationError` 的 Pydantic/TS 类型只约束 `code`，`details` 仍是开放对象；“出现该 reason 或 `graph_version` 时 `details` 必须是专用结构”只由 JSON Schema 保证。
    - I02 应直接用 `ProgressNotInPublishedVersionDetails` 模型构造 `details`，以获得闭合校验。
@@ -105,8 +124,7 @@
 
 ## 待决（需人工决定）
 
-- 风险 1：谁来修 `test_b07.py` 夹具（一行，超出本任务文件锁）。
-- 风险 2：`field` 采用 `[<i>].kp_id`（ADR 原文）还是 `<i>.kp_id`（C13 点路径）。
+- 原待决 1（tooling 夹具）、2（`field` 写法）均已由协调方决定并在追加提交中处理，目前无待决项。
 
 ## 下一步
 
@@ -114,4 +132,4 @@
 
 ## 回滚
 
-`git revert` 本分支的 B12-R1 提交即可恢复到 B12 契约（`diagnostic_id` 与通用 422）及对应生成物。无数据库或外部状态。
+`git revert` 本分支的两个 B12-R1 提交（先追加提交，再 `75a3775`）即可恢复到 B12 契约（`diagnostic_id` 与通用 422）及对应生成物。无数据库或外部状态。

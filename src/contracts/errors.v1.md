@@ -85,7 +85,7 @@
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
-| `fields[]` | array | 每个不在发布版中的请求项一项，固定为 `{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}`，`<i>` 为请求数组下标；不与其他 `reason` 混排 |
+| `fields[]` | array | 每个不在发布版中的请求项一项，固定为 `{in: "body", field: "<i>.kp_id", reason: "not_in_published_version"}`，`<i>` 为请求数组下标，与上表 `field` 的点路径写法一致（ADR-017 勘误）；不与其他 `reason` 混排 |
 | `graph_version` | integer | 请求事务所见的当前发布版本号；写入期间发布指针变化时为复核所用的新版本 |
 
 ```json
@@ -93,7 +93,7 @@
   "code": "VALIDATION_ERROR",
   "message": "部分知识点不在当前发布的课程图谱中，请刷新后重试",
   "details": {
-    "fields": [{ "in": "body", "field": "[0].kp_id", "reason": "not_in_published_version" }],
+    "fields": [{ "in": "body", "field": "0.kp_id", "reason": "not_in_published_version" }],
     "graph_version": 4
   }
 }

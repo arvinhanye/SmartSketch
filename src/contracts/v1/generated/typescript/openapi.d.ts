@@ -1440,7 +1440,7 @@ export interface components {
             /** @description 请求事务所见的当前发布版本号（发布指针途中变化时为复核所用的新版本） */
             graph_version: number;
         };
-        /** @description 单个不在当前发布版中的请求项，闭合对象；`field` 为 `[<i>].kp_id`，`<i>` 为请求数组下标。 */
+        /** @description 单个不在当前发布版中的请求项，闭合对象；`field` 为 `<i>.kp_id`，`<i>` 为请求数组下标，与全局 422 处理器的点路径一致（ADR-017 勘误）。 */
         ProgressNotInPublishedVersionField: {
             /** @constant */
             in: "body";
@@ -2690,7 +2690,7 @@ export interface operations {
              *     2. 目标 `kp_id` 不在请求事务所见的当前发布版中（ADR-017 决定 5）：草稿独有、已删除、他课三种情况
              *        同一 `reason = not_in_published_version`，不暴露他课节点是否存在；写入期间发布指针变化、复核时目标
              *        不在新版本中同样返回此错误。`details.fields` 每个不在发布版中的请求项一项
-             *        `{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}`（`<i>` 为请求数组下标），
+             *        `{in: "body", field: "<i>.kp_id", reason: "not_in_published_version"}`（`<i>` 为请求数组下标，与全局 422 的点路径一致），
              *        `details.graph_version` 为请求事务所见的当前发布版。客户端处置：重新 `GET /progress` 后再提交。
              *      */
             422: {
