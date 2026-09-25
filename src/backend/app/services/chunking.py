@@ -18,7 +18,9 @@ from app.services.parsers.models import ParsedBlock, SourceLocator
 
 DEFAULT_TARGET_CHARS = 1500
 DEFAULT_OVERLAP_CHARS = 200
-_SENTENCE_END = re.compile(r"[。！？!?；;](?:[”’\"']+)?|\n+")
+_SENTENCE_END = re.compile(
+    r"[。！？!?；;](?:[”’\"']+)?|(?<!\d)\.(?:[”’\"']+)?(?=\s|$)|\n+"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +63,7 @@ def _chunk_run(
     # with many tiny paragraphs still yields approximately target-sized text.
     stream_parts: list[str] = []
     positions: list[tuple[int, int, ParsedBlock]] = []
+    prefix_lengths: list[int] = []
     position = 0
     for block in blocks:
         path = block.locator.section_path
@@ -68,13 +71,37 @@ def _chunk_run(
         body_start = position + len(prefix)
         body_end = body_start + len(block.text)
         positions.append((body_start, body_end, block))
+        prefix_lengths.append(len(prefix))
         stream_parts.extend((prefix, block.text, "\n\n"))
         position = body_end + 2
     stream = "".join(stream_parts)[:-2]
     body_starts = [item[0] for item in positions]
+    body_starts_by_ordinal = {block.ordinal: body_start for body_start, _, block in positions}
+
+    max_prefix_length = max(prefix_lengths, default=0)
+    if max_prefix_length + 1 > target_chars:
+        raise ValueError("section_path prefix leaves no room for source text within target_chars")
+    # A very long repeated path consumes the space otherwise available for overlap.
+    # Keep at least one new source character per window to guarantee progress.
+    effective_overlap = min(overlap_chars, target_chars - max_prefix_length - 1)
 
     boundaries = [match.end() for match in _SENTENCE_END.finditer(stream)]
     by_ordinal = {block.ordinal: block for block in blocks}
+
+    def sources_for(start: int, end: int) -> list[ChunkSource]:
+        sources: list[ChunkSource] = []
+        first = max(0, bisect_right(body_starts, start) - 1)
+        for index in range(first, len(positions)):
+            block_start, block_end, block = positions[index]
+            if block_start >= end:
+                break
+            left, right = max(start, block_start), min(end, block_end)
+            if left < right:
+                sources.append(
+                    ChunkSource(block.ordinal, left - block_start, right - block_start, block.locator)
+                )
+        return sources
+
     result: list[SemanticChunk] = []
     start = 0
     while start < len(stream):
@@ -87,29 +114,40 @@ def _chunk_run(
             if boundary_index >= 0 and boundaries[boundary_index] >= start + target_chars * 4 // 5:
                 end = boundaries[boundary_index]
 
-        sources: list[ChunkSource] = []
-        first = max(0, bisect_right(body_starts, start) - 1)
-        for index in range(first, len(positions)):
-            block_start, block_end, block = positions[index]
-            if block_start >= end:
-                break
-            left, right = max(start, block_start), min(end, block_end)
-            if left < right:
-                sources.append(
-                    ChunkSource(block.ordinal, left - block_start, right - block_start, block.locator)
-                )
+        sources = sources_for(start, end)
         if sources:
+            text = _render(sources, by_ordinal)
+            if len(text) > target_chars:
+                # A window can begin inside the first block's presentation prefix.
+                # Rendering restores that full prefix, so cap by actual output size.
+                first_source = sources[0]
+                first_block_start = body_starts_by_ordinal[first_source.block_ordinal]
+                minimum_end = first_block_start + first_source.start + 1
+                low, high = minimum_end, end
+                best_end = minimum_end
+                while low <= high:
+                    candidate_end = (low + high) // 2
+                    candidate_sources = sources_for(start, candidate_end)
+                    candidate_text = _render(candidate_sources, by_ordinal)
+                    if len(candidate_text) <= target_chars:
+                        best_end = candidate_end
+                        low = candidate_end + 1
+                    else:
+                        high = candidate_end - 1
+                end = best_end
+                sources = sources_for(start, end)
+                text = _render(sources, by_ordinal)
             result.append(
                 SemanticChunk(
                     ordinal=ordinal_start + len(result),
-                    text=_render(sources, by_ordinal),
+                    text=text,
                     section_titles=blocks[0].locator.section_titles,
                     sources=tuple(sources),
                 )
             )
         if end == len(stream):
             break
-        start = max(start + 1, end - overlap_chars)
+        start = max(start + 1, end - effective_overlap)
     return result
 
 
