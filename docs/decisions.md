@@ -890,3 +890,19 @@
   - 分块规则或参数一变，已有资料再处理即产生新修订与新块 ID，抽取缓存随块 ID 失效；已发布版本按修订固定，不受影响（与 PUB-29 同理）。
 - **推翻条件**：分块参数需要按课程或按资料频繁调整，导致修订数量失控时，重开决定 2，改为参数只进缓存键。
 - **签收**：ArvinHan 2026-09-25
+
+## ADR-019：后端加入 `python-multipart` 解析资料上传
+
+> **签收状态：已签收（ACCEPTED）**，ArvinHan，2026-09-25（在会话中选定「加 python-multipart」）。本条由协调方在 C07 实现前记录。
+
+- **日期**：2026-09-25
+- **背景**：契约 `POST /api/v1/courses/{cid}/documents` 规定 `multipart/form-data`、字段 `file`。FastAPI 的 `UploadFile`/`File` 与 Starlette 的 `request.form()` 都依赖 `python-multipart`，而 `src/backend/pyproject.toml` 没有它，C07 无法实现上传。可选方案：加依赖；用标准库手写 multipart 解析（需自行维护安全敏感的解析器）；C07 拆分、上传延后。
+- **决定**：
+  1. 在 `src/backend/pyproject.toml` 的运行时依赖中加入 `python-multipart==0.0.32`，与其他依赖一样固定版本。
+  2. 上传路由不声明 `UploadFile` 参数；先经 `course_teacher` 授权，再以按 `Content-Length` 与实收字节双重计数（上限 `UPLOAD_MAX_BYTES` + 16 KiB 表单开销）的有界解析读取表单，由 C05 `FileStorage` 精确校验文件大小；做法移植自 539210 的 #229。
+- **后果**：
+  - C07 落实，依赖变更属 C07 的范围扩展，由本 ADR 授权。CI 的 `pip install -e './src/backend[test]'` 自动安装，无需改工作流。
+  - 升级该依赖按常规依赖升级处理，需在 PR 中写明回滚步骤。
+  - **回滚**：删除 pyproject 中该依赖行并重新安装后端依赖；上传路由随之不可用（导入 `UploadFile` 表单时报缺依赖），需同时撤下 C07 的上传路由注册。数据与迁移不受影响。
+- **推翻条件**：该库出现无法及时修复的安全问题，或上传改为非 multipart 协议（如直传对象存储）时重开。
+- **签收**：ArvinHan 2026-09-25
