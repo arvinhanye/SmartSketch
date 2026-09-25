@@ -1,6 +1,6 @@
 # Codex 交接：B07 契约门禁缺依赖假绿
 
-- 任务与状态：B07 实现及本地验收完成，待 PR 合并。
+- 任务与状态：B07 实现及本地验收完成；[PR #187](https://github.com/arvinhanye/SmartSketch/pull/187) 已创建，待审查与合并。
 - 基线：`origin/main@28b09b4`，隔离工作树 `b07-main`；没有合并到 main。
 - 范围：`scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`src/backend/pyproject.toml`、`tests/tooling/test_b07.py`，以及 `docs/architecture.md`、`docs/tasks.md`、本交接。
 
@@ -26,5 +26,5 @@
 
 - 无对外接口或数据模型变更；只增加本地测试依赖声明，不改生产依赖。无迁移或外部服务状态。
 - C13 并行分支也可能改 `src/backend/pyproject.toml` 的生产依赖；合并时须同时保留其生产依赖与 B07 的三个测试依赖。本分支不覆盖 C13 工作区。
-- 下一位 Agent：审查本分支并创建/合并 PR；在 PR 基线如有 C13 并入，先复核 `pyproject.toml` 的两组依赖，再重跑定向测试和 `verify.sh`。
+- 下一位 Agent：审查 PR #187，由 ArvinHan 合并；在 PR 基线如有 C13 并入，先复核 `pyproject.toml` 的两组依赖，再重跑定向测试和 `verify.sh`。
 - 回滚：仅撤销 B07 自有提交；不删契约真源、生成物或 C13 依赖，无数据恢复步骤。

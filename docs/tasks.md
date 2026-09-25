@@ -342,7 +342,7 @@
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B07 | DONE（待 PR 合并） | 校验结果显式 PASS/SKIP/FAIL，缺依赖与坏契约失败 | Codex（后端） | `b07-main` / `origin/main@28b09b4` | `scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`src/backend/pyproject.toml`、`tests/tooling/test_b07.py`；文档 `docs/architecture.md`、本节、`docs/handoffs/codex-b07.md` | B07 14 PASS；最终 `./scripts/verify.sh` exit 0；全仓 218 PASS（审查补丁前）；`docs/handoffs/codex-b07.md` |
+| B07 | DONE（待 PR 合并） | 校验结果显式 PASS/SKIP/FAIL，缺依赖与坏契约失败 | Codex（后端） | `b07-main` / `origin/main@28b09b4` | `scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`src/backend/pyproject.toml`、`tests/tooling/test_b07.py`；文档 `docs/architecture.md`、本节、`docs/handoffs/codex-b07.md` | B07 14 PASS；最终 `./scripts/verify.sh` exit 0；全仓 218 PASS（审查补丁前）；[PR #187](https://github.com/arvinhanye/SmartSketch/pull/187)；`docs/handoffs/codex-b07.md` |
 
 - 输入：R02 审查结论与已导入 main 的契约门禁；输出：一套门禁的显式状态及后端测试依赖声明，不引入第二套校验入口。
 - 依赖：A01、B05 已合入；基线为最新集成 main。风险：C13 并行任务可能也改 `src/backend/pyproject.toml`，合并时需逐行保留双方依赖，不覆写其改动。
