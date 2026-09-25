@@ -202,10 +202,10 @@ def test_loose_list_with_code_and_hash_inside_item_stays_one_list():
 
 
 def test_yaml_front_matter_is_skipped_without_shifting_lines():
-    src = "---\ntitle: 栈与队列\ntags: [ds]\n---\n\n# 第3章\n\n正文。\n"
+    src = "---\ntitle: 栈与队列\ntags: [ds]\n---\n\n前言正文。\n\n# 第3章\n\n正文。\n"
     doc = md(src)
-    # front matter 不产生块，也不会被误读成 Setext 标题「tags: [ds]」
-    assert shape(doc) == [(P, "第3章 > 第1段", 8, 8)]
+    # front matter 不产生块，也不会被 CommonMark 误读成分隔线 + Setext 标题「title: … tags: [ds]」
+    assert shape(doc) == [(P, "第1段", 6, 6), (P, "第3章 > 第1段", 10, 10)]
 
 
 def test_front_matter_closed_with_dots_is_skipped():
@@ -289,7 +289,7 @@ def test_crlf_and_cr_line_endings_count_physical_lines(newline):
 
 
 def test_utf8_bom_is_ignored():
-    data = "﻿# 第1章\n\n正文。\n".encode("utf-8")
+    data = "\ufeff# 第1章\n\n正文。\n".encode("utf-8")
     doc = parse_markdown(data)
     assert shape(doc) == [(P, "第1章 > 第1段", 3, 3)]
 
@@ -302,7 +302,7 @@ def test_block_text_keeps_inline_markup_and_indentation_verbatim():
 
 def test_whitespace_only_paragraph_line_does_not_become_block():
     # U+3000 在 CommonMark 中不是空白，markdown-it 会生成段落，但它没有可提取文本
-    doc = md("甲。\n\n　　\n\n乙。\n")
+    doc = md("甲。\n\n\u3000\u3000\n\n乙。\n")
     assert shape(doc) == [(P, "第1段", 1, 1), (P, "第2段", 5, 5)]
 
 
@@ -328,6 +328,31 @@ def test_mixed_document_satisfies_d01_invariants():
     assert_blocks_map_back_to_source(doc, data)
 
 
+_FUZZ_PIECES = [
+    "# 标题", "## 小节 > x", "###", "正文一行", "  缩进正文", "    code", "\t# tab", "```", "~~~",
+    "- 项", "  - 子项", "1. 有序", "> 引用", "> # 引用标题", "| a | b |", "| - | - |", "| 1 | 2 |",
+    "---", "===", "***", "<!-- c -->", "<div>", "</div>", "<!--", "-->", "[r]: #x", "", "", "",
+    "\u3000", "\r", "   ", "#不是", "+ 加号", "1) 括号", "...",
+]
+
+
+def test_random_block_combinations_never_violate_d01_rules():
+    """固定种子的随机拼接：结果要么是合法 ParsedDocument（D01 构造时校验行号不重叠、段落连续），
+    要么是 no_text；块文本总能按行号映射回原文。"""
+    import random
+
+    rng = random.Random(20260924)
+    for _ in range(1500):
+        src = "\n".join(rng.choice(_FUZZ_PIECES) for _ in range(rng.randint(1, 25)))
+        data = src.encode("utf-8")
+        try:
+            doc = parse_markdown(data)
+        except DocumentUnreadableError as exc:
+            assert exc.reason is UnreadableReason.NO_TEXT, repr(src)
+            continue
+        assert_blocks_map_back_to_source(doc, data)
+
+
 # ── 失败路径：没有可提取文本 ──────────────────────────────
 
 
@@ -337,9 +362,9 @@ def test_mixed_document_satisfies_d01_invariants():
         b"",
         b"   ",
         b"\n\n\t\n",
-        "　\n".encode("utf-8"),
-        "﻿".encode("utf-8"),
-        "﻿ \r\n".encode("utf-8"),
+        "\u3000\n".encode("utf-8"),
+        "\ufeff".encode("utf-8"),
+        "\ufeff \r\n".encode("utf-8"),
     ],
     ids=["empty", "spaces", "blank-lines", "fullwidth-space", "bom-only", "bom-crlf"],
 )

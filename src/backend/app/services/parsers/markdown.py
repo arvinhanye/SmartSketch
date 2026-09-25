@@ -141,7 +141,7 @@ def _decode(data: bytes) -> str:
         ) from None
     if "\x00" in text:
         raise DocumentUnreadableError(UnreadableReason.CORRUPTED, "含 NUL 字节，疑似二进制文件")
-    if text.startswith("﻿"):
+    if text.startswith("\ufeff"):
         text = text[1:]
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
