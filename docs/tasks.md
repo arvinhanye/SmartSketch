@@ -760,6 +760,13 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 
 - I03 验收：已掌握集合为空、全部掌握、孤立点、多前置、有环、外课 ID；不修改用户的掌握集合。验证：`python3 -m pytest tests/backend/test_i03.py -q`。
 
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B12-R1 | IN PROGRESS | 进度契约错误细节修订（ADR-017 决定 4、5） | ArvinHan（Claude 子代理） | `claude/b12-r1-progress-errors` / ADR-017 提交 | `src/contracts/api.v1.yaml`、`src/contracts/errors.v1.md`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`、`specs/learning-path.md`、`docs/handoffs/claude-b12-r1.md` | 待补 |
+
+- B12-R1 验收：`LearningIntegrityDetails` 只含 `request_id`；`PUT /progress` 422 的 `details.fields[].reason = not_in_published_version` 与 `details.graph_version` 有正负例；重新生成且 `gen-contracts.sh --check`、`tests/tooling` 通过。
+- ADR-017 同时追加到 C09（#220：决定 1、6）与 E03（#221：决定 2、3），各自在本节表内更新证据。
+
 - 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925b-claims` 上解决一次，再并入三个分支，保证三者的解决结果一致。
 
 ## 2026-09-25 第三批并行（Claude）
