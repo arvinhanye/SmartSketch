@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.repositories import tasks
+from app.repositories import materials, tasks
 from app.repositories.sqlite import connect, migrate
 from app.services.file_storage import StoredFile
 
@@ -138,3 +138,33 @@ def test_database_constraints_reject_empty_course_or_idempotency_key(db_url, tmp
     with connect(db_url) as database:
         assert database.execute("SELECT count(*) FROM materials").fetchone() == (0,)
         assert database.execute("SELECT count(*) FROM processing_tasks").fetchone() == (0,)
+
+
+def test_material_reads_require_course_scope(db_url, tmp_path):
+    result = tasks.create_material_task(
+        db_url,
+        course_id="course-a",
+        stored_file=_stored_file(tmp_path),
+        idempotency_key="read-material",
+    )
+
+    with pytest.raises(TypeError):
+        materials.get_material(db_url, result.material.id)
+    assert materials.get_material(
+        db_url, result.material.id, course_id="course-b"
+    ) is None
+
+
+def test_task_reads_require_course_scope(db_url, tmp_path):
+    result = tasks.create_material_task(
+        db_url,
+        course_id="course-a",
+        stored_file=_stored_file(tmp_path),
+        idempotency_key="read-task",
+    )
+
+    with pytest.raises(TypeError):
+        tasks.get_task(db_url, result.task.id)
+    assert tasks.get_task(
+        db_url, result.task.id, course_id="course-b"
+    ) is None

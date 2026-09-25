@@ -57,14 +57,13 @@ def insert_material(
 
 
 def get_material(
-    sqlite_url: str, material_id: str, *, course_id: str | None = None
+    sqlite_url: str, material_id: str, *, course_id: str
 ) -> MaterialRecord | None:
-    """Return a material, optionally constrained to its owning course."""
-    where = "id = ?" if course_id is None else "id = ? AND course_id = ?"
-    parameters = (material_id,) if course_id is None else (material_id, course_id)
+    """Return a material constrained to its owning course."""
     with connect(sqlite_url) as database:
         row = database.execute(
-            f"SELECT {_COLUMNS} FROM materials WHERE {where}", parameters
+            f"SELECT {_COLUMNS} FROM materials WHERE id = ? AND course_id = ?",
+            (material_id, course_id),
         ).fetchone()
     return MaterialRecord(*row) if row else None
 

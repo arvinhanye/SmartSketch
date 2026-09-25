@@ -154,13 +154,13 @@ def create_material_task(
 
 
 def get_task(
-    sqlite_url: str, task_id: str, *, course_id: str | None = None
+    sqlite_url: str, task_id: str, *, course_id: str
 ) -> TaskRecord | None:
-    """Return a task, optionally constrained to its owning course."""
-    where = "id = ?" if course_id is None else "id = ? AND course_id = ?"
-    parameters = (task_id,) if course_id is None else (task_id, course_id)
+    """Return a task constrained to its owning course."""
     with connect(sqlite_url) as database:
         row = database.execute(
-            f"SELECT {_TASK_COLUMNS} FROM processing_tasks WHERE {where}", parameters
+            f"SELECT {_TASK_COLUMNS} FROM processing_tasks "
+            "WHERE id = ? AND course_id = ?",
+            (task_id, course_id),
         ).fetchone()
     return _task_from_row(row) if row else None
