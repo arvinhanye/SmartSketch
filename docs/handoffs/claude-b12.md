@@ -117,3 +117,10 @@
 ## 回滚
 
 只撤销本分支的 B12 提交（`git revert` 对应 SHA）即可恢复原契约与生成物。无数据库或外部状态。
+
+## 合并前复核补丁（协调方，2026-09-25）
+
+- 问题：B12 把 `test_b12.py` 接入 `scripts/verify/contracts.sh` 后，`tests/tooling/test_b07.py::test_dispatcher_reports_aggregate_status[0-PASS]` 失败——该用例的 `shell_workspace` 夹具只为已接入门禁的 B08/B09/B10/B13 放了占位文件，门禁在夹具里找不到 `test_b12.py`，返回 1。子代理只跑了 `tests/contracts`；`verify.sh` 不含 `tests/tooling`，CI 也未检出。
+- 修复（范围扩展）：夹具占位清单补 `test_b12.py`，一行。
+- 验证：`python3 -m pytest tests/tooling tests/contracts -q` → 269 passed（修前 1 failed / 268 passed）。
+- 提醒后续接入门禁的契约任务（O02、O05 等）：同步更新 `test_b07.py` 夹具占位清单，并跑 `tests/tooling`。
