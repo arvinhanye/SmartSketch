@@ -710,7 +710,7 @@ C09、E03、I03 前置均已合并，issue 无人认领，与在途工作不共�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| I03 | IN PROGRESS | 实现可学集合纯函数 | ArvinHan（Claude 子代理） | `claude/i03-eligible-set` / `36670a3` | `src/backend/app/services/learning/eligible.py`、`tests/backend/test_i03.py`、`docs/handoffs/claude-i03.md` | 待补 |
+| I03 | DONE（待 PR 审查/合并） | 实现可学集合纯函数 | ArvinHan（Claude 子代理） | `claude/i03-eligible-set` / `36670a3` | `src/backend/app/services/learning/eligible.py`、`tests/backend/test_i03.py`、`docs/handoffs/claude-i03.md` | 新增 `services/learning/__init__.py`（包原不存在）。红：先收集错误（无模块），桩函数 79 failed/1 passed；绿：`test_i03.py` 80 passed；`tests/backend` 全量 1082 passed（基线 1002）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；6 处反向篡改均检出（36/19/3/3/28/2 failed），恢复后 `cmp` 一致。有环、自环、悬空端点（含外课边）、重复 ID、`V=∅` 抛 `GraphIntegrityError`；`mastered` 含外课 ID 抛 `ProgressOutsideGraphError`（§1）；结果按 `kp_id` UTF-8 字节序。见 `docs/handoffs/claude-i03.md` |
 
 - I03 验收：已掌握集合为空、全部掌握、孤立点、多前置、有环、外课 ID；不修改用户的掌握集合。验证：`python3 -m pytest tests/backend/test_i03.py -q`。
 
