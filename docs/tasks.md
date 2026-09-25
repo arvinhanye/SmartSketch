@@ -605,7 +605,7 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 验收条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C06 | READY FOR REVIEW（PR #209） | 实现资料和任务创建事务 | Codex（后端） | `.claude/worktrees/c06-material-task-transaction`，分支 `codex/c06-material-task-transaction` / `origin/main@04f8ac6` | `src/backend/app/repositories/materials.py`、`src/backend/app/repositories/tasks.py`、`src/backend/migrations/003_tasks.sql`、`tests/backend/test_c06.py`、`tests/backend/test_c13.py`（范围扩展：仅更新新增 003 后的默认迁移序列断言）、`docs/handoffs/codex-c06.md` | 原子创建、回滚、课程隔离幂等已验证；C06 5 passed；后端 725 passed（1 条既有 Starlette/httpx 弃用警告）；`./scripts/verify.sh` 与 `git diff --check` 通过。交接：`docs/handoffs/codex-c06.md`；实现锚点 `4ed5890`；PR #209。迁移编号按 D-10 于合并时复核。 |
+| C06 | READY FOR REVIEW（PR #209） | 实现资料和任务创建事务 | Codex（后端） | `.claude/worktrees/c06-material-task-transaction`，分支 `codex/c06-material-task-transaction` / `origin/main@50dca8c` | `src/backend/app/repositories/materials.py`、`src/backend/app/repositories/tasks.py`、`src/backend/migrations/003_tasks.sql`、`tests/backend/test_c06.py`、`tests/backend/test_c13.py`（范围扩展：仅更新新增 003 后的默认迁移序列断言）、`docs/handoffs/codex-c06.md` | 原子创建、回滚、课程隔离幂等与按课程限定读取已验证；C06 7 passed；后端 737 passed（1 条既有 Starlette/httpx 弃用警告）；`./scripts/verify.sh` 与 `git diff --check` 通过。交接：`docs/handoffs/codex-c06.md`；实现锚点 `7117683`；课程隔离评审修正 `34c73c9`；PR #209。迁移编号按 D-10 于合并时复核。 |
 
 - 输入 / 输出：接收已校验的文件元数据，原子地产生 material 与 queued task。依赖 C01、B10 均已合入 `origin/main`；C05 已合入，上传 API 留给 C07。
 - 风险 / 回滚：C13 默认迁移序列测试随新增 003 更新，范围扩展仅限其期望序列；其余只写入上列文件。迁移需遵循 C01 停机、备份与恢复流程；合并前若编号冲突，按 D-10 改号并重跑迁移测试。C07 需在幂等重放时删除新落盘的未引用文件；再处理与 parse_status 语义留待 C07。
