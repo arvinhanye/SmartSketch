@@ -1,0 +1,46 @@
+# SmartSketch 本地开发依赖编排（F01）。
+# 用法见 docs/integrations.md「本地依赖环境（F01）」。启动前必须先 `cp .env.example .env`。
+# Compose 自动读取仓库根目录的 .env 完成变量插值；.env 已被 .gitignore 忽略。
+
+services:
+  neo4j:
+    # 固定 5.26 LTS 次版本，避免不同成员拉到不同的 5.x 导致 APOC 版本错配。
+    image: neo4j:${NEO4J_IMAGE_TAG:-5.26-community}
+    # 不写 container_name：容器名随 compose 项目名（默认取目录名，可用 COMPOSE_PROJECT_NAME 覆盖），
+    # 这样测试沙箱与其他 worktree 能各自起一个实例而不撞名。
+    restart: unless-stopped
+    ports:
+      # 只绑本机回环地址，局域网访问不到开发库。
+      - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"
+      - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"
+    environment:
+      # 凭据来自 .env，仓库不含任何真实密码。
+      NEO4J_AUTH: "${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD 未设置，请先 cp .env.example .env 并填写}"
+      # 知识融合（E09/F 系列）依赖 apoc.refactor.mergeNodes；社区版必须显式装载 APOC。
+      # 5.26 镜像自带与之匹配的 APOC Core，按此变量启用，不需要联网下载。
+      NEO4J_PLUGINS: '["apoc"]'
+      # 只放开 apoc.*，不设置 allowlist，以免挡掉向量索引用到的 db.index.vector.*。
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_server_memory_heap_max__size: "${NEO4J_HEAP_MAX:-1G}"
+      NEO4J_server_memory_pagecache_size: "${NEO4J_PAGECACHE:-512M}"
+    volumes:
+      # 绑定路径写死在 .gitignore 已忽略的 neo4j/data/ 与 neo4j/logs/，
+      # 不做成变量，避免有人把数据目录指到会被提交的位置。
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+    healthcheck:
+      # 凭据从容器内的 NEO4J_AUTH 取，经 cypher-shell 认识的环境变量传入，
+      # 不出现在任何命令行参数里；$$ 让 compose 不在宿主机插值。
+      test:
+        - CMD-SHELL
+        - NEO4J_USERNAME="$${NEO4J_AUTH%%/*}" NEO4J_PASSWORD="$${NEO4J_AUTH#*/}" cypher-shell "RETURN 1" >/dev/null 2>&1 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 40s
+
+# SQLite 不需要服务：它是嵌入式文件，由后端进程直接打开，路径见 .env 的 SQLITE_URL。
+# 本地只需保证 STORAGE_DIR 存在（scripts/dev-up.sh 会创建），默认落在已忽略的 storage/ 下。
+#
+# 后端与前端暂不编排：仓库还没有 Dockerfile。需要容器化时由对应任务补全本文件并更新
+# docs/integrations.md。
