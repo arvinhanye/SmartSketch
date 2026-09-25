@@ -2,6 +2,7 @@
 
 - `task_id`: C06（GitHub issue #63）
 - `review_status`: ready_for_review
+- `pull_request`: https://github.com/arvinhanye/SmartSketch/pull/209
 - `worktree`: `/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/c06-material-task-transaction`
 - `branch`: `codex/c06-material-task-transaction`
 - `base_commit`: `04f8ac6`（最新 `origin/main`）
