@@ -121,7 +121,7 @@ def test_migration_002_adds_users_after_001_and_keeps_a_restorable_backup(tmp_pa
     with sqlite3.connect(path) as database:
         database.execute("INSERT INTO embedding_space_state VALUES (1, 'model-a', 768, 0)")
 
-    assert migrate(_url(path)) == ["002"]
+    assert migrate(_url(path)) == ["002", "003"]
     assert migrate(_url(path)) == []
 
     with sqlite3.connect(path) as database:
@@ -129,7 +129,7 @@ def test_migration_002_adds_users_after_001_and_keeps_a_restorable_backup(tmp_pa
         assert database.execute("SELECT model FROM embedding_space_state").fetchone() == ("model-a",)
         assert [row[0] for row in database.execute(
             "SELECT version FROM schema_migrations ORDER BY version"
-        )] == ["001", "002"]
+        )] == ["001", "002", "003"]
     assert columns == {"id", "username", "password_hash", "role", "created_at", "disabled_at"}
 
     backup = next((tmp_path / "backups").glob("*-before-002.sqlite"))

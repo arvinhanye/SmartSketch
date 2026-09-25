@@ -1,5 +1,21 @@
 # 任务看板
 
+## B12 进度与推荐契约（2026-09-25）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B12 | DONE（待 PR 审查/合并） | 迁移进度和推荐契约 | ArvinHan（Claude 子代理执行） | `claude/b12-progress-contract` / base `8eeac3b` | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/`、`tests/contracts/test_b12.py`；按 B08～B13 先例接入 `scripts/verify/contracts.sh`；随附 `specs/learning-path.md` 状态标注与 `docs/handoffs/claude-b12.md` | 改真源前 B12 65 failed / 28 passed，改后 93 passed；契约全量 255 passed；`./scripts/gen-contracts.sh --check` exit 0；`./scripts/verify.sh` exit 0（含 B12 回归）；生成 TS `tsc --noEmit --strict` exit 0；`git diff --check` exit 0；反向篡改 6 处均被检出；范围扩展：`src/contracts/errors.v1.md` 登记 `details.diagnostic_id`；`docs/handoffs/claude-b12.md` |
+
+- 输入：`specs/learning-path.md`（LP-1～19、§7）、ADR-014 及修订 1、`docs/atomic-task-plan.md` B12 行；输出：`ProgressEntry` 新字段、GET/PUT 返回全部节点、推荐 DTO 与未发布错误/全部掌握空态区分。
+- 依赖：B08、A08 已完成；B11 已合入并释放 YAML 锁（issue #54）。
+- 风险：已提交空图按发布快照完整性故障处理，不增加 `no_graph` wire 状态；未舍入 double 分量按 `u→i→c→e` 求和须逐位等于评分。
+- 验证：`python3 -m pytest tests/contracts/test_b12.py -q`、`./scripts/gen-contracts.sh --check`、`./scripts/verify.sh`、`git diff --check`。
+- 待决（需 ArvinHan 决定，I02/I05 实现前）：
+  1. 学生读路径完整性错误的公开码：契约暂用既有 `INTERNAL_ERROR` + 闭合 `details.diagnostic_id`（`LearningIntegrityError`）；是否新增专用码、字段名是否与问答 `details.request_id` 统一。
+  2. `PUT /progress` 中 `kp_id` 不在绑定发布版（草稿独有、已删除、他课、发布指针变化后复核失败）时整批拒绝的公开码（422/404/409）与 `details` 形状；契约描述暂写“待定”。
+- 待审查的契约决定：进度响应改为 `ProgressResponse{graph_version, entries}`；移除推荐 `target`/`path`（§7，交 O02）；重复 `kp_id` 归 422 `VALIDATION_ERROR`。详见交接。
+- 观察：`tests/contracts/test_b11.py` 未接入 `scripts/verify/contracts.sh`，不在 B12 范围内，未改。
+
 ## B11 图谱编辑与版本契约（2026-09-24）
 
 | ID | 状态 | 任务 | 负责人 | 范围与验收 | 证据 |
@@ -601,6 +617,15 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 输入：D-11（50 MiB、变量名 `UPLOAD_MAX_BYTES`）；`STORAGE_DIR=./storage` 沿用 740adb（A10 导入映射「批 2 只取 `STORAGE_DIR`」）。输出：`Settings.STORAGE_DIR`、`Settings.UPLOAD_MAX_BYTES`，C06/C07 按 `FileStorage(settings.STORAGE_DIR, max_bytes=settings.UPLOAD_MAX_BYTES)` 使用。
 - 验收：缺省值与 D-11 一致；0、负数、小数、带单位、空串拒绝并指出变量名；空白 `STORAGE_DIR` 拒绝；设置值能直接构造 `FileStorage` 并在超限时给出 `limit_bytes`；`.env.example` 覆盖全部设置（B06 回归）。
 
+## 2026-09-25 Codex 认领：C06
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标 worktree / base HEAD | 文件锁（本轮唯一写入者） | 验收条件 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C06 | READY FOR REVIEW（PR #209） | 实现资料和任务创建事务 | Codex（后端） | `.claude/worktrees/c06-material-task-transaction`，分支 `codex/c06-material-task-transaction` / `origin/main@a80519c` | `src/backend/app/repositories/materials.py`、`src/backend/app/repositories/tasks.py`、`src/backend/migrations/003_tasks.sql`、`tests/backend/test_c06.py`、`tests/backend/test_c13.py`（范围扩展：仅更新新增 003 后的默认迁移序列断言）、`docs/handoffs/codex-c06.md` | 原子创建、回滚、课程隔离幂等与按课程限定读取已验证；C06 7 passed；后端 763 passed（1 条既有 Starlette/httpx 弃用警告）；`./scripts/verify.sh` 与 `git diff --check` 通过。交接：`docs/handoffs/codex-c06.md`；实现锚点 `7117683`；课程隔离评审修正 `34c73c9`；PR #209。迁移编号按 D-10 已对 `origin/main@a80519c` 复核，最大版本仍为 002。 |
+
+- 输入 / 输出：接收已校验的文件元数据，原子地产生 material 与 queued task。依赖 C01、B10 均已合入 `origin/main`；C05 已合入，上传 API 留给 C07。
+- 风险 / 回滚：C13 默认迁移序列测试随新增 003 更新，范围扩展仅限其期望序列；其余只写入上列文件。迁移需遵循 C01 停机、备份与恢复流程；合并前若编号冲突，按 D-10 改号并重跑迁移测试。C07 需在幂等重放时删除新落盘的未引用文件；再处理与 parse_status 语义留待 C07。
+
 ## C14 账号管理命令与演示账号种子
 
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
@@ -611,11 +636,47 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 验收：创建和停用都能用 `list` 复查；重复停用保留首次时间；重复种子不新增、不改已有口令和停用状态；缺少或空白的 `SEED_DEMO_PASSWORD` 非 0 退出且不写库；同名账号类型不符整批拒绝；未迁移的库非 0 退出且不建库文件；口令不作为命令行参数，也不出现在任何输出里。
 - 不在本任务：协作教师经命令行加入课程（§3.3）需要 C02 的课程和成员表，交 C02/C15。
 
+## 2026-09-25 并行批次（Claude）
+
+F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）无共享文件，五项同时开工，各在独立 worktree 与分支上进行。C02 原分配 539210（2026-09-24 回复“正在做”，远端无分支或 PR），经 ArvinHan 授权转由 Claude 执行，见 issue #59。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F05 | DONE（待 PR 审查/合并） | 实现 DAG 环检测纯函数 | ArvinHan（Claude 子代理） | `claude/f05-dag-cycle` / `8eeac3b` | `src/backend/app/services/graph/dag.py`、`tests/backend/test_f05.py`、`docs/handoffs/claude-f05.md` | 红：仅测试时收集错误（无 `app.services.graph`）；桩函数 72 failed。绿：`test_f05.py` 73 passed；`tests/backend` 793 passed（基线 720）；5 处篡改全部被检出（其中旋转篡改首轮漏检，已补测试）；`./scripts/verify.sh`、`git diff --check` exit 0。另补 `services/graph/__init__.py`。见 `docs/handoffs/claude-f05.md` |
+
+- F05 验收：自环、三节点环、反转造环、断开图、大链条；复杂度边界明确。验证：`python3 -m pytest tests/backend/test_f05.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E02 | DONE（待 PR 审查/合并） | 建立模型接口和 fake 适配器 | ArvinHan（Claude 子代理） | `claude/e02-ai-client` / `8eeac3b` | `src/backend/app/services/ai/client.py`、`src/backend/app/services/ai/fake.py`、`tests/backend/test_e02.py`、`docs/handoffs/claude-e02.md` | `docs/handoffs/claude-e02.md`；实现 `c87ae5c`；E02 先红（收集错误 exit 2）后 65 passed；后端 785 passed；`verify.sh` exit 0；`git diff --check` exit 0；5 处篡改均被检出；无新依赖；待决见交接（fake 模式模型 ID、缓存键取哪个模型 ID） |
+
+- E02 验收：固定输入输出可复现；超时/坏 JSON/限流可模拟；无需密钥。验证：`python3 -m pytest tests/backend/test_e02.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D06 | DONE（待 PR 审查/合并） | 实现 PDF 标题判定 | ArvinHan（Claude 子代理） | `claude/d06-pdf-headings` / `8eeac3b` | `src/backend/app/services/parsers/pdf_headings.py`、`tests/backend/test_d06.py`、`docs/handoffs/claude-d06.md` | `docs/handoffs/claude-d06.md`；无新依赖；先红（模块缺失，收集错误 exit 2）后绿：D06 34 passed，后端 754 passed，6 项反向篡改均被检出；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
+
+- D06 验收：正文加粗不误做所有标题；标题跨页、无字号层级有退路。验证：`python3 -m pytest tests/backend/test_d06.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D07 | DONE（待 PR 审查/合并） | 实现重复页眉页脚清洗 | ArvinHan（Claude 子代理） | `claude/d07-header-footer` / `8eeac3b` | `src/backend/app/services/parsers/cleanup.py`、`tests/backend/test_d07.py`、`docs/handoffs/claude-d07.md` | `docs/handoffs/claude-d07.md`；标准库、无新依赖；先红（收集错误 exit 2）后绿 D07 43 passed；6 处反向篡改均被检出；后端 763 passed（venv，Python 3.13.5）；`./scripts/verify.sh` exit 0；`git diff --check` exit 0 |
+
+- D07 验收：重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗。验证：`python3 -m pytest tests/backend/test_d07.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C02 | DONE（待 PR 审查/合并） | 实现课程和成员仓储 | ArvinHan（Claude 子代理；原 539210） | `claude/c02-course-repo` / `8eeac3b` | `src/backend/app/repositories/courses.py`、`src/backend/migrations/NNN_courses.sql`（D-10：合并时取 main 最大编号 + 1）、`tests/backend/test_c02.py`、`docs/handoffs/claude-c02.md` | 迁移取 `003_courses.sql`（合并前若 main 已有 003 须改号）。`test_c02.py`：实现前收集失败（ImportError，0 passed），实现后 21 passed；4 处反向篡改分别 2/2/1/2 failed，恢复后全绿。`tests/backend` 初为 1 failed / 740 passed（`test_c13.py` 断言迁移目录只到 002）；协调方以单独提交把该用例改为只含 001、002 的临时目录（范围扩展），复跑 741 passed。`./scripts/verify.sh` exit 0；`git diff --check` exit 0。交接 `docs/handoffs/claude-c02.md` |
+
+- C02 验收：课程成员唯一；同用户不同课程角色独立；读写外键正确（`course_members.user_id` → C13 的 `users`）。验证：`python3 -m pytest tests/backend/test_c02.py -q`。
+
+- 并行约束：各子任务只写自己的文件锁与交接文件，并只改本节自己那一张表的状态与证据；不改 `docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`、`parsers/__init__.py`、`parsers/models.py` 等共享文件，需要时停下交协调方。
+
 ## F01 复用本地 Neo4j 环境并验证
 
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F01 | DONE（待 PR 审查/合并） | 复用本地 Neo4j 环境并验证 | Claude | `claude/f01-neo4j-env` / `a80519c` | `docker-compose.yml`、`scripts/dev-up.sh`、`scripts/check-apoc.sh`、`tests/integration/test_f01.py`；按导入映射「批 2」扩到 `scripts/_dev-common.sh`（dev-up 依赖它）、`.env.example`（仅容器变量注释行）、`docs/integrations.md`（本地依赖环境一节与计划集成 Neo4j 行）；本节、`docs/handoffs/claude-f01.md` | `docs/handoffs/claude-f01.md`；真实 Docker 12 passed（Neo4j 5.26.31 + APOC 5.26.31 可用，停启后数据仍在）；原脚本红灯 4 failed，两处缺陷（unhealthy 被判就绪、口令出现在宿主机命令行）已单独取证并修复；反向篡改 5 处全被抓到；后端 756 passed |
+| F01 | DONE（PR #211） | 复用本地 Neo4j 环境并验证 | Claude | `claude/f01-neo4j-env` / `a80519c` | `docker-compose.yml`、`scripts/dev-up.sh`、`scripts/check-apoc.sh`、`tests/integration/test_f01.py`；按导入映射「批 2」扩到 `scripts/_dev-common.sh`（dev-up 依赖它）、`.env.example`（仅容器变量注释行）、`docs/integrations.md`（本地依赖环境一节与计划集成 Neo4j 行）；本节、`docs/handoffs/claude-f01.md` | `docs/handoffs/claude-f01.md`；真实 Docker 12 passed（Neo4j 5.26.31 + APOC 5.26.31 可用，停启后数据仍在）；原脚本红灯 4 failed，两处缺陷（unhealthy 被判就绪、口令出现在宿主机命令行）已单独取证并修复；反向篡改 5 处全被抓到；后端 756 passed |
 
 - 输入：740adb `978671e` 的 compose 与脚本（M0-05，当时因 APOC 未实测而 BLOCKED）；ArvinHan 本机 Docker Desktop 29.8、Compose v5.5。输出：可启动、可健康检查、已验证 APOC、停启后数据仍在的本地 Neo4j。
 - 验收：先审原脚本（审查结论与两处缺陷的取证见交接）；缺 `.env`、容器不健康、APOC 缺失都以非 0 退出并给出提示；口令不出现在任何命令行参数里；真实容器上 APOC 可用、停启后数据仍在。
