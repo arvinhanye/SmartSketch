@@ -779,7 +779,7 @@ D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B15 | IN PROGRESS | 建立前端 HTTP 客户端 | ArvinHan（Claude 子代理） | `claude/b15-http-client` / 本认领提交 | `src/frontend/src/api/http.ts`、`tests/frontend/b15.test.ts`、`docs/handoffs/claude-b15.md` | 待补 |
+| B15 | DONE（待 PR 审查/合并） | 建立前端 HTTP 客户端 | ArvinHan（Claude 子代理） | `claude/b15-http-client` / 本认领提交 | `src/frontend/src/api/http.ts`、`tests/frontend/b15.test.ts`、`docs/handoffs/claude-b15.md` | 红灯：实现前 exit 1（无法解析 `api/http`）；绿灯：type-check + B15 23 passed，前端全量 4 files / 53 passed，build 通过；7 处反向篡改（不传 signal、401 不回调、超时并入取消、不解析错误体、令牌进 URL、登录 401 回调、参数不编码）均使测试失败，恢复后 `cmp` 一致；`verify.sh` 在补 `openapi-typescript@7.4.4`（仓库外临时安装）后 exit 0，缺该工具时 B14 两例失败与基线相同；待决 8 项见 `docs/handoffs/claude-b15.md` |
 
 - B15 验收：类型化错误、超时/取消、认证失败处理；组件不自行拼路径；把 `scope.signal` 传给 fetch（B04 交出项）。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts`。
 
