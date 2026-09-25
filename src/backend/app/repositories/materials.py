@@ -77,3 +77,31 @@ def get_material_in_connection(
         (material_id, course_id),
     ).fetchone()
     return MaterialRecord(*row) if row else None
+
+
+def list_materials(sqlite_url: str, *, course_id: str) -> list[MaterialRecord]:
+    """List one course's materials, ``parse_status`` read from the latest created task (D-16).
+
+    The latest task is the one with the greatest ``created_at``; ties fall back to insertion
+    order (``rowid``). A material without any task keeps its column value (the ``queued``
+    default). Rows are ordered by ``uploaded_at`` then ``id`` so the listing is stable.
+    """
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            """SELECT m.id, m.course_id, m.filename, m.format, m.size_bytes, m.content_hash,
+                      m.storage_name,
+                      COALESCE(latest.stage, m.parse_status) AS parse_status,
+                      m.uploaded_at
+               FROM materials AS m
+               LEFT JOIN processing_tasks AS latest
+                 ON latest.rowid = (
+                    SELECT t.rowid FROM processing_tasks AS t
+                    WHERE t.course_id = m.course_id AND t.document_id = m.id
+                    ORDER BY t.created_at DESC, t.rowid DESC
+                    LIMIT 1
+                 )
+               WHERE m.course_id = ?
+               ORDER BY m.uploaded_at, m.id""",
+            (course_id,),
+        ).fetchall()
+    return [MaterialRecord(*row) for row in rows]
