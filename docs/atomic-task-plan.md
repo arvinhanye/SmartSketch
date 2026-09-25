@@ -217,8 +217,8 @@
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
-| **K01 建立自编标注集及评测口径** | A07, E11, J06, I04 | 自编材料 → 标注格式与指标定义 | `evaluation/README.md`<br>`evaluation/fixtures/synthetic.json` | 区分实体/关系准确召回、引用有效/支持度、未覆盖混淆矩阵；阈值不在测试集调 | `git diff --check；逐条核对 K01 验收矩阵与源文档，人工决策保留未签收标记` |
-| **K02 实现抽取和融合离线评测** | K01, E11 | 预测/金标 → 分项指标报告 | `evaluation/evaluate_extraction.py` | 空分母、ID匹配、四类型分组；固定输入重复结果一致；假模型不充真实效果 | `python3 -m pytest tests/backend/test_k02.py -q` |
+| **K01 建立自编标注集及评测口径** | A07, E11, J06, I04 | 自编材料（至少一章完整课程量） → 标注格式与指标定义 | `evaluation/README.md`<br>`evaluation/fixtures/synthetic.json` | 区分实体/关系准确召回、引用有效/支持度、未覆盖混淆矩阵；阈值不在测试集调；含赛题抽取硬指标口径（一章基准、实体≥20、实体与关系人工抽样准确率各≥70%、判定标准与固定种子抽样），见 course-knowledge-graph 验收 7 | `git diff --check；逐条核对 K01 验收矩阵与源文档，人工决策保留未签收标记` |
+| **K02 实现抽取和融合离线评测** | K01, E11 | 预测/金标 → 分项指标报告 | `evaluation/evaluate_extraction.py`<br>`evaluation/reports/extraction-accuracy.md` | 空分母、ID匹配、四类型分组；固定输入重复结果一致；假模型不充真实效果；报告计算并判定赛题两项硬指标（恰为 20 个或 70% 视为达标，不足如实写未达标），列错误类型与改进方向；真实模型判定结果另记于报告文件 | `python3 -m pytest tests/backend/test_k02.py -q` |
 | **K03 实现可信问答离线评测** | K01, J06 | 问题/答案/证据 → 质量指标 | `evaluation/evaluate_qa.py` | 编号存在不等于支持结论；包含注入/不覆盖负例；支持人工复核与假阳性记录 | `python3 -m pytest tests/backend/test_k03.py -q` |
 | **K04 实现全链路阶段性能测量** | F13, J07, E04 | 固定约2万字fixture → 阶段耗时/token报告 | `evaluation/benchmark_pipeline.py` | 注明机器/模型/并发/样本数/p50/p95；区分目标与实测；付费执行另行确认 | `python3 -m pytest tests/backend/test_k04.py -q` |
 | **K05 建立教师主线 E2E** | H02, H08, H09, H10, F13 | 自编四格式资料 → 上传到发布用例 |  | fake模型也走真实服务；成环拒绝、失败重试、发布可见；保留失败证据 | `npm --prefix src/frontend run test:e2e -- ../../tests/e2e/teacher.spec.ts` |
@@ -270,5 +270,5 @@
 - 身份实现及成员权限：A05；两个分支决定不同步，不能依聊天推断。
 - 模型接入取值、向量维度和预算：A07；fake 工作可先行，真实接入/评测须确认。
 - 发布版本/快照形态、worker 策略：A04/A06；实现前同步架构。
-- 示例课程/资料：既有 D-01；自编单元 fixture 不等于真实课程质量验收。
+- 示例课程/资料：既有 D-01；自编单元 fixture 不等于真实课程质量验收。赛题抽取硬指标以一门完整课程的一章为基准（REQ-01），D-01 选定的材料须够一章且版权合规。
 - 加分项：O01；主线完成前不抢占。
