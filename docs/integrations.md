@@ -126,7 +126,7 @@
 | --- | --- | --- | --- | --- |
 | `AUTH_JWT_SECRET` | 密钥；UTF-8 编码后 ≥ 32 字节，不得全为空白 | 空 | 访问令牌 HS256 签名密钥。缺失或过短时 API 拒绝启动，不回退默认密钥；错误信息只含变量名。本机用 `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` 生成 | 本机填写 |
 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 整数 ≥ 1 | `28800` | 访问令牌有效期（秒），即 `LoginResponse.expires_in` 与 `exp - iat`；无刷新令牌 | 已签收（ADR-013） |
-| `SEED_DEMO_PASSWORD` | 密钥；仅种子脚本读取 | 不设（`.env.example` 中为注释行） | 演示账号口令；未设置时种子脚本非 0 退出，不回退仓库内默认口令。由 C14 实现；不是 API 设置，因此不进 `Settings` | 本机填写 |
+| `SEED_DEMO_PASSWORD` | 密钥；仅种子脚本读取 | 不设（`.env.example` 中为注释行） | 演示账号口令；未设置时种子脚本非 0 退出，不回退仓库内默认口令。由 C14 的 `scripts/seed-demo-accounts.py` 读取；不是 API 设置，因此不进 `Settings` | 本机填写 |
 
 ### 文档解析依赖（D02～D05）
 
@@ -140,6 +140,18 @@
 | PDF | `parsers/pdf.py`（`pdf/1`） | `pdfminer.six==20260107`（MIT），连带 `cryptography`（Apache-2.0 或 BSD-3-Clause）、`charset-normalizer`（MIT） | 版面分析给出逐行字号、字重和坐标，供 D06、D07 使用；不解密，带加密字典即报 `encrypted`（D-14 待定）；无 OCR |
 
 `cryptography` 是 pdfminer.six 的强制依赖，本项目代码不调用它解密。
+
+账号命令（C14，均从仓库根目录运行，读取与 API 相同的环境变量；数据库须已迁移，否则非 0 退出并提示先运行 `python -m app.repositories.sqlite`）：
+
+| 命令 | 作用 |
+| --- | --- |
+| `python3 scripts/seed-demo-accounts.py` | 补齐 `demo_teacher`、`demo_student`、`demo_student2`；已存在的账号不改口令、不改停用状态；同名账号类型不符时整批拒绝 |
+| `python3 scripts/manage-accounts.py create <用户名> --role teacher\|student` | 新建账号；口令交互输入两次，或 `--password-env 变量名` 从环境变量读 |
+| `python3 scripts/manage-accounts.py disable\|enable <用户名>` | 停用（保留首次停用时间）或重新启用；停用后旧令牌的下一次请求即 401 |
+| `python3 scripts/manage-accounts.py reset-password <用户名>` | 重置口令，读取方式同 `create` |
+| `python3 scripts/manage-accounts.py list` | 列出用户名、账号类型、创建时间与停用状态，不显示哈希 |
+
+口令永远不作为命令行参数（会留在 shell 历史和进程列表里）；误输入 `--password …` 时脚本拒绝执行，而且不回显所输内容。
 
 ## 模型接入规则（A07）
 

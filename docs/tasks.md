@@ -591,3 +591,13 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 输出：验收 7 规定了基准材料、实体数、准确率、判定对象、报告内容和失败路径；K01 负责口径与一章量的标注材料，K02 负责计算、判定并新增 `evaluation/reports/extraction-accuracy.md`。
 - 核对：赛题其余指标已有覆盖——格式 ≥ 2 种、关系 ≥ 3 种（四格式、四关系）；问答 ≤ 15 秒（`LLM_CHAT_TIMEOUT_SECONDS`、K04）；讲解与练习题（O05/O06）；赛题不要求训练模型。
 - 决策 D-15（ArvinHan，2026-09-24 确认；原拟编号 D-14 已被 PR #199 的 PDF 权限决策占用，合并时改号）：70% 按「实体、关系分别达标」执行。
+
+## C14 账号管理命令与演示账号种子
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C14 | DONE（待 PR 审查/合并） | 实现账号管理命令与演示账号种子 | Claude | `claude/c14-account-seed` / `04f8ac6` | `scripts/manage-accounts.py`、`scripts/seed-demo-accounts.py`、`tests/backend/test_c14.py`；**范围扩展**（后端分层规则要求业务放 services、持久化放 repositories，#161 已登记）：`src/backend/app/services/account_admin.py`（新建）、`src/backend/app/repositories/accounts.py`（只追加函数）；`docs/integrations.md`（本地账号登录节）、本节、`docs/handoffs/claude-c14.md` | `docs/handoffs/claude-c14.md`；C14 26 passed（先红：缺模块收集失败，后续逐步转绿）；8 处反向篡改中 6 处被抓到，另 2 处是等价变异（原因见交接）；后端全量 746 passed；`verify.sh` exit 0 |
+
+- 输入：`specs/identity-access.md` §1.1、§1.2（ADR-013）；C13 的 `create_account` 与 `users` 表。输出：两个命令脚本，以及服务函数 `set_disabled`、`reset_password`、`list_accounts`、`seed_demo_accounts`。
+- 验收：创建和停用都能用 `list` 复查；重复停用保留首次时间；重复种子不新增、不改已有口令和停用状态；缺少或空白的 `SEED_DEMO_PASSWORD` 非 0 退出且不写库；同名账号类型不符整批拒绝；未迁移的库非 0 退出且不建库文件；口令不作为命令行参数，也不出现在任何输出里。
+- 不在本任务：协作教师经命令行加入课程（§3.3）需要 C02 的课程和成员表，交 C02/C15。
