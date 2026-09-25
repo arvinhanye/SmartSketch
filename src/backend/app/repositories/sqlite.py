@@ -51,10 +51,15 @@ def _table_exists(database: sqlite3.Connection, name: str) -> bool:
     ).fetchone() is not None
 
 
+def _has_column(database: sqlite3.Connection, table: str, column: str) -> bool:
+    return any(row[1] == column for row in database.execute(f"PRAGMA table_info({table})"))
+
+
 def _check_no_live_leases(database: sqlite3.Connection) -> None:
-    # C06 creates the task table; C01 must also guard a database migrated later.
+    # C06 creates the task table before C09 adds lease columns; a table without the
+    # lease column cannot hold a lease, so only query tables that have it.
     for table in ("processing_tasks", "tasks"):
-        if _table_exists(database, table):
+        if _table_exists(database, table) and _has_column(database, table, "lease_expires_at"):
             try:
                 active = database.execute(
                     f"SELECT 1 FROM {table} WHERE lease_expires_at >= unixepoch() LIMIT 1"
@@ -63,7 +68,7 @@ def _check_no_live_leases(database: sqlite3.Connection) -> None:
                 raise MigrationError(f"Cannot inspect {table} lease state") from exc
             if active:
                 raise MigrationError("Active task lease: stop API and worker before migration")
-    if _table_exists(database, "course_locks"):
+    if _table_exists(database, "course_locks") and _has_column(database, "course_locks", "expires_at"):
         try:
             active = database.execute(
                 "SELECT 1 FROM course_locks WHERE expires_at >= unixepoch() LIMIT 1"
