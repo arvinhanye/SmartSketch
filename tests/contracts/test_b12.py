@@ -349,7 +349,9 @@ def test_recommend_limit_and_no_target_path():
     assert params["limit"]["schema"] == {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}
     assert {"401", "403", "404", "422", "500"} <= set(RECOMMEND["responses"])
     assert "limit" in RECOMMEND["responses"]["422"]["description"]
-    assert "path" not in yaml.safe_dump(SCHEMAS["RecommendResponse"])
+    for branch in SCHEMAS["RecommendResponse"]["discriminator"]["mapping"].values():
+        assert "path" not in SCHEMAS[branch.rsplit("/", 1)[1]]["properties"]
+    assert "#/components/schemas/LearningPath" not in yaml.safe_dump(PATHS)
 
 
 # ── 生成物（ADR-004：改真源后重新生成）────────────────────────────────────────
@@ -357,10 +359,14 @@ def test_recommend_limit_and_no_target_path():
 def test_generated_pydantic_models_enforce_shape():
     models = generated_models()
     models.ProgressEntry.model_validate(LP17_B)
-    with pytest.raises(Exception):
-        models.ProgressEntry.model_validate(_without(LP17_B, "own_status"))   # 可空但必填
-    with pytest.raises(Exception):
-        models.ProgressEntry.model_validate(_without(LP17_B, "updated_at"))
+    # 注意：datamodel-codegen 0.26.3 对 OpenAPI 3.1 的「必填且可空」字段生成 `= None` 默认值
+    # （既有 GraphExchange.graph_version 同样如此），缺字段不会被 Pydantic 拒绝；必填性以真源、
+    # openapi.json 与 TS 生成物为准，见 docs/handoffs/claude-b12.md 风险。
+    assert {"own_status", "inherited_from", "updated_at"} <= set(models.ProgressEntry.model_fields)
+    for bad in (LP17_B | {"own_status": "skipped"}, LP17_B | {"write_seq": 3},
+                LP17_B | {"inherited_from": [{"kp_id": "kp_a", "status": "mastered", "commit_seq": 1}]}):
+        with pytest.raises(Exception):
+            models.ProgressEntry.model_validate(bad)
     models.ProgressResponse.model_validate({"graph_version": 2, "entries": [LP17_B]})
     models.RecommendResponse.model_validate(LIST)
     models.RecommendResponse.model_validate(ALL_MASTERED)
@@ -389,8 +395,10 @@ def test_generated_typescript_keeps_nullable_fields_required():
 def test_generated_openapi_json_matches_source_for_b12_schemas():
     import json
     generated = json.loads((GENERATED / "openapi.json").read_text(encoding="utf-8"))["components"]["schemas"]
-    for name in ("ProgressEntry", "ProgressResponse", "RecommendResponse", "Recommendation",
-                 "RecommendWeightedFactors", "LearningIntegrityError"):
+    for name in ("MasteryStatus", "ProgressUpdate", "ProgressInheritedSource", "ProgressEntry", "ProgressResponse",
+                 "RecommendFactors", "RecommendWeightedFactors", "RecommendReasonFacts", "Recommendation",
+                 "RecommendListResponse", "RecommendAllMasteredResponse", "RecommendResponse",
+                 "LearningIntegrityError", "LearningIntegrityDetails"):
         assert generated[name] == SCHEMAS[name], name
 
 
