@@ -1,7 +1,7 @@
 # Codex 交接：B07 契约门禁缺依赖假绿
 
-- 任务与状态：B07 实现及本地验收完成；[PR #187](https://github.com/arvinhanye/SmartSketch/pull/187) 已创建，待审查与合并。
-- 基线：`origin/main@28b09b4`，隔离工作树 `b07-main`；没有合并到 main。
+- 任务与状态：B07 已完成审查；[PR #187](https://github.com/arvinhanye/SmartSketch/pull/187) 于 2026-09-25 UTC 合入 `main@1d3e20c`。
+- 基线：初始 `origin/main@28b09b4`，隔离工作树 `b07-main`；合并前同步 `main@588d00a`。
 - 范围：`scripts/check_contracts.py`、`scripts/verify/contracts.sh`、`src/backend/pyproject.toml`、`tests/tooling/test_b07.py`，以及 `docs/architecture.md`、`docs/tasks.md`、本交接。
 
 ## 交付与决定
@@ -20,17 +20,17 @@
 | `PATH=/private/tmp/smartsketch-c08-venv/bin:$HOME/.local/share/smartsketch/contracts-venv/bin:$PATH PYTEST_ADDOPTS='-p no:cacheprovider' ./scripts/verify.sh` | exit 0；契约负例 24 项、B08 5、B09 5、B10 45、B13 53 均通过（审查补丁前） |
 | `PATH=/opt/anaconda3/bin:$HOME/.local/share/smartsketch/contracts-venv/bin:$PATH PYTEST_ADDOPTS='-p no:cacheprovider' ./scripts/verify.sh` | exit 0；契约负例 24 项、B08 5、B09 5、B10 45、B13 53 均通过（审查补丁后） |
 
-单独系统 `python3` 缺 PyYAML、pytest 等依赖；最初无环境 PATH 的全仓收集失败。上述命令使用当时已存在的测试环境，未向系统环境安装包。门禁运行所需生成器保持在独立 venv 的 PATH 中。最终补丁后的全仓测试未重跑：临时测试 venv 已清理，conda Python 缺 FastAPI；定向 14 项与最终契约门禁均已通过。
+单独系统 `python3` 缺 PyYAML、pytest 等依赖；最初无环境 PATH 的全仓收集失败。上述命令使用当时已存在的测试环境，未向系统环境安装包。门禁运行所需生成器保持在独立 venv 的 PATH 中。原实现阶段未重跑最终补丁后的全仓测试；PR 复核阶段在临时合并副本安装锁定依赖并重跑，见下节。
 
 ## 接口、风险与下一步
 
 - 无对外接口或数据模型变更；只增加本地测试依赖声明，不改生产依赖。无迁移或外部服务状态。
-- C13 并行分支也可能改 `src/backend/pyproject.toml` 的生产依赖；合并时须同时保留其生产依赖与 B07 的三个测试依赖。本分支不覆盖 C13 工作区。
-- 下一位 Agent：审查 PR #187，由 ArvinHan 合并；在 PR 基线如有 C13 并入，先复核 `pyproject.toml` 的两组依赖，再重跑定向测试和 `verify.sh`。
+- C13 的 `argon2-cffi==25.1.0` 与 B07 三项测试依赖在 `main@1d3e20c` 均保留；未覆盖 C13 工作区。
+- 后续：K11 汇总门禁时保持普通缺依赖非零退出、显式降级不构成验收；无 B07 剩余合并动作。
 - 回滚：仅撤销 B07 自有提交；不删契约真源、生成物或 C13 依赖，无数据恢复步骤。
 
 ## PR 审查复核（2026-09-25 UTC）
 
 - 已在 `origin/main@588d00a` 的临时合并副本审查七个文件；无 P1/P2，C13 生产依赖与 B07 测试依赖均保留。
 - 合并副本定向 B07 14 passed、全量 620 passed、`./scripts/verify.sh` exit 0、`git diff --cached --check` PASS。受限沙箱中另有两例 C13 测试因本地 socket 权限失败；允许本地 socket 的全量复跑 620 passed。
-- 详细审查与命令见 `docs/reviews/codex-b07-pr187-2026-09-25.md`。合并后须将任务板状态与本交接中的“待 PR 合并”更新为已合并并补入 merge SHA。
+- 详细审查与命令见 `docs/reviews/codex-b07-pr187-2026-09-25.md`。PR #187 六项 CI 检查全部成功；GitHub 返回 merge commit `1d3e20c1e39165c817bd3c91b5282b67a58f6cff`，远端 `main` 指向该提交。
