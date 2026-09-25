@@ -830,7 +830,7 @@ D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #22
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E04 | IN PROGRESS | 实现模型调用预算与退避 | ArvinHan（Claude 子代理） | `claude/e04-call-policy` / 本认领提交 | `src/backend/app/services/ai/policy.py`、`src/backend/app/repositories/model_calls.py`、`tests/backend/test_e04.py`、`docs/handoffs/claude-e04.md`（`model_calls` 表已在 001，无迁移） | 待补 |
+| E04 | DONE（待 PR 审查/合并） | 实现模型调用预算与退避 | ArvinHan（Claude 子代理） | `claude/e04-call-policy` / 本认领提交 | `src/backend/app/services/ai/policy.py`、`src/backend/app/repositories/model_calls.py`、`tests/backend/test_e04.py`、`docs/handoffs/claude-e04.md`（`model_calls` 表已在 001，无迁移） | 红灯：实现前收集 `ImportError`；绿灯 `tests/backend/test_e04.py` 66 passed（47 个函数）；全量 `tests/backend` 1742 passed（基线 1676 + 66），`tests/contracts tests/tooling` 305 passed；反向篡改 5 处（鉴权被重试、`Retry-After` 不封顶、任务预算 `>=` 改 `>`、预写失败仍发请求、日志输出提示词）各被检出（5/2/1/2/1 failed），改回 `cmp` 一致；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；待决 9 项（含退避变量登记、生成前被拒的 `error_class` 格式）见 `docs/handoffs/claude-e04.md` |
 
 - E04 验收：429/5xx 有界退避，鉴权错误不重试；预算零不发请求；日志无 token/原文；退避参数有上限（A07 交出项）。验证：`python3 -m pytest tests/backend/test_e04.py -q`。
 
