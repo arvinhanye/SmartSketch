@@ -876,7 +876,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D11 | IN PROGRESS | 实现解析阶段 worker 编排 | ArvinHan（Claude） | `claude/d11-parse-worker` / 本认领提交 | `src/backend/app/workers/__init__.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_d11.py`、`docs/handoffs/claude-d11.md` | 待补 |
+| D11 | DONE（待 PR 审查/合并） | 实现解析阶段 worker 编排 | ArvinHan（Claude） | `claude/d11-parse-worker` / 本认领提交 | `src/backend/app/workers/__init__.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_d11.py`、`docs/handoffs/claude-d11.md` | `test_d11.py` 42 passed；`tests/backend` 2147 passed（基线 2105 + 42）；`verify.sh` 通过；反向篡改 7 处全部检出；待决（PDF 管线版本 `pdf/1,cleanup/1,headings/1` 待确认等）见 `docs/handoffs/claude-d11.md` |
 
 - D11 验收：已领取任务（C09 租约）经解析 → 分块 → 块身份（D09）→ 来源块持久化（D10）到 `parsing` 完成检查点（T4 `parsing → extracting`，带令牌条件）；解析失败 T9 `DOCUMENT_UNREADABLE`、取消在检查点 T8、租约丢失即停、重启重跑不产生新块；只做解析阶段，不接真实 LLM。验证：`python3 -m pytest tests/backend/test_d11.py -q`。
 
