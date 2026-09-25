@@ -363,6 +363,61 @@ def test_teacher_cannot_upload_into_other_teachers_course(client, world):
     assert world.count("materials") == 0
 
 
+# ---------------------------------------------------------------- 先授权、再有界解析（移植自 #229）
+
+# 超过 UPLOAD_MAX_BYTES + 16 KiB 表单开销（LIMIT=64 时为 16 448 字节）。
+OVERSIZE_BODY = b"x" * 17000
+
+
+def _forbid_multipart_parsing(monkeypatch, reason):
+    from starlette.formparsers import MultiPartParser
+
+    def must_not_parse(*args, **kwargs):
+        raise AssertionError(reason)
+
+    monkeypatch.setattr(MultiPartParser, "parse", must_not_parse)
+
+
+def test_unauthenticated_upload_is_rejected_before_multipart_parsing(client, world, monkeypatch):
+    _forbid_multipart_parsing(monkeypatch, "multipart parsed before authorization")
+
+    response = upload(client, world, user=False)
+
+    assert (response.status_code, response.json()["code"]) == (401, "UNAUTHENTICATED")
+
+
+def test_huge_content_length_is_413_before_multipart_parsing(client, world, monkeypatch):
+    _forbid_multipart_parsing(monkeypatch, "oversize body parsed before length rejection")
+
+    response = upload(client, world, data=OVERSIZE_BODY)
+
+    assert response.status_code == 413
+    assert response.json()["code"] == "FILE_TOO_LARGE"
+    assert response.json()["details"] == {"limit_bytes": LIMIT}
+    assert world.stored_files() == []
+    assert world.count("materials") == 0
+
+
+def test_body_limit_counts_received_bytes_when_content_length_is_unreliable(client, world, monkeypatch):
+    from app.services.file_storage import FileStorage
+
+    def must_not_save(*args, **kwargs):
+        raise AssertionError("oversize body reached the storage service")
+
+    monkeypatch.setattr(FileStorage, "save", must_not_save)
+    response = client.post(
+        world.path(),
+        headers=world.headers(world.teacher) | {"Content-Length": "0"},
+        files={"file": ("notes.txt", OVERSIZE_BODY, "text/plain")},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["code"] == "FILE_TOO_LARGE"
+    assert response.json()["details"] == {"limit_bytes": LIMIT}
+    assert world.stored_files() == []
+    assert world.count("materials") == 0
+
+
 # ---------------------------------------------------------------- 列表
 
 
@@ -499,3 +554,6 @@ def test_openapi_exposes_contract_operations(world):
     assert paths["post"]["operationId"] == "uploadDocument"
     assert "202" in paths["post"]["responses"]
     assert {"413", "415"} <= set(paths["post"]["responses"])
+    body = paths["post"]["requestBody"]["content"]["multipart/form-data"]["schema"]
+    assert body["required"] == ["file"]
+    assert body["properties"]["file"] == {"type": "string", "format": "binary"}
