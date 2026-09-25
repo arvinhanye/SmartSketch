@@ -271,13 +271,15 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
 ./scripts/dev-up.sh           # 建目录 → 启动 → 等健康（上限 NEO4J_WAIT_SECONDS，默认 180 秒）→ 验证 APOC；可重复执行
 ./scripts/check-apoc.sh       # 单独验证 APOC
-docker compose stop neo4j     # 停止，保留数据（docker compose down 也保留：数据在绑定目录里）
+./scripts/dev-down.sh          # 普通停止：保留卷和 neo4j/data、neo4j/logs
+./scripts/dev-down.sh --destroy  # 交互终端精确输入 DELETE NEO4J DATA 后执行 compose down -v
+                                # 只删除 Compose 管理的卷；绑定目录 neo4j/data、neo4j/logs 仍保留
 ```
 
 - 健康检查和 APOC 检查都在容器内从 `NEO4J_AUTH` 取出凭据，通过 `cypher-shell` 认识的 `NEO4J_USERNAME`/`NEO4J_PASSWORD` 环境变量传入，口令不出现在宿主机或容器内的任何命令行参数里。
 - 健康状态必须完整等于 `healthy` 才算就绪；`unhealthy` 或容器已退出时立即失败，并提示查看 `docker compose logs neo4j`。
 - Docker Desktop 装好后如果终端里找不到 `docker`，把 `~/.docker/bin` 加进 `PATH`，或者重开终端。
-- 停止与销毁脚本（`dev-down.sh`，普通停止保留数据、删卷须确认）由 K07 导入并审查；在那之前用上面的 `docker compose` 命令。
+- `dev-down.sh` 默认只停止 Neo4j，保留 Compose 卷和绑定数据；`--destroy` 需要显式开关及交互终端精确确认，拒绝或非交互执行不会删卷。`compose down -v` 不删除绑定目录 `neo4j/data`、`neo4j/logs`，也不清理 `storage/`。
 - 验收测试：`python3 -m pytest tests/integration/test_f01.py -q`。没有 Docker 守护进程时，真实容器用例自动跳过；设 `SMARTSKETCH_SKIP_DOCKER=1` 也可跳过。
 
 ## 计划集成
