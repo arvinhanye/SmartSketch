@@ -89,7 +89,7 @@
 | D-08 | 融合自动合并阈值与低置信度阈值的初始取值（沿用 `740adb` 未决问题编号，ADR-016 决定 7） | 技术负责人 | E09/E10 开工前 |
 | D-09 | 前端登录页与会话存储缺少原子任务。**已关闭**：补登 **H13 实现前端登录页与会话存储**（依赖 C13、B15、B03、B04；原子清单增至 141 项），负责登录页、`sessionStorage` 会话读写、401 清会话与课程上下文回登录页，并向 B03 的 `getAccountRole` 注入真实来源（ArvinHan，2026-09-24 确认） | 产品负责人 / 协调 Agent | 已完成 |
 | D-10 | 迁移文件编号何时确定、表间外键如何约束合并顺序。**已关闭**：编号在合并时取「main 最大编号 + 1」，原子清单中 002～009 改为 `NNN_<名称>.sql`；C02 增加对 C13 的依赖（`course_members.user_id` → `users`）。原因：C01 迁移器拒绝应用比已应用版本更小的编号，按旧计划 C13 的 `008` 先合并会使后到的 004～007 无法应用（ArvinHan，2026-09-24） | 技术负责人 | 已完成 |
-| D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（C13 已合并，配置落地待认领） |
+| D-11 | 上传单文件大小上限。**已关闭**：50 MiB（52 428 800 字节），环境变量名 `UPLOAD_MAX_BYTES`，超过即 413 `FILE_TOO_LARGE`（`details.limit_bytes`）。与存储目录 `STORAGE_DIR` 一起在 C13 合并后补进 `config.py`、`.env.example`、`docs/integrations.md`（三者当前在 C13 文件锁内）；C05 的 `FileStorage(root, max_bytes)` 由 C06/C07 按此传入（ArvinHan，2026-09-24） | 技术负责人 | 已完成（配置已落地，见「D-11 上传配置落地」） |
 | D-12 | Markdown 中 `#` 后不加空格的写法（如 `#第一章`）是否算标题。**已关闭**：放宽，由 D03 在 PR #191 中实现；规则保守，只作用于顶层行，不误伤 `#include`、`#1`、`#tag` 这类行，边界见 `docs/handoffs/claude-d03.md`。D03 首次合并前完成，`parser_version` 仍为 `markdown/1`（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
 | D-13 | 解析器只把标题放进章节路径、标题文字不在块正文里，抽取（D12）看不到标题。**已关闭**：由 D08 分块时在每块正文前拼上章节路径（`section_path`），解析器输出与 D01 模型不变（ArvinHan，2026-09-24） | 技术负责人 | 已完成（D08 实现） |
 | D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
@@ -560,7 +560,7 @@
 | C05 | DONE（PR #181 `3f1f059`） | 实现文件落盘边界 | Claude（后端子代理） | `claude/c05-file-storage` / `origin/main` | `src/backend/app/services/file_storage.py`、`tests/backend/test_c05.py` | `docs/handoffs/claude-c05.md`；C05 61 passed、后端全部通过；CI 三个 job 通过；配置项待补（D-11） |
 
 - 进展（2026-09-24）：C05、E01、D01、C13 均已合并，本批完成。C13 引入的全局 422 处理器输出 `details.fields = [{in, field, reason}]`，已登记到 `src/contracts/errors.v1.md`。
-- 待认领：按 D-11 把 `UPLOAD_MAX_BYTES`、`STORAGE_DIR` 补进 `config.py`、`.env.example`、`docs/integrations.md`（C13 已释放这三个文件的锁）；D02～D05 现可并行认领（只依赖 D01）；C02、C03、C14、H13 的前置 C13 已满足。
+- ~~待认领：按 D-11 把 `UPLOAD_MAX_BYTES`、`STORAGE_DIR` 补进 `config.py`、`.env.example`、`docs/integrations.md`~~（已完成，见「D-11 上传配置落地」）；D02～D05 现可并行认领（只依赖 D01）；C02、C03、C14、H13 的前置 C13 已满足。
 - 不在本批：B12（与 539210 的 B11 同改 `api.v1.yaml`）、B07（与 C13 可能同改 `pyproject.toml`）、F01（需要本机 Docker/Neo4j）。
 - 并行约束：四项都不改 `docs/tasks.md`、`docs/architecture.md`、`scripts/verify.sh`；需要改共享文件时停下来交给协调方。
 
@@ -591,3 +591,12 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 输出：验收 7 规定了基准材料、实体数、准确率、判定对象、报告内容和失败路径；K01 负责口径与一章量的标注材料，K02 负责计算、判定并新增 `evaluation/reports/extraction-accuracy.md`。
 - 核对：赛题其余指标已有覆盖——格式 ≥ 2 种、关系 ≥ 3 种（四格式、四关系）；问答 ≤ 15 秒（`LLM_CHAT_TIMEOUT_SECONDS`、K04）；讲解与练习题（O05/O06）；赛题不要求训练模型。
 - 决策 D-15（ArvinHan，2026-09-24 确认；原拟编号 D-14 已被 PR #199 的 PDF 权限决策占用，合并时改号）：70% 按「实体、关系分别达标」执行。
+
+## D-11 上传配置落地
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D-11 落地 | DONE（待 PR 审查/合并） | 把 `STORAGE_DIR`、`UPLOAD_MAX_BYTES` 补进设置、示例与集成登记 | Claude（协调方） | `claude/d11-upload-config` / `04f8ac6` | `src/backend/app/config.py`、`.env.example`、`docs/integrations.md`（应用运行与存储表、启动校验）、`tests/backend/test_d11_upload_config.py`、本节与 D-11 行、`docs/handoffs/claude-d11-upload-config.md` | `docs/handoffs/claude-d11-upload-config.md`；先红 10 failed，后绿 D-11 10 passed；后端全量 730 passed |
+
+- 输入：D-11（50 MiB、变量名 `UPLOAD_MAX_BYTES`）；`STORAGE_DIR=./storage` 沿用 740adb（A10 导入映射「批 2 只取 `STORAGE_DIR`」）。输出：`Settings.STORAGE_DIR`、`Settings.UPLOAD_MAX_BYTES`，C06/C07 按 `FileStorage(settings.STORAGE_DIR, max_bytes=settings.UPLOAD_MAX_BYTES)` 使用。
+- 验收：缺省值与 D-11 一致；0、负数、小数、带单位、空串拒绝并指出变量名；空白 `STORAGE_DIR` 拒绝；设置值能直接构造 `FileStorage` 并在超限时给出 `limit_bytes`；`.env.example` 覆盖全部设置（B06 回归）。
