@@ -168,7 +168,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | DOCX | 不填（不编造页码） | 必填 | 不填 | 同上 |
 
 - **段落号**：`paragraph` 是该块在同一组标题（`section_titles`）下按文档顺序的序号，从 1 起、连续不断档。同一标题路径在文档中再次出现时接续编号，因此「标题路径 + 第N段」在一份文档内唯一。例：`第3章 > 3.1 栈 > 第2段`。
-- **标题规范化**：各级标题以 `" > "` 连接。标题先合并空白、去首尾，再把半角 `>` 替换为全角 `＞`，保证路径能无歧义地拆回各级标题。标题本身不成块。
+- **标题规范化**：各级标题以 `" > "` 连接。标题先合并空白、去首尾，再把半角 `>` 替换为全角 `＞`，保证路径能无歧义地拆回各级标题。标题本身不成块。标题文字由 D08 分块时以章节路径的形式拼在每块正文前，供抽取与检索使用（D-13）。
 - **空文档**：没有可提取文本（含扫描件无文本层）时不构造结果，抛 `DocumentUnreadableError`。`reason ∈ {corrupted, encrypted, no_text}`，对应任务错误 `DOCUMENT_UNREADABLE`。
 - **资料修订**：`RevisionKey(document_id, content_hash, parser_version)`。其中 `parser_version` 由解析器给出，为不含空白的非空字符串（如 `txt/1`）。`content_hash` 形如 `sha256:<64 位小写十六进制>`，唯一来源是 C05 `FileStorage.save()` 返回的 `StoredFile.content_hash`，D11 直接使用、不重算。`revision_id` 与块 ID 的派生公式归 D09。
 
