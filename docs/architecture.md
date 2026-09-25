@@ -155,7 +155,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 读取绑定 | 学生请求开始时读一次指针，全程使用同一 `version_id`；MVP 不回收已提交版本 |
 | 崩溃恢复 | worker 周期回收步骤清扫过期尝试与 `cleanup_pending`；Neo4j 有而 SQLite 无的版本只告警不删除 |
 
-跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；修订 1 再修订 ADR-011 决定 5、7（块 ID 按资料修订生成、来源块删除保护）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 已由 B08 纳入契约，DTO 字段交 B11，配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
+跨任务影响：ADR-012 修订 ADR-011 决定 6（课程写锁由「两处持有」扩大到所有草稿写入）；修订 1 再修订 ADR-011 决定 5、7（块 ID 按资料修订生成、来源块删除保护）；新增错误码 `PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 已由 B08 纳入契约。B11 的对外 DTO 包括节点级 `revision`/编辑 `expected_revision`、关系降级解释、`PublishResult.unchanged/excluded`、`GraphVersion.kind/source_version` 与结构化 `PUBLISH_BLOCKED`；快照谱系 `merged_from` 和共享 `commit_seq` 仅内部持久化，不进入节点/版本 wire DTO。配置 `PUBLISH_LEASE_SECONDS`、`COURSE_LOCK_WAIT_SECONDS` 交 A07。
 
 ## 解析输出与来源定位（D01）
 

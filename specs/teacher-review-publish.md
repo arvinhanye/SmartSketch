@@ -142,7 +142,8 @@
 | `empty_graph` | 发布集合没有任何知识点 |
 | `invalid_lineage` | 谱系违反不变式：来源是本快照的节点、同一来源出现在两个节点的 `merged_from` 中，或节点的 `merged_from` 含其自身（属草稿不变量被破坏）（ADR-012 修订 3） |
 
-`details` 的具体结构由 B11 写入真源。「manual 条目是否必须有来源」不在本协议裁定；本协议只要求已有引用全部有效。
+`details.reasons` 为非空数组，元素至少包含闭集 `kind`；`cycle` 必须附首尾同节点的 `cycle` ID 链，其余原因可附 `relation_id`、`kp_id`、`chunk_id` 定位。B11 将该结构写入真源。`manual` 条目可有空 `source_refs`，但已有引用必须全部有效。
+`cycle` 首尾同 ID 是跨数组元素等值约束，JSON Schema 不负责比较；G04 组装 `PUBLISH_BLOCKED` 前必须验证，契约以 `x-closed-cycle: true` 标记这一服务端不变量。
 
 **快照格式**（`snapshot_format = 1`）：
 
