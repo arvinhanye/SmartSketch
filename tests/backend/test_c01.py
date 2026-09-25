@@ -192,6 +192,28 @@ def test_lease_expiring_at_current_second_still_blocks_migration(tmp_path, table
             _check_no_live_leases(database)
 
 
+def test_task_table_without_lease_columns_does_not_block_later_migrations(tmp_path):
+    # C06 的 003_tasks.sql 建 processing_tasks 时尚无租约列（C09 才加）；没有租约列就不可能有租约，
+    # 不应让 003 之后的任何迁移都报 "Cannot inspect processing_tasks lease state"。
+    path = tmp_path / "db.sqlite3"
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    for name in ("001_base.sql", "002_accounts.sql", "003_tasks.sql"):
+        shutil.copyfile(ROOT / "src/backend/migrations" / name, migrations / name)
+    assert migrate(_url(path), migrations) == ["001", "002", "003"]
+    (migrations / "004_next.sql").write_text("CREATE TABLE next_table (id INTEGER);", encoding="utf-8")
+
+    assert migrate(_url(path), migrations) == ["004"]
+
+
+@pytest.mark.parametrize("table", ["processing_tasks", "course_locks"])
+def test_lease_table_without_lease_column_has_no_live_lease(tmp_path, table):
+    with sqlite3.connect(tmp_path / "db.sqlite3") as database:
+        database.execute(f"CREATE TABLE {table} (id INTEGER)")
+        database.execute(f"INSERT INTO {table} VALUES (1)")
+        _check_no_live_leases(database)
+
+
 def test_backup_can_restore_previous_schema_and_applied_checksum_is_immutable(tmp_path):
     path = tmp_path / "db.sqlite3"
     url = _url(path)

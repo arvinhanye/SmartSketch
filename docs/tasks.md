@@ -671,3 +671,11 @@ F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）�
 - C02 验收：课程成员唯一；同用户不同课程角色独立；读写外键正确（`course_members.user_id` → C13 的 `users`）。验证：`python3 -m pytest tests/backend/test_c02.py -q`。
 
 - 并行约束：各子任务只写自己的文件锁与交接文件，并只改本节自己那一张表的状态与证据；不改 `docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`、`parsers/__init__.py`、`parsers/models.py` 等共享文件，需要时停下交协调方。
+
+## FIX-MIGRATE-LEASE 迁移器租约检查与 C06 任务表不兼容（2026-09-25）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| FIX-MIGRATE-LEASE | DONE（待 PR 审查/合并） | C01 迁移器只对有租约列的表检查租约，解除 C06 `processing_tasks`（无租约列）对 003 之后所有迁移的阻塞 | ArvinHan（Claude 协调方） | `claude/fix-migrate-lease-guard` / `1ffda90` | `src/backend/app/repositories/sqlite.py`、`tests/backend/test_c01.py`、`docs/handoffs/claude-fix-migrate-lease.md` | 复现用例 3 个修前 failed、修后 C01 21 passed；后端 981 passed；`docs/handoffs/claude-fix-migrate-lease.md` |
+
+- 后续：C09 加租约列时，补一条真实表上“有效租约阻止迁移”的回归。
