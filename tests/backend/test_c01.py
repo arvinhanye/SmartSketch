@@ -33,6 +33,14 @@ def _url(path: Path) -> str:
     return f"sqlite:///{path.as_posix()}"
 
 
+def _base_only(tmp_path: Path) -> Path:
+    """Only the real 001_base.sql, so these 001 assertions hold after later migrations land."""
+    directory = tmp_path / "base-only-migrations"
+    directory.mkdir()
+    shutil.copyfile(ROOT / "src/backend/migrations/001_base.sql", directory / "001_base.sql")
+    return directory
+
+
 def test_connection_enables_wal_foreign_keys_and_busy_timeout(tmp_path):
     with connect(_url(tmp_path / "db.sqlite3")) as database:
         assert database.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
@@ -47,8 +55,9 @@ def test_base_migration_adopts_existing_embedding_space_and_is_repeatable(tmp_pa
         database.execute(LEGACY_B06_DDL)
         database.execute("INSERT INTO embedding_space_state VALUES (1, 'model-a', 768, 0)")
 
-    assert migrate(url) == ["001"]
-    assert migrate(url) == []
+    base = _base_only(tmp_path)
+    assert migrate(url, base) == ["001"]
+    assert migrate(url, base) == []
     with sqlite3.connect(path) as database:
         assert database.execute(
             "SELECT model, dimensions, is_fake FROM embedding_space_state"
@@ -61,7 +70,7 @@ def test_base_migration_adopts_existing_embedding_space_and_is_repeatable(tmp_pa
 def test_model_calls_prewrite_replay_and_attribution_query(tmp_path):
     path = tmp_path / "db.sqlite3"
     url = _url(path)
-    assert migrate(url) == ["001"]
+    assert migrate(url, _base_only(tmp_path)) == ["001"]
     prewrite = (
         "call-1", "course-1", "task-1", "chunk-1", None,
         "entity", 1, 2, 1, "primary", 0, "model-a", 120, 50,
@@ -92,7 +101,7 @@ def test_model_calls_prewrite_replay_and_attribution_query(tmp_path):
 
 def test_backup_can_be_moved_immediately_after_migration_returns(tmp_path):
     path = tmp_path / "db.sqlite3"
-    assert migrate(_url(path)) == ["001"]
+    assert migrate(_url(path), _base_only(tmp_path)) == ["001"]
     backup = next((tmp_path / "backups").glob("*-before-001.sqlite"))
     moved = tmp_path / "moved-backup.sqlite"
     shutil.move(backup, moved)
@@ -293,16 +302,17 @@ def test_repository_pins_migration_files_to_lf():
 def test_pending_migrations_is_read_only_and_validates_history(tmp_path):
     path = tmp_path / "db.sqlite3"
     url = _url(path)
-    assert pending_migrations(url) == ["001"]
+    base = _base_only(tmp_path)
+    assert pending_migrations(url, base) == ["001"]
     assert not path.exists(), "只读检查不得创建数据库文件"
 
-    migrate(url)
-    assert pending_migrations(url) == []
+    migrate(url, base)
+    assert pending_migrations(url, base) == []
 
     with sqlite3.connect(path) as database:
         database.execute("UPDATE schema_migrations SET checksum = 'x' WHERE version = '001'")
     with pytest.raises(MigrationError, match="checksum"):
-        pending_migrations(url)
+        pending_migrations(url, base)
 
 
 def test_api_refuses_to_start_before_migrations_run(tmp_path, monkeypatch):

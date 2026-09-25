@@ -118,6 +118,16 @@
 | `RECOMMEND_WEIGHT_CHAPTER` | 数值 ≥ 0；四项成组 | `0.20` | 章节顺序权重 | 已签收（ADR-014 修订 1） |
 | `RECOMMEND_WEIGHT_EASE` | 数值 ≥ 0；四项成组 | `0.20` | 易学度权重 | 已签收（ADR-014 修订 1） |
 
+### 本地账号登录（C13）
+
+名称、约束与默认值来自 `specs/identity-access.md` §2.1、§6（ADR-013 已签收）。`load_settings` 只校验类型与范围；密钥是否存在、长度是否足够由 API 服务入口检查（`app.config.check_auth_settings`，`app.main:app` 与 `python -m app` 都经过它），worker 与迁移命令不签发令牌，不要求此变量。登录失败限流（同一用户名连续失败 5 次后锁 60 秒、进程内最多 1 万个键）是固定常量，不做成配置。
+
+| 变量 | 类型与约束 | 样例 | 用途 | 状态 |
+| --- | --- | --- | --- | --- |
+| `AUTH_JWT_SECRET` | 密钥；UTF-8 编码后 ≥ 32 字节，不得全为空白 | 空 | 访问令牌 HS256 签名密钥。缺失或过短时 API 拒绝启动，不回退默认密钥；错误信息只含变量名。本机用 `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` 生成 | 本机填写 |
+| `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 整数 ≥ 1 | `28800` | 访问令牌有效期（秒），即 `LoginResponse.expires_in` 与 `exp - iat`；无刷新令牌 | 已签收（ADR-013） |
+| `SEED_DEMO_PASSWORD` | 密钥；仅种子脚本读取 | 不设（`.env.example` 中为注释行） | 演示账号口令；未设置时种子脚本非 0 退出，不回退仓库内默认口令。由 C14 实现；不是 API 设置，因此不进 `Settings` | 本机填写 |
+
 ## 模型接入规则（A07）
 
 本节是上面「模型模式」至「向量模型」各变量的行为约定，消费方为 B06（设置加载）、D09（缓存键）、E03（兼容适配器）、E04（重试/熔断/预算）、E07（向量适配）、E12（抽取并发）、J03/J05（问答调用）与 K08（容器环境）。取值未签收不影响按本节形状实现与 fake 测试。
@@ -198,6 +208,7 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 - `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake`。
 - `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 必须小于 `LLM_CHAT_TIMEOUT_SECONDS`。
 - `RECOMMEND_WEIGHT_*` 四项成组：都不设或都为空时用缺省值；只设一部分、有负数或非有限值、全为 0、和偏离 1 超过 `1e-9` 时拒绝启动（ADR-014 修订 1 决定 6）。
+- API 服务入口另行要求 `AUTH_JWT_SECRET` 存在且 ≥ 32 字节（C13，IAM-23）；`create_app()` 工厂本身不要求，以便测试在无密钥时构造应用，但工厂构造的应用在缺密钥时登录一律返回 500 `INTERNAL_ERROR`，不签发令牌。
 - 所有「密钥」类变量在日志、异常信息与设置对象的 repr 中一律打码；日志不输出提示词原文与模型返回正文（E04 验收）。
 
 ### 待签收取值（D-02）
