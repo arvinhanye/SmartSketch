@@ -33,6 +33,9 @@ class Settings(BaseModel):
     API_PORT: int = Field(default=8000, ge=1, le=65535)
     WEB_ORIGIN: str = "http://localhost:5173"
     SQLITE_URL: str = "sqlite:///./storage/smartsketch.sqlite3"
+    # 资料落盘根目录与单文件上限（D-11）；由 C06/C07 传给 FileStorage(root, max_bytes)
+    STORAGE_DIR: str = "./storage"
+    UPLOAD_MAX_BYTES: int = Field(default=52_428_800, ge=1)
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = Field(default="neo4j", min_length=1)
     NEO4J_PASSWORD: SecretStr = SecretStr("")
@@ -136,6 +139,8 @@ def _check_rules(settings: Settings) -> None:
         or "#" in settings.SQLITE_URL
     ):
         invalid.add("SQLITE_URL")
+    if not settings.STORAGE_DIR.strip():
+        invalid.add("STORAGE_DIR")
 
     primary = ("LLM_BASE_URL", "LLM_API_KEY", "LLM_EXTRACTION_MODEL", "LLM_CHAT_MODEL")
     fallback = (
