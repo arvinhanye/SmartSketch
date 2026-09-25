@@ -863,7 +863,7 @@
   2. **向量 HTTP 客户端归 E03**：在 `services/ai/compatible.py` 新增 `CompatibleEmbeddingClient`，实现 E02 的 `EmbeddingClient`，复用 E03 的传输、错误分类与密钥防泄露；请求 `POST /embeddings` 带 `dimensions`，按 `EMBEDDING_BATCH_SIZE` 分批，逐条核对返回维度。E07 保持只做切换、维度校验与缓存。随 #221 追加提交。
   3. **输出上限字段默认 `max_tokens`**，可切换为 `max_completion_tokens`。流式 usage、`finish_reason` 扩展值、缺 `[DONE]` 的处理，在拿到密钥后用手工冒烟脚本（不进 CI）对 D-02a/b 候选各测一次普通与流式请求，结果填入 `docs/integrations.md` D-02a/b 签收栏；不阻塞 E03 合并。缺 usage 按 ADR-011 修订 3 回退估算。
   4. **学习读路径完整性错误保留 `INTERNAL_ERROR`，不新增专用码**；`details.diagnostic_id` 改名为 **`details.request_id`**，与问答一致，作为全平台日志关联编号。读路径先按 LP-12 把原始进度投影到当前发布版节点集（脏行告警后忽略），再调用 I03；若 `ProgressOutsideGraphError` 仍被抛出，视为缺陷，按 `INTERNAL_ERROR` 返回。
-  5. **`PUT /progress` 目标不在当前发布版 → 422 `VALIDATION_ERROR`**：`details.fields = [{in: "body", field: "[<i>].kp_id", reason: "not_in_published_version"}]`，并带 `details.graph_version`（请求事务所见的当前发布版）。草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课是否存在；写入期间发布指针变化、目标不在新版本时同样返回此错误。不用 404（`identity-access` §4 的 404 针对路径参数，`/progress` 资源本身存在），不用 409（客户端处置与 422 相同：重新 `GET /progress`）。
+  5. **`PUT /progress` 目标不在当前发布版 → 422 `VALIDATION_ERROR`**：`details.fields = [{in: "body", field: "<i>.kp_id", reason: "not_in_published_version"}]`，并带 `details.graph_version`（请求事务所见的当前发布版）。草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课是否存在；写入期间发布指针变化、目标不在新版本时同样返回此错误。不用 404（`identity-access` §4 的 404 针对路径参数，`/progress` 资源本身存在），不用 409（客户端处置与 422 相同：重新 `GET /progress`）。
   6. **`merging` 阶段尝试耗尽、最后一次为模型不可用 → `LLM_UNAVAILABLE`**（`details` 含 `attempts`、`stage`）。§6 表 `LLM_UNAVAILABLE` 行补注；C08 码表放开 `LLM_UNAVAILABLE` 用于 `merging`（仅此情形）；C09 直接写入该码，不再报错后等租约过期。
 - **后果**：
   - C09（#220）追加：决定 1 的架构登记、决定 6 的码表与规格补注及测试。C08 的 `task_state.py` 属范围扩展，由本 ADR 授权。
@@ -872,6 +872,7 @@
   - I03（#219）无需代码改动；I05 须按决定 4 先投影再调用。
 - **推翻条件**：供应商实测表明默认字段或向量协议与决定 2、3 不兼容；或前端需要区分「版本已变」与「非法 ID」以提供不同处置时，重开决定 5。
 - **签收**：ArvinHan 2026-09-25
+- **勘误**（2026-09-25）：决定 5 的 `field` 原写作 `[<i>].kp_id`，与 C13 全局校验处理器的点路径不一致，按签收时“沿用 C13 已有格式”的原意改为 `<i>.kp_id`（B12-R1 落实）
 
 ## ADR-018：分块版本并入解析器版本，块 ID 随分块规则或参数变化而更新
 

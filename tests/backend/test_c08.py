@@ -217,15 +217,17 @@ def test_error_details_must_be_strict_json(details):
 
 
 # REVIEW-C08 R02: failure codes are the closed, stage-bound set in specs/task-processing.md §6.
+# ADR-017 决定 6：LLM_UNAVAILABLE 放开到 merging，但只用于尝试耗尽（details 带 attempts、stage）。
 FAILURE_CODE_STAGES = {
     "DOCUMENT_UNREADABLE": {"parsing"},
-    "LLM_UNAVAILABLE": {"extracting"},
+    "LLM_UNAVAILABLE": {"extracting", "merging"},
     "EXTRACTION_INCOMPLETE": {"extracting"},
     "CYCLE_DETECTED": {"persisting"},
     "STORAGE_UNAVAILABLE": {"parsing", "extracting", "merging", "persisting"},
     "INTERNAL_ERROR": {"parsing", "extracting", "merging", "persisting"},
     "TASK_ATTEMPTS_EXHAUSTED": {"parsing", "extracting", "merging", "persisting"},
 }
+EXHAUSTION_ONLY = {("LLM_UNAVAILABLE", "merging")}
 PROCESSING = [("parsing", .04), ("extracting", .4), ("merging", .7), ("persisting", .9)]
 
 
@@ -234,10 +236,57 @@ PROCESSING = [("parsing", .04), ("extracting", .4), ("merging", .7), ("persistin
 def test_failure_code_is_bound_to_stage(code, stage, progress):
     start = TaskState(stage, progress)
     event = TransitionEvent("fail", error=TaskError(code, "failed"))
-    if stage in FAILURE_CODE_STAGES[code]:
+    if stage in FAILURE_CODE_STAGES[code] and (code, stage) not in EXHAUSTION_ONLY:
         assert apply_event(start, event) == Applied(TaskState("failed", progress, False, event.error), changed=True)
     else:
         assert_rejected(start, event, "error_stage_mismatch")
+
+
+def test_exhaustion_only_pairs_match_implementation():
+    from app.services.task_state import EXHAUSTION_ONLY_FAILURES
+
+    assert set(EXHAUSTION_ONLY_FAILURES) == EXHAUSTION_ONLY
+
+
+def test_llm_unavailable_in_merging_is_allowed_when_attempts_are_exhausted():
+    # ADR-017 决定 6：merging 尝试耗尽、最后一次为模型不可用 → LLM_UNAVAILABLE，details 含 attempts、stage。
+    start = TaskState("merging", .7)
+    error = TaskError("LLM_UNAVAILABLE", "模型服务不可用，任务重试次数已用尽", {"attempts": 3, "stage": "merging"})
+    event = TransitionEvent("fail", error=error)
+    assert apply_event(start, event) == Applied(TaskState("failed", .7, False, error), changed=True)
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        None,
+        {},
+        {"attempts": 3},
+        {"stage": "merging"},
+        {"attempts": 3, "stage": "extracting"},
+        {"attempts": 0, "stage": "merging"},
+        {"attempts": True, "stage": "merging"},
+        {"attempts": "3", "stage": "merging"},
+        {"attempts": 3.0, "stage": "merging"},
+        {"chunks_failed": 3, "chunks_total": 10, "threshold": .2},
+    ],
+)
+def test_llm_unavailable_in_merging_without_exhaustion_details_is_rejected(details):
+    # 仅限尝试耗尽：单次模型故障应走 §8.3 主动释放，不能直接以 LLM_UNAVAILABLE 终结 merging。
+    start = TaskState("merging", .7)
+    assert_rejected(start, TransitionEvent("fail", error=TaskError("LLM_UNAVAILABLE", "failed", details)), "error_stage_mismatch")
+
+
+def test_llm_unavailable_in_extracting_keeps_its_threshold_meaning():
+    start = TaskState("extracting", .4)
+    error = TaskError("LLM_UNAVAILABLE", "failed", {"chunks_failed": 3, "chunks_total": 10, "threshold": .2})
+    assert apply_event(start, TransitionEvent("fail", error=error)) == Applied(TaskState("failed", .4, False, error), changed=True)
+
+
+@pytest.mark.parametrize("stage,progress", [("parsing", .04), ("persisting", .9)])
+def test_llm_unavailable_stays_out_of_parsing_and_persisting_even_when_exhausted(stage, progress):
+    error = TaskError("LLM_UNAVAILABLE", "failed", {"attempts": 3, "stage": stage})
+    assert_rejected(TaskState(stage, progress), TransitionEvent("fail", error=error), "error_stage_mismatch")
 
 
 @pytest.mark.parametrize("code", ["PUBLISH_BLOCKED", "NOT_A_CODE", "VALIDATION_ERROR", "internal_error"])

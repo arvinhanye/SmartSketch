@@ -110,13 +110,34 @@ _EVENT_KINDS = frozenset(
 # specs/task-processing.md §6: closed failure-code set and the stages that may raise each code.
 FAILURE_CODE_STAGES = {
     "DOCUMENT_UNREADABLE": frozenset({"parsing"}),
-    "LLM_UNAVAILABLE": frozenset({"extracting"}),
+    "LLM_UNAVAILABLE": frozenset({"extracting", "merging"}),
     "EXTRACTION_INCOMPLETE": frozenset({"extracting"}),
     "CYCLE_DETECTED": frozenset({"persisting"}),
     "STORAGE_UNAVAILABLE": _PROCESSING,
     "INTERNAL_ERROR": _PROCESSING,
     "TASK_ATTEMPTS_EXHAUSTED": _PROCESSING,
 }
+# (code, stage) pairs that are legal only as the §8.3 attempts-exhausted code, i.e. with
+# ``details = {attempts ≥ 1, stage}``. ADR-017 decision 6: a model outage that exhausts the
+# ``merging`` attempts ends as LLM_UNAVAILABLE; a single outage there must release and back off.
+EXHAUSTION_ONLY_FAILURES = frozenset({("LLM_UNAVAILABLE", "merging")})
+
+
+def failure_code_allowed(code: str, stage: str, details: Mapping[str, object] | None) -> bool:
+    """Whether a T9 in ``stage`` may carry ``code`` with ``details`` (§6 table + ADR-017)."""
+    if stage not in FAILURE_CODE_STAGES.get(code, ()):
+        return False
+    if (code, stage) not in EXHAUSTION_ONLY_FAILURES:
+        return True
+    if not isinstance(details, Mapping):
+        return False
+    attempts = details.get("attempts")
+    return (
+        isinstance(attempts, int)
+        and not isinstance(attempts, bool)
+        and attempts >= 1
+        and details.get("stage") == stage
+    )
 
 
 def stage_progress_range(stage: str) -> tuple[float, float]:
@@ -214,7 +235,7 @@ def apply_event(state: TaskState, event: TransitionEvent) -> Applied | Rejected:
     if kind == "fail" and state.stage in _PROCESSING:
         if not _valid_error(event.error):
             return reject("invalid_error")
-        if state.stage not in FAILURE_CODE_STAGES[event.error.code]:
+        if not failure_code_allowed(event.error.code, state.stage, event.error.details):
             return reject("error_stage_mismatch")
         return accept(TaskState("failed", state.progress, state.cancel_requested, event.error))
 
