@@ -141,6 +141,7 @@
 | D-13 | 解析器只把标题放进章节路径、标题文字不在块正文里，抽取（D12）看不到标题。**已关闭**：由 D08 分块时在每块正文前拼上章节路径（`section_path`），解析器输出与 D01 模型不变（ArvinHan，2026-09-24） | 技术负责人 | 已完成（D08 实现） |
 | D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
 | D-15 | 赛题「知识抽取准确率不低于 70%」是否同时约束关系（REQ-01）。**已关闭**：实体和关系分别计算、各自不低于 70%，写入 `specs/course-knowledge-graph.md` 验收 7 与 K01/K02（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
+| D-16 | C07 资料列表的 `Document.parse_status` 取自哪里、失败/取消后的「再处理」入口（A03 交出项）。**已关闭**：`parse_status` 在读时取该资料**最新创建任务**的 `stage`（单一事实来源，worker 不另写）；`materials.parse_status` 列不再维护，保留默认值待后续迁移清理。MVP 的再处理只靠**重新上传**（新资料、新任务），不新增端点、不改契约；再处理端点留作后续任务（ArvinHan，2026-09-25） | 技术负责人 | 已完成（C07 落实） |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -784,3 +785,13 @@ D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10�
 - B15 验收：类型化错误、超时/取消、认证失败处理；组件不自行拼路径；把 `scope.signal` 传给 fetch（B04 交出项）。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/b15.test.ts`。
 
 - 合并约定：三个分支共用本认领提交。若合并前 main 在本文件末尾又有追加导致冲突，由协调方先在 `claude/batch-0925c-claims` 上解决一次，再并入三个分支。C16 的迁移 006 以 C09 #220 的 005 先合并为前提；若 C09 未合并而 C16 先合，按 D-10 改号。
+
+## 2026-09-25 第四批（Claude）
+
+C07 前置 C03、C05、C06、B09 均已合并，issue #64 无人认领、无远端分支；规格缺口已由 D-16 关闭（本提交同时补注 `specs/task-processing.md`）。其余新任务的前置均在待合并 PR 中（E04←E03 #221、E05←D09 #226、I04←I03 #219、C10←C09 #220），本轮不领。已核对在途工作：539210 的 C04（课程 API，可能同样改 `main.py` 路由注册）；arvinhanye 的 F02、K07；待合并的 #219、#220、#221、#224、#226、#227、#228。本认领提交基于第三批认领提交 `9116315`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C07 | IN PROGRESS | 实现上传及资料列表 API | ArvinHan（Claude 子代理） | `claude/c07-materials-api` / 本认领提交 | `src/backend/app/api/materials.py`、`src/backend/app/services/materials.py`、`src/backend/app/schemas/materials.py`、`tests/backend/test_c07.py`、`docs/handoffs/claude-c07.md`；范围扩展：`src/backend/app/repositories/materials.py` 仅新增列表查询（按 D-16 关联最新任务），`src/backend/app/main.py` 仅加路由注册 | 待补 |
+
+- C07 验收：非法格式/课程越权拒绝；存盘或建任务失败可补偿（删除新落盘的未引用文件）；长处理不堵请求（只建任务、立即返回 202 `UploadAccepted`）；列表 `parse_status` 按 D-16 取最新任务 `stage`。验证：`python3 -m pytest tests/backend/test_c07.py -q`。
