@@ -888,7 +888,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C11 | IN PROGRESS | 实现任务查询与 GET SSE | ArvinHan（Claude） | `claude/c11-task-events` / 本认领提交 | `src/backend/app/api/tasks.py`、`src/backend/app/services/task_events.py`、`tests/backend/test_c11.py`、`docs/handoffs/claude-c11.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+| C11 | DONE（待 PR 审查/合并） | 实现任务查询与 GET SSE | ArvinHan（Claude） | `claude/c11-task-events` / 本认领提交 | `src/backend/app/api/tasks.py`、`src/backend/app/services/task_events.py`、`tests/backend/test_c11.py`、`docs/handoffs/claude-c11.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | `test_c11.py` 先收集错误（ImportError）后 46 passed；`tests/backend` 2151 passed（基线 2105）；`tests/contracts tests/tooling` 323 passed；九处反向篡改（SSE/GET 跳过授权、awaiting_review 不关流、结束事件两条、断开不释放、票据可重用、进度回退推送、去 aclose、不补快照）均被检出；`verify.sh` exit 0；`git diff --check` 通过；待决 7 项（SQL 所在层、本地响应模型/B10F-R01、可选字段、轮询间隔配置、错过 awaiting_review 的收尾、C10 `sse_event` 未消费、心跳节奏）见 `docs/handoffs/claude-c11.md` |
 
 - C11 验收：`GET /api/v1/tasks/{tid}` 与 `GET /api/v1/tasks/{tid}/events` 先验证课程权限（C03，越权同形拒绝、不含快照）；SSE 用 C16 一次性票据；建连首条为当前快照，`awaiting_review` 与终态推送后关流，每连接恰好一条结束事件；15 秒心跳；客户端断开释放监听器（`specs/task-processing.md` §7、TASK-1/3/11/19/20）。验证：`python3 -m pytest tests/backend/test_c11.py -q`。
 
