@@ -767,7 +767,7 @@ D09、C16、B15 的前置均已合并（D09：D08、A07；C16：C03、C06、B10�
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D09 | IN PROGRESS | 实现块身份与缓存键 | ArvinHan（Claude 子代理） | `claude/d09-chunk-identity` / 本认领提交 | `src/backend/app/services/chunk_identity.py`、`tests/backend/test_d09.py`、`docs/handoffs/claude-d09.md` | 待补 |
+| D09 | DONE（待 PR 审查/合并） | 实现块身份与缓存键 | ArvinHan（Claude 子代理） | `claude/d09-chunk-identity` / 本认领提交 | `src/backend/app/services/chunk_identity.py`、`tests/backend/test_d09.py`、`docs/handoffs/claude-d09.md` | 红：实现前收集错误 `ModuleNotFoundError`；绿：`tests/backend/test_d09.py` 96 passed；后端全量 1146 passed（基线 1050）；反向篡改 5 处（去 course_id、去 model_id、序号补零、修订哈希输入换序、模型 ID 改取响应字段）均变红，改回后 `cmp` 一致；`verify.sh` exit 1 仅因本机缺 `openapi-typescript`（B14 生成类 2 条 + 负例 1 条），base `9116315` 同命令日志逐行相同；`git diff --check` 通过；待决 5 项见 `docs/handoffs/claude-d09.md` |
 
 - D09 验收：同文不同页有独立出处；跨课程不复用身份；提示词/模型变更失效（缓存键用实际给出结果的模型 ID，见 `docs/integrations.md`）；`revision_id` 与块 ID 按 ADR-012 修订 1 确定性派生。验证：`python3 -m pytest tests/backend/test_d09.py -q`。
 
