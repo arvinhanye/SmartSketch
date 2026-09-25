@@ -48,6 +48,11 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 课程访问由 `course_members` 的实时课程角色决定。按 `specs/identity-access.md` §4.1 顺序检查成员、角色、发布状态。课程不存在与非成员同为 403；任务 ID 通过仓储只读归属查询定位，任务不存在或非成员同为 404。下游路由应直接复用依赖，不自行检查 JWT 或信任令牌 `role`。
 - 身份/访问拒绝由统一异常处理器输出契约 `Error` 形状；认证错误只返回 `UNAUTHENTICATED`，不输出令牌与请求输入。
 
+### C04 课程列表与创建 API
+
+- `api/courses.py` 只转换 HTTP、注入 C03 身份依赖；`services/courses.py` 按成员课程角色和 `published_version` 过滤列表，并按 `specs/teacher-review-publish.md` V7 从发布指针及修订号推导 `Course.status`。课程与创建者教师成员由 C02 仓储在同一个 SQLite 事务写入。
+- 请求/响应直接使用 `src/contracts/v1/generated/python/models.py` 的 `CourseCreate`、`Course` 等类型，经 `app/schemas/contracts.py` 从仓库真源生成物加载，不另写同名 DTO。未有图谱计数时省略可选的 `kp_count`；部署打包时需包含该生成物（K08）。
+
 - `src/backend/app/main.py` 暴露 `create_app()` 与 `app`，将路由注册到 FastAPI。创建应用和导入模块时不连接数据库、模型服务或外部网络；B06 从环境变量读取并校验设置，默认 fake 模式不要求真实模型密钥，非法配置使应用创建失败。
 - `GET /health` 是无鉴权的根路径，返回 HTTP 200 和 JSON 对象 `{"status": "ok", "version": "<非空版本字符串>"}`。它只表示 API 进程可响应，不表示 Neo4j、SQLite 或模型服务就绪。响应形状沿用待 A10 导入的 `src/contracts/api.v1.yaml` 现有定义，不新增契约真源。
 - 健康检查不接受写入方法；未知或带 `/api/v1` 前缀的健康路径不注册。B05 的测试须覆盖响应、路径边界、错误方法，以及应用工厂无网络副作用。
@@ -144,6 +149,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## 核心数据模型
 
 - SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`ChatLog`（表 `chat_logs`，每个通过鉴权与版本绑定的问答请求一行，服务端不保存会话；命名由 A09 定，ADR-015，A10 N5；覆盖范围见 ADR-015 修订 1）。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
+- SQLite `processing_tasks`（C09 迁移 005，ADR-017 决定 1）：租约六列 `lease_owner`、`lease_token`、`lease_expires_at`、`attempt`、`not_before`、`cleanup_pending`，与任务错误三列 `error_code`、`error_message`、`error_details`（JSON 对象文本，与契约 `Error{code, message, details}` 同构）；数据库 CHECK 强制 `stage = 'failed'` ⇔ `error_code` 非空。均为内部字段，经 `Task.error` 对外；可用码与阶段见 `specs/task-processing.md` §6 与 C08 `FAILURE_CODE_STAGES`。
 - Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
 
