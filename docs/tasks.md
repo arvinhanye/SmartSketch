@@ -817,3 +817,39 @@ C07 前置 C03、C05、C06、B09 均已合并，issue #64 无人认领、无远�
 | C07 | DONE（PR #230 `e8e9787`；移植 539210 #229 的先授权后解析） | 实现上传及资料列表 API | ArvinHan（Claude 子代理） | `claude/c07-materials-api` / 本认领提交 | `src/backend/app/api/materials.py`、`src/backend/app/services/materials.py`、`src/backend/app/schemas/materials.py`、`tests/backend/test_c07.py`、`docs/handoffs/claude-c07.md`；范围扩展：`src/backend/app/repositories/materials.py` 仅新增列表查询（按 D-16 关联最新任务），`src/backend/app/main.py` 仅加路由注册 | `docs/handoffs/claude-c07.md`；红：仅测试时收集错误（无 `app.services.materials`），服务桩 39 failed；绿：`test_c07.py` 39 passed；`tests/backend` 1089 passed（基线 1050）；contracts+tooling 272 passed、1 failed 为已知基线 `test_b07[0-PASS]`（#224）；6 处反向篡改（去课程隔离、parse_status 取列、取最早任务、去补偿删除、忽略 `UPLOAD_MAX_BYTES`、去重放删除）全部检出，恢复后 `cmp` 一致；`./scripts/verify.sh`、`git diff --check` exit 0；依赖 `python-multipart==0.0.32` 按 ADR-019（`6bc2ec4`）；待决见交接（契约无幂等键、列表排序、请求体上限前置、无任务回退）；**移植 #229（539210，`8514ecc`）先授权再有界解析**：红 3 failed、绿 `test_c07.py` 42 passed，`tests/backend` 1718 passed，contracts+tooling 305 passed，3 处篡改（恢复 `UploadFile` 参数、去实收字节计数、去 `Content-Length` 预检）全部检出且 `cmp` 一致，`verify.sh`、`git diff --check` exit 0；ADR-019 决定 2 同步改写 |
 
 - C07 验收：非法格式/课程越权拒绝；存盘或建任务失败可补偿（删除新落盘的未引用文件）；长处理不堵请求（只建任务、立即返回 202 `UploadAccepted`）；列表 `parse_status` 按 D-16 取最新任务 `stage`。验证：`python3 -m pytest tests/backend/test_c07.py -q`。
+
+## 2026-09-25 第五批并行（Claude）
+
+D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #226、C01；E04：E03 #221、C01；E05：E02、D09 #226；C10：C09 #220、C03；I04：I03 #219），issue 无人认领、无远端分支。已核对在途工作并避开：arvinhanye（Codex）的 F02 #231（`repositories/neo4j.py`、`pyproject.toml`）、K07 #232（`scripts/`）；本人待合并的 C07 #230（`api/materials.py`、`main.py`）。本认领提交基于第四批认领提交并入 main 后的结果。五项各在独立分支上进行，各子任务只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D10 | DONE（待 PR 审查/合并） | 实现来源块持久化 | ArvinHan（Claude 子代理） | `claude/d10-chunk-store` / 本认领提交 | `src/backend/app/repositories/chunks.py`、`src/backend/migrations/007_chunks.sql`（D-10：main 最大 006）、`tests/backend/test_d10.py`、`docs/handoffs/claude-d10.md` | 交接 `docs/handoffs/claude-d10.md`；迁移 007 新增 `material_revisions`/`task_revisions`/`chunks`（库层不可变触发器，回滚步骤已测）。红灯：仅有测试时收集 `ImportError`（1 error）；绿灯：`test_d10.py` 36 passed（PUB-28/29/30、课程隔离、V2 删除保护）；后端全量 1712 passed（基线 1676 + 36）；contracts+tooling 305 passed；反向篡改 5 处分别 1/4/1/1/1 failed，改回 `cmp` 一致；`verify.sh` exit 0；`git diff --check` 通过。待决 5 项（已提交版本判定注入待 G02、在途任务共享修订的保守保护等）见交接 |
+
+- D10 验收：重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用；块 ID 按 D09/ADR-018 派生，已存在 ID 内容哈希不一致即拒绝（PUB-30）。验证：`python3 -m pytest tests/backend/test_d10.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E04 | IN PROGRESS | 实现模型调用预算与退避 | ArvinHan（Claude 子代理） | `claude/e04-call-policy` / 本认领提交 | `src/backend/app/services/ai/policy.py`、`src/backend/app/repositories/model_calls.py`、`tests/backend/test_e04.py`、`docs/handoffs/claude-e04.md`（`model_calls` 表已在 001，无迁移） | 待补 |
+
+- E04 验收：429/5xx 有界退避，鉴权错误不重试；预算零不发请求；日志无 token/原文；退避参数有上限（A07 交出项）。验证：`python3 -m pytest tests/backend/test_e04.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E05 | IN PROGRESS | 实现块级实体抽取 | ArvinHan（Claude 子代理） | `claude/e05-entity-extraction` / 本认领提交 | `src/backend/app/services/ai/entities.py`、`prompts/extract_entities.yaml`、`tests/backend/test_e05.py`、`docs/handoffs/claude-e05.md` | 待补 |
+
+- E05 验收：五类实体、字段范围、证据必须来自输入；坏 JSON 修复最多一次；只用 E02 fake 客户端测试，不需要密钥。验证：`python3 -m pytest tests/backend/test_e05.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C10 | IN PROGRESS | 实现任务取消服务与 API | ArvinHan（Claude 子代理） | `claude/c10-task-cancel` / 本认领提交 | `src/backend/app/services/task_cancel.py`、`src/backend/app/api/task_cancel.py`、`tests/backend/test_c10.py`、`docs/handoffs/claude-c10.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+
+- C10 验收：queued/运行中/完成后/重复取消；取消和写入竞争有确定结果（与 C09 租约令牌同一写入序列）。审查遗留 B10F-R01/R02（取消快照 `cancel_requested` 非必填）若影响响应校验，写入交接待决，不在本任务改契约。验证：`python3 -m pytest tests/backend/test_c10.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I04 | IN PROGRESS | 实现四项评分和结构化理由 | ArvinHan（Claude 子代理） | `claude/i04-ranking` / 本认领提交 | `src/backend/app/services/learning/ranking.py`、`tests/backend/test_i04.py`、`docs/handoffs/claude-i04.md` | 待补 |
+
+- I04 验收：零分母、全零权重、同分、真实解锁数；分量求和等于 score；理由不用 LLM。验证：`python3 -m pytest tests/backend/test_i04.py -q`。
+
+- 合并约定：五个分支共用本认领提交。只有 D10 新增迁移（007）；C10 与 C07 #230 都改 `main.py` 路由注册，后合者解决一行冲突。
