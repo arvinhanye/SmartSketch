@@ -824,25 +824,25 @@ D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #22
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D10 | IN PROGRESS | 实现来源块持久化 | ArvinHan（Claude 子代理） | `claude/d10-chunk-store` / 本认领提交 | `src/backend/app/repositories/chunks.py`、`src/backend/migrations/007_chunks.sql`（D-10：main 最大 006）、`tests/backend/test_d10.py`、`docs/handoffs/claude-d10.md` | 待补 |
+| D10 | DONE（待 PR 审查/合并） | 实现来源块持久化 | ArvinHan（Claude 子代理） | `claude/d10-chunk-store` / 本认领提交 | `src/backend/app/repositories/chunks.py`、`src/backend/migrations/007_chunks.sql`（D-10：main 最大 006）、`tests/backend/test_d10.py`、`docs/handoffs/claude-d10.md` | 交接 `docs/handoffs/claude-d10.md`；迁移 007 新增 `material_revisions`/`task_revisions`/`chunks`（库层不可变触发器，回滚步骤已测）。红灯：仅有测试时收集 `ImportError`（1 error）；绿灯：`test_d10.py` 36 passed（PUB-28/29/30、课程隔离、V2 删除保护）；后端全量 1712 passed（基线 1676 + 36）；contracts+tooling 305 passed；反向篡改 5 处分别 1/4/1/1/1 failed，改回 `cmp` 一致；`verify.sh` exit 0；`git diff --check` 通过。待决 5 项（已提交版本判定注入待 G02、在途任务共享修订的保守保护等）见交接 |
 
 - D10 验收：重复重试不重复写；按课程/文档定位；删除资料策略不破坏已发布引用；块 ID 按 D09/ADR-018 派生，已存在 ID 内容哈希不一致即拒绝（PUB-30）。验证：`python3 -m pytest tests/backend/test_d10.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E04 | IN PROGRESS | 实现模型调用预算与退避 | ArvinHan（Claude 子代理） | `claude/e04-call-policy` / 本认领提交 | `src/backend/app/services/ai/policy.py`、`src/backend/app/repositories/model_calls.py`、`tests/backend/test_e04.py`、`docs/handoffs/claude-e04.md`（`model_calls` 表已在 001，无迁移） | 待补 |
+| E04 | DONE（待 PR 审查/合并） | 实现模型调用预算与退避 | ArvinHan（Claude 子代理） | `claude/e04-call-policy` / 本认领提交 | `src/backend/app/services/ai/policy.py`、`src/backend/app/repositories/model_calls.py`、`tests/backend/test_e04.py`、`docs/handoffs/claude-e04.md`（`model_calls` 表已在 001，无迁移） | 红灯：实现前收集 `ImportError`；绿灯 `tests/backend/test_e04.py` 66 passed（47 个函数）；全量 `tests/backend` 1742 passed（基线 1676 + 66），`tests/contracts tests/tooling` 305 passed；反向篡改 5 处（鉴权被重试、`Retry-After` 不封顶、任务预算 `>=` 改 `>`、预写失败仍发请求、日志输出提示词）各被检出（5/2/1/2/1 failed），改回 `cmp` 一致；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；待决 9 项（含退避变量登记、生成前被拒的 `error_class` 格式）见 `docs/handoffs/claude-e04.md` |
 
 - E04 验收：429/5xx 有界退避，鉴权错误不重试；预算零不发请求；日志无 token/原文；退避参数有上限（A07 交出项）。验证：`python3 -m pytest tests/backend/test_e04.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E05 | IN PROGRESS | 实现块级实体抽取 | ArvinHan（Claude 子代理） | `claude/e05-entity-extraction` / 本认领提交 | `src/backend/app/services/ai/entities.py`、`prompts/extract_entities.yaml`、`tests/backend/test_e05.py`、`docs/handoffs/claude-e05.md` | 待补 |
+| E05 | DONE（待 PR 审查/合并） | 实现块级实体抽取 | ArvinHan（Claude 子代理） | `claude/e05-entity-extraction` / 本认领提交 | `src/backend/app/services/ai/entities.py`、`prompts/extract_entities.yaml`、`tests/backend/test_e05.py`、`docs/handoffs/claude-e05.md` | `docs/handoffs/claude-e05.md`；红灯：实现前收集错误（模块不存在），绿灯 `test_e05.py` 63 passed；后端全量 1739 passed（基线 1676 + 63），contracts/tooling 305 passed；反向篡改 6 处（证据子串、修复一次、修复不超过一次、类型闭集、长度边界、截断）全被抓到；`./scripts/verify.sh` 与 `git diff --check` 通过；提示词升 v2，越锁改 `prompts/MANIFEST.md` 一行（E01 规则要求同提交更新摘要），待协调方确认；长度上限、修复模板、失败块错误码、缓存存储等见交接待决 |
 
 - E05 验收：五类实体、字段范围、证据必须来自输入；坏 JSON 修复最多一次；只用 E02 fake 客户端测试，不需要密钥。验证：`python3 -m pytest tests/backend/test_e05.py -q`。
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C10 | IN PROGRESS | 实现任务取消服务与 API | ArvinHan（Claude 子代理） | `claude/c10-task-cancel` / 本认领提交 | `src/backend/app/services/task_cancel.py`、`src/backend/app/api/task_cancel.py`、`tests/backend/test_c10.py`、`docs/handoffs/claude-c10.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+| C10 | DONE（待 PR 审查/合并） | 实现任务取消服务与 API | ArvinHan（Claude 子代理） | `claude/c10-task-cancel` / 本认领提交 | `src/backend/app/services/task_cancel.py`、`src/backend/app/api/task_cancel.py`、`tests/backend/test_c10.py`、`docs/handoffs/claude-c10.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | `test_c10.py` 先收集错误（ImportError）后 33 passed；`tests/backend` 1709 passed（基线 1676）；`tests/contracts tests/tooling` 305 passed；六处反向篡改（去比较并交换条件、终态可再取消、跳过授权、取消清租约、延迟 BEGIN、去 course_id）均被检出；`verify.sh` exit 0；`git diff --check` 通过；待决 5 项（本地响应模型、SQL 所在层、B10F-R01 影响、快照可选字段、SSE 投递）见 `docs/handoffs/claude-c10.md` |
 
 - C10 验收：queued/运行中/完成后/重复取消；取消和写入竞争有确定结果（与 C09 租约令牌同一写入序列）。审查遗留 B10F-R01/R02（取消快照 `cancel_requested` 非必填）若影响响应校验，写入交接待决，不在本任务改契约。验证：`python3 -m pytest tests/backend/test_c10.py -q`。
 
