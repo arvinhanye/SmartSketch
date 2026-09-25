@@ -631,7 +631,10 @@ def test_decompressed_size_limit_guards_against_zip_bombs(tmp_path):
     body = para("压" * 200_000)
     data = make_docx(tmp_path, body)
     assert len(data) < 50_000
-    assert unreadable(data, max_part_bytes=100_000) is UnreadableReason.CORRUPTED
+    with pytest.raises(DocumentUnreadableError) as info:
+        parse_docx(data, max_part_bytes=100_000)
+    assert info.value.reason is UnreadableReason.CORRUPTED
+    assert "上限" in info.value.detail
     assert parse_docx(data, max_part_bytes=2_000_000).blocks[0].text == "压" * 200_000
 
 
