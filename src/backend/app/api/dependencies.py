@@ -11,8 +11,8 @@ from app.services.access import (
     AccessDenied,
     AccessService,
     CourseAccess,
-    ROLE_FORBIDDEN,
-    UNAUTHENTICATED,
+    role_forbidden,
+    unauthenticated,
 )
 
 
@@ -28,7 +28,7 @@ def access_service(request: Request) -> AccessService:
         return AccessService(request.app.state.settings, request.app.state.auth_clock)
     except SettingsError:
         # Factory-created apps may omit the secret; never treat this as anonymous success.
-        raise UNAUTHENTICATED from None
+        raise unauthenticated() from None
 
 
 def current_user(
@@ -38,13 +38,13 @@ def current_user(
     authorization = request.headers.get("Authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token or token.strip() != token:
-        raise UNAUTHENTICATED
+        raise unauthenticated()
     return service.authenticate(token)
 
 
 def teacher_account(user: AccountRecord = Depends(current_user)) -> AccountRecord:
     if user.role != "teacher":
-        raise ROLE_FORBIDDEN
+        raise role_forbidden()
     return user
 
 

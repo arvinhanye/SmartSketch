@@ -27,11 +27,30 @@ class AccessDenied(Exception):
         self.message = message
 
 
-UNAUTHENTICATED = AccessDenied(401, "UNAUTHENTICATED", "请先登录或重新登录")
-COURSE_FORBIDDEN = AccessDenied(403, "COURSE_FORBIDDEN", "无权访问该课程")
-ROLE_FORBIDDEN = AccessDenied(403, "ROLE_FORBIDDEN", "当前课程角色无权执行此操作")
-NOT_FOUND = AccessDenied(404, "NOT_FOUND", "资源不存在")
-GRAPH_NOT_PUBLISHED = AccessDenied(404, "GRAPH_NOT_PUBLISHED", "课程图谱尚未发布")
+# Each denial is a new instance. Re-raising one shared exception object would append every
+# request's frames (and their locals, such as the bearer token) to its __traceback__:
+# unbounded memory growth driven by unauthenticated requests (review C03-R01).
+def unauthenticated() -> AccessDenied:
+    return AccessDenied(401, "UNAUTHENTICATED", "请先登录或重新登录")
+
+
+def course_forbidden() -> AccessDenied:
+    return AccessDenied(403, "COURSE_FORBIDDEN", "无权访问该课程")
+
+
+def role_forbidden() -> AccessDenied:
+    return AccessDenied(403, "ROLE_FORBIDDEN", "当前课程角色无权执行此操作")
+
+
+def not_found() -> AccessDenied:
+    return AccessDenied(404, "NOT_FOUND", "资源不存在")
+
+
+def graph_not_published() -> AccessDenied:
+    return AccessDenied(404, "GRAPH_NOT_PUBLISHED", "课程图谱尚未发布")
+
+
+_B64URL = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
 
 @dataclass(frozen=True)
@@ -45,21 +64,18 @@ def _decode_part(part: str) -> dict:
     if (
         not part
         or len(part) > 4096
-        or any(
-            c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-            for c in part
-        )
+        or any(c not in _B64URL for c in part)
     ):
-        raise UNAUTHENTICATED
+        raise unauthenticated()
     try:
         raw = base64.b64decode(
             part + "=" * (-len(part) % 4), altchars=b"-_", validate=True
         )
         value = json.loads(raw)
     except (ValueError, UnicodeDecodeError, binascii.Error):
-        raise UNAUTHENTICATED from None
+        raise unauthenticated() from None
     if not isinstance(value, dict):
-        raise UNAUTHENTICATED
+        raise unauthenticated()
     return value
 
 
@@ -74,16 +90,16 @@ class AccessService:
     def authenticate(self, token: str) -> AccountRecord:
         """Verify the C13 compact HS256 token and reload account state."""
         if not token or len(token) > 8192:
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         parts = token.split(".")
         if len(parts) != 3:
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         header, payload, signature = parts
         if _decode_part(header) != {"alg": "HS256", "typ": "JWT"}:
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         claims = _decode_part(payload)
         if set(claims) != {"sub", "role", "iat", "exp"}:
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         if (
             not isinstance(claims["sub"], str)
             or not claims["sub"]
@@ -91,31 +107,35 @@ class AccessService:
             or type(claims["iat"]) is not int
             or type(claims["exp"]) is not int
         ):
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         now = self._clock()
         if (
             claims["iat"] > now
             or claims["exp"] <= now
             or claims["exp"] <= claims["iat"]
         ):
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         signed = f"{header}.{payload}".encode("ascii")
         expected = hmac.new(
             self._settings.AUTH_JWT_SECRET.get_secret_value().encode("utf-8"),
             signed,
             hashlib.sha256,
         ).digest()
+        # Same alphabet rule as header/payload: b64decode(altchars=...) would also accept
+        # "+" and "/", giving one signature several spellings.
+        if not signature or any(c not in _B64URL for c in signature):
+            raise unauthenticated()
         try:
             supplied = base64.b64decode(
                 signature + "=" * (-len(signature) % 4), altchars=b"-_", validate=True
             )
         except (ValueError, binascii.Error):
-            raise UNAUTHENTICATED from None
+            raise unauthenticated() from None
         if not hmac.compare_digest(supplied, expected):
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         account = find_by_id(self._settings.SQLITE_URL, claims["sub"])
         if account is None or account.disabled_at is not None:
-            raise UNAUTHENTICATED
+            raise unauthenticated()
         return account
 
     def require_course(
@@ -128,27 +148,27 @@ class AccessService:
     ) -> CourseAccess:
         member = get_member(self._settings.SQLITE_URL, course_id, user.id)
         if member is None:
-            raise COURSE_FORBIDDEN
+            raise course_forbidden()
         if role is not None and member.role != role:
-            raise ROLE_FORBIDDEN
+            raise role_forbidden()
         course = get_course(self._settings.SQLITE_URL, course_id)
         if course is None:
-            raise COURSE_FORBIDDEN
+            raise course_forbidden()
         if (
             student_published
             and member.role == "student"
             and course.published_version is None
         ):
-            raise GRAPH_NOT_PUBLISHED
+            raise graph_not_published()
         return CourseAccess(user, member, course)
 
     def require_task(self, user: AccountRecord, task_id: str) -> CourseAccess:
         course_id = find_task_course_id(self._settings.SQLITE_URL, task_id)
         if course_id is None:
-            raise NOT_FOUND
+            raise not_found()
         try:
             return self.require_course(user, course_id, role="teacher")
         except AccessDenied as error:
             if error.code == "COURSE_FORBIDDEN":
-                raise NOT_FOUND from None
+                raise not_found() from None
             raise

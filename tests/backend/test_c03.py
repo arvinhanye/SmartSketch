@@ -16,6 +16,8 @@ from app.repositories.accounts import insert_account, set_disabled
 from app.repositories.courses import add_member, create_course, remove_member
 from app.repositories.sqlite import connect, migrate
 from app.services.auth import issue_access_token
+from app.config import load_settings
+from app.services.access import AccessDenied, AccessService
 
 from app.api.dependencies import (
     current_user,
@@ -315,3 +317,64 @@ def test_task_nonmember_and_missing_are_indistinguishable(scenario):
         == "ROLE_FORBIDDEN"
     )
     assert get(client, "/probe/tasks/task1", token(teacher)).status_code == 200
+
+
+# --- C03-R01 (review of PR #216): denials must not reuse one exception object -----------------
+
+
+def _traceback_depth(error: BaseException) -> int:
+    depth, tb = 0, error.__traceback__
+    while tb is not None:
+        depth, tb = depth + 1, tb.tb_next
+    return depth
+
+
+def _collect(action, times: int) -> list[AccessDenied]:
+    errors: list[AccessDenied] = []
+    for attempt in range(times):
+        with pytest.raises(AccessDenied) as excinfo:
+            action(attempt)
+        errors.append(excinfo.value)
+    return errors
+
+
+def test_repeated_denials_raise_fresh_errors_that_hold_no_earlier_request_state(scenario):
+    _, url, teacher, _, outsider, course = scenario
+    service = AccessService(load_settings({"SQLITE_URL": url, "AUTH_JWT_SECRET": SECRET}))
+    cases = {
+        "UNAUTHENTICATED": lambda i: service.authenticate(f"forged-{i}.x.y"),
+        "COURSE_FORBIDDEN": lambda i: service.require_course(outsider, course.id),
+        "NOT_FOUND": lambda i: service.require_task(teacher, f"missing-task-{i}"),
+    }
+    for code, action in cases.items():
+        errors = _collect(action, 50)
+
+        assert {error.code for error in errors} == {code}
+        assert len({id(error) for error in errors}) == len(errors), f"{code} reuses one instance"
+        assert _traceback_depth(errors[-1]) == _traceback_depth(errors[0]), f"{code} traceback grows"
+    leaked = []
+    tb = errors[-1].__traceback__
+    while tb is not None:
+        leaked.append(tb.tb_frame.f_locals.get("task_id"))
+        tb = tb.tb_next
+    assert "missing-task-0" not in leaked
+
+
+def test_signature_must_be_canonical_base64url(scenario):
+    _, url, teacher, _, _, _ = scenario
+    service = AccessService(load_settings({"SQLITE_URL": url, "AUTH_JWT_SECRET": SECRET}))
+    now = int(time.time())
+    for offset in range(200):  # find a signature that contains a URL-safe character
+        issued = token(teacher, now=now - offset)
+        signature = issued.rsplit(".", 1)[1]
+        if "-" in signature or "_" in signature:
+            break
+    else:
+        pytest.skip("no signature with - or _ in 200 attempts")
+    assert service.authenticate(issued).id == teacher.id
+
+    standard = issued.rsplit(".", 1)[0] + "." + signature.replace("-", "+").replace("_", "/")
+
+    with pytest.raises(AccessDenied) as excinfo:
+        service.authenticate(standard)
+    assert excinfo.value.code == "UNAUTHENTICATED"
