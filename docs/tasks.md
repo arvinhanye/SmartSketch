@@ -842,7 +842,7 @@ D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #22
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C10 | IN PROGRESS | 实现任务取消服务与 API | ArvinHan（Claude 子代理） | `claude/c10-task-cancel` / 本认领提交 | `src/backend/app/services/task_cancel.py`、`src/backend/app/api/task_cancel.py`、`tests/backend/test_c10.py`、`docs/handoffs/claude-c10.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | 待补 |
+| C10 | DONE（待 PR 审查/合并） | 实现任务取消服务与 API | ArvinHan（Claude 子代理） | `claude/c10-task-cancel` / 本认领提交 | `src/backend/app/services/task_cancel.py`、`src/backend/app/api/task_cancel.py`、`tests/backend/test_c10.py`、`docs/handoffs/claude-c10.md`；范围扩展：`src/backend/app/main.py` 仅加路由注册 | `test_c10.py` 先收集错误（ImportError）后 33 passed；`tests/backend` 1709 passed（基线 1676）；`tests/contracts tests/tooling` 305 passed；六处反向篡改（去比较并交换条件、终态可再取消、跳过授权、取消清租约、延迟 BEGIN、去 course_id）均被检出；`verify.sh` exit 0；`git diff --check` 通过；待决 5 项（本地响应模型、SQL 所在层、B10F-R01 影响、快照可选字段、SSE 投递）见 `docs/handoffs/claude-c10.md` |
 
 - C10 验收：queued/运行中/完成后/重复取消；取消和写入竞争有确定结果（与 C09 租约令牌同一写入序列）。审查遗留 B10F-R01/R02（取消快照 `cancel_requested` 非必填）若影响响应校验，写入交接待决，不在本任务改契约。验证：`python3 -m pytest tests/backend/test_c10.py -q`。
 
