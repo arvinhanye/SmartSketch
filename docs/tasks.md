@@ -567,3 +567,39 @@ D02～D05 只依赖已合并的 D01，四项同时开工，各在独立 worktree
 - 输出：验收 7 规定了基准材料、实体数、准确率、判定对象、报告内容和失败路径；K01 负责口径与一章量的标注材料，K02 负责计算、判定并新增 `evaluation/reports/extraction-accuracy.md`。
 - 核对：赛题其余指标已有覆盖——格式 ≥ 2 种、关系 ≥ 3 种（四格式、四关系）；问答 ≤ 15 秒（`LLM_CHAT_TIMEOUT_SECONDS`、K04）；讲解与练习题（O05/O06）；赛题不要求训练模型。
 - 决策 D-15（ArvinHan，2026-09-24 确认；原拟编号 D-14 已被 PR #199 的 PDF 权限决策占用，合并时改号）：70% 按「实体、关系分别达标」执行。
+
+## 2026-09-25 并行批次（Claude）
+
+F05、E02、D06、D07、C02 前置均已合并，与 B12（改 `api.v1.yaml`）无共享文件，五项同时开工，各在独立 worktree 与分支上进行。C02 原分配 539210（2026-09-24 回复“正在做”，远端无分支或 PR），经 ArvinHan 授权转由 Claude 执行，见 issue #59。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F05 | IN PROGRESS | 实现 DAG 环检测纯函数 | ArvinHan（Claude 子代理） | `claude/f05-dag-cycle` / `8eeac3b` | `src/backend/app/services/graph/dag.py`、`tests/backend/test_f05.py`、`docs/handoffs/claude-f05.md` | 待补 |
+
+- F05 验收：自环、三节点环、反转造环、断开图、大链条；复杂度边界明确。验证：`python3 -m pytest tests/backend/test_f05.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E02 | IN PROGRESS | 建立模型接口和 fake 适配器 | ArvinHan（Claude 子代理） | `claude/e02-ai-client` / `8eeac3b` | `src/backend/app/services/ai/client.py`、`src/backend/app/services/ai/fake.py`、`tests/backend/test_e02.py`、`docs/handoffs/claude-e02.md` | 待补 |
+
+- E02 验收：固定输入输出可复现；超时/坏 JSON/限流可模拟；无需密钥。验证：`python3 -m pytest tests/backend/test_e02.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D06 | IN PROGRESS | 实现 PDF 标题判定 | ArvinHan（Claude 子代理） | `claude/d06-pdf-headings` / `8eeac3b` | `src/backend/app/services/parsers/pdf_headings.py`、`tests/backend/test_d06.py`、`docs/handoffs/claude-d06.md` | 待补 |
+
+- D06 验收：正文加粗不误做所有标题；标题跨页、无字号层级有退路。验证：`python3 -m pytest tests/backend/test_d06.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D07 | IN PROGRESS | 实现重复页眉页脚清洗 | ArvinHan（Claude 子代理） | `claude/d07-header-footer` / `8eeac3b` | `src/backend/app/services/parsers/cleanup.py`、`tests/backend/test_d07.py`、`docs/handoffs/claude-d07.md` | 待补 |
+
+- D07 验收：重复正文不被误删；删除页码不丢原始页定位；支持关掉清洗。验证：`python3 -m pytest tests/backend/test_d07.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C02 | IN PROGRESS | 实现课程和成员仓储 | ArvinHan（Claude 子代理；原 539210） | `claude/c02-course-repo` / `8eeac3b` | `src/backend/app/repositories/courses.py`、`src/backend/migrations/NNN_courses.sql`（D-10：合并时取 main 最大编号 + 1）、`tests/backend/test_c02.py`、`docs/handoffs/claude-c02.md` | 待补 |
+
+- C02 验收：课程成员唯一；同用户不同课程角色独立；读写外键正确（`course_members.user_id` → C13 的 `users`）。验证：`python3 -m pytest tests/backend/test_c02.py -q`。
+
+- 并行约束：各子任务只写自己的文件锁与交接文件，并只改本节自己那一张表的状态与证据；不改 `docs/architecture.md`、`docs/integrations.md`、`scripts/verify.sh`、`parsers/__init__.py`、`parsers/models.py` 等共享文件，需要时停下交协调方。
