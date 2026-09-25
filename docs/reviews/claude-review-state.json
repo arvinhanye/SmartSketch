@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "updated_at": "2026-09-23T01:38:32.049069+00:00",
+  "updated_at": "2026-09-25T05:05:40.792538+00:00",
   "automation_id": "claude-smartsketch",
   "review_root": "/Users/arvinhan/Desktop/SmartSketch",
   "purpose": "Incremental review state, not task completion evidence",
   "worktrees": [
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch",
-      "head": "9ddcef8ee11d335f52c8f17964bc3ad6f218e7b3",
+      "head": "b345a34ddf06c1dc08d97efee423b70945656db7",
       "sessions": [
         {
           "session_id": "09951476-bd65-45ae-b74d-d98d4535d4dd",
@@ -17,13 +17,14 @@
       ],
       "status": "NO_NEW_CLAUDE_IMPLEMENTATION",
       "covered_scope": "主目录初始骨架；本次新增 docs 属 Codex PLAN-01，不是 Claude 交付",
-      "stable_observations": 3,
+      "stable_observations": 1,
       "pending_paths": [],
       "open_findings": [],
-      "dirty_sha256": "76a72482cf2a5bdaaf09e5c3f9e9848dda3c5dcad5911d7965679d98f2e45445",
-      "handoff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "last_observed_at": "2026-09-23T01:38:32.049069+00:00",
-      "last_check_result": "NO_NEW_CLAUDE_ACTIVITY"
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "6924691ab71ccfa4492a5825bf04ef29b3f6e471d447762bddb3bf878f8e8540",
+      "last_observed_at": "2026-09-23T05:30:04.628559+00:00",
+      "last_check_result": "MAIN_CI01_NO_NEW_CLAUDE_IMPLEMENTATION",
+      "dirty_scope": "Claude implementation paths only; REVIEW-03 documents and task row excluded"
     },
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/tech-plan-review-improvements-ff30e0",
@@ -33,7 +34,7 @@
       "sessions": [
         {
           "session_id": "7f61308f-077f-43d3-af9f-bb396a5f2677",
-          "last_complete_offset": 1523107,
+          "last_complete_offset": 1523411,
           "last_observed_stop": "2026-09-22T12:06:55.069Z"
         }
       ],
@@ -93,24 +94,46 @@
     },
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/quirky-dijkstra-eca5de",
-      "head": "05d214c09b770b0a18268f5e1ee27bb5194bc1dd",
+      "head": "37da66959950b16d45a303ca42439b2562560573",
       "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stable_observations": 4,
+      "stable_observations": 2,
       "sessions": [
         {
-          "session_id": "439ad940-960d-4024-b9cb-90ed523a274d",
-          "last_complete_offset": 779009,
-          "last_observed_stop": "2026-09-22T10:31:18.842Z"
+          "session_id": "39ce05a4-d8b0-4132-b52a-7dcdccea97f6",
+          "last_complete_offset": 3061723,
+          "last_observed_stop": "2026-09-23T13:18:30.148Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T13:18:30.148Z"
+          }
         }
       ],
-      "status": "NO_NEW_IMPLEMENTATION",
+      "status": "A10_FIXED_DOCS_REVIEWED_TWO_P2",
       "initial_report": null,
-      "covered_scope": "与 main 初始骨架相同",
+      "covered_scope": "A10 6881ffe..37da669 four-document integration map and ADR-016 reviewed; not the 92 source implementation files.",
       "pending_paths": [],
-      "open_findings": [],
-      "handoff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "last_observed_at": "2026-09-22T13:25:23.692155+00:00",
-      "last_check_result": "NO_NEW_CLAUDE_ACTIVITY"
+      "open_findings": [
+        "A10-R01",
+        "A10-R02"
+      ],
+      "handoff_sha256": "fdab00436311c7b4862915ca2e7138c9419270e6a8285c0d64fc7134fe9d777d",
+      "last_observed_at": "2026-09-23T14:03:00Z",
+      "last_check_result": "A10_TWO_P2_INTEGRATION_PLAN_FINDINGS",
+      "review_candidate": true,
+      "candidate_head": "37da66959950b16d45a303ca42439b2562560573",
+      "candidate_handoff": "docs/handoffs/claude-a10.md",
+      "base_commit": "6881ffe",
+      "reviewed_commits": [
+        "37da66959950b16d45a303ca42439b2562560573"
+      ],
+      "reviewed_paths": [
+        "docs/decisions.md",
+        "docs/tasks.md",
+        "docs/handoffs/claude-a10.md",
+        "docs/reviews/branch-integration-map.md"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a10-37da669-2026-09-23-1403z.md"
     },
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/worktree-meaning-7a61bc",
@@ -135,11 +158,11 @@
     },
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/worktree-contract-conflicts-740adb",
-      "head": "8865686f202f367db7d67e4e16bec19f5841939a",
+      "head": "978671eecd16176ad880e03e3efee4839c1e89d7",
       "sessions": [
         {
           "session_id": "e6e2babd-4e1e-4540-b82d-186884a2fb87",
-          "last_complete_offset": 1959503,
+          "last_complete_offset": 1959890,
           "last_observed_stop": "2026-09-22T13:23:01.725Z",
           "last_event": {
             "type": "system",
@@ -148,15 +171,13 @@
           }
         }
       ],
-      "status": "PARTIAL_REVIEW",
-      "stable_observations": 2,
+      "status": "PARTIAL_REVIEW_S07_R15_P2",
+      "stable_observations": 4,
       "pending_paths": [
-        "S-07 merge conflict resolution versus both parents",
-        "src/contracts/v1/generated/ (remaining artifact audit)",
-        "S-07 remaining ADR/spec consistency"
+        "S-07 merge conflict resolution versus both parents (remaining files outside M1 DAG task)",
+        "S-07 remaining ADR/spec consistency outside M1 DAG task"
       ],
       "open_findings": [
-        "S07-R06",
         "S07-R07",
         "S07-R08",
         "S07-R09",
@@ -164,16 +185,17 @@
         "S07-R11",
         "S07-R12",
         "S07-R13",
-        "S07-R14"
+        "S07-R14",
+        "S07-R15"
       ],
       "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "handoff_sha256": "9ec6bdbeee948a2f253e02b9903e550c7220a7988cd8eee7a32d4adfa90868a2",
-      "last_observed_at": "2026-09-23T01:38:32.049069+00:00",
-      "last_check_result": "REVIEWED_TOOLING_BATCH_WITH_FINDINGS",
+      "handoff_sha256": "8104d97fee3080e718c59841d5fd7655993ea3eede4bea8f23a3fa2c0881164e",
+      "last_observed_at": "2026-09-23T13:04:00Z",
+      "last_check_result": "S07_DAG_PLAN_CONTRADICTION_P2",
       "review_candidate": true,
       "candidate_handoff": "docs/handoffs/claude-s07-contract-conflicts.md",
-      "candidate_head": "1bc63ad5ae9fa16a642535e1487bc9e81cb0e18b",
-      "completion_signal": "stop_hook_summary at 2026-09-22T13:23:01.725Z and Claude ready_for_review handoff; first clean-head observation only",
+      "candidate_head": "978671eecd16176ad880e03e3efee4839c1e89d7",
+      "completion_signal": "Claude M0-09 ready_for_review handoff names fixed 978671e; original S-07 session unchanged; two stable target snapshots",
       "reviewed_paths": [
         ".claude/hooks/block-dangerous.sh",
         "docker-compose.yml",
@@ -191,37 +213,856 @@
         "scripts/check_contracts.py",
         "tests/contracts/test_contracts.py",
         "src/contracts/api.v1.yaml",
-        "src/contracts/events.v1.md"
+        "src/contracts/events.v1.md",
+        "src/contracts/v1/generated/openapi.json",
+        "src/contracts/v1/generated/schemas/TaskEvent.schema.json",
+        "src/contracts/v1/generated/schemas/ChatEvent.schema.json",
+        "src/contracts/v1/generated/schemas/GraphExchange.schema.json",
+        "docs/tasks/M1.md",
+        "specs/course-knowledge-graph.md"
       ],
-      "latest_report": "docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md"
+      "latest_report": "docs/reviews/codex-claude-s07-dag-plan-2026-09-23-1304z.md",
+      "resolved_findings": [
+        "S07-R06"
+      ],
+      "reviewed_commits": [
+        "978671eecd16176ad880e03e3efee4839c1e89d7"
+      ],
+      "covered_scope": "Prior S-07 contract/tooling batches plus 978671e R06 fix diff; not full branch review Four committed OpenAPI/standalone JSON artifacts audited; Python/TypeScript artifacts still missing; merge and ADR/spec scopes pending. M1-04b DAG task line and course graph acceptance checked at 978671e; S07-R15 P2; remainder still pending."
     },
     {
       "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/adoring-sinoussi-709263",
-      "head": "6c19f258729c4e9b2390d2e79bf2869e3aade87f",
+      "head": "25d96cf3b3bd0312d759c9a0165e7f3f88f483af",
       "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "handoff_sha256": "2ade2542e2fbf954c932ab34504e93f5a3bf082acc74fbbd8bdcdf825173fdbe",
+      "handoff_sha256": "481429fcd282989d798b65965aba9fb942f8f4d6b7aa6a2b50da4212881429e3",
       "stable_observations": 2,
       "sessions": [
         {
           "session_id": "77fbec9b-a322-414b-9b3f-2faff92cc3e2",
-          "last_complete_offset": 2010303,
-          "last_observed_stop": "2026-09-22T14:50:30.401Z"
+          "last_complete_offset": 3011863,
+          "last_observed_stop": "2026-09-23T02:48:00.626Z"
+        },
+        {
+          "session_id": "f35ff092-d42b-423c-8fd1-e83e1952f763",
+          "last_complete_offset": 2826327,
+          "last_observed_stop": "2026-09-23T05:41:47.989Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T05:41:47.989Z"
+          }
         }
       ],
-      "status": "REVIEWED_DOCUMENT_SCOPE_NEEDS_SIGNOFF",
+      "status": "A02_HOOK01_AND_CI01_FIXED_COMMITS_REVIEWED",
       "initial_report": "docs/reviews/codex-claude-a01-s07-tooling-2026-09-23-0136z.md",
-      "covered_scope": "A01 88ea517 documents plus 6c19f25 handoff corrections; M0-09 toolchain record cross-check only",
+      "covered_scope": "A01 prior review; A02 fixed commit 13d586e four documents/handoff; HOOK-01 fixed branch commit 3c2dfab hook/test/verify/handoff. Current session has new user activity after last stop; no whole-round completion. CI-01 43a278c/25d96cf handoff-only diff reviewed; local workflow blobs equal; no new runtime code.",
+      "reviewed_paths": [
+        ".claude/hooks/block-dangerous.sh",
+        "docs/architecture.md",
+        "docs/decisions.md",
+        "docs/handoffs/claude-a01.md",
+        "docs/handoffs/claude-a02.md",
+        "docs/handoffs/claude-hook-01.md",
+        "docs/handoffs/claude-m0-09-toolchain.md",
+        "docs/tasks.md",
+        "scripts/verify.sh",
+        "specs/course-knowledge-graph.md",
+        "tests/hooks/test_block_dangerous.sh"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "A02-R01"
+      ],
+      "last_observed_at": "2026-09-23T06:08:32.177992+00:00",
+      "last_check_result": "CI01_HANDOFF_DOC_ONLY_REVIEWED_NO_NEW_IMPLEMENTATION",
+      "reviewed_commits": [
+        "13d586e",
+        "3c2dfab",
+        "43a278c",
+        "25d96cf"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a03-ci01-s07-2026-09-23-0606z.md",
+      "candidate_head": "25d96cf",
+      "candidate_handoff": "docs/handoffs/claude-ci-01-smoke.md",
+      "review_candidate": true
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a03-d430b9",
+      "head": "ab04053413540c18f480ca90fc1162d1efd21f45",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "bda89c07ceb7c16efd4db885373c95033b77694538fc24b2da8b38c136dc0fdb",
+      "stable_observations": 2,
+      "sessions": [
+        {
+          "session_id": "254b679d-7d12-4fdc-8319-ed1765633ce9",
+          "last_complete_offset": 2954230,
+          "last_observed_stop": "2026-09-23T06:45:55.691Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T06:45:55.691Z"
+          }
+        }
+      ],
+      "status": "A03_FIX_REVIEWED_A06_BLOCKED_P1",
+      "review_candidate": true,
+      "candidate_head": "ab04053",
+      "candidate_handoff": "docs/handoffs/claude-a06.md",
+      "base_commit": "931361d7365eb0b1a87a0a8d515e2d21115e71d5",
+      "content_sha256": "62c5b460477c3bf4ab4fdcab80688be0d75f13bac8ee85ef5335ccb0bac35492",
+      "reviewed_commits": [
+        "2049129",
+        "6345ce1",
+        "ab04053"
+      ],
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/decisions.md",
+        "docs/handoffs/claude-a03.md",
+        "docs/handoffs/claude-a06.md",
+        "docs/tasks.md",
+        "specs/course-knowledge-graph.md",
+        "specs/task-processing.md"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "A06-R01",
+        "A06-R02"
+      ],
+      "covered_scope": "A03 6345ce1 six-document wording fix reviewed; A06 ab04053 five-document lease/cleanup specification reviewed with two P1 findings; no runtime implementation or LEASE tests.",
+      "latest_report": "docs/reviews/codex-claude-a03fix-a06-ab04053-2026-09-23-0649z.md",
+      "last_observed_at": "2026-09-23T06:51:01.610216+00:00",
+      "last_check_result": "A03_WORDING_FIXED_A06_TWO_P1_CLEANUP_FINDINGS",
+      "latest_round_base": "6345ce1",
+      "a06_diff_sha256": "09bc765c49e32934bf6fea801794530a368896094c8ef7ca9c054beddc75675c",
+      "resolved_findings": [
+        "A03-R01",
+        "A03-R02"
+      ]
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a04-f5f479",
+      "head": "1012b6fc59ff5238f92d191017bef0c57899e916",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "0c33d56565aa23483c5fcef862f5bb65a4ccdb7efeeba61ecf1edd1c6319d035",
+      "sessions": [
+        {
+          "session_id": "c696b09f-d95e-4884-8546-efab26c165c8",
+          "last_complete_offset": 3558816,
+          "last_observed_stop": "2026-09-23T08:36:31.590Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T08:36:31.590Z"
+          }
+        }
+      ],
+      "status": "A04_A06_A07_FIXED_DOCS_REVIEWED_TWO_P2",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "covered_scope": "Fixed documentation revisions 02bc228, d426170, 1012b6f reviewed; prior A04/A06/A07 findings addressed at specification level. No runtime implementation; S-07 and old branch pending scopes unchanged.",
+      "pending_paths": [],
+      "open_findings": [
+        "FIX-R01",
+        "FIX-R02"
+      ],
+      "last_observed_at": "2026-09-23T12:15:49+00:00",
+      "last_check_result": "THREE_FIXED_DOCS_REVIEWED_TWO_NEW_P2",
+      "candidate_head": "1012b6fc59ff5238f92d191017bef0c57899e916",
+      "candidate_handoff": "docs/handoffs/claude-a07.md",
+      "base_commit": "931361d7365eb0b1a87a0a8d515e2d21115e71d5",
+      "reviewed_commits": [
+        "110f2431b6c25e755fa40970e9a944be0eab0f57",
+        "4b2ccb5a1b34474bf17b2eb44c1de2f075e20a5c",
+        "02bc228a6c1e9ee54d0d8356dcb2980d6df524d3",
+        "d426170",
+        "1012b6fc59ff5238f92d191017bef0c57899e916"
+      ],
       "reviewed_paths": [
         "docs/architecture.md",
         "docs/decisions.md",
         "docs/tasks.md",
-        "docs/handoffs/claude-a01.md",
-        "docs/handoffs/claude-m0-09-toolchain.md"
+        "docs/handoffs/claude-a04.md",
+        "specs/teacher-review-publish.md",
+        "specs/task-processing.md",
+        "docs/integrations.md",
+        "docs/handoffs/claude-a06.md",
+        "docs/handoffs/claude-a07.md"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a04-fixes-1012b6f-2026-09-23-1215z.md",
+      "a04_diff_sha256": "b5a57b497952c81914702c764036fd15735a62a573ec9f5cce2e7fef89b42bfa",
+      "merge_parent_diff_sha256": "49d4ca10300ae6ded478a69b83992978b0c1cc22c1349e89c12d610f14ac84c0",
+      "observed_active_head": "02bc228a6c1e9ee54d0d8356dcb2980d6df524d3",
+      "observed_active_dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "completion_signal": "Three ready_for_review handoffs bind fixed commits; last SmartSketch session stop 2026-09-23T08:36:31.590Z with no later user/tool; two identical snapshots",
+      "resolved_findings": [
+        "A04-R01",
+        "A04-R02",
+        "A06-R01",
+        "A06-R02",
+        "A07-R01"
+      ]
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/repository-permissions-0f326c",
+      "head": "931361d7365eb0b1a87a0a8d515e2d21115e71d5",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "ae6facee9278c872411117af085829e834589f7f82b4bee2e0c6fdadea93977b",
+      "sessions": [
+        {
+          "session_id": "bc3055f7-edfd-4357-ab74-b43dfeb9ae34",
+          "last_complete_offset": 309283,
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T06:50:56.654Z"
+          }
+        }
+      ],
+      "status": "STOPPED_NO_NEW_IMPLEMENTATION",
+      "stable_observations": 1,
+      "review_candidate": false,
+      "covered_scope": "No commit or dirty implementation beyond already-covered 931361d baseline; no task handoff in this worktree.",
+      "pending_paths": [],
+      "open_findings": [],
+      "last_observed_at": "2026-09-23T07:02:47.228925+00:00",
+      "last_check_result": "NO_NEW_CLAUDE_IMPLEMENTATION"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/repository-public-14d3fc",
+      "head": "931361d7365eb0b1a87a0a8d515e2d21115e71d5",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "ae6facee9278c872411117af085829e834589f7f82b4bee2e0c6fdadea93977b",
+      "sessions": [
+        {
+          "session_id": "b772858f-f774-448d-a5ea-3d0c4be9f754",
+          "last_complete_offset": 407661,
+          "last_event": {
+            "type": "atis-latch",
+            "subtype": null,
+            "timestamp": null
+          }
+        }
+      ],
+      "status": "ACTIVE_NO_NEW_IMPLEMENTATION",
+      "stable_observations": 1,
+      "review_candidate": false,
+      "covered_scope": "No commit or dirty implementation beyond already-covered 931361d baseline; no task handoff in this worktree.",
+      "pending_paths": [],
+      "open_findings": [],
+      "last_observed_at": "2026-09-23T07:02:47.228925+00:00",
+      "last_check_result": "NO_NEW_CLAUDE_IMPLEMENTATION"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a05-aa1561",
+      "head": "e0b7ccd34b8ae4ba8c06654e2a165d2ac047ccab",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "01385c5fe43c027086e104d457f17b83e2b1156ac45c68368be85fd6142f8499",
+      "sessions": [
+        {
+          "session_id": "187773cd-02bd-4ec5-9119-eed82ace5882",
+          "last_complete_offset": 1684279,
+          "last_observed_stop": "2026-09-23T07:30:16.267Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T07:30:16.267Z"
+          }
+        }
+      ],
+      "status": "A05_FIXED_DOCS_REVIEWED_NO_NEW_FINDINGS",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "covered_scope": "A05 fixed delivery 931361d..e0b7ccd all four changed document/config files reviewed; no runtime implementation; prior inherited branches not re-reviewed.",
+      "pending_paths": [],
+      "open_findings": [],
+      "last_observed_at": "2026-09-23T08:06:52.037037+00:00",
+      "last_check_result": "A05_REVIEW_COMPLETE_NO_NEW_FINDINGS",
+      "candidate_head": "e0b7ccd34b8ae4ba8c06654e2a165d2ac047ccab",
+      "candidate_handoff": "docs/handoffs/claude-a05.md",
+      "base_commit": "931361d",
+      "content_sha256": "216c87f3e385f63f469bcc2ec2b3fbdd990ce200cfa01ff37da15401009d207f",
+      "delivery_handoff_sha256": "617a06f653112decf5bc52bf9d5a2f22a2369721d1304dd686f03fc7f6827620",
+      "reviewed_commits": [
+        "e0b7ccd34b8ae4ba8c06654e2a165d2ac047ccab"
+      ],
+      "reviewed_paths": [
+        "docs/decisions.md",
+        "docs/handoffs/claude-a05.md",
+        "docs/tasks.md",
+        "specs/identity-access.md"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a05-a07-2026-09-23-0804z.md"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a07-297f68",
+      "head": "af9ff7d4ceeed23da97495819e4a5b27e54b9e94",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "918b89951c8e6504dbcf84e5382f4dfbea40eaaf4505000518dce44a3deb6171",
+      "sessions": [
+        {
+          "session_id": "70fe9db6-2403-47ef-abb6-29352e417c20",
+          "last_complete_offset": 1416769,
+          "last_observed_stop": "2026-09-23T07:28:35.370Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T07:28:35.370Z"
+          }
+        }
+      ],
+      "status": "A07_FIXED_DOCS_REVIEWED_P2",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "covered_scope": "A07 fixed delivery ab04053..af9ff7d all four changed document/config files reviewed; no runtime implementation; prior inherited branches not re-reviewed.",
+      "pending_paths": [],
+      "open_findings": [
+        "A07-R01"
+      ],
+      "last_observed_at": "2026-09-23T08:06:52.037037+00:00",
+      "last_check_result": "A07_REVIEW_COMPLETE_ONE_P2_BUDGET_IDENTITY_GAP",
+      "candidate_head": "af9ff7d4ceeed23da97495819e4a5b27e54b9e94",
+      "candidate_handoff": "docs/handoffs/claude-a07.md",
+      "base_commit": "ab04053",
+      "content_sha256": "fe6d5e37461f948c2b2687aa5eb038f905b81ceb21798df0a8fc74971bd88b83",
+      "delivery_handoff_sha256": "76e274dbafcc19a7de1c57d5e08cf76a7680faf3bbe98e2417ae92ee141c28c9",
+      "reviewed_commits": [
+        "af9ff7d4ceeed23da97495819e4a5b27e54b9e94"
+      ],
+      "reviewed_paths": [
+        ".env.example",
+        "docs/handoffs/claude-a07.md",
+        "docs/integrations.md",
+        "docs/tasks.md"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a05-a07-2026-09-23-0804z.md"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/project-progress-check-875638",
+      "head": "931361d7365eb0b1a87a0a8d515e2d21115e71d5",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "aaa96c0d6a9d7fec86acc2efbf87f3f176a770f2ef39b7c62added27224f9361",
+      "sessions": [
+        {
+          "session_id": "8b0d1fff-658d-4bd1-a5e9-ea9c67455c4a",
+          "last_complete_offset": 373481,
+          "last_observed_stop": "2026-09-23T07:05:40.786Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T07:05:40.786Z"
+          }
+        }
+      ],
+      "status": "NO_NEW_IMPLEMENTATION",
+      "stable_observations": 1,
+      "review_candidate": false,
+      "covered_scope": "Progress answer only; no implementation beyond covered baseline.",
+      "pending_paths": [],
+      "open_findings": [],
+      "last_observed_at": "2026-09-23T07:31:21.778342+00:00",
+      "last_check_result": "NO_NEW_IMPLEMENTATION"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a09-dev-environment-check-8e5e93",
+      "head": "68b1aaf275129deb003f83ee04608e132cb59355",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "91f945b209c458dcf20cdec0a6aa17a1c04e5df5a03fe68f8081e28c10ff4310",
+      "stable_observations": 2,
+      "sessions": [
+        {
+          "session_id": "5fbc9e8a-f374-43f1-ac30-aed589330530",
+          "last_complete_offset": 2351955,
+          "last_observed_stop": "2026-09-23T13:50:32.069Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T13:50:32.069Z"
+          }
+        }
+      ],
+      "status": "A09_FIX_DOCS_REVIEWED_TWO_NEW_P2",
+      "review_candidate": true,
+      "covered_scope": "A09 1754c96..68b1aaf five-document remediation reviewed. Original period-separated citation failure specified as rejected; logging scope conflict fixed at document level. Semicolon and assertive-heading citation gaps remain. No runtime implementation or committed reference model.",
+      "pending_paths": [],
+      "open_findings": [
+        "A09F-R01",
+        "A09F-R02"
+      ],
+      "last_observed_at": "2026-09-24T02:03:22Z",
+      "last_check_result": "A09_FIX_TWO_NEW_P2_CITATION_BOUNDARY_FINDINGS",
+      "candidate_head": "68b1aaf275129deb003f83ee04608e132cb59355",
+      "candidate_handoff": "docs/handoffs/claude-a09.md",
+      "base_commit": "f9dfc8f9c731deb44ab2bbb080d2ebd623e0dc23",
+      "reviewed_commits": [
+        "1754c96025c0c48700a53dafb8ef1fa9ba6fb89c",
+        "097f248",
+        "68b1aaf275129deb003f83ee04608e132cb59355"
+      ],
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/decisions.md",
+        "docs/handoffs/claude-a09-env-check.md",
+        "docs/handoffs/claude-a09.md",
+        "docs/tasks.md",
+        "specs/grounded-qa.md"
+      ],
+      "latest_report": "docs/reviews/codex-claude-a09-fix-68b1aaf-2026-09-24-0200z.md",
+      "resolved_findings": [
+        "A09-R02"
+      ],
+      "completion_signal": "ready_for_review fixed 68b1aaf; two identical HEAD/dirty/handoff snapshots; SmartSketch session had only last-prompt/cost-state metadata after prior stop"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/codex-a08-check-0ae6d7",
+      "head": "8f1e73f188e7b01301574b7a0a8e6dbe3f135ee2",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "2ee0684526fa29a9902044dea8470e793c65ed4af9642ed46426d9214e0add55",
+      "stable_observations": 2,
+      "sessions": [
+        {
+          "session_id": "8ead3104-1f55-47da-bdc8-cc793a709292",
+          "last_complete_offset": 2354199,
+          "last_observed_stop": "2026-09-23T13:36:19.818Z",
+          "last_event": {
+            "type": "system",
+            "subtype": "stop_hook_summary",
+            "timestamp": "2026-09-23T13:36:19.818Z"
+          }
+        }
+      ],
+      "status": "A08_FIX_FIXED_COMMIT_REVIEWED_NO_NEW_FINDINGS",
+      "review_candidate": true,
+      "candidate_head": "2f2e4ce53e21c7b8909d32c43b01088b39f2bb19",
+      "candidate_handoff": "docs/handoffs/claude-sign-a08.md",
+      "pending_paths": [],
+      "open_findings": [],
+      "last_observed_at": "2026-09-24T16:03:21+00:00",
+      "last_check_result": "A08_FIX_DOC_ISSUES_CLOSED_VERIFY_PASS",
+      "reviewed_paths": [
+        "docs/decisions.md",
+        "docs/handoffs/claude-sign-a08.md",
+        "docs/tasks.md",
+        "specs/learning-path.md"
+      ],
+      "covered_scope": "A08 repair fixed delta 445478e..2f2e4ce reviewed; current HEAD 8f1e73f main sync, runtime implementation and DTO migration not covered.",
+      "latest_report": "docs/reviews/codex-claude-a08-fix-2f2e4ce-2026-09-24-1603z.md",
+      "completion_signal": "ready_for_review fixed commit; two identical HEAD/dirty/handoff snapshots; project session incremental 625 bytes had only mode/cost-state metadata, no new user/tool",
+      "base_commit": "445478e",
+      "reviewed_commits": [
+        "39633fe",
+        "2f2e4ce53e21c7b8909d32c43b01088b39f2bb19"
+      ],
+      "diff_sha256": "f780eccddcf78191d53c23f245d7ceb454e70361c075a0a19c43ea1a0817c5b5",
+      "resolved_findings": [
+        "A08S-R01",
+        "A08S-R02"
+      ]
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/batch1-qa",
+      "head": "3da4f2fbf652161a6a54762a299e16ec8eabfd94",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "d0ce33eafa660d83fcaba972a18eac3011ca69cd0a2043c6a00ba436a746bfa5",
+      "stable_observations": 2,
+      "sessions": [],
+      "status": "A10_BATCH1_QA_REVIEWED_NO_NEW_FINDINGS",
+      "review_candidate": true,
+      "candidate_head": "3da4f2fbf652161a6a54762a299e16ec8eabfd94",
+      "candidate_handoff": "docs/handoffs/claude-a10-batch1-supplement.md",
+      "base_commit": "548c4f8a9f53145cdcf8f3213505952815cbc15b",
+      "reviewed_commits": [
+        "3da4f2fbf652161a6a54762a299e16ec8eabfd94"
+      ],
+      "reviewed_paths": [
+        "docs/handoffs/claude-a10-batch1-supplement.md",
+        "docs/tasks.md",
+        "scripts/check_contracts.py",
+        "tests/contracts/test_contracts.py"
       ],
       "pending_paths": [],
       "open_findings": [],
-      "last_observed_at": "2026-09-23T01:38:32.049069+00:00",
-      "last_check_result": "REVIEWED_NO_NEW_A01_DEFECTS"
+      "covered_scope": "A10 batch 1 supplement four-file commit 548c4f8..3da4f2f; naming guard for grounded QA and independent negative fixtures only; no runtime QA implementation.",
+      "latest_report": "docs/reviews/codex-claude-batch1-qa-3da4f2f-2026-09-24-0446z.md",
+      "last_observed_at": "2026-09-24T04:47:44+00:00",
+      "last_check_result": "VERIFY_24_OF_24_NO_NEW_FINDINGS",
+      "completion_signal": "Committed ready_for_review handoff; two identical HEAD/dirty/handoff snapshots; no matching Claude JSONL for this newly created worktree."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/wrap-fix-pr16",
+      "head": "8dcd7b2533a4111c3f169704931635e5c6ef0177",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "0997a3f4d95c482e623a5b27c0bf95b5c9549fbd25c1ace24c363c692ec21156",
+      "stable_observations": 2,
+      "sessions": [],
+      "status": "FIX_R03_DOC_REVIEWED_NO_NEW_FINDINGS",
+      "review_candidate": true,
+      "candidate_head": "8dcd7b2533a4111c3f169704931635e5c6ef0177",
+      "candidate_handoff": "docs/handoffs/claude-a04.md",
+      "base_commit": "77310d2",
+      "reviewed_commits": [
+        "970c582fdce8b3654bc26779ce6d7641277d0330",
+        "8dcd7b2533a4111c3f169704931635e5c6ef0177"
+      ],
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/decisions.md",
+        "docs/handoffs/claude-a04.md",
+        "docs/integrations.md",
+        "docs/tasks.md",
+        "specs/teacher-review-publish.md"
+      ],
+      "pending_paths": [],
+      "open_findings": [],
+      "resolved_findings": [
+        "FIX-R03"
+      ],
+      "covered_scope": "FIX-R03 documentation-only repair 77310d2..8dcd7b2, six paths; migration/runtime vector-space write rules and PUB-39; no F03 runtime implementation or tests.",
+      "latest_report": "docs/reviews/codex-claude-fix-r03-8dcd7b2-2026-09-24-0451z.md",
+      "last_observed_at": "2026-09-24T04:52:24.917299+00:00",
+      "last_check_result": "FIX_R03_CLOSED_AT_SPEC_LEVEL_VERIFY_SCAFFOLD_PASS",
+      "completion_signal": "Committed ready_for_review handoff; two identical HEAD/dirty/handoff snapshots; no matching Claude JSONL for worktree."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/agent-acb88d2bd608b82fd",
+      "head": "815318612e166ce1c092dde6fa98864b22f39d8e",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "54fe22fd547be956a01ddc2d83923472803a8ed0a0c6c1f91d3a7d99d47bb7b1",
+      "sessions": [],
+      "session_note": "No project Claude JSONL directory for newly created agent worktree; fixed-commit ready_for_review handoff used.",
+      "status": "B03_FIXED_COMMIT_REVIEWED_P2",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "candidate_head": "815318612e166ce1c092dde6fa98864b22f39d8e",
+      "candidate_handoff": "docs/handoffs/claude-b03.md",
+      "base_commit": "9dddcb4ea18e074fdfd1476823b48b0832231252",
+      "shared_prep_base_commit": "8e5b707ed3695fd6ad74bc0ae6b090bcf5016756",
+      "shared_prep_head_commit": "9dddcb4ea18e074fdfd1476823b48b0832231252",
+      "reviewed_commits": [
+        "9dddcb4ea18e074fdfd1476823b48b0832231252",
+        "815318612e166ce1c092dde6fa98864b22f39d8e"
+      ],
+      "diff_sha256": "f93499c2fa3a485e30b6b15f37ee27033eb4fb169e719a7600d011a92f4724b1",
+      "reviewed_paths": [
+        "docs/handoffs/claude-b03.md",
+        "src/frontend/src/App.vue",
+        "src/frontend/src/main.ts",
+        "src/frontend/src/router/index.ts",
+        "src/frontend/src/views/StudentHome.vue",
+        "src/frontend/src/views/TeacherHome.vue",
+        "tests/frontend/b03.test.ts"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "B03-R01"
+      ],
+      "covered_scope": "Fixed delivery and shared B03/B04 preparation only; parallel branches not integrated. No whole-branch approval.",
+      "latest_report": "docs/reviews/codex-claude-b03-b04-2026-09-24-0605z.md",
+      "last_observed_at": "2026-09-24T06:07:17.839963+00:00",
+      "last_check_result": "B03_FIXED_COMMIT_REVIEWED_P2",
+      "completion_signal": "ready_for_review fixed commit; two identical HEAD/dirty/untracked/handoff/diff snapshots; no matching project session for child worktree."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/agent-af5fba1b70b95c810",
+      "head": "225f102be1948a93be293efefa2c3cae58937a09",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "4d7c5f25e3cdb627832c6932d920a229069e0b73b433f082669ef047e1063c00",
+      "sessions": [],
+      "session_note": "No project Claude JSONL directory for newly created agent worktree; fixed-commit ready_for_review handoff used.",
+      "status": "B04_FIXED_COMMIT_REVIEWED_P2",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "candidate_head": "225f102be1948a93be293efefa2c3cae58937a09",
+      "candidate_handoff": "docs/handoffs/claude-b04.md",
+      "base_commit": "9dddcb4ea18e074fdfd1476823b48b0832231252",
+      "shared_prep_base_commit": "8e5b707ed3695fd6ad74bc0ae6b090bcf5016756",
+      "shared_prep_head_commit": "9dddcb4ea18e074fdfd1476823b48b0832231252",
+      "reviewed_commits": [
+        "9dddcb4ea18e074fdfd1476823b48b0832231252",
+        "225f102be1948a93be293efefa2c3cae58937a09"
+      ],
+      "diff_sha256": "86665109f33930b52aae62edaab9a9d90a7ca01761d5a3dab22713e57ac82deb",
+      "reviewed_paths": [
+        "docs/handoffs/claude-b04.md",
+        "src/frontend/src/stores/course.ts",
+        "tests/frontend/b04.test.ts"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "B04-R01"
+      ],
+      "covered_scope": "Fixed delivery and shared B03/B04 preparation only; parallel branches not integrated. No whole-branch approval.",
+      "latest_report": "docs/reviews/codex-claude-b03-b04-2026-09-24-0605z.md",
+      "last_observed_at": "2026-09-24T06:07:17.839963+00:00",
+      "last_check_result": "B04_FIXED_COMMIT_REVIEWED_P2",
+      "completion_signal": "ready_for_review fixed commit; two identical HEAD/dirty/untracked/handoff/diff snapshots; no matching project session for child worktree."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/agent-a6e6226be56d04b53",
+      "head": "465170080d4c4381b6342900750dbdfe50b84255",
+      "base_commit": "588d00a",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "60bc9a651be51fc451c494c4c9ecdb90d8370392eb8aceea97a3b3ed83b3373a",
+      "diff_sha256": "75d4844a540485f40706a1d93d2d53b342960f5832c7427be081ce2529aa37a6",
+      "sessions": [],
+      "session_note": "No matching SmartSketch Claude JSONL directory for this child worktree; fixed ready_for_review handoff and two stable worktree snapshots used.",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "candidate_head": "465170080d4c4381b6342900750dbdfe50b84255",
+      "candidate_handoff": "docs/handoffs/claude-d02.md",
+      "status": "D02_FIXED_COMMIT_REVIEWED_ONE_P2",
+      "reviewed_commits": [
+        "8275897",
+        "a32db5b",
+        "87576e3",
+        "4651700"
+      ],
+      "reviewed_paths": [
+        "docs/handoffs/claude-d02.md",
+        "src/backend/app/services/parsers/txt.py",
+        "tests/backend/test_d02.py"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "D02-R01"
+      ],
+      "covered_scope": "Only D02 588d00a..4651700; no cross-parser integration or other worktrees.",
+      "latest_report": "docs/reviews/codex-claude-d02-4651700-2026-09-25-0403z.md",
+      "last_observed_at": "2026-09-25T04:03:43+00:00",
+      "last_check_result": "D02_P2_CONTROL_ONLY_BINARY_ACCEPTED",
+      "completion_signal": "ready_for_review handoff, clean fixed HEAD, two identical HEAD/dirty/handoff snapshots."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/agent-aed9e93d65bae34c0",
+      "head": "d3b7a6ca394ca7296d97b7019cc2c12500baf529",
+      "base_commit": "68affa8",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "0d10649608d8182a1ac542f4059991de67e79c69046e4a01c646735b1b1cbb1e",
+      "diff_sha256": "2c100449cc2199a02b4566e8a87638a642f5ee27a259736642c4a233415c7b1",
+      "sessions": [],
+      "session_note": "Fixed ready_for_review handoff; no Claude session text read for this fixed-commit review.",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "candidate_head": "d3b7a6ca394ca7296d97b7019cc2c12500baf529",
+      "candidate_handoff": "docs/handoffs/claude-c05.md",
+      "status": "C05_FIXED_COMMIT_REVIEWED_NO_NEW_FINDINGS",
+      "reviewed_commits": [
+        "d3b7a6ca394ca7296d97b7019cc2c12500baf529"
+      ],
+      "reviewed_paths": [
+        "docs/handoffs/claude-c05.md",
+        "src/backend/app/services/file_storage.py",
+        "tests/backend/test_c05.py"
+      ],
+      "pending_paths": [],
+      "open_findings": [],
+      "covered_scope": "Only C05 68affa8..d3b7a6c three-file delivery; C06/C07 integration and other worktrees not covered.",
+      "latest_report": "docs/reviews/codex-claude-c05-d3b7a6c-2026-09-25-0502z.md",
+      "last_observed_at": "2026-09-25T05:01:55+00:00",
+      "last_check_result": "C05_61_PASS_NO_NEW_FINDINGS",
+      "completion_signal": "ready_for_review fixed commit and two identical HEAD/dirty/handoff/diff snapshots."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/agent-aec40eaf0087d513d",
+      "head": "74be60de24f797796bfe648ccd288c91be75a0b0",
+      "base_commit": "909ce33",
+      "initial_d01_commit": "3b38724",
+      "repair_parent": "83e5338",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "handoff_sha256": "9ab7e2ac4fd6ecfd4a07e803613cb53b02a4b4dd599a433539447d501537d98b",
+      "diff_sha256": "794cb6a34f97d79e13eae31d224163c0fe5420564f3b9186d5defa5ac9182081",
+      "sessions": [],
+      "session_note": "No matching SmartSketch Claude JSONL directory for this child worktree; fixed ready_for_review handoff and two stable snapshots used.",
+      "stable_observations": 2,
+      "review_candidate": true,
+      "candidate_head": "74be60de24f797796bfe648ccd288c91be75a0b0",
+      "candidate_handoff": "docs/handoffs/claude-d01.md",
+      "status": "D01_FIXED_COMMIT_REVIEWED_ONE_P3",
+      "reviewed_commits": [
+        "3b38724",
+        "74be60d"
+      ],
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/handoffs/claude-d01.md",
+        "src/backend/app/services/parsers/__init__.py",
+        "src/backend/app/services/parsers/models.py",
+        "tests/backend/test_d01.py",
+        "tests/fixtures/documents/README.md",
+        "tests/fixtures/documents/empty.txt",
+        "tests/fixtures/documents/linear-list-numbered.txt",
+        "tests/fixtures/documents/sorting-plain.txt",
+        "tests/fixtures/documents/stack-queue-notes.md"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "D01-R01"
+      ],
+      "covered_scope": "Only D01 initial and repair commits relative to merged main baseline; not C05/C08/E01 or cross-parser integration.",
+      "latest_report": "docs/reviews/codex-claude-d01-74be60d-2026-09-25-0503z.md",
+      "verification": "D01 88 passed; full verify.sh exit 0 with existing Anaconda Python; default Python failed missing dependencies; malformed newline hash counterexample accepted; diff check pass.",
+      "last_observed_at": "2026-09-25T05:02:59+00:00",
+      "last_check_result": "D01_P3_TRAILING_NEWLINE_HASH_ACCEPTED",
+      "completion_signal": "ready_for_review fixed HEAD; two identical HEAD/dirty/handoff/diff snapshots."
+    }
+  ],
+  "fixed_commit_reviews": [
+    {
+      "base": "1a47eb2",
+      "head": "5186e09976cb6dbc23eac512a965f7b06a896b41",
+      "original_worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/quirky-dijkstra-eca5de",
+      "status": "FIX_R01_R02_SPEC_GAPS_CLOSED_NEW_FIX_R03_P2",
+      "resolved_findings": [
+        "FIX-R01",
+        "FIX-R02"
+      ],
+      "open_findings": [
+        "FIX-R03"
+      ],
+      "latest_report": "docs/reviews/codex-claude-fix-r01-r02-5186e09-2026-09-23-1252z.md",
+      "scope_note": "Fixed commit content only; original worktree switched to A10 branch during review; no runtime implementation tested."
+    },
+    {
+      "base": "dddafb3",
+      "head": "8e5b707ed3695fd6ad74bc0ae6b090bcf5016756",
+      "original_worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a09-dev-environment-check-8e5e93",
+      "session_id": "52c4c9a5-9112-49bd-b0be-3b3ad8cedf78",
+      "last_observed_stop": "2026-09-24T05:01:57.069Z",
+      "status": "B02_FIXED_COMMIT_REVIEWED_NO_NEW_FINDINGS",
+      "delivery_handoff": "docs/handoffs/claude-b02.md",
+      "handoff_sha256": "a252380f3ec76002b255a69d7458ece724531b53fb34146d92c5432f7be469ce",
+      "diff_sha256": "ef1f8004229a6dfa3ade7af85a1c57dab503d2d7671385dcfee1d0f67ff2f180",
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/handoffs/claude-b02.md",
+        "docs/tasks.md",
+        "src/frontend/README.md",
+        "src/frontend/package-lock.json",
+        "src/frontend/package.json",
+        "src/frontend/tsconfig.json",
+        "src/frontend/tsconfig.node.json",
+        "src/frontend/vitest.config.ts",
+        "tests/frontend/b02.test.ts",
+        "tests/frontend/setup.ts"
+      ],
+      "pending_paths": [],
+      "open_findings": [],
+      "latest_report": "docs/reviews/codex-claude-b02-8e5b707-2026-09-24-0504z.md",
+      "verification": "Isolated archive: type-check PASS; B02 5 tests PASS; build PASS; diff check PASS; verify.sh FAIL missing pyyaml and openapi-spec-validator; no install",
+      "scope_note": "B02 fixed commit only; later B03/B04 prep and active agent worktrees not reviewed; prior A09 findings unchanged."
+    },
+    {
+      "base": "9d2437ec6f2ad6af736df669741e16d887913054",
+      "head": "3771ae1f576b88bfe6f4798a17b00fa32e3179b1",
+      "original_worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a09-dev-environment-check-8e5e93",
+      "session_id": "52c4c9a5-9112-49bd-b0be-3b3ad8cedf78",
+      "session_note": "Parent session later advanced through B13; B10 review is bound only to its committed handoff and immutable commit, not the later stop event.",
+      "status": "B10_FIXED_COMMIT_REVIEWED_TWO_P2",
+      "review_candidate": true,
+      "delivery_handoff": "docs/handoffs/claude-b10.md",
+      "handoff_sha256": "67e43c8f03e6564ff26fdd09332df5e7955f2277eab60e901b33392ae472c33f",
+      "reviewed_paths": [
+        "docs/handoffs/claude-b10.md",
+        "docs/tasks.md",
+        "scripts/verify/contracts.sh",
+        "specs/identity-access.md",
+        "specs/task-processing.md",
+        "src/contracts/README.md",
+        "src/contracts/api.v1.yaml",
+        "src/contracts/events.v1.md",
+        "src/contracts/v1/generated/openapi.json",
+        "src/contracts/v1/generated/python/models.py",
+        "src/contracts/v1/generated/schemas/TaskEvent.schema.json",
+        "src/contracts/v1/generated/typescript/openapi.d.ts",
+        "tests/contracts/test_b10.py"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "B10-R01",
+        "B10-R02"
+      ],
+      "latest_report": "docs/reviews/codex-claude-b10-3771ae1-2026-09-24-0703z.md",
+      "verification": "Isolated git archive: B10 36 tests PASS; generated artifacts match; diff check PASS; two jsonschema counterexamples accepted. Default python lacks pytest; existing Anaconda used.",
+      "scope_note": "Only B10 commit. Later B13, parent branch integration, and older pending scopes not covered."
+    },
+    {
+      "base": "3771ae1f576b88bfe6f4798a17b00fa32e3179b1",
+      "head": "14d405d1907bf8d0f11977fb4cd759a312289324",
+      "original_worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a09-dev-environment-check-8e5e93",
+      "session_id": "52c4c9a5-9112-49bd-b0be-3b3ad8cedf78",
+      "last_observed_stop": "2026-09-24T06:57:33.826Z",
+      "session_note": "No later user/tool activity in matching SmartSketch session; fixed ready_for_review handoff and two stable worktree snapshots.",
+      "status": "B13_FIXED_COMMIT_REVIEWED_TWO_P2",
+      "review_candidate": true,
+      "delivery_handoff": "docs/handoffs/claude-b13.md",
+      "handoff_sha256": "622eaad8df71722c6b522b1c0d9a8c3c8282c3a82644cb57aad574047affbb88",
+      "diff_sha256": "0c189f2de5db1b41e8fd330099ed1d66d60222ea52d9564ffdf22f4aef75d38f",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "untracked_note": "src/backend/smartsketch_backend.egg-info/ excluded from fixed B13 commit review",
+      "stable_observations": 2,
+      "reviewed_paths": [
+        "docs/architecture.md",
+        "docs/handoffs/claude-b13.md",
+        "docs/tasks.md",
+        "scripts/verify/contracts.sh",
+        "specs/grounded-qa.md",
+        "src/contracts/api.v1.yaml",
+        "src/contracts/errors.v1.md",
+        "src/contracts/events.v1.md",
+        "src/contracts/v1/generated/openapi.json",
+        "src/contracts/v1/generated/python/models.py",
+        "src/contracts/v1/generated/schemas/ChatEvent.schema.json",
+        "src/contracts/v1/generated/typescript/openapi.d.ts",
+        "tests/contracts/test_b13.py",
+        "tests/contracts/test_contracts.py"
+      ],
+      "pending_paths": [],
+      "open_findings": [
+        "B13-R01",
+        "B13-R02"
+      ],
+      "latest_report": "docs/reviews/codex-claude-b13-14d405d-2026-09-24-1104z.md",
+      "verification": "Isolated git archive: B13 43 tests PASS; verify.sh PASS (22 negative gate cases, B08 5, B09 5, B10 36, B13 43); diff check PASS; two generated DTO counterexamples accepted and answered/retrieved=0 accepted by standalone schema.",
+      "scope_note": "Only B13 fixed commit; not parent branch integration, B10 fixes, older pending scopes, or untracked egg-info."
+    },
+    {
+      "base": "3771ae1f576b88bfe6f4798a17b00fa32e3179b1",
+      "head": "21de62767e303b6477808e138c6d48e7d1d87b06",
+      "original_worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a05-aa1561",
+      "session_id": "ed94dae8-64c4-48a7-a6b3-5c05be823d33",
+      "session_note": "Matching project session has later user activity; fixed ready_for_review commit reviewed independently of session stop.",
+      "status": "B10_FIX_FIXED_COMMIT_REVIEWED_NEW_P2_P3",
+      "review_candidate": true,
+      "delivery_handoff": "docs/handoffs/claude-review-b10.md",
+      "handoff_sha256": "e020a4a089ec5e2c8165f297f96d2227a0a76f067f3f4d733f9037ca4ec1fb96",
+      "diff_sha256": "fd4525b7258ad4ff062aa4574deb571f4284e315d52e54c06af2d3f5bb89e504",
+      "dirty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stable_observations": 2,
+      "reviewed_paths": [
+        "docs/handoffs/claude-b10.md",
+        "docs/handoffs/claude-review-b10.md",
+        "docs/tasks.md",
+        "specs/task-processing.md",
+        "src/contracts/api.v1.yaml",
+        "src/contracts/errors.v1.md",
+        "src/contracts/v1/generated/openapi.json",
+        "src/contracts/v1/generated/python/models.py",
+        "src/contracts/v1/generated/schemas/TaskEvent.schema.json",
+        "src/contracts/v1/generated/typescript/openapi.d.ts",
+        "tests/contracts/test_b10.py"
+      ],
+      "pending_paths": [],
+      "resolved_findings": [
+        "B10-R01",
+        "B10-R02"
+      ],
+      "open_findings": [
+        "B10F-R01",
+        "B10F-R02"
+      ],
+      "latest_report": "docs/reviews/codex-claude-b10-fix-21de627-2026-09-24-1556z.md",
+      "verification": "Isolated archive: B10 45 tests PASS; jsonschema/Pydantic counterexamples reproduced; diff check PASS. Full verify final success text seen, exit code uncaptured after interruption.",
+      "scope_note": "Only 21de627 fix commit; main merge/integration and runtime not reviewed."
     }
   ],
   "rules": {
@@ -230,5 +1071,37 @@
     "unchanged_notifications": "quiet",
     "raw_transcripts_stored": false
   },
-  "last_heartbeat_result": "A01 document scope reviewed with no new defect; PLAN-D01/D04 await decisions. S-07 tooling batch found R12-R14; prior R06-R11 and remaining paths still open."
+  "last_heartbeat_result": "D01 fixed parser model 74be60d reviewed: one P3 hash-validation boundary issue; 88 targeted tests and full gate pass with existing Anaconda; C05 separately reviewed, other new worktrees pending.",
+  "pending_new_delivery_heads": [
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/codex-a08-check-0ae6d7",
+      "head": "8f1e73f188e7b01301574b7a0a8e6dbe3f135ee2",
+      "prior_covered_head": "2f2e4ce53e21c7b8909d32c43b01088b39f2bb19",
+      "scope": "A08 fixed repair reviewed; later main sync/integration not reviewed"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/wrap-a10-fix",
+      "head": "666c2f6fc48a4896958e2ba59d2d2dbfcec87d89",
+      "prior_covered_head": "37da66959950b16d45a303ca42439b2562560573",
+      "scope": "A10-R01/R02 remediation and main sync; not yet reviewed"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a1-a10-meta-task-wrap-ddbf4b",
+      "head": "c23e2a25316f401bcb45ff67aa6853edd3a3f388",
+      "prior_covered_head": "f9dfc8f9c731deb44ab2bbb080d2ebd623e0dc23",
+      "scope": "A1-A10 wrap handoff/task documentation; not yet reviewed"
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a09-dev-environment-check-8e5e93",
+      "head": "14d405d1907bf8d0f11977fb4cd759a312289324",
+      "prior_covered_head": "14d405d1907bf8d0f11977fb4cd759a312289324",
+      "scope": "B10/B13 fixed commits separately reviewed; parent branch integration and later untracked state remain pending."
+    },
+    {
+      "worktree": "/Users/arvinhan/Desktop/SmartSketch/.claude/worktrees/a05-aa1561",
+      "head": "bb48429",
+      "prior_covered_head": "21de62767e303b6477808e138c6d48e7d1d87b06",
+      "scope": "B10 21de627 fix reviewed standalone; bb48429 main integration and other merged scopes still pending."
+    }
+  ]
 }
