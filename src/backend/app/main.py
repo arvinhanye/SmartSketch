@@ -15,6 +15,7 @@ from app.api.event_tickets import router as event_tickets_router
 from app.api.health import router as health_router
 from app.api.task_cancel import router as task_cancel_router
 from app.api.tasks import router as tasks_router
+from app.api.materials import policy_router as upload_policy_router
 from app.api.materials import router as materials_router
 from app.api.members import router as members_router
 from app.config import check_auth_settings, load_settings
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     application.include_router(tasks_router)
     application.include_router(courses_router)
     application.include_router(materials_router)
+    application.include_router(upload_policy_router)
     application.include_router(members_router)
     return application
 

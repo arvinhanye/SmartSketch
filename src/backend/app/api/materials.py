@@ -1,4 +1,5 @@
-"""资料上传与列表路由（契约 ``uploadDocument`` / ``listDocuments``）——只做协议转换。
+"""资料上传、列表、删除与上传策略路由（契约 ``uploadDocument`` / ``listDocuments`` /
+``deleteDocument`` / ``getUploadPolicy``）——只做协议转换。
 
 授权用 C03 的 ``course_teacher``（访问矩阵：匿名 401、非成员 403 COURSE_FORBIDDEN、
 学生成员 403 ROLE_FORBIDDEN）。业务规则在 ``app.services.materials``。
@@ -10,7 +11,7 @@
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData, UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -18,12 +19,19 @@ from starlette.types import Message
 
 from app.api.dependencies import course_teacher
 from app.schemas.errors import Error
-from app.schemas.materials import Document, UploadAccepted
-from app.services.access import CourseAccess
+from app.schemas.materials import Document, DocumentNotDeletableDetails, UploadAccepted, UploadPolicy
+from app.services.access import CourseAccess, not_found
 from app.services.file_storage import FileStorageError, FileTooLargeError, iter_file
-from app.services.materials import list_course_materials, upload_material
+from app.services.materials import (
+    MaterialNotDeletable,
+    delete_course_material,
+    list_course_materials,
+    upload_material,
+)
 
 router = APIRouter(prefix="/api/v1/courses/{cid}/documents", tags=["documents"])
+# ADR-022：上传策略与资料同属 documents 标签，但路径不在 /documents 之下。
+policy_router = APIRouter(prefix="/api/v1/courses/{cid}", tags=["documents"])
 
 _STATUS_BY_CODE = {
     "UNSUPPORTED_FORMAT": 415,
@@ -83,6 +91,7 @@ def list_documents(
             format=record.format,
             size_bytes=record.size_bytes,
             parse_status=record.parse_status,
+            task_id=record.task_id,
             uploaded_at=record.uploaded_at,
         )
         for record in records
@@ -146,6 +155,37 @@ async def upload_document(
     return UploadAccepted(task_id=result.task_id, document_id=result.document_id)
 
 
+@router.delete(
+    "/{did}",
+    operation_id="deleteDocument",
+    summary="删除未产生图谱贡献的资料（教师）",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={
+        **_ACCESS_RESPONSES,
+        404: {"model": Error, "description": "资料不存在，或不属于该课程（`NOT_FOUND`）"},
+        409: {"model": Error, "description": "资料仍在处理、已产生图谱贡献或清理未完成（`DOCUMENT_NOT_DELETABLE`）"},
+    },
+)
+def delete_document(
+    did: str, request: Request, access: CourseAccess = Depends(course_teacher)
+) -> Response:
+    outcome = delete_course_material(
+        request.app.state.settings, course_id=access.course.id, material_id=did
+    )
+    if outcome is None:
+        raise not_found()
+    if isinstance(outcome, MaterialNotDeletable):
+        details = DocumentNotDeletableDetails(stage=outcome.stage, reason=outcome.reason)
+        body = Error(
+            code="DOCUMENT_NOT_DELETABLE",
+            message="资料仍在处理或已进入图谱，不能删除",
+            details=details.model_dump(),
+        )
+        return JSONResponse(status_code=409, content=body.model_dump(exclude_none=True))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 class _BodyTooLarge(Exception):
     """请求体超过 ``UPLOAD_MAX_BYTES`` + 表单开销；路由转为 413 ``FILE_TOO_LARGE``。"""
 
@@ -179,3 +219,14 @@ async def _read_bounded_form(request: Request, max_file_bytes: int) -> FormData:
     except StarletteHTTPException:
         # 表单格式错误或字段/文件数超限。
         raise _invalid_body("file", "multipart_invalid") from None
+
+
+@policy_router.get(
+    "/upload-policy",
+    operation_id="getUploadPolicy",
+    response_model=UploadPolicy,
+    responses=_ACCESS_RESPONSES,
+)
+def get_upload_policy(request: Request, access: CourseAccess = Depends(course_teacher)) -> UploadPolicy:
+    """ADR-022：返回服务端当前的 ``UPLOAD_MAX_BYTES``，与 413 的 ``limit_bytes`` 同源。"""
+    return UploadPolicy(max_bytes=request.app.state.settings.UPLOAD_MAX_BYTES)

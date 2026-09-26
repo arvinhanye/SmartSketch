@@ -1,4 +1,4 @@
-"""C07 资料上传与列表的业务规则。
+"""C07 资料上传与列表的业务规则；ADR-021 删除未产生图谱贡献的资料。
 
 上传只做三件事：经 C05 ``FileStorage`` 校验并落盘，经 C06 在一个事务里建资料与 queued
 任务，然后返回；解析由 worker 异步进行，请求里不解析。落盘之后的任何失败都删除新落盘的
@@ -14,7 +14,13 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from app.config import Settings
-from app.repositories.materials import MaterialRecord, list_materials
+from app.repositories.materials import (
+    MaterialDeleted,
+    MaterialNotDeletable,
+    MaterialRecord,
+    delete_material,
+    list_materials,
+)
 from app.repositories.tasks import create_material_task
 from app.services.file_storage import FileStorage, FileStorageError, StorageWriteError
 
@@ -77,3 +83,19 @@ def upload_material(
 def list_course_materials(settings: Settings, course_id: str) -> list[MaterialRecord]:
     """本课程资料，``parse_status`` 按 D-16 取最新创建任务的 stage。"""
     return list_materials(settings.SQLITE_URL, course_id=course_id)
+
+
+def delete_course_material(
+    settings: Settings, *, course_id: str, material_id: str
+) -> MaterialDeleted | MaterialNotDeletable | None:
+    """ADR-021：全部任务为 ``failed``/``cancelled``（且无待清理）时删除资料；``None`` 为不存在。
+
+    数据库删除提交之后才删存储文件；删文件失败只记日志，不回滚（孤儿文件由运维清理）。
+    """
+    outcome = delete_material(settings.SQLITE_URL, material_id, course_id=course_id)
+    if isinstance(outcome, MaterialDeleted):
+        try:
+            open_storage(settings).delete(outcome.storage_name)
+        except (FileStorageError, ValueError):
+            logger.error("material %s deleted but its stored file is left orphaned", material_id)
+    return outcome

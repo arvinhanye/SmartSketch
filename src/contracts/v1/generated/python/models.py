@@ -35,6 +35,7 @@ class ErrorCode(Enum):
     PUBLISH_IN_PROGRESS = 'PUBLISH_IN_PROGRESS'
     COURSE_BUSY = 'COURSE_BUSY'
     BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
+    DOCUMENT_NOT_DELETABLE = 'DOCUMENT_NOT_DELETABLE'
 
 
 class CycleItem(RootModel[str]):
@@ -147,6 +148,19 @@ class DocumentFormat(Enum):
     markdown = 'markdown'
 
 
+class UploadPolicy(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    max_bytes: Annotated[
+        int,
+        Field(
+            description='单文件上限（字节），与 413 `FILE_TOO_LARGE` 的 `details.limit_bytes` 同值。',
+            ge=1,
+        ),
+    ]
+
+
 class UploadAccepted(BaseModel):
     task_id: str
     document_id: str
@@ -243,6 +257,20 @@ class TaskCancelled(TaskBase):
 
 class FixedStageProgress(BaseModel):
     pass
+
+
+class Reason(Enum):
+    processing = 'processing'
+    contributed = 'contributed'
+    cleanup_pending = 'cleanup_pending'
+
+
+class DocumentNotDeletableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    stage: TaskStage
+    reason: Reason
 
 
 class TaskPersistingDetails(BaseModel):
@@ -1138,6 +1166,12 @@ class Document(BaseModel):
     format: DocumentFormat
     size_bytes: Optional[int] = None
     parse_status: TaskStage
+    task_id: Annotated[
+        Optional[str],
+        Field(
+            description='该资料最新创建任务的 ID，与 `parse_status` 同源（D-16、ADR-021）；没有任务时为 null。可用于续订 SSE 与取消。'
+        ),
+    ] = None
     uploaded_at: datetime
 
 
@@ -1151,6 +1185,11 @@ class TaskActive(TaskBase, FixedStageProgress):
 class TaskFailed(TaskBase):
     stage: Literal['failed'] = 'failed'
     error: Error
+
+
+class DocumentNotDeletableError(Error):
+    code: Literal['DOCUMENT_NOT_DELETABLE']
+    details: DocumentNotDeletableDetails
 
 
 class TaskNotCancellableError(Error):

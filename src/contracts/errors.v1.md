@@ -117,6 +117,7 @@
 | 码 | HTTP | 触发条件 | 前端处理 |
 | --- | --- | --- | --- |
 | `TASK_NOT_CANCELLABLE` | 409 | 任务正在入库（`persisting`）、已处理结束（`awaiting_review`）或已处于终态时调用取消；`details: {stage, reason}` 为闭集，见 `api.v1.yaml` 的 `TaskNotCancellableError` | 按 `details.stage` 刷新任务状态，隐藏取消按钮 |
+| `DOCUMENT_NOT_DELETABLE` | 409 | 删除资料时该资料仍有未结束的任务，或已有任务处理结束（`awaiting_review`/`completed`）而产生了图谱贡献（ADR-021）；`details: {stage, reason}`，`reason` 为 `processing`、`contributed` 或 `cleanup_pending`（失败任务的图谱清理未完成） | 按 `details.stage` 刷新资料状态，隐藏删除按钮 |
 | `PUBLISH_BLOCKED` | 409 | 发布前校验未通过，如存在未解决的环冲突 | `details.reasons` 列出阻塞项，引导至审核队列 |
 | `PUBLISH_IN_PROGRESS` | 409 | 同一课程已有发布或回滚进行中 | 等待当前操作结束后刷新版本列表 |
 | `COURSE_BUSY` | 409 | 获取课程写锁的有界等待超时 | `details.holder` 标明持锁操作；稍后重试 |

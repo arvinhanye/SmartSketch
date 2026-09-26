@@ -12,13 +12,13 @@
 | `extract_entities`（`prompts/extract_entities.yaml`） | 2 | 草稿 | `src/backend/app/services/ai/entities.py` `EntityExtractor`（E05） | v1 `d07afc2`；v2 `caa74e9` | #182（v1）；#236（v2，合并提交 `d5bda28`） |
 | `extract_entities_gleaning`（`prompts/extract_entities_gleaning.yaml`） | 2 | 草稿 | `src/backend/app/services/ai/gleaning.py` `EntityGleaner`（E06） | v1 `d07afc2`；v2 `1b383c1` | #182（v1）；#245（v2，合并提交 `59b2e5a`） |
 | `rewrite_query`（`prompts/rewrite_query.yaml`） | 2 | 草稿 | `src/backend/app/services/qa/rewrite.py` `QueryRewriter`（J03） | v1 `d07afc2`；v2 `b5bcdee` | #182（v1）；#242（v2，合并提交 `8985a16`） |
-| `extract_relations` | 1 | 占位 | 无（仅 `tests/backend/test_e01.py` 装载） | `d07afc2` | #182 |
+| `extract_relations`（`prompts/extract_relations.yaml`） | 2 | 草稿 | `src/backend/app/services/ai/relations.py` `RelationExtractor`（E11） | v1 `d07afc2`；v2 见 E11 PR | #182（v1）；E11 PR（v2，待合并） |
 | `judge_duplicate` | 1 | 占位 | 无（同上） | `d07afc2` | #182 |
 | `summarize_definition` | 1 | 占位 | 无（同上） | `d07afc2` | #182 |
 | `answer_with_context` | 1 | 占位 | 无（同上） | `d07afc2` | #182 |
 | `gen_study_material` | — | 未建：待 O01 准入 | 无；装载器报「未知用途」 | — | — |
 
-出处：版本、状态、变量与摘要见 `prompts/MANIFEST.md`「清单」表；提交历史取自 `git log --follow -- prompts/<用途>.yaml`；PR 号取自合并提交信息（`git log --merges`）；E01 合并 PR #182 见 `docs/tasks.md` E01 行（`dc20326`）。调用方由 `grep -rn PromptLibrary src/` 确定：业务代码中只有 `entities.py`、`gleaning.py`、`qa/rewrite.py` 三处取用提示词。
+出处：版本、状态、变量与摘要见 `prompts/MANIFEST.md`「清单」表；提交历史取自 `git log --follow -- prompts/<用途>.yaml`；PR 号取自合并提交信息（`git log --merges`）；E01 合并 PR #182 见 `docs/tasks.md` E01 行（`dc20326`）。调用方由 `grep -rn PromptLibrary src/` 确定：业务代码中只有 `entities.py`、`gleaning.py`、`qa/rewrite.py` 三处取用提示词（E11 之后增加 `relations.py`）。
 
 **使用程度说明**：上表「代码调用方」指服务层模块已按固定版本取用提示词并有测试覆盖。截至 `d624208`，这三个服务尚未接入任务编排（E12）或问答接口装配（J07），`src/` 中除各自模块与 `app/services/qa/__init__.py` 的导出外没有其他引用；它们目前只在 fake 模型测试中被调用，从未对真实模型发出过请求。
 
@@ -93,13 +93,29 @@
 | 修改依据（v1→v2） | 明确指代替换、无需改写或无法确定时原样输出、单行输出不带引用标记等规则，配合 ADR-015 决定 6 与 `specs/grounded-qa.md` H2 的历史清洗 | 提交 `b5bcdee`；PR #242；yaml 首行注释；`claude-j03.md` |
 | 评测证据 | `tests/backend/test_j03.py` 95 passed（J03 交接记为 94，TD-01 跟进新增 1 条 `test_policy_retries_stop_before_the_reserved_time`）；8 处反向篡改全部被抓到。**尚无真实模型评测（K03 未完成）**；J03 交接风险一节明确 fake 测试只验证流程与降级，不衡量改写效果 | `claude-j03.md`「实际命令与结果」「TD-01 跟进」「风险」 |
 
+### 3.4 `extract_relations` v2 — 小节级四类关系抽取
+
+| 项目 | 内容 | 出处 |
+| --- | --- | --- |
+| 版本 / 摘要 | 2 / `be9c788194869a7421e3058dc73923608697995bb50e662de6a60d1b6cc963d6` | MANIFEST；`prompts/extract_relations.yaml` |
+| 前一版本 | 1（E01 占位）/ `0f70d551a4965794410208078505a064df8a8fc945bf1888618a42ae7acccf00` | `git show d07afc2:prompts/MANIFEST.md` |
+| 状态 | 草稿 | MANIFEST |
+| 用途 | 两阶段抽取的第二阶段：在同一小节已规范化的实体表内判断四类关系 | yaml `purpose`；`docs/architecture-review-2026-09-22.md`「两阶段抽取」 |
+| 调用方 | `RelationExtractor`，常量 `RELATION_PROMPT_PURPOSE = "extract_relations"`、`RELATION_PROMPT_VERSION = 2` | `src/backend/app/services/ai/relations.py` |
+| 输入变量 | `entity_table`：`[{"id","name","type"}]` JSON，每行一项；`source_chunks`：「[块 ID]\n块文本」段落，段间空行 | `relations.py` `_render_entities`、`_render_chunks` |
+| 调用参数 | 单条 user 消息；`response_format="json"`；`max_output_tokens` 由构造参数声明 | `relations.py` `_request()` |
+| 输出格式 | `{"relations": [{"from_id","to_id","type","evidence","confidence"}]}`；无关系时空数组 | yaml 正文 |
+| 输出校验 | 修复一次规则同 E05；逐条：类型闭集（大写原样）、端点须在实体表内（悬空/他课 ID 丢弃）、自环删除、证据须为某来源块连续子串、`PREREQUISITE` 证据须含先修表述（`PREREQUISITE_CUES`）、`EXAMPLE_OF` 例子端颠倒丢弃、重复边保留首条（`RELATED_TO` 无向） | `relations.py` 模块文档第 5 步；`docs/handoffs/claude-e11.md` |
+| 防注入 | 正文声明资料中的指令只当作数据；块文本、实体名称、证据不进 `repr`，模块不写日志 | yaml；`test_e11.py::test_repr_does_not_leak_text_names_or_evidence` |
+| 修改依据（v1→v2） | 写明四类关系的方向定义与方向反例、先修表述示例、证据逐字摘录与长度上限、置信度含义、端点只用实体表 ID | yaml；`claude-e11.md` |
+| 评测证据 | `tests/backend/test_e11.py`（E02 fake，只验证流程与校验，不衡量抽取效果）；9 处反向篡改全部被抓到。**尚无真实模型评测（K02 未完成）** | `claude-e11.md`「验证」 |
+
 ## 4. 未被业务代码使用的提示词（占位）
 
 以下文件由 E01 写入最小可用正文，只保证装载与调用链可测，**不代表提示词效果，也不是「已使用的提示词」**（MANIFEST「状态」说明；`docs/handoffs/claude-e01.md`「未验证项与风险」第 1 条）。它们只在 `tests/backend/test_e01.py` 中被装载和渲染。
 
 | 用途 | 版本 / 摘要 | 变量 | 负责任务 | 已写入的约束 |
 | --- | --- | --- | --- | --- |
-| `extract_relations` | 1 / `0f70d551a4965794410208078505a064df8a8fc945bf1888618a42ae7acccf00` | `entity_table`、`source_chunks` | E11 | 关系类型限 `CONTAINS`/`PREREQUISITE`/`RELATED_TO`/`EXAMPLE_OF`；共现不算前置；注入声明；JSON 输出 |
 | `judge_duplicate` | 1 / `65e5f1c05e1fc811f4b92f68805625782ec93f8bdbb9f7adc93565d3c039cc6c` | `name_a`、`definition_a`、`name_b`、`definition_b` | E10 | 只依据名称与定义判断；注入声明；输出 `{"same","reason"}` |
 | `summarize_definition` | 1 / `6cea845cd8dd36247201f2799b75978468cd55c8ceb1092494e1e52c6c54cc7d` | `name`、`definitions` | E10 | 只用给出原文，不补资料外知识；注入声明 |
 | `answer_with_context` | 1 / `3deb3eb06ce8f3dabdf282e4445359c36522d70b918f9938996c604d3583bcba` | `context`、`question` | J05 | 哨兵 `<<INSUFFICIENT_EVIDENCE>>`（ADR-015 决定 3）、每句以 `[n]` 结尾（决定 2、修订 1 决定 9）、无 `history` 变量（决定 6）；由 `test_e01.py::test_answer_prompt_carries_sentinel_and_citation_contract` 守住 |

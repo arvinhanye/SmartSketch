@@ -36,7 +36,7 @@
 | `WEB_ORIGIN` | URL | `http://localhost:5173` | 允许的前端来源（CORS） | 已约定 |
 | `SQLITE_URL` | 字符串，`sqlite:///` 开头；不得为内存库 | `sqlite:///./storage/smartsketch.sqlite3` | SQLite 连接串，不含凭据；相对路径按进程工作目录解析，API/worker 须指向同一文件 | 已约定 |
 | `STORAGE_DIR` | 字符串，非空白 | `./storage` | 原始课程资料落盘根目录，C06/C07 作为 `FileStorage` 的 `root` 传入；相对路径按进程工作目录解析，API/worker 须指向同一目录；`storage/` 已被 `.gitignore` 忽略，目录内是真实资料，不得提交；须支持硬链接（C05 发布方式），网络盘或 exFAT 会报 `STORAGE_UNAVAILABLE` | 已约定（沿用 740adb，D-11） |
-| `UPLOAD_MAX_BYTES` | 整数 ≥ 1 | `52428800` | 上传单文件上限（字节，50 MiB），C06/C07 作为 `FileStorage` 的 `max_bytes` 传入；超过即 413 `FILE_TOO_LARGE`，`details.limit_bytes` 为该值 | 已签收（D-11） |
+| `UPLOAD_MAX_BYTES` | 整数 ≥ 1 | `52428800` | 上传单文件上限（字节，50 MiB），C06/C07 作为 `FileStorage` 的 `max_bytes` 传入；超过即 413 `FILE_TOO_LARGE`，`details.limit_bytes` 为该值；前端经 `getUploadPolicy` 读取同一值做本地校验（ADR-022） | 已签收（D-11） |
 | `NEO4J_URI` | URL，`bolt://` 或 `neo4j://` 开头 | `bolt://localhost:7687` | Neo4j 地址 | 已约定 |
 | `NEO4J_USER` | 字符串 | `neo4j` | Neo4j 用户 | 已约定 |
 | `NEO4J_PASSWORD` | 密钥 | `change-me-locally` | Neo4j 密码 | 本机填写 |
