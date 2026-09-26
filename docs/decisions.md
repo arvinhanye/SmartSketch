@@ -1243,3 +1243,18 @@
 - **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
 - **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-051：H06 知识点详情与来源浏览的展示约定
+
+- **日期**：2026-09-26
+- **背景**：H06 要把画布点击的知识点 ID（H04 `nodeClick`）变成定义、关系与原文来源的详情抽屉。契约 `SourceRef` 要求页码或章节至少其一（ADR-003），但前端仍可能收到不合契约或无法定位的来源；已发布版本的来源不带原文片段（ADR-033 后果）；`SourceRef` 只有 `document_id` 没有资料名；目前也没有原文阅读器。快速切换节点时多个详情请求会并发返回。
+- **决定**：
+  1. 新增 `api/knowledgeDetail.ts` 只封装 `getKnowledgePoint`，经 `KNOWLEDGE_DETAIL_API_KEY` 注入；未注入时组件用 `HTTP_CLIENT_KEY` 的会话客户端构造，不改 `main.ts`。前端不传版本，草稿/发布由后端按身份决定（ADR-030）。
+  2. 来源只展示可定位的：`document_id`、`chunk_id` 非空，且页码为正整数或章节路径非空；无效页码不显示但有效章节仍保留。不满足的丢弃并提示「另有 N 条未显示」；全部无法定位时明确提示，不给定位按钮。不补页码、章节或原文；资料名由页面经 `documentNames` 传入，没有时显示「资料 <document_id>」。
+  3. 点击来源不在组件内打开原文，而是发出 `locateSource({ documentId, chunkId, page?, sectionPath? })` 并标记当前来源（`aria-pressed`）；原文阅读器接线留给页面任务（H11）。点击关联知识点发出 `selectKnowledgePoint`，由页面改选中并联动画布。
+  4. 迟到请求隔离：每次选择递增序号并中止上一次请求，同时绑定课程作用域（`useCourseStore().beginRequest()`）；只有序号与作用域都仍有效时写入。响应的 `id`/`course_id` 与请求不符按数据异常处理，不展示。课程变了而选择没变时回到空态。
+  5. 所有服务端文本以插值渲染，不用 `v-html`；原文片段按名称与别名做字面量切分高亮（`<mark>`），不拼 HTML、不解释正则。
+  6. 错误只给固定文案：`NOT_FOUND`、`GRAPH_NOT_PUBLISHED` 不可重试；网络/超时/5xx/数据异常可重试；`COURSE_FORBIDDEN` 发出 `courseForbidden` 交页面处理，组件不清课程上下文。
+- **后果**：详情组件可独立挂到任何图谱页；资料名、原文定位跳转与画布联动都由页面负责。学生看已发布版本时来源只有位置没有片段，这是后端既定行为，不是前端缺陷。
+- **回滚**：删除 `src/frontend/src/api/knowledgeDetail.ts`、`components/KnowledgeDetail.vue`、`composables/useKnowledgeDetail.ts`、`tests/frontend/h06.test.ts` 与本 ADR；无依赖、契约或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
