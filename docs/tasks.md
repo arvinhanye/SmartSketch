@@ -1127,6 +1127,15 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收：从未发布返回 404 `GRAPH_NOT_PUBLISHED`（带 `version` 亦然，进行中或失败的尝试不算发布）；解析结果不可变，请求内提交 v2 不混读，下一次解析读到 v2（PUB-13）；`?version=1` 在指针指向 v2 时可读，不存在、他课、非正数版本号 404 `NOT_FOUND`（PUB-14 解析部分）；回滚得到新版本号与源版本修订；同一结果提供图谱作用域、`graph_version` 与问答修订过滤；指针或已提交版本损坏报 `INTERNAL_ERROR`，不回退、不缓存。
 - G07 待决：F07 `resolve_target`、推荐与问答服务尚未接入解析器（F07 改用后即可读历史版本，完成 PUB-14）；修订列表缓存上限 256 为占位值。
 
+## 2026-09-26 H04 G6 画布生命周期（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H04 | DONE（待 PR 审查/合并） | 实现 G6 生命周期组件 | ArvinHan（Claude） | `claude/project-thread-3eixq2` / `main@95d5c9a` | `src/frontend/src/graph/lifecycle.ts`、`src/frontend/src/components/GraphCanvas.vue`、`tests/frontend/h04.test.ts`；另含 `src/frontend/package.json`/`package-lock.json`（新增 `@antv/g6`） | `h04.test.ts` 27 passed；16 处反向篡改均检出；前端全量 312 passed；type-check、build、`verify.sh` exit 0；Chromium 冒烟通过；`docs/handoffs/claude-h04.md`；ADR-040 |
+
+- 验收：挂载按容器尺寸建图，尺寸为 0 时推迟；更新走 `setData` + `render`，渲染中连续更新只画最后一次；resize 下一帧合并，`setSize` 后适应视口，隐藏（尺寸 0）与未变不动；销毁后图、观察器、帧、window 监听归零，迟到的建图与渲染不生效；路由来回切换 20 次无泄漏；节点点击回传知识点 ID；加载、空图、失败（可重试）状态与画布无障碍标签。
+- H04 待决：H03 的边颜色仍为占位；`rejected`/`low_confidence` 的样式与过滤仍留给 H05；画布本身不可键盘操作，键盘可达由 H11 卡片视图承担。
+
 ## 2026-09-26 F14 离线重新向量化（Claude）
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
