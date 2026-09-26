@@ -1,4 +1,4 @@
-"""G08：发布时补齐文本块向量（ADR-047；specs/teacher-review-publish.md V5 P8/P9、V8「向量检索」）。
+"""G08：发布时补齐文本块向量（ADR-066；specs/teacher-review-publish.md V5 P8/P9、V8「向量检索」）。
 
 文本块不可变、各版本共享（ADR-012 修订 1），向量属于 ``(course_id, chunk_id)`` 的 ``Chunk`` 节点。
 抽取阶段（F04）只为被知识点引用的块建节点，不写向量；J01 检索却要覆盖版本内的全部文本块。

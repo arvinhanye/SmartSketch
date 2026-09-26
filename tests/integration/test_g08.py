@@ -2,7 +2,7 @@
 
 Acceptance: after a publish, every chunk of every revision in the version has a ``Chunk`` node with a
 current-space vector, so J01 can find it; chunks already indexed are not embedded again; revisions
-outside the version are left alone; a failure keeps the old pointer (ADR-047, V5 P8/P9).
+outside the version are left alone; a failure keeps the old pointer (ADR-066, V5 P8/P9).
 """
 
 from __future__ import annotations

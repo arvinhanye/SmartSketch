@@ -13,7 +13,7 @@
 | `src/backend/app/services/versions/publish.py`（扩围） | P8 写副本前调用 `index_chunks`，P9 调用 `verify_chunks` |
 | `tests/integration/test_g08.py` | 10 个用例，连真实 Neo4j 与迁移后的 SQLite（夹具取自 `test_g04.py`） |
 | `specs/teacher-review-publish.md`、`docs/architecture.md`（扩围） | P8、P9、V8 与向量版本各一句 |
-| ADR-047、`docs/tasks.md` | 决定与看板 |
+| ADR-066、`docs/tasks.md` | 决定与看板 |
 
 ## 验收对照
 
@@ -49,7 +49,7 @@
 ## 风险
 
 - 首次发布要为课程全部文本块算一次向量，耗时与模型调用量随资料量增长；已有块只算一次。
-- 本任务之前提交的版本没有文本块向量，回滚到它们时检索结果不全；重新发布一次即可补齐。
+- 本任务之前提交的版本没有文本块向量，回滚到它们时检索结果不全；**「重新发布一次即可补齐」已被独立审查证伪**（草稿未变时 P7 幂等路径在 P8 之前返回），补齐需按修订列表的独立入口。
 - CI 只跑 `tests/backend`，本任务用例在 `tests/integration`，依赖本地 Neo4j。
 
 ## 下一步 / 待决

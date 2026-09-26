@@ -206,7 +206,7 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | P5 | 释放课程写锁 | SQLite | 释放失败无妨，锁到期自动失效 |
 | P6 | 按 V3 校验 | 内存 | 409 `PUBLISH_BLOCKED`，尝试行 `failed` |
 | P7 | 生成快照与摘要。**摘要等于当前发布版摘要，且当前发布版的 `embedding_space` 等于当前向量空间** → 幂等路径（见下）；摘要相等而空间不等说明 V12 的不变式被破坏，5xx 并告警，不走幂等；否则写入尝试行的 `snapshot_json`、`digest`、`draft_revision=r`、`task_watermark=w`、统计与 `embedding_space` | SQLite | 写失败 → 尝试行 `failed`（写不进去则由清扫收尾），5xx |
-| P8 | 物化：在**一个 Neo4j 写事务**内按快照与内存向量创建 `(course_id, version_id)` 下的章节、知识点、关系与 `EVIDENCE` 边。之前先补齐快照修订列表内**全部文本块**的 `Chunk` 节点与当前空间向量，只为缺向量的块调用模型；这些节点跨版本共享、可重复写入，C1 不删除（G08，ADR-047） | Neo4j | C1 |
+| P8 | 物化：在**一个 Neo4j 写事务**内按快照与内存向量创建 `(course_id, version_id)` 下的章节、知识点、关系与 `EVIDENCE` 边。之前先补齐快照修订列表内**全部文本块**的 `Chunk` 节点与当前空间向量，只为缺向量的块调用模型；这些节点跨版本共享、可重复写入，C1 不删除（G08，ADR-066） | Neo4j | C1 |
 | P9 | 核对：读回 `(course_id, version_id)` 复算摘要，必须等于 P7；向量数 = 知识点数，且全部属于当前向量空间（V12），维度等于该空间维度；快照修订列表内每个文本块都有 `Chunk` 节点、`revision_id` 与当前空间向量（G08） | Neo4j | C1 |
 | P10 | 尝试行 `state=materialized` | SQLite | C1 |
 | P11 | **提交点**，一个 SQLite 事务（见下） | SQLite | C1 |
