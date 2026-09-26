@@ -1000,7 +1000,7 @@
 - **回滚**：撤销 `graph_relations.py`、`services/graph/relations.py`、`write_transaction` 与测试；守卫约束可 `DROP CONSTRAINT draft_write_guard_scope`，守卫节点可 `MATCH (g:DraftWriteGuard) DELETE g`，不影响知识点与关系。
 - **签收**：待 ArvinHan 审阅（守卫节点与属性编码由 Claude 选定并在交接中报告）。
 
-## ADR-028：F13 直通融合、持久化单事务、课程写锁与 T6 提交序号
+## ADR-029：F13 直通融合、持久化单事务、课程写锁与 T6 提交序号
 
 - **日期**：2026-09-26
 - **背景**：F13 要把 E12 的候选写进草稿并完成 T6，但 `merging` 阶段没有任务承接；完整融合（E08～E10）依赖向量与 D-08 阈值，都未就绪。§8.5 的 `course_locks` 与 §3 的 T6 提交序号也还没有迁移。节点与关系的 `draft`/`low_confidence` 分界属于 D-08，同样未签收。F02 只有「一条查询一个事务」，满足不了 §8.4 的「撤销旧贡献 + 写入」单事务。

@@ -1,4 +1,4 @@
-"""F13：``merging``（直通）与 ``persisting`` 阶段（specs/task-processing.md §3、§8.4、§8.5；ADR-009、ADR-028）。
+"""F13：``merging``（直通）与 ``persisting`` 阶段（specs/task-processing.md §3、§8.4、§8.5；ADR-009、ADR-029）。
 
 ``merging``（直通，ArvinHan 2026-09-26 选定）：不做跨任务融合（E08～E10 与 D-08 阈值未接入），
 只在阶段边界执行 C08 ``stage_done``：取消标志为真 → T8，否则 T5 进入 ``persisting``（最后一个取消点）。

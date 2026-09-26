@@ -18,7 +18,7 @@
 | `task_leases.py`（扩） | 回收或释放时 `persisting` 耗尽 → 置 `cleanup_pending` |
 | `tasks.py`（扩） | `read_effective_task_ids`（V） |
 | `tests/integration/test_f13.py` | 17 个无服务器用例 + 10 个真实 Neo4j 用例 |
-| ADR-028、`specs/task-processing.md` §8.4 一段、`docs/tasks.md` | 决定与看板 |
+| ADR-029、`specs/task-processing.md` §8.4 一段、`docs/tasks.md` | 决定与看板 |
 
 ## 行为要点
 
@@ -66,7 +66,7 @@ CI 只跑 `tests/backend`，本文件（含无服务器用例）与 F03/F04/F06 
 3. **等锁超时消耗尝试次数**：发布长时间持锁时，任务可能因多次等锁超时而耗尽尝试；发布只在建快照期间持锁（V4），风险低。
 4. **快照与 SSE**：C11 的 `chunks_done`/`failed_chunks` 仍未接（E12 待决 1）。
 5. **生产装配**：`run_pipeline_once` 需要调用方传 `ExtractionToolkit` 与 `Neo4jRepository`，尚无常驻 worker 进程入口。
-6. **`draft_revision`**：T6 时递增（任务内容此刻变为可见，课程状态由 `published` 变 `revising`）；规格 V4 只写了教师编辑递增，这是 Claude 的补充，见 ADR-028。教师编辑的递增仍归 F08。
+6. **`draft_revision`**：T6 时递增（任务内容此刻变为可见，课程状态由 `published` 变 `revising`）；规格 V4 只写了教师编辑递增，这是 Claude 的补充，见 ADR-029。教师编辑的递增仍归 F08。
 
 ## 回滚
 

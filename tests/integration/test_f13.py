@@ -1,4 +1,4 @@
-"""F13：直通 ``merging`` 与 ``persisting`` 阶段（specs/task-processing.md §3、§8.4、§8.5；ADR-009、ADR-028）。
+"""F13：直通 ``merging`` 与 ``persisting`` 阶段（specs/task-processing.md §3、§8.4、§8.5；ADR-009、ADR-029）。
 
 验收：失败重跑幂等（LEASE-3、LEASE-21）；取消不标已完成（T8 只在 T5 之前，``persisting`` 不可取消）；
 部分块失败按 A03（E12 已判定，阈值内的任务照常写入成功块的内容）。另覆盖：ADR-009 降级（DAG-2～5、DAG-10）、

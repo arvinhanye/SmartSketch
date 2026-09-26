@@ -278,7 +278,7 @@ C08 实现 `(当前任务状态, 事件) → 新任务状态 | 拒绝`，不做 
 
 > **`parsing` 行已被 ADR-012 修订 1（A04-R01，2026-09-23 签收）修订**：原公式「文档 ID + 解析器版本 + 块序号」不含内容，同一资料换内容再处理会原地覆盖已发布版本引用的原文。现改为按资料修订生成，文本块一经写入不可变。见 `specs/teacher-review-publish.md` V2。
 
-> **F13 落实（ADR-028，2026-09-26）**：`merging` 暂为直通（只做 T5/T8，不做跨资料融合）；课程写锁表 `course_locks` 与 T6 提交序号 `processing_tasks.t6_seq` 由迁移 009 创建；`persisting` 的任何 T9 都置 `cleanup_pending`，清理成功后清除。
+> **F13 落实（ADR-029，2026-09-26）**：`merging` 暂为直通（只做 T5/T8，不做跨资料融合）；课程写锁表 `course_locks` 与 T6 提交序号 `processing_tasks.t6_seq` 由迁移 009 创建；`persisting` 的任何 T9 都置 `cleanup_pending`，清理成功后清除。
 
 **`persisting`**（落实 I6，F13 实现；ADR-011 修订 1 修订第 1、3、4 条并新增「草稿可见性」）：
 
