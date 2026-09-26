@@ -992,3 +992,11 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | TD-02 | DONE（待 PR 审查/合并） | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | ArvinHan（Claude 子代理） | `claude/td02-task-repo` / 本认领提交 | `src/backend/app/repositories/tasks.py`、`src/backend/app/services/task_cancel.py`、`src/backend/app/services/task_events.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_td02.py`、`docs/handoffs/claude-td-02.md` | `test_td02.py` 14 passed；C10/C11/D11 搬迁前后均 121 passed（断言未改）；后端全量 2535 passed；`verify.sh` 通过；交接 `docs/handoffs/claude-td-02.md` |
 
 - TD-02 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL；C10/C11/D11 现有测试不改断言即通过。
+
+## 2026-09-26 图谱构建主线：E10 认领（Codex）
+
+| 原子 ID | 状态 | 负责人 | 分支 / base | 范围与文件所有权 | 验收与证据 |
+| --- | --- | --- | --- | --- | --- |
+| E10 | DESIGN（待设计规格签收） | Codex | `codex/e10-fusion-design` / `main@5072a48` | `docs/superpowers/specs/2026-09-26-e10-fusion-judge-design.md`；实施阶段拟改 `src/backend/app/services/fusion/judge.py`、`prompts/judge_duplicate.yaml`、`prompts/summarize_definition.yaml`、`prompts/MANIFEST.md`、`tests/backend/test_e10.py`、相关规格与交接。此阶段不改产品代码 | 设计已确认：E10 不内置 D-08 阈值，只裁决调用方给定的候选对；坏输出、非同义或预算拒绝保留独立并送审。待书面规格签收与实施计划后，运行 `python3 -m pytest tests/backend/test_e10.py -q`、相关回归、`./scripts/verify.sh`、`git diff --check`。 |
+
+- **输入**：同课候选对、两侧名称/定义与可定位证据；**输出**：带理由、来源引用、模型/提示词元数据的归并提案或独立待审核结果；**依赖**：E09、E04、E01、E05。**风险**：D-08 阈值未签收；E08/E09 合流与稳定候选 ID 由 E12 定；模型引用能验证来源存在，不能自动证明归并语义正确。后两项及缓存失效规则见 E10 设计规格。
