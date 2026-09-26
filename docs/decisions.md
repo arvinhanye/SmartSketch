@@ -1117,6 +1117,22 @@
 - **回滚**：撤销 `services/versions/publish.py`，以及 `repositories/versions.py` 末尾的 `DraftState`/`read_draft_state`/`complete_published_tasks`、`course_locks.current_holder`、F07 节点投影中的 `.merged_from`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
 
+## ADR-035：F08 教师编辑知识点、人工编辑锁与新建必带来源
+
+- **日期**：2026-09-26
+- **背景**：契约已有 `updateKnowledgePoint`（节点级 `expected_revision`）与 `createKnowledgePoint`，但 `specs/teacher-review-publish.md`「待细化」里的加锁粒度、解锁方式、并发冲突策略，以及「manual 条目是否必须有来源」都没定；契约没有解锁接口，也没有「修订号过期」的错误码。ADR-030 的后果要求 F08 保证教师新建的知识点至少带一条来源，否则详情接口会 500。F04 已按 ArvinHan 2026-09-26 的决定让自动写入完全跳过加锁节点（ADR-024 决定 4）。
+- **决定**：
+  1. **写入顺序（V4）**：取课程写锁（持有方 `edit`，租约与心跳同 `course_locks`，最多等 `COURSE_LOCK_WAIT_SECONDS`，超时 409 `COURSE_BUSY`，`details.holder` 为当时的持有方）→ 读一次 V → 读目标节点并校验 → `draft_revision + 1` → 一个 Neo4j 写事务（锁守卫节点 + 以 `revision = expected_revision` 为条件的更新）→ 释放锁。校验失败（404、409、422）不写任何数据，也不加 `draft_revision`。
+  2. **并发冲突**：`expected_revision` 与当前修订号不等 → 409 `REVISION_CONFLICT`（新增错误码），不覆盖；`details` 给出 `kp_id`、`expected_revision`、`current_revision` 与当前内容 `current`（`name`、`aliases`、`type`、`definition`、`status`、`locked`，以及存在时的 `importance`、`difficulty`），后写者据此知道自己会覆盖什么（验收 10）。
+  3. **加锁粒度**：锁整个节点（全部字段与来源），不连带关系；关系的保护沿用「`manual` 或 `approved` 的边自动流程不动」。任何成功的教师修改都置 `locked = true`、`contrib_manual = true`、修订号加 1，即使值没有变化；`status` 改动（如审核通过）同样加锁。
+  4. **解锁**：单独的接口 `POST /api/v1/courses/{cid}/kp/{kid}/unlock`（`unlockKnowledgePoint`），须带 `expected_revision`；修改接口不接受 `locked` 字段（422 `extra_forbidden`），因此不能顺带解锁。没有过期策略。权限为课程教师成员：课程内没有比教师更高的角色，`courses.teacher_id` 不参与授权（`specs/identity-access.md`），所以「单独权限」落实为单独的接口与动作。解锁置 `locked = false`、修订号加 1、`draft_revision + 1`；`contrib_manual` 不回落。节点本就未加锁时 200 原样返回，不写入。
+  5. **新建必带来源**：`KnowledgePointCreate` 新增必填 `sources`（至少一条 `KnowledgePointSourceInput{chunk_id, evidence_start?, evidence_end?}`）。块须属于本课程，且其资料修订关联到 V 中的任务（内容已提交，发布时不会是 `invalid_source_ref`）；证据区间两端同给或同省，省略取整个块，须满足 `0 ≤ start < end ≤ 块长`。不满足 → 422 `VALIDATION_ERROR`，`details.fields` 指向出错的来源（`source_not_available`、`evidence_out_of_range`、`missing`）。`chapter_id` 须是可见章节，否则 422 `not_found`。新节点 `kp_id = kp_<uuid4 十六进制>`、`source = manual`、`locked = true`、`status = approved`、`confidence = 1.0`、`revision = 1`、`contrib_manual = true`，来源关联不带 `task_id`（F07 按人工来源读取）。
+  6. **自动流程守锁**：F04 跳过加锁节点，不改内容、不并入贡献、不加来源；解锁后自动写入恢复更新（验收 5、11）。`NODE_LOCKED` 仍只留给后台流程。
+  7. 审计日志不在本任务，归 F12。
+- **后果**：F07 的「人工新建且无来源的知识点详情 500」不再能由 API 产生。前端要为新建知识点提供选择来源块的交互（可从已有知识点的 `source_refs.chunk_id` 或问答引用中取）；尚无按资料列块的接口。编辑与解锁都算草稿写入，会使已发布课程变为 `revising`。人工节点没有向量，向量在发布物化时计算（G03），不影响草稿。
+- **回滚**：撤销 `api/graph_nodes.py`、`services/graph/edit_node.py`、`repositories/graph_edit.py`、`main.py` 与 `schemas/contracts.py` 各一处注册、契约改动（`sources`、`KnowledgePointSourceInput`、`KnowledgePointUnlock`、解锁路径、`REVISION_CONFLICT`）及生成物、前端两处错误码副本与测试；无 SQLite 迁移与 Neo4j DDL。已写入的人工节点可按 `source = 'manual'` 查出后由教师删除（F09）。
+- **签收**：ArvinHan，2026-09-26（含人工新建节点 `status = approved`、置信度 1.0，以及任何课程教师均可解锁）。
+
 ## ADR-040：H04 G6 画布生命周期
 
 - **日期**：2026-09-26
