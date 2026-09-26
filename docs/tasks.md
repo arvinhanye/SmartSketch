@@ -1030,6 +1030,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | K01 | DONE（部分：问答口径待 J06；D-01 已定为本章，ADR-026） | 建立自编标注集及评测口径 | ArvinHan（Claude 子代理） | `claude/project-thread-sp1d3a` / `main@6742f6a` | `evaluation/README.md`、`evaluation/fixtures/synthetic.json`、`docs/handoffs/claude-k01.md` | 自编「数据结构 第3章 栈与队列」3141 字，金标 45 个实体（五类齐全）、40 条关系（四类齐全），证据全部为原文子串、前置关系无环；夹具校验脚本 ALL PASS，4 份篡改副本均被拒；`docs/handoffs/claude-k01.md` |
 | K02 | DONE（真实模型判定未实测：待 D-01、D-02 与付费确认） | 实现抽取和融合离线评测 | ArvinHan（Claude 子代理 + 联调） | 同上 | `evaluation/evaluate_extraction.py`、`tests/backend/test_k02.py`、`evaluation/reports/extraction-accuracy.md`、`docs/handoffs/claude-k02.md` | 桩实现 46 failed → 46 passed；联调按 README 对齐 4 处，先 5 failed → `test_k02.py` 52 passed（含 K01 夹具用例）；假模型自检在 K01 标注集上跑通，两次输出 sha256 一致，数值全部过线仍判「不可用于判定（假模型）」；`docs/handoffs/claude-k02.md` |
 
+- 本机真实模型运行脚本 `evaluation/run_live_extraction.py`（`tests/backend/test_k02_run.py` 先 12 failed → 13 passed；假模型端到端：16 块、简化融合后 18 个实体、12 条关系，`score` exit 0 且判「不可用于判定（假模型）」；交接 `docs/handoffs/claude-k02-run.md`）。只做同名合并的简化融合，结果是初步数字，最终判定仍需 E12。
 - 联调对齐（以 `evaluation/README.md` 为准）：F1 在 precision 或 recall 为 null 时为 null；各指标只统计 `source = "ai"`；按 `judgments.seed` 重算的抽中项有缺判时写「判定不完整」，准确率只统计抽中项；实体数 < 20 直接「未达标」。
 - 待决：
   1. ~~D-01~~：已定为本次自编的「栈与队列」一章，`is_final_benchmark` 改为 `true`（ADR-026）。
