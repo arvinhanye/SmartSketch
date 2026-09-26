@@ -914,3 +914,27 @@ TD-01 带出的跟进项：
 - **D11（#239）**：worker 删除自拼的 `PDF_PARSER_VERSION`，改为引用 `pdf_headings.CLEANED_PARSER_VERSION`（取值逐字相同，块 ID 不变）；清洗只用默认阈值。 **已完成**（#239）。
 - **J03（#242）**：预写失败改用原问题已有测试覆盖；另绑定 E04 截止时间「链路截止 − 预留」并把 `CallDeadlineExceededError` 归为 `timeout`。**已完成**（#242）。
 - **J07（未开始）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
+
+## 2026-09-25 第七批并行（Claude）
+
+H13、F03、E06 的前置均已合入 main@`8985a16`（H13：C13、B15、B03、B04；F03：F02 #231、B11 #194；E06：E05 #236）。issue #173（H13）、#95（F03）、#86（E06）无人认领、无远端分支。已核对在途工作：C11 #241（`api/tasks.py`、`main.py`）、E08 #240（`services/fusion/`）待审查，与三项文件不重叠。本认领提交为三个分支共用的 base，各分支只改本节中自己那一张表的状态与证据列。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H13 | IN PROGRESS | 实现前端登录页与会话存储 | ArvinHan（Claude） | `claude/h13-login-session` / 本认领提交 | `src/frontend/src/views/LoginView.vue`、`src/frontend/src/stores/session.ts`、`src/frontend/src/api/auth.ts`、`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts`、`tests/frontend/h13.test.ts`、`docs/handoffs/claude-h13.md` | 待补 |
+
+- H13 验收：令牌与 `LoginResponse.user` 只存 `sessionStorage`（不存 localStorage/Cookie）；登录后按 `user.role` 进首页；401、429 分别明确提示；收到 401 清会话与课程上下文并回登录页（同时关闭审查遗留 B03-R01′、B04-R01）；口令/令牌不写日志；不解析 JWT 做授权。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F03 | IN PROGRESS | 建立图唯一约束和索引迁移 | ArvinHan（Claude 子代理） | `claude/f03-graph-constraints` / 本认领提交 | `src/backend/migrations/neo4j/001_constraints.cypher`、`src/backend/app/repositories/graph_migrations.py`、`tests/integration/test_f03.py`、`docs/handoffs/claude-f03.md` | 待补 |
+
+- F03 验收：同作用域 ID 唯一；版本不同可共存；迁移可重复执行；迁移失败有回滚/修复说明。验证：`python3 -m pytest tests/integration/test_f03.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E06 | IN PROGRESS | 实现补漏实体抽取 | ArvinHan（Claude 子代理） | `claude/e06-gleaning` / 本认领提交 | `src/backend/app/services/ai/gleaning.py`、`prompts/extract_entities_gleaning.yaml`、`prompts/MANIFEST.md`（一行）、`tests/backend/test_e06.py`、`docs/handoffs/claude-e06.md` | 待补 |
+
+- E06 验收：不开启时零调用；只加遗漏、不复制已有实体；预算和轮数有上限。验证：`python3 -m pytest tests/backend/test_e06.py -q`。
+
+- 合并约定：三个分支共用本认领提交；无 SQLite 迁移；F03 只新增 Neo4j 迁移文件与运行器。
