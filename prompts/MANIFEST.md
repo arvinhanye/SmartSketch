@@ -10,7 +10,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `extract_entities` | 2 | `chunk_text` | `evaluation/evaluate_extraction.py` | `3d7cfca562e1f3685e1def3915215d922dec2f94b72dc57037bc10903dd059e6` | E05 | 草稿 |
 | `extract_entities_gleaning` | 2 | `chunk_text`、`entities_json` | `evaluation/evaluate_extraction.py` | `61a0c8d0040e457d8310dc0d9e451769ee89e0b3c004fa73e8278042b3397c7e` | E06 | 草稿 |
-| `extract_relations` | 1 | `entity_table`、`source_chunks` | `evaluation/evaluate_extraction.py` | `0f70d551a4965794410208078505a064df8a8fc945bf1888618a42ae7acccf00` | E11 | 占位 |
+| `extract_relations` | 2 | `entity_table`、`source_chunks` | `evaluation/evaluate_extraction.py` | `be9c788194869a7421e3058dc73923608697995bb50e662de6a60d1b6cc963d6` | E11 | 草稿 |
 | `judge_duplicate` | 1 | `name_a`、`definition_a`、`name_b`、`definition_b` | `evaluation/evaluate_extraction.py` | `65e5f1c05e1fc811f4b92f68805625782ec93f8bdbb9f7adc93565d3c039cc6c` | E10 | 占位 |
 | `summarize_definition` | 1 | `name`、`definitions` | `evaluation/evaluate_extraction.py` | `6cea845cd8dd36247201f2799b75978468cd55c8ceb1092494e1e52c6c54cc7d` | E10 | 占位 |
 | `rewrite_query` | 2 | `history`、`question` | `evaluation/evaluate_qa.py` | `26c5779846c8a164ef25b9b68d5b6f764f26545b1dc9300ae292b93a1c3ac261` | J03 | 草稿 |
