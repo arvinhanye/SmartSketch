@@ -46,6 +46,8 @@ __all__ = [
     "heartbeat",
     "immediate",
     "list_attempts",
+    "list_course_ids",
+    "list_expired_attempts",
     "list_versions",
     "mark_materialized",
     "new_version_id",
@@ -511,3 +513,28 @@ def complete_published_tasks(database: sqlite3.Connection, course_id: str, task_
            WHERE course_id = ? AND stage = 'awaiting_review' AND coalesce(t6_seq, 0) <= ?""",
         (course_id, task_watermark),
     ).rowcount
+
+
+# ---------------------------------------------------------------- G05 清扫
+
+
+def list_expired_attempts(sqlite_url: str, course_id: str) -> list[VersionRecord]:
+    """V9 第 1 步：本课程租约已过期、仍为 ``preparing``/``materialized`` 的尝试。
+
+    过期后心跳（``expires_at >= unixepoch()``）与提交（``expires_at > unixepoch()``）都不再成立，
+    所以读出后到 C1 第 1 步之间它们不会复活。
+    """
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            f"""SELECT {_COLUMNS} FROM graph_versions
+                WHERE course_id = ? AND state IN ('preparing', 'materialized') AND expires_at < unixepoch()
+                ORDER BY created_at, version_id""",
+            (course_id,),
+        ).fetchall()
+    return [_record(r) for r in rows]
+
+
+def list_course_ids(sqlite_url: str) -> list[str]:
+    """清扫按课程逐个处理（V9）：全部课程 ID，升序。"""
+    with connect(sqlite_url) as database:
+        return [r[0] for r in database.execute("SELECT id FROM courses ORDER BY id")]

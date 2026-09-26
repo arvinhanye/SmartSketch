@@ -27,6 +27,7 @@ from app.repositories.sqlite import connect, migrate
 from app.services.ai.embeddings import EmbeddingAdapter
 from app.services.ai.fake import FakeEmbeddingClient
 from app.services.versions import publish as publishing
+from app.services.versions import reconcile
 from app.services.versions.materialize import VerificationError
 from app.services.versions.publish import (
     CourseBusy,
@@ -410,7 +411,7 @@ def test_undeletable_copy_is_marked_for_the_sweeper(env, monkeypatch):  # C1 ste
     def no_drop(*args, **kwargs):
         raise RuntimeError("neo4j down")
 
-    monkeypatch.setattr(publishing, "drop_version", no_drop)
+    monkeypatch.setattr(reconcile, "drop_version", no_drop)
     with pytest.raises(PublishFailed):
         run(env)
     attempt = last_attempt(env)

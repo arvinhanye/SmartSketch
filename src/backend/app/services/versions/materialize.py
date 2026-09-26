@@ -26,7 +26,9 @@ from app.services.versions.snapshot import Snapshot, canonical_bytes, digest_of
 __all__ = [
     "MaterializeError",
     "MaterializeResult",
+    "SourceCopyMissing",
     "VerificationError",
+    "copy_version",
     "drop_version",
     "embed_snapshot_nodes",
     "materialize",
@@ -51,6 +53,10 @@ class Embedder(Protocol):
 
 class MaterializeError(RuntimeError):
     """副本没有完整写入（来源块或端点缺失），事务已回滚。"""
+
+
+class SourceCopyMissing(MaterializeError):
+    """R5：回滚源版本在 Neo4j 中没有完整副本（V9 第 5 步的情形），不得重算向量。"""
 
 
 class VerificationError(RuntimeError):
@@ -92,10 +98,10 @@ def _scope(snapshot: Snapshot, version_id: str) -> GraphScope:
     return GraphScope(str(snapshot.data["course_id"]), version_id)
 
 
+# 按标签匹配走 (course_id, version_id) 索引，不做无标签全库扫描。
 _DELETE = """
-MATCH (n {course_id: $course_id, version_id: $version_id})
-WHERE n:KnowledgePoint OR n:Chapter
-DETACH DELETE n
+CALL () { MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $version_id}) DETACH DELETE k }
+CALL () { MATCH (c:Chapter {course_id: $course_id, version_id: $version_id}) DETACH DELETE c }
 """
 _CHAPTERS = """
 UNWIND $rows AS row
@@ -246,3 +252,59 @@ def drop_version(repo: Neo4jRepository, course_id: str, version_id: str) -> None
     if not isinstance(version_id, str) or not version_id.strip() or version_id == DRAFT:
         raise ValueError("a published version_id is required")
     repo.write(_DELETE, GraphScope(course_id, version_id))
+
+
+# ---------------------------------------------------------------- R5 回滚复制
+
+_COPY_CHAPTERS = """
+MATCH (c:Chapter {course_id: $course_id, version_id: $source})
+CREATE (n:Chapter) SET n = c {.*, version_id: $version_id}
+RETURN count(n) AS written
+"""
+_COPY_NODES = """
+MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $source})
+CREATE (n:KnowledgePoint) SET n = k {.*, version_id: $version_id}
+RETURN count(n) AS written
+"""
+_COPY_EVIDENCE = """
+MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $source})-[e:EVIDENCED_BY]->
+      (c:Chunk {course_id: $course_id})
+MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: k.kp_id})
+CREATE (n)-[:EVIDENCED_BY {chunk_id: e.chunk_id}]->(c)
+RETURN count(*) AS written
+"""
+
+
+def _copy_relations_query(kind: str) -> str:
+    return f"""
+MATCH (a:KnowledgePoint {{course_id: $course_id, version_id: $source}})
+      -[r:{kind} {{course_id: $course_id, version_id: $source}}]->
+      (b:KnowledgePoint {{course_id: $course_id, version_id: $source}})
+MATCH (x:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: a.kp_id}})
+MATCH (y:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: b.kp_id}})
+CREATE (x)-[s:{kind}]->(y) SET s = r {{.*, version_id: $version_id}}
+RETURN count(s) AS written
+"""
+
+
+def copy_version(repo: Neo4jRepository, snapshot: Snapshot, source_version_id: str, version_id: str) -> int:
+    """R5：一个写事务内把源版本副本（含向量）复制到 ``version_id``，先删后建；不调用向量模型。
+
+    源副本的知识点数必须等于快照知识点数，否则 ``SourceCopyMissing`` 并整体回滚。返回复制的知识点数。
+    """
+    scope = _scope(snapshot, version_id)
+    _scope(snapshot, source_version_id)
+    expected = len(snapshot.data["nodes"])
+
+    def work(tx: ScopedTransaction) -> int:
+        tx.run(_DELETE)
+        tx.run(_COPY_CHAPTERS, {"source": source_version_id})
+        [nodes] = tx.run(_COPY_NODES, {"source": source_version_id})
+        if nodes["written"] != expected:
+            raise SourceCopyMissing(f"source version has {nodes['written']} of {expected} knowledge points")
+        tx.run(_COPY_EVIDENCE, {"source": source_version_id})
+        for kind in RELATION_TYPES:
+            tx.run(_copy_relations_query(kind), {"source": source_version_id})
+        return expected
+
+    return repo.write_transaction(scope, work)

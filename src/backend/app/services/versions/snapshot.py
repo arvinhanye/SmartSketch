@@ -299,6 +299,11 @@ def build_snapshot(draft: DraftGraph) -> SnapshotBuild:
     all_node_ids = {n.kp_id for n in draft.nodes}
 
     nodes = sorted((_node_dict(n) for n in draft.nodes if n.status in PUBLISHABLE), key=lambda n: n["kp_id"])
+    # 章节引用悬空（草稿里没有这个可见章节）时按「未归章」发布，快照里不留断开的引用（ADR-036）。
+    chapter_ids = {c.chapter_id for c in draft.chapters}
+    for node in nodes:
+        if node["chapter_id"] is not None and node["chapter_id"] not in chapter_ids:
+            node["chapter_id"] = None
     kept = {n["kp_id"] for n in nodes}
     low_nodes = sum(1 for n in draft.nodes if n.status == "low_confidence")
 
@@ -368,7 +373,11 @@ def _chapters(chapters: Sequence[DraftChapter], wanted: set[str]) -> list[dict[s
         while current is not None and current in by_id and current not in chosen:
             chosen.add(current)
             current = by_id[current].parent_id
-    return [_chapter_dict(by_id[c]) for c in sorted(chosen)]
+    out = [_chapter_dict(by_id[c]) for c in sorted(chosen)]
+    for chapter in out:
+        if chapter["parent_id"] is not None and chapter["parent_id"] not in chosen:
+            chapter["parent_id"] = None  # 父章节不在草稿中：按顶层章节发布
+    return out
 
 
 # ---------------------------------------------------------------- 读回

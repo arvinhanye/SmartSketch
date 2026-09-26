@@ -36,7 +36,8 @@ from app.repositories.graph_read import GraphReader
 from app.repositories.neo4j import GraphScope, Neo4jRepository
 from app.repositories.versions import CommitRejected, PublishInProgress
 from app.services.graph.read import _relation_chunk_ids
-from app.services.versions.materialize import Embedder, drop_version, embed_snapshot_nodes, materialize, verify
+from app.services.versions.materialize import Embedder, embed_snapshot_nodes, materialize, verify
+from app.services.versions.reconcile import compensate, reclaim_expired
 from app.services.versions.snapshot import (
     DraftChapter,
     DraftEdge,
@@ -188,23 +189,12 @@ def _heartbeat(ctx: PublishContext, version_id: str) -> Iterator[None]:
 
 
 def _compensate(ctx: PublishContext, course_id: str, version_id: str, reason: str, *, touched_graph: bool) -> None:
-    """C1：先条件判失败，再删 Neo4j 副本；删不掉置 ``cleanup_pending``。自身失败留给清扫，不掩盖原错误。"""
+    """C1（G05 ``reconcile.compensate``）；自身失败只记日志，留给清扫，不掩盖原错误。"""
     try:
-        if not versions.fail_attempt(ctx.sqlite_url, version_id, reason):
-            return  # 已提交或已被清扫处理：不得删除 Neo4j 数据
+        compensate(ctx.sqlite_url, ctx.repo, course_id, version_id, reason, touched_graph=touched_graph)
     except Exception:
-        logger.exception("publish C1 could not mark attempt %s failed; sweeper will expire it", version_id)
-        return
-    if not touched_graph:
-        return
-    try:
-        drop_version(ctx.repo, course_id, version_id)
-    except Exception:
-        logger.warning("publish C1 could not drop Neo4j copy of %s; marking cleanup_pending", version_id)
-        try:
-            versions.set_cleanup_pending(ctx.sqlite_url, version_id, True)
-        except Exception:
-            logger.exception("publish C1 could not set cleanup_pending for %s", version_id)
+        logger.exception("publish C1 failed for attempt %s; the sweeper will finish it after the lease expires",
+                         version_id)
 
 
 # ---------------------------------------------------------------- 发布
@@ -213,6 +203,10 @@ def _compensate(ctx: PublishContext, course_id: str, version_id: str, reason: st
 def publish(ctx: PublishContext, course_id: str, *, created_by: str | None) -> PublishOutcome:
     """V5 P2～P12。调用方已完成 P1 鉴权。"""
     url = ctx.sqlite_url
+    try:  # 先回收本课程过期的尝试，崩溃留下的尝试不会让课程一直 409（ADR-036）
+        reclaim_expired(url, ctx.repo, course_id)
+    except Exception:
+        logger.exception("could not reclaim expired attempts for course %s before publishing", course_id)
     attempt = versions.begin_attempt(url, course_id, kind="publish", created_by=created_by,
                                      lease_seconds=ctx.lease_seconds)  # P2；冲突抛 PublishInProgress
     version_id = attempt.version_id
