@@ -16,7 +16,7 @@
 | `src/frontend/src/api/nodeEdit.ts`（**扩围**，新建） | `NODE_EDIT_API_KEY`、`createNodeEditApi`：`get`/`update`/`unlock`/`remove`（删除带 `expected_revision` 查询参数） |
 | `docs/decisions.md`、`docs/tasks.md`（**扩围**） | 末尾追加 ADR-062 与 H07 任务记录 |
 
-未改：契约、后端、`main.ts`、路由与页面。面板**未**接入页面；依赖图中没有任务负责教师图谱编辑页：H11 是学生端浏览页（不取草稿），H09 审核队列依赖 H07 可复用本面板，但画布 + 详情 + 节点/连边编辑（H07/H08）的教师页无归属，需新增任务。
+未改：契约、后端、`main.ts`、路由与页面。面板**未**接入页面；挂载页由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板。
 
 ## 行为要点（ADR-062）
 
@@ -54,11 +54,11 @@
 ## 待决
 
 1. ADR-062 签收。
-2. 新增「教师图谱编辑页」任务（或扩 H09 范围）以挂载 H07 面板与 H08 连边编辑；K05 教师主线 E2E 依赖 H08/H09，缺这一页时编辑路径无法端到端验证。
+2. 已按 ArvinHan 选择补登 H14 教师图谱编辑页（D-17），K05 增加对 H14 的依赖；H14 待认领。
 
 ## 下一步
 
-- 挂载页（待新增任务）：`<NodeEditor :kp-id="selected" @saved="…" @deleted="selected = null" @refresh-needed="重新加载草稿图谱" @close="selected = null" @course-forbidden="回课程列表" />`；如需统一注入，在 `main.ts` provide `NODE_EDIT_API_KEY: createNodeEditApi(http)`。
+- H14：`<NodeEditor :kp-id="selected" @saved="…" @deleted="selected = null" @refresh-needed="重新加载草稿图谱" @close="selected = null" @course-forbidden="回课程列表" />`；如需统一注入，在 `main.ts` provide `NODE_EDIT_API_KEY: createNodeEditApi(http)`。
 
 ## 回滚
 
