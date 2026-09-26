@@ -274,6 +274,18 @@ describe('H11 学生图谱页：任何入口不取草稿', () => {
     expect(wrapper.find('[data-test="knowledge-cards"]').exists()).toBe(false)
   })
 
+  it('课程详情本身返回 GRAPH_NOT_PUBLISHED：显示未发布，不请求图谱与详情', async () => {
+    const f = fakes({ course: async () => Promise.reject(apiError(404, 'GRAPH_NOT_PUBLISHED')) })
+    const { wrapper } = await mountPage(f)
+    expect(wrapper.find('[data-test="sg-unpublished"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="sg-unpublished"]').text()).toContain('尚未发布')
+    expect(wrapper.find('[data-test="sg-error"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('服务端原文')
+    expect(f.courses.get).toHaveBeenCalledTimes(1)
+    expect(f.graph.getPublished).not.toHaveBeenCalled()
+    expect(f.detail.get).not.toHaveBeenCalled()
+  })
+
   it('读图返回 GRAPH_NOT_PUBLISHED：显示未发布，不回显服务端原文', async () => {
     const f = fakes({ graph: async () => Promise.reject(apiError(404, 'GRAPH_NOT_PUBLISHED')) })
     const { wrapper } = await mountPage(f)
