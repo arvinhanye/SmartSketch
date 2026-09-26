@@ -1083,3 +1083,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - G02 验收：同一尝试（幂等键 `version_id`）至多成为一个版本；版本号按课程连续、失败不占号，`(course_id, version)` 唯一；失败行带原因永久可查且不进版本列表；已提交版本不可删改。G02 待决：清扫过期尝试归 G05；租约时长由调用方传入（G04 读 `PUBLISH_LEASE_SECONDS`）。
 - G03 验收：物化只写 `(course_id, 新 version_id)`，旧版本副本与发布指针不变，学生照读旧版；向量空间或维度不符、缺向量在连库前失败，缺来源块整体回滚；重试同一版本先删后建、不重复；P9 读回复算摘要一致。G03 已决：已发布知识点对外状态恒为 `approved`、来源类别恒为 `manual`（ArvinHan 2026-09-26，ADR-033 第 5 条）。G03 待决：已发布详情的来源没有原文片段。
 - G04 验收：先按 V3 校验（成环、来源无效、空图）再切指针；P7～P11 任一失败、提交指针被移动、写锁超时都保留旧指针且不留副本；版本号无空洞；同课程并发发布或发布与回滚并发返回 `PUBLISH_IN_PROGRESS`；内容未变走幂等路径不占号不写 Neo4j；T7 只完成水位以内的任务，锁释放后的编辑不进本次快照（PUB-1/2/4/5/6/12/21/22/23/35）。G04 待决：`POST /publish` 路由未分配任务（建议并入 G06 的 `api/versions.py`）；G04 依赖 F12 仅因谱系，发布不写审计日志（ADR-034 第 7 条）；过期尝试的清扫归 G05。
+
+## 2026-09-26 H03 图谱适配（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H03 | DONE（待 PR 审查/合并） | 实现契约到 G6 数据适配 | ArvinHan（Claude） | `claude/project-thread-m4mk7n` / `main@ebb0f42` | `src/frontend/src/graph/adapter.ts`、`tests/frontend/h03.test.ts` | `h03.test.ts` 22 passed；11 处反向篡改均检出；前端全量 285 passed；type-check、build、`verify.sh` exit 0；`docs/handoffs/claude-h03.md` |
+
+- 验收：四类边样式两两可区分且带中文图例名；`source/target` 取 `from_id/to_id`，仅 `RELATED_TO` 无箭头；缺端点、外课、重复 ID 的元素不进画布并逐条报告；空图得空数组；元素 ID 为 `kp:`/`rel:` 前缀且按码点排序，输入乱序输出逐字节相同；深冻结输入照常转换，输出不引用输入对象。
+- H03 待决：边颜色为占位方案未经设计签收；`rejected`/`low_confidence` 的样式与过滤、`issues` 是否提示给教师，留给 H04/H05。
