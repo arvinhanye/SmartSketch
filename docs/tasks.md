@@ -1167,6 +1167,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：worker 按 A06 §8.1 运行（同机、同 SQLite 卷、`WORKER_PROCESSES` 个进程、启动门禁与 API 相同）；API/worker/web 均有健康检查；密钥只经 `env_file` 进后端三服务；前端 Dockerfile 无构建参数、只 COPY `src/frontend/`，`.dockerignore` 排除 `.env*`。
 - K08 待决：镜像真实构建与整套启动未在本机跑（无 Docker 守护进程），须在有 Docker 的机器上跑 `docker compose --profile app up -d --build` 复验；worker 优雅停止不释放在途任务（ADR-039 第 2 条）；`maintenance` 挂点是否接 G05 清扫留给后续任务；镜像基底未钉摘要。
+- K08 复验（Claude，2026-09-26，`main@7261514`，`docs/handoffs/claude-k08-recheck.md`）：**真实构建与整套启动已补跑**——两镜像构建成功、`nginx -t` 通过、`docker compose --profile app up` 后 migrate exit 0 且 api/worker/web/neo4j 全 healthy；经 web 反代验证 `/health`、401 鉴权、登录→建课→上传→worker 领取、SSE 无缓冲；`WORKER_PROCESSES=3` 生效，子进程被杀后容器自动重启，SIGTERM 0.6 s 干净退出，`down`/`up` 后数据保留、迁移幂等。`test_k08.py` 21 passed、1 failed（`test_images_build` 遇 Docker Hub 429 限流，沙箱环境问题）；`verify.sh` exit 0。原「真实构建未跑」待决可关闭。新待决（交 K12 或新任务）：后端镜像不含 `scripts/`，容器内建账号需挂载脚本目录；`LLM_MODE=fake` 下整套服务抽取必以 `EXTRACTION_INCOMPLETE` 结束，容器演示需真实模型或 fake 演示响应器。
 
 ## 2026-09-26 I01 学习进度仓储（Codex 认领）
 
