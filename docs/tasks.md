@@ -1073,10 +1073,10 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| G01 | DONE（待 PR 审查/合并） | 实现快照序列化和摘要 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@608be90`（#258 合并后重开） | `src/backend/app/services/versions/snapshot.py`、`tests/backend/test_g01.py`；扩围 `src/backend/app/services/versions/__init__.py`、`docs/decisions.md`（ADR-031） | `test_g01.py` 49 passed；12 处反向篡改均检出；后端全量 2870 passed；`verify.sh` exit 0；`docs/handoffs/claude-g01.md` |
-| G02 | DONE（待 PR 审查/合并） | 实现版本元数据与发布操作记录 | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/versions.py`、`src/backend/migrations/010_versions.sql`、`tests/backend/test_g02.py`；扩围 `tests/integration/test_f13.py`（009 回滚用例先回滚更新的迁移）、`docs/decisions.md`（ADR-032） | `test_g02.py` 22 passed；10 处反向篡改均检出；后端全量 2892 passed；集成（真实 Neo4j）103 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g02.md` |
-| G03 | DONE（待 PR 审查/合并） | 实现版本图与向量构建 | ArvinHan（Claude） | 同上 | `src/backend/app/services/versions/materialize.py`、`tests/integration/test_g03.py`；扩围 `src/backend/app/services/graph/read.py` 与 `src/backend/app/repositories/graph_read.py`（读版本副本、不回传向量）、`tests/backend/test_f07.py`（1 个用例）、`docs/decisions.md`（ADR-033） | `test_g03.py` 12 passed（其中 11 个连真实 Neo4j 5.26）；8 处反向篡改 7 处检出，第 8 处（删草稿）由 F02 作用域校验兜住；后端全量 2893 passed；集成 115 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g03.md` |
-| G04 | DONE（待 PR 审查/合并） | 实现原子发布指针切换 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@ebb0f42` | `src/backend/app/services/versions/publish.py`、`tests/integration/test_g04.py`；扩围 `src/backend/app/repositories/versions.py`（P4 读取与 T7）、`src/backend/app/repositories/course_locks.py`（`current_holder`）、`src/backend/app/repositories/graph_read.py`（投影加 `merged_from`）、`tests/backend/test_g04_sqlite.py`、`docs/decisions.md`（ADR-034） | `test_g04.py` 19 passed（真实 Neo4j 5.26）；`test_g04_sqlite.py` 3 passed；9 处反向篡改 8 处检出，1 处（C1 提交后仍删副本）补用例后检出；后端全量 2962 passed；集成 134 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g04.md` |
+| G01 | DONE（PR #259 已合入 `b92c65b`；#106 已关闭） | 实现快照序列化和摘要 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@608be90`（#258 合并后重开） | `src/backend/app/services/versions/snapshot.py`、`tests/backend/test_g01.py`；扩围 `src/backend/app/services/versions/__init__.py`、`docs/decisions.md`（ADR-031） | `test_g01.py` 49 passed；12 处反向篡改均检出；后端全量 2870 passed；`verify.sh` exit 0；`docs/handoffs/claude-g01.md` |
+| G02 | DONE（PR #259 已合入 `b92c65b`；#107 已关闭） | 实现版本元数据与发布操作记录 | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/versions.py`、`src/backend/migrations/010_versions.sql`、`tests/backend/test_g02.py`；扩围 `tests/integration/test_f13.py`（009 回滚用例先回滚更新的迁移）、`docs/decisions.md`（ADR-032） | `test_g02.py` 22 passed；10 处反向篡改均检出；后端全量 2892 passed；集成（真实 Neo4j）103 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g02.md` |
+| G03 | DONE（PR #259 已合入 `b92c65b`；#108 已关闭） | 实现版本图与向量构建 | ArvinHan（Claude） | 同上 | `src/backend/app/services/versions/materialize.py`、`tests/integration/test_g03.py`；扩围 `src/backend/app/services/graph/read.py` 与 `src/backend/app/repositories/graph_read.py`（读版本副本、不回传向量）、`tests/backend/test_f07.py`（1 个用例）、`docs/decisions.md`（ADR-033） | `test_g03.py` 12 passed（其中 11 个连真实 Neo4j 5.26）；8 处反向篡改 7 处检出，第 8 处（删草稿）由 F02 作用域校验兜住；后端全量 2893 passed；集成 115 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g03.md` |
+| G04 | DONE（PR #261 已合入 `ba761dd`；#109 已关闭） | 实现原子发布指针切换 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@ebb0f42` | `src/backend/app/services/versions/publish.py`、`tests/integration/test_g04.py`；扩围 `src/backend/app/repositories/versions.py`（P4 读取与 T7）、`src/backend/app/repositories/course_locks.py`（`current_holder`）、`src/backend/app/repositories/graph_read.py`（投影加 `merged_from`）、`tests/backend/test_g04_sqlite.py`、`docs/decisions.md`（ADR-034） | `test_g04.py` 19 passed（真实 Neo4j 5.26）；`test_g04_sqlite.py` 3 passed；9 处反向篡改 8 处检出，1 处（C1 提交后仍删副本）补用例后检出；后端全量 2962 passed；集成 134 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g04.md` |
 
 - 验收：规范化字节键序与数组顺序稳定（PUB-10，乱序构造摘要相同）；端点缺失、来源无效、成环、空图、谱系违规逐条拒绝并符合契约 `PublishBlockedDetails`；`load_snapshot` 读回与原快照逐字节相同、不丢任何属性；PUB-8 排除计数、PUB-9、PUB-11 均有用例。
 - G01 待决：从 Neo4j/SQLite 读出可见草稿与修订的装载归 G04（P4～P7）；快照章节带 `parent_id`，而 Neo4j 章节与契约 `Chapter` 尚无此字段，章节层级落地时需同步（ADR-031）。
@@ -1088,10 +1088,35 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| H03 | DONE（待 PR 审查/合并） | 实现契约到 G6 数据适配 | ArvinHan（Claude） | `claude/project-thread-m4mk7n` / `main@ebb0f42` | `src/frontend/src/graph/adapter.ts`、`tests/frontend/h03.test.ts` | `h03.test.ts` 22 passed；11 处反向篡改均检出；前端全量 285 passed；type-check、build、`verify.sh` exit 0；`docs/handoffs/claude-h03.md` |
+| H03 | DONE（PR #262 已合入 `95d5c9a`；#115 已关闭） | 实现契约到 G6 数据适配 | ArvinHan（Claude） | `claude/project-thread-m4mk7n` / `main@ebb0f42` | `src/frontend/src/graph/adapter.ts`、`tests/frontend/h03.test.ts` | `h03.test.ts` 22 passed；11 处反向篡改均检出；前端全量 285 passed；type-check、build、`verify.sh` exit 0；`docs/handoffs/claude-h03.md` |
 
 - 验收：四类边样式两两可区分且带中文图例名；`source/target` 取 `from_id/to_id`，仅 `RELATED_TO` 无箭头；缺端点、外课、重复 ID 的元素不进画布并逐条报告；空图得空数组；元素 ID 为 `kp:`/`rel:` 前缀且按码点排序，输入乱序输出逐字节相同；深冻结输入照常转换，输出不引用输入对象。
 - H03 待决：边颜色为占位方案未经设计签收；`rejected`/`low_confidence` 的样式与过滤、`issues` 是否提示给教师，留给 H04/H05。
+
+## 2026-09-26 可开工清单与 issue 同步（Claude，基线 `main@95d5c9a`）
+
+依据 `docs/atomic-tasks.json` 的 `depends_on` 与 GitHub issue 状态计算：以下任务前置全部完成且无人认领。进行中不列入：G05→G06（主线线程，#110/#111 标 `status:in-progress`）、F08（草稿 PR #263，#100 标 `status:in-review`）。
+
+| 原子 ID | 组 | 任务 | 前置（均已完成） | Issue | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| G07 | 发布版本和补偿 | 实现统一发布版本解析器 | G04 | #112 | 解锁 H11、I01、I05、J01、J02，关键路径优先 |
+| H04 | 教师与学生图谱界面 | 实现 G6 生命周期组件 | H03 | #116 | 解锁 H05、H06、H08 |
+| F14 | 图存储与教师编辑 | 实现离线重新向量化命令 | E07、D10、F03、G04 | #164 | 与 G05 同属版本/向量区域，开工前核对文件锁 |
+| K08 | 评测部署与交付 | 实现前后端与 worker 容器配置 | K07、B05、B01、F13 | #147 | 解锁 K10、K12 |
+| K13 | 评测部署与交付 | 实现抽取消融实验 | K02、E06 | #166 | 需真实模型调用，开工前须用户确认预算 |
+
+- 等 F08 合并后可开工：F09、F10（再到 F11、F12）。等 G07：I01、J01、J02。等 H04：H05、H06、H08。
+- Issue 同步：关闭已合并任务 #92（E12）、#96（F04）、#98（F06）、#105（F13）、#99（F07）、#106～#109（G01～G04）、#115（H03）、#140（K01，问答口径随 K03）、#141（K02），均附 PR 评论并标 `status:done`；141 个原子任务各有一个 issue，无缺漏。
+
+## 2026-09-26 F08 教师节点编辑与人工编辑锁（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F08 | DONE（待 PR 审查/合并） | 实现教师节点编辑与手改锁 | ArvinHan（Claude） | `claude/project-thread-z0m8yg` / `main@ebb0f42` | `src/backend/app/services/graph/edit_node.py`、`src/backend/app/api/graph_nodes.py`、`tests/backend/test_f08.py`；扩围 `src/backend/app/repositories/graph_edit.py`（Cypher 与 SQLite 查询）、`src/backend/app/main.py` 与 `src/backend/app/schemas/contracts.py`（各一处注册）、`tests/integration/test_f08.py`、契约（`api.v1.yaml`、`errors.v1.md`、生成物）、`src/frontend/src/api/http.ts` 与 `taskEvents.ts`（错误码副本）、`docs/decisions.md`（ADR-035）、`docs/architecture.md`（错误码表）、`specs/teacher-review-publish.md`（待细化四条） | `test_f08.py` 62 passed（实现前 61 failed）；`tests/integration/test_f08.py` 8 passed（真实 Neo4j 5.26）；后端全量 3024 passed；集成全量 142 passed / 4 skipped；前端 type-check 通过、285 passed（合入 main 后复跑）；`verify.sh` exit 0；`docs/handoffs/claude-f08.md` |
+
+- 验收：后写者 `expected_revision` 过期 → 409 `REVISION_CONFLICT` 带当前内容，不覆盖；教师修改（含只改状态）置 `locked = true`；解锁只能经单独的 `unlockKnowledgePoint`，修改接口带 `locked` 字段 → 422；F04 自动写入跳过加锁节点，解锁后恢复更新；新建知识点必须带至少一条本课程、已提交修订的来源（ADR-035）。
+- F08 已决（ArvinHan 2026-09-26，ADR-035）：人工新建节点 `status = approved`、置信度 1.0；任何课程教师均可解锁。
+- F08 待决：前端尚无为新建知识点选择来源块的接口与交互（无按资料列块的 API）；审计日志归 F12；删除与合并归 F09/F10。
 
 ## 2026-09-26 G07 发布版本解析器（Claude）
 
