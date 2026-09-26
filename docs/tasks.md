@@ -1038,3 +1038,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - F04 已决：加锁知识点完全不动，只记为跳过（ArvinHan 2026-09-26，ADR-024 决定 4）。F04 待决：节点状态与低置信度阈值由调用方给（D-08）；§8.4 的「撤销旧贡献 + 写入」同一事务由 F13 组合。
 - F06 验收：两个连接并发写 A→B / B→A 恰有一方 `CYCLE_DETECTED`；四个连接并发写成环的四条边恰有一方冲突；读图、环检测与提交在同一写事务里并由课程守卫节点串行（ADR-025）。F06 待决：SQLite 课程写锁 `course_locks` 与 `draft_revision+1` 仍未落地（V4，归 API/发布任务）；ADR-009 自动降级与「撤销旧贡献 + 写入」同一事务由 F13 组合。
 - F13 已决（ArvinHan 2026-09-26，ADR-029）：`merging` 先用直通版（不做跨资料融合）；D-08 签收前自动写入的节点和关系状态一律 `draft`。F13 同时补上迁移 009 的 `course_locks` 与 `t6_seq`，F06 待决中的课程写锁表因此已有；`draft_revision+1` 仍归教师编辑（F08）。F13 待决：融合编排（E08～E10 接入 `merging`）无任务承接；D-08 签收后需重算状态；等锁超时消耗一次尝试。
+
+## 2026-09-26 F07 图谱读取（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F07 | DONE（待 PR 审查/合并） | 实现草稿图读取与详情服务 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@fa00164`（#256 合并后重开） | `src/backend/app/services/graph/read.py`、`src/backend/app/api/graph.py`、`tests/backend/test_f07.py`；扩围 `src/backend/app/repositories/graph_read.py`（读取 Cypher）、`src/backend/app/schemas/contracts.py`（导出图谱模型）、`src/backend/app/main.py`（注册路由）、`tests/integration/test_f07_live.py`、`docs/decisions.md`（ADR-030） | `test_f07.py` 20 passed；`test_f07_live.py` 4 passed（真实 Neo4j 5.26）；10 处反向篡改均检出；后端全量 2821 passed；`verify.sh` exit 0；`docs/handoffs/claude-f07.md` |
+
+- 验收：教师不带 `version` 读草稿（按 V 过滤），学生只读当前发布版本；空图 200、未发布 404 `GRAPH_NOT_PUBLISHED`、版本不符 404 `NOT_FOUND`；每条来源都有 `page` 或 `section_path`，知识点来源按证据区间定位到解析块并带原文（ADR-030）。
+- F07 待决：历史版本读取等 G02 版本表；人工添加且无来源的知识点详情会 500，需 F08 保证新建带来源或改契约；`getKnowledgePoint` 每次整图计算层级。

@@ -1014,3 +1014,17 @@
 - **后果**：上传的资料能一路走到 `awaiting_review`，但同名知识点在不同资料间不合并，直到融合接入。直通模式下本任务的节点 ID 由任务派生，跨任务成环只可能来自草稿里已有的环（DAG-10）；降级他人未确认边的路径已实现，由纯函数测试和 `downgrade_relation` 覆盖。等锁超时会消耗一次尝试。
 - **回滚**：停 API 与 worker，按迁移 009 文件头的 `ROLLBACK` 行删表与列（`test_f13.py` 已验证），撤销 `persist_graph.py`、`course_locks.py`、`downgrade.py` 与相关改动；处于 `merging`/`persisting` 的任务会停在原阶段，直到新的 worker 接手。
 - **签收**：ArvinHan 2026-09-26 在会话卡片上选定第 1、2 条；其余由 Claude 选定并在交接中报告。
+
+## ADR-030：F07 图谱读取入口、读取时计算层级与来源定位
+
+- **日期**：2026-09-26
+- **背景**：契约 `getGraph` 只写了「教师读草稿、学生读已发布」与 `version` 参数，没有定：教师带 `version` 读什么；课程未发布、版本不存在、图为空三者如何区分；`KnowledgePoint.level` 由谁计算；`SourceRef` 的页码/章节从哪来（Neo4j 的 `EVIDENCED_BY` 只有块内证据区间，§8.4 与 ADR-024）。历史版本表（G02）与发布快照（G04）都还没有。
+- **决定**：
+  1. **读入口**：教师不带 `version` 读草稿，V 在请求开始时从 SQLite 读一次（§8.4），节点、章节、关系、来源关联都按 V 过滤，关系另要求两端可见。学生（C03 已先拒绝未发布课程），或教师带 `version`，读当前发布版本 `courses.published_version_id` 的副本，不按 V 过滤。
+  2. **空图与未发布**：空草稿、空的已发布版本返回 200 与空 `nodes`/`edges`；没有发布版本时 404 `GRAPH_NOT_PUBLISHED`；`version` 不等于当前发布版本号时 404 `NOT_FOUND`（历史版本读取待 G02 建版本表后补）。
+  3. **`level` 读取时计算**：取返回课程图（过滤前）中非 `rejected` 的 `PREREQUISITE` 边的最长前置路径；草稿若违反 DAG，环上节点为 0。存储里不写 `level`。
+  4. **来源定位**：`SourceRef` 的 `page`/`section_path` 取自 SQLite 按本课程读出的块（D10）。知识点来源按证据区间在块文本中的位置找对应解析块（与 E05 抽取时相同的拼接规则），另带该区间的原文 `text`；关系来源取 `source_pairs` 中可见贡献方的块的第一个出处。无法定位的来源（块不在本课程、无定位字段）丢弃并记日志；知识点一条可定位来源都没有时 500 `INTERNAL_ERROR`（违反 `source_refs` 至少一条）。
+  5. Neo4j 不可达 → 503 `STORAGE_UNAVAILABLE`；可选字段省略而不是写 `null`，`graph_version` 总是返回（草稿为 `null`）。
+- **后果**：前端和学习路径可以直接用 `getGraph` 的 `level`；每次读取都会整图计算层级，课程规模（数百节点）下可以接受。人工添加且没有来源的知识点在详情接口上会是 500，F08 需保证教师新建知识点时至少带一条来源，否则要回来改契约。
+- **回滚**：撤销 `api/graph.py`、`services/graph/read.py`、`repositories/graph_read.py`、`main.py` 一行注册与测试；无数据变更。
+- **签收**：待 ArvinHan 审阅（入口语义与 500 处理由 Claude 选定并在交接中报告）。
