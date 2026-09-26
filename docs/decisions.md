@@ -1055,3 +1055,47 @@
 - **后果**：前端和学习路径可以直接用 `getGraph` 的 `level`；每次读取都会整图计算层级，课程规模（数百节点）下可以接受。人工添加且没有来源的知识点在详情接口上会是 500，F08 需保证教师新建知识点时至少带一条来源，否则要回来改契约。
 - **回滚**：撤销 `api/graph.py`、`services/graph/read.py`、`repositories/graph_read.py`、`main.py` 一行注册与测试；无数据变更。
 - **签收**：待 ArvinHan 审阅（入口语义与 500 处理由 Claude 选定并在交接中报告）。
+
+## ADR-031：G01 快照组装的边界情形
+
+- **日期**：2026-09-26
+- **背景**：`specs/teacher-review-publish.md` V3 定了发布集合、校验原因、快照格式与规范化，但留下几处实现细节：快照章节的 `parent_id` 在契约 `Chapter` 中不存在；降级关系的 `downgraded_from_type`/`downgrade_cycle` 是否进快照；`low_confidence` 或 `rejected` 关系端点不存在时是否阻断；`rejected` 是否计入 `excluded`；输入结构错误如何与发布阻断区分。
+- **决定**：
+  1. 快照章节按 V3 示例带 `parent_id`（无则 `null`）；发布集合的章节为被引用章节及其在草稿中的祖先，保证 `parent_id` 可解析。
+  2. 降级字段不进快照：降级关系必为 `low_confidence`（契约 `RelationDowngraded`），本就被排除；教师通过后成为普通关系。
+  3. 端点不存在按「草稿不变量被破坏」处理：除 `rejected` 外，`draft`/`approved`/`low_confidence` 关系都检查并报 `dangling_endpoint`；`rejected` 关系不在任何集合里，不检查。
+  4. `excluded` 只计 `low_confidence` 知识点与关系，`rejected` 不计；端点被 `low_confidence` 或 `rejected` 排除的关系计入 `cascaded_edges`。
+  5. 所有阻断原因一次报全，顺序固定为 `cycle`、`dangling_endpoint`（按关系 ID）、`invalid_source_ref`（先知识点后关系，各按 ID）、`empty_graph`、`invalid_lineage`（按知识点 ID）。
+  6. 输入结构错误（重复 ID、非法类型/状态、非有限数值、区间外的难度与重要度等）抛 `SnapshotFormatError`，属实现缺陷，由 G04 按 5xx 处理，不作为 `PUBLISH_BLOCKED` 返回；`load_snapshot` 只接受规范形态的字节，读出即可复算摘要。
+- **后果**：G04 在 P4～P7 持锁读出可见草稿后直接调用 `build_snapshot`；G03 物化与 P9 核对用 `load_snapshot` 读回。今后若给学生可见字段加项，须同时改快照与 `snapshot_format`。
+- **回滚**：撤销 `services/versions/` 与 `tests/backend/test_g01.py`；无数据变更。
+- **签收**：待 ArvinHan 审阅（以上细节由 Claude 选定并在交接中报告）。
+
+## ADR-032：G02 版本表的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V2 给出了 `graph_versions` 的字段语义与部分唯一索引，但没有定：G02 验收里的「幂等键」指什么；P11 的提交、指针 CAS 与 T7 怎样放进同一事务；已提交版本如何在库层面防改；租约与审计时间的单位。
+- **决定**：
+  1. **幂等键就是尝试的 `version_id`**（ULID，开始时生成、永不复用）。同一尝试重复提交时，第二次因行已不是 `materialized` 被拒，版本数与 `commit_sequence` 都不变；重复使用 `version_id` 插入违反主键。「同一内容不产生新版本」由 G04 的摘要比较（P7 幂等路径）负责，G02 提供 `discard_attempt`。
+  2. `commit_attempt` 与 `discard_attempt` 接收调用方的写事务，只做 P11/R7 第 1、2 条（分配版本号与提交序号、指针 CAS）或幂等路径的删除与 `published_from_revision`；条件不成立抛 `CommitRejected`，调用方回滚整个事务（含 T7）。版本号取本课程已提交最大 + 1，`(course_id, version)` 与 `commit_seq` 各有部分唯一索引。
+  3. 表约束保证状态与字段一致：只有 `committed` 行有版本号、提交序号与提交时间；只有 `failed` 行有失败原因、可置 `cleanup_pending`；`materialized` 与 `committed` 必有快照与摘要；回滚行必有 `source_version`。
+  4. 触发器禁止删除 `committed` 行、禁止修改其内容，只放行 `embedding_space`（V12 重新向量化）。
+  5. `expires_at` 为 SQLite `unixepoch()` 秒（与 `course_locks` 一致）；`created_at`/`committed_at` 为 ISO-8601 UTC 文本。`course_id` 外键指向 `courses`；`created_by` 可空（命令行操作）。
+  6. `commit_sequence` 单行表由本迁移创建并插入 `(1, 0)`，版本提交与进度写入共用（ADR-012 修订 3）。
+- **后果**：G04/G06 可以在一个 `immediate()` 事务里组合 `commit_attempt` 与 T7；G05 的清扫用 `fail_attempt`/`set_cleanup_pending`。F13 的迁移 009 回滚测试改为先回滚更新的迁移（按编号倒序），因为迁移器拒绝在已有更新版本时重放旧迁移。
+- **回滚**：按迁移 010 文件头的 `ROLLBACK` 行回滚（`test_g02.py` 已验证），或恢复 `backups/*-before-010.sqlite`；撤销 `repositories/versions.py`。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-033：G03 版本副本的形态与读取
+
+- **日期**：2026-09-26
+- **背景**：V2/V5 规定版本副本「只含快照字段 + 知识点向量 + 作用域字段」，P8 在一个 Neo4j 写事务内物化、P9 读回复算摘要。未定的是：知识点向量用什么文本；来源边的类型（V2 写 `EVIDENCE`，而草稿按 ADR-024 用 `EVIDENCED_BY`）；关系来源怎么存；契约 `KnowledgePoint`/`Relation` 要求 `status`、`confidence`、`source`、`locked`、`revision`，而副本按规定不带这些字段，F07 读已发布版本时怎么办；重试怎样保证不重复。
+- **决定**：
+  1. 知识点向量文本为「名称 + 换行 + 定义」，经 E07 适配器按当前空间计算；写入前逐个核对空间标识与维度（F03 `_validate_vector`），缺向量或不符即在连库前失败。
+  2. 副本的来源边沿用 `EVIDENCED_BY`（只带 `chunk_id`，无 `task_id`、无证据区间），与草稿同名，F07 读取不分版本；V2 的 `EVIDENCE` 视为 ADR-024 之前的叫法。
+  3. 副本关系存 `source_refs`（块 ID 列表），不存 `source_pairs` 与贡献记录。
+  4. P8 在同一写事务里先删除本 `(course_id, version_id)` 的全部副本再重建，重试同一尝试得到同一张图；来源块或端点缺失时整体回滚。P9 从 Neo4j 读回章节、知识点、来源与关系，`revisions` 取自快照本身，复算摘要必须相等。
+  5. F07 读已发布版本时，副本缺少的契约必填字段按「已发布」补齐：`status = approved`、`confidence = 1.0`、`source = manual`、`locked = false`、`revision = 1`。F07 的节点查询改为显式投影，不把向量属性带回应用层。
+- **后果**：学生端看到的已发布知识点状态恒为 `approved`，来源类别恒为 `manual`，与草稿里的真实值无关；如果前端需要展示真实来源类别，须改规格让它进快照（并使 `snapshot_format` 加 1）。知识点详情里已发布版本的来源不带原文片段（副本没有证据区间），只有页码或章节路径。
+- **回滚**：撤销 `services/versions/materialize.py` 与测试，恢复 F07 的两处改动；已物化的版本副本可按 `(course_id, version_id)` 删除。
+- **签收**：第 5 条由 ArvinHan 2026-09-26 在会话卡片上选定「统一填默认」；其余由 Claude 选定并在交接中报告。

@@ -27,7 +27,9 @@ def _visible(var: str) -> str:
             f"WHERE t IN $effective_task_ids))")
 
 
-_NODE_FIELDS = "properties(n) AS p"
+# 显式投影：不把向量属性（embedding_<suffix>，G03）带回应用层。
+_NODE_FIELDS = ("n {.kp_id, .chapter_id, .name, .aliases, .type, .definition, .importance, .difficulty, "
+                ".confidence, .status, .source, .locked, .revision} AS p")
 
 _DRAFT_NODES = f"""
 MATCH (n:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
