@@ -1381,3 +1381,18 @@
 - **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-065：J04 检索合并、相关度闸门与上下文预算
+
+- **日期**：2026-09-26
+- **背景**：规格 Q1 定义了候选集合 H 与允许引用集合 A，P5 规定 H 为空走 `no_retrieval_hit`、H 非空但无候选达到阈值走 `below_similarity_threshold`，主验收第 8 条要求超出 token 预算时截断后仍可定位、每个编号有效。但规格没有说明：只有图证据（没有相似度）的块如何参与阈值判断，预算截断以什么为单位，以及预算放不下任何块时如何处理。阈值与预算的具体值仍是待细化项（K01）。
+- **决定**：
+  1. 实现在 `services/qa/context.py` 的 `build_context(course_id, revision_ids, vector_hits, subgraph, load_chunks, threshold, budget, estimate_tokens)`。阈值与 `ContextBudget(chunk_tokens, graph_tokens, max_chunks)` 由调用方传入，**不设缺省值**，测试一律用 fake 值；真实值待 K01 标注集调参后由 J07 配置。
+  2. 合并去重：J01 向量命中与 J02 子图证据按 `chunk_id` 合并，保留全部出处（`origins` 为 `vector` / `graph`，`kp_ids` 为经 `EVIDENCED_BY` 关联的知识点），相似度取最大值。
+  3. Q3.1 以 SQLite 中的块为准复核：课程相同、`revision_id` 在绑定版本修订列表内、可定位（第一个能给出 `page` 或 `section_path` 的出处）。读不到的块也剔除。通过者构成 H，各类剔除分别计数。
+  4. **只有向量相似度能打开闸门**：H 中至少一个向量候选的 `score ≥ threshold`（含等号）才进入生成。只来自图证据的块没有相似度，闸门打开后作为补充排在达标向量块之后；有相似度但未达标的块不论是否也来自图，都不进 A。这样用词相近但无关的问题（主验收第 9 条）不会因图谱子串匹配而绕过阈值。
+  5. 预算以**整块**为单位：块的文本与定位从不截断，放不下的块跳过，继续尝试后面较小的块，直到 `max_chunks`。token 缺省按渲染后整块的 UTF-8 字节数估算（E03 口径，只会高估）。闸门已开但一个块都放不下时，同样按 `below_similarity_threshold` 拒答（wire 原因是闭集），记 WARNING，`stats.over_budget` 可区分。
+  6. 图谱子图渲染为无编号的行（节点在前、关系在后），行内容剔除类标记与哨兵，按行计入独立的 `graph_tokens` 预算；节点放不下时不渲染任何关系。拒答时仍返回全部命中知识点 ID，供 Q4 `related_kp_ids` 导航。
+- **后果**：J05 拿到的编号 `1..k` 与 A 一一对应，J06 可用 `by_index` 复核并构造引用。运行时尚无环节为文本块写向量（J01 待决），接上前向量检索为空，任何问题都会以 `no_retrieval_hit` 或 `below_similarity_threshold` 拒答；这一缺口不在本任务内补。图证据不能单独打开闸门，因此向量召回不足时，即使图谱命中也会拒答，这是有意偏向少答错。
+- **回滚**：撤销 `src/backend/app/services/qa/context.py` 与 `tests/backend/test_j04.py`；无迁移、无契约与依赖变更。
+- **签收**：待 ArvinHan 审阅（第 4、5 条的取舍由 Claude 选定并在交接中报告）。

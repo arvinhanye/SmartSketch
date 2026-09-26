@@ -1207,3 +1207,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
 - J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
+
+## 2026-09-26 J04 检索合并与上下文预算（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J04 | DONE（待 PR 审查/合并，issue #133） | 实现检索合并与上下文预算 | ArvinHan（Claude） | `claude/project-thread-ohmwyv` / `main@a7d8075` | `src/backend/app/services/qa/context.py`、`tests/backend/test_j04.py`；扩围 `docs/decisions.md`（ADR-065） | 红灯：收集错误（模块不存在）；`test_j04.py` 44 passed；21 处反向篡改全部检出；后端全量 3146 passed；`verify.sh` 通过；`docs/handoffs/claude-j04.md` |
+
+- 验收：两路候选按 `chunk_id` 去重并保留出处（`origins`、`kp_ids`）；他课、修订不在绑定版本内、不可定位或读不到的块不获得编号（QA-17）；H 为空 → `no_retrieval_hit`，H 非空但无向量候选达到 fake 阈值 → `below_similarity_threshold`（QA-6、QA-7 的 J04 部分）；token 预算整块取舍，不截断文本与定位；图谱上下文无编号。
+- J04 待决：阈值与 `ContextBudget` 三个值无缺省，待 K01 调参、J07 配置；「只有向量相似度能打开闸门」与「预算放不下任何块时按 `below_similarity_threshold` 拒答」待签收（ADR-065）；运行时文本块向量写入缺口（J01 待决）仍未补，接上前问答总会拒答。
