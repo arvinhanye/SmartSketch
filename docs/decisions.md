@@ -1116,3 +1116,17 @@
 - **后果**：发布服务可被路由或命令行直接调用；学生读取在 G07 前仍需调用方自行解析版本。持锁区间只含 SQLite 与 Neo4j 读取，不含模型调用。
 - **回滚**：撤销 `services/versions/publish.py`，以及 `repositories/versions.py` 末尾的 `DraftState`/`read_draft_state`/`complete_published_tasks`、`course_locks.current_holder`、F07 节点投影中的 `.merged_from`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-036：G05 发布补偿与清扫的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V5 C1 与 V9 规定了补偿与清扫的步骤，但没有写死：C1 放在哪里、发布与回滚怎样共用；清扫怎样判断「过期」而不和心跳、提交抢同一行；V9 第 3 步（`failed` 行在 Neo4j 仍有副本）怎样发现；第 4、5 步告警后留下什么记录；清扫由谁调度。
+- **决定**：
+  1. C1 为 `services/versions/reconcile.compensate`，G04 发布改为调用它，G06 回滚同样调用。尝试行条件更新影响 0 行即返回，不碰 Neo4j；SQLite 写失败原样抛出，尝试行保持进行中，租约到期后由清扫补做。
+  2. 过期判定为 `state ∈ {preparing, materialized} AND expires_at < unixepoch()`。心跳要求 `expires_at >= unixepoch()`，提交要求 `expires_at > unixepoch()`，所以过期的尝试不会复活，读出后直接执行 C1，失败原因为 `LEASE_EXPIRED`。恰在 `expires_at = unixepoch()` 那一秒，双方都不动，下一轮清扫处理。
+  3. 清扫按课程逐个处理（`sweep_course`），通过 Neo4j 列出本课程所有非草稿 `version_id`（`graph_read.stored_version_ids`）与 SQLite 全部尝试行对照：`failed` 且 `cleanup_pending` 或仍有副本的删除副本并清标记；`committed` 行与租约内的尝试从不删除。
+  4. 第 4 步（孤儿副本）与第 5 步（已提交版本缺副本）只写日志（WARNING / ERROR）并在 `SweepReport` 中列出，不写任何库。
+  5. `sweep` 遍历全部课程，单个课程失败记日志后继续。调度（A06 §8.6 的 worker 周期回收步骤）尚无实现，本任务只提供可调用的 `sweep`，接入列入待决。
+- **后果**：发布与回滚的失败都在一处补偿；清扫可重复执行，没有新变化时第二次不写库。孤儿副本会一直告警，直到人工按 K10 处理。
+- **回滚**：撤销 `services/versions/reconcile.py`，恢复 `publish.py` 中的 `_compensate` 原实现；撤销 `repositories/versions.py` 末尾的 `list_expired_attempts`/`list_course_ids` 与 `graph_read.stored_version_ids`；无数据迁移。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

@@ -16,7 +16,7 @@ from typing import Any, Final, Literal
 
 from app.repositories.neo4j import GraphScope, Neo4jRepository
 
-__all__ = ["GraphReader", "NodeEvidence"]
+__all__ = ["GraphReader", "NodeEvidence", "stored_version_ids"]
 
 DRAFT: Final = "draft"
 Reader = Literal["teacher", "student"]
@@ -126,3 +126,17 @@ class GraphReader:
 
     def chapters(self, scope: GraphScope, reader: Reader) -> list[dict[str, Any]]:
         return [row["p"] for row in self._read(_DRAFT_CHAPTERS, _PUBLISHED_CHAPTERS, scope, reader, {})]
+
+
+# 草稿作用域只为满足 F02 的参数约定；本查询列出草稿之外的全部版本副本，不读草稿内容。
+_VERSION_IDS = """
+MATCH (n {course_id: $course_id})
+WHERE (n:KnowledgePoint OR n:Chapter) AND n.version_id <> $version_id AND $effective_task_ids IS NOT NULL
+RETURN DISTINCT n.version_id AS version_id
+"""
+
+
+def stored_version_ids(repo: Neo4jRepository, course_id: str) -> set[str]:
+    """G05 清扫：本课程在 Neo4j 中存有副本的全部非草稿 ``version_id``。"""
+    rows = repo.read(_VERSION_IDS, GraphScope(course_id, DRAFT, effective_task_ids=()), reader="worker")
+    return {str(r["version_id"]) for r in rows}
