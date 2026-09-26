@@ -1319,3 +1319,19 @@
 - **后果**：H08 不改 H04 文件即可与 `GraphCanvas` 组合；画布上的冲突节点着色与真正的 G6 拖线需在 `lifecycle.ts` 增加节点样式透传与 `create-edge` 行为（后续任务）。后端关系路由落地后，若返回的错误码或 `details` 与契约不同，须先改契约。
 - **回滚**：删除 `api/relations.ts`、`composables/useRelationEditor.ts`、`components/RelationEditor.vue` 与 `tests/frontend/h08.test.ts`，删去本 ADR；无数据或契约变更。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-054：K10 备份与恢复演练的一致性栅栏、两条 Neo4j 路径与不覆盖原则
+
+- **日期**：2026-09-26
+- **背景**：K10 要求 SQLite 与 Neo4j 的备份对应同一时间点、发布指针与已提交版本一致，恢复在隔离副本中核对引用/图/进度，且不覆盖用户库。两库之间没有分布式事务；Neo4j 社区版的 `neo4j-admin database dump/load` 只能在数据库停止时执行，社区版也不能单独停一个库。F14（ADR-038）以 `--neo4j-backup-confirmed` 暂代 Neo4j 备份；G05 把孤儿副本与缺副本的处理留给 K10。
+- **决定**：
+  1. **栅栏**：备份先持有全部课程的写锁（`course_locks`，持有者 `k10-backup-<备份 ID>`，按 L/3 续约）——发布 P3、回滚、图编辑与 T6 写图都要这把锁；并与 F14 第 1 步同口径拒绝活动任务租约、他人的活动写锁、任何 `preparing`/`materialized` 尝试（含过期未补偿的，先跑 G05）。拒绝时退出码 2，不写任何文件。
+  2. **同一时间点的判定**：G0 读 Neo4j 全图摘要 → S1 用 SQLite 在线备份 API（单步、一个读事务）复制整库 → 导出 Neo4j → G2 摘要必须等于 G0 → S3 再做一次在线备份，逐表内容摘要必须等于 S1 → 写锁仍由本次持有。任一不等即判定有写入绕过了写锁，整份备份作废（退出码 1，`.partial` 目录删除），不尝试「修补」。代价：栅栏期间被拒的发布仍会留下一行 `failed` 尝试，使该次备份作废，需重跑（测试已覆盖）。副本中删去本次的锁行。
+  3. **发布指针**：每门课的 `published_version_id` 必须是本课程 `committed` 且版本号一致的行，且该版本的 Neo4j 副本按快照用 G03 P9 `materialize.verify` 复核通过（节点、边、来源引用、向量维度），否则备份失败。非当前版本复核失败、未提交尝试的孤儿副本、没有 SQLite 行的 `Chunk` 只记为警告写入清单（G05 留给 K10 的两类残留在此报告，不自动删除或重建）。Neo4j 中出现 SQLite 快照里没有的课程也视为不一致而失败。
+  4. **两条 Neo4j 路径**：缺省经 Bolt 导出为 gzip JSON 行（结构语句、节点、关系；元素 ID 只用于文件内连线），任何可连接的 Neo4j 都能用，且可在进程内 harness 上测试；`--neo4j-container NAME` 走 neo4j-admin：停容器 → `docker run --rm --volumes-from NAME <同镜像> neo4j-admin database dump neo4j` → 启容器 → 等 Bolt，停机期间写锁仍持有，重启后摘要必须等于停机前。两条路径的清单都含同一套检查结果（图摘要与 SQLite 行级摘要与路径无关），恢复端一视同仁地核对。属性只接受标量与标量列表，遇到时间、空间等类型直接失败（当前代码不写这些类型）。
+  5. **不覆盖**：恢复脚本的 Neo4j 目标必须以 `--neo4j-uri` 显式给出（不读 `NEO4J_URI`）；SQLite 目标必须不存在、Neo4j 目标必须没有节点，否则退出码 2 且不做任何改动。覆盖需同时给 `--replace-existing` 与 `--confirm <备份 ID>`，目标须已停机（同第 1 条），并先把目标整体做一份 K10 备份到安全目录（`--allow-inconsistent`，允许记录已损坏的状态），撤销覆盖即从该安全副本再恢复一次。
+  6. **恢复核对**：先校验清单中每个文件的 SHA-256（不符即拒绝，不动目标）；装入后用 `backup-demo.sh --inspect` 重新检查目标，并与清单逐项比较：SQLite 完整性、外键、结构、逐表行级摘要（含今后的进度表，不依赖具体表名）、发布指针；Neo4j 图摘要、计数与结构（清单中的结构必须存在）；一致性结论（复核通过的版本、指针错误、孤儿副本、悬空文本块）。有差异则退出码 1 并在报告中列出，副本不得使用。
+  7. 备份目录 0700、文件 0600，含账号口令散列等，放在已被忽略的 `backups/` 下或仓库外，不得提交或外传。
+- **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
+- **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
