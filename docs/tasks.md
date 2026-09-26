@@ -1212,7 +1212,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| J04 | DONE（待 PR 审查/合并，issue #133） | 实现检索合并与上下文预算 | ArvinHan（Claude） | `claude/project-thread-ohmwyv` / `main@a7d8075` | `src/backend/app/services/qa/context.py`、`tests/backend/test_j04.py`；扩围 `docs/decisions.md`（ADR-065） | 红灯：收集错误（模块不存在）；`test_j04.py` 44 passed；21 处反向篡改全部检出；后端全量 3146 passed；`verify.sh` 通过；`docs/handoffs/claude-j04.md` |
+| J04 | DONE（待 PR 审查/合并，issue #133；**独立审查 APPROVE_WITH_NOTES，必改项已修**） | 实现检索合并与上下文预算 | ArvinHan（Claude） | `claude/project-thread-ohmwyv` / `main@a7d8075` | `src/backend/app/services/qa/context.py`、`tests/backend/test_j04.py`；扩围 `docs/decisions.md`（ADR-065）、`specs/grounded-qa.md`（Q3.1 与「待细化」各一条） | 红灯：收集错误（模块不存在）；`test_j04.py` 44 passed；21 处反向篡改全部检出；后端全量 3146 passed；审查独立复跑 44 passed / 全量 3146 passed / 4 处反向篡改检出；已修 docstring 接线示例（M1）并把 ①② 落成规格文字；`verify.sh` 通过；`docs/handoffs/claude-j04.md` |
 
 - 验收：两路候选按 `chunk_id` 去重并保留出处（`origins`、`kp_ids`）；他课、修订不在绑定版本内、不可定位或读不到的块不获得编号（QA-17）；H 为空 → `no_retrieval_hit`，H 非空但无向量候选达到 fake 阈值 → `below_similarity_threshold`（QA-6、QA-7 的 J04 部分）；token 预算整块取舍，不截断文本与定位；图谱上下文无编号。
 - J04 待决：阈值与 `ContextBudget` 三个值无缺省，待 K01 调参、J07 配置；「只有向量相似度能打开闸门」与「预算放不下任何块时按 `below_similarity_threshold` 拒答」待签收（ADR-065）；运行时文本块向量写入缺口（J01 待决）仍未补，接上前问答总会拒答。

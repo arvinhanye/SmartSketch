@@ -73,6 +73,15 @@ ctx.by_index(n)                            # J06 引用校验：n ∈ A 时返�
 
 J05 用 `render_evidence()` 与 `graph.text` 组提示；J06 用 `by_index` 复核并构造 `citations`；J07 在 P5 按 `ctx.covered` 分支、`meta.retrieved = ctx.retrieved`。
 
+## 独立审查修复（2026-09-26，协调者）
+
+独立只读审查（worktree `review-j04`，带 `PYTHONPATH` 自证测的是本分支代码）结论 APPROVE_WITH_NOTES，已按「合并前必须修的项」处理：
+
+1. **M1 接线示例错误（已修）**：`context.py` 的 `build_context` docstring 原写 `functools.partial(chunks.get_chunks, sqlite_url, course_id=...)`，但 `get_chunks` 的 `chunk_ids` 是 keyword-only，而 `build_context` 以位置参数调用 `load_chunks(ids)` → `TypeError`。已改为 `lambda ids: get_chunks(sqlite_url, course_id=course_id, chunk_ids=ids)`，与本交接的接线示例一致。
+2. **①② 待签收文字（已落规格）**：ADR-065 决定 4 补写「闸门打开后无相似度的图证据块会获得编号并进入 A（可被引用），相对 Q1 字面是扩大」；决定 5 补写「预算 0 块复用 `below_similarity_threshold` 属 wire 语义合并，K03/J10 须另记 `over_budget` 分流，且不映射 `BUDGET_EXCEEDED`（那是 A07 的调用计费预算）」。同步写入 `specs/grounded-qa.md` Q3.1 与「待细化」，签收行改为明确列出这两点。
+3. **审查记录但未在本任务修**（已写入 ADR-065「已知遗留」）：`kp_ids` 只取 J02 子图 evidence 内的知识点，覆盖面窄于 Q4 字面；测试全用 fake loader，未覆盖真实 `get_chunks` 的 keyword-only 接线（M4）；`over_budget` 同时统计 token 装不下与 `max_chunks` 截断；`revision_ids` 误传字符串按字符集合展开。交给 J06/J07 或后续技术债任务。
+4. 审查独立复跑：`PYTHONPATH=$PWD/src/backend .venv/bin/python -m pytest tests/backend/test_j04.py -q` → 44 passed；后端全量 3146 passed；4 处独立反向篡改全部检出。
+
 ## 回滚
 
 撤销上述两个源文件与本交接、ADR-065、`docs/tasks.md` 中 J04 一节；无数据变更。
