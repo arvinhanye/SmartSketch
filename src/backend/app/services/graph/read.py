@@ -136,6 +136,9 @@ def _pair(raw: object) -> tuple[str | None, str] | None:
 
 
 def _relation_chunk_ids(edge: Mapping[str, Any], scope: GraphScope) -> list[str]:
+    if scope.version_id != DRAFT and "source_refs" in edge["p"]:
+        # G03 版本副本只存块 ID 列表（ADR-033）。
+        return list(dict.fromkeys(c for c in edge["p"]["source_refs"] or [] if isinstance(c, str)))
     visible = set(scope.effective_task_ids or ())
     ids = []
     for raw in edge["p"].get("source_pairs") or []:
@@ -173,7 +176,13 @@ def _levels(node_ids: Iterable[str], edges: Sequence[Mapping[str, Any]]) -> dict
     return level
 
 
-def _node(course_id: str, p: Mapping[str, Any], level: int) -> KnowledgePoint | None:
+# 版本副本不带草稿元数据（V2）；读取时按「已发布」补齐契约必填字段（ADR-033）。
+_PUBLISHED_DEFAULTS = {"status": "approved", "confidence": 1.0, "source": "manual", "locked": False, "revision": 1}
+
+
+def _node(course_id: str, p: Mapping[str, Any], level: int, *, published: bool = False) -> KnowledgePoint | None:
+    if published:
+        p = {**_PUBLISHED_DEFAULTS, **{k: v for k, v in p.items() if v is not None}}
     fields = {
         "id": p.get("kp_id"),
         "course_id": course_id,
@@ -198,8 +207,11 @@ def _node(course_id: str, p: Mapping[str, Any], level: int) -> KnowledgePoint | 
         return None
 
 
-def _relation(course_id: str, edge: Mapping[str, Any], refs: list[SourceRef]) -> Relation | None:
+def _relation(course_id: str, edge: Mapping[str, Any], refs: list[SourceRef], *,
+              published: bool = False) -> Relation | None:
     p = edge["p"]
+    if published:
+        p = {**_PUBLISHED_DEFAULTS, **{k: v for k, v in p.items() if v is not None}}
     fields: dict[str, Any] = {
         "id": p.get("rel_id"),
         "course_id": course_id,
@@ -249,7 +261,7 @@ def read_graph(reader: GraphReader, sqlite_url: str, target: ReadTarget, graph_f
             continue
         if graph_filter.type is not None and p.get("type") != graph_filter.type:
             continue
-        node = _node(scope.course_id, p, levels.get(p.get("kp_id"), 0))
+        node = _node(scope.course_id, p, levels.get(p.get("kp_id"), 0), published=scope.version_id != DRAFT)
         if node is not None:
             nodes.append(node)
     kept = {n.id for n in nodes}
@@ -263,7 +275,7 @@ def read_graph(reader: GraphReader, sqlite_url: str, target: ReadTarget, graph_f
     for e in raw_edges:
         refs = [ref for cid in _relation_chunk_ids(e, scope)
                 if (ref := _source_ref(chunks.get(cid), None, None, None)) is not None]
-        relation = _relation(scope.course_id, e, refs)
+        relation = _relation(scope.course_id, e, refs, published=scope.version_id != DRAFT)
         if relation is not None:
             edges.append(relation)
 
@@ -346,7 +358,7 @@ def read_knowledge_point(reader: GraphReader, sqlite_url: str, target: ReadTarge
         raise SourceUnavailable()
     level = _levels((p.get("kp_id") for p in reader.nodes(scope, role)),  # type: ignore[arg-type]
                     reader.edges(scope, role)).get(kp_id, 0)  # type: ignore[arg-type]
-    node = _node(scope.course_id, found[0], level)
+    node = _node(scope.course_id, found[0], level, published=scope.version_id != DRAFT)
     if node is None:
         raise not_found()
     return KnowledgePointDetail.model_validate({

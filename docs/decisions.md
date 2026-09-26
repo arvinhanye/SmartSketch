@@ -1058,3 +1058,17 @@
 - **后果**：G04/G06 可以在一个 `immediate()` 事务里组合 `commit_attempt` 与 T7；G05 的清扫用 `fail_attempt`/`set_cleanup_pending`。F13 的迁移 009 回滚测试改为先回滚更新的迁移（按编号倒序），因为迁移器拒绝在已有更新版本时重放旧迁移。
 - **回滚**：按迁移 010 文件头的 `ROLLBACK` 行回滚（`test_g02.py` 已验证），或恢复 `backups/*-before-010.sqlite`；撤销 `repositories/versions.py`。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-033：G03 版本副本的形态与读取
+
+- **日期**：2026-09-26
+- **背景**：V2/V5 规定版本副本「只含快照字段 + 知识点向量 + 作用域字段」，P8 在一个 Neo4j 写事务内物化、P9 读回复算摘要。未定的是：知识点向量用什么文本；来源边的类型（V2 写 `EVIDENCE`，而草稿按 ADR-024 用 `EVIDENCED_BY`）；关系来源怎么存；契约 `KnowledgePoint`/`Relation` 要求 `status`、`confidence`、`source`、`locked`、`revision`，而副本按规定不带这些字段，F07 读已发布版本时怎么办；重试怎样保证不重复。
+- **决定**：
+  1. 知识点向量文本为「名称 + 换行 + 定义」，经 E07 适配器按当前空间计算；写入前逐个核对空间标识与维度（F03 `_validate_vector`），缺向量或不符即在连库前失败。
+  2. 副本的来源边沿用 `EVIDENCED_BY`（只带 `chunk_id`，无 `task_id`、无证据区间），与草稿同名，F07 读取不分版本；V2 的 `EVIDENCE` 视为 ADR-024 之前的叫法。
+  3. 副本关系存 `source_refs`（块 ID 列表），不存 `source_pairs` 与贡献记录。
+  4. P8 在同一写事务里先删除本 `(course_id, version_id)` 的全部副本再重建，重试同一尝试得到同一张图；来源块或端点缺失时整体回滚。P9 从 Neo4j 读回章节、知识点、来源与关系，`revisions` 取自快照本身，复算摘要必须相等。
+  5. F07 读已发布版本时，副本缺少的契约必填字段按「已发布」补齐：`status = approved`、`confidence = 1.0`、`source = manual`、`locked = false`、`revision = 1`。F07 的节点查询改为显式投影，不把向量属性带回应用层。
+- **后果**：学生端看到的已发布知识点状态恒为 `approved`，来源类别恒为 `manual`，与草稿里的真实值无关；如果前端需要展示真实来源类别，须改规格让它进快照（并使 `snapshot_format` 加 1）。知识点详情里已发布版本的来源不带原文片段（副本没有证据区间），只有页码或章节路径。
+- **回滚**：撤销 `services/versions/materialize.py` 与测试，恢复 F07 的两处改动；已物化的版本副本可按 `(course_id, version_id)` 删除。
+- **签收**：待 ArvinHan 审阅（第 1、5 条的取值由 Claude 选定，是学生能看到的输出，请重点确认）。

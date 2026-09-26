@@ -439,3 +439,22 @@ def test_student_detail_reads_published_copy(s):
     assert_schema("KnowledgePointDetail", body)
     assert body["source_refs"] == [{"chunk_id": "c1", "document_id": "doc-c1", "page": 3, "text": "栈"}]
     assert {(scope.version_id, reader) for _, scope, reader in s.reader.calls} == {(version_id, "student")}
+
+
+def test_published_copies_without_draft_metadata_are_read_as_published(s):
+    """G03 version copies carry only snapshot fields (ADR-033)."""
+    version_id = s.publish(1)
+    s.add_chunk("c1", [(PAGE, "栈。")])
+    # The Cypher projection returns absent properties as null.
+    s.reader.put(version_id, nodes=[{"kp_id": "a", "name": "栈", "type": "concept", "definition": "d",
+                                     "status": None, "confidence": None, "revision": None},
+                                    {"kp_id": "b", "name": "队列", "type": "concept", "definition": "d"}],
+                 edges=[{"type": "PREREQUISITE", "from_id": "a", "to_id": "b",
+                         "p": {"rel_id": "r1", "source_refs": ["c1"], "status": None}}])
+    body = s.get("/graph", s.student).json()
+    assert_schema("GraphExchange", body)
+    assert [(n["id"], n["status"], n["revision"]) for n in body["nodes"]] == [("a", "approved", 1), ("b", "approved", 1)]
+    assert body["edges"][0]["source_refs"] == [{"chunk_id": "c1", "document_id": "doc-c1", "page": 3}]
+    # The draft never gets these defaults.
+    s.reader.put("draft", nodes=[{"kp_id": "a", "name": "栈", "type": "concept", "definition": "d"}])
+    assert s.get("/graph", s.teacher).json()["nodes"] == []
