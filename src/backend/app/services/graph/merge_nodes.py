@@ -23,7 +23,11 @@
 **节点字段**：主名与其他字段取主节点；被合并节点的名称与别名依次并入别名（去重，不含主名）；
 ``merged_from`` 取主节点、被合并节点及其 ``merged_from`` 的并集（展平，V3）；贡献任务取并集；
 主节点加锁、登记人工贡献、修订号加 1。来源关联全部迁到主节点（按 ``task_id``、块、区间去重，保留
-``task_id``），共享的文本块不删。审计日志归 F12。
+``task_id``），共享的文本块不删。
+
+审计（F12，ADR-061）：第 4 步的 ``draft_revision + 1`` 由 ``audit.begin`` 连同 ``pending`` 审计行一起写入，
+摘要记主节点、**直接**被合并的节点与展平谱系（ADR-012 修订 3）；提交后补上重接与来源迁移的计数并置
+``committed``，事务抛错则置 ``aborted``。
 """
 
 from __future__ import annotations
@@ -33,10 +37,11 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from app.repositories import graph_edit
-from app.repositories.graph_edit import IncidentRelation, bump_draft_revision
+from app.repositories.graph_edit import IncidentRelation
 from app.repositories.graph_relations import derive_rel_id, read_prerequisite_graph, read_visible_nodes
 from app.repositories.neo4j import GraphScope, ScopedTransaction
 from app.schemas.contracts import KnowledgePoint
+from app.services.graph import audit
 from app.services.graph.dag import check_candidates
 from app.services.graph.edit_node import EditContext, InvalidEdit, RevisionConflict, _course_write, _respond
 from app.services.graph.relations import CycleDetectedError
@@ -252,7 +257,10 @@ def _merge(tx: ScopedTransaction, ctx: EditContext, scope: GraphScope, primary: 
                                 + [nodes[m].get("merged_from") or [] for m in merged])) - {primary})
     tasks = _union([head.get("contrib_tasks") or []] + [nodes[m].get("contrib_tasks") or [] for m in merged])
 
-    bump()
+    bump(int(head.get("revision") or 0), {
+        "primary": head, "merged": [nodes[m] for m in merged], "lineage": lineage,
+        "relations_removed": len(plan.removed), "relations_created": len(plan.created), "evidence_moved": len(evidence),
+    })
     written = graph_edit.update_merged_primary(tx, primary, int(head.get("revision") or 0), aliases=aliases,
                                                merged_from=lineage, contrib_tasks=tasks)
     if written is None:  # 同一事务内刚读过且持有守卫锁：不应出现
@@ -272,12 +280,28 @@ def merge_nodes(ctx: EditContext, course_id: str, primary_id: str, merged_ids: S
     """
     primary, merged, expected = _validate(primary_id, merged_ids, expected_revisions)
     with _course_write(ctx, course_id) as scope:
-        bumped: list[int] = []
+        started: list[tuple[audit.Pending, dict[str, Any]]] = []
 
-        def bump() -> None:  # 驱动重跑事务时不重复加
-            if not bumped:
-                bumped.append(bump_draft_revision(ctx.sqlite_url, course_id))
+        def bump(revision: int, facts: dict[str, Any]) -> None:
+            # 驱动重跑事务时不重复加；事实取最后一次（即提交的那次）执行
+            if not started:
+                started.append((audit.begin(ctx, course_id, "merge", primary, revision_before=revision,
+                                            summary=audit.merge_summary(facts["primary"], facts["merged"],
+                                                                        lineage=facts["lineage"])), facts))
+            else:
+                started[0] = (started[0][0], facts)
 
-        written = ctx.store.transaction(  # type: ignore[attr-defined]
-            scope, lambda tx: _merge(tx, ctx, scope, primary, merged, expected, bump))
+        try:
+            written = ctx.store.transaction(  # type: ignore[attr-defined]
+                scope, lambda tx: _merge(tx, ctx, scope, primary, merged, expected, bump))
+        except BaseException as exc:
+            if started:
+                audit.abort(ctx, started[0][0], exc)
+            raise
+        pending, facts = started[0]
+        audit.commit(ctx, pending, revision_after=int(written.get("revision") or 0) or None,
+                     summary=audit.merge_summary(facts["primary"], facts["merged"], lineage=facts["lineage"],
+                                                 relations_removed=facts["relations_removed"],
+                                                 relations_created=facts["relations_created"],
+                                                 evidence_moved=facts["evidence_moved"]))
         return _respond(ctx, scope, written)

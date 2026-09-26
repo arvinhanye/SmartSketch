@@ -66,7 +66,7 @@ def get_review_queue(
     access: CourseAccess = Depends(course_teacher),
 ) -> Response:
     try:
-        body = read_queue(_context(request), access.course.id, kind=None if kind is None else kind.value,
+        body = read_queue(_context(request, access), access.course.id, kind=None if kind is None else kind.value,
                           cursor=cursor, limit=limit)
     except InvalidCursor as invalid:
         raise RequestValidationError([{"type": invalid.reason, "loc": ("query", "cursor")}]) from None
@@ -130,4 +130,4 @@ def resolve_review_item(
             return resolve_isolated(ctx, course_id, action["kp_id"], verb, user_id).body()
         return resolve_duplicate(ctx, course_id, action["kp_ids"], verb, action.get("primary_id"), user_id).body()
 
-    return _run(request, operation)
+    return _run(request, access, operation)
