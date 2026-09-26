@@ -1232,3 +1232,11 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | H07 | DONE（待 PR 审查/合并，issue #119；**独立审查 APPROVE_WITH_NOTES**） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；type-check 与 build 通过；前端全量**实测 493 passed + 1 failed**，失败项为既有 `b02.test.ts` 子进程 vitest 5 s 超时（本机慢；给 90 s 即通过，`b02.test.ts`/`vitest.config.ts`/`package.json` 本分支未改，`origin/main` 上同样失败）——原写「494 passed」不可复现，已按实测更正；**仅假 API 验证**（真实后端路由已存在但未联调）；独立审查：3 处篡改检出、契约形状与后端 `_CURRENT_FIELDS` 逐字段吻合、`verify.sh` 与 `validate_atomic_plan.py` 通过；`docs/handoffs/claude-h07.md` |
 
 - H07 待决（需 ArvinHan）：ADR-062 签收；教师图谱编辑页无归属（挂载页由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板）；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。
+## 2026-09-26 H11 学生图谱和卡片视图（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H11 | DONE（待 PR 审查/合并，issue #123） | 实现学生图谱和卡片视图 | ArvinHan（Claude） | `claude/project-thread-vrtfxt` / `main@a7d8075` | `src/frontend/src/views/StudentGraphView.vue`、`src/frontend/src/components/KnowledgeCards.vue`、`tests/frontend/h11.test.ts`；扩围新建 `api/graph.ts`、`composables/useStudentGraph.ts`，小改 `router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/GraphToolbar.vue`（`showStatuses`） | `h11.test.ts` 45 passed（测试与实现同批写成，未单独跑红灯）；type-check、build 通过；前端全量 15 files 483 passed；`verify.sh` 通过；15 处反向篡改检出 14，存活 1 处为冗余防护；ADR-063；`docs/handoffs/claude-h11.md` |
+
+- 验收：无发布（`published_version = null` 或 `GRAPH_NOT_PUBLISHED`）显示未发布且不读图；空图显示空态；卡片分页；卡片键盘可达（单 Tab 位、方向键跨页、Home/End、PageUp/PageDown、Enter/空格）；任何入口不取草稿（读图必带发布版本号并核对响应版本，课程内教师不发图谱/详情请求，卡片不调 `GET /kp`）。
+- H11 待决：课程内教师是否需要「以学生身份预览已发布版」（需详情接口加 `version` 参数）；详情响应不带版本号，读图与读详情之间发布新版本时可能不一致；原文阅读器（`locateSource`）与学生端资料名仍未落地（H06 待决）；未做真实浏览器冒烟。

@@ -1426,4 +1426,17 @@
   7. 一次只允许一个写请求；切换知识点或课程时中止在途请求，晚到结果（序号 + 课程作用域）丢弃，不写 store、不提示成功。错误只给固定文案，不回显服务端 message；服务端文本全部插值渲染。
 - **后果**：面板可独立挂到教师图谱页；接入页面由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板。`details.current` 不含章节，采用最新内容时章节沿用本地已知值；新建知识点仍缺来源块选择接口（F08 待决），本面板只编辑已有节点。
 - **回滚**：删除 `src/frontend/src/api/nodeEdit.ts`、`components/NodeEditor.vue`、`composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts` 与本 ADR；无依赖、契约或数据变更。
+## ADR-063：H11 学生图谱页只读已发布版本、图/卡片共用筛选与选中
+
+- **日期**：2026-09-26
+- **背景**：H11 要求学生浏览已发布图谱并可在图与卡片之间切换，验收为「无发布、空图、分页卡片、键盘可用；任何入口不取草稿」。契约 `getGraph` 在省略 `version` 时对课程内教师返回草稿；`GET /kp/{kid}` 与 `GET /kp` 都没有版本参数，同样按课程内角色决定读草稿还是发布版。课程内角色与账号类型无关（教师账号可以在别的课做学生），路由守卫只能按账号类型引导。H04 画布不可键盘操作，H04/H06 交接把键盘可达留给 H11 卡片视图。
+- **决定**：
+  1. 新建 `api/graph.ts` 的 `PublishedGraphApi.getPublished(cid, version)`，`version` 必填且须为正整数（否则不发请求），前端没有任何不带版本读图的封装。
+  2. `composables/useStudentGraph.ts` 先读课程详情：`my_role ≠ student` 显示「此页面向学生」且不发图谱与详情请求；`published_version = null` 显示「尚未发布」且不发图谱请求；否则按 `published_version` 读图，响应的 `course_id`、`graph_version` 必须与请求一致（草稿的 `graph_version` 为 null，会被拒绝），不一致按数据异常处理。`GRAPH_NOT_PUBLISHED` 显示「尚未发布」，`NOT_FOUND`（版本在读图前被回滚/替换）提示重新加载，`COURSE_FORBIDDEN` 回课程列表并提示。
+  3. 卡片由同一份已发布图经 `toKnowledgeCards` 派生（章节目录顺序 → 层级 → 名称 → ID），不调用没有版本参数的 `GET /kp`；详情抽屉复用 H06，只在学生角色下出现。
+  4. 图与卡片共用 H05 `useGraphFilters` 的筛选与选中：在图上选中后切到卡片，卡片跳到选中项所在页；工具栏新增 `showStatuses` 属性（缺省 true），学生页关闭审核状态筛选。
+  5. `KnowledgeCards.vue` 分页（缺省每页 12）并可完整键盘操作：卡片是原生按钮（Enter/空格选中），卡片组只占一个 Tab 位，方向键移动且越过页边自动翻页，Home/End 到本页首尾，PageUp/PageDown 翻页；列表变短时页码收回最后一页。
+  6. 路由新增 `/courses/:cid/graph`（`STUDENT_GRAPH_ROUTE`，`anyAccountRole`），课程页只对课程内学生显示「浏览课程图谱」入口；草稿防护不依赖路由守卫。
+- **后果**：课程内教师不能用本页预览学生所见（需要详情接口加版本参数后再开放）。图谱按课程详情里的版本号读取，详情接口按后端当前发布版读取，两次请求之间若恰好发布新版本，详情可能来自新版本（详情响应不带版本号，前端无法校验）。
+- **回滚**：删除 `api/graph.ts`、`composables/useStudentGraph.ts`、`components/KnowledgeCards.vue`、`views/StudentGraphView.vue`、`tests/frontend/h11.test.ts`；还原 `router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/GraphToolbar.vue` 的本任务改动并删去本 ADR；无契约、数据或依赖变更。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

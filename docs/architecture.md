@@ -41,6 +41,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 课程上下文（B04）：`src/frontend/src/stores/course.ts` 的 `useCourseStore` 持有当前课程与课程内图谱（`GraphExchange`）、问答历史（`ChatTurn[]`）。切课即清空并中止旧 `AbortController`；composables 先 `beginRequest()` 取作用域，把 `scope.signal` 交给 HTTP 客户端，再经 `setGraph` / `appendChatTurns` / `commit` 提交，作用域按代次失效，晚到响应被丢弃。store 与组件都不直接发请求。
 - 图谱画布（H03/H04）：`graph/adapter.ts` 把 `GraphExchange` 转为独立的 G6 数据；`graph/lifecycle.ts` 的 `createGraphLifecycle` 负责建图、串行更新、resize 与销毁，G6（`@antv/g6`，版本精确锁定）经工厂按需加载，工厂可由 `GRAPH_FACTORY_KEY` 注入替换；`components/GraphCanvas.vue` 只接收适配图并发出 `nodeClick(kpId)`，不发请求（ADR-040）。
 - 图谱筛选与布局（H05）：`composables/useGraphFilters.ts` 在适配图上按搜索词、关系类型、知识点类型、审核状态、章节算出可见图（关系须两端可见，无悬空边），并给元素打 `rejected`/`lowConfidence`/`selected` 状态；选中与布局独立于筛选条件。`components/GraphToolbar.vue` 是搜索、关系图例兼筛选、布局切换与清空的受控组件。`GraphCanvas` 的 `layout` 属性经 `lifecycle.setLayout` 在原图上重新布局（层次 `antv-dagre`／力导向 `d3-force`），不重建、不重设数据（ADR-052）。
+- 学生图谱页（H11）：`views/StudentGraphView.vue`（`/courses/:cid/graph`）组装画布、工具栏、卡片与详情；`composables/useStudentGraph.ts` 只在课程内学生角色下、按 `Course.published_version` 经 `api/graph.ts` 读图并核对响应的 `course_id`/`graph_version`，任何入口不读草稿；`components/KnowledgeCards.vue` 是分页、可键盘操作的卡片视图，与图共用 `useGraphFilters` 的筛选与选中（ADR-063）。
 
 ## 后端启动与健康检查（B05）
 
