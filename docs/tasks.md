@@ -1081,3 +1081,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - G01 待决：从 Neo4j/SQLite 读出可见草稿与修订的装载归 G04（P4～P7）；快照章节带 `parent_id`，而 Neo4j 章节与契约 `Chapter` 尚无此字段，章节层级落地时需同步（ADR-031）。
 - G02 验收：同一尝试（幂等键 `version_id`）至多成为一个版本；版本号按课程连续、失败不占号，`(course_id, version)` 唯一；失败行带原因永久可查且不进版本列表；已提交版本不可删改。G02 待决：清扫过期尝试归 G05；租约时长由调用方传入（G04 读 `PUBLISH_LEASE_SECONDS`）。
 - G03 验收：物化只写 `(course_id, 新 version_id)`，旧版本副本与发布指针不变，学生照读旧版；向量空间或维度不符、缺向量在连库前失败，缺来源块整体回滚；重试同一版本先删后建、不重复；P9 读回复算摘要一致。G03 已决：已发布知识点对外状态恒为 `approved`、来源类别恒为 `manual`（ArvinHan 2026-09-26，ADR-033 第 5 条）。G03 待决：已发布详情的来源没有原文片段。
+
+## 2026-09-26 F08 教师节点编辑与人工编辑锁（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F08 | DONE（待 PR 审查/合并） | 实现教师节点编辑与手改锁 | ArvinHan（Claude） | `claude/project-thread-z0m8yg` / `main@ebb0f42` | `src/backend/app/services/graph/edit_node.py`、`src/backend/app/api/graph_nodes.py`、`tests/backend/test_f08.py`；扩围 `src/backend/app/repositories/graph_edit.py`（Cypher 与 SQLite 查询）、`src/backend/app/main.py` 与 `src/backend/app/schemas/contracts.py`（各一处注册）、`tests/integration/test_f08.py`、契约（`api.v1.yaml`、`errors.v1.md`、生成物）、`src/frontend/src/api/http.ts` 与 `taskEvents.ts`（错误码副本）、`docs/decisions.md`（ADR-035）、`docs/architecture.md`（错误码表）、`specs/teacher-review-publish.md`（待细化四条） | `test_f08.py` 62 passed（实现前 61 failed）；`tests/integration/test_f08.py` 8 passed（真实 Neo4j 5.26）；后端全量 3021 passed；集成全量 123 passed / 4 skipped；前端 type-check 通过、263 passed；`verify.sh` exit 0；`docs/handoffs/claude-f08.md` |
+
+- 验收：后写者 `expected_revision` 过期 → 409 `REVISION_CONFLICT` 带当前内容，不覆盖；教师修改（含只改状态）置 `locked = true`；解锁只能经单独的 `unlockKnowledgePoint`，修改接口带 `locked` 字段 → 422；F04 自动写入跳过加锁节点，解锁后恢复更新；新建知识点必须带至少一条本课程、已提交修订的来源（ADR-035）。
+- F08 待决：前端尚无为新建知识点选择来源块的接口与交互（无按资料列块的 API）；人工新建节点的状态定为 `approved` 由 Claude 选定，待签收；审计日志归 F12；删除与合并归 F09/F10。
