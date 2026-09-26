@@ -41,6 +41,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 课程上下文（B04）：`src/frontend/src/stores/course.ts` 的 `useCourseStore` 持有当前课程与课程内图谱（`GraphExchange`）、问答历史（`ChatTurn[]`）。切课即清空并中止旧 `AbortController`；composables 先 `beginRequest()` 取作用域，把 `scope.signal` 交给 HTTP 客户端，再经 `setGraph` / `appendChatTurns` / `commit` 提交，作用域按代次失效，晚到响应被丢弃。store 与组件都不直接发请求。
 - 图谱画布（H03/H04）：`graph/adapter.ts` 把 `GraphExchange` 转为独立的 G6 数据；`graph/lifecycle.ts` 的 `createGraphLifecycle` 负责建图、串行更新、resize 与销毁，G6（`@antv/g6`，版本精确锁定）经工厂按需加载，工厂可由 `GRAPH_FACTORY_KEY` 注入替换；`components/GraphCanvas.vue` 只接收适配图并发出 `nodeClick(kpId)`，不发请求（ADR-040）。
 - 图谱筛选与布局（H05）：`composables/useGraphFilters.ts` 在适配图上按搜索词、关系类型、知识点类型、审核状态、章节算出可见图（关系须两端可见，无悬空边），并给元素打 `rejected`/`lowConfidence`/`selected` 状态；选中与布局独立于筛选条件。`components/GraphToolbar.vue` 是搜索、关系图例兼筛选、布局切换与清空的受控组件。`GraphCanvas` 的 `layout` 属性经 `lifecycle.setLayout` 在原图上重新布局（层次 `antv-dagre`／力导向 `d3-force`），不重建、不重设数据（ADR-052）。
+- 学生图谱页（H11）：`views/StudentGraphView.vue`（`/courses/:cid/graph`）组装画布、工具栏、卡片与详情；`composables/useStudentGraph.ts` 只在课程内学生角色下、按 `Course.published_version` 经 `api/graph.ts` 读图并核对响应的 `course_id`/`graph_version`，任何入口不读草稿；`components/KnowledgeCards.vue` 是分页、可键盘操作的卡片视图，与图共用 `useGraphFilters` 的筛选与选中（ADR-063）。
 
 ## 后端启动与健康检查（B05）
 
@@ -121,7 +122,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 | `NodeSource` | `ai`、`manual` | lower | `KnowledgePoint.source`、`Relation.source` | 一致。自动降级只作用于未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`，见规格「前置关系成环处理」） |
 | `DocumentFormat` | `pdf`、`docx`、`txt`、`markdown` | lower | `Document.format` | 一致。wire 值是 `markdown`，扩展名 `.md` 不是枚举值 |
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
-| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影 |
+| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影；I02 的 `app/services/learning/progress.py` 负责投影与批量写入，`GET`/`PUT /progress` 仅学生成员可用（ADR-064） |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
 | `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | `ff30e0` 无此枚举。`insufficient_evidence` 取代 `740adb` 的旧值（语义为生成模型以哨兵声明证据不足），A09 决定（ADR-015 决定 3），B13 落实真源；前两者不调用生成，后两者调用了生成 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
@@ -165,7 +166,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 | 版本标识 | 内部 `version_id`（ULID，尝试开始时生成、永不复用）；对外整数 `version`（按课程、提交时分配 `max+1`，无空洞） |
 | 快照位置 | SQLite `GraphVersion.snapshot_json` 是版本内容的真相，附 sha256 摘要；Neo4j 按 `version_id` 物化副本供遍历与向量检索 |
 | 文本块固定 | 文本块按资料修订（资料 + 内容哈希 + 解析器版本）生成 ID，一经写入不可变；快照固定修订列表，检索按 `revision_id` 过滤，不按 `material_id`（修订 1） |
-| 向量版本 | 知识点向量随版本复制；文本块向量共享；Neo4j 向量索引「多取再过滤」 |
+| 向量版本 | 知识点向量随版本复制；文本块向量共享、发布时补齐（ADR-066）；Neo4j 向量索引「多取再过滤」 |
 | 向量空间 | 运行时只有一个空间（模型 + 维度）；换模型须停机离线重新向量化 Neo4j 实际存量中的全部文本块、草稿知识点与已提交版本副本，并按存量核对；缓存与中间产物中的向量带空间标识；运行时写入只接受当前空间，只有迁移命令可写迁移目标空间（修订 2 补注）；配置与记录不一致即拒绝启动；向量是派生数据，重算不产生新版本（修订 1、修订 2） |
 | 提交点 | 唯一：SQLite 中「CAS 切换发布指针 + 分配版本号 + T7 推进任务」的单个事务。之前任一步失败，按 `(course_id, version_id)` 删除 Neo4j 副本并把尝试记为 `failed`，学生继续读旧版本 |
 | 互斥 | 同课程同时至多一个发布/回滚（SQLite 部分唯一索引）；草稿写入与建快照共用 A06 的 SQLite 课程写锁，发布只在读草稿的几秒内持锁 |
@@ -203,7 +204,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 - API 响应、任务事件、图谱导入/导出格式先在 `src/contracts/` 版本化。
 - LLM 是可替换适配器，基础 URL、模型和密钥均来自环境变量。
-- 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。
+- 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。教师图编辑审计（F12，ADR-061）在 SQLite `graph_edit_logs`：与 `draft_revision + 1` 同一事务写入 `pending`，Neo4j 写入后置 `committed`/`aborted`，遗留行由下一次同课程教师写入持锁对账；摘要白名单并脱敏。
 
 ## 持续集成
 

@@ -1,1 +1,1 @@
-"""Learning progress and next-step recommendation: pure eligible set (I03), ranking (I04)."""
+"""Learning progress and next-step recommendation: progress projection and writes (I02), pure eligible set (I03), ranking (I04)."""

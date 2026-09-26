@@ -167,6 +167,7 @@
 | D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
 | D-15 | 赛题「知识抽取准确率不低于 70%」是否同时约束关系（REQ-01）。**已关闭**：实体和关系分别计算、各自不低于 70%，写入 `specs/course-knowledge-graph.md` 验收 7 与 K01/K02（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
 | D-16 | C07 资料列表的 `Document.parse_status` 取自哪里、失败/取消后的「再处理」入口（A03 交出项）。**已关闭**：`parse_status` 在读时取该资料**最新创建任务**的 `stage`（单一事实来源，worker 不另写）；`materials.parse_status` 列不再维护，保留默认值待后续迁移清理。MVP 的再处理只靠**重新上传**（新资料、新任务），不新增端点、不改契约；再处理端点留作后续任务（ArvinHan，2026-09-25） | 技术负责人 | 已完成（C07 落实） |
+| D-17 | 教师图谱编辑页缺少原子任务：H11 是学生端浏览页（不取草稿），H09 审核队列不含画布编辑，H07 节点编辑面板与 H08 连边编辑无页面可挂，K05 教师主线无法端到端覆盖编辑。**已关闭**：补登 **H14 实现教师图谱编辑页**（依赖 H05、H06、H07、H08；K05 增加对 H14 的依赖；原子清单增至 142 项）（ArvinHan，2026-09-26 选择「新增任务」；issue #281） | 产品负责人 / 协调 Agent | 已完成（清单补登；实现待认领） |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -1207,3 +1208,101 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
 - J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
+
+## 2026-09-26 F11 审核队列和单项处理（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F11 | DONE（分支 `claude/project-thread-bd1f83`，待 PR 审查/合并；issue #103） | 实现审核队列和单项处理 | ArvinHan（Claude） | `claude/project-thread-bd1f83` / `main@a7d8075` | `src/backend/app/services/graph/review.py`、`src/backend/app/api/review.py`、`tests/backend/test_f11.py`；扩围 `src/backend/app/repositories/review.py`、`src/backend/migrations/013_review_dismissals.sql`（迁移号协调者预分配）、`api/graph_nodes.py` 的 `_run` 一个分支、`main.py`、`schemas/contracts.py`、契约与生成物 | 见 `docs/handoffs/claude-f11.md`；ADR-060 |
+
+- 验收：三栏按 ADR-060 分类（低置信度关系、E08 名称归一 + 已存别名的疑似重复对、发布后无边的孤立节点）；通过、拒绝、合并后 `totals` 与各栏相应变化，重复提交同一动作 200 `changed = false`，已不在队列 404；各栏固定排序 + 键集分页，边处理边翻页不漏不重。
+- F11 待决（需 ArvinHan）：ADR-060 签收（尤其「疑似重复」只用名称归一、不含向量相似；「确认保留」按节点永久生效；新增 `resolveReviewItem` 而不是借 `/relations`）；D-08 阈值定稿后是否把 E09 向量候选并入疑似重复栏。
+### F11 独立审查与并行核查遗留（2026-09-26，协调者；不含已修项）
+
+背景：F11 由另一会话的 PR #282 实现；本会话另派的独立实现已作废（SUPERSEDED），但两者都对 #282 做了独立核查，结论如下。已修项见下方「F11 审查修复」。以下均为**未修**、需后续任务或 ArvinHan 裁决的事项。
+
+- **M2 CI 掩盖（中）**：`tests/backend/test_f11.py` 有 23 个真实 Neo4j 用例（`skipif` 依赖 `SMARTSKETCH_TEST_NEO4J_*`），而 `.github/workflows/ci.yml` 只跑 `pytest tests/backend -q` 且不设该 env、也无 Neo4j service 与 `tests/integration` job → CI 恒为 17 passed / 23 skipped 报绿；`docs/atomic-tasks.json` 的 F11 `verification_command` 同样无 env。仓库惯例是 live 用例放 `tests/integration`（F09/F10/J01/K10）。建议迁目录或给 CI 加 Neo4j service。
+- **M3 审计缺口（中，跨任务）**：F12（ADR-061）只审计 F08 新建/修改/解锁、F09 删除、F10 合并五个入口。F11 的关系 approve/reject（`repositories/review.py`）与节点 reject 是**直接 Cypher**，不经这五个入口、也直接调 `bump_draft_revision` → 审核队列的图写入**不进审计表、不做 reconcile**，而规格「一致性」要求修改记录写入日志。需显式跟进项（或让 F11 接入 `audit.begin/commit`）。
+- **M4 dismissals 永久且无撤销入口（中）**：`review_dismissals`（迁移 013）按 `kp_id`/关系对永久生效，没有 API 或界面可撤销；而 `kp_id` 是确定性派生 `derive_kp_id(course, task, candidate_key)`，`tasks.py` 明说重试返回**原 task_id** → 重跑抽取复用同一批 ID，「不是重复/确认保留」的记录会**静默抑制重建后的条目**（实测：dismiss 后删掉一方、再用同一 ID 建回，totals 仍为 0）。ADR-060 只写「留下的记录无害」，未覆盖该路径。
+- **D-1 已修**（`bump_draft_revision` 可重跑事务内未记忆化）→ 见下方审查修复。
+- **D-2 低置信度栏口径（中，口径/覆盖缺口）**：低置信度关系只按 `status == "low_confidence"`、**无数值阈值**；而 ADR-029/F13 已决「D-08 签收前自动写入的状态一律 `draft`」，`low_confidence` 只由 ADR-009 的成环降级产生（`services/graph/downgrade.py`）。后果：**未发生过成环降级的课程，该栏恒为空**，即使草稿里全是低置信度 AI 边；现有验收靠手工种 `low_confidence` 行证明，不代表真实数据。`specs/teacher-review-publish.md`「低置信度阈值」仍是待细化，D-08 签收后需回改。
+- **D-3 孤立定义口径（低-中，需产品裁决）**：实现只按「没有未拒绝的相连边」，**不含「无章归属」**（与 F07 `GraphStats.isolated_count` 一致）。只挂 `chapter_id`、没有任何关系的节点会进孤立栏，教师「确认保留」后按节点 ID 永久压制。需要在两个自洽口径里选一个并写进规格。
+- **D-4 新端点契约未声明 503（低）**：`GET /review` 与 `POST /review/actions` 的契约未声明 503，而实现（复用 `graph_nodes._run`）在 Neo4j 不可达时返回 503 `STORAGE_UNAVAILABLE`，交接也把 503 写进接口变更 → 契约/实现/交接三者不一致（`/graph` 同样未写 503，属既有惯例，非回归）。建议补可复用的 503 响应组件。
+- **D-5 幂等判断顺序（低）**：「状态已是目标值 → `changed=false`」排在「仍在队列」判断之前，故「已 approved、但其后某端点被置 rejected」的关系再 approve 返回 200 而非 ADR-060 决定 7 的 404。
+- **D-6 跨模块私有导入（低，建议）**：`api/review.py` 从 `api/graph_nodes.py` 导入私有 `_context`/`_run`，并为此改了后者（+3 行，其中 `isinstance(node, dict)` 分支现有调用方不可达）。建议把 `_context`/`_run` 上提到 `api/dependencies.py`（共享 adapter 的既定位置），F11 就不必动 F08/F12 的文件。**合并期已处理**：与 F12 的 `_run(request, access, ...)` 签名冲突已解，`api/review.py` 两处调用点已改传 `access`。
+- **D-8 字段名（低）**：`similarity` 对 same_key/alias 恒为 1.0、对 containment 为有效字符比，实际只有三档语义、用途是排序；契约已注明，但字段名与 0～1 值域易被前端当相似度展示。建议改名或强化描述。
+- **D-9 关系新增 `revision` 属性未登记（低）**：`repositories/review.py` 给关系写 `coalesce(r.revision,0)+1`，但 `docs/architecture.md` 的 Neo4j 模型段与契约 `Relation` 都未登记，事实上单方面定了 H08 的待决「关系是否加修订号」。
+- **缺证据（低）**：无「空草稿队列 → 200 + 三栏空 + totals 全 0」用例；无「他课教师 → 403 `COURSE_FORBIDDEN`」用例（只测了本课学生 403）；无「队列不含已发布副本节点」的固化用例（结构上已排除：`_draft_scope` 硬编码 `version_id="draft"`，端点无 `version` 参数）。
+- **已核实的优点（记录备查）**：键集分页为唯一总序（confidence+rel_id / -similarity+左右 ID / name+kp_id）+ 严格 `>` + `_key_shape` 拦跨栏，边处理边翻页不漏不重；关系 approve/reject 与 F08/F09/F10 用同一把课程写锁、`SET r.status` 原地改（rel_id 不变）；幂等由 `INSERT OR IGNORE` + 状态条件写保证；`gen-contracts.sh --check` 与 `check_contracts.py` 均 PASS。
+
+## 2026-09-26 F12 图编辑审计日志（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F12 | DONE（待 PR 审查/合并，issue #104；**独立审查 APPROVE_WITH_NOTES，必改项已修**） | 实现图编辑审计日志 | ArvinHan（Claude） | `claude/project-thread-21sjlj` / `main@a7d8075` | `src/backend/app/repositories/edit_logs.py`、`src/backend/app/services/graph/audit.py`、`tests/backend/test_f12.py`；扩围 `src/backend/migrations/012_edit_logs.sql`、`tests/integration/test_f12.py`，接入点 `services/graph/edit_node.py`、`delete_node.py`、`merge_nodes.py`、`api/graph_nodes.py`（传调用者）；`docs/decisions.md`（ADR-061）、`docs/architecture.md` 一句、`specs/teacher-review-publish.md`「一致性」 | 红灯：收集错误（模块不存在）；`test_f12.py` 后端 30 passed、集成 8 passed（真实 Neo4j 5.26）；16 处反向篡改全部检出（2 处补强用例后）；后端全量 3132 passed；集成全量 341 passed、8 skipped（真实 Neo4j，Docker 用例跳过）；**独立审查**：修正 PYTHONPATH 后自证测的是本分支代码，后端 30 passed、集成 8 passed、回归 88 passed、6 处独立篡改全部检出；已修 M2（重试预算断言不再由 `RETRY_DELAYS` 派生，篡改 `RETRY_DELAYS=()` 现在红灯）、M1 与脱敏/只追加缺口写入 ADR-061；迁移 012 与 #282(F11) 的 013 无冲突；`verify.sh` exit 0；`docs/handoffs/claude-f12.md` |
+
+- 验收：新建、修改、解锁、删除、合并各记一行 `graph_edit_logs`，含操作者、`created_at`/`resolved_at`、写入后的 `draft_revision`、节点修订号前后值与白名单摘要（合并含直接被合并节点与展平谱系）；只记真实写入，冲突、404、校验失败、成环、未加锁节点的解锁不记；Neo4j 写入失败记 `aborted`；审计更新失败退避重试，仍失败留 `pending`、编辑照常成功，下一次同课程教师写入持锁对账补齐；密钥、令牌、口令散列、私钥与 `password=` 等赋值值不进日志；行只追加，结束后冻结；迁移可按 `ROLLBACK:` 行回滚后重放。
+- F12 待决（需 ArvinHan）：ADR-061 签收；迁移号 012 若与并行 PR 冲突，合并前改为 main 最大号 + 1；审计读接口（教师查看历史）未分配任务；关系编辑（F06 路由未实现）与审核队列操作（F11）接入审计留给对应任务；脱敏只按模式匹配。
+## 2026-09-26 H07 教师节点编辑面板（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H07 | DONE（待 PR 审查/合并，issue #119；**独立审查 APPROVE_WITH_NOTES**） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；type-check 与 build 通过；前端全量**实测 493 passed + 1 failed**，失败项为既有 `b02.test.ts` 子进程 vitest 5 s 超时（本机慢；给 90 s 即通过，`b02.test.ts`/`vitest.config.ts`/`package.json` 本分支未改，`origin/main` 上同样失败）——原写「494 passed」不可复现，已按实测更正；**仅假 API 验证**（真实后端路由已存在但未联调）；独立审查：3 处篡改检出、契约形状与后端 `_CURRENT_FIELDS` 逐字段吻合、`verify.sh` 与 `validate_atomic_plan.py` 通过；`docs/handoffs/claude-h07.md` |
+
+- H07 待决（需 ArvinHan）：ADR-062 签收；教师图谱编辑页无归属（挂载页由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板）；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。
+## 2026-09-26 H11 学生图谱和卡片视图（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H11 | DONE（待 PR 审查/合并，issue #123） | 实现学生图谱和卡片视图 | ArvinHan（Claude） | `claude/project-thread-vrtfxt` / `main@a7d8075` | `src/frontend/src/views/StudentGraphView.vue`、`src/frontend/src/components/KnowledgeCards.vue`、`tests/frontend/h11.test.ts`；扩围新建 `api/graph.ts`、`composables/useStudentGraph.ts`，小改 `router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/GraphToolbar.vue`（`showStatuses`） | `h11.test.ts` 45 passed（测试与实现同批写成，未单独跑红灯）；type-check、build 通过；前端全量 15 files 483 passed；`verify.sh` 通过；15 处反向篡改检出 14，存活 1 处为冗余防护；ADR-063；`docs/handoffs/claude-h11.md` |
+
+- 验收：无发布（`published_version = null` 或 `GRAPH_NOT_PUBLISHED`）显示未发布且不读图；空图显示空态；卡片分页；卡片键盘可达（单 Tab 位、方向键跨页、Home/End、PageUp/PageDown、Enter/空格）；任何入口不取草稿（读图必带发布版本号并核对响应版本，课程内教师不发图谱/详情请求，卡片不调 `GET /kp`）。
+- H11 待决：课程内教师是否需要「以学生身份预览已发布版」（需详情接口加 `version` 参数）；详情响应不带版本号，读图与读详情之间发布新版本时可能不一致；原文阅读器（`locateSource`）与学生端资料名仍未落地（H06 待决）；未做真实浏览器冒烟。
+## 2026-09-26 J04 检索合并与上下文预算（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J04 | DONE（待 PR 审查/合并，issue #133；**独立审查 APPROVE_WITH_NOTES，必改项已修**） | 实现检索合并与上下文预算 | ArvinHan（Claude） | `claude/project-thread-ohmwyv` / `main@a7d8075` | `src/backend/app/services/qa/context.py`、`tests/backend/test_j04.py`；扩围 `docs/decisions.md`（ADR-065）、`specs/grounded-qa.md`（Q3.1 与「待细化」各一条） | 红灯：收集错误（模块不存在）；`test_j04.py` 44 passed；21 处反向篡改全部检出；后端全量 3146 passed；审查独立复跑 44 passed / 全量 3146 passed / 4 处反向篡改检出；已修 docstring 接线示例（M1）并把 ①② 落成规格文字；`verify.sh` 通过；`docs/handoffs/claude-j04.md` |
+
+- 验收：两路候选按 `chunk_id` 去重并保留出处（`origins`、`kp_ids`）；他课、修订不在绑定版本内、不可定位或读不到的块不获得编号（QA-17）；H 为空 → `no_retrieval_hit`，H 非空但无向量候选达到 fake 阈值 → `below_similarity_threshold`（QA-6、QA-7 的 J04 部分）；token 预算整块取舍，不截断文本与定位；图谱上下文无编号。
+- J04 待决：阈值与 `ContextBudget` 三个值无缺省，待 K01 调参、J07 配置；「只有向量相似度能打开闸门」与「预算放不下任何块时按 `below_similarity_threshold` 拒答」待签收（ADR-065）；运行时文本块向量写入缺口（J01 待决）仍未补，接上前问答总会拒答。
+## 2026-09-26 G08 发布时补齐文本块向量（Claude，新增任务）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G08 | DONE（待 PR 审查/合并） | 发布时补齐文本块向量（J01 发现的缺口，ArvinHan 2026-09-26 同意新增） | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@a7d8075` | `src/backend/app/services/versions/chunk_vectors.py`、`tests/integration/test_g08.py`；扩围 `src/backend/app/services/versions/publish.py`（P8/P9 各一处）、`specs/teacher-review-publish.md`（P8、P9、V8 各一句）、`docs/architecture.md`（一句）、`docs/decisions.md`（ADR-066） | 红灯：收集错误（模块不存在）；`test_g08.py` 10 passed（真实 Neo4j）；9 处反向篡改，补 1 个用例后全部检出；全量见 `docs/handoffs/claude-g08.md` |
+
+- 依赖：G03、G04、J01、E07。J04 的端到端检索依赖本任务（原子清单 `docs/atomic-tasks.json` 是基线计划，未改）；反向记入 J01/J04 待决：运行时文本块向量只由本任务的发布路径写入，没有发布就没有向量。
+- 验收：发布后版本修订内的全部文本块（包括没有被引用的块）都有节点和当前空间向量，J01 能检索到；已有向量的块不再调用模型；版本外修订的块不处理；向量调用失败时发布在 P8 失败，指针不变；P9 能发现缺向量、维度不对或缺 `revision_id` 的块；嵌入器空间不符时拒绝。
+- **迁移应用顺序（F11 审查 S2，实测可复现）**：`sqlite.py` 拒绝「比已应用版本更旧的迁移」。若某环境先应用了 F11 的 `013_review_dismissals.sql`，之后再引入 F12 的 `012_edit_logs.sql`，012 在该库上**永久无法应用**（需按 `backups/*-before-013.sqlite` 恢复）。本批把 F12（012）与 F11（013）放在同一合入窗口，迁移按版本号顺序 012 → 013 应用；**任何环境不得先单独跑 013**。
+- G08 待决：本任务之前已经提交的版本没有文本块向量，回滚到这些版本时检索结果不全（MVP 阶段没有真实数据）；**补齐途径未闭环**——「重新发布一次即可补齐」已被独立审查证伪（幂等路径跳过 P8；旧修订被新修订取代后永远补不上），需为 G06 或 `scripts/reembed.py` 记「按版本补齐块向量」子命令；首次发布耗时与**尝试租约覆盖**尚未实测（首次发布若超过尝试租约，`reclaim_expired` 会把仍在进行的尝试判失败，而块向量已写一部分）；**跨任务缺口（审查 M3）**：`ensure_vector_indexes` 只在 `scripts/reembed.py` 与测试夹具调用，`main.py` 启动校验与 `apply_migrations`（只接受 `CREATE CONSTRAINT`/`CREATE INDEX`）都不建 `CREATE VECTOR INDEX`，`EXPECTED_SCHEMA` 也不含它 → **P9 绿不等于 J01 可检索**，归 F03/F14 确认。另：P9 只查 `revision_id IS NULL`，非空但错误的值不检出（J01 会静默丢弃该块）；P9 不校验 `document_id`。
+
+## 2026-09-26 断点恢复批次：F11、F12、H07、H11、I02、J04、G08（Claude，协调者）
+
+**断点事实（已核实，非推测）**：上一会话中断时的现场为——本地 `main` 落后远端 28 个提交；6 个 PR（#275 H11、#276 H07、#277 J04、#278 G08、#279 F12、#280 I02）已开待收；**F11 是真正中断的任务**（issue #103 标 `status:in-progress`，无分支、无提交、三个目标文件都不存在，但 Docker 容器 `ss-neo4j-f11` 仍在运行，为其遗留开发环境）。恢复期间发现**另一会话**已在 `17:07Z` 用 PR **#282** 完整实现 F11（17 文件、+2289/-46、迁移 013、契约更新、40 用例），因此本会话派出的并行 F11 实现**作废（SUPERSEDED）**，改为对 #282 的独立审查；该分支名 `claude/f11-f12-h07-h11-i02-j04` 也印证中断批次就是这六个任务加 F11。断点前最后一笔提交为 `bceeced`（D-17 补登 H14 教师图谱编辑页 + K05 增加依赖，issue #281）。
+
+| 原子 ID | 状态 | 本批处置 | 独立审查结论 | 审查修复 |
+| --- | --- | --- | --- | --- |
+| F11 | DONE（本批合入；#282，ADR-060） | 采纳另一会话实现；本会话并行实现作废 | REQUEST_CHANGES → **已修 S1**（merge 不校验是否在疑似重复栏，无关节点可被合并）与 **M1**（`bump_draft_revision` 在可重跑事务内未记忆化） | 见 `docs/handoffs/claude-f11.md` 与本批说明；遗留项见上一小节 |
+| F12 | DONE（本批合入；#279，ADR-061） | 采纳 | APPROVE_WITH_NOTES | M2 测试去自证（篡改 `RETRY_DELAYS=()` 现在红灯）；M1 租约错记窗口与脱敏/只追加缺口写入 ADR-061；迁移 012 与 013 无冲突 |
+| H07 | DONE（本批合入；#276，ADR-062） | 采纳 | APPROVE_WITH_NOTES | 证据行按实测更正（493 passed + 1 既有 b02 flake）并补「仅假 API 验证」；删除确认的焦点管理、`aria-invalid`、别名标签一致性已修（h07 61 passed，3 处篡改检出） |
+| H11 | DONE（本批合入；#275，ADR-063） | 采纳 | APPROVE_WITH_NOTES（无阻断） | 补 IAM-11 的「课程详情 404 `GRAPH_NOT_PUBLISHED`」回归用例（h11 46 passed）；交接补 `getCourse` 未实现这一依赖 |
+| I02 | DONE（本批合入；#280，ADR-064） | 采纳 | APPROVE_WITH_NOTES | 补有鉴别力的「写事务内解析发布指针」用例（原断言恒真，审查实测该篡改存活）；`identity-access.md` 与契约的 `user_id` 多余字段口径冲突显式落文并列入签收；`reason="duplicate"` 登记进 `errors.v1.md` |
+| J04 | DONE（本批合入；#277，ADR-065） | 采纳 | APPROVE_WITH_NOTES | M1 接线示例错误已修（`functools.partial` 与 keyword-only `chunk_ids` 不兼容，J07 照抄即崩）；①② 待签收落成 ADR-065 与 `specs/grounded-qa.md` 条文 |
+| G08 | DONE（本批合入；#278，ADR-066） | 采纳 | REQUEST_CHANGES（仅文档） | ADR 撞号 047 → **066**（7 处 G08 引用；F10 语境的 ADR-047 未动，含 `src/contracts/*`）；被证伪的「重新发布一次即可补齐」按实测更正；补记补齐途径未闭环、租约覆盖未实测与向量索引无生产创建路径（M3，归 F03/F14） |
+
+- **合并方式**：七个分支按 ADR 号升序（060→066）合入集成分支 `claude/integration-0926`，`docs/decisions.md` 与 `docs/tasks.md` 的末尾追加型冲突一律「两段都保留」；唯一的代码冲突在 `api/graph_nodes.py`——取 F12 的 `_run(request, access, operation)` 签名与 `_context(request, access)`，保留 F11 的 `dict` 返回类型与 `isinstance` 分支，并同步把 `api/review.py` 的两处调用点改为传 `access`（否则审核动作会 TypeError→500）。**迁移应用顺序**：012（F12）与 013（F11）必须同一窗口合入并按版本号顺序应用，任何环境不得先单独跑 013（见 G08 待决中的 S2 记录）。
+- **环境事实（写给后续会话）**：worktree 里共享的 `.venv` 是 editable 安装、`app` 包指向**主仓**——在任何 worktree 里跑 Python 测试必须带 `PYTHONPATH=$PWD/src/backend`，否则测的是主仓代码（会假绿或 ImportError）；本批全部审查与实现任务都据此修正并在报告里附了自证输出。集成测试连真实 Neo4j 需 `SMARTSKETCH_TEST_NEO4J_URI=bolt://localhost:17687 SMARTSKETCH_TEST_NEO4J_USER=neo4j SMARTSKETCH_TEST_NEO4J_PASSWORD=testpassword1`（容器 `ss-neo4j-f11`，Neo4j 5.26.31）；注意 `.env` 里的 `NEO4J_URI` 仍写 7687，与容器端口不一致。同名校验：`tests/backend/test_f08.py` 与 `tests/integration/test_f08.py` 同名，混跑会触发 pytest import mismatch，须按目录分开跑。
+- **本批新解锁（可开工）**：H14（教师图谱编辑页，依赖 H05/H06/H07/H08，D-17 补登，issue #281）、I05（推荐查询 API，依赖 I02/I04/G07）、J05（有证据问答生成，依赖 J04/E04）；其后 H09（F11+H07）、J06（J05）、I06（I05）跟进。
+- **需 ArvinHan 签收（本批累计）**：ADR-060～066 七条；ADR-061 的租约被夺窗口如何处置（当前选择如实记录、接受残留风险）与脱敏/只追加缺口是否本轮补；ADR-065 的「图证据块在闸门打开后可被引用」与「预算 0 块复用 `below_similarity_threshold`」两点；ADR-064 的 `user_id` 多余字段覆盖 `specs/identity-access.md` 相应条目；I02 的 `reason="duplicate"` 登记。
+- **收口**：#273（codex 的 J02 draft）已被 #274 合入的 J02 取代，作为重复草稿关闭；已合入 main 但 issue 仍 open 的陈旧项（#100 F08、#110 G05、#111 G06、#130 J01、#131 J02、#117 H05、#118 H06、#120 H08、#149 K10、#101 F09、#102 F10 等）随本批一并关闭并附合并证据。
+## 2026-09-26 I02 掌握标记 API（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I02 | DONE（待 PR 审查/合并；issue #125） | 实现掌握标记 API | ArvinHan（Claude） | `claude/project-thread-fqm6l4` / `main@a7d8075` | `src/backend/app/services/learning/progress.py`、`src/backend/app/api/progress.py`、`tests/backend/test_i02.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 两行导出、`services/learning/__init__.py` 文档串、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-064、`docs/handoffs/claude-i02.md` | `test_i02.py` 24 passed；8 处反向篡改检出 7 处，存活 1 处为冗余防护（绑定版本号复核，G07 已查）；后端 + 契约全量 3417 passed；`./scripts/verify.sh` 通过；`git diff --check` 干净 |
+
+- 验收：请求体带 `user_id` 整批 422 零写入、查询串 `user_id` 不被读取、学生之间与课程之间隔离；改标后 `GET /progress` 与 I03 可学集合按新投影重算；草稿独有、已删除、他课、已并入他点的来源 `kp_id` 均 422 `not_in_published_version` 且零写入；LP-8/9/16～20 的投影与覆盖、同值写入重放无操作、写事务内复核发布指针、完整性故障 500 只含 `request_id`。
+- 依赖：I01（PR #272）、C03、B12/B12-R1（契约）、G07 均已在 main。无迁移（预分配的 014 未使用）、无契约与依赖变更。
+- 验证：`python3 -m pytest tests/backend/test_i02.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- I02 待决（需 ArvinHan）：ADR-064 签收——教师成员读写进度一律 403（教师查看学生进度须另立接口）；同批重复 `kp_id` 的 `reason` 取 `duplicate`。

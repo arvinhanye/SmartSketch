@@ -25,8 +25,10 @@ const props = withDefaults(
     summary?: GraphSummary | null
     canClear?: boolean
     selectedHidden?: boolean
+    /** 是否显示审核状态筛选与图例；学生看已发布图时关闭（H11），审核状态对学生无意义 */
+    showStatuses?: boolean
   }>(),
-  { chapters: () => [], summary: null, canClear: false, selectedHidden: false },
+  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true },
 )
 
 const emit = defineEmits<{
@@ -159,7 +161,7 @@ const summaryText = computed(() => {
       </label>
     </fieldset>
 
-    <fieldset class="graph-toolbar__group">
+    <fieldset v-if="showStatuses" class="graph-toolbar__group" data-test="status-filter">
       <legend>审核状态</legend>
       <label v-for="item in statusItems" :key="item.status" :data-status="item.status">
         <input

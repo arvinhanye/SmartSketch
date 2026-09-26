@@ -12,7 +12,7 @@ ADR-012、ADR-034）。
   摘要等于当前版本且向量空间相同 → 幂等路径：一个事务内删尝试行、T7、写 ``published_from_revision``，
   返回 ``unchanged = True``，不写 Neo4j；摘要相同而空间不同 → 不变式被破坏，5xx 并告警。
   否则写入快照（``record_snapshot``）。
-- P8/P9 G03 物化并核对；P10 ``materialized``；P11 一个事务内 ``commit_attempt``（取号、指针 CAS）与 T7。
+- P8/P9 G08 补齐版本修订内全部文本块的向量，G03 物化并核对；P10 ``materialized``；P11 一个事务内 ``commit_attempt``（取号、指针 CAS）与 T7。
 
 P2 之后任何失败都走 C1：尝试行条件更新为 ``failed``（0 行说明已提交或已被清扫，**不碰 Neo4j**）；
 若已开始物化，再删除本尝试的 Neo4j 副本，删不掉置 ``cleanup_pending`` 交给清扫（G05）。发布指针在 C1
@@ -36,6 +36,7 @@ from app.repositories.graph_read import GraphReader
 from app.repositories.neo4j import GraphScope, Neo4jRepository
 from app.repositories.versions import CommitRejected, PublishInProgress
 from app.services.graph.read import _relation_chunk_ids
+from app.services.versions.chunk_vectors import index_chunks, verify_chunks
 from app.services.versions.materialize import Embedder, embed_snapshot_nodes, materialize, verify
 from app.services.versions.reconcile import compensate, reclaim_expired
 from app.services.versions.snapshot import (
@@ -255,11 +256,15 @@ def publish(ctx: PublishContext, course_id: str, *, created_by: str | None) -> P
             ):
                 raise PublishFailed(step, "attempt is no longer preparing", version_id)
             step = "P8"
+            chunk_scope = GraphScope(course_id, version_id)
+            revision_ids = [r["revision_id"] for r in snapshot.data["revisions"]]
+            index_chunks(url, ctx.repo, ctx.embedder, chunk_scope, revision_ids, space)  # G08，共享、可重复
             vectors = embed_snapshot_nodes(ctx.embedder, snapshot)
             touched_graph = True
             materialize(ctx.repo, snapshot, version_id, vectors, lambda: space)
             step = "P9"
             verify(ctx.repo, snapshot, version_id, space)
+            verify_chunks(url, ctx.repo, chunk_scope, revision_ids, space)
             step = "P10"
             if not versions.mark_materialized(url, version_id):
                 raise PublishFailed(step, "attempt is no longer preparing", version_id)

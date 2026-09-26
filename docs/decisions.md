@@ -1381,3 +1381,105 @@
 - **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-060：F11 审核队列的三栏定义、排序分页与单项处理
+
+- **日期**：2026-09-26
+- **背景**：契约只有 `getReviewQueue`（三栏，无参数），规格只说「列出低置信度关系、疑似重复知识点、孤立知识点，支持一键通过 / 拒绝 / 合并」，并把「审核队列的排序与分页」列为待细化。未定的是：三栏各按什么条件入列、疑似重复怎样判定、队列存不存、怎样排序与分页才能在教师边处理边翻页时不漏不重、单项处理走哪个接口、处理后怎样离开队列、重复操作返回什么。关系编辑路由 `/relations` 尚未实现，也不能指望前端借它来处理低置信度关系。
+- **决定**：
+  1. **实时计算，不另存队列**。请求开始时读 V，从草稿读可见节点与关系（F07 `GraphReader`，与 `getGraph` 同一可见性），再扣掉 SQLite `review_dismissals`（迁移 013）中教师记下的处理。
+  2. **三栏**：（a）低置信度关系：状态 `low_confidence`、两端都未被拒绝的可见关系，含 ADR-009 降级关系，附 `source_refs`；（b）疑似重复：未被拒绝的可见节点两两比对，用 E08 名称归一（`same_key` / `alias` / `containment`），另把已存的 `aliases` 逐个归一，名称或别名的归一键相交也算 `alias`，原因取最强者；`similarity` 对前两者为 1，包含候选为有效字符比 较短/较长；以一对为单位（`candidates` 恰两项，按 ID 升序），新增必填 `reason`。向量相似（E09）等 D-08 阈值定稿后再接入；（c）孤立知识点：未被拒绝、且没有「关系未拒绝、另一端可见且未拒绝」的相连关系的可见节点，即发布后在图中没有一条边的节点。
+  3. **排序**：低置信度关系 `(confidence 升序, id)`，疑似重复 `(similarity 降序, 小 ID, 大 ID)`，孤立知识点 `(name, id)`，都按码点比较、与存储顺序无关。
+  4. **分页**为键集分页：`limit`（1～200，默认 50）；不带 `kind` 时三栏各返回第一页，带 `kind` 时只填该栏，`cursor` 取上一页 `next_cursors` 中该栏的值（不透明的 base64url JSON，编码本栏最后一条的排序键），下一页取排序键严格大于它的条目。`cursor` 无 `kind`、无法解析或属于另一栏 → 422。`totals` 始终是三栏完整条数。处理掉已看过的条目不会让后续条目被跳过或重复；排在游标之前的新条目要重新从第一页读才看到。
+  5. **单项处理**新增 `POST /courses/{cid}/review/actions`（`resolveReviewItem`，`ReviewAction` 按 `item` 区分）：低置信度关系 `approve` / `reject` 改状态为 `approved` / `rejected`，登记人工贡献（此后自动流程不再降级或改写它）、关系修订号加 1；疑似重复 `merge` 以 `primary_id`（必须是这一对之一）调用 F10 `merge_nodes`（ADR-047 的规则与错误原样适用），`reject` 记为「不是重复」；孤立知识点 `approve` 记为「确认保留」，`reject` 把节点置 `rejected`，按 ADR-035 加锁、登记人工贡献、修订号加 1。
+  6. **写入顺序**：图写入（关系状态、节点拒绝）同 ADR-035：课程写锁（超时 409 `COURSE_BUSY`）→ 读 V → 一个 Neo4j 写事务（锁守卫 → 读 → 判断仍在队列 → `draft_revision + 1` → 条件写）。「不是重复」「确认保留」只写 SQLite，不取课程写锁、不加草稿修订号、不影响发布。批准或拒绝的都是已在环检测范围内的关系（`low_confidence` 的 `PREREQUISITE` 本就参与验环），只维持或删除前置边，不会成环，不再验环。
+  7. **结果**：条目已不在队列中（不存在、不可见、端点已拒绝、已被其他动作处理、不是疑似重复的一对）→ 404 `NOT_FOUND`；同一动作已经生效（关系已是目标状态、节点已拒绝、已记过、被合并节点已并入主节点的 `merged_from`）→ 200、`changed = false`，不写入。响应带处理后的 `totals`，前端刷新后数量一致。
+  8. 审计日志归 F12，本任务不记录。
+- **后果**：队列与草稿永不脱节，代价是每次读取都要全量读草稿并做 O(n²) 名称比对（面向单课程规模）。「确认保留」按节点 ID 记，节点此后又失去所有边也不会再次入列；「不是重复」按一对 ID 记，节点被合并或删除后留下的记录无害。已拒绝的节点与关系不再出现在任何一栏，恢复要通过节点/关系编辑。
+- **回滚**：撤销 `services/graph/review.py`、`repositories/review.py`、`api/review.py`、`main.py` 与 `schemas/contracts.py` 的引用、`api/graph_nodes.py` 的 `_run` 字典分支、契约（`getReviewQueue` 参数与 `ReviewQueue` 字段、`resolveReviewItem` 与相关 schema）并重新生成；迁移 013 按文件头 `ROLLBACK` 行回滚（只丢失「不是重复」「确认保留」记录，条目重新入列）或恢复 `backups/*-before-013.sqlite`。已批准、拒绝或合并的图数据不会自动恢复。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+## ADR-061：F12 图编辑审计日志的存储、跨库顺序与脱敏
+
+- **日期**：2026-09-26
+- **背景**：F12 要求图编辑审计「谁/何时/何版本/变更摘要齐全；跨库失败可重试；不记录秘密」。教师写入（F08 新建/修改/解锁、F09 删除、F10 合并）改的是 Neo4j 草稿，而课程 `draft_revision` 与用户、课程都在 SQLite，两库之间没有分布式事务。ADR-012 修订 3 与 ADR-047 规定合并的**直接**父子关系只记在 F12 审计里（快照只存展平的 `merged_from`）；ADR-034 第 7 条已定发布不写本日志。
+- **决定**：
+  1. **存储**：SQLite 新表 `graph_edit_logs`（迁移 `012_edit_logs.sql`），一行一次教师写入：`event_id`、`course_id`、`actor_id`（`users.id`）、`action ∈ {create, update, unlock, delete, merge}`、`kp_id`（合并为主节点）、`draft_revision`（写入后的课程草稿修订号）、`kp_revision_before/after`、`state ∈ {pending, committed, aborted}`、`summary`（JSON 对象）、`failure_reason`、`resolved_by ∈ {writer, reconcile}`、`created_at`/`resolved_at`（ISO-8601 UTC）。行只追加：触发器禁止删除，结束后的行禁止修改。课程隔离靠 `course_id` 条件；分页以自增 `seq` 为游标。
+  2. **只记真实写入**：持锁并校验通过、即将加 `draft_revision` 时才记；校验失败、`REVISION_CONFLICT`、404、成环、未加锁节点的解锁等不写数据的请求不记。
+  3. **跨库顺序**：`draft_revision + 1` 与 `pending` 行在**同一个** SQLite 事务写入（`edit_logs.begin`，取代写入路径上的 `bump_draft_revision`），所以审计的版本号与课程修订号严格一致，且 V4「先加修订号再写 Neo4j」不变。Neo4j 写入返回后置 `committed`（附写后修订号与最终摘要）或 `aborted`（附错误码或异常类名，不含消息）。置状态的 SQLite 更新以 `state = 'pending'` 为条件，可重复执行；失败时退避重试（0.05/0.2/0.5 s），仍失败只记日志、**不**让已提交的编辑报错（否则客户端重试只会得到 `REVISION_CONFLICT`），行留在 `pending`。
+  4. **对账**：每次教师写入取得课程写锁后、做任何读写之前，先把本课程遗留的 `pending` 行对照 Neo4j 判定（`audit.reconcile`）：`create` 看节点是否存在；`update`/`merge` 看主节点是否已加锁且修订号恰为写前 + 1；`unlock` 看节点是否已解锁；`delete` 看节点是否已不可见。持锁时没有其他教师写入插进来，自动流程又不改加锁节点，所以判定确定。判定未生效的记 `aborted`、原因 `not_applied`。**前提补充（独立审查 2026-09-26 M1）**：「判定确定」还依赖**本课程的写锁未被夺**。`course_locks` 的续约在 `renew` 返回 `False` 时静默返回、写入继续（`repositories/course_locks.py`），而租约默认 60 秒、每 20 秒续约（`config.py`）；若写入方在 `begin` 之后停顿超过租约时长，另一教师可先取锁并**抢在对账前**把这条 `pending` 判为 `aborted`（`not_applied`），而停顿方的 Neo4j 写入随后仍可能成功（条件更新只校验节点 `revision`，未被触碰的节点不冲突）——此时「图已改、审计写 `aborted`」，且该行已被冻结触发器保护，**后续对账无法纠正**。窗口要求写入停顿超过租约时长，实际概率低，但后果不可逆。处置选项（待签收）：(a) 如实把该窗口写进本 ADR 的后果与交接，接受残留风险（当前选择）；(b) 对账跳过 `created_at` 晚于本次取锁时刻的行；(c) 续约失败即中止写入。
+  5. **摘要白名单与脱敏**：只记知识点的 `name/aliases/type/definition/importance/difficulty/status/chapter_id` 与锁状态；修改记提交字段的前后值；新建记字段与来源块及区间；删除记被删节点字段与删除的关系数；合并记主节点、直接被合并节点（ID、名称、修订号）、展平谱系与重接/来源迁移计数。贡献、向量、令牌、请求头一律不进。字符串先去掉形似密钥的片段（`sk-…`、`Bearer …`、JWT、`AKIA…`、argon2 散列、私钥块，以及 `password=`/`token:` 等赋值的值）换成 `[REDACTED]`，再截断到 500 字符；列表最多 50 项。**已知缺口（独立审查 2026-09-26 L1/L3/L4，待补）**：`secret_key`/`credential`/`cookie`/`session` 类关键词、URI 内嵌口令（`scheme://user:pass@host`）、空格分隔的 `--password value`、中文「密码：」目前**不**被脱敏；`merged` 列表未按 50 项截断（`create_summary` 已截断）；`create` 摘要不含锁状态。
+  6. `EditContext` 增加可选 `actor_id`；API 路由传入调用者；为 `None`（内部调用、既有测试）时不记审计，只加草稿修订号，行为与 F08～F10 相同。
+- **后果**：每次教师写入多一次 SQLite 读（查遗留 `pending`，通常为空）和一次更新。进程在 `begin` 之后、下一次同课程教师写入之前崩溃时，该行保持 `pending`，直到下一次写入对账；审计读接口与关系编辑（F06 路由未实现）的审计尚未覆盖。脱敏是模式匹配，不能识别任意形态的秘密；教师在定义里写入的普通个人信息仍会原样记录。**租约被夺时的错记窗口见决定 4 的前提补充**：图已改而审计为 `aborted` 且行被冻结，不可自动纠正。审计行的只追加由两个触发器保证，但 `INSERT OR REPLACE` 可绕过（SQLite 默认 `recursive_triggers = 0`），属防御纵深缺口、当前无调用路径。
+- **回滚**：`git revert` 本任务提交；数据库按迁移文件头部的 `ROLLBACK:` 行在停机时执行（会丢失审计历史，先导出），或从 `backups/*-before-012.sqlite` 恢复。无 Neo4j DDL、契约或依赖变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。**需明确签收**：决定 4 前提补充中的租约被夺窗口如何处置（当前选择 (a) 如实记录、接受残留风险）；脱敏缺口与只追加绕过是否在本轮补。
+## ADR-062：H07 教师节点编辑面板的保存、冲突与锁交互
+
+- **日期**：2026-09-26
+- **背景**：H07 要把 F08（`updateKnowledgePoint`/`unlockKnowledgePoint`，ADR-035）与 F09（`deleteKnowledgePoint`，ADR-048）接成教师编辑面板，验收为「字段错误、revision 冲突、锁/解锁；失败不假装保存成功」。PATCH 必带节点级 `expected_revision`，冲突时 409 `REVISION_CONFLICT` 的 `details.current` 只含名称、别名、类型、定义、状态、锁与重要度/难度，不含章节与来源；删除的 `expected_revision` 可选；保存成功后服务端把节点锁定。
+- **决定**：
+  1. 新增 `api/nodeEdit.ts` 封装读、改、解锁、删四个契约操作，经 `NODE_EDIT_API_KEY` 注入；未注入时组件用 `HTTP_CLIENT_KEY` 的会话客户端构造，不改 `main.ts`。删除总是带上读到的修订号。
+  2. 不做乐观更新：表单是本地副本，只有服务端确认（且响应 `id`/`course_id` 与请求一致）后才更新基准、写回课程 store 中的图谱（改节点或删节点及相连边）并显示成功提示。任何失败都保留表单修改并写明「未保存/未解锁/未删除」；网络中断与超时写明「不能确认是否已保存」并提供重新加载，不猜测结果。
+  3. 只提交改过的字段：名称、定义去首尾空白后比较；别名按行、逗号、顿号分隔并去空项、去重；重要度、难度须为 0～1，已有值不能清空（PATCH 不接受 null）。本地校验错误在首次提交后显示；服务端 422 `details.fields` 按首段字段名落到对应输入框（`aria-invalid` + `aria-describedby`），编辑该字段后清除，认不出的字段给表单级错误。
+  4. 保存遇 `REVISION_CONFLICT`：不覆盖，列出「你的修改 / 最新内容」逐字段差异并阻止再次保存，直到教师选择「采用最新内容」（丢弃本地修改）或「保留我的修改」（以 `current_revision` 为基准重新提交；教师没改过的字段跟随最新内容，不把他人的修改改回去；与最新一致的字段不再提交）。解锁、删除遇冲突时同样换到最新基准并请教师确认后再操作。`details` 形状不完整时只提示重新加载。
+  5. 锁：面板显示锁定状态；保存成功后提示「已锁定，自动抽取不会覆盖」；只有已锁定节点显示「解锁」；服务端返回仍锁定时不提示已解锁。
+  6. 删除须二次确认（`role=alertdialog`），说明相连关系会一并删除，有未保存修改时额外提示。404 时说明「已不存在」并请页面刷新图谱，不提示「已删除」。
+  7. 一次只允许一个写请求；切换知识点或课程时中止在途请求，晚到结果（序号 + 课程作用域）丢弃，不写 store、不提示成功。错误只给固定文案，不回显服务端 message；服务端文本全部插值渲染。
+- **后果**：面板可独立挂到教师图谱页；接入页面由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板。`details.current` 不含章节，采用最新内容时章节沿用本地已知值；新建知识点仍缺来源块选择接口（F08 待决），本面板只编辑已有节点。
+- **回滚**：删除 `src/frontend/src/api/nodeEdit.ts`、`components/NodeEditor.vue`、`composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts` 与本 ADR；无依赖、契约或数据变更。
+## ADR-063：H11 学生图谱页只读已发布版本、图/卡片共用筛选与选中
+
+- **日期**：2026-09-26
+- **背景**：H11 要求学生浏览已发布图谱并可在图与卡片之间切换，验收为「无发布、空图、分页卡片、键盘可用；任何入口不取草稿」。契约 `getGraph` 在省略 `version` 时对课程内教师返回草稿；`GET /kp/{kid}` 与 `GET /kp` 都没有版本参数，同样按课程内角色决定读草稿还是发布版。课程内角色与账号类型无关（教师账号可以在别的课做学生），路由守卫只能按账号类型引导。H04 画布不可键盘操作，H04/H06 交接把键盘可达留给 H11 卡片视图。
+- **决定**：
+  1. 新建 `api/graph.ts` 的 `PublishedGraphApi.getPublished(cid, version)`，`version` 必填且须为正整数（否则不发请求），前端没有任何不带版本读图的封装。
+  2. `composables/useStudentGraph.ts` 先读课程详情：`my_role ≠ student` 显示「此页面向学生」且不发图谱与详情请求；`published_version = null` 显示「尚未发布」且不发图谱请求；否则按 `published_version` 读图，响应的 `course_id`、`graph_version` 必须与请求一致（草稿的 `graph_version` 为 null，会被拒绝），不一致按数据异常处理。`GRAPH_NOT_PUBLISHED` 显示「尚未发布」，`NOT_FOUND`（版本在读图前被回滚/替换）提示重新加载，`COURSE_FORBIDDEN` 回课程列表并提示。
+  3. 卡片由同一份已发布图经 `toKnowledgeCards` 派生（章节目录顺序 → 层级 → 名称 → ID），不调用没有版本参数的 `GET /kp`；详情抽屉复用 H06，只在学生角色下出现。
+  4. 图与卡片共用 H05 `useGraphFilters` 的筛选与选中：在图上选中后切到卡片，卡片跳到选中项所在页；工具栏新增 `showStatuses` 属性（缺省 true），学生页关闭审核状态筛选。
+  5. `KnowledgeCards.vue` 分页（缺省每页 12）并可完整键盘操作：卡片是原生按钮（Enter/空格选中），卡片组只占一个 Tab 位，方向键移动且越过页边自动翻页，Home/End 到本页首尾，PageUp/PageDown 翻页；列表变短时页码收回最后一页。
+  6. 路由新增 `/courses/:cid/graph`（`STUDENT_GRAPH_ROUTE`，`anyAccountRole`），课程页只对课程内学生显示「浏览课程图谱」入口；草稿防护不依赖路由守卫。
+- **后果**：课程内教师不能用本页预览学生所见（需要详情接口加版本参数后再开放）。图谱按课程详情里的版本号读取，详情接口按后端当前发布版读取，两次请求之间若恰好发布新版本，详情可能来自新版本（详情响应不带版本号，前端无法校验）。
+- **回滚**：删除 `api/graph.ts`、`composables/useStudentGraph.ts`、`components/KnowledgeCards.vue`、`views/StudentGraphView.vue`、`tests/frontend/h11.test.ts`；还原 `router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/GraphToolbar.vue` 的本任务改动并删去本 ADR；无契约、数据或依赖变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+## ADR-064：I02 掌握标记 API 的访问角色、写事务内绑定与错误形状
+
+- **日期**：2026-09-26
+- **背景**：I02 实现 `GET`/`PUT /api/v1/courses/{cid}/progress`（`specs/learning-path.md` §5，ADR-014 修订 1 决定 8、9，ADR-017 决定 4、5）。契约未写明教师能否读写进度、同批重复 `kp_id` 的 `reason` 取值，以及“发布指针在写入期间变化时按新版本复核”的实现方式；I01 仓储只提供原始行与调用方事务入口。
+- **决定**：
+  1. 两个接口都用 `course_student` 依赖：只有本课程学生成员可读写**自己**的进度；教师成员 403 `ROLE_FORBIDDEN`，非成员 403 `COURSE_FORBIDDEN`，课程从未发布 404 `GRAPH_NOT_PUBLISHED`。身份只取自令牌；请求项带 `user_id` 因 `ProgressUpdate` 闭合而 422 `extra_forbidden`，查询串中的 `user_id` 不被读取。
+     **本条覆盖的规格条目**：`specs/identity-access.md` §2.3 第 2 条中「运行时客户端即使多传了这类字段，也只能被忽略」这一表述，以及 `specs/identity-access.md` IAM-14（§4 失败路径）中请求体夹带 `user_id` 时的预期「只改动 A 的进度」——两者都改为本条的 422 零写入。覆盖依据是契约 `api.v1.yaml` `PUT /progress` 的 422 说明（「带 `user_id` 等多余字段」属整批零写入）与 `specs/learning-path.md` §5；被覆盖的两处已就地加覆盖声明。该规格自称「访问矩阵与身份规则的唯一规范表述…不一致时回改契约，不改本文」，本 ADR 未按其路径回改契约，属单方面覆盖，待裁决；「不得从请求读取调用者身份」「不得在请求 schema 中定义 `user_id`」两条不在覆盖范围内。
+  2. `PUT` 先查同批重复（通用 422，`details.fields` 每个重复出现项一项 `{in: "body", field: "<i>.kp_id", reason: "duplicate"}`，首次出现项不列），再开 `BEGIN IMMEDIATE`，在持有写锁后按 G07 重新解析发布指针。发布/回滚提交同样需要写锁，因此这就是提交时的最终绑定版本，请求开始后提交的新版本自然用于整批复核；不另做“先绑定、失败再重试”的循环。
+  3. 投影在服务层 `app/services/learning/progress.py`（`project_progress` 供 I05 推荐复用，保证同版本同投影）：已提交快照的节点集与谱系按 `version_id` 缓存；原始行经 I01 `read_progress` 读取。同值写入仍有未被覆盖的来源时以 I01 的 `force` 写入，否则交仓储判为无操作。成功后在提交之后按最终绑定版本重新投影返回。
+  4. 已提交版完整性故障（快照缺失/摘要不符/不可解析/他课、`V = ∅`、谱系违反修订 3 决定 16）以及这两个接口内其他未预期异常，一律 500 `INTERNAL_ERROR`，`details` 只含 `request_id`（`uuid4().hex`），具体原因与节点 ID 只进服务端日志。
+- **后果**：教师端若需要查看某学生进度，须另开接口与规格；I05 推荐直接调用 `project_progress` 即可与 `GET /progress` 同投影。每次投影仍扫描本课程全部已提交版本的版本行（快照解析有缓存），MVP 规模可接受。
+- **回滚**：删除 `app/api/progress.py`、`app/services/learning/progress.py`、`tests/backend/test_i02.py`，撤回 `app/main.py` 的路由注册与 `app/schemas/contracts.py` 的两行导出，删去本 ADR；无迁移、无契约与依赖变更，已写入的进度行保留。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。**待裁决项（决定 1 ↔ `specs/identity-access.md`，2026-09-26 独立审查 M-2 提出）**：`specs/identity-access.md` §2.3 第 2 条与 IAM-14 要求请求体中多余的 `user_id`「只能被忽略」，而契约与 `specs/learning-path.md` §5 要求 422 零写入；本 ADR 决定 1 单方面取了 422，并已在该规格这两处就地加覆盖声明。请裁决二者之一：**(A) 保持 422**——现状，实现与契约不变，由产品/协调 Agent 确认覆盖声明并修正 IAM-14 的预期；**(B) 改为忽略**——须同步改 `api.v1.yaml` 该操作的 422 说明、`specs/learning-path.md` §5 与 `tests/backend/test_i02.py::test_body_user_id_is_rejected_with_zero_writes`，并撤回上述覆盖声明。裁决前实现不改。
+## ADR-065：J04 检索合并、相关度闸门与上下文预算
+
+- **日期**：2026-09-26
+- **背景**：规格 Q1 定义了候选集合 H 与允许引用集合 A，P5 规定 H 为空走 `no_retrieval_hit`、H 非空但无候选达到阈值走 `below_similarity_threshold`，主验收第 8 条要求超出 token 预算时截断后仍可定位、每个编号有效。但规格没有说明：只有图证据（没有相似度）的块如何参与阈值判断，预算截断以什么为单位，以及预算放不下任何块时如何处理。阈值与预算的具体值仍是待细化项（K01）。
+- **决定**：
+  1. 实现在 `services/qa/context.py` 的 `build_context(course_id, revision_ids, vector_hits, subgraph, load_chunks, threshold, budget, estimate_tokens)`。阈值与 `ContextBudget(chunk_tokens, graph_tokens, max_chunks)` 由调用方传入，**不设缺省值**，测试一律用 fake 值；真实值待 K01 标注集调参后由 J07 配置。
+  2. 合并去重：J01 向量命中与 J02 子图证据按 `chunk_id` 合并，保留全部出处（`origins` 为 `vector` / `graph`，`kp_ids` 为经 `EVIDENCED_BY` 关联的知识点），相似度取最大值。
+  3. Q3.1 以 SQLite 中的块为准复核：课程相同、`revision_id` 在绑定版本修订列表内、可定位（第一个能给出 `page` 或 `section_path` 的出处）。读不到的块也剔除。通过者构成 H，各类剔除分别计数。
+  4. **只有向量相似度能打开闸门**：H 中至少一个向量候选的 `score ≥ threshold`（含等号）才进入生成。只来自图证据的块没有相似度，闸门打开后作为补充排在达标向量块之后；有相似度但未达标的块不论是否也来自图，都不进 A。这样用词相近但无关的问题（主验收第 9 条）不会因图谱子串匹配而绕过阈值。**闸门打开后，这些无相似度的图证据块会获得编号并进入 A，即成为可被引用的证据**（J06 的三项复核只查课程、修订、可定位，不查阈值）；这相对规格 Q1「从 H 中选出、达到阈值」的字面是**扩大**，属有意取舍（偏向少答错、保留完整证据链），已同步写入 `specs/grounded-qa.md` Q3.1，并要求 K03 把「引用来自图证据块」单列统计。
+  5. 预算以**整块**为单位：块的文本与定位从不截断，放不下的块跳过，继续尝试后面较小的块，直到 `max_chunks`。token 缺省按渲染后整块的 UTF-8 字节数估算（E03 口径，只会高估）。闸门已开但一个块都放不下时，同样按 `below_similarity_threshold` 拒答（wire 原因是闭集），记 WARNING，`stats.over_budget` 可区分。**该分支的 `reason` 与「相似度不达标」不同义，属 wire 语义合并**：`reason` 是闭集且 J10 只记 `reason`（`stats` 不出进程），故 K03 与 J10 必须另记 `over_budget` 与候选数，才能把预算拒答与阈值拒答分流，否则 QA-6/QA-7 的机器面统计会把两者混为一类。不映射 `BUDGET_EXCEEDED`：O11/QA-28 的预算是 A07 的 **LLM 调用计费预算**（语义是「不发请求」，HTTP 层错误），与「上下文窗口装不下证据」无关。
+  6. 图谱子图渲染为无编号的行（节点在前、关系在后），行内容剔除类标记与哨兵，按行计入独立的 `graph_tokens` 预算；节点放不下时不渲染任何关系。拒答时仍返回全部命中知识点 ID，供 Q4 `related_kp_ids` 导航。
+- **后果**：J05 拿到的编号 `1..k` 与 A 一一对应，J06 可用 `by_index` 复核并构造引用。运行时尚无环节为文本块写向量（J01 待决），接上前向量检索为空，任何问题都会以 `no_retrieval_hit` 或 `below_similarity_threshold` 拒答；这一缺口不在本任务内补。图证据不能单独打开闸门，因此向量召回不足时，即使图谱命中也会拒答，这是有意偏向少答错。**已知遗留**（独立审查 2026-09-26 提出，未在本次实现内修）：`kp_ids` 只取 J02 子图 evidence 内的知识点（`context.py`），对「仅向量命中且不在子图 evidence 内」的块为空，与 Q4 「∪ J02 命中知识点」的字面相比覆盖面偏窄，J06/J07 需知悉，必要时补反向查询；测试全部使用 fake loader，未覆盖真实 `get_chunks` 的 keyword-only 接线。
+- **回滚**：撤销 `src/backend/app/services/qa/context.py` 与 `tests/backend/test_j04.py`；无迁移、无契约与依赖变更。
+- **签收**：待 ArvinHan 审阅。**需明确签收的两点**：第 4 条的「图证据块在闸门打开后可获得编号并被引用」（相对 Q1 字面的扩大）；第 5 条的「预算 0 块复用 `below_similarity_threshold`」属 wire 语义合并、必须由 K03/J10 另记 `over_budget` 分流。若否决任一条，先改规格再改 `services/qa/context.py`。
+## ADR-066：发布时补齐文本块向量（G08）
+
+- **日期**：2026-09-26
+- **背景**：J01 检索文本块向量（ADR-046），但运行时没有任何环节写文本块向量。F04 只为被知识点引用的块建 `Chunk` 节点，不写向量；G03 只算知识点向量；只有 F14 迁移会重写已有的文本块向量。不补这一步，问答检索永远为空。
+- **决定**：
+  1. 新增任务 G08（ArvinHan 2026-09-26 同意）。在发布 P8 写副本之前，`services/versions/chunk_vectors.index_chunks` 按快照修订列表，从 SQLite 读出全部文本块：
+     - 先查 Neo4j，找出缺节点、缺 `revision_id`、缺当前空间向量或维度不对的块；
+     - 只为这些块调用向量模型；
+     - 按每批 200 块分批 `MERGE` 节点，并写入向量和缺失的 `document_id`、`revision_id`。
+  2. 文本块节点与向量跨版本共享，写入可以重复执行。发布失败时它们保留，C1 不删除，清扫也不处理。
+  3. P9 增加核对：快照修订列表内的每个文本块都要有节点、`revision_id` 和当前空间下维度正确的向量，否则按 `VerificationError` 走 C1。
+  4. 回滚不补齐，也不核对文本块：回滚不得调用向量模型（PUB-26），源版本在发布时已经补齐。
+  5. 放在发布阶段而不是抽取阶段：只有发布版需要被学生检索；向量调用与知识点向量一起放在锁外；抽取与持久化阶段的状态机和取消点不变。
+- **后果**：首次发布要为课程全部文本块算一次向量，耗时随资料量增长；之后只算新修订的块。本 ADR 之前已经提交的版本没有文本块向量；**「重新发布一次即可补齐」不成立**（独立审查 2026-09-26 证伪：草稿摘要未变时 P7 的幂等路径在 P8 之前返回，`publish.py` 不补齐；草稿有改动时补的是**新快照**的修订列表，被新修订取代掉的旧修订永远补不上；回滚按 PUB-26 也不补）。补齐需按修订列表的独立入口（如 `scripts/reembed.py` 的按版本补齐子命令），或在发布一个仍包含这些修订的新版本时顺带完成。回滚到这样的旧版本时检索结果不全，MVP 阶段没有真实数据，暂可接受，但不得再按「重新发布即可」操作。另：批次中途失败会在库里留下「部分块有向量」（不属任何版本副本、`materialize` 也不会删 `Chunk`），可重试续做。
+- **回滚**：撤销 `services/versions/chunk_vectors.py` 和 `publish.py` 中的两处调用；已经写入的文本块向量可以留在库中，不影响其他读取，F14 迁移时照常处理。
+- **签收**：新增任务由 ArvinHan 2026-09-26 同意；放在发布阶段及以上细节由 Claude 选定，并在交接中报告。

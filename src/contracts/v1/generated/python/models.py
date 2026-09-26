@@ -671,9 +671,105 @@ class GraphStats(BaseModel):
     ] = None
 
 
+class ReviewItemKind(Enum):
+    low_confidence_relation = 'low_confidence_relation'
+    suspected_duplicate = 'suspected_duplicate'
+    isolated_node = 'isolated_node'
+
+
+class ReviewCounts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    low_confidence_relations: Annotated[int, Field(ge=0)]
+    suspected_duplicates: Annotated[int, Field(ge=0)]
+    isolated_nodes: Annotated[int, Field(ge=0)]
+
+
+class NextCursors(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    low_confidence_relations: Optional[str] = None
+    suspected_duplicates: Optional[str] = None
+    isolated_nodes: Optional[str] = None
+
+
+class Reason1(Enum):
+    same_key = 'same_key'
+    alias = 'alias'
+    containment = 'containment'
+
+
 class SuspectedDuplicate(BaseModel):
-    candidates: Annotated[list[KnowledgePointRef], Field(min_length=2)]
+    candidates: Annotated[list[KnowledgePointRef], Field(max_length=2, min_length=2)]
     similarity: Annotated[float, Field(ge=0.0, le=1.0)]
+    reason: Reason1
+
+
+class Action(Enum):
+    approve = 'approve'
+    reject = 'reject'
+
+
+class ReviewRelationAction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item: Literal['low_confidence_relation']
+    rel_id: Annotated[str, Field(min_length=1)]
+    action: Action
+
+
+class KpId(RootModel[str]):
+    root: Annotated[str, Field(min_length=1)]
+
+
+class Action1(Enum):
+    merge = 'merge'
+    reject = 'reject'
+
+
+class ReviewDuplicateAction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item: Literal['suspected_duplicate']
+    kp_ids: Annotated[list[KpId], Field(max_length=2, min_length=2)]
+    action: Action1
+    primary_id: Annotated[Optional[str], Field(min_length=1)] = None
+
+
+class Action2(Enum):
+    approve = 'approve'
+    reject = 'reject'
+
+
+class ReviewIsolatedAction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item: Literal['isolated_node']
+    kp_id: Annotated[str, Field(min_length=1)]
+    action: Action2
+
+
+class Action3(Enum):
+    approve = 'approve'
+    reject = 'reject'
+    merge = 'merge'
+
+
+class ReviewActionResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item: ReviewItemKind
+    action: Action3
+    changed: Annotated[
+        bool, Field(description='false 表示同一动作此前已生效，本次没有写入。')
+    ]
+    totals: ReviewCounts
 
 
 class PublishedGraphVersion(BaseModel):
@@ -1292,6 +1388,20 @@ class ReviewQueue(BaseModel):
     low_confidence_relations: list[Relation]
     suspected_duplicates: list[SuspectedDuplicate]
     isolated_nodes: list[KnowledgePointRef]
+    totals: ReviewCounts
+    next_cursors: Annotated[
+        NextCursors,
+        Field(description='各栏下一页的游标；该栏已到末尾或本次未返回该栏时为 null。'),
+    ]
+
+
+class ReviewAction(
+    RootModel[Union[ReviewRelationAction, ReviewDuplicateAction, ReviewIsolatedAction]]
+):
+    root: Annotated[
+        Union[ReviewRelationAction, ReviewDuplicateAction, ReviewIsolatedAction],
+        Field(discriminator='item'),
+    ]
 
 
 class GraphVersion(RootModel[Union[PublishedGraphVersion, RollbackGraphVersion]]):

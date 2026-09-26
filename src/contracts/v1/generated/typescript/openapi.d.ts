@@ -546,11 +546,52 @@ export interface paths {
         };
         /**
          * 审核队列（教师）
-         * @description 三栏：低置信度关系、疑似重复知识点、孤立知识点。每条附原文证据。
+         * @description 三栏：低置信度关系、疑似重复知识点、孤立知识点（ADR-060）。按请求开始时的 V 从草稿实时计算，
+         *     只含可见内容；关系附原文证据（`source_refs`）。各栏排序固定：低置信度关系按 `confidence` 升序、
+         *     `id` 升序；疑似重复按 `similarity` 降序、两端 ID 升序；孤立知识点按 `name`、`id` 升序。
+         *
+         *     分页为键集分页（keyset），处理掉已看过的条目不会让后面的条目被跳过或重复：
+         *     不带 `kind` 时三栏各返回第一页；带 `kind` 时只填该栏（其余两栏为空数组），`cursor` 取上一页
+         *     `next_cursors` 中该栏的值。`cursor` 不带 `kind`、无法解析或属于另一栏时 422。
+         *     `totals` 始终是三栏的完整条数，与分页无关。
+         *
          */
         get: operations["getReviewQueue"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/review/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 处理一条审核项（教师）
+         * @description 一键处理队列中的一条（ADR-060）：
+         *
+         *     - 低置信度关系：`approve` 置 `approved`，`reject` 置 `rejected`；关系登记人工贡献、修订号加 1。
+         *     - 疑似重复：`merge` 以 `primary_id` 为主节点执行 `mergeKnowledgePoints`（ADR-047 的全部规则与错误）；
+         *       `reject` 记为「不是重复」，这一对不再出现。
+         *     - 孤立知识点：`approve` 记为「确认保留」，不再出现；`reject` 把节点置 `rejected`（按 F08 教师修改加锁）。
+         *
+         *     图写入（关系状态、节点拒绝、合并）持课程写锁并使草稿修订号加 1，超时 409 `COURSE_BUSY`；
+         *     「不是重复」「确认保留」只记在 SQLite，不改草稿图、不加草稿修订号。条目已不在队列中时 404
+         *     `NOT_FOUND`；再次提交已生效的同一动作幂等返回 200、`changed = false`。
+         *
+         */
+        post: operations["resolveReviewItem"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1282,13 +1323,78 @@ export interface components {
             edges: components["schemas"]["Relation"][];
             stats?: components["schemas"]["GraphStats"];
         };
+        /**
+         * @description 审核队列的三栏（ADR-060）。
+         * @enum {string}
+         */
+        ReviewItemKind: "low_confidence_relation" | "suspected_duplicate" | "isolated_node";
+        ReviewCounts: {
+            low_confidence_relations: number;
+            suspected_duplicates: number;
+            isolated_nodes: number;
+        };
         ReviewQueue: {
             low_confidence_relations: components["schemas"]["Relation"][];
-            suspected_duplicates: {
-                candidates: components["schemas"]["KnowledgePointRef"][];
-                similarity: number;
-            }[];
+            suspected_duplicates: components["schemas"]["SuspectedDuplicate"][];
             isolated_nodes: components["schemas"]["KnowledgePointRef"][];
+            totals: components["schemas"]["ReviewCounts"];
+            /** @description 各栏下一页的游标；该栏已到末尾或本次未返回该栏时为 null。 */
+            next_cursors: {
+                low_confidence_relations: string | null;
+                suspected_duplicates: string | null;
+                isolated_nodes: string | null;
+            };
+        };
+        /** @description 一对名称疑似重复的知识点（ADR-060，E08 名称归一）。`reason` 为 `same_key`（归一主键相同）、
+         *     `alias`（一方的名称或别名与另一方的名称或别名归一后相同）或 `containment`（较短名称是较长名称的前缀）；
+         *     `similarity` 前两者为 1，包含候选为有效字符比 较短/较长。`candidates` 按 `id` 升序。
+         *      */
+        SuspectedDuplicate: {
+            candidates: components["schemas"]["KnowledgePointRef"][];
+            similarity: number;
+            /** @enum {string} */
+            reason: "same_key" | "alias" | "containment";
+        };
+        ReviewAction: components["schemas"]["ReviewRelationAction"] | components["schemas"]["ReviewDuplicateAction"] | components["schemas"]["ReviewIsolatedAction"];
+        ReviewRelationAction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            item: "low_confidence_relation";
+            rel_id: string;
+            /** @enum {string} */
+            action: "approve" | "reject";
+        };
+        /** @description `merge` 必带 `primary_id`，且须是 `kp_ids` 之一；`reject` 不得带 `primary_id`。 */
+        ReviewDuplicateAction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            item: "suspected_duplicate";
+            kp_ids: string[];
+            /** @enum {string} */
+            action: "merge" | "reject";
+            primary_id?: string;
+        };
+        ReviewIsolatedAction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            item: "isolated_node";
+            kp_id: string;
+            /** @enum {string} */
+            action: "approve" | "reject";
+        };
+        ReviewActionResult: {
+            item: components["schemas"]["ReviewItemKind"];
+            /** @enum {string} */
+            action: "approve" | "reject" | "merge";
+            /** @description false 表示同一动作此前已生效，本次没有写入。 */
+            changed: boolean;
+            totals: components["schemas"]["ReviewCounts"];
         };
         GraphVersion: components["schemas"]["PublishedGraphVersion"] | components["schemas"]["RollbackGraphVersion"];
         PublishedGraphVersion: {
@@ -2734,7 +2840,13 @@ export interface operations {
     };
     getReviewQueue: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: components["schemas"]["ReviewItemKind"];
+                /** @description 上一页 `next_cursors` 中对应栏的不透明游标；必须与 `kind` 同时给出。 */
+                cursor?: string;
+                /** @description 每栏最多返回的条数。 */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description 课程 ID，所有查询的第一隔离条件 */
@@ -2755,6 +2867,39 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    resolveReviewItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAction"];
+            };
+        };
+        responses: {
+            /** @description 处理结果与处理后的三栏条数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewActionResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     publishGraph: {

@@ -14,7 +14,7 @@
 __pycache__/
 *.egg-info/
 *.py[cod]
-.venv/
+.venv
 venv/
 .pytest_cache/
 .mypy_cache/
@@ -22,7 +22,7 @@ venv/
 htmlcov/
 
 # Node/Vite
-node_modules/
+node_modules
 dist/
 coverage/
 *.tsbuildinfo

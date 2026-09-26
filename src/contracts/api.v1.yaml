@@ -845,8 +845,38 @@ paths:
     get:
       tags: [review]
       summary: 审核队列（教师）
-      description: 三栏：低置信度关系、疑似重复知识点、孤立知识点。每条附原文证据。
+      description: |
+        三栏：低置信度关系、疑似重复知识点、孤立知识点（ADR-060）。按请求开始时的 V 从草稿实时计算，
+        只含可见内容；关系附原文证据（`source_refs`）。各栏排序固定：低置信度关系按 `confidence` 升序、
+        `id` 升序；疑似重复按 `similarity` 降序、两端 ID 升序；孤立知识点按 `name`、`id` 升序。
+
+        分页为键集分页（keyset），处理掉已看过的条目不会让后面的条目被跳过或重复：
+        不带 `kind` 时三栏各返回第一页；带 `kind` 时只填该栏（其余两栏为空数组），`cursor` 取上一页
+        `next_cursors` 中该栏的值。`cursor` 不带 `kind`、无法解析或属于另一栏时 422。
+        `totals` 始终是三栏的完整条数，与分页无关。
       operationId: getReviewQueue
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ReviewItemKind'
+        - name: cursor
+          in: query
+          required: false
+          description: 上一页 `next_cursors` 中对应栏的不透明游标；必须与 `kind` 同时给出。
+          schema:
+            type: string
+            minLength: 1
+        - name: limit
+          in: query
+          required: false
+          description: 每栏最多返回的条数。
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
       responses:
         '401':
           $ref: '#/components/responses/Unauthenticated'
@@ -858,6 +888,50 @@ paths:
                 $ref: '#/components/schemas/ReviewQueue'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/courses/{cid}/review/actions:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    post:
+      tags: [review]
+      summary: 处理一条审核项（教师）
+      description: |
+        一键处理队列中的一条（ADR-060）：
+
+        - 低置信度关系：`approve` 置 `approved`，`reject` 置 `rejected`；关系登记人工贡献、修订号加 1。
+        - 疑似重复：`merge` 以 `primary_id` 为主节点执行 `mergeKnowledgePoints`（ADR-047 的全部规则与错误）；
+          `reject` 记为「不是重复」，这一对不再出现。
+        - 孤立知识点：`approve` 记为「确认保留」，不再出现；`reject` 把节点置 `rejected`（按 F08 教师修改加锁）。
+
+        图写入（关系状态、节点拒绝、合并）持课程写锁并使草稿修订号加 1，超时 409 `COURSE_BUSY`；
+        「不是重复」「确认保留」只记在 SQLite，不改草稿图、不加草稿修订号。条目已不在队列中时 404
+        `NOT_FOUND`；再次提交已生效的同一动作幂等返回 200、`changed = false`。
+      operationId: resolveReviewItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewAction'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '200':
+          description: 处理结果与处理后的三栏条数
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewActionResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
   /api/v1/courses/{cid}/publish:
     parameters:
@@ -2450,9 +2524,29 @@ components:
         stats:
           $ref: '#/components/schemas/GraphStats'
 
+    ReviewItemKind:
+      type: string
+      description: 审核队列的三栏（ADR-060）。
+      enum: [low_confidence_relation, suspected_duplicate, isolated_node]
+
+    ReviewCounts:
+      type: object
+      additionalProperties: false
+      required: [low_confidence_relations, suspected_duplicates, isolated_nodes]
+      properties:
+        low_confidence_relations:
+          type: integer
+          minimum: 0
+        suspected_duplicates:
+          type: integer
+          minimum: 0
+        isolated_nodes:
+          type: integer
+          minimum: 0
+
     ReviewQueue:
       type: object
-      required: [low_confidence_relations, suspected_duplicates, isolated_nodes]
+      required: [low_confidence_relations, suspected_duplicates, isolated_nodes, totals, next_cursors]
       properties:
         low_confidence_relations:
           type: array
@@ -2461,22 +2555,129 @@ components:
         suspected_duplicates:
           type: array
           items:
-            type: object
-            required: [candidates, similarity]
-            properties:
-              candidates:
-                type: array
-                minItems: 2
-                items:
-                  $ref: '#/components/schemas/KnowledgePointRef'
-              similarity:
-                type: number
-                minimum: 0
-                maximum: 1
+            $ref: '#/components/schemas/SuspectedDuplicate'
         isolated_nodes:
           type: array
           items:
             $ref: '#/components/schemas/KnowledgePointRef'
+        totals:
+          $ref: '#/components/schemas/ReviewCounts'
+        next_cursors:
+          type: object
+          additionalProperties: false
+          description: 各栏下一页的游标；该栏已到末尾或本次未返回该栏时为 null。
+          required: [low_confidence_relations, suspected_duplicates, isolated_nodes]
+          properties:
+            low_confidence_relations:
+              type: [string, 'null']
+            suspected_duplicates:
+              type: [string, 'null']
+            isolated_nodes:
+              type: [string, 'null']
+
+    SuspectedDuplicate:
+      type: object
+      required: [candidates, similarity, reason]
+      description: |
+        一对名称疑似重复的知识点（ADR-060，E08 名称归一）。`reason` 为 `same_key`（归一主键相同）、
+        `alias`（一方的名称或别名与另一方的名称或别名归一后相同）或 `containment`（较短名称是较长名称的前缀）；
+        `similarity` 前两者为 1，包含候选为有效字符比 较短/较长。`candidates` 按 `id` 升序。
+      properties:
+        candidates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/KnowledgePointRef'
+        similarity:
+          type: number
+          minimum: 0
+          maximum: 1
+        reason:
+          type: string
+          enum: [same_key, alias, containment]
+
+    ReviewAction:
+      oneOf:
+        - $ref: '#/components/schemas/ReviewRelationAction'
+        - $ref: '#/components/schemas/ReviewDuplicateAction'
+        - $ref: '#/components/schemas/ReviewIsolatedAction'
+      discriminator:
+        propertyName: item
+        mapping:
+          low_confidence_relation: '#/components/schemas/ReviewRelationAction'
+          suspected_duplicate: '#/components/schemas/ReviewDuplicateAction'
+          isolated_node: '#/components/schemas/ReviewIsolatedAction'
+
+    ReviewRelationAction:
+      type: object
+      additionalProperties: false
+      required: [item, rel_id, action]
+      properties:
+        item:
+          type: string
+          const: low_confidence_relation
+        rel_id:
+          type: string
+          minLength: 1
+        action:
+          type: string
+          enum: [approve, reject]
+
+    ReviewDuplicateAction:
+      type: object
+      additionalProperties: false
+      required: [item, kp_ids, action]
+      description: '`merge` 必带 `primary_id`，且须是 `kp_ids` 之一；`reject` 不得带 `primary_id`。'
+      properties:
+        item:
+          type: string
+          const: suspected_duplicate
+        kp_ids:
+          type: array
+          minItems: 2
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        action:
+          type: string
+          enum: [merge, reject]
+        primary_id:
+          type: string
+          minLength: 1
+
+    ReviewIsolatedAction:
+      type: object
+      additionalProperties: false
+      required: [item, kp_id, action]
+      properties:
+        item:
+          type: string
+          const: isolated_node
+        kp_id:
+          type: string
+          minLength: 1
+        action:
+          type: string
+          enum: [approve, reject]
+
+    ReviewActionResult:
+      type: object
+      additionalProperties: false
+      required: [item, action, changed, totals]
+      properties:
+        item:
+          $ref: '#/components/schemas/ReviewItemKind'
+        action:
+          type: string
+          enum: [approve, reject, merge]
+        changed:
+          type: boolean
+          description: false 表示同一动作此前已生效，本次没有写入。
+        totals:
+          $ref: '#/components/schemas/ReviewCounts'
 
     GraphVersion:
       oneOf:
