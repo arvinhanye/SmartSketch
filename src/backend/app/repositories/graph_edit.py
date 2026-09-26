@@ -16,6 +16,9 @@ F10 合并（ADR-047）的语句只在 ``DraftNodeStore.transaction`` 打开的*
 节点），由 ``app.services.graph.merge_nodes`` 组合为「读 → 校验与验环 → 写」：``read_nodes``、
 ``read_incident_relations``、``read_evidence``、``update_merged_primary``、``add_evidence``、
 ``replace_relations``、``delete_merged_nodes``。任何一步抛错，整个事务回滚。
+
+F09 删除（ADR-048）同样在 ``transaction`` 内：``read_nodes`` 读目标，``delete_draft_node`` 以修订号为条件删除
+草稿节点、与之相连的草稿关系及其关系身份、来源关联；只匹配 ``version_id = draft``，版本副本与共享文本块不动。
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ __all__ = [
     "IncidentRelation",
     "add_evidence",
     "bump_draft_revision",
+    "delete_draft_node",
     "delete_merged_nodes",
     "read_evidence",
     "read_incident_relations",
@@ -257,6 +261,22 @@ DETACH DELETE n
 RETURN count(*) AS deleted
 """
 
+# F09：与节点相连的草稿关系（不论可见与否）连同关系身份一起删除；自环只算一条。
+_TX_DELETE_NODE = f"""
+MATCH (n:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: $kp_id}})
+WHERE {_visible("n")} AND n.revision = $expected_revision
+OPTIONAL MATCH (n)-[r]-(:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
+WHERE r.course_id = $course_id AND r.version_id = $version_id AND type(r) IN $types
+WITH n, collect(DISTINCT r.rel_id) AS rel_ids
+CALL (rel_ids) {{
+    UNWIND rel_ids AS id
+    MATCH (ri:RelationIdentity {{course_id: $course_id, version_id: $version_id, rel_id: id}})
+    DELETE ri
+}}
+DETACH DELETE n
+RETURN size(rel_ids) AS relations
+"""
+
 
 @dataclass(frozen=True)
 class IncidentRelation:
@@ -334,6 +354,13 @@ def delete_merged_nodes(tx: ScopedTransaction, kp_ids: Sequence[str]) -> int:
     """删除草稿节点及其余下的来源关联；共享的文本块与其他版本的副本不动。"""
     [row] = tx.run(_TX_DELETE_NODES, {"kp_ids": list(kp_ids)})
     return int(row["deleted"])
+
+
+def delete_draft_node(tx: ScopedTransaction, kp_id: str, expected_revision: int) -> int | None:
+    """删除可见且修订号为 ``expected_revision`` 的草稿节点及其草稿关系；返回删除的关系数，条件不成立为 ``None``。"""
+    rows = tx.run(_TX_DELETE_NODE, {"kp_id": kp_id, "expected_revision": expected_revision,
+                                    "types": list(RELATION_TYPES)})
+    return int(rows[0]["relations"]) if rows else None
 
 
 # ---------------------------------------------------------------- SQLite

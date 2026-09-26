@@ -1260,3 +1260,17 @@
 - **后果**：合并是一次原子的草稿写入，会使已发布课程变为 `revising`；发布时 G01 按 `merged_from` 生成谱系。已知限制：(a) 被合并节点的 `kp_id` 若被后续抽取任务再次写入，F04 会重建该节点，与主节点的 `merged_from` 冲突，发布时报 `invalid_lineage`（F04 尚不查谱系）；(b) 迁移关系上的 `downgrade_cycle` 保留原节点 ID，可能引用已被合并的节点；(c) 合并数量没有上限。
 - **回滚**：撤销 `services/graph/merge_nodes.py`、`repositories/graph_edit.py` 中 F10 段（`transaction`、`read_nodes` 至 `delete_merged_nodes`）、`api/graph_nodes.py` 的合并路由、`schemas/contracts.py` 一行、契约（`MergeRequest.expected_revisions`、`additionalProperties`、合并描述、`errors.v1.md` 两处措辞）并重新生成；无 SQLite 迁移与 Neo4j DDL。已合并的数据无法自动拆回，需按 F12 审计或备份恢复。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-048：F09 删除知识点与关系清理
+
+- **日期**：2026-09-26
+- **背景**：契约已有 `deleteKnowledgePoint`（204，无请求体），规格只说「草稿写入持课程写锁」「`merged_from` 由 F09 删除时丢弃」。未定的是：删除哪些关系与数据、会不会波及已发布版本、节点不存在/不可见/他课时返回什么、并发删除与 `expected_revision` 怎么处理、不可见（失败任务留下）的关系是否一并清理。
+- **决定**：
+  1. **写入顺序**同 ADR-035/047：输入校验 → 课程写锁（持有方 `edit`，超时 409 `COURSE_BUSY`）→ 读 V → 一个 Neo4j 写事务（锁 `DraftWriteGuard` → 读目标 → 核对 → `draft_revision + 1` → 以修订号为条件删除）。校验失败不写任何数据，也不加 `draft_revision`。
+  2. **范围只限草稿**（`version_id = draft`）：节点、与它相连的全部草稿关系（含对 V 不可见的，否则会留下悬空边）及其 `RelationIdentity`、节点的 `EVIDENCED_BY` 与 `merged_from`。已发布版本的副本（同 `kp_id`/`rel_id`、不同 `version_id`）、SQLite 版本行与快照、发布指针、共享文本块都不动；删除使已发布课程变为 `revising`，学生在重新发布前仍读旧版本。
+  3. **明确结果**：节点不存在、对 V 不可见、属于他课，或只存在于已发布版本 → 404 `NOT_FOUND`；空白 ID 同样 404。删除成功 204。同一课程的删除经课程写锁与守卫串行，并发删除同一节点恰有一次 204，其余 404；删除与合并（F10）并发时二者之一先完成，另一方按「节点不存在」处理（合并 422 `not_found`，删除 404）。
+  4. **乐观并发**：新增可选查询参数 `expected_revision`（整数 ≥ 1）；与当前修订号不一致 → 409 `REVISION_CONFLICT`（`details` 同 ADR-035），不删除。非法值 → 422。省略时不核对，保持契约原有的无参数调用可用。
+  5. 加锁节点照常可删（锁只约束自动流程）；删除不做环检测（只删边不会产生新环）。审计日志归 F12。
+- **后果**：删除是一次原子的草稿写入。已知限制：被删节点的 `kp_id` 若被后续抽取任务再次写出，F04 会重建该节点（教师删除不留墓碑）；失败任务留下的不可见关系随节点删除，清理任务再撤销时找不到它们，属预期（撤销对不存在的元素无操作）。
+- **回滚**：撤销 `services/graph/delete_node.py`、`repositories/graph_edit.py` 中 `_TX_DELETE_NODE` 与 `delete_draft_node`、`api/graph_nodes.py` 的删除路由与 `_run` 的 204 分支、契约（`expected_revision` 查询参数、422 响应、描述、`errors.v1.md` 一处措辞）并重新生成；无 SQLite 迁移与 Neo4j DDL。已删除的草稿数据只能从备份恢复或由教师重建。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

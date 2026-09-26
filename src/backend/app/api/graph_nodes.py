@@ -1,5 +1,6 @@
 """Teacher knowledge-point writes — ``createKnowledgePoint``, ``updateKnowledgePoint`` and
-``unlockKnowledgePoint`` (F08, ADR-035), ``mergeKnowledgePoints`` (F10, ADR-047).
+``unlockKnowledgePoint`` (F08, ADR-035), ``mergeKnowledgePoints`` (F10, ADR-047) and
+``deleteKnowledgePoint`` (F09, ADR-048).
 
 Protocol translation and dependency injection only; ``app.services.graph.edit_node`` holds the
 course write lock, the revision check and the lock semantics.
@@ -19,7 +20,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -47,6 +48,7 @@ from app.services.graph.edit_node import (
     unlock_node,
     update_node,
 )
+from app.services.graph.delete_node import delete_node
 from app.services.graph.merge_nodes import merge_nodes
 from app.services.graph.relations import CycleDetectedError
 
@@ -86,9 +88,9 @@ def _error(status: int, code: str, message: str, details: dict[str, Any] | None 
     return JSONResponse(status_code=status, content=content)
 
 
-def _run(request: Request, operation: Any, status: int = 200) -> JSONResponse:
+def _run(request: Request, operation: Any, status: int = 200) -> Response:
     try:
-        node: KnowledgePoint = operation(_context(request))
+        node: KnowledgePoint | None = operation(_context(request))
     except RepositoryError:
         return _error(503, "STORAGE_UNAVAILABLE", "图数据库暂不可用，请稍后重试")
     except CourseBusy as busy:
@@ -101,6 +103,8 @@ def _run(request: Request, operation: Any, status: int = 200) -> JSONResponse:
         raise RequestValidationError([
             {"type": f["reason"], "loc": (f["in"], *[p for p in f["field"].split(".") if p])} for f in invalid.fields
         ]) from None
+    if node is None:
+        return Response(status_code=status)
     return JSONResponse(status_code=status, content=node.model_dump(mode="json", exclude_none=True))
 
 
@@ -165,7 +169,7 @@ def create_knowledge_point(
     request: Request,
     body: KnowledgePointCreate,
     access: CourseAccess = Depends(course_teacher),
-) -> JSONResponse:
+) -> Response:
     nulls = [k for k in ("aliases", "chapter_id", "importance", "difficulty")
              if k in body.model_fields_set and getattr(body, k) is None]
     nulls += [f"sources.{i}.{k}" for i, s in enumerate(body.sources) for k in ("evidence_start", "evidence_end")
@@ -184,7 +188,7 @@ def update_knowledge_point(
     kid: str,
     body: Any = Body(...),
     access: CourseAccess = Depends(course_teacher),
-) -> JSONResponse:
+) -> Response:
     expected, changes = _patch(body)
     return _run(request, lambda ctx: update_node(ctx, access.course.id, kid, expected, changes))
 
@@ -196,7 +200,7 @@ def unlock_knowledge_point(
     kid: str,
     body: KnowledgePointUnlock,
     access: CourseAccess = Depends(course_teacher),
-) -> JSONResponse:
+) -> Response:
     return _run(request, lambda ctx: unlock_node(ctx, access.course.id, kid, body.expected_revision))
 
 
@@ -205,8 +209,22 @@ def merge_knowledge_points(
     request: Request,
     body: MergeRequest,
     access: CourseAccess = Depends(course_teacher),
-) -> JSONResponse:
+) -> Response:
     if "expected_revisions" in body.model_fields_set and body.expected_revisions is None:
         raise RequestValidationError([{"type": "null_forbidden", "loc": ("body", "expected_revisions")}])
     return _run(request, lambda ctx: merge_nodes(ctx, access.course.id, body.primary_id, body.merged_ids,
                                                  body.expected_revisions))
+
+
+@router.delete("/kp/{kid}", operation_id="deleteKnowledgePoint", status_code=204, response_class=Response,
+               responses={**_ERRORS, 404: {"model": Error}})
+def delete_knowledge_point(
+    request: Request,
+    kid: str,
+    expected_revision: int | None = Query(None, ge=1),
+    access: CourseAccess = Depends(course_teacher),
+) -> Response:
+    def operation(ctx: EditContext) -> None:
+        delete_node(ctx, access.course.id, kid, expected_revision)
+
+    return _run(request, operation, status=204)

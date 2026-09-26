@@ -380,7 +380,11 @@ export interface paths {
         post?: never;
         /**
          * 删除知识点及其关系（教师）
-         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         * @description 从草稿删除知识点、与它相连的全部草稿关系（含关系身份）及其来源关联；共享文本块、已发布版本的副本与快照
+         *     不变（ADR-048）。节点不存在、不可见或属于他课 → 404 `NOT_FOUND`；并发删除同一节点恰有一次 204，
+         *     其余 404。可选 `expected_revision` 与当前修订号不一致时 409 `REVISION_CONFLICT`，不删除。
+         *     草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         *
          */
         delete: operations["deleteKnowledgePoint"];
         options?: never;
@@ -2486,7 +2490,10 @@ export interface operations {
     };
     deleteKnowledgePoint: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 节点级乐观并发：读到的 `revision`；省略时不核对（ADR-048） */
+                expected_revision?: number;
+            };
             header?: never;
             path: {
                 /** @description 课程 ID，所有查询的第一隔离条件 */
@@ -2508,6 +2515,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateKnowledgePoint: {

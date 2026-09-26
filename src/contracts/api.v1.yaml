@@ -634,8 +634,20 @@ paths:
     delete:
       tags: [graph]
       summary: 删除知识点及其关系（教师）
-      description: 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+      description: |
+        从草稿删除知识点、与它相连的全部草稿关系（含关系身份）及其来源关联；共享文本块、已发布版本的副本与快照
+        不变（ADR-048）。节点不存在、不可见或属于他课 → 404 `NOT_FOUND`；并发删除同一节点恰有一次 204，
+        其余 404。可选 `expected_revision` 与当前修订号不一致时 409 `REVISION_CONFLICT`，不删除。
+        草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
       operationId: deleteKnowledgePoint
+      parameters:
+        - name: expected_revision
+          in: query
+          required: false
+          description: 节点级乐观并发：读到的 `revision`；省略时不核对（ADR-048）
+          schema:
+            type: integer
+            minimum: 1
       responses:
         '401':
           $ref: '#/components/responses/Unauthenticated'
@@ -647,6 +659,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
   /api/v1/courses/{cid}/kp/{kid}/unlock:
     parameters:
