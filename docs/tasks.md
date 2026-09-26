@@ -965,7 +965,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E09 | IN PROGRESS | 实现向量候选分层 | ArvinHan（Claude 子代理） | `claude/e09-vector-tiers` / 本认领提交 | `src/backend/app/services/fusion/candidates.py`、`tests/backend/test_e09.py`、`docs/handoffs/claude-e09.md` | 待补 |
+| E09 | DONE（待 PR 审查/合并） | 实现向量候选分层 | ArvinHan（Claude 子代理） | `claude/e09-vector-tiers` / 本认领提交 | `src/backend/app/services/fusion/candidates.py`、`tests/backend/test_e09.py`、`docs/handoffs/claude-e09.md` | `test_e09.py` 94 passed（红：`ModuleNotFoundError`；接口变更后先红 12 failed）；后端全量 2615 passed；自动合并/需裁决返回配对，保留组只返回 `kept_count`（不物化，三组计数和 = n(n-1)/2）；边界：`≥ auto_merge` 自动、`review ≤ s < auto_merge` 裁决、`< review` 保留；阈值须有限、`[0, 1]`、`review < auto_merge`，无默认值（D-08 未签收）；跨课程/跨向量空间混传整体拒绝（`VectorIsolationError`）；反向篡改均检出（首版 11 处、变更后 10 处）；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；待决 3 项见 `docs/handoffs/claude-e09.md` |
 
 - E09 验收：课程隔离；阈值顺序非法拒绝；边界等号有明确规则。验证：`python3 -m pytest tests/backend/test_e09.py -q`。
 
