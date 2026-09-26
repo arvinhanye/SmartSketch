@@ -22,7 +22,12 @@ evaluation/
 ├── README.md                    # 本文件：口径、格式、判定标准
 ├── fixtures/synthetic.json      # K01：自编开发集（资料正文 + 金标）
 ├── evaluate_extraction.py       # K02：离线评测脚本
-└── reports/extraction-accuracy.md  # K02：抽取准确率测试报告（参赛材料）
+├── run_live_extraction.py       # K02：本机真实模型抽取
+├── ablation.py                  # K13：抽取消融（单阶段 / 两阶段 / 两阶段 + 补漏）
+├── prompts/extract_joint.yaml   # K13：单阶段对照组专用提示词（不进生产）
+└── reports/
+    ├── extraction-accuracy.md   # K02：抽取准确率测试报告（参赛材料）
+    └── ablation.md              # K13：消融实验报告
 ```
 
 ## 3. 标注集格式（`fixtures/*.json`）

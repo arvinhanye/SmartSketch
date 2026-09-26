@@ -1107,3 +1107,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 等 F08 合并后可开工：F09、F10（再到 F11、F12）。等 G07：I01、J01、J02。等 H04：H05、H06、H08。
 - Issue 同步：关闭已合并任务 #92（E12）、#96（F04）、#98（F06）、#105（F13）、#99（F07）、#106～#109（G01～G04）、#115（H03）、#140（K01，问答口径随 K03）、#141（K02），均附 PR 评论并标 `status:done`；141 个原子任务各有一个 issue，无缺漏。
+
+## 2026-09-26 K13 抽取消融（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| K13 | IN PROGRESS（代码与 fake 测试完成，待本机真实模型运行） | 实现抽取消融实验 | ArvinHan（Claude） | `claude/project-thread-yswyz2` / `main@a44c680` | `evaluation/ablation.py`、`evaluation/reports/ablation.md`、`tests/backend/test_k13.py`；扩围 `evaluation/prompts/extract_joint.yaml`、`evaluation/README.md`（目录）、`docs/decisions.md`（ADR-045）、`docs/integrations.md`（D-02d 备注） | `test_k13.py` 22 passed；5 处反向篡改均检出；K02/E01 回归通过；`docs/handoffs/claude-k13.md`；#166 |
+
+- 验收：同一标注集、同一模型、同一计分口径记录三组结果、成本与版本；空样本标「空样本」，失败组与未运行组保留行并写明原因；fake 结果一律标「假模型」且不给达标判定。
+- 待办：ArvinHan 在本机按 `evaluation/reports/ablation.md`「本机运行步骤」跑一次真实模型，把 `ablation.md` 输出贴回报告第 4 节；结论只对简化融合成立，完整融合接入后需重跑。
