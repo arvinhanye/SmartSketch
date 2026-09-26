@@ -167,6 +167,7 @@
 | D-14 | 只设所有者密码（空用户密码即可打开，仅限制复制、打印等权限）的 PDF 是否放行。**暂定**：与其他加密 PDF 一样按 `DOCUMENT_UNREADABLE`（`encrypted`）拒绝（ArvinHan，2026-09-25）。放行前须决定是否遵守「禁止复制」等权限，涉及版权 | 产品负责人 | 首批课程资料导入前（D-01） |
 | D-15 | 赛题「知识抽取准确率不低于 70%」是否同时约束关系（REQ-01）。**已关闭**：实体和关系分别计算、各自不低于 70%，写入 `specs/course-knowledge-graph.md` 验收 7 与 K01/K02（ArvinHan，2026-09-24） | 产品负责人 | 已完成 |
 | D-16 | C07 资料列表的 `Document.parse_status` 取自哪里、失败/取消后的「再处理」入口（A03 交出项）。**已关闭**：`parse_status` 在读时取该资料**最新创建任务**的 `stage`（单一事实来源，worker 不另写）；`materials.parse_status` 列不再维护，保留默认值待后续迁移清理。MVP 的再处理只靠**重新上传**（新资料、新任务），不新增端点、不改契约；再处理端点留作后续任务（ArvinHan，2026-09-25） | 技术负责人 | 已完成（C07 落实） |
+| D-17 | 教师图谱编辑页缺少原子任务：H11 是学生端浏览页（不取草稿），H09 审核队列不含画布编辑，H07 节点编辑面板与 H08 连边编辑无页面可挂，K05 教师主线无法端到端覆盖编辑。**已关闭**：补登 **H14 实现教师图谱编辑页**（依赖 H05、H06、H07、H08；K05 增加对 H14 的依赖；原子清单增至 142 项）（ArvinHan，2026-09-26 选择「新增任务」；issue #281） | 产品负责人 / 协调 Agent | 已完成（清单补登；实现待认领） |
 | PLAN-D05 | 学习材料生成分支决定是否同步 main；目标路径是否纳入（O01） | 产品负责人 | 主线验收后、加分项前 |
 
 ## Claude 审查批次
@@ -1224,3 +1225,10 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：新建、修改、解锁、删除、合并各记一行 `graph_edit_logs`，含操作者、`created_at`/`resolved_at`、写入后的 `draft_revision`、节点修订号前后值与白名单摘要（合并含直接被合并节点与展平谱系）；只记真实写入，冲突、404、校验失败、成环、未加锁节点的解锁不记；Neo4j 写入失败记 `aborted`；审计更新失败退避重试，仍失败留 `pending`、编辑照常成功，下一次同课程教师写入持锁对账补齐；密钥、令牌、口令散列、私钥与 `password=` 等赋值值不进日志；行只追加，结束后冻结；迁移可按 `ROLLBACK:` 行回滚后重放。
 - F12 待决（需 ArvinHan）：ADR-061 签收；迁移号 012 若与并行 PR 冲突，合并前改为 main 最大号 + 1；审计读接口（教师查看历史）未分配任务；关系编辑（F06 路由未实现）与审核队列操作（F11）接入审计留给对应任务；脱敏只按模式匹配。
+## 2026-09-26 H07 教师节点编辑面板（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H07 | DONE（待 PR 审查/合并，issue #119；**独立审查 APPROVE_WITH_NOTES**） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；type-check 与 build 通过；前端全量**实测 493 passed + 1 failed**，失败项为既有 `b02.test.ts` 子进程 vitest 5 s 超时（本机慢；给 90 s 即通过，`b02.test.ts`/`vitest.config.ts`/`package.json` 本分支未改，`origin/main` 上同样失败）——原写「494 passed」不可复现，已按实测更正；**仅假 API 验证**（真实后端路由已存在但未联调）；独立审查：3 处篡改检出、契约形状与后端 `_CURRENT_FIELDS` 逐字段吻合、`verify.sh` 与 `validate_atomic_plan.py` 通过；`docs/handoffs/claude-h07.md` |
+
+- H07 待决（需 ArvinHan）：ADR-062 签收；教师图谱编辑页无归属（挂载页由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板）；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。

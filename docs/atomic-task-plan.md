@@ -1,6 +1,6 @@
 # SmartSketch 单轮可执行原子任务清单
 
-共 **141 个叶子任务**，其中 **133 个主线任务、8 个条件性加分任务**。这是实施计划，不是已完成列表，也不承诺 AI 自动保证正确。每次只选一个依赖已验收的叶子任务；用负例、真实命令、人工决策和独立审查形成可靠性边界。机器可读版见 [atomic-tasks.json](atomic-tasks.json)。
+共 **142 个叶子任务**，其中 **134 个主线任务、8 个条件性加分任务**。这是实施计划，不是已完成列表，也不承诺 AI 自动保证正确。每次只选一个依赖已验收的叶子任务；用负例、真实命令、人工决策和独立审查形成可靠性边界。机器可读版见 [atomic-tasks.json](atomic-tasks.json)。
 
 ## 使用规则
 
@@ -27,7 +27,7 @@
 | M1-02 解析分块 | D01～D11 | 四种格式独立测，避免一个任务包办 |
 | M1-03 抽取融合 | E01～E12、F04、F13～F14 | fake 接口先行，模型真实效果另评测 |
 | M1-04 DAG | F05～F06 | 纯函数和数据库并发分别验收 |
-| M1-05 教师审核发布 | F07～F12、G01～G07、H07～H10 | 服务、快照、补偿、UI 顺序交接 |
+| M1-05 教师审核发布 | F07～F12、G01～G07、H07～H10、H14 | 服务、快照、补偿、UI 顺序交接 |
 | main 尚缺的学生端主线 | H11～H12、I01～I06、J01～J10 | 属现有 MVP，不当新增加分范围 |
 | S2 M3/M4 交付 | K01～K19 | 回归、实测、部署、数据恢复、消融和参赛材料 |
 | 可选范围 | O01～O08 | 未批准不执行；不挤占主线 |
@@ -169,7 +169,7 @@
 | **G06 实现回滚和版本列表 API** | G05, C03 | 历史版本 → 列表或指针回滚 | `src/backend/app/api/versions.py`<br>`src/backend/app/services/versions/rollback.py` | 不存在/跨课版本拒绝；回滚当前版按 A04 幂等；保留历史审计 | `python3 -m pytest tests/backend/test_g06.py -q` |
 | **G07 实现统一发布版本解析器** | G04 | 学生课程请求 → 固定 version_id | `src/backend/app/services/versions/resolver.py` | 无发布版明确状态；请求中发布新版本不混读；图/问答/路径复用 | `python3 -m pytest tests/backend/test_g07.py -q` |
 
-## H 教师与学生图谱界面（12 项）
+## H 教师与学生图谱界面（14 项）
 
 | ID 与单轮任务 | 依赖 | 输入 → 输出 | 功能文件范围 | 验收与负例 | 单项命令 |
 | --- | --- | --- | --- | --- | --- |
@@ -186,6 +186,7 @@
 | **H11 实现学生图谱和卡片视图** | H05, H06, G07 | 发布图 → 图/卡片切换 | `src/frontend/src/views/StudentGraphView.vue`<br>`src/frontend/src/components/KnowledgeCards.vue` | 无发布、空图、分页卡片、键盘可用；任何入口不取草稿 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h11.test.ts` |
 | **H12 实现课程成员管理页面** | C15, B15, H01 | 课程成员 API → 教师成员列表与增删操作 | `src/frontend/src/views/MembersView.vue`<br>`src/frontend/src/api/members.ts` | 教师可添加和移除；学生无入口；权限失败明确提示；重复提交不重复成员 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h12.test.ts` |
 | **H13 实现前端登录页与会话存储** | C13, B15, B03, B04 | 登录端点 + A05 §2.4 → 登录页、会话读写与 401 回登录 | `src/frontend/src/views/LoginView.vue`<br>`src/frontend/src/stores/session.ts`<br>`src/frontend/src/api/auth.ts`<br>`src/frontend/src/router/index.ts`<br>`src/frontend/src/main.ts` | 令牌与 LoginResponse.user 只存 sessionStorage（不存 localStorage/Cookie）；登录后按 user.role 进首页；401、429 分别明确提示；收到 401 清会话与课程上下文并回登录页；口令/令牌不写日志；不解析 JWT 做授权 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts` |
+| **H14 实现教师图谱编辑页**（D-17 补登） | H05, H06, H07, H08 | 草稿图谱 + 详情/节点编辑/连边编辑组件 → 教师图谱页 | `src/frontend/src/views/TeacherGraphView.vue`<br>`src/frontend/src/composables/useTeacherGraph.ts`<br>`src/frontend/src/router/index.ts` | 只取草稿图谱且仅课程教师可进入；画布选中联动 H06 详情与 H07 节点编辑面板切换，H08 连边编辑可用；保存/删除/连边成功后画布同步、失败不改画布；有未保存修改时切换节点先确认；空图、加载、错误态 | `npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h14.test.ts` |
 
 ## I 进度与可解释推荐（6 项）
 
@@ -221,7 +222,7 @@
 | **K02 实现抽取和融合离线评测** | K01, E11 | 预测/金标 → 分项指标报告 | `evaluation/evaluate_extraction.py`<br>`evaluation/reports/extraction-accuracy.md` | 空分母、ID匹配、四类型分组；固定输入重复结果一致；假模型不充真实效果；报告计算并判定赛题两项硬指标（恰为 20 个或 70% 视为达标，不足如实写未达标），列错误类型与改进方向；真实模型判定结果另记于报告文件 | `python3 -m pytest tests/backend/test_k02.py -q` |
 | **K03 实现可信问答离线评测** | K01, J06 | 问题/答案/证据 → 质量指标 | `evaluation/evaluate_qa.py` | 编号存在不等于支持结论；包含注入/不覆盖负例；支持人工复核与假阳性记录 | `python3 -m pytest tests/backend/test_k03.py -q` |
 | **K04 实现全链路阶段性能测量** | F13, J07, E04 | 固定约2万字fixture → 阶段耗时/token报告 | `evaluation/benchmark_pipeline.py` | 注明机器/模型/并发/样本数/p50/p95；区分目标与实测；付费执行另行确认 | `python3 -m pytest tests/backend/test_k04.py -q` |
-| **K05 建立教师主线 E2E** | H02, H08, H09, H10, F13 | 自编四格式资料 → 上传到发布用例 |  | fake模型也走真实服务；成环拒绝、失败重试、发布可见；保留失败证据 | `npm --prefix src/frontend run test:e2e -- ../../tests/e2e/teacher.spec.ts` |
+| **K05 建立教师主线 E2E** | H02, H08, H09, H10, F13, H14 | 自编四格式资料 → 上传到发布用例 |  | fake模型也走真实服务；成环拒绝、失败重试、发布可见；保留失败证据 | `npm --prefix src/frontend run test:e2e -- ../../tests/e2e/teacher.spec.ts` |
 | **K06 建立学生主线 E2E** | I06, J09, H11, K05 | 已发布课程 → 浏览/掌握/推荐/问答 |  | 跨课程拒绝；草稿不可见；旧发布版稳定；无来源答案不完成显示 | `npm --prefix src/frontend run test:e2e -- ../../tests/e2e/student.spec.ts` |
 | **K07 复用并审查环境启停脚本** | F01, A10 | 已有 dev-up/down → 启停行为修正 | `scripts/dev-up.sh`<br>`scripts/dev-down.sh`<br>`scripts/_dev-common.sh` | 普通停止保留数据；删除卷需要显式确认；缺 env 给提示；不覆盖个人 .env | `python3 -m pytest tests/tooling/test_k07.py -q` |
 | **K08 实现前后端与 worker 容器配置** | K07, B05, B01, F13 | 可运行应用 → 镜像/Compose 服务 | `src/backend/Dockerfile`<br>`src/frontend/Dockerfile`<br>`docker-compose.yml` | 按 A06 运行worker；容器健康检查；密钥只在后端；前端构建不含密钥 | `python3 -m pytest tests/integration/test_k08.py -q` |
