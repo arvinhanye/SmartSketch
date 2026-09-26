@@ -7,12 +7,12 @@ predicates, including relationship endpoints and evidence visibility (§8.4).
 """
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeVar
 
 from neo4j import GraphDatabase
-from neo4j.exceptions import AuthError, ServiceUnavailable, SessionExpired
+from neo4j.exceptions import AuthError, DriverError, Neo4jError, ServiceUnavailable, SessionExpired
 
 from app.config import Settings
 
@@ -79,7 +79,28 @@ class GraphDriver(Protocol):
         self, query: str, *, parameters_: dict[str, Any], routing_: str, database_: str
     ) -> QueryResult: ...
 
+    def session(self, *, database: str) -> Any: ...
+
     def close(self) -> None: ...
+
+
+T = TypeVar("T")
+
+
+class ScopedTransaction:
+    """One statement runner inside an explicit write transaction (F06).
+
+    Every statement passes the same scope-token validation as ``Neo4jRepository``
+    reads and writes, and receives the scope's course, version and V.
+    """
+
+    def __init__(self, tx: Any, scope: GraphScope) -> None:
+        self._tx = tx
+        self.scope = scope
+
+    def run(self, query: str, parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+        bound = _parameters(query, self.scope, parameters)
+        return [dict(record) for record in self._tx.run(query, bound)]
 
 
 # Consume quoted strings/identifiers and comments BEFORE considering parameters.
@@ -120,8 +141,8 @@ class Neo4jRepository:
     course membership and resolves the published version. Internal workers use
     worker intent for V-scoped merging candidates and persisting cycle checks.
     Writes are internal teacher/worker operations, not a student-facing escape
-    hatch. Each method is one managed transaction; multi-query atomic operations
-    belong to later work.
+    hatch. ``read``/``write`` are one managed transaction each;
+    ``write_transaction`` runs several scoped statements atomically (F06).
     """
 
     def __init__(self, driver: GraphDriver) -> None:
@@ -168,6 +189,24 @@ class Neo4jRepository:
         parameters: Mapping[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         return self._execute(query, scope, parameters, "w")
+
+    def write_transaction(self, scope: GraphScope, work: Callable[[ScopedTransaction], T]) -> T:
+        """Run ``work`` in one explicit write transaction and commit if it returns.
+
+        The driver may re-run ``work`` after a transient failure (deadlock, leader
+        switch), so ``work`` must derive everything from what it reads inside the
+        transaction. Exceptions raised by ``work`` itself roll back and propagate
+        unchanged; driver failures are redacted like ``read``/``write``.
+        """
+        if not isinstance(scope, GraphScope):
+            raise GraphScopeError("A GraphScope is required")
+        try:
+            with self._driver.session(database="neo4j") as session:
+                return session.execute_write(lambda tx: work(ScopedTransaction(tx, scope)))
+        except _CONNECTION_ERRORS:
+            raise RepositoryConnectionError() from None
+        except (Neo4jError, DriverError):
+            raise RepositoryError() from None
 
     def _execute(
         self,

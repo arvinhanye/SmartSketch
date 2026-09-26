@@ -984,3 +984,18 @@
 - **后果**：F13 可以直接用 `write_draft_nodes` 写节点；审核与问答读来源时按 `EVIDENCED_BY.task_id ∈ V` 判定可见。新资料里对加锁知识点的证据不会挂上去，教师需要时手动添加。每批一个 Neo4j 事务，§8.4 要求的「撤销旧贡献 + 写入」同一事务由 F13 组合。
 - **回滚**：撤销 `graph_nodes.py` 与测试；已写入草稿的节点与关系按 `contrib_tasks`、`EVIDENCED_BY.task_id` 可定向清理。
 - **签收**：ArvinHan 2026-09-26（在会话卡片上选择「加锁节点完全不动」）；关系名与属性由 Claude 选定并在交接中报告。
+
+## ADR-025：F06 关系写入的课程守卫节点、关系属性与既有关系的处理
+
+- **日期**：2026-09-26
+- **背景**：F06 验收要求「两个连接并发 A→B / B→A 至少一方冲突；校验与提交同写入序列」。Neo4j 默认读已提交，两个事务各自读图、各自通过环检测后都能提交；只锁端点也不够（A→B、C→D 先提交后，B→C 与 D→A 的端点互不相交，仍会同时通过）。V4 的 SQLite 课程写锁（`course_locks`）尚未建表，且租约过期后可能与晚到的写入重叠。§8.4 只说关系来源按「(贡献方, 文本块 ID)」成对保存、编码由 F03/F13 定。
+- **决定**：
+  1. F03 迁移新增 `DraftWriteGuard(course_id, version_id)` 唯一约束。每个关系写事务第一条语句 `MERGE` 本课程草稿的守卫节点并递增 `seq`，持有它的写锁直到提交；读图、环检测（F05）与 `MERGE` 都在其后、同一事务内。同一课程草稿的关系写入因此串行，与 SQLite 课程写锁互为冗余。
+  2. F02 `Neo4jRepository` 新增 `write_transaction(scope, work)`：一个显式写事务内多条语句，每条都经同样的作用域参数校验；驱动的临时故障可能让 `work` 重跑，`work` 须只依赖事务内读到的数据；`work` 自己抛出的异常回滚后原样抛出，驱动异常仍脱敏。
+  3. 关系属性：`course_id`、`version_id`、`rel_id`、`confidence`、`status`、`source`、`contrib_tasks`、`contrib_manual`、`revision`、`source_pairs`；`source_pairs` 每项是 JSON 字符串 `[贡献方, chunk_id]`，人工贡献方为 `null`。`RelationIdentity` 记当前 `type`、`from_id`、`to_id`。
+  4. 关系 ID 由「课程 + 类型 + 起点 + 终点」派生；`RELATED_TO` 还可使用同端点 `PREREQUISITE` 的 ID（ADR-009 降级保留原 ID）。
+  5. 已有同 ID 关系时：教师写入遇到可见关系、或类型/端点不同 → `DUPLICATE_RELATION`；遇到不可见关系（未提交或失败任务留下）由教师接管字段。任务写入从不改已有关系的字段：端点不同（教师改过端点）跳过并报告；类型不同（降级或教师改类型）沿用现有类型，只并入贡献与来源。
+  6. 一次调用全有或全无：端点不可见 → `DANGLING_ENDPOINT`；成环 → `CYCLE_DETECTED` 带闭合环路；`PREREQUISITE` 自环不连库即返回 `[A, A]`，其他类型自环为非法输入。
+- **后果**：教师新建/修改关系（F08）与 F13 `persisting` 都能在同一事务里复用这些语句；F13 的自动降级在锁内、同一次读取上计算。守卫节点让同一课程的关系写入不能并行，吞吐按课程串行（与课程写锁一致）。Neo4j 等锁默认无上限，靠 V4 的 API 侧有界等待兜底。
+- **回滚**：撤销 `graph_relations.py`、`services/graph/relations.py`、`write_transaction` 与测试；守卫约束可 `DROP CONSTRAINT draft_write_guard_scope`，守卫节点可 `MATCH (g:DraftWriteGuard) DELETE g`，不影响知识点与关系。
+- **签收**：待 ArvinHan 审阅（守卫节点与属性编码由 Claude 选定并在交接中报告）。
