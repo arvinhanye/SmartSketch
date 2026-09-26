@@ -1381,3 +1381,18 @@
 - **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-061：F12 图编辑审计日志的存储、跨库顺序与脱敏
+
+- **日期**：2026-09-26
+- **背景**：F12 要求图编辑审计「谁/何时/何版本/变更摘要齐全；跨库失败可重试；不记录秘密」。教师写入（F08 新建/修改/解锁、F09 删除、F10 合并）改的是 Neo4j 草稿，而课程 `draft_revision` 与用户、课程都在 SQLite，两库之间没有分布式事务。ADR-012 修订 3 与 ADR-047 规定合并的**直接**父子关系只记在 F12 审计里（快照只存展平的 `merged_from`）；ADR-034 第 7 条已定发布不写本日志。
+- **决定**：
+  1. **存储**：SQLite 新表 `graph_edit_logs`（迁移 `012_edit_logs.sql`），一行一次教师写入：`event_id`、`course_id`、`actor_id`（`users.id`）、`action ∈ {create, update, unlock, delete, merge}`、`kp_id`（合并为主节点）、`draft_revision`（写入后的课程草稿修订号）、`kp_revision_before/after`、`state ∈ {pending, committed, aborted}`、`summary`（JSON 对象）、`failure_reason`、`resolved_by ∈ {writer, reconcile}`、`created_at`/`resolved_at`（ISO-8601 UTC）。行只追加：触发器禁止删除，结束后的行禁止修改。课程隔离靠 `course_id` 条件；分页以自增 `seq` 为游标。
+  2. **只记真实写入**：持锁并校验通过、即将加 `draft_revision` 时才记；校验失败、`REVISION_CONFLICT`、404、成环、未加锁节点的解锁等不写数据的请求不记。
+  3. **跨库顺序**：`draft_revision + 1` 与 `pending` 行在**同一个** SQLite 事务写入（`edit_logs.begin`，取代写入路径上的 `bump_draft_revision`），所以审计的版本号与课程修订号严格一致，且 V4「先加修订号再写 Neo4j」不变。Neo4j 写入返回后置 `committed`（附写后修订号与最终摘要）或 `aborted`（附错误码或异常类名，不含消息）。置状态的 SQLite 更新以 `state = 'pending'` 为条件，可重复执行；失败时退避重试（0.05/0.2/0.5 s），仍失败只记日志、**不**让已提交的编辑报错（否则客户端重试只会得到 `REVISION_CONFLICT`），行留在 `pending`。
+  4. **对账**：每次教师写入取得课程写锁后、做任何读写之前，先把本课程遗留的 `pending` 行对照 Neo4j 判定（`audit.reconcile`）：`create` 看节点是否存在；`update`/`merge` 看主节点是否已加锁且修订号恰为写前 + 1；`unlock` 看节点是否已解锁；`delete` 看节点是否已不可见。持锁时没有其他教师写入插进来，自动流程又不改加锁节点，所以判定确定。判定未生效的记 `aborted`、原因 `not_applied`。
+  5. **摘要白名单与脱敏**：只记知识点的 `name/aliases/type/definition/importance/difficulty/status/chapter_id` 与锁状态；修改记提交字段的前后值；新建记字段与来源块及区间；删除记被删节点字段与删除的关系数；合并记主节点、直接被合并节点（ID、名称、修订号）、展平谱系与重接/来源迁移计数。贡献、向量、令牌、请求头一律不进。字符串先去掉形似密钥的片段（`sk-…`、`Bearer …`、JWT、`AKIA…`、argon2 散列、私钥块，以及 `password=`/`token:` 等赋值的值）换成 `[REDACTED]`，再截断到 500 字符；列表最多 50 项。
+  6. `EditContext` 增加可选 `actor_id`；API 路由传入调用者；为 `None`（内部调用、既有测试）时不记审计，只加草稿修订号，行为与 F08～F10 相同。
+- **后果**：每次教师写入多一次 SQLite 读（查遗留 `pending`，通常为空）和一次更新。进程在 `begin` 之后、下一次同课程教师写入之前崩溃时，该行保持 `pending`，直到下一次写入对账；审计读接口与关系编辑（F06 路由未实现）的审计尚未覆盖。脱敏是模式匹配，不能识别任意形态的秘密；教师在定义里写入的普通个人信息仍会原样记录。
+- **回滚**：`git revert` 本任务提交；数据库按迁移文件头部的 `ROLLBACK:` 行在停机时执行（会丢失审计历史，先导出），或从 `backups/*-before-012.sqlite` 恢复。无 Neo4j DDL、契约或依赖变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

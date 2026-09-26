@@ -11,7 +11,10 @@
 SQLite 中的快照与发布指针、共享文本块都不动；学生在重新发布前仍读旧版本。
 
 并发：同一课程的删除经课程写锁与守卫节点串行，后到者读到节点已不存在 → 404，所以同一节点恰有一次成功。
-加锁节点照常可删（锁只约束自动流程）。审计日志归 F12。
+加锁节点照常可删（锁只约束自动流程）。
+
+审计（F12，ADR-061）：``draft_revision + 1`` 由 ``audit.begin`` 连同 ``pending`` 审计行一起写入；事务提交后
+置 ``committed``（摘要含删除的关系数），事务抛错则置 ``aborted``。
 """
 
 from __future__ import annotations
@@ -20,9 +23,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.repositories import graph_edit
-from app.repositories.graph_edit import bump_draft_revision
 from app.repositories.neo4j import ScopedTransaction
 from app.services.access import not_found
+from app.services.graph import audit
 from app.services.graph.edit_node import EditContext, InvalidEdit, RevisionConflict, _course_write
 
 __all__ = ["DeletedNode", "delete_node"]
@@ -55,7 +58,7 @@ def _delete(tx: ScopedTransaction, kp_id: str, expected_revision: int | None, bu
     current = int(node.get("revision") or 0)
     if expected_revision is not None and expected_revision != current:
         raise RevisionConflict(kp_id, expected_revision, node)
-    bump()
+    bump(current, node)
     relations = graph_edit.delete_draft_node(tx, kp_id, current)
     if relations is None:  # 同一事务内刚读过且持有守卫锁：不应出现
         raise RevisionConflict(kp_id, current, node)
@@ -70,11 +73,20 @@ def delete_node(ctx: EditContext, course_id: str, kp_id: str, expected_revision:
     """
     _validate(kp_id, expected_revision)
     with _course_write(ctx, course_id) as scope:
-        bumped: list[int] = []
+        started: list[tuple[audit.Pending, dict[str, Any]]] = []
 
-        def bump() -> None:  # 驱动重跑事务时不重复加
-            if not bumped:
-                bumped.append(bump_draft_revision(ctx.sqlite_url, course_id))
+        def bump(revision: int, node: dict[str, Any]) -> None:  # 驱动重跑事务时不重复加
+            if not started:
+                started.append((audit.begin(ctx, course_id, "delete", kp_id, revision_before=revision,
+                                            summary=audit.delete_summary(node)), node))
 
-        return ctx.store.transaction(  # type: ignore[attr-defined, no-any-return]
-            scope, lambda tx: _delete(tx, kp_id, expected_revision, bump))
+        try:
+            deleted: DeletedNode = ctx.store.transaction(  # type: ignore[attr-defined]
+                scope, lambda tx: _delete(tx, kp_id, expected_revision, bump))
+        except BaseException as exc:
+            if started:
+                audit.abort(ctx, started[0][0], exc)
+            raise
+        pending, node = started[0]
+        audit.commit(ctx, pending, revision_after=None, summary=audit.delete_summary(node, deleted.relations))
+        return deleted

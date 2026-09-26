@@ -1207,3 +1207,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
 - J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
+
+## 2026-09-26 F12 图编辑审计日志（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F12 | DONE（待 PR 审查/合并，issue #104） | 实现图编辑审计日志 | ArvinHan（Claude） | `claude/project-thread-21sjlj` / `main@a7d8075` | `src/backend/app/repositories/edit_logs.py`、`src/backend/app/services/graph/audit.py`、`tests/backend/test_f12.py`；扩围 `src/backend/migrations/012_edit_logs.sql`、`tests/integration/test_f12.py`，接入点 `services/graph/edit_node.py`、`delete_node.py`、`merge_nodes.py`、`api/graph_nodes.py`（传调用者）；`docs/decisions.md`（ADR-061）、`docs/architecture.md` 一句、`specs/teacher-review-publish.md`「一致性」 | 红灯：收集错误（模块不存在）；`test_f12.py` 后端 30 passed、集成 8 passed（真实 Neo4j 5.26）；16 处反向篡改全部检出（2 处补强用例后）；后端全量 3132 passed；`verify.sh` exit 0；`docs/handoffs/claude-f12.md` |
+
+- 验收：新建、修改、解锁、删除、合并各记一行 `graph_edit_logs`，含操作者、`created_at`/`resolved_at`、写入后的 `draft_revision`、节点修订号前后值与白名单摘要（合并含直接被合并节点与展平谱系）；只记真实写入，冲突、404、校验失败、成环、未加锁节点的解锁不记；Neo4j 写入失败记 `aborted`；审计更新失败退避重试，仍失败留 `pending`、编辑照常成功，下一次同课程教师写入持锁对账补齐；密钥、令牌、口令散列、私钥与 `password=` 等赋值值不进日志；行只追加，结束后冻结；迁移可按 `ROLLBACK:` 行回滚后重放。
+- F12 待决（需 ArvinHan）：ADR-061 签收；迁移号 012 若与并行 PR 冲突，合并前改为 main 最大号 + 1；审计读接口（教师查看历史）未分配任务；关系编辑（F06 路由未实现）与审核队列操作（F11）接入审计留给对应任务；脱敏只按模式匹配。

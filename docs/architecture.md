@@ -203,7 +203,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 - API 响应、任务事件、图谱导入/导出格式先在 `src/contracts/` 版本化。
 - LLM 是可替换适配器，基础 URL、模型和密钥均来自环境变量。
-- 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。
+- 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。教师图编辑审计（F12，ADR-061）在 SQLite `graph_edit_logs`：与 `draft_revision + 1` 同一事务写入 `pending`，Neo4j 写入后置 `committed`/`aborted`，遗留行由下一次同课程教师写入持锁对账；摘要白名单并脱敏。
 
 ## 持续集成
 

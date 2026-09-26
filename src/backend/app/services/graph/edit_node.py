@@ -14,24 +14,28 @@
 加锁语义（ADR-035）：锁是整个节点（全部字段与来源），不连带关系；任何成功的教师修改都置
 ``locked = true``。修改接口不能解锁；解锁是单独的接口与动作，节点本就未加锁时原样返回、不写入。
 新建的知识点必须带至少一条来源，块须属于本课程且其修订关联到 V 中的任务。
-审计日志归 F12，本模块不记录。
+
+审计（F12，ADR-061）：取锁后先对账本课程遗留的审计行（``audit.reconcile``）；第 3 步的草稿修订号加 1
+改由 ``audit.begin`` 与 ``pending`` 审计行在同一 SQLite 事务里完成，Neo4j 写入返回后置 ``committed`` /
+``aborted``。``EditContext.actor_id`` 为空时不记审计。
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from app.repositories import course_locks
-from app.repositories.graph_edit import bump_draft_revision, source_chunks
+from app.repositories.graph_edit import source_chunks
 from app.repositories.neo4j import GraphScope
 from app.repositories.sqlite import connect
 from app.repositories.tasks import read_effective_task_ids
 from app.schemas.contracts import KnowledgePoint
 from app.services.access import not_found
+from app.services.graph import audit
 from app.services.graph.read import _levels, _node
 
 __all__ = [
@@ -81,6 +85,8 @@ class EditContext:
     reader: GraphView
     lock_seconds: int
     wait_seconds: float
+    #: 发起写入的用户（审计的「谁」）；``None`` 时不记审计（内部调用）。
+    actor_id: str | None = None
 
 
 class CourseBusy(Exception):
@@ -144,7 +150,9 @@ def _course_write(ctx: EditContext, course_id: str) -> Iterator[GraphScope]:
     with course_locks.held(ctx.sqlite_url, lock, lease_seconds=ctx.lock_seconds):
         with connect(ctx.sqlite_url) as database:
             effective = read_effective_task_ids(database, course_id)
-        yield GraphScope(course_id, DRAFT, effective_task_ids=effective)
+        scope = GraphScope(course_id, DRAFT, effective_task_ids=effective)
+        audit.reconcile(ctx, scope)
+        yield scope
 
 
 def _respond(ctx: EditContext, scope: GraphScope, p: Mapping[str, Any]) -> KnowledgePoint:
@@ -171,6 +179,22 @@ def _lost_race(ctx: EditContext, scope: GraphScope, kp_id: str, expected_revisio
     if node is None:
         return not_found()
     return RevisionConflict(kp_id, expected_revision, node)
+
+
+def _write(ctx: EditContext, pending: audit.Pending, write: Callable[[], dict[str, Any] | None],
+           lost: Callable[[], Exception] | None) -> dict[str, Any]:
+    """执行一次 Neo4j 写入并结束审计行：成功 → ``committed``；抛错或条件未命中 → ``aborted`` 后原样抛出。"""
+    try:
+        written = write()
+        if written is None:
+            if lost is None:  # pragma: no cover - create 总是返回节点
+                raise RuntimeError("draft write returned no node")
+            raise lost()
+    except BaseException as exc:
+        audit.abort(ctx, pending, exc)
+        raise
+    audit.commit(ctx, pending, revision_after=int(written.get("revision") or 0) or None)
+    return written
 
 
 # ---------------------------------------------------------------- 输入规范化
@@ -223,11 +247,11 @@ def update_node(ctx: EditContext, course_id: str, kp_id: str, expected_revision:
     """教师修改：写入字段、加锁、修订号加 1。"""
     normalized = _changes(changes)
     with _course_write(ctx, course_id) as scope:
-        _current(ctx, scope, kp_id, expected_revision)
-        bump_draft_revision(ctx.sqlite_url, course_id)
-        written = ctx.store.update(scope, kp_id, expected_revision, normalized)
-        if written is None:
-            raise _lost_race(ctx, scope, kp_id, expected_revision)
+        node = _current(ctx, scope, kp_id, expected_revision)
+        pending = audit.begin(ctx, course_id, "update", kp_id, revision_before=expected_revision,
+                              summary=audit.update_summary(node, normalized))
+        written = _write(ctx, pending, lambda: ctx.store.update(scope, kp_id, expected_revision, normalized),
+                         lambda: _lost_race(ctx, scope, kp_id, expected_revision))
         return _respond(ctx, scope, written)
 
 
@@ -237,10 +261,10 @@ def unlock_node(ctx: EditContext, course_id: str, kp_id: str, expected_revision:
         node = _current(ctx, scope, kp_id, expected_revision)
         if not node.get("locked"):
             return _respond(ctx, scope, node)
-        bump_draft_revision(ctx.sqlite_url, course_id)
-        written = ctx.store.unlock(scope, kp_id, expected_revision)
-        if written is None:
-            raise _lost_race(ctx, scope, kp_id, expected_revision)
+        pending = audit.begin(ctx, course_id, "unlock", kp_id, revision_before=expected_revision,
+                              summary=audit.unlock_summary())
+        written = _write(ctx, pending, lambda: ctx.store.unlock(scope, kp_id, expected_revision),
+                         lambda: _lost_race(ctx, scope, kp_id, expected_revision))
         return _respond(ctx, scope, written)
 
 
@@ -297,6 +321,8 @@ def create_node(ctx: EditContext, course_id: str, fields: Mapping[str, Any],
         for key in ("chapter_id", "importance", "difficulty"):
             if fields.get(key) is not None:
                 props[key] = fields[key]
-        bump_draft_revision(ctx.sqlite_url, course_id)
-        written = ctx.store.create(scope, "kp_" + uuid.uuid4().hex, props, rows)
+        kp_id = "kp_" + uuid.uuid4().hex
+        pending = audit.begin(ctx, course_id, "create", kp_id, revision_before=None,
+                              summary=audit.create_summary(props, rows))
+        written = _write(ctx, pending, lambda: ctx.store.create(scope, kp_id, props, rows), None)
         return _respond(ctx, scope, written)
