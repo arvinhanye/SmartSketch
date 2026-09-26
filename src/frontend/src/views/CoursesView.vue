@@ -3,7 +3,7 @@ import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
 import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, useCourses } from '../composables/useCourses'
-import { COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE } from '../router'
+import { COURSE_MEMBERS_ROUTE, COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
 
 const api = inject(COURSES_API_KEY, null)
@@ -48,6 +48,9 @@ const {
   },
 })
 
+// H12：成员管理入口只给本课教师成员，且仅在注册了成员路由时显示；学生无入口
+const hasMembersRoute = router.hasRoute(COURSE_MEMBERS_ROUTE)
+
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
 </script>
 
@@ -76,6 +79,11 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
           · 状态：{{ current.statusLabel }}
         </p>
         <p v-if="current.description">{{ current.description }}</p>
+        <p v-if="hasMembersRoute && current.myRole === 'teacher'">
+          <RouterLink data-test="members-link" :to="{ name: COURSE_MEMBERS_ROUTE, params: { cid: current.id } }">
+            管理成员
+          </RouterLink>
+        </p>
       </template>
     </section>
 
