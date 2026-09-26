@@ -1,3 +1,4 @@
+import type { Component } from 'vue'
 import { createRouter, type RouterHistory } from 'vue-router'
 import type { components } from '../../../contracts/v1/generated/typescript/openapi'
 import StudentHome from '../views/StudentHome.vue'
@@ -19,18 +20,25 @@ export const NOTICE_WRONG_ROLE = 'wrong-role'
 export const ROOT_ROUTE = 'root'
 const HOME_ROUTE: Record<Role, string> = { teacher: 'teacher-home', student: 'student-home' }
 
+/** 该账号类型的默认首页路由名（登录成功后按 `LoginResponse.user.role` 跳转） */
+export function homeRouteFor(role: Role): string {
+  return HOME_ROUTE[role]
+}
+
 export interface AppRouterOptions {
   history: RouterHistory
   /** 当前登录账号的类型；未登录返回 null */
   getAccountRole: () => Role | null
+  /** 未登录时在根路由显示的登录页（H13）；省略时根路由为空页，只显示外壳提示 */
+  loginComponent?: Component
 }
 
-export function createAppRouter({ history, getAccountRole }: AppRouterOptions) {
+export function createAppRouter({ history, getAccountRole, loginComponent }: AppRouterOptions) {
   const router = createRouter({
     history,
     routes: [
-      // 未登录时停在这里，页面本身为空，提示由外壳显示
-      { path: '/', name: ROOT_ROUTE, component: { render: () => null } },
+      // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
+      { path: '/', name: ROOT_ROUTE, component: loginComponent ?? { render: () => null } },
       { path: '/teacher', name: HOME_ROUTE.teacher, component: TeacherHome, meta: { accountRole: 'teacher' } },
       { path: '/student', name: HOME_ROUTE.student, component: StudentHome, meta: { accountRole: 'student' } },
       { path: '/:pathMatch(.*)*', redirect: '/' },

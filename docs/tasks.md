@@ -921,7 +921,7 @@ H13、F03、E06 的前置均已合入 main@`8985a16`（H13：C13、B15、B03、B
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| H13 | IN PROGRESS | 实现前端登录页与会话存储 | ArvinHan（Claude） | `claude/h13-login-session` / 本认领提交 | `src/frontend/src/views/LoginView.vue`、`src/frontend/src/stores/session.ts`、`src/frontend/src/api/auth.ts`、`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts`、`tests/frontend/h13.test.ts`、`docs/handoffs/claude-h13.md` | 待补 |
+| H13 | DONE（待 PR 审查/合并） | 实现前端登录页与会话存储 | ArvinHan（Claude） | `claude/h13-login-session` / 本认领提交 | `src/frontend/src/views/LoginView.vue`、`src/frontend/src/stores/session.ts`、`src/frontend/src/api/auth.ts`、`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts`、`tests/frontend/h13.test.ts`、`docs/handoffs/claude-h13.md` | `h13.test.ts` 28 passed；前端全量 81 passed；type-check、build、`verify.sh` 通过；关闭审查遗留 B03-R01′、B04-R01；`docs/handoffs/claude-h13.md` |
 
 - H13 验收：令牌与 `LoginResponse.user` 只存 `sessionStorage`（不存 localStorage/Cookie）；登录后按 `user.role` 进首页；401、429 分别明确提示；收到 401 清会话与课程上下文并回登录页（同时关闭审查遗留 B03-R01′、B04-R01）；口令/令牌不写日志；不解析 JWT 做授权。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts`。
 
