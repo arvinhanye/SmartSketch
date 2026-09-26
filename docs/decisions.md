@@ -1028,3 +1028,18 @@
 - **后果**：前端和学习路径可以直接用 `getGraph` 的 `level`；每次读取都会整图计算层级，课程规模（数百节点）下可以接受。人工添加且没有来源的知识点在详情接口上会是 500，F08 需保证教师新建知识点时至少带一条来源，否则要回来改契约。
 - **回滚**：撤销 `api/graph.py`、`services/graph/read.py`、`repositories/graph_read.py`、`main.py` 一行注册与测试；无数据变更。
 - **签收**：待 ArvinHan 审阅（入口语义与 500 处理由 Claude 选定并在交接中报告）。
+
+## ADR-031：G01 快照组装的边界情形
+
+- **日期**：2026-09-26
+- **背景**：`specs/teacher-review-publish.md` V3 定了发布集合、校验原因、快照格式与规范化，但留下几处实现细节：快照章节的 `parent_id` 在契约 `Chapter` 中不存在；降级关系的 `downgraded_from_type`/`downgrade_cycle` 是否进快照；`low_confidence` 或 `rejected` 关系端点不存在时是否阻断；`rejected` 是否计入 `excluded`；输入结构错误如何与发布阻断区分。
+- **决定**：
+  1. 快照章节按 V3 示例带 `parent_id`（无则 `null`）；发布集合的章节为被引用章节及其在草稿中的祖先，保证 `parent_id` 可解析。
+  2. 降级字段不进快照：降级关系必为 `low_confidence`（契约 `RelationDowngraded`），本就被排除；教师通过后成为普通关系。
+  3. 端点不存在按「草稿不变量被破坏」处理：除 `rejected` 外，`draft`/`approved`/`low_confidence` 关系都检查并报 `dangling_endpoint`；`rejected` 关系不在任何集合里，不检查。
+  4. `excluded` 只计 `low_confidence` 知识点与关系，`rejected` 不计；端点被 `low_confidence` 或 `rejected` 排除的关系计入 `cascaded_edges`。
+  5. 所有阻断原因一次报全，顺序固定为 `cycle`、`dangling_endpoint`（按关系 ID）、`invalid_source_ref`（先知识点后关系，各按 ID）、`empty_graph`、`invalid_lineage`（按知识点 ID）。
+  6. 输入结构错误（重复 ID、非法类型/状态、非有限数值、区间外的难度与重要度等）抛 `SnapshotFormatError`，属实现缺陷，由 G04 按 5xx 处理，不作为 `PUBLISH_BLOCKED` 返回；`load_snapshot` 只接受规范形态的字节，读出即可复算摘要。
+- **后果**：G04 在 P4～P7 持锁读出可见草稿后直接调用 `build_snapshot`；G03 物化与 P9 核对用 `load_snapshot` 读回。今后若给学生可见字段加项，须同时改快照与 `snapshot_format`。
+- **回滚**：撤销 `services/versions/` 与 `tests/backend/test_g01.py`；无数据变更。
+- **签收**：待 ArvinHan 审阅（以上细节由 Claude 选定并在交接中报告）。

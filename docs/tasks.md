@@ -1047,3 +1047,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：教师不带 `version` 读草稿（按 V 过滤），学生只读当前发布版本；空图 200、未发布 404 `GRAPH_NOT_PUBLISHED`、版本不符 404 `NOT_FOUND`；每条来源都有 `page` 或 `section_path`，知识点来源按证据区间定位到解析块并带原文（ADR-030）。
 - F07 待决：历史版本读取等 G02 版本表；人工添加且无来源的知识点详情会 500，需 F08 保证新建带来源或改契约；`getKnowledgePoint` 每次整图计算层级。
+
+## 2026-09-26 G 组：发布版本（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G01 | DONE（待 PR 审查/合并） | 实现快照序列化和摘要 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@608be90`（#258 合并后重开） | `src/backend/app/services/versions/snapshot.py`、`tests/backend/test_g01.py`；扩围 `src/backend/app/services/versions/__init__.py`、`docs/decisions.md`（ADR-031） | `test_g01.py` 49 passed；12 处反向篡改均检出；后端全量 2870 passed；`verify.sh` exit 0；`docs/handoffs/claude-g01.md` |
+
+- 验收：规范化字节键序与数组顺序稳定（PUB-10，乱序构造摘要相同）；端点缺失、来源无效、成环、空图、谱系违规逐条拒绝并符合契约 `PublishBlockedDetails`；`load_snapshot` 读回与原快照逐字节相同、不丢任何属性；PUB-8 排除计数、PUB-9、PUB-11 均有用例。
+- G01 待决：从 Neo4j/SQLite 读出可见草稿与修订的装载归 G04（P4～P7）；快照章节带 `parent_id`，而 Neo4j 章节与契约 `Chapter` 尚无此字段，章节层级落地时需同步（ADR-031）。
