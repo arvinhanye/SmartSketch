@@ -1162,3 +1162,20 @@
 - **后果**：G6 不进首屏包；画布组件不发请求，数据与筛选由页面、H05 负责；布局切换、图例、节点详情分别留给 H05、H06。单测覆盖生命周期契约而非 G6 绘制细节。
 - **回滚**：撤销 `graph/lifecycle.ts`、`components/GraphCanvas.vue`、`tests/frontend/h04.test.ts`，并从 `src/frontend/package.json` 删除 `@antv/g6` 后在 `src/frontend` 执行 `npx npm@11 install` 还原锁文件（或 `git checkout <base> -- src/frontend/package.json src/frontend/package-lock.json`）；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-038：F14 离线重新向量化命令的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V12 规定了重新向量化的 7 步与 PUB-39 的迁移上下文，但以下细节未写死：目标空间从哪里来；未过期与已过期的发布尝试怎么对待；K10 的 Neo4j 备份尚无脚本；未提交尝试留在 Neo4j 的副本是否迁移；「已写入的向量在重跑时复用」对内容可变的草稿是否成立；文本块的文字从哪里读；`model_calls` 的 `course_id` 必填而本命令跨课程；第 6 步失败后怎样收尾。
+- **决定**：
+  1. 命令为 `scripts/reembed.py`。目标空间取环境变量（`EMBEDDING_MODE/MODEL/DIMENSIONS`，与 E07、B06 同一推导），源空间取 SQLite 记录；两者相同时只做清理（见第 7 条）。
+  2. 第 1 步：有未过期的任务租约或课程写锁即拒绝；有 `preparing`/`materialized` 的发布或回滚尝试即拒绝，**不论是否过期**（先跑 G05 补偿），因为这类副本既不是版本也不会被迁移。SQLite 用 `VACUUM INTO` + `integrity_check` 备份到 `backups/*-before-reembed.sqlite`；K10 尚无脚本，Neo4j 备份由操作者完成后以 `--neo4j-backup-confirmed` 确认，否则拒绝。第 5 步事务内再查一次上述条件与记录空间。
+  3. 第 3 步按 Neo4j 存量枚举：全部 `Chunk`、全部 `version_id = draft` 的知识点（不论状态）、`(course_id, version_id)` 属于 `committed` 行的知识点副本。其他版本号的副本（失败尝试残留）不迁移，只在第 6 步去掉旧属性，由 G05 清理。已提交版本的副本数必须等于 `node_count`，在调用模型前核对。
+  4. 文本：文本块取 SQLite `chunks.text`（按课程与块 ID），Neo4j 有而 SQLite 无的块即失败；知识点为「名称 + 换行 + 定义」（ADR-033）。同一文本全程只算一次（E07 缓存跨课程共享）。
+  5. 重跑复用：文本块与已提交副本已有目标空间且维度正确的向量时复用（内容不可变）；草稿知识点每次重算（两次运行之间可能被编辑）。每批写入一次，中断后的进度保留在目标属性里。
+  6. 向量调用逐次记入 `model_calls`（`purpose = embedding`，`task_id` 为空，`course_id` 为当前批所属课程），不计预算。在线/本地模式用 `CompatibleEmbeddingClient`（`EMBEDDING_BASE_URL/API_KEY`），即由操作者运行时才产生真实调用；测试只用 fake。
+  7. 第 6 步删除「不是当前空间」的全部 `chunk_embedding_*`/`kp_embedding_*` 索引与 `embedding_<16 位十六进制>` 属性（分批 `REMOVE`）。失败不回退第 5 步，命令退出码 3，用同一配置重跑即完成。记录空间与配置相同时的「只清理」也用于第 5 步前的回退：改回旧配置重跑，清掉写了一半的新空间。
+  8. 退出码：0 完成；1 第 5 步前失败（旧空间保留）；2 拒绝执行（未停机或未确认备份）；3 已切换但旧空间未清完。输出不含密钥，命令结束打印回滚步骤。
+- **后果**：换向量模型是一次停机操作，耗时与存量文本数成正比；失败尝试的残留副本在换空间后没有任何向量，G05 清理前不可被当作版本读取（本来也不会）。
+- **回滚**：撤销 `scripts/reembed.py` 与 `tests/integration/test_f14.py`；无数据迁移。已执行过的换空间按命令打印的步骤回退（SQLite 备份 + K10 Neo4j 恢复，或用旧配置再跑一次）。
+- **签收**：ArvinHan 2026-09-26 在项目频道回复「全部合并」，接受第 2 条（Neo4j 备份由操作者确认、未完成的发布尝试不论是否过期都拒绝）等约定。

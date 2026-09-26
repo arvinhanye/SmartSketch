@@ -1135,3 +1135,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：挂载按容器尺寸建图，尺寸为 0 时推迟；更新走 `setData` + `render`，渲染中连续更新只画最后一次；resize 下一帧合并，`setSize` 后适应视口，隐藏（尺寸 0）与未变不动；销毁后图、观察器、帧、window 监听归零，迟到的建图与渲染不生效；路由来回切换 20 次无泄漏；节点点击回传知识点 ID；加载、空图、失败（可重试）状态与画布无障碍标签。
 - H04 待决：H03 的边颜色仍为占位；`rejected`/`low_confidence` 的样式与过滤仍留给 H05；画布本身不可键盘操作，键盘可达由 H11 卡片视图承担。
+
+## 2026-09-26 F14 离线重新向量化（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F14 | DONE（待 PR 审查/合并） | 实现离线重新向量化命令 | ArvinHan（Claude） | `claude/project-thread-200r6n` / `main@95d5c9a` | `scripts/reembed.py`、`tests/integration/test_f14.py`；扩围 `docs/decisions.md`（ADR-038）、`specs/teacher-review-publish.md`（V12 启动门禁一句）、`src/backend/README.md`（一句） | 红灯：收集错误（`scripts/reembed.py` 不存在）；`test_f14.py` 32 passed（其中 2 个连真实 Neo4j 5.26）；9 处反向篡改均检出；后端全量 2962 passed；集成 165 passed、5 skipped；`verify.sh` exit 0；`docs/handoffs/claude-f14.md` |
+
+- 验收：有未过期租约、课程写锁或任何未完成的发布/回滚尝试即拒绝，不备份、不调模型、不动 Neo4j；按 Neo4j 存量枚举全部文本块、全部草稿知识点（不论状态）与全部已提交副本；模型失败、存量在运行中变化、缺向量或维度不符、已提交副本数不等于 `node_count`、块无原文、记录空间被他人改动时都保留旧空间（旧属性与索引完好）；切换后运行时写入只接受新空间；第 6 步失败退出码 3，重跑完成清理；命令打印回滚步骤。
+- F14 与 G05/G06 文件不重叠。F14 待决：K10 Neo4j 备份脚本未实现，暂以 `--neo4j-backup-confirmed` 由操作者确认；worker 入口尚未调用启动门禁（C09 待办，非本任务）。
