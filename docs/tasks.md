@@ -1111,3 +1111,13 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 等 F08 合并后可开工：F09、F10（再到 F11、F12）。等 G07：I01、J01、J02。等 H04：H05、H06、H08。
 - Issue 同步：关闭已合并任务 #92（E12）、#96（F04）、#98（F06）、#105（F13）、#99（F07）、#106～#109（G01～G04）、#115（H03）、#140（K01，问答口径随 K03）、#141（K02），均附 PR 评论并标 `status:done`；141 个原子任务各有一个 issue，无缺漏。
+
+## 2026-09-26 F08 教师节点编辑与人工编辑锁（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F08 | DONE（待 PR 审查/合并） | 实现教师节点编辑与手改锁 | ArvinHan（Claude） | `claude/project-thread-z0m8yg` / `main@ebb0f42` | `src/backend/app/services/graph/edit_node.py`、`src/backend/app/api/graph_nodes.py`、`tests/backend/test_f08.py`；扩围 `src/backend/app/repositories/graph_edit.py`（Cypher 与 SQLite 查询）、`src/backend/app/main.py` 与 `src/backend/app/schemas/contracts.py`（各一处注册）、`tests/integration/test_f08.py`、契约（`api.v1.yaml`、`errors.v1.md`、生成物）、`src/frontend/src/api/http.ts` 与 `taskEvents.ts`（错误码副本）、`docs/decisions.md`（ADR-035）、`docs/architecture.md`（错误码表）、`specs/teacher-review-publish.md`（待细化四条） | `test_f08.py` 62 passed（实现前 61 failed）；`tests/integration/test_f08.py` 8 passed（真实 Neo4j 5.26）；后端全量 3024 passed；集成全量 142 passed / 4 skipped；前端 type-check 通过、285 passed（合入 main 后复跑）；`verify.sh` exit 0；`docs/handoffs/claude-f08.md` |
+
+- 验收：后写者 `expected_revision` 过期 → 409 `REVISION_CONFLICT` 带当前内容，不覆盖；教师修改（含只改状态）置 `locked = true`；解锁只能经单独的 `unlockKnowledgePoint`，修改接口带 `locked` 字段 → 422；F04 自动写入跳过加锁节点，解锁后恢复更新；新建知识点必须带至少一条本课程、已提交修订的来源（ADR-035）。
+- F08 已决（ArvinHan 2026-09-26，ADR-035）：人工新建节点 `status = approved`、置信度 1.0；任何课程教师均可解锁。
+- F08 待决：前端尚无为新建知识点选择来源块的接口与交互（无按资料列块的 API）；审计日志归 F12；删除与合并归 F09/F10。

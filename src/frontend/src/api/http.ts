@@ -201,6 +201,7 @@ const ERROR_CODES = [
   'COURSE_BUSY',
   'BUDGET_EXCEEDED',
   'DOCUMENT_NOT_DELETABLE',
+  'REVISION_CONFLICT',
 ] as const satisfies readonly ErrorCode[]
 type MissingErrorCode = Exclude<ErrorCode, (typeof ERROR_CODES)[number]>
 const errorCodesComplete: [MissingErrorCode] extends [never] ? true : MissingErrorCode = true

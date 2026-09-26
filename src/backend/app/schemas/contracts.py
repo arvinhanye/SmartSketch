@@ -28,6 +28,10 @@ GraphExchange = _module.GraphExchange
 GraphStats = _module.GraphStats
 KnowledgePoint = _module.KnowledgePoint
 KnowledgePointDetail = _module.KnowledgePointDetail
+# F08 teacher knowledge-point writes.
+KnowledgePointCreate = _module.KnowledgePointCreate
+KnowledgePointStatus = _module.KnowledgePointStatus
+KnowledgePointUnlock = _module.KnowledgePointUnlock
 KnowledgePointRef = _module.KnowledgePointRef
 KnowledgePointType = _module.KnowledgePointType
 Relation = _module.Relation
