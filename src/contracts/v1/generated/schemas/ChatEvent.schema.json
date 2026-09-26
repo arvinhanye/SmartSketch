@@ -497,7 +497,8 @@
         "PUBLISH_IN_PROGRESS",
         "COURSE_BUSY",
         "BUDGET_EXCEEDED",
-        "DOCUMENT_NOT_DELETABLE"
+        "DOCUMENT_NOT_DELETABLE",
+        "REVISION_CONFLICT"
       ]
     },
     "NotCoveredReason": {

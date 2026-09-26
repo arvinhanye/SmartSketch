@@ -36,6 +36,7 @@ class ErrorCode(Enum):
     COURSE_BUSY = 'COURSE_BUSY'
     BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
     DOCUMENT_NOT_DELETABLE = 'DOCUMENT_NOT_DELETABLE'
+    REVISION_CONFLICT = 'REVISION_CONFLICT'
 
 
 class CycleItem(RootModel[str]):
@@ -473,14 +474,20 @@ class KnowledgePointRef(BaseModel):
     type: Optional[KnowledgePointType] = None
 
 
-class KnowledgePointCreate(BaseModel):
-    name: Annotated[str, Field(min_length=1)]
-    aliases: Optional[list[str]] = None
-    type: KnowledgePointType
-    definition: str
-    chapter_id: Optional[str] = None
-    importance: Annotated[Optional[float], Field(ge=0.0, le=1.0)] = None
-    difficulty: Annotated[Optional[float], Field(ge=0.0, le=1.0)] = None
+class KnowledgePointSourceInput(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    chunk_id: Annotated[str, Field(min_length=1)]
+    evidence_start: Annotated[Optional[int], Field(ge=0)] = None
+    evidence_end: Annotated[Optional[int], Field(ge=1)] = None
+
+
+class KnowledgePointUnlock(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    expected_revision: Annotated[int, Field(ge=1)]
 
 
 class KnowledgePointUpdate1(BaseModel):
@@ -1236,6 +1243,20 @@ class KnowledgePointDetail(KnowledgePoint):
         Optional[list[KnowledgePointRef]], Field(description='直接后继知识点')
     ] = None
     related: Optional[list[KnowledgePointRef]] = None
+
+
+class KnowledgePointCreate(BaseModel):
+    name: Annotated[str, Field(min_length=1)]
+    sources: Annotated[
+        list[KnowledgePointSourceInput],
+        Field(description='新建知识点的来源，至少一条（ADR-035）', min_length=1),
+    ]
+    aliases: Optional[list[str]] = None
+    type: KnowledgePointType
+    definition: str
+    chapter_id: Optional[str] = None
+    importance: Annotated[Optional[float], Field(ge=0.0, le=1.0)] = None
+    difficulty: Annotated[Optional[float], Field(ge=0.0, le=1.0)] = None
 
 
 class Relation(RootModel[Union[RelationStandard, RelationDowngraded]]):
