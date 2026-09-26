@@ -1,5 +1,17 @@
 # 任务看板
 
+## 2026-09-25 Codex 认领：F03
+
+| ID | 状态 | 任务 | 负责人 | 文件范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| F03 | IN REVIEW（PR #246，交接 Claude） | 建立图唯一约束和索引迁移 | Codex（后端） | `src/backend/migrations/neo4j/001_constraints.cypher`、`src/backend/app/repositories/graph_migrations.py`、`tests/integration/test_f03.py`、本节及相关规格/架构/交接 | [PR #246](https://github.com/arvinhanye/SmartSketch/pull/246)；F03 15 passed（一次性 Neo4j 5.26，含审查修复）；最新 main 基线后端 2277 passed；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；交接 `docs/handoffs/codex-f03.md` |
+
+- 输入：F02 Neo4j 驱动、B11/ADR-012 图模型、E07 `EmbeddedVector`；输出：可重跑的 schema 迁移与带空间标识的向量写入边界。
+- 依赖：F02、B11 已在当前 `main`。风险：Neo4j DDL 非整体事务；失败后保留已建对象，修复数据或环境后重跑。
+- 验证命令：`python3 -m pytest tests/integration/test_f03.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 验收证据：迁移模块缺失、SQLite/CLI 符号缺失、连接关闭泄漏及缺失 SQLite 文件均先红后绿；真实 Neo4j 首次检出向量索引 DDL 缺闭合大括号，新增结构负例先红后修复；独立审查又指出空间错误细节及同名异构 DDL 跳过风险，先加负例后修复并处理 Neo4j 唯一约束配套索引同名；一次性容器中 `tests/integration/test_f03.py` 15 passed。重基到 `origin/main@8985a16` 后虚拟环境 `tests/backend` 2277 passed；虚拟环境 PATH 下 `./scripts/verify.sh` exit 0；详见交接。
+
+
 ## 2026-09-25 并行认领批次
 
 | ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（唯一写入者） | 证据 / 同步状态 |

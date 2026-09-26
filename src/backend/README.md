@@ -26,6 +26,16 @@ $env:AUTH_JWT_SECRET = .\.venv\Scripts\python.exe -c "import secrets; print(secr
 
 设置只读取进程环境变量，不自动加载 `.env` 文件；变量名、无敏感样例和取值约束见根目录 `.env.example` 与 `docs/integrations.md`。`python -m app` 使用 `API_HOST` 和 `API_PORT`；直接使用 Uvicorn CLI 时仍须自行传入监听参数。无效环境设置在应用导入/创建时抛出只含变量名的 `SettingsError`，密钥字段在设置对象的 `repr` 中打码。启动阶段检查 SQLite 中的向量空间；空间不一致时拒绝服务，保留原记录，待离线重新向量化。worker 入口建立时须调用同一检查函数。
 
+## Neo4j 图约束迁移（F03）
+
+停止 API 与 worker，先按 K10 流程备份 Neo4j，再在与服务相同的 `NEO4J_URI`、`NEO4J_USER`、`NEO4J_PASSWORD` 环境下运行（命令不打印密码）：
+
+```bash
+PYTHONPATH=src/backend python3 -m app.repositories.graph_migrations
+```
+
+`001_constraints.cypher` 使用逐条 `IF NOT EXISTS`，重复运行不重建已有约束。若历史数据违反唯一性，迁移在对应语句失败并保留已完成的 DDL；停机修复冲突数据后重跑。回滚不是删除约束或图数据：恢复迁移前的 Neo4j 备份，并按 K10 核对 SQLite/Neo4j 时间点。向量空间索引由 `GraphVectorWriter.ensure_vector_indexes(space)` 分空间创建；切换前旧索引和属性保持不变。
+
 ## SQLite 迁移与恢复（C01）
 
 API 启动时会检查迁移是否已是最新，有未执行的迁移即拒绝启动；因此首次启动或部署新增迁移前，**先停止 API 与 worker**，从仓库根目录运行；进程环境中的 `SQLITE_URL` 必须与两者使用的值一致（不设置时为 `sqlite:///./storage/smartsketch.sqlite3`）：
