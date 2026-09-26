@@ -8,6 +8,10 @@
   块仍按相邻且 `(page, box)` 相同的行合并，页码取原始页码，不填 `paragraph` 与行号；
 - `parse_pdf_with_headings`：`extract_pdf` + 上一步，不做页眉页脚清洗（D07 另行接入）。
 
+**版本**（ADR-018 修订 1）：解析器段内各步骤按处理顺序用 `,` 连接，`+` 只留给修订键的分块段。
+`PARSER_VERSION`（`pdf/1,headings/1`）对应不清洗的 `parse_pdf_with_headings`；D11 先经 D07 清洗再判定
+标题，须用 `CLEANED_PARSER_VERSION`（`pdf/1,cleanup/1,headings/1`）。
+
 **正文字号**：按非空白字符数加权的最常见字号（相同时取较小者）。
 
 **策略 1：字号层级**（`HeadingStrategy.FONT`）。
@@ -49,6 +53,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from app.services.parsers import pdf as _pdf
+from app.services.parsers.cleanup import CLEANUP_VERSION
 from app.services.parsers.models import (
     BlockKind,
     DocumentUnreadableError,
@@ -64,6 +69,7 @@ from app.services.parsers.txt import heading_rank
 
 __all__ = [
     "BOLD_LINE_RATIO",
+    "CLEANED_PARSER_VERSION",
     "HEADINGS_VERSION",
     "MAX_HEADING_CHARS",
     "MIN_FONT_HEADINGS",
@@ -82,8 +88,11 @@ __all__ = [
 
 #: 标题判定规则的版本；阈值或规则变化时递增。
 HEADINGS_VERSION = "headings/1"
-#: 带标题判定的 PDF 解析结果的 `parser_version`（D05 版本 + 本规则版本）。
-PARSER_VERSION = f"{_pdf.PARSER_VERSION}+{HEADINGS_VERSION}"
+#: 带标题判定、未清洗的 PDF 解析结果的 `parser_version`（D05 → D06）。
+PARSER_VERSION = ",".join((_pdf.PARSER_VERSION, HEADINGS_VERSION))
+#: D05 → D07 清洗 → D06 流水线的 `parser_version`；D11 编排 PDF 时用它。清洗只用默认阈值，
+#: 阈值或规则变化时递增 `CLEANUP_VERSION`。
+CLEANED_PARSER_VERSION = ",".join((_pdf.PARSER_VERSION, CLEANUP_VERSION, HEADINGS_VERSION))
 
 MIN_SIZE_DELTA = 1.0
 SIZE_TOLERANCE = 0.5
