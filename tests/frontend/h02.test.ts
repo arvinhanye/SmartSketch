@@ -994,6 +994,32 @@ describe('H02 删除资料（ADR-021）', () => {
     return mountPage({ materials })
   }
 
+  it('删除后，删除前发出的列表刷新迟到也不会让该行复现', async () => {
+    const old = doc('d1', { parse_status: 'failed', task_id: 't1' })
+    const stale = deferred<Document[]>()
+    let calls = 0
+    const materials = fakeMaterialsApi({
+      list: async () => {
+        calls += 1
+        return calls === 1 ? [old] : stale.promise
+      },
+    })
+    const { wrapper } = await mountPage({ materials })
+    // 上传触发静默刷新（第 2 次 list），保持未返回
+    await chooseFile(wrapper, file('new.pdf'))
+    await submitUpload(wrapper)
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d1"]').exists()).toBe(false)
+
+    stale.resolve([old, doc('d_t1', { filename: 'new.pdf', parse_status: 'queued', task_id: 't1' })])
+    await flushPromises()
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d_t1"]').exists()).toBe(true)
+  })
+
   it('失败与已取消的资料可删除：先确认，确认后调用接口并移除该行', async () => {
     const { wrapper, materials } = await withDocs([
       doc('d1', { parse_status: 'failed', task_id: 't1' }),

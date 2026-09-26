@@ -281,6 +281,8 @@ interface PageSession {
   scope: CourseRequestScope
   controller: AbortController
   subs: Map<string, TaskSubscription>
+  /** 本页已删除（或服务端已不存在）的资料；删除前发出的列表响应迟到时据此过滤，不让该行复现 */
+  removed: Set<string>
   uploading: boolean
   disposed: boolean
 }
@@ -364,6 +366,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       scope,
       controller: new AbortController(),
       subs: new Map(),
+      removed: new Set(),
       uploading: false,
       disposed: false,
     }
@@ -391,7 +394,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       const list = await materialsApi.list(s.courseId, { signal: s.controller.signal })
       if (!alive(s)) return
       // 资料按 course_id 隔离，不接收别的课程的数据
-      documents.value = list.filter((d) => d.course_id === s.courseId)
+      documents.value = list.filter((d) => d.course_id === s.courseId && !s.removed.has(d.id))
       pageStatus.value = 'ready'
       adopt(s)
     } catch (cause) {
@@ -434,7 +437,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     try {
       const list = await materialsApi.list(s.courseId, { signal: s.controller.signal })
       if (!alive(s)) return
-      documents.value = list.filter((d) => d.course_id === s.courseId)
+      documents.value = list.filter((d) => d.course_id === s.courseId && !s.removed.has(d.id))
       adopt(s)
     } catch {
       // 忽略：下次进入页面或上传会再刷新
@@ -669,6 +672,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       s.subs.get(t.taskId)?.close()
       s.subs.delete(t.taskId)
     }
+    s.removed.add(documentId)
     documents.value = documents.value.filter((d) => d.id !== documentId)
     delete tracked.value[documentId]
     delete retryable.value[documentId]
