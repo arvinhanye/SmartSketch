@@ -3,7 +3,7 @@
 - task_id: E11
 - review_status: ready_for_review
 - 分支：`claude/project-thread-sp1d3a`（与 H02、H12 同一 PR，各自独立提交）
-- base: `origin/main@5072a48`（E09 合并后）；E10（PR #253）尚未合入，本任务不导入 E10 代码
+- base: `origin/main@5072a48`，之后合入含 E10（PR #253，`cc53c8d`）的最新 main；本任务不导入 E10 代码，只在 MANIFEST 相邻行解决了一处文本冲突
 - 状态：实现与验证完成，待 PR 审查/合并
 
 ## 改动文件
@@ -80,7 +80,7 @@ result = extractor.extract(course_id: str,
 ## 风险
 
 - **先修表述清单**是本任务暂定（规格未给），可能漏掉合法的前置表述（召回下降）或放过含「基础」一词的并列句；需 K02 在自编标注集上观察 `prerequisite_without_cue` 丢弃量后调整（改清单不需升提示词版本）。
-- **与 E10 PR #253 的合并**：两边都改 `prompts/MANIFEST.md` 的相邻行（E10 改 `judge_duplicate`/`summarize_definition`），后合入者可能要手工解决一处文本冲突，两行内容各自保留即可。
+- **E10 已合入**：合并 main 时 `prompts/MANIFEST.md` 相邻行冲突已解决（两边内容各自保留）。`docs/submission/prompt-engineering.md` 中 `judge_duplicate`/`summarize_definition` 仍记为 v1 占位，E10 未同步，不在本任务范围。
 - fake 模式默认 JSON 没有 `relations`，未脚本化时会修复一次后以 `invalid_structure` 失败（与 E05 相同的现状）。
 
 ## 待决
