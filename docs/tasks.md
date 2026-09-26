@@ -1039,3 +1039,30 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
   4. **E11 先修表述清单**：金标 `g-r03`（证据「基于栈的后进先出特性」）不含清单中的表述，E11 会按 `prerequisite_without_cue` 丢弃；是否把「基于」加入清单待实测召回后决定。审查同时指出「基础」「才能」偏宽。
   5. **E12/F13 须对同一小节产出的反向 `PREREQUISITE` 候选做环检测**（PR #255 审查意见，E11 不去重二元环）。
 - 看板同步：本次把已合入 main 却仍标「待 PR 审查/合并」或「IN REVIEW」的 24 行改为「DONE（PR #N 已合入 `sha`）」：F02、F03、K07、D10、E04、E05、C10、I04、E08、C11、H13、E06、C12、E09、H01、C15、K14、TD-02、E10、E11、H02、H12、ADR-021、ADR-022。
+
+## 2026-09-26 E11 之后主线：E12、F04、F06、F13（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E12 | DONE（PR #256 已合入 `fa00164`） | 实现抽取阶段编排和检查点 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / 起于 PR #255 头 `52db31c`，#255 合并后已合入 `main@6742f6a` | `src/backend/app/workers/extract_task.py`、`tests/backend/test_e12.py`；扩围 `src/backend/migrations/008_extraction_checkpoints.sql`、`src/backend/app/repositories/extraction_checkpoints.py`、`docs/decisions.md`（ADR-023）、`specs/task-processing.md`（§8.4 一段） | 红灯：收集 `ImportError`；`test_e12.py` 37 passed（连跑 5 次稳定）；后端全量 2801 passed；8 处反向篡改均检出；`verify.sh` exit 0；`docs/handoffs/claude-e12.md` |
+| F04 | DONE（PR #256 已合入 `fa00164`） | 实现草稿节点和来源批写 | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/graph_nodes.py`、`tests/integration/test_f04.py`；扩围 `docs/decisions.md`（ADR-024）、`docs/architecture.md`（来源关联一句） | 红灯：收集 `ImportError`；`test_f04.py` 21 passed（其中 7 个连真实 Neo4j 5.26）；7 处反向篡改均检出；`docs/handoffs/claude-f04.md` |
+| F06 | DONE（PR #256 已合入 `fa00164`） | 实现关系事务写入与并发防环 | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/graph_relations.py`、`src/backend/app/services/graph/relations.py`、`tests/integration/test_f06.py`；扩围 `src/backend/app/repositories/neo4j.py`（`write_transaction`）、`src/backend/migrations/neo4j/001_constraints.cypher` 与 `graph_migrations.py`（守卫约束）、`docs/decisions.md`（ADR-025）、`docs/architecture.md` | `test_f06.py` 28 passed（其中 12 个连真实 Neo4j 5.26，连跑 5 次稳定）；8 处反向篡改均检出；后端全量 2801 passed；`verify.sh` exit 0；`docs/handoffs/claude-f06.md` |
+| F13 | DONE（PR #256 已合入 `fa00164`） | 完成图持久化 worker 阶段 | ArvinHan（Claude） | 同上 | `src/backend/app/workers/persist_graph.py`、`tests/integration/test_f13.py`；扩围 `src/backend/migrations/009_course_locks.sql`、`src/backend/app/repositories/course_locks.py`、`src/backend/app/services/graph/downgrade.py`、`graph_relations.py`（降级/撤销语句）、`graph_nodes.py`（事务内写入）、`services/graph/relations.py`（事务内写入）、`task_leases.py`（persisting 失败置 `cleanup_pending`）、`tasks.py`（读 V）、`docs/decisions.md`（ADR-029）、`specs/task-processing.md`（§8.4 一段） | `test_f13.py` 27 passed（其中 10 个连真实 Neo4j 5.26，连跑 5 次稳定）；9 处反向篡改均检出；后端全量 2801 passed；`verify.sh` exit 0；`docs/handoffs/claude-f13.md` |
+
+- 依赖：E12 ← D11（#239）、E04（#235）、E11（#255，已合并）；F04 ← F03（#246）、E12。
+- 验收：每块失败只重试该块（L2）；在途块数不超过 `LLM_MAX_CONCURRENCY`；取消在块/小节边界生效，在途结果不写检查点（TASK-4）；接管后已结束的块和小节不再调用模型、来源不重复（LEASE-2）；阈值内继续、恰等于阈值继续、超阈值提前判定（TASK-9/10/13）；熔断打开不记失败块并退避释放（LEASE-6）。
+- 已决：小节关系抽取失败不计入失败块阈值（ArvinHan 2026-09-26，ADR-023 决定 4）。
+- E12 待决（详见交接）：任务快照与 SSE 尚未带 `chunks_done`/`chunks_failed`/`failed_chunks`（C11 接列）；模型调用结果缓存未实现，块中途崩溃会重新计费；小节实体表与提示词长度无上限；检查点保留期清理（§8.6）未实现；生产装配（`ExtractionToolkit` 的模型、输出上限、补漏开关）未接入启动入口；`merging` 阶段 worker 尚无任务承接。
+
+- F04 已决：加锁知识点完全不动，只记为跳过（ArvinHan 2026-09-26，ADR-024 决定 4）。F04 待决：节点状态与低置信度阈值由调用方给（D-08）；§8.4 的「撤销旧贡献 + 写入」同一事务由 F13 组合。
+- F06 验收：两个连接并发写 A→B / B→A 恰有一方 `CYCLE_DETECTED`；四个连接并发写成环的四条边恰有一方冲突；读图、环检测与提交在同一写事务里并由课程守卫节点串行（ADR-025）。F06 待决：SQLite 课程写锁 `course_locks` 与 `draft_revision+1` 仍未落地（V4，归 API/发布任务）；ADR-009 自动降级与「撤销旧贡献 + 写入」同一事务由 F13 组合。
+- F13 已决（ArvinHan 2026-09-26，ADR-029）：`merging` 先用直通版（不做跨资料融合）；D-08 签收前自动写入的节点和关系状态一律 `draft`。F13 同时补上迁移 009 的 `course_locks` 与 `t6_seq`，F06 待决中的课程写锁表因此已有；`draft_revision+1` 仍归教师编辑（F08）。F13 待决：融合编排（E08～E10 接入 `merging`）无任务承接；D-08 签收后需重算状态；等锁超时消耗一次尝试。
+
+## 2026-09-26 F07 图谱读取（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F07 | DONE（PR #258 已合入 `608be90`） | 实现草稿图读取与详情服务 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@fa00164`（#256 合并后重开） | `src/backend/app/services/graph/read.py`、`src/backend/app/api/graph.py`、`tests/backend/test_f07.py`；扩围 `src/backend/app/repositories/graph_read.py`（读取 Cypher）、`src/backend/app/schemas/contracts.py`（导出图谱模型）、`src/backend/app/main.py`（注册路由）、`tests/integration/test_f07_live.py`、`docs/decisions.md`（ADR-030） | `test_f07.py` 20 passed；`test_f07_live.py` 4 passed（真实 Neo4j 5.26）；10 处反向篡改均检出；后端全量 2821 passed；`verify.sh` exit 0；`docs/handoffs/claude-f07.md` |
+
+- 验收：教师不带 `version` 读草稿（按 V 过滤），学生只读当前发布版本；空图 200、未发布 404 `GRAPH_NOT_PUBLISHED`、版本不符 404 `NOT_FOUND`；每条来源都有 `page` 或 `section_path`，知识点来源按证据区间定位到解析块并带原文（ADR-030）。
+- F07 待决：历史版本读取等 G02 版本表；人工添加且无来源的知识点详情会 500，需 F08 保证新建带来源或改契约；`getKnowledgePoint` 每次整图计算层级。

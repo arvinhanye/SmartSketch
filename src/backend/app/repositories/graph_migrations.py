@@ -23,6 +23,7 @@ EXPECTED_SCHEMA = {
     'chapter_scope_id': ('UNIQUENESS', 'NODE', ('Chapter',), ('course_id', 'version_id', 'chapter_id')),
     'chunk_course_id': ('UNIQUENESS', 'NODE', ('Chunk',), ('course_id', 'chunk_id')),
     'relation_identity_scope_id': ('UNIQUENESS', 'NODE', ('RelationIdentity',), ('course_id', 'version_id', 'rel_id')),
+    'draft_write_guard_scope': ('UNIQUENESS', 'NODE', ('DraftWriteGuard',), ('course_id', 'version_id')),
     'contains_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('CONTAINS',), ('course_id', 'version_id', 'rel_id')),
     'prerequisite_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('PREREQUISITE',), ('course_id', 'version_id', 'rel_id')),
     'related_to_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('RELATED_TO',), ('course_id', 'version_id', 'rel_id')),

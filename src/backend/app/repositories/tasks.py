@@ -292,3 +292,15 @@ def read_leased_task(
     if row is None:
         return None
     return LeasedTaskRow(row[0], row[1], row[2], float(row[3]), bool(row[4]))
+
+
+def read_effective_task_ids(database: sqlite3.Connection, course_id: str) -> tuple[str, ...]:
+    """§8.4 有效任务集合 V：本课程 ``stage ∈ {awaiting_review, completed}`` 的任务 ID（升序）。"""
+    if not isinstance(course_id, str) or not course_id.strip():
+        raise ValueError("course_id must be a non-empty string")
+    rows = database.execute(
+        """SELECT id FROM processing_tasks
+           WHERE course_id = ? AND stage IN ('awaiting_review', 'completed') ORDER BY id""",
+        (course_id,),
+    ).fetchall()
+    return tuple(row[0] for row in rows)

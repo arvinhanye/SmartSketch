@@ -210,7 +210,8 @@ def reclaim_expired(sqlite_url: str, *, max_attempts: int) -> ReclaimResult:
 
     Order: cancel requested → ``cancelled`` (T8, the reclaimer acts as the checkpoint);
     else ``attempt ≥ max_attempts`` → ``failed`` with ``TASK_ATTEMPTS_EXHAUSTED``;
-    else untouched, waiting for takeover. Also lists ``failed`` tasks with
+    else untouched, waiting for takeover. A ``persisting`` task failed here (or by
+    ``release_after_transient_failure``) gets ``cleanup_pending`` (§8.4, F13). Also lists ``failed`` tasks with
     ``cleanup_pending`` for the §8.4 cleanup retry. Returned terminal tasks need an SSE push.
     """
     _positive_int("max_attempts", max_attempts)
@@ -227,6 +228,7 @@ def reclaim_expired(sqlite_url: str, *, max_attempts: int) -> ReclaimResult:
                 SET error_code = 'TASK_ATTEMPTS_EXHAUSTED',
                     error_message = :message,
                     error_details = json_object('attempts', attempt, 'stage', stage),
+                    cleanup_pending = CASE WHEN stage = 'persisting' THEN 1 ELSE cleanup_pending END,
                     stage = 'failed', lease_owner = NULL, lease_token = NULL,
                     lease_expires_at = NULL, updated_at = {_NOW_TEXT}
                 WHERE stage IN {_PROCESSING_SQL} AND attempt >= :max_attempts
@@ -287,6 +289,7 @@ def release_after_transient_failure(
             database.execute(
                 f"""UPDATE processing_tasks
                     SET stage = 'failed', error_code = ?, error_message = ?, error_details = ?,
+                        cleanup_pending = CASE WHEN stage = 'persisting' THEN 1 ELSE cleanup_pending END,
                         lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
                         updated_at = {_NOW_TEXT}
                     WHERE id = ? AND lease_token = ?""",

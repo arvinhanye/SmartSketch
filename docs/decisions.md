@@ -957,6 +957,49 @@
 - **回滚**：撤销本 ADR 对应的契约、生成物、后端路由与前端改动，前端恢复固定 50 MiB。
 - **签收**：ArvinHan 2026-09-26（在会话中决定「一起处理掉」前端写死上限的问题；接口形状由 Claude 选定并报告）。
 
+## ADR-023：E12 抽取阶段的检查点、小节划分与失败口径
+
+- **日期**：2026-09-26
+- **背景**：§8.4 规定 `extracting` 有块级检查点，但没有定表结构、关系抽取（E11 第二阶段）放在哪里、「小节」怎么划分，也没有定关系抽取失败是否计入 §5 失败块阈值。E05 交接待决 3 另指出输出不合规在 `ErrorCode` 中没有块级码。
+- **决定**：
+  1. 迁移 008 新建 `task_chunk_checkpoints(task_id, course_id, unit_kind ∈ {chunk, section}, unit_id, status ∈ {done, failed}, attempts, error_code, result)`，主键 `(task_id, unit_kind, unit_id)`；行不可变、按课程作用域校验，随任务行级联删除（ADR-021 删除资料不受阻）。
+  2. 实体抽取（E05，可选 E06 补漏）逐块进行；全部块结束且未超阈值后，成功块按「资料修订 + 章节标题路径」分组为小节，每个小节做一次关系抽取（E11），各写一个检查点。小节实体表取该小节成功块的候选，按「任务 + E06 规范化名称键」去重，得到任务内临时实体 ID `tent_…`；跨任务与草稿融合（E08～E10、D-08）留在 `merging`。
+  3. 块最终失败码：输出不合规 → `EXTRACTION_INCOMPLETE`；其余模型调用错误 → `LLM_UNAVAILABLE`；预算被拒 → `BUDGET_EXCEEDED`（不再重试）。熔断打开与调用记录写入失败不记失败块，按阶段级临时故障主动释放。
+  4. 小节关系抽取重试耗尽仍失败只记检查点，**不计入**失败块阈值，也不进 `Task.failed_chunks`（该小节的实体照常保留）。
+  5. 阈值比较按阈值的十进制写法精确计算（0.29 即 29/100），避免二进制浮点让恰好等于阈值的情形误判为超出。
+- **后果**：接管后已结束的块与小节不再调用模型（LEASE-2）；取消在块边界生效，在途调用的结果不写检查点。小节关系失败目前只在检查点和 `load_candidates().failed_sections` 中可见，审核页如需展示须另加契约字段。块与小节检查点的保留期清理（§8.6）尚未实现。
+- **回滚**：停 API 与 worker，按迁移 008 文件头的 `ROLLBACK` 行删表；撤销 `extract_task.py` 与 `extraction_checkpoints.py`。处于 `extracting` 的任务之后从阶段开头重跑。
+- **签收**：ArvinHan 2026-09-26（在会话卡片上选择「小节关系失败不计入阈值」）；其余默认值由 Claude 选定并在交接中报告。
+
+## ADR-024：F04 草稿节点与来源关联的图模型；加锁节点完全不动
+
+- **日期**：2026-09-26
+- **背景**：§8.4 规定了贡献记录（`contrib_tasks`、`contrib_manual`、来源关联带 `task_id`），但没有定来源关联在 Neo4j 中的类型与属性、共享 `Chunk` 节点带哪些字段，也没有定加锁节点遇到新资料里的同名知识点时能否补来源（`specs/teacher-review-publish.md`「待细化」列有加锁粒度）。
+- **决定**：
+  1. 知识点到文本块的来源关联为 `(:KnowledgePoint)-[:EVIDENCED_BY {task_id, chunk_id, evidence_start, evidence_end}]->(:Chunk)`，证据为块文本中的半开区间；人工添加的来源不带 `task_id`（F08 落实）。
+  2. `Chunk` 节点按 `(course_id, chunk_id)` 共享（F03 约束），自动写入时只在新建时写 `document_id`、`revision_id`；原文仍以 SQLite `chunks` 为准。
+  3. 自动写入的新节点：`source = ai`、`locked = false`、`contrib_manual = false`、`revision = 1`、`level = 0`；本任务 ID 不重复地并入 `contrib_tasks`；内容有变化才递增节点 `revision`，重试不改数据。自动流程只能写 `draft`/`low_confidence` 两种状态。
+  4. **加锁节点完全不动**：不改内容、不并入贡献、不加来源，写入结果记为「因加锁跳过」。加锁粒度为整个节点（契约 `KnowledgePoint.locked`）。
+  5. 跨课程来源在写库前拒绝：来源块必须在调用方按本课程从 SQLite 读出的块中，且资料、修订与证据区间与该块一致。
+- **后果**：F13 可以直接用 `write_draft_nodes` 写节点；审核与问答读来源时按 `EVIDENCED_BY.task_id ∈ V` 判定可见。新资料里对加锁知识点的证据不会挂上去，教师需要时手动添加。每批一个 Neo4j 事务，§8.4 要求的「撤销旧贡献 + 写入」同一事务由 F13 组合。
+- **回滚**：撤销 `graph_nodes.py` 与测试；已写入草稿的节点与关系按 `contrib_tasks`、`EVIDENCED_BY.task_id` 可定向清理。
+- **签收**：ArvinHan 2026-09-26（在会话卡片上选择「加锁节点完全不动」）；关系名与属性由 Claude 选定并在交接中报告。
+
+## ADR-025：F06 关系写入的课程守卫节点、关系属性与既有关系的处理
+
+- **日期**：2026-09-26
+- **背景**：F06 验收要求「两个连接并发 A→B / B→A 至少一方冲突；校验与提交同写入序列」。Neo4j 默认读已提交，两个事务各自读图、各自通过环检测后都能提交；只锁端点也不够（A→B、C→D 先提交后，B→C 与 D→A 的端点互不相交，仍会同时通过）。V4 的 SQLite 课程写锁（`course_locks`）尚未建表，且租约过期后可能与晚到的写入重叠。§8.4 只说关系来源按「(贡献方, 文本块 ID)」成对保存、编码由 F03/F13 定。
+- **决定**：
+  1. F03 迁移新增 `DraftWriteGuard(course_id, version_id)` 唯一约束。每个关系写事务第一条语句 `MERGE` 本课程草稿的守卫节点并递增 `seq`，持有它的写锁直到提交；读图、环检测（F05）与 `MERGE` 都在其后、同一事务内。同一课程草稿的关系写入因此串行，与 SQLite 课程写锁互为冗余。
+  2. F02 `Neo4jRepository` 新增 `write_transaction(scope, work)`：一个显式写事务内多条语句，每条都经同样的作用域参数校验；驱动的临时故障可能让 `work` 重跑，`work` 须只依赖事务内读到的数据；`work` 自己抛出的异常回滚后原样抛出，驱动异常仍脱敏。
+  3. 关系属性：`course_id`、`version_id`、`rel_id`、`confidence`、`status`、`source`、`contrib_tasks`、`contrib_manual`、`revision`、`source_pairs`；`source_pairs` 每项是 JSON 字符串 `[贡献方, chunk_id]`，人工贡献方为 `null`。`RelationIdentity` 记当前 `type`、`from_id`、`to_id`。
+  4. 关系 ID 由「课程 + 类型 + 起点 + 终点」派生；`RELATED_TO` 还可使用同端点 `PREREQUISITE` 的 ID（ADR-009 降级保留原 ID）。
+  5. 已有同 ID 关系时：教师写入遇到可见关系、或类型/端点不同 → `DUPLICATE_RELATION`；遇到不可见关系（未提交或失败任务留下）由教师接管字段。任务写入从不改已有关系的字段：端点不同（教师改过端点）跳过并报告；类型不同（降级或教师改类型）沿用现有类型，只并入贡献与来源。
+  6. 一次调用全有或全无：端点不可见 → `DANGLING_ENDPOINT`；成环 → `CYCLE_DETECTED` 带闭合环路；`PREREQUISITE` 自环不连库即返回 `[A, A]`，其他类型自环为非法输入。
+- **后果**：教师新建/修改关系（F08）与 F13 `persisting` 都能在同一事务里复用这些语句；F13 的自动降级在锁内、同一次读取上计算。守卫节点让同一课程的关系写入不能并行，吞吐按课程串行（与课程写锁一致）。Neo4j 等锁默认无上限，靠 V4 的 API 侧有界等待兜底。
+- **回滚**：撤销 `graph_relations.py`、`services/graph/relations.py`、`write_transaction` 与测试；守卫约束可 `DROP CONSTRAINT draft_write_guard_scope`，守卫节点可 `MATCH (g:DraftWriteGuard) DELETE g`，不影响知识点与关系。
+- **签收**：待 ArvinHan 审阅（守卫节点与属性编码由 Claude 选定并在交接中报告）。
+
 ## ADR-026：抽取硬指标的基准材料定为自编「栈与队列」一章（D-01）
 
 - **日期**：2026-09-26
@@ -983,3 +1026,32 @@
 - **后果**：`docs/integrations.md` 两项状态改为已签收。评测在能访问供应商的本机上运行（开发云环境的网络策略拦截 `api.deepseek.com`）。其他用途的付费调用仍按原规则单独确认。
 - **回滚**：两项状态改回占位（D-02d）；撤回付费确认后不得再发起评测调用。
 - **签收**：ArvinHan 2026-09-26（会话中「确认预算上限和付费调用」）。
+
+## ADR-029：F13 直通融合、持久化单事务、课程写锁与 T6 提交序号
+
+- **日期**：2026-09-26
+- **背景**：F13 要把 E12 的候选写进草稿并完成 T6，但 `merging` 阶段没有任务承接；完整融合（E08～E10）依赖向量与 D-08 阈值，都未就绪。§8.5 的 `course_locks` 与 §3 的 T6 提交序号也还没有迁移。节点与关系的 `draft`/`low_confidence` 分界属于 D-08，同样未签收。F02 只有「一条查询一个事务」，满足不了 §8.4 的「撤销旧贡献 + 写入」单事务。
+- **决定**：
+  1. **`merging` 直通**（ArvinHan 在会话卡片上选定）：阶段边界只做 C08 `stage_done`（T5 或 T8），不调用模型。任务内按 E06 规范化名称去重（E12 已做），每个实体写成新节点 `kp_id = derive_kp_id(课程, 任务, tent_id)`；跨资料重复交审核队列「疑似重复」。接入 E08～E10 时只替换这一步。
+  2. **状态一律 `draft`**（ArvinHan 在会话卡片上选定），置信度原值保存（缺失记 0）；D-08 签收后按阈值重算。ADR-009 降级的关系仍为 `low_confidence`。
+  3. 迁移 009：`course_locks(course_id 主键, holder, token, expires_at)` 与任务租约同构；`processing_tasks.t6_seq` 在 T6 事务里取本课程最大值 + 1，`(course_id, t6_seq)` 部分唯一索引。
+  4. `persisting` 流程：取课程写锁（持锁期间每 `L/3` 续约；等锁上限为一个锁租约 `L`，仍拿不到则按存储临时故障释放退避）→ 复核租约 → 读 V → **一个 Neo4j 写事务**：锁守卫节点（ADR-025）、撤销本任务全部贡献并删除因此无贡献的元素、F04 写节点、按 ADR-009 逐环降级（`plan_downgrades`，选环上置信度最低、并列取 `rel_id` 最小的可降级边）、F06 写关系 → T6（分配序号、清空租约，并递增 `courses.draft_revision`：任务内容此刻变为可见，已发布课程据此显示为 `revising`）→ 释放锁。
+  5. 失败：Neo4j/SQLite 故障与等锁超时 → `STORAGE_UNAVAILABLE` 释放退避，耗尽则 T9；环上无可降级边 → T9 `CYCLE_DETECTED`；其余 → T9 `INTERNAL_ERROR`。`persisting` 的任何 T9（含 C09 回收与释放时的耗尽）都置 `cleanup_pending`，随后在课程写锁下撤销本任务贡献，成功才清除；回收步骤对遗留标记重试。
+  6. 找环用 F05 `find_cycle`（按节点 ID 升序 DFS），而非规格原文「按边 ID 升序遍历邻接」；两者都只依赖边集合，结果可复现（DAG-3），降级选择规则不变。
+- **后果**：上传的资料能一路走到 `awaiting_review`，但同名知识点在不同资料间不合并，直到融合接入。直通模式下本任务的节点 ID 由任务派生，跨任务成环只可能来自草稿里已有的环（DAG-10）；降级他人未确认边的路径已实现，由纯函数测试和 `downgrade_relation` 覆盖。等锁超时会消耗一次尝试。
+- **回滚**：停 API 与 worker，按迁移 009 文件头的 `ROLLBACK` 行删表与列（`test_f13.py` 已验证），撤销 `persist_graph.py`、`course_locks.py`、`downgrade.py` 与相关改动；处于 `merging`/`persisting` 的任务会停在原阶段，直到新的 worker 接手。
+- **签收**：ArvinHan 2026-09-26 在会话卡片上选定第 1、2 条；其余由 Claude 选定并在交接中报告。
+
+## ADR-030：F07 图谱读取入口、读取时计算层级与来源定位
+
+- **日期**：2026-09-26
+- **背景**：契约 `getGraph` 只写了「教师读草稿、学生读已发布」与 `version` 参数，没有定：教师带 `version` 读什么；课程未发布、版本不存在、图为空三者如何区分；`KnowledgePoint.level` 由谁计算；`SourceRef` 的页码/章节从哪来（Neo4j 的 `EVIDENCED_BY` 只有块内证据区间，§8.4 与 ADR-024）。历史版本表（G02）与发布快照（G04）都还没有。
+- **决定**：
+  1. **读入口**：教师不带 `version` 读草稿，V 在请求开始时从 SQLite 读一次（§8.4），节点、章节、关系、来源关联都按 V 过滤，关系另要求两端可见。学生（C03 已先拒绝未发布课程），或教师带 `version`，读当前发布版本 `courses.published_version_id` 的副本，不按 V 过滤。
+  2. **空图与未发布**：空草稿、空的已发布版本返回 200 与空 `nodes`/`edges`；没有发布版本时 404 `GRAPH_NOT_PUBLISHED`；`version` 不等于当前发布版本号时 404 `NOT_FOUND`（历史版本读取待 G02 建版本表后补）。
+  3. **`level` 读取时计算**：取返回课程图（过滤前）中非 `rejected` 的 `PREREQUISITE` 边的最长前置路径；草稿若违反 DAG，环上节点为 0。存储里不写 `level`。
+  4. **来源定位**：`SourceRef` 的 `page`/`section_path` 取自 SQLite 按本课程读出的块（D10）。知识点来源按证据区间在块文本中的位置找对应解析块（与 E05 抽取时相同的拼接规则），另带该区间的原文 `text`；关系来源取 `source_pairs` 中可见贡献方的块的第一个出处。无法定位的来源（块不在本课程、无定位字段）丢弃并记日志；知识点一条可定位来源都没有时 500 `INTERNAL_ERROR`（违反 `source_refs` 至少一条）。
+  5. Neo4j 不可达 → 503 `STORAGE_UNAVAILABLE`；可选字段省略而不是写 `null`，`graph_version` 总是返回（草稿为 `null`）。
+- **后果**：前端和学习路径可以直接用 `getGraph` 的 `level`；每次读取都会整图计算层级，课程规模（数百节点）下可以接受。人工添加且没有来源的知识点在详情接口上会是 500，F08 需保证教师新建知识点时至少带一条来源，否则要回来改契约。
+- **回滚**：撤销 `api/graph.py`、`services/graph/read.py`、`repositories/graph_read.py`、`main.py` 一行注册与测试；无数据变更。
+- **签收**：待 ArvinHan 审阅（入口语义与 500 处理由 Claude 选定并在交接中报告）。
