@@ -427,6 +427,18 @@ def test_timeout_after_policy_retries_still_falls_back(tmp_path):
     assert {row["request_id"] for row in env.rows()} == {REQUEST}
 
 
+def test_policy_retries_stop_before_the_reserved_time(tmp_path):
+    # E04 截止时间 = 链路截止 - 预留：第二次退避会越过它，于是不再重试，退回原问题。
+    env = Env(tmp_path, max_retries=2)
+    env.fake.script(*(ModelRateLimitedError(MODEL, retry_after_seconds=5.0) for _ in range(3)))
+    result = env.rewrite("它有哪些基本操作？", STACK_HISTORY)
+    assert_fallback(result, "它有哪些基本操作？", RewriteReason.TIMEOUT)
+    assert result.model_called is True
+    assert len(env.fake.calls) == 2
+    assert env.clock.now <= CHAIN_DEADLINE - REWRITE_RESERVE_SECONDS
+    assert [row["status"] for row in env.rows()] == ["error", "error"]
+
+
 @pytest.mark.parametrize(
     "error",
     [ModelServerError(MODEL), ModelConnectionError(MODEL), ModelRateLimitedError(MODEL),

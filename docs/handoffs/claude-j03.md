@@ -27,8 +27,8 @@
 2. **清洗**：助手回合剔除全部类标记（规格 Q1 定义：`[…]`/`【…】`/`［…］`，括号内只有数字（半角或全角）、空白、`,，、`、`-–~`，至少含一个数字，总长 ≤ 32；包括 `[1]`、`[1,3]`、`【2】`、`［3］`、`[0]`、`[01]`、`[1-3]`、`[１]`）以及哨兵 `<<INSUFFICIENT_EVIDENCE>>`，反复剔除直到稳定（`[1[2]]` 这类嵌套也能清掉）。`[a]`、`[注]`、`[]` 以及超过 32 字符的方括号保留。**不区分代码片段**，理由见待决 3。学生回合保持原话，只压空白（H2 只要求处理助手回合）。每次发言的空白和换行都压成一个空格，因此历史里伪造不出额外的「学生：/助教：」行。清洗后为空的回合丢弃。
 3. **裁剪**：单个回合超过 `MAX_TURN_CHARS = 800` 时保留开头，末尾加「…」；只看最近 `MAX_HISTORY_TURNS = 6` 个回合，从最新一条往前累加，总字符超过 `MAX_HISTORY_CHARS = 2000` 就停，保留的是连续的最近一段，按时间先后渲染。
 4. **不调用模型的情形**（直接用原问题，不计费、无 `model_calls` 行）：问题只有空白（`blank_question`）；无历史或历史清洗后为空（`no_history`，理由：没有可补全的指代）；问题超过 `MAX_QUESTION_CHARS = 200` 字（`question_too_long`）；链路剩余时间扣除 `reserve_seconds` 后不足 `min_seconds`（`no_time`）。
-5. **调用**：渲染 `rewrite_query@2`，发一条 user 消息，`response_format = text`，`max_output_tokens = 300`，`timeout_seconds = min(3.0, deadline − now − 8.0)`。经 `policy.bind(CallAttribution(course_id, request_id))` 调用，因此 `model_calls` 行带 `request_id`，`task_id`/`chunk_id` 为空，`purpose = "rewrite_query"`（测试直接查临时 SQLite 行核对）。`deadline` 是整条问答链路的截止时刻，即「收到请求时刻 + `LLM_CHAT_TIMEOUT_SECONDS`」，与 `clock` 用同一时间轴。
-6. **降级（不失败）**：`BudgetExceededError` 对应 `budget_exceeded`；`CallRecordError` 对应 `call_record_failed`；`ModelUnavailableError` 与非超时的 `ModelCallError` 对应 `model_error`；超时（包括 E04 L1 重试后仍然超时）对应 `timeout`；其他异常对应 `unexpected_error`，只记一条 WARNING，内容仅为异常类型名。输出有下列问题时同样退回原问题：`finish_reason = length` 或超过 300 字（`output_too_long`）；空输出（`empty_output`）；多行（`multiline_output`）；含哨兵、控制字符或原问题中没有的类标记（`invalid_output`）。输出等于原问题时记 `unchanged`，覆盖「无需改写」和「指代无法补全」两种情况，指代词随原问题保留（主验收第 7 条）。降级时 `query` 与原问题逐字相同，数据类构造时会校验这一不变式。去掉首尾空白后，最外层的一对引号（`“”`、`""`、`「」`、`『』`、`‘’`、`''`）会被剥掉。
+5. **调用**：渲染 `rewrite_query@2`，发一条 user 消息，`response_format = text`，`max_output_tokens = 300`，`timeout_seconds = min(3.0, deadline − now − 8.0)`。经 `policy.bind(CallAttribution(course_id, request_id), deadline=deadline − 8.0)` 调用（TD-01 的 E04 截止时间：E04 的重试与退避也不会越过为检索与生成预留的 8 s），因此 `model_calls` 行带 `request_id`，`task_id`/`chunk_id` 为空，`purpose = "rewrite_query"`（测试直接查临时 SQLite 行核对）。`deadline` 是整条问答链路的截止时刻，即「收到请求时刻 + `LLM_CHAT_TIMEOUT_SECONDS`」，与 `clock` 用同一时间轴。
+6. **降级（不失败）**：`BudgetExceededError` 对应 `budget_exceeded`；`CallRecordError` 对应 `call_record_failed`；`ModelUnavailableError` 与非超时的 `ModelCallError` 对应 `model_error`；超时（包括 E04 L1 重试后仍然超时，以及 E04 因截止时间终止重试抛出的 `CallDeadlineExceededError`）对应 `timeout`；其他异常对应 `unexpected_error`，只记一条 WARNING，内容仅为异常类型名。输出有下列问题时同样退回原问题：`finish_reason = length` 或超过 300 字（`output_too_long`）；空输出（`empty_output`）；多行（`multiline_output`）；含哨兵、控制字符或原问题中没有的类标记（`invalid_output`）。输出等于原问题时记 `unchanged`，覆盖「无需改写」和「指代无法补全」两种情况，指代词随原问题保留（主验收第 7 条）。降级时 `query` 与原问题逐字相同，数据类构造时会校验这一不变式。去掉首尾空白后，最外层的一对引号（`“”`、`""`、`「」`、`『』`、`‘’`、`''`）会被剥掉。
 7. **提示词**：模板装配时加载（`QueryRewriter.__init__`），缺文件或版本不符会在启动时暴露。模板本身不含类标记和哨兵，所以「改写输入中不含类标记」对整个提示词成立（QA-19）。
 
 ## 实际命令与结果
@@ -76,6 +76,12 @@
 - 改写质量完全取决于提示词和模型，fake 测试只验证流程与降级，不衡量效果。
 - 历史中的注入文本已经作为「数据」写进提示词并压成单行，但仅靠提示词能否防住注入，仍需 K03 评测验证（规格「防注入的实现层次」待细化）。
 - 输出检查无法识别模型悄悄删掉指代词却没有补全的情况，只能靠提示词第 3 条约束。
+
+## TD-01 跟进（合并 main@`c333bd1` 后）
+
+- 绑定时传 E04 截止时间「链路截止 − `reserve_seconds`」，并把 `CallDeadlineExceededError` 归为 `timeout`。
+- 新测试 `test_policy_retries_stop_before_the_reserved_time`：两次 `429`（`Retry-After` 5 s）后，第二次退避会越过改写截止时间，于是停止重试、退回原问题，时钟不超过「链路截止 − 8 s」。该测试在未修改的实现上失败（`1 failed, 94 passed`），修改后 `95 passed`。
+- 改写调用预写失败时改用原问题：原有 `test_call_record_prewrite_failure_falls_back_without_sending` 已覆盖，口径见 `docs/integrations.md`「调用记录」第 1 条。
 
 ## 下一步
 

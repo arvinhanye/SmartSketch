@@ -23,8 +23,10 @@
 5. **调用**：渲染 ``rewrite_query@REWRITE_PROMPT_VERSION``，单条 user 消息、文本格式、声明输出上限，
    单次超时取 ``min(timeout_seconds, 剩余时间 - reserve_seconds)``；经 E04 ``ModelCallPolicy`` 以
    ``CallAttribution(course_id, request_id)`` 绑定后调用——``task_id`` 为空，``model_calls`` 记录带
-   ``request_id``，``purpose = "rewrite_query"``。
-6. **降级**：预算拒绝、预写失败、熔断、超时、其他供应商错误、未预期异常，以及输出为空、多行、过长
+   ``request_id``，``purpose = "rewrite_query"``。绑定时传入截止时间「链路截止 - ``reserve_seconds``」
+   （E04 截止时间，``docs/integrations.md``「问答链路截止时间」），E04 的重试与退避因此也不会
+   挤占留给检索与生成的时间。
+6. **降级**：预算拒绝、预写失败、熔断、超时（含 E04 因截止时间终止）、其他供应商错误、未预期异常，以及输出为空、多行、过长
    （含 ``finish_reason = length``）、含哨兵/控制字符/问题中没有的类标记，都返回原问题并给出闭集原因
    ``RewriteReason``；模型原样返回问题（无需改写或无法补全指代）记为 ``unchanged``，指代词随原问题保留。
 
@@ -47,6 +49,7 @@ from app.services.ai.client import ErrorClass, Message, ModelCallError, ModelReq
 from app.services.ai.policy import (
     BudgetExceededError,
     CallAttribution,
+    CallDeadlineExceededError,
     CallRecordError,
     ModelCallPolicy,
     ModelUnavailableError,
@@ -372,9 +375,12 @@ class QueryRewriter:
             response_format="text",
             timeout_seconds=seconds,
         )
-        client = self._policy.bind(CallAttribution(course_id=course_id, request_id=request_id))
+        client = self._policy.bind(CallAttribution(course_id=course_id, request_id=request_id),
+                                   deadline=deadline - self._reserve_seconds)
         try:
             result = client.complete(request)
+        except CallDeadlineExceededError:
+            return fallback(RewriteReason.TIMEOUT, True)
         except BudgetExceededError:
             return fallback(RewriteReason.BUDGET_EXCEEDED, True)
         except CallRecordError:
