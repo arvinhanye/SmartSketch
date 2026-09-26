@@ -1116,4 +1116,3 @@
 - **后果**：发布服务可被路由或命令行直接调用；学生读取在 G07 前仍需调用方自行解析版本。持锁区间只含 SQLite 与 Neo4j 读取，不含模型调用。
 - **回滚**：撤销 `services/versions/publish.py`，以及 `repositories/versions.py` 末尾的 `DraftState`/`read_draft_state`/`complete_published_tasks`、`course_locks.current_holder`、F07 节点投影中的 `.merged_from`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
-
