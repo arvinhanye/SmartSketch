@@ -1167,3 +1167,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：worker 按 A06 §8.1 运行（同机、同 SQLite 卷、`WORKER_PROCESSES` 个进程、启动门禁与 API 相同）；API/worker/web 均有健康检查；密钥只经 `env_file` 进后端三服务；前端 Dockerfile 无构建参数、只 COPY `src/frontend/`，`.dockerignore` 排除 `.env*`。
 - K08 待决：镜像真实构建与整套启动未在本机跑（无 Docker 守护进程），须在有 Docker 的机器上跑 `docker compose --profile app up -d --build` 复验；worker 优雅停止不释放在途任务（ADR-039 第 2 条）；`maintenance` 挂点是否接 G05 清扫留给后续任务；镜像基底未钉摘要。
+
+## 2026-09-26 I01 学习进度仓储（Codex 认领）
+
+| ID | 状态 | 任务 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| I01 | DONE（待 PR 审查） | 实现学习进度仓储 | Codex（后端） | `src/backend/migrations/011_progress.sql`、`src/backend/app/repositories/progress.py`、`tests/backend/test_i01.py`、相关规格/架构/交接 | 用户与课程隔离；原始行和 dormant 行保留；仅允许发布版节点写入；同值无操作及显式覆盖；`write_seq` 与版本提交共用事务序列；I01 6 passed，I01+G02 28 passed，`verify.sh` exit 0；交接 `docs/handoffs/codex-i01.md`。 |
+
+- 输入：已认证 `user_id`/`course_id`、绑定发布版节点集合、原始状态；输出：SQLite 原始进度行及可供 I02 投影的隔离读取结果。
+- 依赖：C01、A08、G07 已在本地代码中；I02 负责图谱谱系投影及 HTTP 校验。风险：迁移新增持久表，回滚需停 API/worker 后恢复迁移前 SQLite 备份。
+- 验证命令：`.venv/Scripts/python.exe -m pytest tests/backend/test_i01.py tests/backend/test_g02.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 验收证据：审查发现原 `write_progress` 总是另开事务，无法加入 I02 的版本绑定写事务；新增一个用例先因缺少事务入口而失败，修复后 I01 6 passed、I01+G02 28 passed。隔离 worktree 的 `verify.sh` exit 0。此次未重跑后端全量；原始交接记录中的全量结果仅属修复前快照。
