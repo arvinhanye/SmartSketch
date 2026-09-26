@@ -51,6 +51,9 @@ const uid = useId()
 const id = (field: string) => `ne-${field}${uid}`
 const titleId = id('title')
 const title = ref<HTMLElement | null>(null)
+const root = ref<HTMLElement | null>(null)
+const confirmBox = ref<HTMLElement | null>(null)
+const deleteButton = ref<HTMLButtonElement | null>(null)
 const confirmingDelete = ref(false)
 const busy = computed(() => status.value === 'loading' || saving.value)
 
@@ -66,9 +69,26 @@ async function onSave(): Promise<void> {
   await editor.save()
 }
 
+/**
+ * 焦点管理（无障碍）：确认区打开时焦点移入确认区，关闭时归还给触发删除的按钮；
+ * 触发按钮已不在 DOM（删除成功）时落到面板根容器，绝不留焦点在 `BODY`。
+ */
+async function openDeleteConfirm(): Promise<void> {
+  confirmingDelete.value = true
+  await nextTick()
+  confirmBox.value?.focus()
+}
+
+async function closeDeleteConfirm(): Promise<void> {
+  confirmingDelete.value = false
+  await nextTick()
+  ;(deleteButton.value ?? root.value)?.focus()
+}
+
 async function onConfirmDelete(): Promise<void> {
   const ok = await editor.remove()
-  if (ok || status.value !== 'ready') confirmingDelete.value = false
+  if (!ok && status.value === 'ready') return
+  await closeDeleteConfirm()
 }
 
 watch(
@@ -91,8 +111,10 @@ watch(
 
 <template>
   <aside
+    ref="root"
     class="node-editor"
     data-test="node-editor"
+    tabindex="-1"
     :aria-labelledby="original ? titleId : undefined"
     :aria-label="original ? undefined : '知识点编辑'"
     :aria-busy="busy ? 'true' : 'false'"
@@ -141,7 +163,7 @@ watch(
       </div>
 
       <div class="node-editor__field">
-        <label :for="id('aliases')">{{ FIELD_LABELS.aliases }}（每行一个，或用逗号、顿号分隔）</label>
+        <label :for="id('aliases')">{{ FIELD_LABELS.aliases }}（每行一个，或用逗号、顿号、分号分隔）</label>
         <textarea
           :id="id('aliases')"
           v-model="form.aliases"
@@ -157,7 +179,13 @@ watch(
 
       <div class="node-editor__field">
         <label :for="id('type')">{{ FIELD_LABELS.type }}</label>
-        <select :id="id('type')" v-model="form.type" data-test="ne-type" :aria-describedby="describedBy('type')">
+        <select
+          :id="id('type')"
+          v-model="form.type"
+          data-test="ne-type"
+          :aria-invalid="errorOf('type') ? 'true' : 'false'"
+          :aria-describedby="describedBy('type')"
+        >
           <option v-for="opt in KP_TYPE_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
         <p v-if="errorOf('type')" :id="id('type-error')" class="node-editor__error" data-test="ne-type-error">
@@ -203,7 +231,13 @@ watch(
 
       <div class="node-editor__field">
         <label :for="id('status')">{{ FIELD_LABELS.status }}</label>
-        <select :id="id('status')" v-model="form.status" data-test="ne-status" :aria-describedby="describedBy('status')">
+        <select
+          :id="id('status')"
+          v-model="form.status"
+          data-test="ne-status"
+          :aria-invalid="errorOf('status') ? 'true' : 'false'"
+          :aria-describedby="describedBy('status')"
+        >
           <option v-for="opt in KP_STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
         <p v-if="errorOf('status')" :id="id('status-error')" class="node-editor__error" data-test="ne-status-error">
@@ -254,24 +288,35 @@ watch(
         <button v-if="locked" type="button" data-test="ne-unlock" :disabled="saving" @click="editor.unlock">解锁</button>
         <button
           v-if="!confirmingDelete"
+          ref="deleteButton"
           type="button"
           class="node-editor__danger"
           data-test="ne-delete"
           :disabled="saving"
-          @click="confirmingDelete = true"
+          @click="openDeleteConfirm"
         >
           删除
         </button>
       </div>
 
-      <div v-if="confirmingDelete" class="node-editor__confirm" data-test="ne-delete-confirm" role="alertdialog" :aria-labelledby="id('confirm')">
+      <div
+        v-if="confirmingDelete"
+        ref="confirmBox"
+        class="node-editor__confirm"
+        data-test="ne-delete-confirm"
+        role="alertdialog"
+        aria-modal="true"
+        tabindex="-1"
+        :aria-labelledby="id('confirm')"
+        @keydown.esc.stop.prevent="closeDeleteConfirm"
+      >
         <p :id="id('confirm')">
           确定删除「{{ original.name }}」？与它相连的全部关系会一并删除<span v-if="dirty">，未保存的修改也会丢失</span>。
         </p>
         <button type="button" class="node-editor__danger" data-test="ne-delete-yes" :disabled="saving" @click="onConfirmDelete">
           确认删除
         </button>
-        <button type="button" data-test="ne-delete-no" :disabled="saving" @click="confirmingDelete = false">取消</button>
+        <button type="button" data-test="ne-delete-no" :disabled="saving" @click="closeDeleteConfirm">取消</button>
       </div>
     </form>
   </aside>

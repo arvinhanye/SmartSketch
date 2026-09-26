@@ -871,4 +871,86 @@ describe('H07 NodeEditor 组件', () => {
     await flushPromises()
     expect((wrapper.get('[data-test="ne-name"]').element as HTMLInputElement).value).toBe('知识点 k1')
   })
+
+  it('打开删除确认：焦点移入确认区并有 aria-modal，取消后焦点归还删除按钮', async () => {
+    const wrapper = mountEditor(fakeApi())
+    await flushPromises()
+    await wrapper.get('[data-test="ne-delete"]').trigger('click')
+    await nextTick()
+    const confirm = wrapper.get('[data-test="ne-delete-confirm"]')
+    expect(confirm.attributes('aria-modal')).toBe('true')
+    expect(confirm.attributes('aria-labelledby')).toBeTruthy()
+    expect(document.activeElement).not.toBe(document.body)
+    expect(confirm.element.contains(document.activeElement)).toBe(true)
+    await wrapper.get('[data-test="ne-delete-no"]').trigger('click')
+    await nextTick()
+    expect(wrapper.find('[data-test="ne-delete-confirm"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('[data-test="ne-delete"]').element)
+  })
+
+  it('焦点在确认区时按 Esc 取消确认：不发删除请求，焦点归还删除按钮', async () => {
+    const api = fakeApi()
+    const wrapper = mountEditor(api)
+    await flushPromises()
+    await wrapper.get('[data-test="ne-delete"]').trigger('click')
+    await nextTick()
+    const confirm = wrapper.get('[data-test="ne-delete-confirm"]')
+    expect(confirm.element.contains(document.activeElement)).toBe(true)
+    await confirm.trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(wrapper.find('[data-test="ne-delete-confirm"]').exists()).toBe(false)
+    expect(api.remove).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(document.activeElement).toBe(wrapper.get('[data-test="ne-delete"]').element)
+  })
+
+  it('确认删除成功后焦点不留在 BODY', async () => {
+    const api = fakeApi()
+    const wrapper = mountEditor(api)
+    await flushPromises()
+    await wrapper.get('[data-test="ne-delete"]').trigger('click')
+    await nextTick()
+    await wrapper.get('[data-test="ne-delete-yes"]').trigger('click')
+    await flushPromises()
+    expect(api.remove).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="ne-deleted"]').text()).toContain('已删除')
+    expect(document.activeElement).not.toBe(document.body)
+    expect(wrapper.get('[data-test="node-editor"]').element.contains(document.activeElement)).toBe(true)
+  })
+
+  it('服务端 422 落在类型与审核状态上：两个下拉框都标 aria-invalid', async () => {
+    const api = fakeApi({
+      update: async () =>
+        Promise.reject(
+          apiError(422, 'VALIDATION_ERROR', {
+            fields: [
+              { in: 'body', field: 'type', reason: 'invalid' },
+              { in: 'body', field: 'status', reason: 'invalid' },
+            ],
+          }),
+        ),
+    })
+    const wrapper = mountEditor(api)
+    await flushPromises()
+    expect(wrapper.get('[data-test="ne-type"]').attributes('aria-invalid')).toBe('false')
+    expect(wrapper.get('[data-test="ne-status"]').attributes('aria-invalid')).toBe('false')
+    await wrapper.get('[data-test="ne-name"]').setValue('新名')
+    await wrapper.get('[data-test="ne-form"]').trigger('submit')
+    await flushPromises()
+    const type = wrapper.get('[data-test="ne-type"]')
+    const status = wrapper.get('[data-test="ne-status"]')
+    expect(type.attributes('aria-invalid')).toBe('true')
+    expect(status.attributes('aria-invalid')).toBe('true')
+    expect(type.attributes('aria-describedby')).toBe(wrapper.get('[data-test="ne-type-error"]').attributes('id'))
+    expect(status.attributes('aria-describedby')).toBe(wrapper.get('[data-test="ne-status-error"]').attributes('id'))
+  })
+
+  it('别名分隔符说明与实现一致：逗号、顿号、分号都算分隔符', async () => {
+    const wrapper = mountEditor(fakeApi())
+    await flushPromises()
+    const aliases = wrapper.get('[data-test="ne-aliases"]')
+    const label = wrapper.get(`label[for="${aliases.attributes('id')}"]`)
+    expect(label.text()).toContain('分号')
+    expect(parseAliases('甲;乙；丙')).toEqual(['甲', '乙', '丙'])
+  })
 })
