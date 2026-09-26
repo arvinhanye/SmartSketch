@@ -1258,3 +1258,17 @@
 - **后果**：详情组件可独立挂到任何图谱页；资料名、原文定位跳转与画布联动都由页面负责。学生看已发布版本时来源只有位置没有片段，这是后端既定行为，不是前端缺陷。
 - **回滚**：删除 `src/frontend/src/api/knowledgeDetail.ts`、`components/KnowledgeDetail.vue`、`composables/useKnowledgeDetail.ts`、`tests/frontend/h06.test.ts` 与本 ADR；无依赖、契约或数据变更。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-053：H08 教师连边编辑的乐观更新与冲突呈现
+
+- **日期**：2026-09-26
+- **背景**：H08 要求「成环错误高亮冲突路径；服务拒绝时撤销临时边；无组件 Cypher」。关系接口（`createRelation`/`updateRelation`/`deleteRelation`）只有契约，后端路由尚未实现；关系请求体不带 `expected_revision`。画布生命周期（H04）复制边样式但只复制节点的 `id`/`data`，画布上无法单独给节点着色；G6 的拖线交互需要改 `lifecycle.ts` 的建图参数，不在 H08 文件锁内。
+- **决定**：
+  1. 新建 `api/relations.ts` 封装三个关系接口；`composables/useRelationEditor.ts` 持有全部编辑状态，`components/RelationEditor.vue` 只渲染并调用组合式方法。
+  2. 乐观更新以「叠加层」实现：请求期间在课程 store 的草稿图上叠加一条临时改动（新边、改后的边或移除），不写入 store；成功后把服务端返回的关系合并进 store **当时**的图（`setGraph`，改方向时服务端可能派生新 ID，以响应为准），失败即丢弃叠加层。一次只允许一个写请求。
+  3. 409 `CYCLE_DETECTED`：`details.cycle`（首尾相同、沿边方向）转成名称路径以 `role="alert"` 有序列出；环上相邻两点之间未拒绝的 `PREREQUISITE` 边、以及本次被修改的关系，在 `canvasData` 中以冲突色（`#ff4d4f`、线宽 3）绘出。`details` 不合规时只提示、不高亮。
+  4. `REVISION_CONFLICT`、`NOT_FOUND`、`DANGLING_ENDPOINT`：撤销改动、置 `stale`，并调用 `onRefreshNeeded` 由页面重新加载草稿图；`DUPLICATE_RELATION` 标出 `details.existing_id`；`COURSE_FORBIDDEN` 清空当前课程交调用方回课程列表；其余错误码给固定文案，不回显服务端 `message`。
+  5. 「拖线」先以「在画布上依次点选起点、终点」（`GraphCanvas` 的 `nodeClick` → `pickNode`）加表单实现；节点高亮以面板路径列表与 `highlightedNodeIds` 提供。
+- **后果**：H08 不改 H04 文件即可与 `GraphCanvas` 组合；画布上的冲突节点着色与真正的 G6 拖线需在 `lifecycle.ts` 增加节点样式透传与 `create-edge` 行为（后续任务）。后端关系路由落地后，若返回的错误码或 `details` 与契约不同，须先改契约。
+- **回滚**：删除 `api/relations.ts`、`composables/useRelationEditor.ts`、`components/RelationEditor.vue` 与 `tests/frontend/h08.test.ts`，删去本 ADR；无数据或契约变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
