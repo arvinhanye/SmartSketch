@@ -49,7 +49,7 @@ import os
 import re
 import sys
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -446,6 +446,7 @@ def run(
     section_depth: int = 0,
     entity_max_output_tokens: int = DEFAULT_ENTITY_MAX_OUTPUT_TOKENS,
     relation_max_output_tokens: int = DEFAULT_RELATION_MAX_OUTPUT_TOKENS,
+    progress: Callable[[str], None] | None = None,
 ) -> RunOutcome:
     """执行一次抽取（不读写文件）。配置错误抛 ``RunConfigError``；其余情况返回 ``RunOutcome``。"""
     if not 0 <= glean_rounds <= MAX_ROUNDS_HARD_LIMIT:
@@ -491,8 +492,10 @@ def run(
 
     try:
         # ---- 实体：逐块 E05（可选 E06）
-        for item in prepared:
+        for index, item in enumerate(prepared, 1):
             identity = item.identity
+            if progress is not None:
+                progress(f"[实体 {index}/{len(prepared)}] {' > '.join(item.chunk.section_titles) or '（无标题）'}")
             sections.setdefault(_section_key(item.chunk, section_depth), []).append(item)
             client = bound(identity.chunk_id)
             extractor = EntityExtractor(client, model=runtime.model_id, max_output_tokens=entity_max_output_tokens)
@@ -560,7 +563,9 @@ def run(
 
         # ---- 关系：按章节路径分组调 E11
         ordered_entities = list(fused.values())
-        for key, members in sections.items():
+        for index, (key, members) in enumerate(sections.items(), 1):
+            if progress is not None:
+                progress(f"[关系 {index}/{len(sections)}] {' > '.join(key) or '（无标题）'}")
             chunk_ids = {m.identity.chunk_id for m in members}
             table = [SectionEntity(entity_id=e.id, course_id=course_id, name=e.name, type=e.type)
                      for e in ordered_entities if e.chunk_ids & chunk_ids]
@@ -718,6 +723,7 @@ def main(
             glean_rounds=args.glean_rounds, section_depth=args.section_depth,
             entity_max_output_tokens=args.entity_max_output_tokens,
             relation_max_output_tokens=args.relation_max_output_tokens,
+            progress=lambda line: print(line, file=sys.stderr, flush=True),
         )
     except RunConfigError as exc:
         print(f"run_live_extraction: 配置错误：{exc}", file=sys.stderr)

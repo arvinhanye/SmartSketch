@@ -230,3 +230,16 @@ def test_gleaning_is_optional_and_recorded(run_mod, gold):
     assert outcome.predictions["prompt_versions"]["extract_entities_gleaning"] == 2
     assert outcome.run_log["gleaning"]["enabled"] is True
     assert outcome.run_log["model_calls"]["by_purpose"]["extract_entities_gleaning"] == 16
+
+
+def test_progress_reports_each_chunk_and_section(run_mod, gold):
+    # 本机运行耗时数分钟，逐块、逐小节报告进度，避免用户误以为卡住
+    lines: list[str] = []
+    outcome = run_mod.run(copy.deepcopy(gold), environ=dict(FAKE_ENV), progress=lines.append)
+    log = outcome.run_log
+    entity_lines = [line for line in lines if line.startswith("[实体 ")]
+    relation_lines = [line for line in lines if line.startswith("[关系 ")]
+    assert len(entity_lines) == log["chunk_count"]
+    assert len(relation_lines) == log["section_count"]
+    assert entity_lines[0].startswith(f"[实体 1/{log['chunk_count']}]")
+    assert all("sk-" not in line for line in lines)
