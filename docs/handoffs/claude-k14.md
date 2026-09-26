@@ -39,7 +39,7 @@
 | 上面第 5 项 pytest | 288 passed |
 | `python3 check.py`（第 1 项） | `ALL OK` |
 | `git diff --check` | 通过 |
-| `./scripts/verify.sh` | 见 PR 描述与下方记录 |
+| `PATH=<主仓库 .venv>/bin:$PATH ./scripts/verify.sh` | `PASS contracts gate`、`Scaffold verification passed.`，exit 0 |
 
 ## 未覆盖项
 
