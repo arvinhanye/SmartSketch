@@ -1081,3 +1081,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - G01 待决：从 Neo4j/SQLite 读出可见草稿与修订的装载归 G04（P4～P7）；快照章节带 `parent_id`，而 Neo4j 章节与契约 `Chapter` 尚无此字段，章节层级落地时需同步（ADR-031）。
 - G02 验收：同一尝试（幂等键 `version_id`）至多成为一个版本；版本号按课程连续、失败不占号，`(course_id, version)` 唯一；失败行带原因永久可查且不进版本列表；已提交版本不可删改。G02 待决：清扫过期尝试归 G05；租约时长由调用方传入（G04 读 `PUBLISH_LEASE_SECONDS`）。
 - G03 验收：物化只写 `(course_id, 新 version_id)`，旧版本副本与发布指针不变，学生照读旧版；向量空间或维度不符、缺向量在连库前失败，缺来源块整体回滚；重试同一版本先删后建、不重复；P9 读回复算摘要一致。G03 已决：已发布知识点对外状态恒为 `approved`、来源类别恒为 `manual`（ArvinHan 2026-09-26，ADR-033 第 5 条）。G03 待决：已发布详情的来源没有原文片段。
+
+## 2026-09-26 H03 图谱适配（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H03 | DONE（待 PR 审查/合并） | 实现契约到 G6 数据适配 | ArvinHan（Claude） | `claude/project-thread-m4mk7n` / `main@ebb0f42` | `src/frontend/src/graph/adapter.ts`、`tests/frontend/h03.test.ts` | `h03.test.ts` 22 passed；11 处反向篡改均检出；前端全量 285 passed；type-check、build、`verify.sh` exit 0；`docs/handoffs/claude-h03.md` |
+
+- 验收：四类边样式两两可区分且带中文图例名；`source/target` 取 `from_id/to_id`，仅 `RELATED_TO` 无箭头；缺端点、外课、重复 ID 的元素不进画布并逐条报告；空图得空数组；元素 ID 为 `kp:`/`rel:` 前缀且按码点排序，输入乱序输出逐字节相同；深冻结输入照常转换，输出不引用输入对象。
+- H03 待决：边颜色为占位方案未经设计签收；`rejected`/`low_confidence` 的样式与过滤、`issues` 是否提示给教师，留给 H04/H05。
