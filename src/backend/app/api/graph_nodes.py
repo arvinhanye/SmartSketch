@@ -90,7 +90,7 @@ def _error(status: int, code: str, message: str, details: dict[str, Any] | None 
 
 def _run(request: Request, operation: Any, status: int = 200) -> Response:
     try:
-        node: KnowledgePoint | None = operation(_context(request))
+        node: KnowledgePoint | dict[str, Any] | None = operation(_context(request))
     except RepositoryError:
         return _error(503, "STORAGE_UNAVAILABLE", "图数据库暂不可用，请稍后重试")
     except CourseBusy as busy:
@@ -105,6 +105,8 @@ def _run(request: Request, operation: Any, status: int = 200) -> Response:
         ]) from None
     if node is None:
         return Response(status_code=status)
+    if isinstance(node, dict):  # F11 review actions return a ready contract body
+        return JSONResponse(status_code=status, content=node)
     return JSONResponse(status_code=status, content=node.model_dump(mode="json", exclude_none=True))
 
 

@@ -1207,3 +1207,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
 - J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
+
+## 2026-09-26 F11 审核队列和单项处理（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F11 | DONE（分支 `claude/project-thread-bd1f83`，待 PR 审查/合并；issue #103） | 实现审核队列和单项处理 | ArvinHan（Claude） | `claude/project-thread-bd1f83` / `main@a7d8075` | `src/backend/app/services/graph/review.py`、`src/backend/app/api/review.py`、`tests/backend/test_f11.py`；扩围 `src/backend/app/repositories/review.py`、`src/backend/migrations/013_review_dismissals.sql`（迁移号协调者预分配）、`api/graph_nodes.py` 的 `_run` 一个分支、`main.py`、`schemas/contracts.py`、契约与生成物 | 见 `docs/handoffs/claude-f11.md`；ADR-060 |
+
+- 验收：三栏按 ADR-060 分类（低置信度关系、E08 名称归一 + 已存别名的疑似重复对、发布后无边的孤立节点）；通过、拒绝、合并后 `totals` 与各栏相应变化，重复提交同一动作 200 `changed = false`，已不在队列 404；各栏固定排序 + 键集分页，边处理边翻页不漏不重。
+- F11 待决（需 ArvinHan）：ADR-060 签收（尤其「疑似重复」只用名称归一、不含向量相似；「确认保留」按节点永久生效；新增 `resolveReviewItem` 而不是借 `/relations`）；D-08 阈值定稿后是否把 E09 向量候选并入疑似重复栏。

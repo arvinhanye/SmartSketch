@@ -34,6 +34,10 @@ KnowledgePointStatus = _module.KnowledgePointStatus
 KnowledgePointUnlock = _module.KnowledgePointUnlock
 # F10 merge.
 MergeRequest = _module.MergeRequest
+# F11 review queue.
+ReviewActionResult = _module.ReviewActionResult
+ReviewItemKind = _module.ReviewItemKind
+ReviewQueue = _module.ReviewQueue
 KnowledgePointRef = _module.KnowledgePointRef
 KnowledgePointType = _module.KnowledgePointType
 Relation = _module.Relation

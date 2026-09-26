@@ -1381,3 +1381,20 @@
 - **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-060：F11 审核队列的三栏定义、排序分页与单项处理
+
+- **日期**：2026-09-26
+- **背景**：契约只有 `getReviewQueue`（三栏，无参数），规格只说「列出低置信度关系、疑似重复知识点、孤立知识点，支持一键通过 / 拒绝 / 合并」，并把「审核队列的排序与分页」列为待细化。未定的是：三栏各按什么条件入列、疑似重复怎样判定、队列存不存、怎样排序与分页才能在教师边处理边翻页时不漏不重、单项处理走哪个接口、处理后怎样离开队列、重复操作返回什么。关系编辑路由 `/relations` 尚未实现，也不能指望前端借它来处理低置信度关系。
+- **决定**：
+  1. **实时计算，不另存队列**。请求开始时读 V，从草稿读可见节点与关系（F07 `GraphReader`，与 `getGraph` 同一可见性），再扣掉 SQLite `review_dismissals`（迁移 013）中教师记下的处理。
+  2. **三栏**：（a）低置信度关系：状态 `low_confidence`、两端都未被拒绝的可见关系，含 ADR-009 降级关系，附 `source_refs`；（b）疑似重复：未被拒绝的可见节点两两比对，用 E08 名称归一（`same_key` / `alias` / `containment`），另把已存的 `aliases` 逐个归一，名称或别名的归一键相交也算 `alias`，原因取最强者；`similarity` 对前两者为 1，包含候选为有效字符比 较短/较长；以一对为单位（`candidates` 恰两项，按 ID 升序），新增必填 `reason`。向量相似（E09）等 D-08 阈值定稿后再接入；（c）孤立知识点：未被拒绝、且没有「关系未拒绝、另一端可见且未拒绝」的相连关系的可见节点，即发布后在图中没有一条边的节点。
+  3. **排序**：低置信度关系 `(confidence 升序, id)`，疑似重复 `(similarity 降序, 小 ID, 大 ID)`，孤立知识点 `(name, id)`，都按码点比较、与存储顺序无关。
+  4. **分页**为键集分页：`limit`（1～200，默认 50）；不带 `kind` 时三栏各返回第一页，带 `kind` 时只填该栏，`cursor` 取上一页 `next_cursors` 中该栏的值（不透明的 base64url JSON，编码本栏最后一条的排序键），下一页取排序键严格大于它的条目。`cursor` 无 `kind`、无法解析或属于另一栏 → 422。`totals` 始终是三栏完整条数。处理掉已看过的条目不会让后续条目被跳过或重复；排在游标之前的新条目要重新从第一页读才看到。
+  5. **单项处理**新增 `POST /courses/{cid}/review/actions`（`resolveReviewItem`，`ReviewAction` 按 `item` 区分）：低置信度关系 `approve` / `reject` 改状态为 `approved` / `rejected`，登记人工贡献（此后自动流程不再降级或改写它）、关系修订号加 1；疑似重复 `merge` 以 `primary_id`（必须是这一对之一）调用 F10 `merge_nodes`（ADR-047 的规则与错误原样适用），`reject` 记为「不是重复」；孤立知识点 `approve` 记为「确认保留」，`reject` 把节点置 `rejected`，按 ADR-035 加锁、登记人工贡献、修订号加 1。
+  6. **写入顺序**：图写入（关系状态、节点拒绝）同 ADR-035：课程写锁（超时 409 `COURSE_BUSY`）→ 读 V → 一个 Neo4j 写事务（锁守卫 → 读 → 判断仍在队列 → `draft_revision + 1` → 条件写）。「不是重复」「确认保留」只写 SQLite，不取课程写锁、不加草稿修订号、不影响发布。批准或拒绝的都是已在环检测范围内的关系（`low_confidence` 的 `PREREQUISITE` 本就参与验环），只维持或删除前置边，不会成环，不再验环。
+  7. **结果**：条目已不在队列中（不存在、不可见、端点已拒绝、已被其他动作处理、不是疑似重复的一对）→ 404 `NOT_FOUND`；同一动作已经生效（关系已是目标状态、节点已拒绝、已记过、被合并节点已并入主节点的 `merged_from`）→ 200、`changed = false`，不写入。响应带处理后的 `totals`，前端刷新后数量一致。
+  8. 审计日志归 F12，本任务不记录。
+- **后果**：队列与草稿永不脱节，代价是每次读取都要全量读草稿并做 O(n²) 名称比对（面向单课程规模）。「确认保留」按节点 ID 记，节点此后又失去所有边也不会再次入列；「不是重复」按一对 ID 记，节点被合并或删除后留下的记录无害。已拒绝的节点与关系不再出现在任何一栏，恢复要通过节点/关系编辑。
+- **回滚**：撤销 `services/graph/review.py`、`repositories/review.py`、`api/review.py`、`main.py` 与 `schemas/contracts.py` 的引用、`api/graph_nodes.py` 的 `_run` 字典分支、契约（`getReviewQueue` 参数与 `ReviewQueue` 字段、`resolveReviewItem` 与相关 schema）并重新生成；迁移 013 按文件头 `ROLLBACK` 行回滚（只丢失「不是重复」「确认保留」记录，条目重新入列）或恢复 `backups/*-before-013.sqlite`。已批准、拒绝或合并的图数据不会自动恢复。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
