@@ -3,7 +3,7 @@ import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
 import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, useCourses } from '../composables/useCourses'
-import { COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE } from '../router'
+import { COURSE_ROUTE, homeRouteFor, MATERIALS_ROUTE, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
 
 const api = inject(COURSES_API_KEY, null)
@@ -48,6 +48,9 @@ const {
   },
 })
 
+// 资料页（H02）只对课程内教师显示入口；未注册资料路由时不显示
+const hasMaterials = router.hasRoute(MATERIALS_ROUTE)
+
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
 </script>
 
@@ -76,6 +79,11 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
           · 状态：{{ current.statusLabel }}
         </p>
         <p v-if="current.description">{{ current.description }}</p>
+        <p v-if="hasMaterials && current.myRole === 'teacher'">
+          <RouterLink data-test="materials-link" :to="{ name: MATERIALS_ROUTE, params: { cid: current.id } }">
+            资料上传与处理进度
+          </RouterLink>
+        </p>
       </template>
     </section>
 
