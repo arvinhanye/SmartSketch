@@ -9,7 +9,7 @@ import pytest
 
 from app.services.ai.fake import FakeModelClient
 from app.services.ai.policy import BudgetExceededError, ModelUnavailableError
-from app.services.fusion.judge import FusionEntity, FusionEvidence, FusionJudge, FusionReviewReason, validate_pair
+from app.services.fusion.judge import FusionEntity, FusionEvidence, FusionJudge, FusionReviewReason, FusionStatus, validate_pair
 
 
 def _pair() -> tuple[FusionEntity, FusionEntity]:
@@ -142,3 +142,87 @@ def test_judge_unavailable_propagates() -> None:
     left, right = _pair()
     with pytest.raises(ModelUnavailableError):
         FusionJudge(client, model="fake-model", max_output_tokens=4096).judge_duplicate(left, right)
+
+
+def _summary(definition: str = "栈是一种后进先出的结构", refs: list[str] | None = None) -> str:
+    return json.dumps({"definition": definition, "source_ids": refs if refs is not None else ["s1", "s2"]}, ensure_ascii=False)
+
+
+def _evaluate(*replies: str) -> tuple[FakeModelClient, object]:
+    client = FakeModelClient()
+    client.script(*replies)
+    left, right = _pair()
+    return client, FusionJudge(client, model="fake-model", max_output_tokens=4096).evaluate_pair(left, right)
+
+
+def test_evaluate_same_proposes_definition_with_both_sources() -> None:
+    client, result = _evaluate(_judgment(), _summary())
+    assert result.status is FusionStatus.PROPOSAL
+    assert result.same is True and result.reason == "含义相同"
+    assert result.definition == "栈是一种后进先出的结构"
+    assert result.source_ids == ("s1", "s2")
+    assert {s.source_id for s in result.original_sources} == {"s1", "s2"}
+    assert result.model_calls == len(client.calls) == 2
+    assert [p.version for p in result.prompt_uses] == [2, 2]
+    summary_text = client.calls[1].request.messages[0].content
+    assert '"side":"left"' in summary_text and '"side":"right"' in summary_text
+
+
+def test_evaluate_false_makes_one_call_and_reviews() -> None:
+    client, result = _evaluate(_judgment(False, "概念不同"))
+    assert result.status is FusionStatus.REVIEW
+    assert result.review_reason is FusionReviewReason.NOT_SAME
+    assert result.definition is None and result.source_ids == ("s1", "s2")
+    assert len(client.calls) == 1
+
+
+def test_summary_one_sided_sources_reviews_without_definition() -> None:
+    _, result = _evaluate(_judgment(), _summary(refs=["s1"]), _summary(refs=["s1"]))
+    assert result.status is FusionStatus.REVIEW
+    assert result.review_reason is FusionReviewReason.INVALID_DEFINITION
+    assert result.definition is None
+
+
+def test_summary_unknown_source_then_bad_repair_reviews() -> None:
+    client, result = _evaluate(_judgment(), _summary(refs=["s1", "other"]), "{bad")
+    assert result.review_reason is FusionReviewReason.INVALID_DEFINITION
+    assert result.definition is None and result.model_calls == len(client.calls) == 3
+
+
+def test_summary_budget_exceeded_keeps_originals() -> None:
+    attempts = 0
+    def responder(_request: object) -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return _judgment()
+        raise BudgetExceededError("task")
+    client = FakeModelClient(responder=responder)
+    left, right = _pair()
+    result = FusionJudge(client, model="fake-model", max_output_tokens=4096).evaluate_pair(left, right)
+    assert result.status is FusionStatus.REVIEW
+    assert result.review_reason is FusionReviewReason.BUDGET_EXCEEDED
+    assert result.definition is None and result.model_calls == 1
+    assert result.original_sources == (*left.evidence, *right.evidence)
+
+
+def test_summary_unavailable_propagates() -> None:
+    attempts = 0
+    def responder(_request: object) -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return _judgment()
+        raise ModelUnavailableError()
+    client = FakeModelClient(responder=responder)
+    left, right = _pair()
+    with pytest.raises(ModelUnavailableError):
+        FusionJudge(client, model="fake-model", max_output_tokens=4096).evaluate_pair(left, right)
+
+
+def test_inputs_unchanged_after_success_and_failure() -> None:
+    left, right = _pair()
+    before = (repr(left), repr(right), left, right)
+    _evaluate(_judgment(), _summary())
+    _evaluate(_judgment(), "{bad", "{bad")
+    assert before == (repr(left), repr(right), left, right)

@@ -8,12 +8,19 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from app.services.ai.client import Message, ModelClient, ModelOutputError, ModelRequest, ModelResult
-from app.services.ai.entities import ENTITY_TYPES
+from app.services.ai.entities import DEFINITION_MAX_CHARS, ENTITY_TYPES
 from app.services.ai.prompts import PromptLibrary
 from app.services.ai.policy import BudgetExceededError
 
 JUDGE_PURPOSE = "judge_duplicate"
 JUDGE_VERSION = 2
+SUMMARY_PURPOSE = "summarize_definition"
+SUMMARY_VERSION = 2
+
+
+class FusionStatus(StrEnum):
+    PROPOSAL = "proposal"
+    REVIEW = "review"
 
 
 class FusionReviewReason(StrEnum):
@@ -34,11 +41,32 @@ class PromptUse:
 @dataclass(frozen=True, slots=True)
 class DuplicateJudgment:
     same: bool | None
-    reason: str | None
+    reason: str | None = field(repr=False)
     source_ids: tuple[str, ...]
     review_reason: FusionReviewReason | None
     provenance: PromptUse
     model_calls: int
+
+
+@dataclass(frozen=True, slots=True)
+class FusionDecision:
+    left_id: str
+    right_id: str
+    same: bool | None
+    reason: str | None = field(repr=False)
+    status: FusionStatus
+    review_reason: FusionReviewReason | None
+    definition: str | None = field(repr=False)
+    source_ids: tuple[str, ...]
+    original_sources: tuple[FusionEvidence, ...]
+    prompt_uses: tuple[PromptUse, ...]
+    model_calls: int
+
+    def __post_init__(self) -> None:
+        if self.status is FusionStatus.PROPOSAL and (self.definition is None or not self.source_ids):
+            raise ValueError("proposal requires definition and sources")
+        if self.status is FusionStatus.REVIEW and self.definition is not None:
+            raise ValueError("review cannot contain merged definition")
 
 
 class _InvalidOutput(Exception):
@@ -184,3 +212,63 @@ class FusionJudge:
             return DuplicateJudgment(None, None, (), FusionReviewReason.INVALID_JUDGMENT, provenance, calls)
         same, reason, ids = parsed
         return DuplicateJudgment(same, reason, ids, None if same else FusionReviewReason.NOT_SAME, provenance, calls)
+
+    def evaluate_pair(self, left: FusionEntity, right: FusionEntity) -> FusionDecision:
+        judgment = self.judge_duplicate(left, right)
+        originals = (*left.evidence, *right.evidence)
+
+        def review(reason: FusionReviewReason, uses: tuple[PromptUse, ...], calls: int) -> FusionDecision:
+            return FusionDecision(left.entity_id, right.entity_id, judgment.same, judgment.reason,
+                                  FusionStatus.REVIEW, reason, None, judgment.source_ids, originals, uses, calls)
+
+        uses = (judgment.provenance,)
+        if judgment.same is not True:
+            return review(judgment.review_reason or FusionReviewReason.INVALID_JUDGMENT, uses, judgment.model_calls)
+
+        template = self._prompts.get(SUMMARY_PURPOSE, SUMMARY_VERSION)
+        sources = json.dumps(
+            ([{"side": "left", "source_id": source.source_id, "quote": source.quote} for source in left.evidence]
+             + [{"side": "right", "source_id": source.source_id, "quote": source.quote} for source in right.evidence]),
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        )
+        definitions = json.dumps(
+            [{"source_id": "left", "definition": left.definition},
+             {"source_id": "right", "definition": right.definition}],
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        )
+        rendered = template.render({"name": left.name, "definitions": definitions, "sources": sources})
+        messages = (Message("user", rendered.text),)
+        left_ids = {item.source_id for item in left.evidence}
+        right_ids = {item.source_id for item in right.evidence}
+        allowed = left_ids | right_ids
+
+        def parse(value: object) -> tuple[str, tuple[str, ...]]:
+            if not isinstance(value, dict):
+                raise _InvalidOutput()
+            definition = value.get("definition")
+            if not isinstance(definition, str) or not 1 <= len(definition.strip()) <= DEFINITION_MAX_CHARS:
+                raise _InvalidOutput()
+            raw_ids = value.get("source_ids")
+            if (not isinstance(raw_ids, list) or not raw_ids or
+                any(not isinstance(item, str) or item not in allowed for item in raw_ids) or
+                len(raw_ids) != len(set(raw_ids)) or
+                not left_ids.intersection(raw_ids) or not right_ids.intersection(raw_ids)):
+                raise _InvalidOutput()
+            return definition.strip(), tuple(sorted(raw_ids))
+
+        try:
+            parsed, result, summary_calls = self._call_and_parse(SUMMARY_PURPOSE, messages, parse)
+        except _BudgetAbort as aborted:
+            use = PromptUse(SUMMARY_PURPOSE, SUMMARY_VERSION, template.sha256,
+                            (aborted.result.model_responded or aborted.result.model_requested)
+                            if aborted.result else None)
+            return review(FusionReviewReason.BUDGET_EXCEEDED, (*uses, use), judgment.model_calls + aborted.calls)
+        use = PromptUse(SUMMARY_PURPOSE, SUMMARY_VERSION, template.sha256,
+                        (result.model_responded or result.model_requested) if result else None)
+        uses = (*uses, use)
+        calls = judgment.model_calls + summary_calls
+        if parsed is None:
+            return review(FusionReviewReason.INVALID_DEFINITION, uses, calls)
+        definition, ids = parsed
+        return FusionDecision(left.entity_id, right.entity_id, True, judgment.reason,
+                              FusionStatus.PROPOSAL, None, definition, ids, originals, uses, calls)
