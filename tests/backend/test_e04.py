@@ -13,6 +13,7 @@ import logging
 import math
 import sqlite3
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -54,6 +55,7 @@ from app.services.ai.policy import (
     BackoffPolicy,
     BudgetExceededError,
     CallAttribution,
+    CallDeadlineExceededError,
     CallRecordError,
     CircuitBreaker,
     CircuitState,
@@ -822,3 +824,95 @@ def test_no_backoff_when_breaker_opens_before_switching(tmp_path) -> None:
     env.fallback.script(OUTPUT)
     env.client().complete(request())
     assert env.sleeps == [1.0]
+
+
+# ---------------------------------------------------------------- deadline (grounded-qa 链路时限)
+
+
+def _slow(env: Env, client: FakeModelClient, seconds: float) -> None:
+    """Each ``complete`` on ``client`` takes ``seconds`` of the fake clock."""
+    inner = client.complete
+
+    def complete(req: ModelRequest) -> Any:
+        env.clock.now += seconds
+        return inner(req)
+
+    client.complete = complete  # type: ignore[method-assign]
+
+
+def _qa(env: Env, deadline: float | None) -> Any:
+    attribution = CallAttribution(course_id="course-1", request_id="req-1")
+    return env.policy.bind(attribution, deadline=deadline)
+
+
+@pytest.mark.parametrize(("own", "expected"), [(None, 10.0), (3.0, 3.0), (20.0, 10.0)])
+def test_deadline_caps_each_request_timeout(tmp_path, own, expected) -> None:
+    env = Env(tmp_path)
+    env.primary.script(OUTPUT)
+    req = request() if own is None else replace(request(), timeout_seconds=own)
+    _qa(env, env.clock.now + 10).complete(req)
+    assert env.primary.calls[0].request.timeout_seconds == expected
+
+
+def test_without_deadline_request_timeout_is_untouched(tmp_path) -> None:
+    env = Env(tmp_path)
+    env.primary.script(OUTPUT)
+    env.client().complete(request())
+    assert env.primary.calls[0].request.timeout_seconds is None
+
+
+def test_retries_within_deadline_are_unchanged(tmp_path) -> None:
+    env = Env(tmp_path)
+    env.primary.script(ModelServerError(PRIMARY_MODEL), ModelServerError(PRIMARY_MODEL), OUTPUT)
+    assert _qa(env, env.clock.now + 100).complete(request()).text == OUTPUT
+    assert env.sleeps == [1.0, 2.0]
+
+
+def test_backoff_reaching_deadline_stops_retrying(tmp_path) -> None:
+    env = Env(tmp_path, max_retries=2)
+    _slow(env, env.primary, 9.5)
+    env.primary.script(ModelServerError(PRIMARY_MODEL), OUTPUT)
+    with pytest.raises(CallDeadlineExceededError) as caught:
+        _qa(env, env.clock.now + 10).complete(request())
+    assert caught.value.code == "LLM_UNAVAILABLE" and caught.value.reason == "timeout"
+    assert isinstance(caught.value.__cause__, ModelServerError)
+    assert env.sleeps == [] and len(env.primary.calls) == 1 and env.primary.pending == 1
+    assert [row["status"] for row in env.rows()] == ["error"]
+
+
+def test_deadline_cut_moves_to_fallback_with_remaining_time(tmp_path) -> None:
+    env = Env(tmp_path, with_fallback=True, max_retries=2)
+    assert env.fallback is not None
+    _slow(env, env.primary, 9.5)
+    env.primary.script(ModelTimeoutError(PRIMARY_MODEL))
+    env.fallback.script(OUTPUT)
+    result = _qa(env, env.clock.now + 10).complete(request())
+    assert result.model_requested == FALLBACK_MODEL
+    assert env.sleeps == []
+    assert env.fallback.calls[0].request.timeout_seconds == pytest.approx(0.5)
+
+
+def test_expired_deadline_sends_nothing(tmp_path) -> None:
+    env = Env(tmp_path, with_fallback=True)
+    assert env.fallback is not None
+    with pytest.raises(CallDeadlineExceededError):
+        _qa(env, env.clock.now).complete(request())
+    with pytest.raises(CallDeadlineExceededError):
+        list(_qa(env, env.clock.now - 1).stream(request()))
+    assert env.primary.calls == () and env.fallback.calls == ()
+    assert env.rows() == []
+
+
+def test_deadline_caps_stream_timeout(tmp_path) -> None:
+    env = Env(tmp_path)
+    env.primary.script(FakeReply(chunks=("a",)))
+    events = list(_qa(env, env.clock.now + 7).stream(request()))
+    assert isinstance(events[-1], StreamDone)
+    assert env.primary.calls[0].request.timeout_seconds == 7.0
+
+
+@pytest.mark.parametrize("deadline", [math.nan, math.inf, True, "10"])
+def test_bind_rejects_invalid_deadline(tmp_path, deadline) -> None:
+    env = Env(tmp_path)
+    with pytest.raises(ValueError):
+        env.policy.bind(CallAttribution(course_id="course-1"), deadline=deadline)

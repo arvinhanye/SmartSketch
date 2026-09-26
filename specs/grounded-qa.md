@@ -64,7 +64,7 @@ wire 表达（ADR-009）：`NOT_COVERED` 是概念名，wire 为 HTTP 200 + `sta
 | 临时正文 | 客户端从首个 `delta` 到终态之间显示的 delta 拼接文本 |
 | 撤回 | 客户端在非 `answered` 结局时清除全部临时正文（[Q6](#q6-撤回规则客户端)） |
 | 哨兵 | 字面量 `<<INSUFFICIENT_EVIDENCE>>`（25 个字符），模型用它声明资料不足 |
-| 链路时限 | 从收到请求起 `LLM_CHAT_TIMEOUT_SECONDS`（A07，样例值 15 秒）；链路内任何调用及重试都不得超出剩余时间 |
+| 链路时限 | 从收到请求起 `LLM_CHAT_TIMEOUT_SECONDS`（A07，样例值 15 秒）；链路内任何调用及重试都不得超出剩余时间，由 E04 截止时间保证（`docs/integrations.md`「问答链路截止时间」） |
 
 ### Q2 链路分段与事件文法
 
@@ -76,7 +76,7 @@ wire 表达（ADR-009）：`NOT_COVERED` 是概念名，wire 为 HTTP 200 + `sta
 | --- | --- | --- |
 | P1 鉴权与授权 | 按 `specs/identity-access.md` §4.1 判定顺序与 §4.3 `chat` 行 | 401 `UNAUTHENTICATED`；403 `COURSE_FORBIDDEN`；404 `GRAPH_NOT_PUBLISHED`；403 `ROLE_FORBIDDEN`（教师成员）；422 `VALIDATION_ERROR`；429 `RATE_LIMITED`（本服务限流） |
 | P2 版本绑定 | 读一次发布指针（G07）；生成 `request_id` | 存储不可用 → 503 `STORAGE_UNAVAILABLE`（A03 提议码，待 B08） |
-| P3 问题改写 | J03；输入为问题与历史（[Q8](#q8-多轮历史)） | **不失败**：改写出错、超时、被预算拒绝，均改用原问题（A07「预算」） |
+| P3 问题改写 | J03；输入为问题与历史（[Q8](#q8-多轮历史)） | **不失败**：改写出错、超时、被预算拒绝、调用记录预写失败，均改用原问题（A07「预算」「调用记录」第 1 条） |
 | P4 检索 | J01 向量检索 + J02 图检索，按绑定版本过滤 | 向量调用失败或向量熔断 → 503 `LLM_UNAVAILABLE`；图库不可用 → 503 `STORAGE_UNAVAILABLE`（提议）；未预期异常 → 500 `INTERNAL_ERROR`（A03 提议码，待 B08） |
 | P5 上下文与阈值 | J04 构造 H 与 A，判定是否进入生成 | H 为空 → `no_retrieval_hit`；H 非空但无候选达到阈值 → `below_similarity_threshold`；两者都是开流后的 `not_covered` 终态，不是 HTTP 错误 |
 

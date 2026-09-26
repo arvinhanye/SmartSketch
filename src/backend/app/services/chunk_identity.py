@@ -22,7 +22,9 @@
 
 复合版本（ADR-018）：
 
-- 解析器段取解析器模块的 ``PARSER_VERSION``（只表示解析器自身），须非空、不含空白、不含 ``+``。
+- 解析器段取解析器模块的 ``PARSER_VERSION``（只表示解析器自身）。ADR-018 修订 1：解析器段是
+  一个或多个 ``<名称>/<版本>`` 按处理顺序用 ``,`` 连接，名称为小写字母开头的 ``[a-z0-9_-]``，
+  版本为无前导零的正整数，例如 ``pdf/1,cleanup/1,headings/1``；``+`` 只作解析器段与分块段的分隔符。
 - 分块段取 D08 ``chunking_version(target_chars, overlap_chars)``，形如
   ``chunk/<规则版本>@<target_chars>-<overlap_chars>``：规则版本来自 ``CHUNKER_VERSION``，
   参数为本次实际值（正整数与非负整数，十进制、无前导零）。分块规则或参数一变即新修订、新块 ID。
@@ -72,6 +74,9 @@ _PROMPT_SHA_RE = re.compile(r"[0-9a-f]{64}")
 _PURPOSE_RE = re.compile(r"[a-z][a-z0-9_]*")
 # 分块段：chunk/<规则版本>@<target_chars>-<overlap_chars>。规则版本不含空白、``@``、``+``，
 # 使复合版本可无歧义拆分；数字只收 ASCII、无前导零。
+# 解析器段（ADR-018 修订 1）：<名称>/<版本>[,<名称>/<版本>]*，只收 ASCII。
+_PARSER_STEP = r"[a-z][a-z0-9_-]*/[1-9][0-9]*"
+_PARSER_VERSION_RE = re.compile(rf"{_PARSER_STEP}(?:,{_PARSER_STEP})*", re.ASCII)
 _CHUNKING_VERSION_RE = re.compile(r"chunk/[^\s@+]+@[1-9][0-9]*-(?:0|[1-9][0-9]*)")
 
 
@@ -100,7 +105,7 @@ def _check_content_hash(value: object) -> str:
 
 
 def _is_parser_segment(value: object) -> bool:
-    return isinstance(value, str) and bool(value) and "+" not in value and not any(ch.isspace() for ch in value)
+    return isinstance(value, str) and _PARSER_VERSION_RE.fullmatch(value) is not None
 
 
 def _is_chunking_segment(value: object) -> bool:
@@ -136,11 +141,13 @@ def _check_ordinal(value: object) -> int:
 def revision_parser_version(parser_version: str, chunking_version: str) -> str:
     """组合资料修订键用的复合版本 ``f"{parser_version}+{chunking_version}"``（ADR-018 决定 3）。
 
-    ``parser_version`` 取解析器给出的版本（非空、无空白、不含 ``+``）；``chunking_version`` 取
+    ``parser_version`` 取解析器给出的版本（``<名称>/<版本>`` 用 ``,`` 连接，ADR-018 修订 1）；``chunking_version`` 取
     D08 ``chunking_version(...)`` 的返回值，参数须与实际分块所用一致。
     """
     if not _is_parser_segment(parser_version):
-        raise ChunkIdentityError(f"parser_version 必须是不含空白与 '+' 的非空字符串，收到 {parser_version!r}")
+        raise ChunkIdentityError(
+            f"parser_version 必须形如 <名称>/<版本>[,<名称>/<版本>…]（ADR-018 修订 1），收到 {parser_version!r}"
+        )
     if not _is_chunking_segment(chunking_version):
         raise ChunkIdentityError(
             f"chunking_version 必须形如 chunk/<规则版本>@<正整数>-<非负整数>，收到 {chunking_version!r}"
