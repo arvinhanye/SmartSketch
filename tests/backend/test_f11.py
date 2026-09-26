@@ -498,6 +498,49 @@ def test_approving_and_rejecting_low_confidence_relations(env):
     assert env.act({"item": "low_confidence_relation", "rel_id": "missing", "action": "approve"}).status_code == 404
 
 
+def _retry_once(monkeypatch, ctx):
+    """让下一次 ``ctx.store.transaction`` 像 Neo4j 驱动一样重跑 ``work``：第一次尝试写入后被回滚。"""
+
+    class Transient(Exception):
+        """一次瞬时故障：驱动丢弃这次事务，``work`` 从头再跑一遍。"""
+
+    store = ctx.store
+    real = type(store).transaction
+
+    def flaky(self, scope, work):
+        def attempt(tx):
+            work(tx)
+            raise Transient
+
+        try:
+            real(self, scope, attempt)
+        except Transient:
+            pass
+        return real(self, scope, work)
+
+    monkeypatch.setattr(type(store), "transaction", flaky)
+
+
+@live
+@pytest.mark.parametrize("body", [
+    {"item": "low_confidence_relation", "rel_id": "", "action": "approve"},
+    {"item": "isolated_node", "kp_id": "i", "action": "reject"},
+])
+def test_a_retried_transaction_bumps_the_draft_revision_once(env, monkeypatch, body):
+    g = env.g
+    if body["item"] == "low_confidence_relation":
+        g.node("a")
+        g.node("b")
+        body = {**body, "rel_id": g.edge("PREREQUISITE", "a", "b", status="low_confidence")}
+    else:
+        g.node("i")
+    before = _draft_revision(env)
+    _retry_once(monkeypatch, env.ctx)
+
+    assert _ok(env.act(body))["changed"] is True
+    assert _draft_revision(env) == before + 1  # 重跑事务不重复加修订号
+
+
 @live
 def test_relation_on_a_hidden_or_rejected_endpoint_is_not_in_the_queue(env):
     g = env.g
@@ -574,6 +617,42 @@ def test_duplicates_can_be_dismissed_or_merged(env):
     assert gone.status_code == 404
     other = env.act({"item": "suspected_duplicate", "kp_ids": ["a", "c"], "action": "reject"})
     assert other.status_code == 404  # 不是疑似重复的一对不能记为「不是重复」
+
+
+@live
+def test_merging_a_pair_that_is_not_in_the_duplicate_column_is_not_found(env):
+    g = env.g
+    g.node("a", name="栈")
+    g.node("b", name="栈")      # 栏里唯一一对真候选
+    g.node("c", name="队列")    # 与 a 毫无关系
+    assert _queue(env)["totals"]["suspected_duplicates"] == 1
+    snapshot, before = g.dump(), _draft_revision(env)
+
+    for kp_ids, primary in ((["a", "c"], "a"), (["c", "a"], "c")):
+        response = env.act({"item": "suspected_duplicate", "kp_ids": kp_ids, "action": "merge",
+                            "primary_id": primary})
+        assert response.status_code == 404, response.text
+        assert response.json()["code"] == "NOT_FOUND"
+    assert g.dump() == snapshot and _draft_revision(env) == before  # 未在栏内：一个字也不写
+
+    merged = _ok(env.act({"item": "suspected_duplicate", "kp_ids": ["a", "b"], "action": "merge", "primary_id": "a"}))
+    assert merged["changed"] is True and g.props("b") is None  # 复核没有把整栏一起挡掉
+
+
+@live
+def test_merging_a_pair_with_a_rejected_side_is_not_found(env):
+    g = env.g
+    g.node("a", name="栈")
+    g.node("b", name="栈", status="rejected")
+    assert _queue(env)["totals"]["suspected_duplicates"] == 0
+    snapshot, before = g.dump(), _draft_revision(env)
+
+    for primary in ("a", "b"):
+        response = env.act({"item": "suspected_duplicate", "kp_ids": ["a", "b"], "action": "merge",
+                            "primary_id": primary})
+        assert response.status_code == 404, response.text
+        assert response.json()["code"] == "NOT_FOUND"
+    assert g.dump() == snapshot and _draft_revision(env) == before
 
 
 @live
