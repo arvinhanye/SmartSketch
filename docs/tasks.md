@@ -1207,3 +1207,13 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
 - J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
+
+## 2026-09-26 G08 发布时补齐文本块向量（Claude，新增任务）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G08 | DONE（待 PR 审查/合并） | 发布时补齐文本块向量（J01 发现的缺口，ArvinHan 2026-09-26 同意新增） | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@a7d8075` | `src/backend/app/services/versions/chunk_vectors.py`、`tests/integration/test_g08.py`；扩围 `src/backend/app/services/versions/publish.py`（P8/P9 各一处）、`specs/teacher-review-publish.md`（P8、P9、V8 各一句）、`docs/architecture.md`（一句）、`docs/decisions.md`（ADR-047） | 红灯：收集错误（模块不存在）；`test_g08.py` 10 passed（真实 Neo4j）；9 处反向篡改，补 1 个用例后全部检出；全量见 `docs/handoffs/claude-g08.md` |
+
+- 依赖：G03、G04、J01、E07。J04 的端到端检索依赖本任务（原子清单 `docs/atomic-tasks.json` 是基线计划，未改）。
+- 验收：发布后版本修订内的全部文本块（包括没有被引用的块）都有节点和当前空间向量，J01 能检索到；已有向量的块不再调用模型；版本外修订的块不处理；向量调用失败时发布在 P8 失败，指针不变；P9 能发现缺向量、维度不对或缺 `revision_id` 的块；嵌入器空间不符时拒绝。
+- G08 待决：本任务之前已经提交的版本没有文本块向量，回滚到这些版本时检索结果不全（MVP 阶段没有真实数据）；首次发布的耗时随资料量增长，尚未实测。
