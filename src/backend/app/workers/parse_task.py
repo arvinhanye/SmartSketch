@@ -95,10 +95,10 @@ STAGE = "parsing"
 NEXT_STAGE = "extracting"
 #: 解析与分块完成、写检查点之前上报的阶段内进度（``parsing`` 区间为 [0, 0.10]）。
 PARSED_PROGRESS = 0.05
-#: PDF 管线（D05 提取 → D07 清洗 → D06 标题判定）的解析器段版本。D09 的解析器段不得含 ``+``
-#: （``+`` 是 ADR-018 复合版本的分隔符），D06 自带的 ``pdf/1+headings/1`` 因此不能直接用；
-#: 这里以逗号连接三段各自的版本，任一段变化即新修订、新块 ID。
-PDF_PARSER_VERSION = f"{pdf.PARSER_VERSION},{cleanup.CLEANUP_VERSION},{pdf_headings.HEADINGS_VERSION}"
+#: PDF 管线（D05 提取 → D07 清洗 → D06 标题判定）的解析器段版本，取 D06 给出的常量
+#: （ADR-018 修订 1：``pdf/1,cleanup/1,headings/1``），任一段变化即新修订、新块 ID。
+#: 清洗只用 D07 默认阈值（阈值变化须递增 ``CLEANUP_VERSION``）。
+PDF_PARSER_VERSION = pdf_headings.CLEANED_PARSER_VERSION
 
 _NOW_TEXT = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
 _UNREADABLE_MESSAGES = {

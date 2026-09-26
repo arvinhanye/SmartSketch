@@ -35,9 +35,9 @@
 8. **心跳**：`LeaseHeartbeat` 独立线程每 `L/3` 调 C09 `renew_lease`；影响 0 行置 `lost` 并停止；SQLite 暂时报错则下个周期重试。心跳只延长租约，防旧写仍靠令牌条件。本阶段不写 Neo4j 与文件，§8.2「本地截止」无适用写入。
 9. **`run_once`**：`reclaim_expired` → `claim_next`（`TASK_LEASE_SECONDS`、`TASK_MAX_ATTEMPTS` 取自 `Settings`）→ 若在 `parsing`，在心跳下跑本阶段。领到其他阶段的任务，或本阶段 `advanced` 后，用 C09 `release_on_shutdown` 交还（不计尝试次数），留给后续阶段（见风险 1）。不做守护进程。
 
-### PDF 解析器版本（需确认，见待决 1）
+### PDF 解析器版本（已由 ADR-018 修订 1 定稿）
 
-D06 的 `PARSER_VERSION = "pdf/1+headings/1"` 含 `+`，而 D09 `revision_parser_version` 规定解析器段不得含 `+`（`+` 是 ADR-018 复合版本的分隔符），直接使用会被拒绝。本任务在编排层定义管线版本 `pdf/1,cleanup/1,headings/1`（D05、D07、D06 三段各自的版本常量以逗号连接，任一段递增即新修订），修订键为 `pdf/1,cleanup/1,headings/1+chunk/1@1500-200`。
+ADR-018 修订 1（TD-01，#243）规定解析器段内步骤用 `,` 连接、按处理顺序排列，D06 给出 `pdf_headings.CLEANED_PARSER_VERSION = "pdf/1,cleanup/1,headings/1"`。worker 的 `PDF_PARSER_VERSION` 直接引用该常量，不再自拼（取值与原临时写法逐字相同，块 ID 不变）；修订键为 `pdf/1,cleanup/1,headings/1+chunk/1@1500-200`。清洗只用 D07 默认阈值。
 
 ## 测试覆盖（`tests/backend/test_d11.py`）
 
@@ -96,7 +96,7 @@ scratchpad 为多会话共享；本任务使用自有目录 `S=<scratchpad>/d11`
 
 ## 待决（未擅自拍板）
 
-1. **PDF 管线版本格式**：请协调方确认 `pdf/1,cleanup/1,headings/1`（或另定），写入 ADR-018 补注与 `docs/architecture.md`「资料修订」；并决定 D06 的 `PARSER_VERSION` 常量（含 `+`）是否改名或弃用。一旦有 PDF 块持久化，改格式即新修订、新块 ID。
+1. ~~**PDF 管线版本格式**~~：已由 ADR-018 修订 1（TD-01，#243）定稿，worker 改为引用 `pdf_headings.CLEANED_PARSER_VERSION`。
 2. **D07 清洗默认开启**：课程级或资料级开关（D07 待决 2）未实现。
 3. **存储故障分类**（风险 2、3）：是否把「文件不存在」与 SQLite 非 I/O 类 `OperationalError` 改为 `INTERNAL_ERROR` 不重试。
 4. **SSE 推送**：`ParseOutcome.sse_event` 给 C11；阶段内进度（0.05）的 `stage` 事件由 C11 决定是否按 `progress` 变化推送。
