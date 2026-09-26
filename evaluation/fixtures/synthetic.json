@@ -1,0 +1,800 @@
+{
+  "schema_version": 1,
+  "dataset_id": "synthetic-ds-ch3",
+  "is_final_benchmark": true,
+  "note": "项目自编材料。D-01 已定（ADR-026，ArvinHan 2026-09-26）：本章即赛题抽取硬指标的最终判定材料。提示词、先修表述清单与阈值不在本章上调；若调过，报告须注明迭代材料与判定材料相同。",
+  "license": "项目自编，可随仓库分发",
+  "course": {
+    "id": "synthetic-ds",
+    "name": "数据结构（自编示例）",
+    "chapter": "第3章 栈与队列"
+  },
+  "documents": [
+    {
+      "id": "doc-ch3",
+      "filename": "ch3-stack-queue.md",
+      "format": "md",
+      "text": "# 第3章 栈与队列\n\n> 本章为 SmartSketch 项目自编的教学材料，仅用于抽取评测的开发与调试，不摘自任何教材或真实课程讲义。\n\n## 3.1 本章导读\n\n栈和队列是两种操作受限的线性表。学习本章之前需要先掌握线性表的顺序存储与链式存储，因为栈和队列的两种实现方式都直接沿用这两种存储结构。本章内容分为三部分：3.2 节介绍栈，3.3 节介绍队列，3.4 节和 3.5 节讨论它们在括号匹配、表达式求值、递归和排队服务中的应用。\n\n## 3.2 栈\n\n### 3.2.1 栈的定义\n\n栈（又称堆栈，英文 stack）是只允许在一端进行插入和删除操作的线性表。允许操作的一端称为栈顶，另一端称为栈底。不含任何元素的栈称为空栈。由于最后进入的元素最先被删除，栈的操作特性可以概括为后进先出（Last In First Out，LIFO）。\n\n栈的基本操作包括初始化、判空、入栈、出栈和读栈顶元素。入栈（Push）是在栈顶插入一个新元素，使之成为新的栈顶；出栈（Pop）是删除栈顶元素并返回它。入栈和出栈都只涉及栈顶，因此不论栈中有多少元素，这两个操作都可以在常数时间内完成。\n\n### 3.2.2 顺序栈\n\n采用顺序存储的栈称为顺序栈。顺序栈用一个数组 data[0..MaxSize-1] 存放元素，并用整型变量 top 指示栈顶元素的下标。约定空栈时 top = -1；入栈时先令 top 加 1 再写入元素，出栈时先读出元素再令 top 减 1。\n\n当栈中已有 MaxSize 个元素时再执行入栈，就会发生上溢；对空栈执行出栈则发生下溢。上溢说明预分配的空间不足，是顺序栈的主要缺点。为了提高空间利用率，可以让两个栈共享同一个数组，两个栈底分别设在数组两端，栈顶相向增长，这种结构称为共享栈。只有当两个栈顶相遇时，共享栈才会发生上溢。\n\n### 3.2.3 链栈\n\n采用链式存储的栈称为链栈。链栈通常用不带头结点的单链表实现，并规定所有操作都在表头进行，表头指针就是栈顶指针。链栈的优点是不存在上溢问题，便于多个栈共享存储空间；代价是每个结点需要额外的指针域。\n\n顺序栈与链栈相比，两者的入栈、出栈时间复杂度都是 O(1)；顺序栈需要预先估计容量，链栈则按需申请结点。\n\n### 3.2.4 出栈序列的性质\n\n设有 n 个元素按 1, 2, …, n 的顺序依次入栈，入栈与出栈可以任意交错，于是可能得到多种不同的出栈序列。\n\n**性质 3.1（合法出栈序列判定）**：一个排列 p1 p2 … pn 是合法出栈序列，当且仅当不存在下标 i < j < k 使得 pj < pk < pi。也就是说，若某个较大的元素先出栈，则比它小且仍在栈中的元素必须按从大到小的顺序出栈。\n\n**定理 3.1（出栈序列计数定理）**：n 个不同元素依次入栈，可能得到的不同出栈序列的个数等于第 n 个卡特兰数。\n\n卡特兰数公式为 Cn = C(2n, n) / (n + 1)，其中 C(2n, n) 表示从 2n 个元素中取 n 个的组合数。例如 n = 3 时，C3 = 20 / 4 = 5。\n\n**例 3-1（出栈序列判断）**：元素 1、2、3 依次入栈，判断 3 1 2 是否为合法出栈序列。3 最先出栈，说明 1 和 2 此时都在栈中且 2 在 1 之上，下一个出栈的只能是 2 而不能是 1，所以 3 1 2 不合法。按性质 3.1，取 i = 1、j = 2、k = 3，有 p2 = 1 < p3 = 2 < p1 = 3，同样得出不合法的结论。全部 5 个合法序列为 123、132、213、231、321，这与定理 3.1 的计数结果一致。\n\n## 3.3 队列\n\n### 3.3.1 队列的定义\n\n队列（queue）也是一种操作受限的线性表，它只允许在一端插入、在另一端删除。允许插入的一端称为队尾，允许删除的一端称为队头。最先进入队列的元素最先离开，因此队列的操作特性是先进先出（First In First Out，FIFO）。先进先出与栈的后进先出恰好相反，二者常被放在一起对照学习。\n\n队列的基本操作包括初始化、判空、入队、出队和读队头元素。入队是在队尾插入元素，出队是删除队头元素。\n\n### 3.3.2 循环队列\n\n用数组实现队列时，设置队头指针 front 和队尾指针 rear。若每次出队都只让 front 后移，数组前部腾出的空间将无法再利用，可能出现 rear 已到数组末尾而数组前部仍有空位的情况，这种现象称为假溢出。\n\n为了解决假溢出，把数组在逻辑上视为首尾相接的环，这样的队列称为循环队列。理解循环队列需要先掌握取模运算，因为指针的回绕完全依靠取模实现。指针后移公式为：rear = (rear + 1) % MaxSize，front 的后移方式相同。\n\n循环队列中元素个数的计算公式为：(rear - front + MaxSize) % MaxSize。\n\n**性质 3.2（循环队列判空与判满）**：约定 front 指向队头元素、rear 指向队尾元素的下一个位置，并牺牲一个存储单元，则队空的条件是 front == rear，队满的条件是 (rear + 1) % MaxSize == front。牺牲一个单元是为了区分队空和队满这两种状态；也可以改用计数变量 size 来区分。\n\n**例 3-2（循环队列指针变化）**：设 MaxSize = 6，初始 front = rear = 0。依次让 a、b、c、d、e 入队后 rear = 5，此时 (5 + 1) % 6 = 0 等于 front，队列已满，最多只能存放 5 个元素。接着出队两次，front = 2；再让 f 入队，rear = (5 + 1) % 6 = 0，指针回绕到数组开头。此时元素个数为 (0 - 2 + 6) % 6 = 4，正是 c、d、e、f 四个元素。\n\n### 3.3.3 链队列\n\n采用链式存储的队列称为链队列，它是同时带有队头指针和队尾指针的单链表。入队在链表尾部插入结点，出队删除链表的第一个结点。链队列不会产生假溢出，也不需要预先确定容量，适合元素个数变化较大的场合。\n\n### 3.3.4 双端队列\n\n双端队列是允许在两端都进行插入和删除的线性表。如果限制双端队列只在一端插入和删除，它就退化为栈；如果限制只在一端插入、另一端删除，它就退化为普通队列。因此双端队列与栈、队列都密切相关。\n\n### 3.3.5 栈与队列的比较\n\n从逻辑结构看，栈和队列与线性表完全相同，都是元素之间一对一的线性关系；二者的区别只在于允许进行插入和删除的位置不同。栈的插入和删除都在同一端完成，所以最后到达的元素总是最先被处理；队列的插入和删除分别在两端完成，所以最早到达的元素总是最先被处理。选择使用哪一种结构，关键是看问题要求的处理次序：凡是需要“暂存后逆序处理”的场合，例如撤销操作、回溯搜索和函数调用，适合用栈；凡是需要“按到达先后依次处理”的场合，例如任务排队、消息缓冲和逐层访问，适合用队列。\n\n从存储结构看，二者都可以采用顺序存储或链式存储。顺序存储的优点是结构简单、访问局部性好，缺点是容量需要事先确定；链式存储能够按需扩展，但每个结点都要额外保存指针。实际编程时，如果元素个数的上限可以预先估计，通常优先选用顺序实现；如果元素个数波动很大或无法估计，则选用链式实现更为稳妥。\n\n## 3.4 栈的应用\n\n### 3.4.1 括号匹配\n\n括号匹配算法基于栈的后进先出特性：从左到右扫描表达式，遇到左括号就入栈；遇到右括号时，若栈为空或栈顶的左括号与之类型不符，则匹配失败，否则弹出栈顶。扫描结束后栈为空，才表示所有括号都匹配成功。\n\n**例 3-3（括号匹配）**：检查串 [(]) 时，读到 ] 时栈顶是 (，类型不符，匹配失败；而串 {[()]} 扫描结束时栈为空，匹配成功。\n\n### 3.4.2 中缀表达式与后缀表达式\n\n日常书写的算术表达式把运算符放在两个操作数中间，称为中缀表达式，例如 a + b * c。中缀表达式需要依靠运算符优先级和括号才能确定计算次序。把运算符放在两个操作数之后的写法称为后缀表达式，也叫逆波兰式，例如 a b c * +。后缀表达式不含括号，计算次序完全由运算符出现的位置决定，适合计算机处理。\n\n**中缀转后缀算法**：从左到右扫描中缀表达式，操作数直接输出；遇到左括号入栈；遇到右括号则依次弹出并输出栈顶运算符，直到弹出左括号为止；遇到运算符时，先把栈中优先级大于或等于它的运算符依次弹出并输出（遇到左括号停止），再把它入栈。扫描结束后，把栈中剩余运算符依次弹出。该算法需要先理解运算符优先级，否则无法决定何时弹栈。\n\n**后缀表达式求值算法**：从左到右扫描后缀表达式，遇到操作数就入栈；遇到运算符就从栈中弹出两个操作数，先弹出的是右操作数，后弹出的是左操作数，计算后把结果压回栈中。扫描结束时栈中唯一的元素就是表达式的值。掌握后缀表达式的写法是学习后缀表达式求值算法的前提。\n\n表达式求值通常分两步完成：先用中缀转后缀算法得到后缀表达式，再用后缀表达式求值算法算出结果。\n\n**例 3-4（表达式求值）**：求中缀表达式 (3 + 4) * 2 - 6 / 3 的值。先转换为后缀表达式 3 4 + 2 * 6 3 / -。然后求值：3、4 入栈；遇 + 弹出 4 和 3 得 7 入栈；2 入栈；遇 * 得 14；6、3 入栈；遇 / 得 2；遇 - 计算 14 - 2 得 12。最终结果为 12。\n\n### 3.4.3 递归与栈\n\n递归是指函数在执行过程中直接或间接调用自身。每进入一层递归调用，系统就把当前层的返回地址、实参和局部变量作为一个工作记录压入递归工作栈；该层返回时再弹出这一记录。递归工作栈是栈在程序运行时的典型应用，理解递归的执行过程要以栈为基础。\n\n递归算法结构清晰，但层数过深时递归工作栈会占用大量空间，甚至导致栈溢出。借助显式的栈保存待处理的状态，可以把递归算法改写为非递归算法，这种做法称为递归转非递归。\n\n**例 3-5（阶乘的递归计算）**：计算 3! 时，fact(3) 调用 fact(2)，fact(2) 调用 fact(1)，递归工作栈中依次压入三层记录；fact(1) 返回 1 后逐层弹出，依次得到 fact(2) = 2 和 fact(3) = 6。\n\n## 3.5 队列的应用\n\n队列适合处理需要按到达次序服务的问题，例如操作系统中的作业调度、打印机缓冲区以及图的广度优先遍历。在这些场合中，请求到达的速度和被处理的速度往往不一致，队列起到了缓冲作用：先到的请求先被处理，后到的请求在队尾等待，既不会丢失，也不会被插队。\n\n**例 3-6（银行排队模拟）**：银行只有一个窗口，顾客按到达时间依次入队，窗口空闲时让队头顾客出队办理业务。设顾客 A、B、C 分别在第 0、1、2 分钟到达，每人办理 3 分钟，则 A 在第 0 分钟开始办理，B 等待到第 3 分钟，C 等待到第 6 分钟，平均等待时间为 (0 + 2 + 4) / 3 = 2 分钟。这个例子体现了队列先进先出的服务次序。\n\n## 3.6 本章小结\n\n栈和队列都是操作受限的线性表：栈限定在栈顶操作，具有后进先出特性；队列在队尾插入、队头删除，具有先进先出特性。二者都有顺序和链式两种实现。循环队列通过取模运算解决了假溢出问题。栈的典型应用包括括号匹配、表达式求值和递归，队列的典型应用包括排队服务与广度优先遍历。\n"
+    }
+  ],
+  "gold": {
+    "entities": [
+      {
+        "id": "g-e01",
+        "name": "线性表",
+        "aliases": [
+          "linear list"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "栈和队列是两种操作受限的线性表"
+      },
+      {
+        "id": "g-e02",
+        "name": "栈",
+        "aliases": [
+          "堆栈",
+          "stack"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "栈（又称堆栈，英文 stack）是只允许在一端进行插入和删除操作的线性表"
+      },
+      {
+        "id": "g-e03",
+        "name": "栈顶",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "允许操作的一端称为栈顶"
+      },
+      {
+        "id": "g-e04",
+        "name": "栈底",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "另一端称为栈底"
+      },
+      {
+        "id": "g-e05",
+        "name": "后进先出",
+        "aliases": [
+          "LIFO",
+          "Last In First Out"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "栈的操作特性可以概括为后进先出（Last In First Out，LIFO）"
+      },
+      {
+        "id": "g-e06",
+        "name": "入栈",
+        "aliases": [
+          "Push",
+          "进栈",
+          "压栈"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "入栈（Push）是在栈顶插入一个新元素，使之成为新的栈顶"
+      },
+      {
+        "id": "g-e07",
+        "name": "出栈",
+        "aliases": [
+          "Pop",
+          "退栈",
+          "弹栈"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "出栈（Pop）是删除栈顶元素并返回它"
+      },
+      {
+        "id": "g-e08",
+        "name": "顺序栈",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "采用顺序存储的栈称为顺序栈"
+      },
+      {
+        "id": "g-e09",
+        "name": "上溢",
+        "aliases": [
+          "栈上溢",
+          "栈溢出"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "当栈中已有 MaxSize 个元素时再执行入栈，就会发生上溢"
+      },
+      {
+        "id": "g-e10",
+        "name": "空栈",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "不含任何元素的栈称为空栈"
+      },
+      {
+        "id": "g-e11",
+        "name": "下溢",
+        "aliases": [
+          "栈下溢"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "对空栈执行出栈则发生下溢"
+      },
+      {
+        "id": "g-e12",
+        "name": "共享栈",
+        "aliases": [
+          "双栈共享"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "两个栈底分别设在数组两端，栈顶相向增长，这种结构称为共享栈"
+      },
+      {
+        "id": "g-e13",
+        "name": "链栈",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "采用链式存储的栈称为链栈"
+      },
+      {
+        "id": "g-e14",
+        "name": "合法出栈序列判定性质",
+        "aliases": [
+          "性质 3.1",
+          "合法出栈序列判定"
+        ],
+        "type": "theorem",
+        "document_id": "doc-ch3",
+        "evidence": "一个排列 p1 p2 … pn 是合法出栈序列，当且仅当不存在下标 i < j < k 使得 pj < pk < pi"
+      },
+      {
+        "id": "g-e15",
+        "name": "出栈序列计数定理",
+        "aliases": [
+          "定理 3.1"
+        ],
+        "type": "theorem",
+        "document_id": "doc-ch3",
+        "evidence": "n 个不同元素依次入栈，可能得到的不同出栈序列的个数等于第 n 个卡特兰数"
+      },
+      {
+        "id": "g-e16",
+        "name": "卡特兰数公式",
+        "aliases": [
+          "卡特兰数",
+          "Catalan 数"
+        ],
+        "type": "formula",
+        "document_id": "doc-ch3",
+        "evidence": "卡特兰数公式为 Cn = C(2n, n) / (n + 1)"
+      },
+      {
+        "id": "g-e17",
+        "name": "出栈序列判断示例",
+        "aliases": [
+          "例 3-1",
+          "出栈序列判断"
+        ],
+        "type": "example",
+        "document_id": "doc-ch3",
+        "evidence": "元素 1、2、3 依次入栈，判断 3 1 2 是否为合法出栈序列"
+      },
+      {
+        "id": "g-e18",
+        "name": "队列",
+        "aliases": [
+          "queue"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "队列（queue）也是一种操作受限的线性表，它只允许在一端插入、在另一端删除"
+      },
+      {
+        "id": "g-e19",
+        "name": "队头",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "允许删除的一端称为队头"
+      },
+      {
+        "id": "g-e20",
+        "name": "队尾",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "允许插入的一端称为队尾"
+      },
+      {
+        "id": "g-e21",
+        "name": "先进先出",
+        "aliases": [
+          "FIFO",
+          "First In First Out"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "队列的操作特性是先进先出（First In First Out，FIFO）"
+      },
+      {
+        "id": "g-e22",
+        "name": "入队",
+        "aliases": [
+          "EnQueue",
+          "进队"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "入队是在队尾插入元素"
+      },
+      {
+        "id": "g-e23",
+        "name": "出队",
+        "aliases": [
+          "DeQueue",
+          "离队"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "出队是删除队头元素"
+      },
+      {
+        "id": "g-e24",
+        "name": "假溢出",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "可能出现 rear 已到数组末尾而数组前部仍有空位的情况，这种现象称为假溢出"
+      },
+      {
+        "id": "g-e25",
+        "name": "循环队列",
+        "aliases": [
+          "环形队列"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "把数组在逻辑上视为首尾相接的环，这样的队列称为循环队列"
+      },
+      {
+        "id": "g-e26",
+        "name": "取模运算",
+        "aliases": [
+          "取模",
+          "模运算"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "理解循环队列需要先掌握取模运算"
+      },
+      {
+        "id": "g-e27",
+        "name": "循环队列指针后移公式",
+        "aliases": [
+          "指针后移公式"
+        ],
+        "type": "formula",
+        "document_id": "doc-ch3",
+        "evidence": "指针后移公式为：rear = (rear + 1) % MaxSize"
+      },
+      {
+        "id": "g-e28",
+        "name": "循环队列元素个数公式",
+        "aliases": [
+          "队列长度公式",
+          "循环队列长度公式"
+        ],
+        "type": "formula",
+        "document_id": "doc-ch3",
+        "evidence": "循环队列中元素个数的计算公式为：(rear - front + MaxSize) % MaxSize"
+      },
+      {
+        "id": "g-e29",
+        "name": "循环队列判空与判满性质",
+        "aliases": [
+          "性质 3.2",
+          "循环队列判空与判满"
+        ],
+        "type": "theorem",
+        "document_id": "doc-ch3",
+        "evidence": "队空的条件是 front == rear，队满的条件是 (rear + 1) % MaxSize == front"
+      },
+      {
+        "id": "g-e30",
+        "name": "循环队列指针变化示例",
+        "aliases": [
+          "例 3-2",
+          "循环队列指针变化"
+        ],
+        "type": "example",
+        "document_id": "doc-ch3",
+        "evidence": "设 MaxSize = 6，初始 front = rear = 0"
+      },
+      {
+        "id": "g-e31",
+        "name": "链队列",
+        "aliases": [
+          "链式队列"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "采用链式存储的队列称为链队列"
+      },
+      {
+        "id": "g-e32",
+        "name": "双端队列",
+        "aliases": [
+          "deque"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "双端队列是允许在两端都进行插入和删除的线性表"
+      },
+      {
+        "id": "g-e33",
+        "name": "括号匹配算法",
+        "aliases": [
+          "括号匹配"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "括号匹配算法基于栈的后进先出特性"
+      },
+      {
+        "id": "g-e34",
+        "name": "括号匹配示例",
+        "aliases": [
+          "例 3-3"
+        ],
+        "type": "example",
+        "document_id": "doc-ch3",
+        "evidence": "检查串 [(]) 时，读到 ] 时栈顶是 (，类型不符，匹配失败"
+      },
+      {
+        "id": "g-e35",
+        "name": "中缀表达式",
+        "aliases": [],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "日常书写的算术表达式把运算符放在两个操作数中间，称为中缀表达式"
+      },
+      {
+        "id": "g-e36",
+        "name": "后缀表达式",
+        "aliases": [
+          "逆波兰式",
+          "逆波兰表达式"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "把运算符放在两个操作数之后的写法称为后缀表达式，也叫逆波兰式"
+      },
+      {
+        "id": "g-e37",
+        "name": "运算符优先级",
+        "aliases": [
+          "优先级"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "中缀表达式需要依靠运算符优先级和括号才能确定计算次序"
+      },
+      {
+        "id": "g-e38",
+        "name": "中缀转后缀算法",
+        "aliases": [
+          "中缀表达式转后缀表达式"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "从左到右扫描中缀表达式，操作数直接输出"
+      },
+      {
+        "id": "g-e39",
+        "name": "后缀表达式求值算法",
+        "aliases": [
+          "后缀表达式求值"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "从左到右扫描后缀表达式，遇到操作数就入栈"
+      },
+      {
+        "id": "g-e40",
+        "name": "表达式求值示例",
+        "aliases": [
+          "例 3-4",
+          "表达式求值"
+        ],
+        "type": "example",
+        "document_id": "doc-ch3",
+        "evidence": "求中缀表达式 (3 + 4) * 2 - 6 / 3 的值"
+      },
+      {
+        "id": "g-e41",
+        "name": "递归",
+        "aliases": [
+          "递归调用"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "递归是指函数在执行过程中直接或间接调用自身"
+      },
+      {
+        "id": "g-e42",
+        "name": "递归工作栈",
+        "aliases": [
+          "系统栈",
+          "调用栈"
+        ],
+        "type": "concept",
+        "document_id": "doc-ch3",
+        "evidence": "作为一个工作记录压入递归工作栈"
+      },
+      {
+        "id": "g-e43",
+        "name": "递归转非递归",
+        "aliases": [
+          "递归消除"
+        ],
+        "type": "method",
+        "document_id": "doc-ch3",
+        "evidence": "可以把递归算法改写为非递归算法，这种做法称为递归转非递归"
+      },
+      {
+        "id": "g-e44",
+        "name": "阶乘递归计算示例",
+        "aliases": [
+          "例 3-5",
+          "阶乘的递归计算"
+        ],
+        "type": "example",
+        "document_id": "doc-ch3",
+        "evidence": "计算 3! 时，fact(3) 调用 fact(2)，fact(2) 调用 fact(1)"
+      },
+      {
+        "id": "g-e45",
+        "name": "银行排队模拟示例",
+        "aliases": [
+          "例 3-6",
+          "银行排队模拟"
+        ],
+        "type": "example",
+        "document_id": "doc-ch3",
+        "evidence": "银行只有一个窗口，顾客按到达时间依次入队"
+      }
+    ],
+    "relations": [
+      {
+        "id": "g-r01",
+        "from": "g-e01",
+        "to": "g-e02",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "栈和队列是两种操作受限的线性表。学习本章之前需要先掌握线性表的顺序存储与链式存储"
+      },
+      {
+        "id": "g-r02",
+        "from": "g-e01",
+        "to": "g-e18",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "栈和队列是两种操作受限的线性表。学习本章之前需要先掌握线性表的顺序存储与链式存储"
+      },
+      {
+        "id": "g-r03",
+        "from": "g-e02",
+        "to": "g-e33",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "括号匹配算法基于栈的后进先出特性"
+      },
+      {
+        "id": "g-r04",
+        "from": "g-e26",
+        "to": "g-e25",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "理解循环队列需要先掌握取模运算"
+      },
+      {
+        "id": "g-r05",
+        "from": "g-e37",
+        "to": "g-e38",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "该算法需要先理解运算符优先级，否则无法决定何时弹栈"
+      },
+      {
+        "id": "g-r06",
+        "from": "g-e36",
+        "to": "g-e39",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "掌握后缀表达式的写法是学习后缀表达式求值算法的前提"
+      },
+      {
+        "id": "g-r07",
+        "from": "g-e02",
+        "to": "g-e41",
+        "type": "PREREQUISITE",
+        "document_id": "doc-ch3",
+        "evidence": "理解递归的执行过程要以栈为基础"
+      },
+      {
+        "id": "g-r08",
+        "from": "g-e02",
+        "to": "g-e03",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "允许操作的一端称为栈顶，另一端称为栈底"
+      },
+      {
+        "id": "g-r09",
+        "from": "g-e02",
+        "to": "g-e04",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "允许操作的一端称为栈顶，另一端称为栈底"
+      },
+      {
+        "id": "g-r10",
+        "from": "g-e02",
+        "to": "g-e06",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "栈的基本操作包括初始化、判空、入栈、出栈和读栈顶元素"
+      },
+      {
+        "id": "g-r11",
+        "from": "g-e02",
+        "to": "g-e07",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "栈的基本操作包括初始化、判空、入栈、出栈和读栈顶元素"
+      },
+      {
+        "id": "g-r12",
+        "from": "g-e02",
+        "to": "g-e08",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "采用顺序存储的栈称为顺序栈"
+      },
+      {
+        "id": "g-r13",
+        "from": "g-e02",
+        "to": "g-e13",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "采用链式存储的栈称为链栈"
+      },
+      {
+        "id": "g-r14",
+        "from": "g-e18",
+        "to": "g-e19",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "允许插入的一端称为队尾，允许删除的一端称为队头"
+      },
+      {
+        "id": "g-r15",
+        "from": "g-e18",
+        "to": "g-e20",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "允许插入的一端称为队尾，允许删除的一端称为队头"
+      },
+      {
+        "id": "g-r16",
+        "from": "g-e18",
+        "to": "g-e22",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "队列的基本操作包括初始化、判空、入队、出队和读队头元素"
+      },
+      {
+        "id": "g-r17",
+        "from": "g-e18",
+        "to": "g-e23",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "队列的基本操作包括初始化、判空、入队、出队和读队头元素"
+      },
+      {
+        "id": "g-r18",
+        "from": "g-e18",
+        "to": "g-e25",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "把数组在逻辑上视为首尾相接的环，这样的队列称为循环队列"
+      },
+      {
+        "id": "g-r19",
+        "from": "g-e18",
+        "to": "g-e31",
+        "type": "CONTAINS",
+        "document_id": "doc-ch3",
+        "evidence": "采用链式存储的队列称为链队列"
+      },
+      {
+        "id": "g-r20",
+        "from": "g-e17",
+        "to": "g-e14",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "按性质 3.1，取 i = 1、j = 2、k = 3，有 p2 = 1 < p3 = 2 < p1 = 3，同样得出不合法的结论"
+      },
+      {
+        "id": "g-r21",
+        "from": "g-e30",
+        "to": "g-e29",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "此时 (5 + 1) % 6 = 0 等于 front，队列已满"
+      },
+      {
+        "id": "g-r22",
+        "from": "g-e30",
+        "to": "g-e28",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "此时元素个数为 (0 - 2 + 6) % 6 = 4"
+      },
+      {
+        "id": "g-r23",
+        "from": "g-e34",
+        "to": "g-e33",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "检查串 [(]) 时，读到 ] 时栈顶是 (，类型不符，匹配失败"
+      },
+      {
+        "id": "g-r24",
+        "from": "g-e40",
+        "to": "g-e38",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "先转换为后缀表达式 3 4 + 2 * 6 3 / -"
+      },
+      {
+        "id": "g-r25",
+        "from": "g-e40",
+        "to": "g-e39",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "然后求值：3、4 入栈；遇 + 弹出 4 和 3 得 7 入栈"
+      },
+      {
+        "id": "g-r26",
+        "from": "g-e44",
+        "to": "g-e42",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "fact(2) 调用 fact(1)，递归工作栈中依次压入三层记录"
+      },
+      {
+        "id": "g-r27",
+        "from": "g-e45",
+        "to": "g-e21",
+        "type": "EXAMPLE_OF",
+        "document_id": "doc-ch3",
+        "evidence": "这个例子体现了队列先进先出的服务次序"
+      },
+      {
+        "id": "g-r28",
+        "from": "g-e21",
+        "to": "g-e05",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "先进先出与栈的后进先出恰好相反，二者常被放在一起对照学习"
+      },
+      {
+        "id": "g-r29",
+        "from": "g-e08",
+        "to": "g-e13",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "顺序栈需要预先估计容量，链栈则按需申请结点"
+      },
+      {
+        "id": "g-r30",
+        "from": "g-e09",
+        "to": "g-e08",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "上溢说明预分配的空间不足，是顺序栈的主要缺点"
+      },
+      {
+        "id": "g-r31",
+        "from": "g-e11",
+        "to": "g-e10",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "对空栈执行出栈则发生下溢"
+      },
+      {
+        "id": "g-r32",
+        "from": "g-e12",
+        "to": "g-e09",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "只有当两个栈顶相遇时，共享栈才会发生上溢"
+      },
+      {
+        "id": "g-r33",
+        "from": "g-e15",
+        "to": "g-e16",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "可能得到的不同出栈序列的个数等于第 n 个卡特兰数"
+      },
+      {
+        "id": "g-r34",
+        "from": "g-e24",
+        "to": "g-e25",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "为了解决假溢出，把数组在逻辑上视为首尾相接的环，这样的队列称为循环队列"
+      },
+      {
+        "id": "g-r35",
+        "from": "g-e25",
+        "to": "g-e27",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "理解循环队列需要先掌握取模运算，因为指针的回绕完全依靠取模实现。指针后移公式为：rear = (rear + 1) % MaxSize"
+      },
+      {
+        "id": "g-r36",
+        "from": "g-e32",
+        "to": "g-e02",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "如果限制双端队列只在一端插入和删除，它就退化为栈"
+      },
+      {
+        "id": "g-r37",
+        "from": "g-e32",
+        "to": "g-e18",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "如果限制只在一端插入、另一端删除，它就退化为普通队列"
+      },
+      {
+        "id": "g-r38",
+        "from": "g-e38",
+        "to": "g-e39",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "先用中缀转后缀算法得到后缀表达式，再用后缀表达式求值算法算出结果"
+      },
+      {
+        "id": "g-r39",
+        "from": "g-e41",
+        "to": "g-e42",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "每进入一层递归调用，系统就把当前层的返回地址、实参和局部变量作为一个工作记录压入递归工作栈"
+      },
+      {
+        "id": "g-r40",
+        "from": "g-e41",
+        "to": "g-e43",
+        "type": "RELATED_TO",
+        "document_id": "doc-ch3",
+        "evidence": "可以把递归算法改写为非递归算法"
+      }
+    ]
+  }
+}

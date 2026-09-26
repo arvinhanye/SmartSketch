@@ -1000,6 +1000,33 @@
 - **回滚**：撤销 `graph_relations.py`、`services/graph/relations.py`、`write_transaction` 与测试；守卫约束可 `DROP CONSTRAINT draft_write_guard_scope`，守卫节点可 `MATCH (g:DraftWriteGuard) DELETE g`，不影响知识点与关系。
 - **签收**：待 ArvinHan 审阅（守卫节点与属性编码由 Claude 选定并在交接中报告）。
 
+## ADR-026：抽取硬指标的基准材料定为自编「栈与队列」一章（D-01）
+
+- **日期**：2026-09-26
+- **背景**：验收 7 要求用一门课程的完整一章判定抽取硬指标，材料只能是自编或许可允许使用的开源教材（赛题第 7 节），具体哪章由 D-01 决定。K01 已自编数据结构第3章「栈与队列」（3141 字）并标注 45 个实体、40 条关系。
+- **决定**：D-01 定为该章，`evaluation/fixtures/synthetic.json`（`dataset_id = synthetic-ds-ch3`）即最终判定材料，`is_final_benchmark` 改为 `true`。提示词、先修表述清单与阈值的迭代不在本章上进行；若用过本章，报告注明「迭代材料与判定材料相同」。
+- **后果**：真实模型判定只剩 D-02 签收与付费调用确认两个前提。开发集如需另建，放 `evaluation/fixtures/` 下另一个文件。
+- **回滚**：`is_final_benchmark` 改回 `false`，D-01 重新开放。
+- **签收**：ArvinHan 2026-09-26（会话中「直接用这次自编的「栈与队列」一章」）。
+
+## ADR-027：主用大模型定为 DeepSeek V4.1 Flash（D-02a）
+
+- **日期**：2026-09-26
+- **背景**：真实模型的抽取准确率判定（验收 7、K02）需要先定主用供应商和模型（D-02a）。S2 §6.1 的方案以 DeepSeek 为主。
+- **决定**：主用供应商为 DeepSeek，`LLM_BASE_URL=https://api.deepseek.com`，`LLM_EXTRACTION_MODEL` 与 `LLM_CHAT_MODEL` 都用 V4.1 Flash，模型 ID 为 `deepseek-flash`。模型 ID 和基址取自第三方资料（2026-09-26 检索），官方文档站在开发环境被网络策略拦截，未直接核对；首次冒烟调用时确认 ID、是否返回 usage（含流式），结果补到 `docs/integrations.md` D-02a 行。
+- **后果**：`.env.example` 与 `docs/integrations.md` 填入基址和模型 ID；密钥仍只在本机环境变量。`deepseek-flash` 会随供应商更新指向新版本 Flash，所以每次评测报告须记下模型 ID、调用日期和响应里的 `model` 字段。备用供应商（D-02b）、向量方案（D-02c）、预算（D-02d）、超时并发（D-02e）仍未签收。付费调用仍须用户另行确认。
+- **回滚**：`.env.example` 三项恢复为空，`docs/integrations.md` 相关状态改回「取值待 D-02a」。
+- **签收**：ArvinHan 2026-09-26（会话中「主用deepseekv4.1flash」）。
+
+## ADR-028：模型预算按占位值签收，确认抽取评测的付费调用（D-02d）
+
+- **日期**：2026-09-26
+- **背景**：真实模型判定（验收 7、K02）的前提是预算上限（D-02d）签收，且付费调用得到用户确认。`docs/integrations.md` 的占位值为 `LLM_TASK_TOKEN_BUDGET=500000`、`LLM_DAILY_TOKEN_BUDGET=5000000`；S2 表 5.2 估算单章约 0.35 元。
+- **决定**：两项按占位值签收。ArvinHan 确认可以为抽取准确率评测发起付费调用，范围是用 ADR-027 的主用模型处理 ADR-026 的「栈与队列」一章。密钥只在执行者本机的环境变量 `LLM_API_KEY` 中，不入库。
+- **后果**：`docs/integrations.md` 两项状态改为已签收。评测在能访问供应商的本机上运行（开发云环境的网络策略拦截 `api.deepseek.com`）。其他用途的付费调用仍按原规则单独确认。
+- **回滚**：两项状态改回占位（D-02d）；撤回付费确认后不得再发起评测调用。
+- **签收**：ArvinHan 2026-09-26（会话中「确认预算上限和付费调用」）。
+
 ## ADR-029：F13 直通融合、持久化单事务、课程写锁与 T6 提交序号
 
 - **日期**：2026-09-26

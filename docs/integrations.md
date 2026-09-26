@@ -54,10 +54,10 @@
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `LLM_BASE_URL` | URL；`LLM_MODE=live` 时必填 | 空 | 主用供应商 API 基址 | 已约定；取值待 D-02a |
+| `LLM_BASE_URL` | URL；`LLM_MODE=live` 时必填 | `https://api.deepseek.com` | 主用供应商 API 基址 | 已签收（D-02a，ADR-027） |
 | `LLM_API_KEY` | 密钥；同上 | 空 | 主用供应商密钥 | 本机填写 |
-| `LLM_EXTRACTION_MODEL` | 字符串；同上 | 空 | 抽取、补漏、裁决、定义归并所用模型 ID | 已约定；取值待 D-02a |
-| `LLM_CHAT_MODEL` | 字符串；同上 | 空 | 问题改写与问答生成所用模型 ID | 已约定；取值待 D-02a |
+| `LLM_EXTRACTION_MODEL` | 字符串；同上 | `deepseek-flash` | 抽取、补漏、裁决、定义归并所用模型 ID | 已签收（D-02a，ADR-027） |
+| `LLM_CHAT_MODEL` | 字符串；同上 | `deepseek-flash` | 问题改写与问答生成所用模型 ID | 已签收（D-02a，ADR-027） |
 | `LLM_FALLBACK_BASE_URL` | URL；备用四项全空或全填 | 空 | 备用供应商 API 基址 | 占位（D-02b） |
 | `LLM_FALLBACK_API_KEY` | 密钥；同上 | 空 | 备用供应商密钥 | 本机填写 |
 | `LLM_FALLBACK_EXTRACTION_MODEL` | 字符串；同上 | 空 | 备用抽取模型 ID | 占位（D-02b） |
@@ -79,8 +79,8 @@
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `LLM_TASK_TOKEN_BUDGET` | 整数 ≥ 0 | `500000` | 单个资料处理任务的 LLM token 软上限；`0` 表示不发任何请求 | 占位（D-02d） |
-| `LLM_DAILY_TOKEN_BUDGET` | 整数 ≥ 0 | `5000000` | 全站每日 LLM token 软上限，抽取与问答共用；`0` 表示不发任何请求 | 占位（D-02d） |
+| `LLM_TASK_TOKEN_BUDGET` | 整数 ≥ 0 | `500000` | 单个资料处理任务的 LLM token 软上限；`0` 表示不发任何请求 | 已签收（D-02d，ADR-028） |
+| `LLM_DAILY_TOKEN_BUDGET` | 整数 ≥ 0 | `5000000` | 全站每日 LLM token 软上限，抽取与问答共用；`0` 表示不发任何请求 | 已签收（D-02d，ADR-028） |
 
 ### 向量模型
 
@@ -247,10 +247,10 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 
 | 编号 | 事项 | S2 候选与已核对事实 | 当前占位 | 状态 |
 | --- | --- | --- | --- | --- |
-| D-02a | 主用供应商与 `LLM_EXTRACTION_MODEL`、`LLM_CHAT_MODEL`；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：DeepSeek 为主；§5.1.3 以其轻量模型估价。具体模型 ID、是否别名未核对 | 空 | 未签收。E03 补注（ADR-017 决定 3）：输出上限字段默认 `max_tokens`，可切换为 `max_completion_tokens`（`CompatibleModelClient` 构造参数 `max_tokens_field`）；流式 usage、`finish_reason` 超出 `stop`/`length` 的取值、缺 `[DONE]` 的处理，待拿到密钥后用手工冒烟脚本（不进 CI）对主用候选测普通与流式请求各一次，结果填在此处（实测：待填）；缺 usage 按 ADR-011 修订 3 回退估算 |
+| D-02a | 主用供应商与 `LLM_EXTRACTION_MODEL`、`LLM_CHAT_MODEL`；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：DeepSeek 为主。ArvinHan 2026-09-26 定为 DeepSeek V4.1 Flash。模型 ID `deepseek-flash`、基址 `https://api.deepseek.com` 取自第三方资料（2026-09-26 检索；官方文档站在本环境被网络策略拦截，未直接核对）；资料称 `deepseek-flash` 随版本更新指向最新 Flash，旧 ID `deepseek-v4-flash` 暂时兼容转到 V4.1 | `https://api.deepseek.com`、`deepseek-flash` | **已签收（ADR-027）**；2026-09-26 本机 `GET /models` 返回 `deepseek-flash`、`deepseek-v4-pro`，模型 ID 已确认；usage（含流式）待首次抽取运行确认。E03 补注（ADR-017 决定 3）：输出上限字段默认 `max_tokens`，可切换为 `max_completion_tokens`（`CompatibleModelClient` 构造参数 `max_tokens_field`）；流式 usage、`finish_reason` 超出 `stop`/`length` 的取值、缺 `[DONE]` 的处理，待拿到密钥后用手工冒烟脚本（不进 CI）对主用候选测普通与流式请求各一次，结果填在此处（实测：待填）；缺 usage 按 ADR-011 修订 3 回退估算 |
 | D-02b | 备用供应商与模型；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：通义千问备用。模型 ID 未核对 | 空 | 未签收。E03 补注（ADR-017 决定 3）：输出上限字段默认 `max_tokens`，可切换为 `max_completion_tokens`（`CompatibleModelClient` 构造参数 `max_tokens_field`）；流式 usage、`finish_reason` 超出 `stop`/`length` 的取值、缺 `[DONE]` 的处理，待拿到密钥后用手工冒烟脚本（不进 CI）对备用候选测普通与流式请求各一次，结果填在此处（实测：待填）；缺 usage 按 ADR-011 修订 3 回退估算 |
 | D-02c | 向量方案（`online` / `local`）、模型、维度、批量 | 在线 `text-embedding-v4`：维度可选 2048 / 1536 / 1024（默认）/ 768 / 512 / 256 / 128 / 64，每请求至多 10 条、每条至多 8192 token，OpenAI 兼容接口支持 `dimensions`（阿里云百炼向量化文档，2026-09-23 核对）。本地 `bge-small-zh-v1.5`：512 维、最大序列 512 token（模型 `config.json`，2026-09-23 核对），**S2 的约 1500 字分块会超长被截断**，选本地方案须先定截断或另行分块 | `fake`、`1024`、`10` | 未签收 |
-| D-02d | `LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET` | S2 表 5.2（估算，以实测为准）：单章约 0.35 元、单门课约 4.2 元、千人一学期问答约 2080 元（约 19 元/天）；价格未在本任务核对 | `500000`（按输出单价上限约 4 元/任务）、`5000000` | 未签收 |
+| D-02d | `LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET` | S2 表 5.2（估算，以实测为准）：单章约 0.35 元、单门课约 4.2 元、千人一学期问答约 2080 元（约 19 元/天）；价格未在本任务核对 | `500000`（按输出单价上限约 4 元/任务）、`5000000` | **已签收（ADR-028，ArvinHan 2026-09-26，按占位值）**；抽取评测的付费调用已确认 |
 | D-02e | 超时、并发、重试、熔断取值 | S2 表 6.7：单章 14 块并发 8 路约 20～25 秒；表 3.1：问答首字 ≤ 3 秒、完整 ≤ 10 秒（目标值）、赛题 ≤ 15 秒。样例下单次调用上界约 6 分钟，远大于正常耗时 | 见「调用约束」 | 未签收 |
 | D-02f | 新错误码 `BUDGET_EXCEEDED` | — | 已纳入 `ErrorCode`；同步请求 HTTP 429 | B08 已完成 |
 
