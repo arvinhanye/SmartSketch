@@ -34,7 +34,7 @@
 | 集成 | `$N $V -m pytest tests/integration/test_f12.py -q` | 8 passed |
 | 回归 | `$V -m pytest tests/backend/test_f08.py -q`；`$N $V -m pytest tests/integration/test_f08.py tests/integration/test_f09.py tests/integration/test_f10.py -q` | 62 passed；52 passed |
 | 后端全量 | `$V -m pytest tests/backend -q` | 3132 passed |
-| 集成全量 | `$N $V -m pytest tests/integration -q` | 见下方补记 |
+| 集成全量 | `$N $V -m pytest tests/integration -q` | 341 passed, 8 skipped（跳过的为需 Docker 守护进程的 K08/K10 用例，本环境无 Docker） |
 | 门禁 | `PATH=<工具>:$PATH ./scripts/verify.sh`；`git diff --check` | exit 0；无输出 |
 
 反向篡改（逐处改实现、跑两份 `test_f12.py`、还原）16 处全部检出：去掉取锁后对账；去掉脱敏模式；`update` 对账只看修订号；`unlock` 对账恒为生效；去掉重试；删除/合并/编辑三处不 `abort`；合并 `pending` 摘要不带谱系；`resolve` 不限 `pending`；`delete` 对账恒为生效；API 不传 actor；去掉赋值脱敏；删除提交不补关系数。其中「删除不 abort」「合并 pending 摘要谱系」初次存活，已补 `test_failure_inside_the_delete_transaction_is_logged_as_aborted` 与对账用例的 `merged_from` 断言。
