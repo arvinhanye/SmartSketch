@@ -210,8 +210,8 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 | P5 | 释放课程写锁 | SQLite | 释放失败无妨，锁到期自动失效 |
 | P6 | 按 V3 校验 | 内存 | 409 `PUBLISH_BLOCKED`，尝试行 `failed` |
 | P7 | 生成快照与摘要。**摘要等于当前发布版摘要，且当前发布版的 `embedding_space` 等于当前向量空间** → 幂等路径（见下）；摘要相等而空间不等说明 V12 的不变式被破坏，5xx 并告警，不走幂等；否则写入尝试行的 `snapshot_json`、`digest`、`draft_revision=r`、`task_watermark=w`、统计与 `embedding_space` | SQLite | 写失败 → 尝试行 `failed`（写不进去则由清扫收尾），5xx |
-| P8 | 物化：在**一个 Neo4j 写事务**内按快照与内存向量创建 `(course_id, version_id)` 下的章节、知识点、关系与 `EVIDENCE` 边 | Neo4j | C1 |
-| P9 | 核对：读回 `(course_id, version_id)` 复算摘要，必须等于 P7；向量数 = 知识点数，且全部属于当前向量空间（V12），维度等于该空间维度 | Neo4j | C1 |
+| P8 | 物化：在**一个 Neo4j 写事务**内按快照与内存向量创建 `(course_id, version_id)` 下的章节、知识点、关系与 `EVIDENCE` 边。之前先补齐快照修订列表内**全部文本块**的 `Chunk` 节点与当前空间向量，只为缺向量的块调用模型；这些节点跨版本共享、可重复写入，C1 不删除（G08，ADR-066） | Neo4j | C1 |
+| P9 | 核对：读回 `(course_id, version_id)` 复算摘要，必须等于 P7；向量数 = 知识点数，且全部属于当前向量空间（V12），维度等于该空间维度；快照修订列表内每个文本块都有 `Chunk` 节点、`revision_id` 与当前空间向量（G08） | Neo4j | C1 |
 | P10 | 尝试行 `state=materialized` | SQLite | C1 |
 | P11 | **提交点**，一个 SQLite 事务（见下） | SQLite | C1 |
 | P12 | 停止心跳，返回 200 `PublishResult{version, published_at, stats, excluded, unchanged:false}` | — | — |
@@ -267,7 +267,7 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 - **长请求**：MVP 不回收任何 `committed` 版本，请求绑定的版本在处理期间不会消失。将来引入回收时，保留期必须长于最长请求时长，且不得回收当前指针指向的版本；这是回收功能的前置条件，须另立 ADR。
 - **向量检索**：
   - 知识点向量随版本复制，查询后按 `course_id` 与 `version_id` 过滤；
-  - 文本块向量共享，查询后按 `course_id` 过滤，并只保留 `revision_id` 属于该版本修订列表的文本块。不按 `material_id` 过滤：同一资料可能有版本之外的新修订（Codex A04-R01）；
+  - 文本块向量共享，在发布 P8 补齐（G08，回滚不补，源版本发布时已补齐），查询后按 `course_id` 过滤，并只保留 `revision_id` 属于该版本修订列表的文本块。不按 `material_id` 过滤：同一资料可能有版本之外的新修订（Codex A04-R01）；
   - 查询向量按当前向量空间计算；运行时只存在一个空间（V12）；
   - Neo4j 向量索引做不到先过滤再检索，因此采用「多取再过滤」，取多少由 J01 实测召回后确定。
 - **跨版本对应**：`kp_id`、`rel_id` 跨版本不变。进度如何在版本间对应、节点删除或改名后如何处理，归 A08；问答日志记录 `version_id`，引用撤回协议归 A09。

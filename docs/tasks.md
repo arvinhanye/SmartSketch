@@ -1248,3 +1248,13 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：两路候选按 `chunk_id` 去重并保留出处（`origins`、`kp_ids`）；他课、修订不在绑定版本内、不可定位或读不到的块不获得编号（QA-17）；H 为空 → `no_retrieval_hit`，H 非空但无向量候选达到 fake 阈值 → `below_similarity_threshold`（QA-6、QA-7 的 J04 部分）；token 预算整块取舍，不截断文本与定位；图谱上下文无编号。
 - J04 待决：阈值与 `ContextBudget` 三个值无缺省，待 K01 调参、J07 配置；「只有向量相似度能打开闸门」与「预算放不下任何块时按 `below_similarity_threshold` 拒答」待签收（ADR-065）；运行时文本块向量写入缺口（J01 待决）仍未补，接上前问答总会拒答。
+## 2026-09-26 G08 发布时补齐文本块向量（Claude，新增任务）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G08 | DONE（待 PR 审查/合并） | 发布时补齐文本块向量（J01 发现的缺口，ArvinHan 2026-09-26 同意新增） | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@a7d8075` | `src/backend/app/services/versions/chunk_vectors.py`、`tests/integration/test_g08.py`；扩围 `src/backend/app/services/versions/publish.py`（P8/P9 各一处）、`specs/teacher-review-publish.md`（P8、P9、V8 各一句）、`docs/architecture.md`（一句）、`docs/decisions.md`（ADR-066） | 红灯：收集错误（模块不存在）；`test_g08.py` 10 passed（真实 Neo4j）；9 处反向篡改，补 1 个用例后全部检出；全量见 `docs/handoffs/claude-g08.md` |
+
+- 依赖：G03、G04、J01、E07。J04 的端到端检索依赖本任务（原子清单 `docs/atomic-tasks.json` 是基线计划，未改）；反向记入 J01/J04 待决：运行时文本块向量只由本任务的发布路径写入，没有发布就没有向量。
+- 验收：发布后版本修订内的全部文本块（包括没有被引用的块）都有节点和当前空间向量，J01 能检索到；已有向量的块不再调用模型；版本外修订的块不处理；向量调用失败时发布在 P8 失败，指针不变；P9 能发现缺向量、维度不对或缺 `revision_id` 的块；嵌入器空间不符时拒绝。
+- **迁移应用顺序（F11 审查 S2，实测可复现）**：`sqlite.py` 拒绝「比已应用版本更旧的迁移」。若某环境先应用了 F11 的 `013_review_dismissals.sql`，之后再引入 F12 的 `012_edit_logs.sql`，012 在该库上**永久无法应用**（需按 `backups/*-before-013.sqlite` 恢复）。本批把 F12（012）与 F11（013）放在同一合入窗口，迁移按版本号顺序 012 → 013 应用；**任何环境不得先单独跑 013**。
+- G08 待决：本任务之前已经提交的版本没有文本块向量，回滚到这些版本时检索结果不全（MVP 阶段没有真实数据）；**补齐途径未闭环**——「重新发布一次即可补齐」已被独立审查证伪（幂等路径跳过 P8；旧修订被新修订取代后永远补不上），需为 G06 或 `scripts/reembed.py` 记「按版本补齐块向量」子命令；首次发布耗时与**尝试租约覆盖**尚未实测（首次发布若超过尝试租约，`reclaim_expired` 会把仍在进行的尝试判失败，而块向量已写一部分）；**跨任务缺口（审查 M3）**：`ensure_vector_indexes` 只在 `scripts/reembed.py` 与测试夹具调用，`main.py` 启动校验与 `apply_migrations`（只接受 `CREATE CONSTRAINT`/`CREATE INDEX`）都不建 `CREATE VECTOR INDEX`，`EXPECTED_SCHEMA` 也不含它 → **P9 绿不等于 J01 可检索**，归 F03/F14 确认。另：P9 只查 `revision_id IS NULL`，非空但错误的值不检出（J01 会静默丢弃该块）；P9 不校验 `document_id`。
