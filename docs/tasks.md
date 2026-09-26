@@ -933,7 +933,7 @@ H13、F03、E06 的前置均已合入 main@`8985a16`（H13：C13、B15、B03、B
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E06 | IN PROGRESS | 实现补漏实体抽取 | ArvinHan（Claude 子代理） | `claude/e06-gleaning` / 本认领提交 | `src/backend/app/services/ai/gleaning.py`、`prompts/extract_entities_gleaning.yaml`、`prompts/MANIFEST.md`（一行）、`tests/backend/test_e06.py`、`docs/handoffs/claude-e06.md` | 待补 |
+| E06 | DONE（待 PR 审查/合并） | 实现补漏实体抽取 | ArvinHan（Claude 子代理） | `claude/e06-gleaning` / 本认领提交 | `src/backend/app/services/ai/gleaning.py`、`prompts/extract_entities_gleaning.yaml`、`prompts/MANIFEST.md`（一行）、`tests/backend/test_e06.py`、`docs/handoffs/claude-e06.md` | `tests/backend/test_e06.py` 61 passed；`tests/backend` 全量 2338 passed；`./scripts/verify.sh` 通过；交接 `docs/handoffs/claude-e06.md` |
 
 - E06 验收：不开启时零调用；只加遗漏、不复制已有实体；预算和轮数有上限。验证：`python3 -m pytest tests/backend/test_e06.py -q`。
 
