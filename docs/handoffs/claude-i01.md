@@ -1,6 +1,7 @@
 # Claude 交接：I01 学习进度仓储
 
-- review_status: ready_for_review
+- review_status: superseded
+- **未采用**：与 `main` 合并时，`main` 已含 Codex 的 I01（PR #272）；三份 I01 文件取 `main` 版本，本交接描述的实现（`9b9231e`，仍在分支历史中）未采用。现行实现见 `docs/handoffs/codex-i01.md`。
 - task_id: I01
 - 分支：`task/i01`（本地，未 push）；base：`ddae1ed`（`main@0b8aa73` + 第九批认领）
 - 状态：DONE（待合入 `claude/upbeat-ramanujan-p4ccbq` 与审查）
