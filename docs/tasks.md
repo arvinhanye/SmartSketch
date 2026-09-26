@@ -1167,3 +1167,20 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：worker 按 A06 §8.1 运行（同机、同 SQLite 卷、`WORKER_PROCESSES` 个进程、启动门禁与 API 相同）；API/worker/web 均有健康检查；密钥只经 `env_file` 进后端三服务；前端 Dockerfile 无构建参数、只 COPY `src/frontend/`，`.dockerignore` 排除 `.env*`。
 - K08 待决：镜像真实构建与整套启动未在本机跑（无 Docker 守护进程），须在有 Docker 的机器上跑 `docker compose --profile app up -d --build` 复验；worker 优雅停止不释放在途任务（ADR-039 第 2 条）；`maintenance` 挂点是否接 G05 清扫留给后续任务；镜像基底未钉摘要。
+
+## 2026-09-26 第九批并行：F10→F09、I01、J02、H06、H05、H08、K10（Claude）
+
+基线 `main@0b8aa73`；分支 `claude/upbeat-ramanujan-p4ccbq`（各任务在本地子分支开发后合入本分支）。J01 在 PR #271 进行中，不在本批。ADR 号预分配避免冲突：F10 = ADR-047、F09 = ADR-048、I01 = ADR-049、J02 = ADR-050、H06 = ADR-051、H05 = ADR-052、H08 = ADR-053、K10 = ADR-054（不需要 ADR 的任务空号）。SQLite 迁移号：I01 = `011_progress.sql`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| F10 | IN PROGRESS | 实现节点合并与重接边 | ArvinHan（Claude） | `src/backend/app/services/graph/merge_nodes.py`、`tests/integration/test_f10.py`；与 F09 同一执行者顺序修改 `src/backend/app/repositories/graph_edit.py`、`src/backend/app/api/graph_nodes.py` | — |
+| F09 | IN PROGRESS（F10 之后） | 实现节点删除与关系清理 | ArvinHan（Claude） | `src/backend/app/services/graph/delete_node.py`、`tests/integration/test_f09.py`；共享文件同上 | — |
+| I01 | IN PROGRESS | 实现学习进度仓储 | ArvinHan（Claude） | `src/backend/app/repositories/progress.py`、`src/backend/migrations/011_progress.sql`、`tests/backend/test_i01.py` | — |
+| J02 | IN PROGRESS | 实现图结构检索 | ArvinHan（Claude） | `src/backend/app/repositories/graph_search.py`、`tests/integration/test_j02.py` | — |
+| H06 | IN PROGRESS | 实现知识点详情和来源浏览 | ArvinHan（Claude） | `src/frontend/src/components/KnowledgeDetail.vue`、`src/frontend/src/composables/useKnowledgeDetail.ts`、`tests/frontend/h06.test.ts` | — |
+| H05 | IN PROGRESS | 实现图搜索筛选与布局切换 | ArvinHan（Claude） | `src/frontend/src/composables/useGraphFilters.ts`、`src/frontend/src/components/GraphToolbar.vue`、`tests/frontend/h05.test.ts` | — |
+| H08 | IN PROGRESS | 实现教师连边编辑交互 | ArvinHan（Claude） | `src/frontend/src/components/RelationEditor.vue`、`src/frontend/src/composables/useRelationEditor.ts`、`tests/frontend/h08.test.ts` | — |
+| K10 | IN PROGRESS | 建立备份和恢复演练 | ArvinHan（Claude） | `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py` | — |
+
+- 共享文件（`docs/decisions.md`、`docs/architecture.md`、`src/contracts/`、`src/frontend/src/api/`、`src/frontend/src/router/`）的扩围改动由各执行者在交接中列明，合入本分支时由协调者解决冲突。
