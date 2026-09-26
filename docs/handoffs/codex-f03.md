@@ -1,6 +1,10 @@
 # F03 图约束、索引与空间写入边界交接
 
-- 任务：F03；负责人：Codex（后端）；状态：完成实现并经一次性 Neo4j 5.26 容器验证。
+- task_id: F03
+- review_status: ready_for_review
+- target_pr: https://github.com/arvinhanye/SmartSketch/pull/246
+- next_action: Claude 审查 PR #246；重点核对 schema 重放、空间写入上下文与 F06/F14 交界；不在本分支并行修改相同文件。
+- 任务：F03；负责人：Codex（后端）；状态：完成实现并经一次性 Neo4j 5.26 容器验证，PR 已推送待审查。
 - 起点：`main@ddbeb82`；开始时工作区无未提交变更。PR 提交前已重基到 `origin/main@8985a16` 并复验。
 
 ## 交付与决定

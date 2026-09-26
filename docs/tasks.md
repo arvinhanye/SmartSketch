@@ -4,7 +4,7 @@
 
 | ID | 状态 | 任务 | 负责人 | 文件范围 | 验收 |
 | --- | --- | --- | --- | --- | --- |
-| F03 | DONE（真实 Neo4j 已复验） | 建立图唯一约束和索引迁移 | Codex（后端） | `src/backend/migrations/neo4j/001_constraints.cypher`、`src/backend/app/repositories/graph_migrations.py`、`tests/integration/test_f03.py`、本节及相关规格/架构/交接 | F03 15 passed（一次性 Neo4j 5.26，含审查修复）；最新 main 基线后端 2277 passed；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；交接 `docs/handoffs/codex-f03.md` |
+| F03 | IN REVIEW（PR #246，交接 Claude） | 建立图唯一约束和索引迁移 | Codex（后端） | `src/backend/migrations/neo4j/001_constraints.cypher`、`src/backend/app/repositories/graph_migrations.py`、`tests/integration/test_f03.py`、本节及相关规格/架构/交接 | [PR #246](https://github.com/arvinhanye/SmartSketch/pull/246)；F03 15 passed（一次性 Neo4j 5.26，含审查修复）；最新 main 基线后端 2277 passed；`./scripts/verify.sh` exit 0；`git diff --check` exit 0；交接 `docs/handoffs/codex-f03.md` |
 
 - 输入：F02 Neo4j 驱动、B11/ADR-012 图模型、E07 `EmbeddedVector`；输出：可重跑的 schema 迁移与带空间标识的向量写入边界。
 - 依赖：F02、B11 已在当前 `main`。风险：Neo4j DDL 非整体事务；失败后保留已建对象，修复数据或环境后重跑。
