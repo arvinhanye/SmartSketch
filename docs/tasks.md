@@ -999,4 +999,5 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | --- | --- | --- | --- | --- | --- |
 | E10 | DONE（待 PR 审查/合并） | Codex | `codex/e10-fusion-design` / `main@5072a48` | `src/backend/app/services/fusion/judge.py`、`prompts/judge_duplicate.yaml`、`prompts/summarize_definition.yaml`、`prompts/MANIFEST.md`、`tests/backend/test_e10.py`、`specs/course-knowledge-graph.md`、`specs/task-processing.md`、`docs/decisions.md`、`docs/handoffs/codex-e10.md`、设计与计划文件 | E10+邻接测试 468 passed；后端全量 2681 passed、1 个既有 warning（本机回环测试以获准运行方式复跑）；`./scripts/verify.sh` 通过；`git diff --check` 通过。独立审查指出的缓存键与提示词标签问题均已修正。 |
 
+- E10 审查修正（Claude，2026-09-26）：归并提示词带两侧名称、`FusionJudge` 可选 `timeout_seconds`、ADR-017 空行与计划文件 skill 引用；`test_e10.py` 28 passed，后端全量 2683 passed，`verify.sh` 通过；交接 `docs/handoffs/claude-e10-review-fixes.md`。
 - **输入**：同课候选对、两侧名称/定义与可定位证据；**输出**：带理由、来源引用、模型/提示词元数据的归并提案或独立待审核结果；**依赖**：E09、E04、E01、E05。**风险**：D-08 阈值未签收；E08/E09 合流与稳定候选 ID 由 E12 定；模型引用能验证来源存在，不能自动证明归并语义正确。后两项及缓存失效规则见 E10 设计规格。

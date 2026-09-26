@@ -229,3 +229,18 @@ def test_inputs_unchanged_after_success_and_failure() -> None:
     _evaluate(_judgment(), _summary())
     _evaluate(_judgment(), "{bad", "{bad")
     assert before == (repr(left), repr(right), left, right)
+
+
+def test_summary_prompt_carries_both_names() -> None:
+    client, result = _evaluate(_judgment(), _summary())
+    assert result.status is FusionStatus.PROPOSAL
+    summary_text = client.calls[1].request.messages[0].content
+    assert '"name":"栈"' in summary_text and '"name":"堆栈"' in summary_text
+
+
+def test_timeout_seconds_reaches_every_request() -> None:
+    client = FakeModelClient()
+    client.script(_judgment(1), _judgment(), _summary())
+    left, right = _pair()
+    FusionJudge(client, model="fake-model", max_output_tokens=4096, timeout_seconds=12.5).evaluate_pair(left, right)
+    assert [call.request.timeout_seconds for call in client.calls] == [12.5, 12.5, 12.5]

@@ -129,7 +129,15 @@ def validate_pair(left: FusionEntity, right: FusionEntity) -> None:
 
 
 class FusionJudge:
-    def __init__(self, client: ModelClient, *, model: str, max_output_tokens: int, prompts: PromptLibrary | None = None) -> None:
+    def __init__(
+        self,
+        client: ModelClient,
+        *,
+        model: str,
+        max_output_tokens: int,
+        prompts: PromptLibrary | None = None,
+        timeout_seconds: float | None = None,
+    ) -> None:
         if not isinstance(client, ModelClient):
             raise TypeError("client must implement ModelClient")
         if not isinstance(model, str) or not model.strip():
@@ -140,6 +148,7 @@ class FusionJudge:
         self._model = model
         self._max_output_tokens = max_output_tokens
         self._prompts = prompts or PromptLibrary()
+        self._timeout_seconds = timeout_seconds
 
     def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:
         return ModelRequest(
@@ -148,6 +157,7 @@ class FusionJudge:
             messages=messages,
             max_output_tokens=self._max_output_tokens,
             response_format="json",
+            timeout_seconds=self._timeout_seconds,
         )
 
     def _call_and_parse(
@@ -232,11 +242,12 @@ class FusionJudge:
             ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         )
         definitions = json.dumps(
-            [{"side": "left", "definition": left.definition},
-             {"side": "right", "definition": right.definition}],
+            [{"side": "left", "name": left.name, "definition": left.definition},
+             {"side": "right", "name": right.name, "definition": right.definition}],
             ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         )
-        rendered = template.render({"name": left.name, "definitions": definitions, "sources": sources})
+        name = left.name if left.name == right.name else f"{left.name} / {right.name}"
+        rendered = template.render({"name": name, "definitions": definitions, "sources": sources})
         messages = (Message("user", rendered.text),)
         left_ids = {item.source_id for item in left.evidence}
         right_ids = {item.source_id for item in right.evidence}
