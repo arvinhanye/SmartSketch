@@ -1112,7 +1112,8 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| K13 | IN PROGRESS（代码与 fake 测试完成，待本机真实模型运行） | 实现抽取消融实验 | ArvinHan（Claude） | `claude/project-thread-yswyz2` / `main@a44c680` | `evaluation/ablation.py`、`evaluation/reports/ablation.md`、`tests/backend/test_k13.py`；扩围 `evaluation/prompts/extract_joint.yaml`、`evaluation/README.md`（目录）、`docs/decisions.md`（ADR-045）、`docs/integrations.md`（D-02d 备注） | `test_k13.py` 22 passed；5 处反向篡改均检出；K02/E01 回归通过；`docs/handoffs/claude-k13.md`；#166 |
+| K13 | DONE（真实模型三组已跑，自动比对；人工判定未做） | 实现抽取消融实验 | ArvinHan（Claude） | `claude/project-thread-yswyz2` / `main@a44c680` | `evaluation/ablation.py`、`evaluation/reports/ablation.md`、`tests/backend/test_k13.py`；扩围 `evaluation/prompts/extract_joint.yaml`、`evaluation/README.md`（目录）、`docs/decisions.md`（ADR-045）、`docs/integrations.md`（D-02d 备注） | `test_k13.py` 22 passed；5 处反向篡改均检出；K02/E01 回归通过；`docs/handoffs/claude-k13.md`；#166 |
 
 - 验收：同一标注集、同一模型、同一计分口径记录三组结果、成本与版本；空样本标「空样本」，失败组与未运行组保留行并写明原因；fake 结果一律标「假模型」且不给达标判定。
-- 待办：ArvinHan 在本机按 `evaluation/reports/ablation.md`「本机运行步骤」跑一次真实模型，把 `ablation.md` 输出贴回报告第 4 节；结论只对简化融合成立，完整融合接入后需重跑。
+- 实测（ArvinHan 本机，2026-09-26）：三组全部 ok，合计计费 331155 token。实体召回：单阶段 0.9111、两阶段 0.7556、补漏 0.8222；关系召回：0.4250、0.2000、0.1750；调用次数 17、33、54。详见报告第 4 节。
+- 待决：结论只对简化融合、每组单次运行成立；完整融合接入后建议每组至少跑两次并做人工判定，再定生产配置。生产维持两阶段、补漏默认关闭。
