@@ -1116,3 +1116,17 @@
 - **后果**：发布服务可被路由或命令行直接调用；学生读取在 G07 前仍需调用方自行解析版本。持锁区间只含 SQLite 与 Neo4j 读取，不含模型调用。
 - **回滚**：撤销 `services/versions/publish.py`，以及 `repositories/versions.py` 末尾的 `DraftState`/`read_draft_state`/`complete_published_tasks`、`course_locks.current_holder`、F07 节点投影中的 `.merged_from`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-037：G07 统一发布版本解析器
+
+- **日期**：2026-09-26
+- **背景**：V8 规定学生请求（图谱、推荐、问答）在请求开始时只读一次发布指针，得到 `(version_id, version)` 与该版本的修订列表，实现集中在 G07。未定的是：从未发布与 `?version=n` 同时出现时先判哪个；指针与版本行怎样读才一致；修订列表从哪来、怎样缓存；指针或已提交版本损坏时怎么报。
+- **决定**：
+  1. 入口为 `services/versions/resolver.py` 的 `resolve_published(sqlite_url, course_id, *, version=None) -> PublishedVersion`。结果不可变：`course_id`、`version_id`、`version`、`revision_ids`（`frozenset`），并提供 `graph_version`、`graph_scope()`（`GraphScope(course_id, version_id)`，不带 V）与 `covers_revision(revision_id)`。调用方每个请求只调一次，此后不再读指针。
+  2. 判定顺序：课程不存在 → 404 `NOT_FOUND`；指针为 NULL → 404 `GRAPH_NOT_PUBLISHED`（即使带了 `version`）；`version` 不是本课程已提交版本号（含 0、负数、他课、未提交、失败）→ 404 `NOT_FOUND`。`version` 不是 `int`（含 `bool`）→ `TypeError`，参数校验归路由。
+  3. 指针与版本行用同一条 SQL 读出（`courses LEFT JOIN graph_versions`），二者来自同一时刻。
+  4. 修订列表取自该版本快照的 `revisions`，读时复核摘要、按 G01 `load_snapshot` 校验规范形态与课程归属。已提交版本不可变（G02 触发器），修订列表按 `(sqlite_url, version_id)` 缓存（LRU 256 条）；指针从不缓存。课程归属在读缓存之前按版本行判断。
+  5. 指针指向非提交行、他课行、`published_version` 与行号不符、快照缺失、摘要不符、快照不可解析或属于他课 → `VersionIntegrityError`（`code = INTERNAL_ERROR`，细节只进日志），**不回退到草稿或其他版本**（V9 第 5 条）；错误不进缓存。
+- **后果**：F07、推荐（I 组）、问答（J 组）接入时用同一个结果对象；F07 现有 `resolve_target` 仍直接读访问层带来的课程行，改为调用本解析器（并补上历史版本读取 PUB-14）不在 G07 文件范围内，列入待决。
+- **回滚**：撤销 `services/versions/resolver.py` 与 `tests/backend/test_g07.py`；无数据迁移，无调用方。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 按 V8 选定并在交接中报告）。
