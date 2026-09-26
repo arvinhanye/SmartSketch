@@ -39,6 +39,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 测试（B02）：`src/frontend/vitest.config.ts` 继承 `vite.config.ts`，收集仓库外层 `tests/frontend/**/*.test.ts`（jsdom 环境，排除点开头目录，零用例即失败）；测试文件中的裸模块从 `src/frontend/node_modules` 解析。类型检查拆为应用（`tsconfig.json`，浏览器类型）与 Node 侧（`tsconfig.node.json`：构建/测试配置与 `tests/frontend`），应用代码不可见 Node 类型。
 - 路由（B03）：`src/frontend/src/router/index.ts` 的 `createAppRouter({ history, getAccountRole })` 按账号类型（`users.role`）把 `/` 引到 `/teacher` 或 `/student`；错角色或未登录时回到对应页面并经 `query.notice` 由 `App.vue` 显示 `role="alert"` 提示。守卫只是界面引导，授权以后端为准（`specs/identity-access.md` §2.4）。账号类型由调用方注入；登录与会话存储由 H13 接入（D-09），在此之前入口恒为未登录。
 - 课程上下文（B04）：`src/frontend/src/stores/course.ts` 的 `useCourseStore` 持有当前课程与课程内图谱（`GraphExchange`）、问答历史（`ChatTurn[]`）。切课即清空并中止旧 `AbortController`；composables 先 `beginRequest()` 取作用域，把 `scope.signal` 交给 HTTP 客户端，再经 `setGraph` / `appendChatTurns` / `commit` 提交，作用域按代次失效，晚到响应被丢弃。store 与组件都不直接发请求。
+- 图谱画布（H03/H04）：`graph/adapter.ts` 把 `GraphExchange` 转为独立的 G6 数据；`graph/lifecycle.ts` 的 `createGraphLifecycle` 负责建图、串行更新、resize 与销毁，G6（`@antv/g6`，版本精确锁定）经工厂按需加载，工厂可由 `GRAPH_FACTORY_KEY` 注入替换；`components/GraphCanvas.vue` 只接收适配图并发出 `nodeClick(kpId)`，不发请求（ADR-040）。
 
 ## 后端启动与健康检查（B05）
 
