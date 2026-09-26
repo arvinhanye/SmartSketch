@@ -997,6 +997,6 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 负责人 | 分支 / base | 范围与文件所有权 | 验收与证据 |
 | --- | --- | --- | --- | --- | --- |
-| E10 | PLAN（设计规格已签收，实施计划待审） | Codex | `codex/e10-fusion-design` / `main@5072a48` | `docs/superpowers/specs/2026-09-26-e10-fusion-judge-design.md`、`docs/superpowers/plans/2026-09-26-e10-fusion-judge.md`；实施阶段拟改 `src/backend/app/services/fusion/judge.py`、`prompts/judge_duplicate.yaml`、`prompts/summarize_definition.yaml`、`prompts/MANIFEST.md`、`tests/backend/test_e10.py`、相关规格与交接。此阶段不改产品代码 | 设计已确认：E10 不内置 D-08 阈值，只裁决调用方给定的候选对；坏输出、非同义或预算拒绝保留独立并送审。待实施计划审阅及执行方式选择后，运行 `python3 -m pytest tests/backend/test_e10.py -q`、相关回归、`./scripts/verify.sh`、`git diff --check`。 |
+| E10 | DONE（待 PR 审查/合并） | Codex | `codex/e10-fusion-design` / `main@5072a48` | `src/backend/app/services/fusion/judge.py`、`prompts/judge_duplicate.yaml`、`prompts/summarize_definition.yaml`、`prompts/MANIFEST.md`、`tests/backend/test_e10.py`、`specs/course-knowledge-graph.md`、`specs/task-processing.md`、`docs/decisions.md`、`docs/handoffs/codex-e10.md`、设计与计划文件 | E10+邻接测试 468 passed；后端全量 2681 passed、1 个既有 warning（本机回环测试以获准运行方式复跑）；`./scripts/verify.sh` 通过；`git diff --check` 通过。独立审查指出的缓存键与提示词标签问题均已修正。 |
 
 - **输入**：同课候选对、两侧名称/定义与可定位证据；**输出**：带理由、来源引用、模型/提示词元数据的归并提案或独立待审核结果；**依赖**：E09、E04、E01、E05。**风险**：D-08 阈值未签收；E08/E09 合流与稳定候选 ID 由 E12 定；模型引用能验证来源存在，不能自动证明归并语义正确。后两项及缓存失效规则见 E10 设计规格。

@@ -93,7 +93,7 @@ class FusionEvidence:
 class FusionEntity:
     entity_id: str
     course_id: str
-    name: str
+    name: str = field(repr=False)
     type: str
     definition: str = field(repr=False)
     evidence: tuple[FusionEvidence, ...] = ()
@@ -232,8 +232,8 @@ class FusionJudge:
             ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         )
         definitions = json.dumps(
-            [{"source_id": "left", "definition": left.definition},
-             {"source_id": "right", "definition": right.definition}],
+            [{"side": "left", "definition": left.definition},
+             {"side": "right", "definition": right.definition}],
             ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         )
         rendered = template.render({"name": left.name, "definitions": definitions, "sources": sources})

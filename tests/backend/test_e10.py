@@ -63,6 +63,7 @@ def test_sensitive_fields_not_in_repr() -> None:
     assert "栈是后进先出的线性表" not in repr(left)
     assert "后进先出" not in repr(left)
     assert "堆栈遵循后进先出" not in repr(right.evidence[0])
+    assert "堆栈" not in repr(right)
 
 
 def _judgment(same: object = True, reason: str = "含义相同", refs: list[str] | None = None) -> str:
@@ -166,6 +167,8 @@ def test_evaluate_same_proposes_definition_with_both_sources() -> None:
     assert [p.version for p in result.prompt_uses] == [2, 2]
     summary_text = client.calls[1].request.messages[0].content
     assert '"side":"left"' in summary_text and '"side":"right"' in summary_text
+    assert '"source_id":"left"' not in summary_text
+    assert '"source_id":"right"' not in summary_text
 
 
 def test_evaluate_false_makes_one_call_and_reviews() -> None:
