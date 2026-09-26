@@ -173,3 +173,122 @@ def find_task_course_id(sqlite_url: str, task_id: str) -> str | None:
             "SELECT course_id FROM processing_tasks WHERE id = ?", (task_id,)
         ).fetchone()
     return row[0] if row else None
+
+
+# --- task read model (TD-02: moved from services/task_cancel.py, services/task_events.py and
+# workers/parse_task.py; SQL and column lists unchanged) ------------------------------------------
+
+_NOW_TEXT = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
+_SNAPSHOT_COLUMNS = (
+    "id, course_id, document_id, stage, progress, cancel_requested, created_at, updated_at, "
+    "error_code, error_message, error_details"
+)
+
+
+@dataclass(frozen=True)
+class TaskSnapshotRow:
+    """One ``processing_tasks`` row as the contract ``Task`` snapshot needs it.
+
+    ``error_details_json`` stays the stored JSON text: turning the ``error_*`` columns into a
+    ``TaskError`` is the service layer's single mapping (``services.task_cancel.snapshot_from_row``),
+    because this layer must not depend on ``app.services``.
+    """
+
+    id: str
+    course_id: str
+    document_id: str
+    stage: str
+    progress: float
+    cancel_requested: bool
+    created_at: str
+    updated_at: str
+    error_code: str | None
+    error_message: str | None
+    error_details_json: str | None
+
+
+@dataclass(frozen=True)
+class LeasedTaskRow:
+    """The fields a worker needs from the row its lease token still owns."""
+
+    course_id: str
+    document_id: str
+    stage: str
+    progress: float
+    cancel_requested: bool
+
+
+def _snapshot_row(row: tuple[object, ...]) -> TaskSnapshotRow:
+    return TaskSnapshotRow(
+        id=row[0],
+        course_id=row[1],
+        document_id=row[2],
+        stage=row[3],
+        progress=float(row[4]),
+        cancel_requested=bool(row[5]),
+        created_at=row[6],
+        updated_at=row[7],
+        error_code=row[8],
+        error_message=row[9],
+        error_details_json=row[10],
+    )
+
+
+def read_task_snapshot(
+    database: sqlite3.Connection, task_id: str, *, course_id: str
+) -> TaskSnapshotRow | None:
+    """Read the task row on the caller's connection (and transaction), constrained to its course."""
+    row = database.execute(
+        f"SELECT {_SNAPSHOT_COLUMNS} FROM processing_tasks WHERE id = ? AND course_id = ?",
+        (task_id, course_id),
+    ).fetchone()
+    return _snapshot_row(row) if row else None
+
+
+def get_task_snapshot(
+    sqlite_url: str, task_id: str, *, course_id: str
+) -> TaskSnapshotRow | None:
+    """``read_task_snapshot`` on a fresh connection (C11 snapshot and SSE polling)."""
+    with connect(sqlite_url) as database:
+        return read_task_snapshot(database, task_id, course_id=course_id)
+
+
+def mark_cancel_requested(
+    database: sqlite3.Connection,
+    *,
+    task_id: str,
+    course_id: str,
+    expected_stage: str,
+    target_stage: str,
+) -> bool:
+    """C10 compare-and-swap on the caller's ``BEGIN IMMEDIATE`` transaction.
+
+    Sets ``cancel_requested`` and moves to ``target_stage`` only while the row, in its course,
+    still holds ``expected_stage`` with the flag clear and a cancellable stage. ``True`` iff one
+    row was written.
+    """
+    return database.execute(
+        f"""UPDATE processing_tasks
+            SET stage = ?, cancel_requested = 1, updated_at = {_NOW_TEXT}
+            WHERE id = ? AND course_id = ? AND stage = ? AND cancel_requested = 0
+              AND stage IN ('queued', 'parsing', 'extracting', 'merging')""",
+        (target_stage, task_id, course_id, expected_stage),
+    ).rowcount == 1
+
+
+def read_leased_task(
+    database: sqlite3.Connection, task_id: str, lease_token: str
+) -> LeasedTaskRow | None:
+    """D11: read the row only while ``lease_token`` still owns it; ``None`` means the lease is lost.
+
+    The filter is the lease token (unique per claim), not ``course_id``: the worker compares the
+    returned course and material with its lease and treats a mismatch as a caller defect.
+    """
+    row = database.execute(
+        """SELECT course_id, document_id, stage, progress, cancel_requested
+           FROM processing_tasks WHERE id = ? AND lease_token = ?""",
+        (task_id, lease_token),
+    ).fetchone()
+    if row is None:
+        return None
+    return LeasedTaskRow(row[0], row[1], row[2], float(row[3]), bool(row[4]))

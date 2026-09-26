@@ -989,6 +989,6 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| TD-02 | IN PROGRESS | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | ArvinHan（Claude 子代理） | `claude/td02-task-repo` / 本认领提交 | `src/backend/app/repositories/tasks.py`、`src/backend/app/services/task_cancel.py`、`src/backend/app/services/task_events.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_td02.py`、`docs/handoffs/claude-td-02.md` | 待补 |
+| TD-02 | DONE（待 PR 审查/合并） | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | ArvinHan（Claude 子代理） | `claude/td02-task-repo` / 本认领提交 | `src/backend/app/repositories/tasks.py`、`src/backend/app/services/task_cancel.py`、`src/backend/app/services/task_events.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_td02.py`、`docs/handoffs/claude-td-02.md` | `test_td02.py` 14 passed；C10/C11/D11 搬迁前后均 121 passed（断言未改）；后端全量 2535 passed；`verify.sh` 通过；交接 `docs/handoffs/claude-td-02.md` |
 
 - TD-02 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL；C10/C11/D11 现有测试不改断言即通过。

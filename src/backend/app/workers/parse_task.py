@@ -46,6 +46,7 @@ from app.config import Settings
 from app.repositories.chunks import put_chunks, record_revision
 from app.repositories.materials import get_material
 from app.repositories.sqlite import connect
+from app.repositories.tasks import read_leased_task
 from app.repositories.task_leases import (
     Lease,
     LeaseLost,
@@ -178,14 +179,10 @@ def _read_bytes(storage: FileStorage, storage_name: str) -> bytes:
 
 
 def _leased_row(database: sqlite3.Connection, lease: Lease) -> _LeasedRow | None:
-    row = database.execute(
-        """SELECT course_id, document_id, stage, progress, cancel_requested
-           FROM processing_tasks WHERE id = ? AND lease_token = ?""",
-        (lease.task_id, lease.token),
-    ).fetchone()
+    row = read_leased_task(database, lease.task_id, lease.token)
     if row is None:
         return None
-    return _LeasedRow(row[0], row[1], TaskState(row[2], float(row[3]), bool(row[4])))
+    return _LeasedRow(row.course_id, row.document_id, TaskState(row.stage, row.progress, row.cancel_requested))
 
 
 def _read_leased_task(sqlite_url: str, lease: Lease) -> _LeasedRow | None:
