@@ -36,6 +36,15 @@ as the estimate) and does not touch the breaker.
 
 Duration bound of one non-streaming call (A07): ``max_call_duration_seconds``.
 
+Deadline (grounded-qa「链路时限」: no call or retry may outlast the remaining time):
+``bind(attribution, deadline=...)`` takes an absolute time on the policy clock. Every
+physical request then gets ``timeout_seconds = min(request timeout, remaining)`` (a request
+without its own timeout gets the remaining time, replacing the adapter default); a backoff
+that would reach the deadline is skipped and the call moves on (to the fallback, if any);
+with no time left no row is written and no request is sent. Any call cut short this way
+raises ``CallDeadlineExceededError`` (``LLM_UNAVAILABLE``, ``reason = "timeout"``, O9).
+Workers bind without a deadline and keep the plain behaviour above.
+
 Nothing here logs prompt text, model output, keys or response bodies: log lines carry the
 ``call_id``, role, model ID, error class and HTTP status only.
 """
@@ -261,6 +270,20 @@ class CallRecordError(PolicyError):
         super().__init__("model_calls pre-write failed; no model request sent")
 
 
+class CallDeadlineExceededError(PolicyError):
+    """The caller's deadline left no time for another attempt (grounded-qa O9).
+
+    Raised before any request that could not start in time, or after a failed attempt whose
+    retry the deadline cut short; the last provider error (if any) is the ``__cause__``.
+    """
+
+    code = "LLM_UNAVAILABLE"
+    reason = "timeout"
+
+    def __init__(self) -> None:
+        super().__init__("call deadline reached; no further model request sent")
+
+
 class ModelUnavailableError(PolicyError):
     """Every provider usable for this request has an open breaker (A07 matrix)."""
 
@@ -423,10 +446,13 @@ class ModelCallPolicy:
         """False when every provider usable for ``model`` (default: any) has an open breaker."""
         return any(provider.breaker.available() for provider, _ in self._candidates(model))
 
-    def bind(self, attribution: CallAttribution) -> BoundModelClient:
+    def bind(self, attribution: CallAttribution, *, deadline: float | None = None) -> BoundModelClient:
+        """Client for one caller context; ``deadline`` is an absolute time on the policy clock."""
         if not isinstance(attribution, CallAttribution):
             raise TypeError("attribution must be a CallAttribution")
-        return BoundModelClient(self, attribution)
+        if deadline is not None and not _is_seconds(deadline):
+            raise ValueError("deadline must be a finite number or None")
+        return BoundModelClient(self, attribution, deadline)
 
     # -- internals
 
@@ -481,6 +507,20 @@ class ModelCallPolicy:
             # The row stays ``sent`` and is billed as the estimate (「调用记录」第 3 条).
             logger.error("model_calls write-back failed (%s) call_id=%s", type(error).__name__, call_id)
 
+    def _remaining(self, bound: BoundModelClient) -> float | None:
+        return None if bound.deadline is None else bound.deadline - self._clock()
+
+    def _bounded(self, bound: BoundModelClient, request: ModelRequest, last: BaseException | None) -> ModelRequest:
+        """``request`` with its timeout capped by the remaining time; raises when none is left."""
+        remaining = self._remaining(bound)
+        if remaining is None:
+            return request
+        if remaining <= 0:
+            raise CallDeadlineExceededError() from last
+        if request.timeout_seconds is not None and request.timeout_seconds <= remaining:
+            return request
+        return replace(request, timeout_seconds=remaining)
+
     def _latency_ms(self, started: float) -> int:
         return max(0, round((self._clock() - started) * 1000))
 
@@ -528,20 +568,22 @@ class ModelCallPolicy:
 
     def _complete(self, bound: BoundModelClient, request: ModelRequest) -> ModelResult:
         last: BaseException | None = None
+        cut = False
         for provider, model in self._candidates(request.model):
             assert model is not None
             call_request = request if model == request.model else replace(request, model=model)
             for retry in range(self.max_retries + 1):
+                attempt_request = self._bounded(bound, call_request, last)
                 if not provider.breaker.acquire():
                     break
                 try:
-                    call_id = self._prewrite(bound, provider, call_request)
+                    call_id = self._prewrite(bound, provider, attempt_request)
                 except BaseException:
                     provider.breaker.release()
                     raise
                 started = self._clock()
                 try:
-                    result = provider.client.complete(call_request)
+                    result = provider.client.complete(attempt_request)
                 except ModelCallError as error:
                     self._finish_error(call_id, error, started)
                     self._log_failure(call_id, provider, model, error)
@@ -554,7 +596,12 @@ class ModelCallPolicy:
                     # breaker moves the call to the fallback without waiting.
                     if retry < self.max_retries and provider.breaker.available():
                         retry_after = error.retry_after_seconds if isinstance(error, ModelRateLimitedError) else None
-                        self._sleep(self.backoff.delay(retry, retry_after, self._random()))
+                        delay = self.backoff.delay(retry, retry_after, self._random())
+                        remaining = self._remaining(bound)
+                        if remaining is not None and delay >= remaining:
+                            cut = True  # waiting would reach the deadline: no further try here
+                            break
+                        self._sleep(delay)
                     continue
                 except BaseException as error:
                     self._finish_error(call_id, error, started)
@@ -564,6 +611,8 @@ class ModelCallPolicy:
                 provider.breaker.record_success()
                 self._finish_ok(call_id, result, started)
                 return result
+        if cut:
+            raise CallDeadlineExceededError() from last
         raise self._unavailable(request.model, last)
 
     # -- stream
@@ -572,7 +621,8 @@ class ModelCallPolicy:
         last: BaseException | None = None
         for provider, model in self._candidates(request.model):
             assert model is not None
-            call_request = request if model == request.model else replace(request, model=model)
+            call_request = self._bounded(
+                bound, request if model == request.model else replace(request, model=model), last)
             if not provider.breaker.acquire():
                 continue
             try:
@@ -622,9 +672,10 @@ class ModelCallPolicy:
 class BoundModelClient:
     """``ModelClient`` for one caller context; numbers its physical calls 1, 2, 3 … (``call_seq``)."""
 
-    def __init__(self, policy: ModelCallPolicy, attribution: CallAttribution) -> None:
+    def __init__(self, policy: ModelCallPolicy, attribution: CallAttribution, deadline: float | None = None) -> None:
         self._policy = policy
         self.attribution = attribution
+        self.deadline = deadline
         self._seq_lock = threading.Lock()
         self._seq = 0
 
@@ -656,6 +707,7 @@ __all__ = [
     "BoundModelClient",
     "BudgetExceededError",
     "CallAttribution",
+    "CallDeadlineExceededError",
     "CallRecordError",
     "CallStore",
     "CircuitBreaker",

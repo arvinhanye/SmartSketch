@@ -117,7 +117,8 @@ def test_revision_id_changes_with_each_component(other):
 
 def test_revision_components_cannot_be_shifted_across_field_boundaries():
     # 编码必须区分字段边界：拼接相同但分段不同的输入不得同 ID。
-    assert derive_revision_id("a|b", HASH_A, f"c+{CHUNK_V}") != derive_revision_id("a", HASH_A, f"b|c+{CHUNK_V}")
+    shifted = derive_revision_id("doc", HASH_A, f"x/1,y/1+{CHUNK_V}")
+    assert derive_revision_id("doc,x/1", HASH_A, f"y/1+{CHUNK_V}") != shifted
 
 
 def test_revision_id_is_stable_across_processes():
@@ -216,6 +217,52 @@ def test_revision_parser_version_format():
 def test_revision_parser_version_rejects_bad_parser_segment(parser_version):
     with pytest.raises(ChunkIdentityError, match="parser_version"):
         revision_parser_version(parser_version, CHUNK_V)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "parser_version",
+    [
+        "pdf/1+headings/1",  # D06 修订前的写法：内部 "+" 与复合版本分隔符冲突
+        "pdf/1,",
+        ",pdf/1",
+        "pdf/1,,headings/1",
+        "pdf/1, headings/1",
+        "pdf/1;headings/1",
+        "PDF/1",
+        "pdf",
+        "pdf/",
+        "/1",
+        "pdf/0",
+        "pdf/01",
+        "pdf/1.0",
+        "pdf/1/2",
+        "pdf/１",
+        "pdf/1@x",
+    ],
+)
+def test_revision_parser_version_rejects_malformed_step_list(parser_version):
+    # ADR-018 修订 1：解析器段 = <名称>/<版本> 用 "," 连接，名称小写、版本为无前导零正整数。
+    with pytest.raises(ChunkIdentityError, match="parser_version"):
+        revision_parser_version(parser_version, CHUNK_V)
+    with pytest.raises(ChunkIdentityError, match="parser_version"):
+        derive_revision_id("doc-1", HASH_A, f"{parser_version}+{CHUNK_V}")
+
+
+@pytest.mark.parametrize("parser_version", ["pdf/1,cleanup/1,headings/1", "pdf/1,headings/1", "x/1", "a_b-c/12"])
+def test_revision_parser_version_accepts_step_list(parser_version):
+    pv = revision_parser_version(parser_version, CHUNK_V)
+    assert pv == f"{parser_version}+{CHUNK_V}"
+    assert derive_revision_id("doc-1", HASH_A, pv) == _expected_revision_id("doc-1", HASH_A, pv)
+
+
+def test_every_parser_module_version_composes():
+    # 各解析器模块的 PARSER_VERSION 都必须能直接进入修订键，避免再出现 D06 的 "+" 冲突。
+    from app.services.parsers import docx, markdown, pdf, pdf_headings, txt
+
+    versions = [docx.PARSER_VERSION, markdown.PARSER_VERSION, pdf.PARSER_VERSION, txt.PARSER_VERSION,
+                pdf_headings.PARSER_VERSION, pdf_headings.CLEANED_PARSER_VERSION]
+    for version in versions:
+        derive_revision_id("doc-1", HASH_A, revision_parser_version(version, chunking_version()))
 
 
 @pytest.mark.parametrize(
