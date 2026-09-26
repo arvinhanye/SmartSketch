@@ -1,7 +1,7 @@
 # F03 图约束、索引与空间写入边界交接
 
 - 任务：F03；负责人：Codex（后端）；状态：完成实现并经一次性 Neo4j 5.26 容器验证。
-- 基线：`main@ddbeb82`；开始时工作区无未提交变更。
+- 起点：`main@ddbeb82`；开始时工作区无未提交变更。PR 提交前已重基到 `origin/main@8985a16` 并复验。
 
 ## 交付与决定
 
@@ -15,7 +15,7 @@
 - 红灯：新测试首次因 `app.repositories.graph_migrations` 缺失而收集失败；新增 SQLite/CLI 测试分别因符号缺失而失败；连接关闭脱敏与缺失 SQLite 文件测试各先 1 failed。安装项目依赖后，真实 Neo4j 测试首次以向量索引 DDL 少一个 `}` 失败；新增语句大括号结构测试先红后修复。独立审查指出同名异构 schema 可能被 `IF NOT EXISTS` 掩盖、空间拒绝错误缺两侧标识：两项负例先失败，加入 `SHOW CONSTRAINTS` / `SHOW INDEXES` 结构核对与完整错误信息后通过；实机又捕获唯一约束 backing index 同名，补去重后通过。绿灯：`.venv/bin/python -m pytest tests/integration/test_f03.py -q` 离线 **14 passed / 1 skipped**，一次性 Neo4j 5.26 容器中 **15 passed**。
 - `python3 -m compileall` 与 `git diff --check` → exit 0。
 - `PATH="$PWD/.venv/bin:$PWD/src/frontend/node_modules/.bin:$PATH" ./scripts/verify.sh` → exit 0（契约负例 25 项、B14/B08/B09/B10/B12/B13 回归）。
-- `.venv/bin/python -m pytest tests/backend -q` → **2105 passed / 1 warning**（Starlette 的已存在弃用警告）。沙箱内首次运行的 3 failed / 5 errors 均为 `127.0.0.1` 绑定被拒；允许回环监听的同一环境命令全绿。
+- `.venv/bin/python -m pytest tests/backend -q` → **2277 passed / 1 warning**（重基到 `origin/main@8985a16` 后；Starlette 的已存在弃用警告）。沙箱内首次运行的 3 failed / 5 errors 均为 `127.0.0.1` 绑定被拒；允许回环监听的同一环境命令全绿。
 
 ## 风险、下一步与回滚
 
