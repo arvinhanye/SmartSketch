@@ -1147,6 +1147,22 @@
 - **回滚**：撤销 `services/versions/resolver.py` 与 `tests/backend/test_g07.py`；无数据迁移，无调用方。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 按 V8 选定并在交接中报告）。
 
+## ADR-040：H04 G6 画布生命周期
+
+- **日期**：2026-09-26
+- **背景**：ADR-001 选定 AntV G6，但未定版本与接入方式。H04 要求画布挂载、更新、销毁可靠，反复切页不泄漏，resize 后布局正确；jsdom 没有 Canvas，G6 无法在单测中真实渲染。
+- **决定**：
+  1. 依赖 `@antv/g6@5.1.1`，`package.json` 写精确版本，锁文件用 npm 11（与 CI 的 Node 24 一致）生成，只新增条目。
+  2. `graph/lifecycle.ts` 通过工厂建图，默认工厂 `loadG6Graph` 动态 `import('@antv/g6')`，未打开图谱的页面不下载 G6；组件经 `GRAPH_FACTORY_KEY` 注入工厂，单测用替身，真实渲染由浏览器冒烟验证。
+  3. 对 G6 的建图、更新、调整尺寸串行执行；渲染中的多次更新只画最后一次。交给 G6 的是数据副本（布局会写坐标）。
+  4. 容器尺寸为 0 时推迟建图；尺寸变化由 `ResizeObserver`（缺失时退回 `window` resize）在下一帧合并处理，`setSize` 后 `fitView`；尺寸为 0 或未变时不动。KeepAlive 重新激活时主动复查尺寸。
+  5. 销毁时销毁图、断开观察、取消待执行帧；迟到的建图结果立即销毁，迟到的渲染结果不改状态。
+  6. 默认参数：`antv-dagre` 自上而下层次布局、`zoom-canvas`/`drag-canvas`/`drag-element`、适应视口（留白 32）、关闭动画、`process-parallel-edges` 把同一对知识点间的多条关系画成曲线分开。边样式沿用 H03 适配层。
+  7. 画布错误只显示「图谱渲染失败，请重试」并可重试，不展示内部错误信息。
+- **后果**：G6 不进首屏包；画布组件不发请求，数据与筛选由页面、H05 负责；布局切换、图例、节点详情分别留给 H05、H06。单测覆盖生命周期契约而非 G6 绘制细节。
+- **回滚**：撤销 `graph/lifecycle.ts`、`components/GraphCanvas.vue`、`tests/frontend/h04.test.ts`，并从 `src/frontend/package.json` 删除 `@antv/g6` 后在 `src/frontend` 执行 `npx npm@11 install` 还原锁文件（或 `git checkout <base> -- src/frontend/package.json src/frontend/package-lock.json`）；无数据迁移。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
 ## ADR-045：K13 抽取消融的付费调用确认与单阶段对照组
 
 - **日期**：2026-09-26
