@@ -37,3 +37,7 @@ class UploadAccepted(BaseModel):
 class DocumentNotDeletableDetails(BaseModel):
     stage: TaskStage
     reason: Literal["processing", "contributed", "cleanup_pending"]
+
+
+class UploadPolicy(BaseModel):
+    max_bytes: int

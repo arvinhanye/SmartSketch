@@ -11,8 +11,9 @@ import { useCourseStore, type CourseRequestScope } from '../stores/course'
  *
  * - 页面只对课程内教师开放（`specs/identity-access.md`：`listDocuments` / `uploadDocument` / 任务操作
  *   均为课程教师）；先读课程 `my_role` 作界面引导，授权仍以后端 403 为准。
- * - 上传前本地校验扩展名与大小（PDF/DOCX/TXT/Markdown，50 MiB = `UPLOAD_MAX_BYTES` 默认值，D-11）；
- *   服务端 413/415 仍按 `errors.v1.md` 提示，413 以 `details.limit_bytes` 为准。
+ * - 上传前本地校验扩展名与大小（PDF/DOCX/TXT/Markdown）。大小上限取自 `getUploadPolicy`（ADR-022，
+ *   即服务端 `UPLOAD_MAX_BYTES`）；取不到时跳过本地大小校验、提示以服务器为准。
+ *   服务端 413/415 仍按 `errors.v1.md` 提示，413 的 `details.limit_bytes` 同时刷新本地上限。
  * - 上传成功后按 `task_id` 经 C12 `TaskEventsClient` 订阅进度，作用域取自课程 store。
  * - 「取消中」只看服务端 `cancel_requested = true` 且非终态，「已取消」只看 `stage = cancelled`；
  *   409 `TASK_NOT_CANCELLABLE` 以 `details.stage` 刷新界面，不假装取消成功（`specs/task-processing.md` §4）。
@@ -29,8 +30,6 @@ type ErrorBody = components['schemas']['Error']
 
 /** 与后端 `file_storage._EXTENSIONS` 一致（大小写不敏感） */
 export const MATERIAL_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.markdown'] as const
-/** `UPLOAD_MAX_BYTES` 默认值（D-11：50 MiB）；部署可调，服务端 413 的 `limit_bytes` 为准 */
-export const MATERIAL_MAX_BYTES = 50 * 1024 * 1024
 export const SUPPORTED_FORMATS_TEXT = 'PDF、DOCX、TXT、Markdown（.md / .markdown）'
 /** `<input accept>`：扩展名 + 契约 `uploadDocument` 声明的媒体类型 */
 export const MATERIAL_ACCEPT = [
@@ -71,12 +70,15 @@ export function formatBytes(bytes: number): string {
 
 const UNSUPPORTED_MESSAGE = `不支持该文件格式，仅支持 ${SUPPORTED_FORMATS_TEXT}。`
 
-/** 本地校验；通过返回 null，否则返回提示文案 */
-export function validateMaterialFile(file: File): string | null {
+/**
+ * 本地校验；通过返回 null，否则返回提示文案。
+ * `maxBytes` 为服务端上传上限（ADR-022）；`null` 表示未知，此时不做大小校验，交服务端 413 判定。
+ */
+export function validateMaterialFile(file: File, maxBytes: number | null): string | null {
   if (formatOf(file.name) === null) return UNSUPPORTED_MESSAGE
   if (file.size === 0) return '文件为空，请选择有内容的资料。'
-  if (file.size > MATERIAL_MAX_BYTES) {
-    return `文件大小 ${formatBytes(file.size)} 超过 ${formatBytes(MATERIAL_MAX_BYTES)} 上限，请压缩或拆分后上传。`
+  if (maxBytes !== null && file.size > maxBytes) {
+    return `文件大小 ${formatBytes(file.size)} 超过 ${formatBytes(maxBytes)} 上限，请压缩或拆分后上传。`
   }
   return null
 }
@@ -150,7 +152,14 @@ interface UploadFailure {
   fileInvalid: boolean
 }
 
-function uploadFailure(cause: unknown): UploadFailure {
+/** 413 `FILE_TOO_LARGE` 的 `details.limit_bytes`；缺失或不合法为 null */
+function limitBytesOf(cause: unknown): number | null {
+  if (!(cause instanceof ApiError) || cause.code !== 'FILE_TOO_LARGE') return null
+  const limit = cause.details?.limit_bytes
+  return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : null
+}
+
+function uploadFailure(cause: unknown, maxBytes: number | null): UploadFailure {
   if (isNetworkFailure(cause)) return { message: NETWORK_MESSAGE, retryable: true, fileInvalid: false }
   if (cause instanceof ApiError) {
     if (cause.code === 'UNSUPPORTED_FORMAT') {
@@ -161,9 +170,9 @@ function uploadFailure(cause: unknown): UploadFailure {
       }
     }
     if (cause.code === 'FILE_TOO_LARGE') {
-      const limit = cause.details?.limit_bytes
-      const text = typeof limit === 'number' && limit > 0 ? formatBytes(limit) : formatBytes(MATERIAL_MAX_BYTES)
-      return { message: `文件超过服务器上限 ${text}，请压缩或拆分后上传。`, retryable: false, fileInvalid: true }
+      const limit = limitBytesOf(cause) ?? maxBytes
+      const text = limit === null ? '服务器上限' : `服务器上限 ${formatBytes(limit)}`
+      return { message: `文件超过${text}，请压缩或拆分后上传。`, retryable: false, fileInvalid: true }
     }
     if (cause.code === 'VALIDATION_ERROR') {
       return { message: '文件名不符合要求（可能为空或过长），请重命名后上传。', retryable: false, fileInvalid: true }
@@ -296,6 +305,8 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
   const files = new Map<string, File>()
   const retryable = ref<Record<string, true>>({})
   const deletions = ref<Record<string, DeleteState>>({})
+  /** 服务端上传上限（ADR-022）；`null` = 尚未取到或读取失败 */
+  const maxBytes = ref<number | null>(null)
 
   const selectedName = ref<string | null>(null)
   let selectedFile: File | null = null
@@ -331,6 +342,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     files.clear()
     retryable.value = {}
     deletions.value = {}
+    maxBytes.value = null
     selectedName.value = null
     selectedFile = null
     fileInvalid.value = false
@@ -375,6 +387,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
         pageError.value = '仅课程教师可以上传资料和查看处理进度。'
         return
       }
+      void loadPolicy(s)
       const list = await materialsApi.list(s.courseId, { signal: s.controller.signal })
       if (!alive(s)) return
       // 资料按 course_id 隔离，不接收别的课程的数据
@@ -397,6 +410,18 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       if (cause instanceof ApiError && cause.status === 404) pageError.value = '课程不存在。'
       else if (cause instanceof ApiError && cause.status === 401) pageError.value = '登录已失效，请重新登录。'
       else pageError.value = isNetworkFailure(cause) ? NETWORK_MESSAGE : '资料列表加载失败，请稍后重试。'
+    }
+  }
+
+  /** 上传策略与列表并行读取；失败只影响本地大小预检，不影响页面（ADR-022） */
+  async function loadPolicy(s: PageSession): Promise<void> {
+    try {
+      const policy = await materialsApi.uploadPolicy(s.courseId, { signal: s.controller.signal })
+      if (!alive(s)) return
+      const limit = policy.max_bytes
+      if (Number.isInteger(limit) && limit > 0) maxBytes.value = limit
+    } catch {
+      // 忽略：保持未知，上传时由服务端 413 判定并回填上限
     }
   }
 
@@ -511,7 +536,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     uploadSuccess.value = null
     retryFile = null
     canRetryUpload.value = false
-    const problem = file === null ? null : validateMaterialFile(file)
+    const problem = file === null ? null : validateMaterialFile(file, maxBytes.value)
     uploadError.value = problem
     fileInvalid.value = problem !== null
   }
@@ -520,7 +545,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     const s = session
     // 防重入用同步标志：两次 submit 可能在按钮禁用前连续到达
     if (s === null || !alive(s) || s.uploading || pageStatus.value !== 'ready') return
-    const problem = validateMaterialFile(file)
+    const problem = validateMaterialFile(file, maxBytes.value)
     if (problem !== null) {
       uploadError.value = problem
       fileInvalid.value = true
@@ -544,7 +569,8 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       void refreshList(s)
     } catch (cause) {
       if (!alive(s) || cause instanceof AbortedError) return
-      const failure = uploadFailure(cause)
+      maxBytes.value = limitBytesOf(cause) ?? maxBytes.value
+      const failure = uploadFailure(cause, maxBytes.value)
       uploadError.value = failure.message
       fileInvalid.value = failure.fileInvalid
       retryFile = failure.retryable ? file : null
@@ -738,6 +764,9 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     return [...listed, ...pending]
   })
 
+  /** 提示中的上限文案；未知时为 null，视图提示以服务器为准 */
+  const limitText = computed(() => (maxBytes.value === null ? null : formatBytes(maxBytes.value)))
+
   const isEmpty = computed(() => pageStatus.value === 'ready' && rows.value.length === 0)
 
   watch(courseId, open, { immediate: true })
@@ -749,6 +778,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     courseName,
     rows,
     isEmpty,
+    limitText,
     reload,
     selectedName,
     fileInvalid,

@@ -3,7 +3,7 @@ import { computed, inject } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
 import { MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from '../api/materials'
-import { MATERIAL_ACCEPT, MATERIAL_MAX_BYTES, SUPPORTED_FORMATS_TEXT, formatBytes, useMaterials } from '../composables/useMaterials'
+import { MATERIAL_ACCEPT, SUPPORTED_FORMATS_TEXT, useMaterials } from '../composables/useMaterials'
 import { COURSE_ROUTE, MATERIALS_ROUTE } from '../router'
 
 const materialsApi = inject(MATERIALS_API_KEY, null)
@@ -26,6 +26,7 @@ const {
   courseName,
   rows,
   isEmpty,
+  limitText,
   reload,
   selectedName,
   fileInvalid,
@@ -44,8 +45,6 @@ const {
   cancelDelete,
   confirmDelete,
 } = useMaterials({ materialsApi, coursesApi, taskEvents, courseId })
-
-const limitText = formatBytes(MATERIAL_MAX_BYTES)
 
 function onFileChange(event: Event): void {
   const input = event.target as HTMLInputElement
@@ -91,7 +90,8 @@ function onFileChange(event: Event): void {
             @change="onFileChange"
           />
           <p id="material-upload-hint" data-test="upload-hint" class="hint">
-            支持 {{ SUPPORTED_FORMATS_TEXT }}，单个文件不超过 {{ limitText }}。
+            支持 {{ SUPPORTED_FORMATS_TEXT }}，<template v-if="limitText">单个文件不超过 {{ limitText }}。</template
+            ><template v-else>文件大小上限以服务器为准。</template>
           </p>
           <div id="material-upload-feedback">
             <p v-if="uploadError" data-test="upload-error" role="alert">{{ uploadError }}</p>

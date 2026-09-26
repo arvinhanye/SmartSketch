@@ -287,6 +287,26 @@ paths:
         '415':
           $ref: '#/components/responses/UnsupportedFormat'
 
+  /api/v1/courses/{cid}/upload-policy:
+    parameters:
+      - $ref: '#/components/parameters/CourseId'
+    get:
+      tags: [documents]
+      summary: 资料上传策略（教师）
+      description: 当前部署的单文件上传上限（`UPLOAD_MAX_BYTES`），供前端本地校验与提示（ADR-022）。超过时 `uploadDocument` 仍返回 413。
+      operationId: getUploadPolicy
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '200':
+          description: 上传策略
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadPolicy'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/v1/courses/{cid}/documents/{did}:
     parameters:
       - $ref: '#/components/parameters/CourseId'
@@ -1442,6 +1462,16 @@ components:
         uploaded_at:
           type: string
           format: date-time
+
+    UploadPolicy:
+      type: object
+      required: [max_bytes]
+      additionalProperties: false
+      properties:
+        max_bytes:
+          type: integer
+          minimum: 1
+          description: 单文件上限（字节），与 413 `FILE_TOO_LARGE` 的 `details.limit_bytes` 同值。
 
     UploadAccepted:
       type: object

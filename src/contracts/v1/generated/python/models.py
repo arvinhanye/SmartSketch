@@ -148,6 +148,19 @@ class DocumentFormat(Enum):
     markdown = 'markdown'
 
 
+class UploadPolicy(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    max_bytes: Annotated[
+        int,
+        Field(
+            description='单文件上限（字节），与 413 `FILE_TOO_LARGE` 的 `details.limit_bytes` 同值。',
+            ge=1,
+        ),
+    ]
+
+
 class UploadAccepted(BaseModel):
     task_id: str
     document_id: str

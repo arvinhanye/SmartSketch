@@ -19,7 +19,6 @@ import type {
   TaskStreamState,
 } from '../../src/frontend/src/api/taskEvents'
 import {
-  MATERIAL_MAX_BYTES,
   taskStatusOf,
   validateMaterialFile,
 } from '../../src/frontend/src/composables/useMaterials'
@@ -37,6 +36,8 @@ type TaskStage = components['schemas']['TaskStage']
 type ErrorCode = components['schemas']['ErrorCode']
 
 const CID = 'c1'
+/** 假上传策略默认返回 `UPLOAD_MAX_BYTES` 的默认值（D-11：50 MiB） */
+const DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 
 function course(id: string, overrides: Partial<Course> = {}): Course {
   return {
@@ -116,6 +117,9 @@ function fakeMaterialsApi(overrides: Partial<MaterialsApi> = {}) {
     ),
     cancelTask: vi.fn<MaterialsApi['cancelTask']>(overrides.cancelTask ?? (async (tid) => task(tid, 'cancelled'))),
     deleteDocument: vi.fn<MaterialsApi['deleteDocument']>(overrides.deleteDocument ?? (async () => undefined)),
+    uploadPolicy: vi.fn<MaterialsApi['uploadPolicy']>(
+      overrides.uploadPolicy ?? (async () => ({ max_bytes: DEFAULT_MAX_BYTES })),
+    ),
   }
 }
 
@@ -327,25 +331,44 @@ describe('H02 资料 API 封装', () => {
     expect(calls[0]!.url).toBe('/api/v1/tasks/t1/cancel')
     expect(calls[0]!.init?.method).toBe('POST')
   })
+
+  it('uploadPolicy 走契约 GET /api/v1/courses/{cid}/upload-policy（ADR-022）', async () => {
+    const { calls, fetch } = recordingFetch(() => json({ max_bytes: 1234 }))
+    const api = createMaterialsApi(createHttpClient({ fetch }))
+    await expect(api.uploadPolicy('c/1')).resolves.toEqual({ max_bytes: 1234 })
+    expect(calls[0]!.url).toBe('/api/v1/courses/c%2F1/upload-policy')
+    expect(calls[0]!.init?.method).toBe('GET')
+  })
 })
 
 // ---------------------------------------------------------------- 纯函数
 
 describe('H02 文件校验与状态文案', () => {
   it.each(['a.pdf', 'b.DOCX', 'c.txt', 'd.md', 'e.Markdown'])('接受 %s', (name) => {
-    expect(validateMaterialFile(file(name))).toBeNull()
+    expect(validateMaterialFile(file(name), DEFAULT_MAX_BYTES)).toBeNull()
   })
 
   it.each(['a.doc', 'b.pptx', 'c.pdf.exe', 'README', '.md.zip'])('拒绝非法格式 %s 并列出支持格式', (name) => {
-    const message = validateMaterialFile(file(name))
+    const message = validateMaterialFile(file(name), DEFAULT_MAX_BYTES)
     expect(message).toMatch(/PDF.*DOCX.*TXT.*Markdown/)
   })
 
   it('拒绝空文件与超过上限的文件，恰好等于上限可接受', () => {
-    expect(validateMaterialFile(file('a.pdf', 0))).toMatch(/空/)
-    expect(MATERIAL_MAX_BYTES).toBe(50 * 1024 * 1024)
-    expect(validateMaterialFile(file('a.pdf', MATERIAL_MAX_BYTES))).toBeNull()
-    expect(validateMaterialFile(file('a.pdf', MATERIAL_MAX_BYTES + 1))).toMatch(/50 MiB/)
+    expect(validateMaterialFile(file('a.pdf', 0), DEFAULT_MAX_BYTES)).toMatch(/空/)
+    expect(validateMaterialFile(file('a.pdf', DEFAULT_MAX_BYTES), DEFAULT_MAX_BYTES)).toBeNull()
+    expect(validateMaterialFile(file('a.pdf', DEFAULT_MAX_BYTES + 1), DEFAULT_MAX_BYTES)).toMatch(/50 MiB/)
+  })
+
+  it('上限取传入值而非固定 50 MiB（ADR-022）', () => {
+    expect(validateMaterialFile(file('a.pdf', 2048), 2048)).toBeNull()
+    expect(validateMaterialFile(file('a.pdf', 2049), 2048)).toMatch(/2 KiB/)
+    expect(validateMaterialFile(file('a.pdf', DEFAULT_MAX_BYTES + 1), 100 * 1024 * 1024)).toBeNull()
+  })
+
+  it('上限未知（策略未取到）时跳过本地大小校验，但仍拒绝空文件与非法格式', () => {
+    expect(validateMaterialFile(file('a.pdf', DEFAULT_MAX_BYTES * 10), null)).toBeNull()
+    expect(validateMaterialFile(file('a.pdf', 0), null)).toMatch(/空/)
+    expect(validateMaterialFile(file('a.doc'), null)).toMatch(/PDF.*DOCX/)
   })
 
   it('取消中与已取消是两种状态', () => {
@@ -470,7 +493,7 @@ describe('H02 上传', () => {
 
   it('超过 50 MiB：本地提示，不发请求', async () => {
     const { wrapper, materials } = await mountPage()
-    await chooseFile(wrapper, file('big.pdf', MATERIAL_MAX_BYTES + 1))
+    await chooseFile(wrapper, file('big.pdf', DEFAULT_MAX_BYTES + 1))
     expect(wrapper.get('[data-test="upload-error"]').text()).toContain('50 MiB')
     await submitUpload(wrapper)
     expect(materials.upload).not.toHaveBeenCalled()
@@ -497,6 +520,67 @@ describe('H02 上传', () => {
     await chooseFile(wrapper, file('a.pdf'))
     await submitUpload(wrapper)
     expect(wrapper.get('[data-test="upload-error"]').text()).toContain('10 MiB')
+  })
+})
+
+// ---------------------------------------------------------------- 上传上限（ADR-022）
+
+describe('H02 上传上限取自服务端 UPLOAD_MAX_BYTES（ADR-022）', () => {
+  it('按课程读取上传策略，提示与本地校验都用服务端上限', async () => {
+    const materials = fakeMaterialsApi({ uploadPolicy: async () => ({ max_bytes: 2048 }) })
+    const { wrapper } = await mountPage({ materials })
+    expect(materials.uploadPolicy).toHaveBeenCalledWith(CID, expect.anything())
+    expect(wrapper.get('[data-test="upload-hint"]').text()).toContain('2 KiB')
+    expect(wrapper.get('[data-test="upload-hint"]').text()).not.toContain('50 MiB')
+    await chooseFile(wrapper, file('a.pdf', 2049))
+    expect(wrapper.get('[data-test="upload-error"]').text()).toContain('2 KiB')
+    await submitUpload(wrapper)
+    expect(materials.upload).not.toHaveBeenCalled()
+  })
+
+  it('服务端上限大于 50 MiB 时，不再按 50 MiB 在本地拦截', async () => {
+    const materials = fakeMaterialsApi({ uploadPolicy: async () => ({ max_bytes: 100 * 1024 * 1024 }) })
+    const { wrapper } = await mountPage({ materials })
+    expect(wrapper.get('[data-test="upload-hint"]').text()).toContain('100 MiB')
+    await chooseFile(wrapper, file('big.pdf', 60 * 1024 * 1024))
+    expect(wrapper.find('[data-test="upload-error"]').exists()).toBe(false)
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+  })
+
+  it('策略读取失败：页面照常可用，提示以服务器为准，不做本地大小拦截', async () => {
+    const materials = fakeMaterialsApi({ uploadPolicy: async () => Promise.reject(new NetworkError(new TypeError('offline'))) })
+    const { wrapper } = await mountPage({ materials })
+    expect(wrapper.find('[data-test="materials-error"]').exists()).toBe(false)
+    const hint = wrapper.get('[data-test="upload-hint"]').text()
+    expect(hint).toContain('以服务器为准')
+    expect(hint).not.toContain('MiB')
+    await chooseFile(wrapper, file('big.pdf', 60 * 1024 * 1024))
+    expect(wrapper.find('[data-test="upload-error"]').exists()).toBe(false)
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+  })
+
+  it('413 带 limit_bytes 时刷新本地上限，之后超限文件在本地拦截', async () => {
+    const materials = fakeMaterialsApi({
+      uploadPolicy: async () => Promise.reject(new NetworkError(new TypeError('offline'))),
+      upload: async () => Promise.reject(apiError(413, 'FILE_TOO_LARGE', { limit_bytes: 1024 * 1024 })),
+    })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('a.pdf', 2 * 1024 * 1024))
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="upload-hint"]').text()).toContain('1 MiB')
+    await chooseFile(wrapper, file('b.pdf', 2 * 1024 * 1024))
+    expect(wrapper.get('[data-test="upload-error"]').text()).toContain('1 MiB')
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+  })
+
+  it('非课程教师不读取上传策略', async () => {
+    const courses = fakeCoursesApi({ get: async (cid) => course(cid, { my_role: 'student' }) })
+    const { materials } = await mountPage({ courses })
+    expect(materials.uploadPolicy).not.toHaveBeenCalled()
   })
 
   it('上传失败（网络）可重试：重试用同一文件，成功后开始订阅进度', async () => {

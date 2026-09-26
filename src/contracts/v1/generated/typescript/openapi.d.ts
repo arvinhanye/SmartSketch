@@ -157,6 +157,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/{cid}/upload-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 资料上传策略（教师）
+         * @description 当前部署的单文件上传上限（`UPLOAD_MAX_BYTES`），供前端本地校验与提示（ADR-022）。超过时 `uploadDocument` 仍返回 413。
+         */
+        get: operations["getUploadPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses/{cid}/documents/{did}": {
         parameters: {
             query?: never;
@@ -773,6 +796,10 @@ export interface components {
             task_id: string | null;
             /** Format: date-time */
             uploaded_at: string;
+        };
+        UploadPolicy: {
+            /** @description 单文件上限（字节），与 413 `FILE_TOO_LARGE` 的 `details.limit_bytes` 同值。 */
+            max_bytes: number;
         };
         UploadAccepted: {
             task_id: string;
@@ -2088,6 +2115,31 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             413: components["responses"]["FileTooLarge"];
             415: components["responses"]["UnsupportedFormat"];
+        };
+    };
+    getUploadPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 上传策略 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     deleteDocument: {
