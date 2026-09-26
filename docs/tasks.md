@@ -1217,6 +1217,24 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：三栏按 ADR-060 分类（低置信度关系、E08 名称归一 + 已存别名的疑似重复对、发布后无边的孤立节点）；通过、拒绝、合并后 `totals` 与各栏相应变化，重复提交同一动作 200 `changed = false`，已不在队列 404；各栏固定排序 + 键集分页，边处理边翻页不漏不重。
 - F11 待决（需 ArvinHan）：ADR-060 签收（尤其「疑似重复」只用名称归一、不含向量相似；「确认保留」按节点永久生效；新增 `resolveReviewItem` 而不是借 `/relations`）；D-08 阈值定稿后是否把 E09 向量候选并入疑似重复栏。
+### F11 独立审查与并行核查遗留（2026-09-26，协调者；不含已修项）
+
+背景：F11 由另一会话的 PR #282 实现；本会话另派的独立实现已作废（SUPERSEDED），但两者都对 #282 做了独立核查，结论如下。已修项见下方「F11 审查修复」。以下均为**未修**、需后续任务或 ArvinHan 裁决的事项。
+
+- **M2 CI 掩盖（中）**：`tests/backend/test_f11.py` 有 23 个真实 Neo4j 用例（`skipif` 依赖 `SMARTSKETCH_TEST_NEO4J_*`），而 `.github/workflows/ci.yml` 只跑 `pytest tests/backend -q` 且不设该 env、也无 Neo4j service 与 `tests/integration` job → CI 恒为 17 passed / 23 skipped 报绿；`docs/atomic-tasks.json` 的 F11 `verification_command` 同样无 env。仓库惯例是 live 用例放 `tests/integration`（F09/F10/J01/K10）。建议迁目录或给 CI 加 Neo4j service。
+- **M3 审计缺口（中，跨任务）**：F12（ADR-061）只审计 F08 新建/修改/解锁、F09 删除、F10 合并五个入口。F11 的关系 approve/reject（`repositories/review.py`）与节点 reject 是**直接 Cypher**，不经这五个入口、也直接调 `bump_draft_revision` → 审核队列的图写入**不进审计表、不做 reconcile**，而规格「一致性」要求修改记录写入日志。需显式跟进项（或让 F11 接入 `audit.begin/commit`）。
+- **M4 dismissals 永久且无撤销入口（中）**：`review_dismissals`（迁移 013）按 `kp_id`/关系对永久生效，没有 API 或界面可撤销；而 `kp_id` 是确定性派生 `derive_kp_id(course, task, candidate_key)`，`tasks.py` 明说重试返回**原 task_id** → 重跑抽取复用同一批 ID，「不是重复/确认保留」的记录会**静默抑制重建后的条目**（实测：dismiss 后删掉一方、再用同一 ID 建回，totals 仍为 0）。ADR-060 只写「留下的记录无害」，未覆盖该路径。
+- **D-1 已修**（`bump_draft_revision` 可重跑事务内未记忆化）→ 见下方审查修复。
+- **D-2 低置信度栏口径（中，口径/覆盖缺口）**：低置信度关系只按 `status == "low_confidence"`、**无数值阈值**；而 ADR-029/F13 已决「D-08 签收前自动写入的状态一律 `draft`」，`low_confidence` 只由 ADR-009 的成环降级产生（`services/graph/downgrade.py`）。后果：**未发生过成环降级的课程，该栏恒为空**，即使草稿里全是低置信度 AI 边；现有验收靠手工种 `low_confidence` 行证明，不代表真实数据。`specs/teacher-review-publish.md`「低置信度阈值」仍是待细化，D-08 签收后需回改。
+- **D-3 孤立定义口径（低-中，需产品裁决）**：实现只按「没有未拒绝的相连边」，**不含「无章归属」**（与 F07 `GraphStats.isolated_count` 一致）。只挂 `chapter_id`、没有任何关系的节点会进孤立栏，教师「确认保留」后按节点 ID 永久压制。需要在两个自洽口径里选一个并写进规格。
+- **D-4 新端点契约未声明 503（低）**：`GET /review` 与 `POST /review/actions` 的契约未声明 503，而实现（复用 `graph_nodes._run`）在 Neo4j 不可达时返回 503 `STORAGE_UNAVAILABLE`，交接也把 503 写进接口变更 → 契约/实现/交接三者不一致（`/graph` 同样未写 503，属既有惯例，非回归）。建议补可复用的 503 响应组件。
+- **D-5 幂等判断顺序（低）**：「状态已是目标值 → `changed=false`」排在「仍在队列」判断之前，故「已 approved、但其后某端点被置 rejected」的关系再 approve 返回 200 而非 ADR-060 决定 7 的 404。
+- **D-6 跨模块私有导入（低，建议）**：`api/review.py` 从 `api/graph_nodes.py` 导入私有 `_context`/`_run`，并为此改了后者（+3 行，其中 `isinstance(node, dict)` 分支现有调用方不可达）。建议把 `_context`/`_run` 上提到 `api/dependencies.py`（共享 adapter 的既定位置），F11 就不必动 F08/F12 的文件。**合并期已处理**：与 F12 的 `_run(request, access, ...)` 签名冲突已解，`api/review.py` 两处调用点已改传 `access`。
+- **D-8 字段名（低）**：`similarity` 对 same_key/alias 恒为 1.0、对 containment 为有效字符比，实际只有三档语义、用途是排序；契约已注明，但字段名与 0～1 值域易被前端当相似度展示。建议改名或强化描述。
+- **D-9 关系新增 `revision` 属性未登记（低）**：`repositories/review.py` 给关系写 `coalesce(r.revision,0)+1`，但 `docs/architecture.md` 的 Neo4j 模型段与契约 `Relation` 都未登记，事实上单方面定了 H08 的待决「关系是否加修订号」。
+- **缺证据（低）**：无「空草稿队列 → 200 + 三栏空 + totals 全 0」用例；无「他课教师 → 403 `COURSE_FORBIDDEN`」用例（只测了本课学生 403）；无「队列不含已发布副本节点」的固化用例（结构上已排除：`_draft_scope` 硬编码 `version_id="draft"`，端点无 `version` 参数）。
+- **已核实的优点（记录备查）**：键集分页为唯一总序（confidence+rel_id / -similarity+左右 ID / name+kp_id）+ 严格 `>` + `_key_shape` 拦跨栏，边处理边翻页不漏不重；关系 approve/reject 与 F08/F09/F10 用同一把课程写锁、`SET r.status` 原地改（rel_id 不变）；幂等由 `INSERT OR IGNORE` + 状态条件写保证；`gen-contracts.sh --check` 与 `check_contracts.py` 均 PASS。
+
 ## 2026-09-26 F12 图编辑审计日志（Claude）
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
