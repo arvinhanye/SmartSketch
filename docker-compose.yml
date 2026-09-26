@@ -39,8 +39,101 @@ services:
       retries: 12
       start_period: 40s
 
-# SQLite 不需要服务：它是嵌入式文件，由后端进程直接打开，路径见 .env 的 SQLITE_URL。
-# 本地只需保证 STORAGE_DIR 存在（scripts/dev-up.sh 会创建），默认落在已忽略的 storage/ 下。
-#
-# 后端与前端暂不编排：仓库还没有 Dockerfile。需要容器化时由对应任务补全本文件并更新
-# docs/integrations.md。
+  # ---- 以下为 K08 应用容器，全部放在 `app` profile 里：
+  # `scripts/dev-up.sh`（只起 neo4j）与 F01 测试不受影响；整套启动用
+  #   docker compose --profile app up -d --build
+  # 后端三个服务共用 src/backend/Dockerfile 的镜像，只有命令不同。
+  # 密钥只进后端：env_file 仅挂在 migrate/api/worker 上；web 没有 env_file，也没有任何 environment。
+
+  migrate:
+    # 一次性迁移：SQLite 与 Neo4j 约束都是只向前、可重复执行。API 与 worker 的启动门禁
+    # 会拒绝未迁移的库（C01 R02），所以它们都等本服务成功退出后才启动。
+    profiles: ["app"]
+    build: &backend-build
+      context: .
+      dockerfile: src/backend/Dockerfile
+    image: smartsketch-backend:local
+    env_file: &backend-env-file
+      - .env
+    environment: &backend-env
+      # 容器内的固定取值覆盖 .env 中面向本机开发的取值。
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      NEO4J_URI: bolt://neo4j:7687
+      SQLITE_URL: sqlite:////data/smartsketch.sqlite3
+      STORAGE_DIR: /data/storage
+      WEB_ORIGIN: http://localhost:${WEB_PUBLISH_PORT:-8080}
+    volumes: &backend-volumes
+      # SQLite 与上传文件放同一个本地命名卷：API 与 worker 必须同机共享该文件，
+      # 且不得放在网络文件系统上（specs/task-processing.md §8.1）。
+      - app-data:/data
+    command: ["sh", "-c", "python -m app.repositories.sqlite && python -m app.repositories.graph_migrations"]
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    profiles: ["app"]
+    build: *backend-build
+    image: smartsketch-backend:local
+    restart: unless-stopped
+    env_file: *backend-env-file
+    environment: *backend-env
+    volumes: *backend-volumes
+    command: ["python", "-m", "app"]
+    # 不对外发布端口：浏览器经 web 容器的 /api 反向代理访问。健康检查沿用镜像内的 GET /health。
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      neo4j:
+        condition: service_healthy
+
+  worker:
+    # 按 A06 运行：与 API 同机、共用同一 SQLite 卷的独立进程；进程数取 .env 的 WORKER_PROCESSES，
+    # 多进程互斥交给 C09 租约（specs/task-processing.md §8.1～§8.2）。不要用 scale/replicas 横向扩，
+    # 需要更多进程时调 WORKER_PROCESSES。
+    profiles: ["app"]
+    build: *backend-build
+    image: smartsketch-backend:local
+    restart: unless-stopped
+    env_file: *backend-env-file
+    environment: *backend-env
+    volumes: *backend-volumes
+    command: ["python", "-m", "app.workers"]
+    healthcheck:
+      # 监督进程每 10 秒刷新心跳文件；任一 worker 子进程意外退出即整体退出并由 restart 拉起。
+      test: ["CMD", "python", "-m", "app.workers", "--health"]
+      interval: 15s
+      timeout: 10s
+      retries: 4
+      start_period: 30s
+    # SIGTERM 后不再领新任务，跑完当前一轮再退出；超过宽限期被强杀的任务按租约过期接管。
+    stop_grace_period: 90s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      neo4j:
+        condition: service_healthy
+
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: src/frontend/Dockerfile
+    image: smartsketch-frontend:local
+    restart: unless-stopped
+    ports:
+      # 只绑本机回环地址。
+      - "127.0.0.1:${WEB_PUBLISH_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  app-data:
+
+# SQLite 不需要服务：它是嵌入式文件。本机开发时由后端进程直接打开 .env 的 SQLITE_URL；
+# 容器运行时（`app` profile）固定在 app-data 卷的 /data/smartsketch.sqlite3。
