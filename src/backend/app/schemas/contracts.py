@@ -22,3 +22,14 @@ Course = _module.Course
 CourseCreate = _module.CourseCreate
 CourseStatus = _module.CourseStatus
 Role = _module.Role
+# F07 graph reads.
+Chapter = _module.Chapter
+GraphExchange = _module.GraphExchange
+GraphStats = _module.GraphStats
+KnowledgePoint = _module.KnowledgePoint
+KnowledgePointDetail = _module.KnowledgePointDetail
+KnowledgePointRef = _module.KnowledgePointRef
+KnowledgePointType = _module.KnowledgePointType
+Relation = _module.Relation
+RelationType = _module.RelationType
+SourceRef = _module.SourceRef
