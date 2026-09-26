@@ -1020,3 +1020,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | --- | --- | --- | --- | --- | --- | --- |
 | ADR-021 | DONE（待 PR 审查/合并） | `Document.task_id` 与删除未产生贡献的资料（`deleteDocument`） | ArvinHan（Claude） | 同上 | `docs/decisions.md`（ADR-021）、`specs/task-processing.md`、`specs/identity-access.md`、`src/contracts/`（真源、错误码、生成物）、后端 `materials` 路由/服务/仓储/schema、`tests/backend/test_adr021.py`、`tests/backend/test_c07.py`（键集合）、前端 `materials.ts`/`useMaterials.ts`/`MaterialsView.vue`/`http.ts`/`taskEvents.ts`、`tests/frontend/h02.test.ts` | 后端红 25 failed → `test_adr021.py` 27 passed；后端全量 2757 passed；契约+工具 323 passed；前端红 11 failed → 全量 254 passed；`gen-contracts.sh --check`、`verify.sh`、`git diff --check` exit 0；`docs/handoffs/claude-adr021.md` |
 | ADR-022 | DONE（待 PR 审查/合并） | 上传上限经 `getUploadPolicy` 下发，前端不再写死 50 MiB | ArvinHan（Claude） | 同上 | `docs/decisions.md`（ADR-022）、`specs/identity-access.md`、`docs/integrations.md`、`src/contracts/`（真源、生成物）、后端 `api/materials.py`/`schemas/materials.py`/`main.py`、`tests/backend/test_adr022.py`、前端 `materials.ts`/`useMaterials.ts`/`MaterialsView.vue`、`tests/frontend/h02.test.ts` | 后端红 7 failed → `test_adr022.py` 7 passed；后端全量 2764 passed；前端红 7 failed → `h02.test.ts` 79 passed、全量 262 passed；4 处反向篡改均被检出；`type-check`、`build`、`gen-contracts.sh --check`、`verify.sh`、`git diff --check` exit 0；`docs/handoffs/claude-adr022.md` |
+
+## 2026-09-26 E11 之后主线：E12（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E12 | DONE（待 PR 审查/合并） | 实现抽取阶段编排和检查点 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / PR #255 头 `52db31c`（含 E11，#255 合并后同步 main） | `src/backend/app/workers/extract_task.py`、`tests/backend/test_e12.py`；扩围 `src/backend/migrations/008_extraction_checkpoints.sql`、`src/backend/app/repositories/extraction_checkpoints.py`、`docs/decisions.md`（ADR-023）、`specs/task-processing.md`（§8.4 一段） | 红灯：收集 `ImportError`；`test_e12.py` 37 passed（连跑 5 次稳定）；后端全量 2801 passed；8 处反向篡改均检出；`verify.sh` exit 0；`docs/handoffs/claude-e12.md` |
+
+- 依赖：E12 ← D11（#239）、E04（#235）、E11（#255，未合并）。
+- 验收：每块失败只重试该块（L2）；在途块数不超过 `LLM_MAX_CONCURRENCY`；取消在块/小节边界生效，在途结果不写检查点（TASK-4）；接管后已结束的块和小节不再调用模型、来源不重复（LEASE-2）；阈值内继续、恰等于阈值继续、超阈值提前判定（TASK-9/10/13）；熔断打开不记失败块并退避释放（LEASE-6）。
+- 已决：小节关系抽取失败不计入失败块阈值（ArvinHan 2026-09-26，ADR-023 决定 4）。
+- E12 待决（详见交接）：任务快照与 SSE 尚未带 `chunks_done`/`chunks_failed`/`failed_chunks`（C11 接列）；模型调用结果缓存未实现，块中途崩溃会重新计费；小节实体表与提示词长度无上限；检查点保留期清理（§8.6）未实现；生产装配（`ExtractionToolkit` 的模型、输出上限、补漏开关）未接入启动入口；`merging` 阶段 worker 尚无任务承接。
