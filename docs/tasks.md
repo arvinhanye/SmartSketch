@@ -151,7 +151,7 @@
 
 | ID | 问题 | 决策人 | 需要在何时确认 |
 | --- | --- | --- | --- |
-| D-01 | MVP 首批课程示例和脱敏资料来源。所选材料须覆盖一门完整课程的一章，作为赛题抽取硬指标的基准（REQ-01，`specs/course-knowledge-graph.md` 验收 7）；按赛题第 7 节，只用自编示例或许可允许使用的开源教材 | 产品负责人 | M1 开始前 |
+| D-01 | **已关闭**：定为自编「数据结构 第3章 栈与队列」（`evaluation/fixtures/synthetic.json`，ADR-023，ArvinHan 2026-09-26）。原题：MVP 首批课程示例和脱敏资料来源。所选材料须覆盖一门完整课程的一章，作为赛题抽取硬指标的基准（REQ-01，`specs/course-knowledge-graph.md` 验收 7）；按赛题第 7 节，只用自编示例或许可允许使用的开源教材 | 产品负责人 | 已完成 |
 | D-02 | 首个 OpenAI 兼容模型供应商与预算上限。A07 已拆为 D-02a～f 六项，签收入口见 `docs/integrations.md`「待签收取值（D-02）」；配置形状与规则已定，取值均未签收 | 技术负责人 | 接入抽取服务前（fake 实现可先行） |
 | D-03 | 登录是否先采用本地演示角色。**已关闭**：ADR-013（A05）定为本地账号 + 预置演示账号，不采用纯演示角色；账号类型与课程内角色分离；教师按用户名添加学生（ArvinHan，2026-09-23 签收） | 产品负责人 | 已完成 |
 | PLAN-D01 | 两个 Claude 分支 YAML-first/Pydantic-first 唯一源、API 前缀和冲突 ADR 编号如何统一（A01/A02）。**已关闭**：唯一源与 ADR 编号由 ADR-004 签收；API 前缀由 ADR-009（A02）定为 `/api/v1`（均为 ArvinHan，2026-09-22） | 技术负责人 | 已完成 |
@@ -1027,12 +1027,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| K01 | DONE（部分：问答口径待 J06；最终基准待 D-01） | 建立自编标注集及评测口径 | ArvinHan（Claude 子代理） | `claude/project-thread-sp1d3a` / `main@6742f6a` | `evaluation/README.md`、`evaluation/fixtures/synthetic.json`、`docs/handoffs/claude-k01.md` | 自编「数据结构 第3章 栈与队列」3141 字，金标 45 个实体（五类齐全）、40 条关系（四类齐全），证据全部为原文子串、前置关系无环；夹具校验脚本 ALL PASS，4 份篡改副本均被拒；`docs/handoffs/claude-k01.md` |
+| K01 | DONE（部分：问答口径待 J06；D-01 已定为本章，ADR-023） | 建立自编标注集及评测口径 | ArvinHan（Claude 子代理） | `claude/project-thread-sp1d3a` / `main@6742f6a` | `evaluation/README.md`、`evaluation/fixtures/synthetic.json`、`docs/handoffs/claude-k01.md` | 自编「数据结构 第3章 栈与队列」3141 字，金标 45 个实体（五类齐全）、40 条关系（四类齐全），证据全部为原文子串、前置关系无环；夹具校验脚本 ALL PASS，4 份篡改副本均被拒；`docs/handoffs/claude-k01.md` |
 | K02 | DONE（真实模型判定未实测：待 D-01、D-02 与付费确认） | 实现抽取和融合离线评测 | ArvinHan（Claude 子代理 + 联调） | 同上 | `evaluation/evaluate_extraction.py`、`tests/backend/test_k02.py`、`evaluation/reports/extraction-accuracy.md`、`docs/handoffs/claude-k02.md` | 桩实现 46 failed → 46 passed；联调按 README 对齐 4 处，先 5 failed → `test_k02.py` 52 passed（含 K01 夹具用例）；假模型自检在 K01 标注集上跑通，两次输出 sha256 一致，数值全部过线仍判「不可用于判定（假模型）」；`docs/handoffs/claude-k02.md` |
 
 - 联调对齐（以 `evaluation/README.md` 为准）：F1 在 precision 或 recall 为 null 时为 null；各指标只统计 `source = "ai"`；按 `judgments.seed` 重算的抽中项有缺判时写「判定不完整」，准确率只统计抽中项；实体数 < 20 直接「未达标」。
 - 待决：
-  1. **D-01**：最终判定用哪门课的哪一章；自编集 `is_final_benchmark: false`，只作开发集。
+  1. ~~D-01~~：已定为本次自编的「栈与队列」一章，`is_final_benchmark` 改为 `true`（ADR-023）。
   2. **D-02** 签收及付费调用确认后，按 `evaluation/reports/extraction-accuracy.md` 第 4 节命令跑真实模型并人工判定。
   3. **J06** 完成后补问答夹具（K01 问答部分）并做 K03。
   4. **E11 先修表述清单**：金标 `g-r03`（证据「基于栈的后进先出特性」）不含清单中的表述，E11 会按 `prerequisite_without_cue` 丢弃；是否把「基于」加入清单待实测召回后决定。审查同时指出「基础」「才能」偏宽。

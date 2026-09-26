@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "dataset_id": "synthetic-ds-ch3",
-  "is_final_benchmark": false,
-  "note": "项目自编开发集，用于评测脚本联调与提示词迭代；不是赛题最终判定材料。最终基准课程与章节由 D-01 决定（未签收）。",
+  "is_final_benchmark": true,
+  "note": "项目自编材料。D-01 已定（ADR-023，ArvinHan 2026-09-26）：本章即赛题抽取硬指标的最终判定材料。提示词、先修表述清单与阈值不在本章上调；若调过，报告须注明迭代材料与判定材料相同。",
   "license": "项目自编，可随仓库分发",
   "course": {
     "id": "synthetic-ds",

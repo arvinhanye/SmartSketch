@@ -8,7 +8,7 @@
 | 评测脚本 | `evaluation/evaluate_extraction.py`（仅标准库，不调用模型或网络） |
 | 脚本测试 | `tests/backend/test_k02.py` |
 | 判定口径 | `evaluation/README.md`（K01） |
-| 基准材料 | 待 D-01 签收（一门课程的完整一章） |
+| 基准材料 | 数据结构（自编示例）第3章「栈与队列」，`evaluation/fixtures/synthetic.json`（D-01 / ADR-023 已定） |
 | 模型 | 待 D-02 签收 |
 | 报告日期 | 2026-09-26（骨架） |
 
@@ -35,9 +35,9 @@
 
 **状态：未实测。** 原因：
 
-1. **D-01（基准章节）未签收**：用哪门课的哪一章尚未确定，所以最终判定材料不存在。K01 的合成夹具不是最终基准（`is_final_benchmark: false`）。
+1. ~~D-01（基准章节）未签收~~：已定为自编「栈与队列」一章（ADR-023，ArvinHan 2026-09-26），金标即 `evaluation/fixtures/synthetic.json`。
 2. **D-02（模型供应方）未签收**：还没有可用于判定的真实模型。
-3. **付费调用须另行确认**：D-01、D-02 签收后，真实模型调用仍须用户单独确认才能执行。
+3. **付费调用须另行确认**：D-02 签收后，真实模型调用仍须用户单独确认才能执行。
 
 因此本报告**不给出**实体数、实体准确率或关系准确率的实测值，也不作「达标」或「未达标」的结论。
 
@@ -50,7 +50,7 @@
 
 ## 3. 解除阻塞后的复现步骤
 
-前提：D-01、D-02 已签收，付费调用已获用户确认；把该章处理到 `awaiting_review`，并导出草稿为 predictions.json（`model.is_fake: false`）。
+前提：D-02 已签收（D-01 已定），付费调用已获用户确认；把该章处理到 `awaiting_review`，并导出草稿为 predictions.json（`model.is_fake: false`）。
 
 ```bash
 # 1) 固定种子抽样，生成人工判定清单与 judgments 模板
