@@ -1243,3 +1243,17 @@
 - **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
 - **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-050：J02 图结构检索的匹配规则与子图上限
+
+- **日期**：2026-09-26
+- **背景**：规格只写了「并行混合检索：图谱结构检索（前置/包含/相关）」，并把「图谱扩展跳数」列为待细化（J01/J02/J04）。J03 只产出改写后的整句问题，没有关键词抽取；H4 的 `kp_id` 只用于引导检索。需要确定如何从术语找到知识点、沿哪些关系扩展、扩展到多大，以及如何保证只读绑定的发布版本。
+- **决定**：
+  1. 检索在 `repositories/graph_search.py` 的 `search_subgraph(repo, scope, revision_ids, terms, *, seed_kp_ids, max_hops, max_nodes, max_seeds, max_evidence, relation_types)`，入参风格与 J01 `search_chunks` 一致：`scope` 为 G07 `PublishedVersion.graph_scope()`，`revision_ids` 为其修订列表。只接受已发布版本作用域，草稿作用域拒绝；所有查询按 `(course_id, version_id)` 匹配节点与关系。
+  2. 种子：名称或别名（去首尾空白、小写）与某术语相等、包含在某术语中，或包含某个至少 2 个字的术语。排序为：显式 `seed_kp_ids`（属于本版本）> 相等 > 名称在术语中 > 术语在名称中；同级名称长者优先，再按 `kp_id`。单字名称（如「栈」）也能命中，但排在长名称之后。不在本版本的 `seed_kp_ids` 忽略并记 INFO 日志（H4）。
+  3. 扩展：从种子逐跳无向扩展，缺省只沿规格列出的 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`，`EXAMPLE_OF` 须调用方显式开启；同一跳内按 `kp_id` 取前者。返回的关系是结果节点间的全部四类关系。
+  4. 上限在 Cypher 的 `LIMIT` 中生效：`max_hops` 缺省 2、硬上限 3；`max_nodes` 缺省 30、硬上限 200；`max_seeds` 缺省 `min(10, max_nodes)`；证据块 `max_evidence` 缺省 60、硬上限 500。任一上限截掉内容时 `truncated = true`。以上缺省值均为占位，由 J04 按上下文预算与评测调整。
+  5. 证据块取节点的 `EVIDENCED_BY` 文本块，并只保留 `revision_id` 属于修订列表的（纵深防御，Q3.1 第 2 条）。「可定位」条件与阈值仍由 J04/J06 判断。无匹配返回空子图，不报错。
+- **后果**：图检索不依赖模型调用，也不需要全文索引。匹配时逐个扫描版本内的知识点，课程规模在数千点以内时开销可以接受。子串匹配会带来少量误命中（如问题中出现「堆」），种子上限与排序可以压低这类误命中的影响。关键词抽取接入后，J04 可以把关键词与改写后的问题一起作为 `terms` 传入。
+- **回滚**：撤销 `repositories/graph_search.py` 与 `tests/integration/test_j02.py`；无数据迁移。
+- **签收**：由 Claude 选定并在交接中报告；第 2～4 条的匹配规则与占位值待 J04 实测后确认。
