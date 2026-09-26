@@ -869,3 +869,18 @@ D10、E04、E05、C10、I04 的前置均已合入 main@`f37262c`（D10：D09 #22
 | K07 | IN REVIEW（PR #232） | 复用并审查环境启停脚本 | ArvinHan（Codex） | `codex/k07-dev-scripts` / `130e6b6` | `scripts/_dev-common.sh`、`scripts/dev-up.sh`、`scripts/dev-down.sh`、`tests/tooling/test_k07.py`、`docs/integrations.md`、`docs/handoffs/codex-k07.md`、本节 | `docs/handoffs/codex-k07.md`；K07 **18 passed**，F01 假 Docker **9 passed / 3 skipped**，`./scripts/verify.sh` exit 0，`git diff --check` 通过；review P3 修复后复审无新发现。普通停止保留数据；显式销毁只在精确交互确认后执行 `compose down -v`，绑定目录保留；未运行真实 Compose。PR #232 |
 
 - 验收：缺失 `.env` 时明确报错、不 source 或改写个人 `.env`；默认停止保留数据；销毁须明确交互确认。验证：`python3 -m pytest tests/tooling/test_k07.py -q`、`SMARTSKETCH_SKIP_DOCKER=1 python3 -m pytest tests/integration/test_f01.py -q`、`./scripts/verify.sh`。
+
+## TD 技术债四项（2026-09-25，Claude）
+
+来源：D11（#239）、J03（#242）、C10/C11 实现中发现的四个问题，ArvinHan 在会话中确认「按建议修改」。
+
+| ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| TD-01 | DONE（待 PR 审查/合并） | PDF 解析器版本格式定稿（ADR-018 修订 1）+ E04 问答截止时间 + 改写预写失败口径 | ArvinHan（Claude） | `claude/pdf-parser-version-tech-debt-e95eaf` / `ddbeb82` | `src/backend/app/services/parsers/pdf_headings.py`、`src/backend/app/services/chunk_identity.py`、`src/backend/app/services/ai/policy.py`、`tests/backend/test_d06.py`、`tests/backend/test_d09.py`、`tests/backend/test_e04.py`、`docs/decisions.md`（ADR-018 修订 1）、`docs/architecture.md`（资料修订一行）、`docs/integrations.md`（调用记录第 1 条、问答链路截止时间）、`specs/grounded-qa.md`（链路时限、P3）、本节、`docs/handoffs/claude-td-01.md` | `docs/handoffs/claude-td-01.md` |
+| TD-02 | TODO | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | 未认领 | C10、C11（#241）、D11（#239）全部合并后再开始 | `src/backend/app/services/task_cancel.py`（C10）、C11 与 D11 服务层中的任务读取、`src/backend/app/repositories/tasks.py` | 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL（C10 同文件的取消 UPDATE 一并评估是否迁移）；C10/C11/D11 现有测试不改断言即通过 |
+
+TD-01 带出的跟进项（由对应 PR 的负责人在合并前处理）：
+
+- **D11（#239）**：worker 删除自拼的 `PDF_PARSER_VERSION`，改为引用 `pdf_headings.CLEANED_PARSER_VERSION`（取值逐字相同，块 ID 不变）；清洗只用默认阈值。
+- **J03（#242）**：补一条测试——改写调用预写失败（`CallRecordError`）时改用原问题、不报错。
+- **J07（未开始）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
