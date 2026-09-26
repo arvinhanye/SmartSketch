@@ -1182,6 +1182,21 @@
 - **回滚**：撤销 `scripts/reembed.py` 与 `tests/integration/test_f14.py`；无数据迁移。已执行过的换空间按命令打印的步骤回退（SQLite 备份 + K10 Neo4j 恢复，或用旧配置再跑一次）。
 - **签收**：ArvinHan 2026-09-26 在项目频道回复「全部合并」，接受第 2 条（Neo4j 备份由操作者确认、未完成的发布尝试不论是否过期都拒绝）等约定。
 
+## ADR-039：K08 应用容器与常驻 worker 入口
+
+- **日期**：2026-09-26
+- **背景**：K08 要给前端、API、worker 出容器配置，并要求「按 A06 运行 worker、容器健康检查、密钥只在后端、前端构建不含密钥」。仓库此前没有常驻 worker 进程（只有单次 `run_pipeline_once`），C01/B06 要求的 worker 启动门禁也无处调用；后端运行时按相对仓库根的路径加载迁移、生成 DTO 与提示词。
+- **决定**：
+  1. 新增 `python -m app.workers`（实现在 `app/workers/runner.py`，`__main__.py` 只转调，因为 spawn 子进程无法按名导入 `-m` 的 `__main__`）：先调 `validate_schema_current` 与 `validate_embedding_space`，失败退出码 2；监督进程起 `WORKER_PROCESSES` 个子进程循环 `run_pipeline_once`，无任务时空闲 2 秒；任一子进程意外退出即停掉其余并以退出码 3 退出，交给容器重启策略；监督进程每 10 秒刷新心跳文件，`--health` 以 60 秒为陈旧阈值。
+  2. SIGTERM/SIGINT 后不再领取新任务，当前一轮跑完再退出；不在阶段中途打断（阶段内没有协作式取消点）。宽限期（compose 90 秒）内没跑完的任务被强杀，按 §8.2 租约过期接管。这比 §8.3「正常退出先主动释放」弱：正在跑的任务要等满一个租约才被接管。
+  3. `run_loop` 留 `maintenance` 挂点（每轮之后执行，默认空），供定期清扫（如 G05 的按课程清扫）接入；接不接由后续任务决定。
+  4. worker 在 `LLM_MODE=live` 时用 E03 `CompatibleModelClient`（有备用四项时建备用）外包 E04 策略，调用记录写应用 SQLite；`fake` 时用 E02 缺省 fake 客户端。抽取输出上限固定 4096 token（与 K02 评测一致），暂不设环境变量。
+  5. compose 应用服务全部放 `app` profile，`dev-up.sh` 与 F01 不受影响；`migrate` 一次性服务先迁移，API/worker 等它成功退出。worker 只跑一个容器，不用 replicas 横向扩（§8.1 只支持同机）。SQLite 与上传文件在本地命名卷 `app-data`。
+  6. 后端镜像照搬仓库布局，只装 `pyproject.toml` 的运行依赖、不装后端包本身；非 root。前端镜像为 Vite 构建 + 非 root nginx，同源反向代理 `/api/`，没有构建参数。密钥只经 `env_file: .env` 进后端三服务。
+- **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
+- **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
 ## ADR-040：H04 G6 画布生命周期
 
 - **日期**：2026-09-26
@@ -1229,20 +1244,18 @@
 - **回滚**：撤销 `evaluation/ablation.py`、`evaluation/prompts/extract_joint.yaml` 与测试；撤回付费确认后不得再用真实模型运行消融。
 - **签收**：ArvinHan 2026-09-26 在会话中回复「确认」（第 1 条）；第 2、3 条由 Claude 选定并在交接中报告。
 
-## ADR-039：K08 应用容器与常驻 worker 入口
+## ADR-046：J01 文本块向量检索的「多取再过滤」与补足召回
 
 - **日期**：2026-09-26
-- **背景**：K08 要给前端、API、worker 出容器配置，并要求「按 A06 运行 worker、容器健康检查、密钥只在后端、前端构建不含密钥」。仓库此前没有常驻 worker 进程（只有单次 `run_pipeline_once`），C01/B06 要求的 worker 启动门禁也无处调用；后端运行时按相对仓库根的路径加载迁移、生成 DTO 与提示词。
+- **背景**：V8 规定文本块向量各版本共享、查询后按 `course_id` 与绑定版本修订列表过滤，并说明 Neo4j 向量索引做不到先过滤再检索，「取多少由 J01 实测召回后确定」。一次取固定条数时，他课或版本外的近邻可能把本课结果挤出窗口，召回不足。
 - **决定**：
-  1. 新增 `python -m app.workers`（实现在 `app/workers/runner.py`，`__main__.py` 只转调，因为 spawn 子进程无法按名导入 `-m` 的 `__main__`）：先调 `validate_schema_current` 与 `validate_embedding_space`，失败退出码 2；监督进程起 `WORKER_PROCESSES` 个子进程循环 `run_pipeline_once`，无任务时空闲 2 秒；任一子进程意外退出即停掉其余并以退出码 3 退出，交给容器重启策略；监督进程每 10 秒刷新心跳文件，`--health` 以 60 秒为陈旧阈值。
-  2. SIGTERM/SIGINT 后不再领取新任务，当前一轮跑完再退出；不在阶段中途打断（阶段内没有协作式取消点）。宽限期（compose 90 秒）内没跑完的任务被强杀，按 §8.2 租约过期接管。这比 §8.3「正常退出先主动释放」弱：正在跑的任务要等满一个租约才被接管。
-  3. `run_loop` 留 `maintenance` 挂点（每轮之后执行，默认空），供定期清扫（如 G05 的按课程清扫）接入；接不接由后续任务决定。
-  4. worker 在 `LLM_MODE=live` 时用 E03 `CompatibleModelClient`（有备用四项时建备用）外包 E04 策略，调用记录写应用 SQLite；`fake` 时用 E02 缺省 fake 客户端。抽取输出上限固定 4096 token（与 K02 评测一致），暂不设环境变量。
-  5. compose 应用服务全部放 `app` profile，`dev-up.sh` 与 F01 不受影响；`migrate` 一次性服务先迁移，API/worker 等它成功退出。worker 只跑一个容器，不用 replicas 横向扩（§8.1 只支持同机）。SQLite 与上传文件在本地命名卷 `app-data`。
-  6. 后端镜像照搬仓库布局，只装 `pyproject.toml` 的运行依赖、不装后端包本身；非 root。前端镜像为 Vite 构建 + 非 root nginx，同源反向代理 `/api/`，没有构建参数。密钥只经 `env_file: .env` 进后端三服务。
-- **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
-- **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
-- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+  1. 检索在 `repositories/vector_search.py` 的 `search_chunks`：查询 `chunk_embedding_<suffix>` 索引，在同一条 Cypher 中按 `course_id` 与 `revision_id IN 修订列表` 过滤（不按 `material_id`），返回文本块 ID、修订、资料 ID 与相似度。
+  2. 初始取 `limit × fetch_factor` 条；过滤后不足 `limit` 且索引返回满额时，按 `fetch_factor` 倍扩大重查，直到凑满、索引取尽或到达 `max_fetch`。封顶时记告警并返回已有结果，不报错。`fetch_factor = 4`、`max_fetch = 1000` 为占位值，待 J04 用真实课程实测召回后调整。
+  3. 查询向量必须属于调用方传入的当前空间，维度与数值在查询前校验（V12）；只接受已发布版本作用域，草稿作用域拒绝。
+  4. `score` 为 Neo4j 余弦相似度归一到 `[0, 1]` 的值，索引为近似检索。相关度阈值和「可定位」条件（Q3.1 第 3 条）由 J04/J06 判断，本函数不做。
+- **后果**：跨课与旧版本文本块不会进入候选；本课文本块被大量近邻挤压时，最多多查几轮。按当前实现，运行时没有任何环节为文本块写向量（只有 F14 迁移时会写），检索在接上写入之前只会返回空结果。
+- **回滚**：撤销 `repositories/vector_search.py` 与 `tests/integration/test_j01.py`；无数据迁移。
+- **签收**：由 Claude 选定并在交接中报告；第 2 条的占位值待 J04 实测后确认。
 
 ## ADR-047：F10 合并知识点与重接边
 

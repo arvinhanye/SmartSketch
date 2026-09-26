@@ -1198,3 +1198,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 合并后复验（协调者，HEAD 含八项合入）：后端 + 契约 + tooling 3465 passed；集成（真实 Neo4j 5.26）321 passed、3 skipped、1 failed——`test_k08.py::test_images_build`，本机 Docker 构建拉镜像遇 Docker Hub 429/构建内无网络，属环境问题，此前无 Docker 守护进程时该用例跳过，K08 镜像实机构建仍待人工复验；前端 438 passed、type-check 与 build 通过；`./scripts/verify.sh` 通过；`git diff --check` 干净。
 - 第九批待决（均需 ArvinHan）：ADR-047～054 签收；F10/F09 删除或合并后抽取重建同 ID 节点（F04 查 `merged_from` 或删除留墓碑）；关系是否加修订号（H08）；后端缺关系编辑路由 `/relations`（F06 仅服务层，H08 未联调）；H06 学生端资料名来源；J02 检索上限占位值；K10 compose 下 neo4j-admin 卷挂载与 F14 `--neo4j-backup-confirmed` 换接 K10 备份。
 - 本批合入后新解锁：F11、F12（F10+F09）、H07（H06+F09）、H11（H05+H06）、I02（I01）；J04 待 J01（PR #271）合并。
+
+## 2026-09-26 J01 发布来源向量检索（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J01 | DONE（PR #271，已合并 main 解决冲突） | 建立发布来源向量检索 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@5ff441b` | `src/backend/app/repositories/vector_search.py`、`tests/integration/test_j01.py`；扩围 `docs/decisions.md`（ADR-046） | 红灯：收集错误（模块不存在）；`test_j01.py` 16 passed（真实 Neo4j 5.26）；9 处反向篡改 7 处检出，余 2 处为冗余防护；后端全量与 `verify.sh` 见 `docs/handoffs/claude-j01.md` |
+
+- 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
+- J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
