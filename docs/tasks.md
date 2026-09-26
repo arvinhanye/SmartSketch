@@ -1092,3 +1092,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：四类边样式两两可区分且带中文图例名；`source/target` 取 `from_id/to_id`，仅 `RELATED_TO` 无箭头；缺端点、外课、重复 ID 的元素不进画布并逐条报告；空图得空数组；元素 ID 为 `kp:`/`rel:` 前缀且按码点排序，输入乱序输出逐字节相同；深冻结输入照常转换，输出不引用输入对象。
 - H03 待决：边颜色为占位方案未经设计签收；`rejected`/`low_confidence` 的样式与过滤、`issues` 是否提示给教师，留给 H04/H05。
+
+## 2026-09-26 K08 应用容器（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| K08 | DONE（待 PR 审查/合并；真实镜像构建未在本机运行） | 实现前后端与 worker 容器配置 | ArvinHan（Claude） | `claude/project-thread-cd4etm` / `main@95d5c9a` | `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`docker-compose.yml`、`tests/integration/test_k08.py`；**范围扩展**：`src/backend/app/workers/__main__.py`、`src/backend/app/workers/runner.py`（仓库原无常驻 worker 入口）、`src/frontend/nginx.conf`、`.dockerignore`、`.env.example`、`docs/integrations.md`「应用容器（K08）」、`docs/architecture.md` worker 行、`docs/decisions.md` ADR-039、本节、`docs/handoffs/claude-k08.md` | `test_k08.py` 22 项：21 passed、1 skipped（真实构建，本机无 Docker 守护进程）；后端全量 2962 passed；F01 9 passed；`verify.sh` exit 0；`docker compose --profile app config` exit 0 |
+
+- 验收：worker 按 A06 §8.1 运行（同机、同 SQLite 卷、`WORKER_PROCESSES` 个进程、启动门禁与 API 相同）；API/worker/web 均有健康检查；密钥只经 `env_file` 进后端三服务；前端 Dockerfile 无构建参数、只 COPY `src/frontend/`，`.dockerignore` 排除 `.env*`。
+- K08 待决：镜像真实构建与整套启动未在本机跑（无 Docker 守护进程），须在有 Docker 的机器上跑 `docker compose --profile app up -d --build` 复验；worker 优雅停止不释放在途任务（ADR-039 第 2 条）；`maintenance` 挂点是否接 G05 清扫留给后续任务；镜像基底未钉摘要。

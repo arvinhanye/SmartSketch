@@ -284,6 +284,31 @@ cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
 - `dev-down.sh` 默认只停止 Neo4j，保留 Compose 卷和绑定数据；`--destroy` 需要显式开关及交互终端精确确认，拒绝或非交互执行不会删卷。`compose down -v` 不删除绑定目录 `neo4j/data`、`neo4j/logs`，也不清理 `storage/`。
 - 验收测试：`python3 -m pytest tests/integration/test_f01.py -q`。没有 Docker 守护进程时，真实容器用例自动跳过；设 `SMARTSKETCH_SKIP_DOCKER=1` 也可跳过。
 
+## 应用容器（K08）
+
+前端、API 与 worker 的容器配置在 `docker-compose.yml` 的 `app` profile 里；不带 `--profile app` 时 compose 与 `scripts/dev-up.sh` 只管 Neo4j，行为同 F01。决定见 ADR-039。
+
+| 服务 | 镜像 / 命令 | 说明 |
+| --- | --- | --- |
+| `migrate` | `smartsketch-backend:local`，`python -m app.repositories.sqlite && python -m app.repositories.graph_migrations` | 一次性：等 Neo4j 健康后执行 SQLite 与 Neo4j 迁移，成功退出后 API 与 worker 才启动（两者启动门禁拒绝未迁移的库） |
+| `api` | 同上，`python -m app` | 不发布端口；健康检查为镜像内 `GET /health` |
+| `worker` | 同上，`python -m app.workers` | 按 A06 §8.1：一个容器内起 `WORKER_PROCESSES` 个进程，互斥靠 C09 租约；不要用 scale/replicas 扩；健康检查 `python -m app.workers --health`（监督进程心跳文件 60 秒内刷新过）；停止宽限 90 秒 |
+| `web` | `smartsketch-frontend:local`（nginx 非 root，监听 8080） | 静态资源 + `/api/` 反向代理到 `api:8000`（SSE 关闭缓冲）；只绑 `127.0.0.1:${WEB_PUBLISH_PORT:-8080}` |
+
+- **镜像**：两个 Dockerfile 的构建上下文都是仓库根目录，只 COPY 白名单路径；根目录 `.dockerignore` 另外排除所有 `.env*`、`.git`、运行数据与依赖目录。后端镜像按仓库布局放 `/app/src/backend`、`/app/src/contracts/v1/generated/python`、`/app/prompts`（运行时按相对路径加载迁移、生成 DTO 与提示词，C04 风险项），只装 `pyproject.toml` 声明的运行依赖，不装后端包本身；以 uid 10001 非 root 运行。
+- **密钥**：只经 `env_file: .env` 进入 `migrate`/`api`/`worker`；`web` 没有 `env_file`、`environment` 与构建参数，前端 Dockerfile 不声明任何 `ARG`/`ENV` 形式的密钥。镜像里没有密钥。
+- **数据**：SQLite 与上传文件在本地命名卷 `app-data`（容器内 `/data`），API 与 worker 共用。compose 在容器里固定覆盖 `API_HOST=0.0.0.0`、`NEO4J_URI=bolt://neo4j:7687`、`SQLITE_URL=sqlite:////data/smartsketch.sqlite3`、`STORAGE_DIR=/data/storage`、`WEB_ORIGIN=http://localhost:${WEB_PUBLISH_PORT:-8080}`，其余取 `.env`。
+- **compose 变量**：`WEB_PUBLISH_PORT`（缺省 `8080`，只用于端口发布与 `WEB_ORIGIN`）。**镜像内变量**：`WORKER_HEARTBEAT_FILE`（缺省 `/tmp/smartsketch-worker.heartbeat`，worker 心跳文件路径，一般无需改）。
+
+```bash
+cp .env.example .env   # 首次；填 NEO4J_PASSWORD，API 还需要 ≥ 32 字节的 AUTH_JWT_SECRET
+docker compose --profile app up -d --build
+docker compose --profile app ps          # migrate 为 exited (0)，其余 healthy
+docker compose --profile app down        # 保留 app-data 卷
+```
+
+- 验收测试：`python3 -m pytest tests/integration/test_k08.py -q`。真实镜像构建用例在没有 Docker 守护进程或 `SMARTSKETCH_SKIP_DOCKER=1` 时跳过。
+
 ## 计划集成
 
 | 集成 | 用途 | 接入前置条件 |

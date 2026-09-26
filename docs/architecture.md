@@ -29,7 +29,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/schemas/` | 请求/响应/事件 DTO | 持久化实现 |
 | `src/backend/app/services/` | 领域规则、流程编排 | HTTP/框架细节 |
 | `src/backend/app/repositories/` | Neo4j / SQLite 读写 | 产品策略 |
-| `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011） | Web 请求处理；跨机器部署 |
+| `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011）；常驻入口 `python -m app.workers`（`workers/runner.py`，K08/ADR-039）先过与 API 相同的启动门禁，再起 `WORKER_PROCESSES` 个子进程循环调用 `run_pipeline_once` | Web 请求处理；跨机器部署 |
 | `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
 
 ## 前端构建、测试与应用外壳（B01～B04）
