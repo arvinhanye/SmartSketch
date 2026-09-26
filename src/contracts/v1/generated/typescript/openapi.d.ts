@@ -157,6 +157,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/{cid}/documents/{did}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                did: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 删除未产生图谱贡献的资料（教师）
+         * @description 只有该资料的全部任务都处于 `failed` 或 `cancelled` 时才可删除（ADR-021）：其贡献从未提交，
+         *     删除资料、任务、解析修订与文本块及存储文件。有未结束任务或已有任务处理结束时返回 409。
+         *
+         */
+        delete: operations["deleteDocument"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{tid}": {
         parameters: {
             query?: never;
@@ -647,7 +673,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE";
         PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
         /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
         PublishBlockedCycleReason: {
@@ -743,6 +769,8 @@ export interface components {
             format: components["schemas"]["DocumentFormat"];
             size_bytes?: number;
             parse_status: components["schemas"]["TaskStage"];
+            /** @description 该资料最新创建任务的 ID，与 `parse_status` 同源（D-16、ADR-021）；没有任务时为 null。可用于续订 SSE 与取消。 */
+            task_id: string | null;
             /** Format: date-time */
             uploaded_at: string;
         };
@@ -859,6 +887,18 @@ export interface components {
          *     运行时由 C08 状态迁移纯函数保证。
          *      */
         FixedStageProgress: unknown & unknown;
+        /** @description 删除资料被拒（ADR-021）。`details.stage` 为阻塞任务的实际阶段，前端据此刷新资料状态（H02）。 */
+        DocumentNotDeletableError: components["schemas"]["Error"] & {
+            /** @constant */
+            code: "DOCUMENT_NOT_DELETABLE";
+            details: components["schemas"]["DocumentNotDeletableDetails"];
+        };
+        /** @description 阻塞删除的任务阶段与原因（ADR-021）。 */
+        DocumentNotDeletableDetails: {
+            stage: components["schemas"]["TaskStage"];
+            /** @enum {string} */
+            reason: "processing" | "contributed" | "cleanup_pending";
+        };
         /** @description 取消被拒（`specs/task-processing.md` §4）。`details.stage` 为任务实际阶段，前端据此刷新界面（H02）；
          *     `details.reason` 与 `stage` 的组合是闭集。
          *      */
@@ -1763,6 +1803,7 @@ export interface components {
     parameters: {
         /** @description 课程 ID，所有查询的第一隔离条件 */
         CourseId: string;
+        DocumentId: string;
         TaskId: string;
         UserId: string;
         KnowledgePointId: string;
@@ -2047,6 +2088,44 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             413: components["responses"]["FileTooLarge"];
             415: components["responses"]["UnsupportedFormat"];
+        };
+    };
+    deleteDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                did: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已删除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 资料不存在，或不属于该课程（`NOT_FOUND`）。 */
+            404: components["responses"]["NotFound"];
+            /** @description `DOCUMENT_NOT_DELETABLE`，`details: {stage, reason}`。`reason` 取值：`processing`（有未结束任务，
+             *     `stage` 为其阶段）、`contributed`（有任务到达 `awaiting_review` 或 `completed`，`stage` 为其阶段）、
+             *     `cleanup_pending`（有失败任务的图谱清理尚未完成，`stage = failed`）。
+             *      */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNotDeletableError"];
+                };
+            };
         };
     };
     getTask: {

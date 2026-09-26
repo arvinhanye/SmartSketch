@@ -17,6 +17,8 @@ import { useCourseStore, type CourseRequestScope } from '../stores/course'
  * - 「取消中」只看服务端 `cancel_requested = true` 且非终态，「已取消」只看 `stage = cancelled`；
  *   409 `TASK_NOT_CANCELLABLE` 以 `details.stage` 刷新界面，不假装取消成功（`specs/task-processing.md` §4）。
  * - 失败/取消后的重试 = 用本次会话保留的同一文件重新上传，生成新任务（I3：不复活旧任务；契约无再处理端点）。
+ * - 列表中仍在处理的资料按 `Document.task_id` 续订进度（ADR-021），刷新页面后仍可看进度与取消。
+ * - 失败/已取消的资料可删除（ADR-021）：先确认再请求；409 `DOCUMENT_NOT_DELETABLE` 以 `details.stage` 刷新。
  * - 离开页面（路由离开、卸载、切课）关闭全部订阅并中止在途请求；迟到回调一律丢弃。
  * - 错误只按状态码/错误码给固定文案，不回显服务端 message。
  */
@@ -181,6 +183,21 @@ const CANCEL_REASON_MESSAGE: Record<string, string> = {
   already_terminal: '任务已结束，无法取消。',
 }
 
+const DELETE_REASON_MESSAGE: Record<string, string> = {
+  processing: '资料仍在处理中，不能删除。',
+  contributed: '资料已进入图谱（待审核或已完成），不能删除。',
+  cleanup_pending: '资料的图谱清理尚未完成，请稍后再删除。',
+}
+
+function deleteErrorMessage(cause: unknown): string {
+  if (isNetworkFailure(cause)) return '无法连接服务器，删除未提交，请检查网络后重试。'
+  if (cause instanceof ApiError) {
+    if (cause.status === 401) return '登录已失效，请重新登录。'
+    if (cause.status === 403) return '当前账号无权删除该资料。'
+  }
+  return '删除失败，请稍后重试。'
+}
+
 function cancelErrorMessage(cause: unknown): string {
   if (isNetworkFailure(cause)) return '无法连接服务器，取消未提交，请检查网络后重试。'
   if (cause instanceof ApiError) {
@@ -215,6 +232,19 @@ export interface MaterialRow {
   needsReselect: boolean
   streamNotice: string | null
   canReconnect: boolean
+  /** 失败/已取消的资料可删除（ADR-021） */
+  canDelete: boolean
+  confirmingDelete: boolean
+  deletePending: boolean
+  deleteError: string | null
+}
+
+interface DeleteState {
+  confirming: boolean
+  pending: boolean
+  error: string | null
+  /** 409 后不再提供删除入口（清理未完成除外） */
+  blocked: boolean
 }
 
 interface TrackedTask {
@@ -265,6 +295,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
   // File 不放进响应式对象（代理后不再是 Blob）；按资料 ID 保存本次会话上传的文件，用于重试
   const files = new Map<string, File>()
   const retryable = ref<Record<string, true>>({})
+  const deletions = ref<Record<string, DeleteState>>({})
 
   const selectedName = ref<string | null>(null)
   let selectedFile: File | null = null
@@ -299,6 +330,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     tracked.value = {}
     files.clear()
     retryable.value = {}
+    deletions.value = {}
     selectedName.value = null
     selectedFile = null
     fileInvalid.value = false
@@ -348,6 +380,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       // 资料按 course_id 隔离，不接收别的课程的数据
       documents.value = list.filter((d) => d.course_id === s.courseId)
       pageStatus.value = 'ready'
+      adopt(s)
     } catch (cause) {
       if (!alive(s) || cause instanceof AbortedError) return
       if (cause instanceof ApiError && cause.code === 'COURSE_FORBIDDEN') {
@@ -377,6 +410,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       const list = await materialsApi.list(s.courseId, { signal: s.controller.signal })
       if (!alive(s)) return
       documents.value = list.filter((d) => d.course_id === s.courseId)
+      adopt(s)
     } catch {
       // 忽略：下次进入页面或上传会再刷新
     }
@@ -443,6 +477,26 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       cancelError: null,
     }
     subscribe(s, accepted.document_id)
+  }
+
+  /** 列表中仍在处理、尚未跟踪的资料：按 `task_id` 续订进度（ADR-021） */
+  function adopt(s: PageSession): void {
+    for (const d of documents.value) {
+      if (!d.task_id || !ACTIVE_STAGES.has(d.parse_status) || tracked.value[d.id]) continue
+      tracked.value[d.id] = {
+        taskId: d.task_id,
+        documentId: d.id,
+        filename: d.filename,
+        stage: d.parse_status,
+        progress: 0,
+        cancelRequested: false,
+        error: null,
+        stream: 'connecting',
+        cancelPending: false,
+        cancelError: null,
+      }
+      subscribe(s, d.id)
+    }
   }
 
   function reconnect(documentId: string): void {
@@ -561,6 +615,80 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     }
   }
 
+  // ------------------------------------------------------------ 删除（ADR-021）
+
+  function deletionOf(documentId: string): DeleteState {
+    const existing = deletions.value[documentId]
+    if (existing) return existing
+    const created: DeleteState = { confirming: false, pending: false, error: null, blocked: false }
+    deletions.value[documentId] = created
+    return deletions.value[documentId]!
+  }
+
+  function requestDelete(documentId: string): void {
+    const d = deletionOf(documentId)
+    if (d.pending) return
+    d.confirming = true
+    d.error = null
+  }
+
+  function cancelDelete(documentId: string): void {
+    const d = deletions.value[documentId]
+    if (d && !d.pending) d.confirming = false
+  }
+
+  function forget(s: PageSession, documentId: string): void {
+    const t = tracked.value[documentId]
+    if (t) {
+      s.subs.get(t.taskId)?.close()
+      s.subs.delete(t.taskId)
+    }
+    documents.value = documents.value.filter((d) => d.id !== documentId)
+    delete tracked.value[documentId]
+    delete retryable.value[documentId]
+    delete deletions.value[documentId]
+    files.delete(documentId)
+  }
+
+  async function confirmDelete(documentId: string): Promise<void> {
+    const s = session
+    const d = deletions.value[documentId]
+    // 防重入用同步标志：两次点击可能在按钮禁用前连续到达
+    if (s === null || !alive(s) || !d || !d.confirming || d.pending) return
+    d.pending = true
+    d.error = null
+    try {
+      await materialsApi.deleteDocument(s.courseId, documentId, { signal: s.controller.signal })
+      if (!alive(s)) return
+      forget(s, documentId)
+    } catch (cause) {
+      if (!alive(s) || cause instanceof AbortedError) return
+      if (cause instanceof ApiError && cause.status === 404) {
+        forget(s, documentId)
+        return
+      }
+      d.confirming = false
+      if (cause instanceof ApiError && cause.code === 'DOCUMENT_NOT_DELETABLE') {
+        const stage = cause.details?.stage
+        const reason = cause.details?.reason
+        // 只有「仍在处理」时阻塞任务就是当前进度所在，刷新阶段；「已进入图谱」来自更早的任务，行仍显示最新任务
+        if (reason === 'processing' && typeof stage === 'string' && ALL_STAGES.has(stage)) {
+          documents.value = documents.value.map((doc) =>
+            doc.id === documentId ? { ...doc, parse_status: stage as TaskStage } : doc,
+          )
+          const t = tracked.value[documentId]
+          if (t) t.stage = stage as TaskStage
+        }
+        d.blocked = reason !== 'cleanup_pending'
+        d.error = (typeof reason === 'string' && DELETE_REASON_MESSAGE[reason]) || '资料当前不能删除。'
+        return
+      }
+      d.error = deleteErrorMessage(cause)
+    } finally {
+      d.pending = false
+    }
+  }
+
   // ------------------------------------------------------------ 行
 
   function rowOf(
@@ -577,6 +705,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     const canRetry = ended && retryable.value[documentId] === true
     const stream = t?.stream
     const streamNotice = t && !ended && stream ? (STREAM_NOTICE[stream] ?? null) : null
+    const deletion = deletions.value[documentId]
     return {
       documentId,
       filename,
@@ -592,6 +721,10 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       needsReselect: ended && !canRetry,
       streamNotice,
       canReconnect: !!t && stream === 'broken' && ACTIVE_STAGES.has(t.stage),
+      canDelete: ended && !(deletion?.blocked ?? false),
+      confirmingDelete: deletion?.confirming ?? false,
+      deletePending: deletion?.pending ?? false,
+      deleteError: deletion?.error ?? null,
     }
   }
 
@@ -630,5 +763,8 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     retryTask,
     cancel,
     reconnect,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
   }
 }

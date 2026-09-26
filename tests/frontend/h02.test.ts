@@ -61,6 +61,7 @@ function doc(id: string, overrides: Partial<Document> = {}): Document {
     format: 'pdf',
     size_bytes: 2048,
     parse_status: 'awaiting_review',
+    task_id: null,
     uploaded_at: '2026-09-25T00:00:00Z',
     ...overrides,
   }
@@ -114,6 +115,7 @@ function fakeMaterialsApi(overrides: Partial<MaterialsApi> = {}) {
         }),
     ),
     cancelTask: vi.fn<MaterialsApi['cancelTask']>(overrides.cancelTask ?? (async (tid) => task(tid, 'cancelled'))),
+    deleteDocument: vi.fn<MaterialsApi['deleteDocument']>(overrides.deleteDocument ?? (async () => undefined)),
   }
 }
 
@@ -308,6 +310,14 @@ describe('H02 资料 API 封装', () => {
     expect((body as FormData).get('file')).toBeInstanceOf(File)
     expect(((body as FormData).get('file') as File).name).toBe('讲义.pdf')
     expect(new Headers(calls[0]!.init?.headers).get('Content-Type')).toBeNull()
+  })
+
+  it('deleteDocument 走契约 DELETE /api/v1/courses/{cid}/documents/{did}，204 无响应体', async () => {
+    const { calls, fetch } = recordingFetch(() => new Response(null, { status: 204 }))
+    const api = createMaterialsApi(createHttpClient({ fetch }))
+    await expect(api.deleteDocument(CID, 'd/1')).resolves.toBeUndefined()
+    expect(calls[0]!.url).toBe('/api/v1/courses/c1/documents/d%2F1')
+    expect(calls[0]!.init?.method).toBe('DELETE')
   })
 
   it('cancelTask 走 POST /api/v1/tasks/{tid}/cancel', async () => {
@@ -847,5 +857,210 @@ describe('H02 路由接入', () => {
     expect(() =>
       mount(MaterialsView, { global: { plugins: [pinia] } }),
     ).toThrow(/MATERIALS_API_KEY|COURSES_API_KEY|TASK_EVENTS_CLIENT_KEY/)
+  })
+})
+
+// ---------------------------------------------------------------- ADR-021：刷新后续看进度、删除资料
+
+describe('H02 刷新后续看处理中的资料（Document.task_id）', () => {
+  it('列表中处理中的资料按 task_id 订阅进度，并可取消', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'extracting', task_id: 't9' })],
+    })
+    const { wrapper, events } = await mountPage({ materials })
+
+    expect(events.last().taskId).toBe('t9')
+    events.stage('t9', 'merging', 0.6)
+    await flushPromises()
+    const r = row(wrapper, 'd9')
+    expect(r.get('[data-test="material-status"]').text()).toBe('融合中')
+    expect(r.get('[data-test="material-progress"]').attributes('aria-valuenow')).toBe('60')
+
+    await r.get('[data-test="task-cancel"]').trigger('click')
+    await flushPromises()
+    expect(materials.cancelTask).toHaveBeenCalledWith('t9', expect.anything())
+  })
+
+  it('已结束或待审核的资料不订阅；没有 task_id 的资料也不订阅', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [
+        doc('d1', { parse_status: 'awaiting_review', task_id: 't1' }),
+        doc('d2', { parse_status: 'failed', task_id: 't2' }),
+        doc('d3', { parse_status: 'queued', task_id: null }),
+      ],
+    })
+    const { events } = await mountPage({ materials })
+
+    expect(events.subs).toHaveLength(0)
+  })
+
+  it('离开页面时关闭按 task_id 续订的流', async () => {
+    const materials = fakeMaterialsApi({ list: async () => [doc('d9', { parse_status: 'parsing', task_id: 't9' })] })
+    const { router, events } = await mountPage({ materials })
+
+    await router.push({ name: COURSE_ROUTE, params: { cid: CID } })
+    await flushPromises()
+    expect(events.last('t9').close).toHaveBeenCalled()
+  })
+})
+
+describe('H02 删除资料（ADR-021）', () => {
+  async function withDocs(docs: Document[], overrides: Partial<MaterialsApi> = {}) {
+    const materials = fakeMaterialsApi({ list: async () => docs, ...overrides })
+    return mountPage({ materials })
+  }
+
+  it('失败与已取消的资料可删除：先确认，确认后调用接口并移除该行', async () => {
+    const { wrapper, materials } = await withDocs([
+      doc('d1', { parse_status: 'failed', task_id: 't1' }),
+      doc('d2', { parse_status: 'cancelled', task_id: 't2' }),
+    ])
+
+    const r = row(wrapper, 'd1')
+    await r.get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    expect(materials.deleteDocument).not.toHaveBeenCalled()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(materials.deleteDocument).toHaveBeenCalledTimes(1)
+    expect(materials.deleteDocument).toHaveBeenCalledWith(CID, 'd1', expect.anything())
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d1"]').exists()).toBe(false)
+    expect(row(wrapper, 'd2').find('[data-test="material-delete"]').exists()).toBe(true)
+  })
+
+  it('可以取消删除确认', async () => {
+    const { wrapper, materials } = await withDocs([doc('d1', { parse_status: 'failed', task_id: 't1' })])
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-cancel"]').trigger('click')
+    await flushPromises()
+
+    expect(materials.deleteDocument).not.toHaveBeenCalled()
+    expect(row(wrapper, 'd1').find('[data-test="material-delete"]').exists()).toBe(true)
+  })
+
+  it.each(['queued', 'extracting', 'persisting', 'awaiting_review', 'completed'] as const)(
+    '%s 的资料不显示删除按钮',
+    async (stage) => {
+      const { wrapper } = await withDocs([doc('d1', { parse_status: stage, task_id: null })])
+      expect(row(wrapper, 'd1').find('[data-test="material-delete"]').exists()).toBe(false)
+    },
+  )
+
+  it('删除中重复确认只发一次请求', async () => {
+    const pending = deferred<undefined>()
+    const { wrapper, materials } = await withDocs([doc('d1', { parse_status: 'failed', task_id: 't1' })], {
+      deleteDocument: () => pending.promise,
+    })
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    const confirm = row(wrapper, 'd1').get('[data-test="material-delete-confirm"]')
+    // 不等待重渲染连续点击：按钮禁用前两次点击都会到达
+    void confirm.trigger('click')
+    void confirm.trigger('click')
+    await flushPromises()
+    expect(materials.deleteDocument).toHaveBeenCalledTimes(1)
+    expect(confirm.attributes('disabled')).toBeDefined()
+    pending.resolve(undefined)
+    await flushPromises()
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d1"]').exists()).toBe(false)
+  })
+
+  it('409 contributed（更早的任务已进入图谱）：提示并隐藏删除入口，行仍显示最新任务状态', async () => {
+    const { wrapper } = await withDocs([doc('d1', { parse_status: 'failed', task_id: 't1' })], {
+      deleteDocument: async () => {
+        throw apiError(409, 'DOCUMENT_NOT_DELETABLE', { stage: 'completed', reason: 'contributed' })
+      },
+    })
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    const r = row(wrapper, 'd1')
+    expect(r.get('[data-test="material-status"]').text()).toBe('处理失败')
+    expect(r.get('[data-test="delete-error"]').text()).toContain('已进入图谱')
+    expect(r.find('[data-test="material-delete"]').exists()).toBe(false)
+    expect(r.text()).not.toContain('服务端原文')
+  })
+
+  it('409 processing（列表已过时）：按 details.stage 刷新为处理中，不再显示删除', async () => {
+    const { wrapper } = await withDocs([doc('d1', { parse_status: 'cancelled', task_id: 't1' })], {
+      deleteDocument: async () => {
+        throw apiError(409, 'DOCUMENT_NOT_DELETABLE', { stage: 'parsing', reason: 'processing' })
+      },
+    })
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    const r = row(wrapper, 'd1')
+    expect(r.get('[data-test="material-status"]').text()).toBe('解析中')
+    expect(r.get('[data-test="delete-error"]').text()).toContain('仍在处理')
+    expect(r.find('[data-test="material-delete"]').exists()).toBe(false)
+  })
+
+  it('409 cleanup_pending：提示稍后再试，保留删除入口', async () => {
+    const { wrapper } = await withDocs([doc('d1', { parse_status: 'failed', task_id: 't1' })], {
+      deleteDocument: async () => {
+        throw apiError(409, 'DOCUMENT_NOT_DELETABLE', { stage: 'failed', reason: 'cleanup_pending' })
+      },
+    })
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    const r = row(wrapper, 'd1')
+    expect(r.get('[data-test="delete-error"]').text()).toContain('稍后')
+    expect(r.find('[data-test="material-delete"]').exists()).toBe(true)
+  })
+
+  it('404：资料已不存在，直接从列表移除', async () => {
+    const { wrapper } = await withDocs([doc('d1', { parse_status: 'failed', task_id: 't1' })], {
+      deleteDocument: async () => {
+        throw apiError(404, 'NOT_FOUND')
+      },
+    })
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d1"]').exists()).toBe(false)
+  })
+
+  it('网络失败：提示可重试，保留该行', async () => {
+    const { wrapper } = await withDocs([doc('d1', { parse_status: 'failed', task_id: 't1' })], {
+      deleteDocument: async () => {
+        throw new NetworkError(new TypeError('offline'))
+      },
+    })
+    await row(wrapper, 'd1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    const r = row(wrapper, 'd1')
+    expect(r.get('[data-test="delete-error"]').text()).toContain('网络')
+    expect(r.find('[data-test="material-delete"]').exists()).toBe(true)
+  })
+
+  it('本次会话上传后失败的资料删除后，文件缓存与跟踪一并清除', async () => {
+    const { wrapper, events, materials } = await mountPage()
+    await chooseFile(wrapper, file('第一章.pdf', 16, 'application/pdf'))
+    await submitUpload(wrapper)
+    events.failed('t1', 'DOCUMENT_UNREADABLE')
+    await flushPromises()
+
+    await row(wrapper, 'd_t1').get('[data-test="material-delete"]').trigger('click')
+    await flushPromises()
+    await row(wrapper, 'd_t1').get('[data-test="material-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(materials.deleteDocument).toHaveBeenCalledWith(CID, 'd_t1', expect.anything())
+    expect(wrapper.find('[data-test="material-row"][data-document-id="d_t1"]').exists()).toBe(false)
   })
 })

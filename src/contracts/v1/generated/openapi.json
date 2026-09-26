@@ -443,6 +443,49 @@
         }
       }
     },
+    "/api/v1/courses/{cid}/documents/{did}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CourseId"
+        },
+        {
+          "$ref": "#/components/parameters/DocumentId"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "删除未产生图谱贡献的资料（教师）",
+        "description": "只有该资料的全部任务都处于 `failed` 或 `cancelled` 时才可删除（ADR-021）：其贡献从未提交，\n删除资料、任务、解析修订与文本块及存储文件。有未结束任务或已有任务处理结束时返回 409。\n",
+        "operationId": "deleteDocument",
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "204": {
+            "description": "已删除"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound",
+            "description": "资料不存在，或不属于该课程（`NOT_FOUND`）。"
+          },
+          "409": {
+            "description": "`DOCUMENT_NOT_DELETABLE`，`details: {stage, reason}`。`reason` 取值：`processing`（有未结束任务，\n`stage` 为其阶段）、`contributed`（有任务到达 `awaiting_review` 或 `completed`，`stage` 为其阶段）、\n`cleanup_pending`（有失败任务的图谱清理尚未完成，`stage = failed`）。\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentNotDeletableError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks/{tid}": {
       "parameters": [
         {
@@ -1576,6 +1619,14 @@
           "type": "string"
         }
       },
+      "DocumentId": {
+        "name": "did",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
       "TaskId": {
         "name": "tid",
         "in": "path",
@@ -1760,7 +1811,8 @@
           "TASK_ATTEMPTS_EXHAUSTED",
           "PUBLISH_IN_PROGRESS",
           "COURSE_BUSY",
-          "BUDGET_EXCEEDED"
+          "BUDGET_EXCEEDED",
+          "DOCUMENT_NOT_DELETABLE"
         ]
       },
       "PublishBlockedReason": {
@@ -2085,6 +2137,7 @@
           "filename",
           "format",
           "parse_status",
+          "task_id",
           "uploaded_at"
         ],
         "properties": {
@@ -2105,6 +2158,13 @@
           },
           "parse_status": {
             "$ref": "#/components/schemas/TaskStage"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "该资料最新创建任务的 ID，与 `parse_status` 同源（D-16、ADR-021）；没有任务时为 null。可用于续订 SSE 与取消。"
           },
           "uploaded_at": {
             "type": "string",
@@ -2441,6 +2501,52 @@
             }
           }
         ]
+      },
+      "DocumentNotDeletableError": {
+        "description": "删除资料被拒（ADR-021）。`details.stage` 为阻塞任务的实际阶段，前端据此刷新资料状态（H02）。",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "required": [
+              "code",
+              "details"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "DOCUMENT_NOT_DELETABLE"
+              },
+              "details": {
+                "$ref": "#/components/schemas/DocumentNotDeletableDetails"
+              }
+            }
+          }
+        ]
+      },
+      "DocumentNotDeletableDetails": {
+        "type": "object",
+        "description": "阻塞删除的任务阶段与原因（ADR-021）。",
+        "required": [
+          "stage",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/TaskStage"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "contributed",
+              "cleanup_pending"
+            ]
+          }
+        }
       },
       "TaskNotCancellableError": {
         "description": "取消被拒（`specs/task-processing.md` §4）。`details.stage` 为任务实际阶段，前端据此刷新界面（H02）；\n`details.reason` 与 `stage` 的组合是闭集。\n",

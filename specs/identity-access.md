@@ -185,6 +185,7 @@
 | `removeMember` * | `DELETE /api/v1/courses/{cid}/members/{uid}` | 401 | COURSE | ROLE | ✓（仅学生成员） |
 | `listDocuments` | `GET /api/v1/courses/{cid}/documents` | 401 | COURSE | ROLE | ✓ |
 | `uploadDocument` | `POST /api/v1/courses/{cid}/documents` | 401 | COURSE | ROLE | ✓ |
+| `deleteDocument` | `DELETE /api/v1/courses/{cid}/documents/{did}` | 401 | COURSE | ROLE | ✓（ADR-021；他课或不存在的资料 404） |
 | `getTask` | `GET /api/v1/tasks/{tid}` | 401 | 404 | ROLE | ✓ |
 | `issueEventTicket` * | `POST /api/v1/tasks/{tid}/event-ticket` | 401 | 404 | ROLE | ✓ |
 | `streamTaskEvents` | `GET /api/v1/tasks/{tid}/events` | 401（票据，§5） | 404 | ROLE | ✓ |

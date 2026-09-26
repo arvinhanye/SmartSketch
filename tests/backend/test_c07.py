@@ -26,7 +26,7 @@ SECRET = "c07-test-signing-key-0123456789abcdefghij"
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 LIMIT = 64
 PDF_BYTES = b"%PDF-1.4\n% c07 minimal\n"
-DOCUMENT_KEYS = {"id", "course_id", "filename", "format", "size_bytes", "parse_status", "uploaded_at"}
+DOCUMENT_KEYS = {"id", "course_id", "filename", "format", "size_bytes", "parse_status", "task_id", "uploaded_at"}
 
 
 def _account(url: str, username: str, role: str):
@@ -488,6 +488,7 @@ def test_list_returns_contract_documents_after_upload(client, world):
     assert item["format"] == "pdf"
     assert item["size_bytes"] == len(PDF_BYTES)
     assert item["parse_status"] == "queued"
+    assert item["task_id"] == accepted["task_id"]  # ADR-021
     assert item["uploaded_at"].endswith("Z")
 
 

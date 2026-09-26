@@ -40,6 +40,9 @@ const {
   retryTask,
   cancel,
   reconnect,
+  requestDelete,
+  cancelDelete,
+  confirmDelete,
 } = useMaterials({ materialsApi, coursesApi, taskEvents, courseId })
 
 const limitText = formatBytes(MATERIAL_MAX_BYTES)
@@ -133,6 +136,7 @@ function onFileChange(event: Event): void {
             <p v-if="row.errorMessage" data-test="task-error" role="alert">{{ row.errorMessage }}</p>
             <p v-if="row.cancelError" data-test="cancel-error" role="alert">{{ row.cancelError }}</p>
             <p v-if="row.streamNotice" data-test="stream-status" role="status">{{ row.streamNotice }}</p>
+            <p v-if="row.deleteError" data-test="delete-error" role="alert">{{ row.deleteError }}</p>
             <p v-if="row.needsReselect" class="hint">如需再次处理，请重新选择文件上传。</p>
             <div class="actions">
               <button
@@ -163,6 +167,35 @@ function onFileChange(event: Event): void {
               >
                 重新连接
               </button>
+              <button
+                v-if="row.canDelete && !row.confirmingDelete"
+                type="button"
+                data-test="material-delete"
+                :aria-label="`删除资料「${row.filename}」`"
+                @click="requestDelete(row.documentId)"
+              >
+                删除资料
+              </button>
+              <template v-if="row.canDelete && row.confirmingDelete">
+                <span role="status">删除后不可恢复，确认删除？</span>
+                <button
+                  type="button"
+                  data-test="material-delete-confirm"
+                  :disabled="row.deletePending"
+                  :aria-label="`确认删除资料「${row.filename}」`"
+                  @click="confirmDelete(row.documentId)"
+                >
+                  {{ row.deletePending ? '正在删除…' : '确认删除' }}
+                </button>
+                <button
+                  type="button"
+                  data-test="material-delete-cancel"
+                  :disabled="row.deletePending"
+                  @click="cancelDelete(row.documentId)"
+                >
+                  不删除
+                </button>
+              </template>
             </div>
           </li>
         </ul>

@@ -52,7 +52,8 @@
         "TASK_ATTEMPTS_EXHAUSTED",
         "PUBLISH_IN_PROGRESS",
         "COURSE_BUSY",
-        "BUDGET_EXCEEDED"
+        "BUDGET_EXCEEDED",
+        "DOCUMENT_NOT_DELETABLE"
       ]
     },
     "FixedStageProgress": {
