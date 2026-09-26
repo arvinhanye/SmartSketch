@@ -13,7 +13,7 @@
 | `extract_relations` | 1 | `entity_table`、`source_chunks` | `evaluation/evaluate_extraction.py` | `0f70d551a4965794410208078505a064df8a8fc945bf1888618a42ae7acccf00` | E11 | 占位 |
 | `judge_duplicate` | 1 | `name_a`、`definition_a`、`name_b`、`definition_b` | `evaluation/evaluate_extraction.py` | `65e5f1c05e1fc811f4b92f68805625782ec93f8bdbb9f7adc93565d3c039cc6c` | E10 | 占位 |
 | `summarize_definition` | 1 | `name`、`definitions` | `evaluation/evaluate_extraction.py` | `6cea845cd8dd36247201f2799b75978468cd55c8ceb1092494e1e52c6c54cc7d` | E10 | 占位 |
-| `rewrite_query` | 1 | `history`、`question` | `evaluation/evaluate_qa.py` | `8ccf7c2370b26d781ea70956e23debd0610d61ad833f3430491188811213949b` | J03 | 占位 |
+| `rewrite_query` | 2 | `history`、`question` | `evaluation/evaluate_qa.py` | `26c5779846c8a164ef25b9b68d5b6f764f26545b1dc9300ae292b93a1c3ac261` | J03 | 草稿 |
 | `answer_with_context` | 1 | `context`、`question` | `evaluation/evaluate_qa.py` | `3deb3eb06ce8f3dabdf282e4445359c36522d70b918f9938996c604d3583bcba` | J05 | 占位 |
 | `gen_study_material` | — | — | — | — | O06 | 未建：待 O01 准入 |
 
