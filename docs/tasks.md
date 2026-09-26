@@ -971,7 +971,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| H01 | IN PROGRESS | 实现课程首页和创建表单 | ArvinHan（Claude 子代理） | `claude/h01-courses-view` / 本认领提交 | `src/frontend/src/views/CoursesView.vue`、`src/frontend/src/composables/useCourses.ts`、`src/frontend/src/api/courses.ts`（如需）、`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts`、`tests/frontend/h01.test.ts`、`docs/handoffs/claude-h01.md` | 待补 |
+| H01 | DONE（待 PR 审查/合并） | 实现课程首页和创建表单 | ArvinHan（Claude 子代理） | `claude/h01-courses-view` / 本认领提交 | `src/frontend/src/views/CoursesView.vue`、`src/frontend/src/composables/useCourses.ts`、`src/frontend/src/api/courses.ts`（如需）、`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts`、`tests/frontend/h01.test.ts`、`docs/handoffs/claude-h01.md` | h01 31 passed；前端全量 6 files 112 passed；type-check、build、`verify.sh`、`git diff --check` 均 exit 0；交接 `docs/handoffs/claude-h01.md` |
 
 - H01 验收：加载/空/错/禁止访问；重复点提交不重复创建；切课正确。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h01.test.ts`。
 
