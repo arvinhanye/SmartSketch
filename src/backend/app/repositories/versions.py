@@ -31,11 +31,13 @@ from app.repositories.sqlite import connect
 
 __all__ = [
     "CommitRejected",
+    "DraftState",
     "PublishInProgress",
     "VersionNotFound",
     "VersionRecord",
     "begin_attempt",
     "commit_attempt",
+    "complete_published_tasks",
     "current_version",
     "discard_attempt",
     "fail_attempt",
@@ -48,6 +50,7 @@ __all__ = [
     "mark_materialized",
     "new_version_id",
     "next_commit_seq",
+    "read_draft_state",
     "read_snapshot",
     "record_snapshot",
     "set_cleanup_pending",
@@ -439,3 +442,72 @@ def read_snapshot(sqlite_url: str, version_id: str) -> bytes | None:
         row = database.execute("SELECT snapshot_json FROM graph_versions WHERE version_id = ?",
                                (version_id,)).fetchone()
     return None if row is None or row[0] is None else row[0].encode("utf-8")
+
+
+# ---------------------------------------------------------------- G04 发布输入与 T7
+
+
+@dataclass(frozen=True)
+class DraftState:
+    """P4 在课程写锁内一次读出的 SQLite 部分（V3 可见性前提、V4）。
+
+    ``effective_task_ids`` 即有效任务集合 V；``task_watermark`` 为本课程当前最大 T6 提交序号（无则 0），
+    持锁时 V 恰为 T6 序号 ≤ 水位的 ``awaiting_review``/``completed`` 任务；``revisions`` 为 V 内任务产生的
+    全部资料修订 ``(revision_id, material_id, content_hash, parser_version)``，按 ``revision_id`` 升序。
+    """
+
+    course_id: str
+    draft_revision: int
+    published_version_id: str | None
+    task_watermark: int
+    effective_task_ids: tuple[str, ...]
+    revisions: tuple[tuple[str, str, str, str], ...]
+
+
+def read_draft_state(sqlite_url: str, course_id: str) -> DraftState:
+    """P4：在一个读事务里读草稿修订号、发布指针、任务水位、V 与 V 的资料修订。课程不存在抛 ``LookupError``。"""
+    _text("course_id", course_id)
+    with connect(sqlite_url) as database:
+        database.execute("BEGIN")
+        try:
+            row = database.execute(
+                "SELECT draft_revision, published_version_id FROM courses WHERE id = ?", (course_id,)
+            ).fetchone()
+            if row is None:
+                raise LookupError("course not found")
+            [watermark] = database.execute(
+                "SELECT coalesce(max(t6_seq), 0) FROM processing_tasks WHERE course_id = ?", (course_id,)
+            ).fetchone()
+            tasks = tuple(r[0] for r in database.execute(
+                """SELECT id FROM processing_tasks
+                   WHERE course_id = ? AND stage IN ('awaiting_review', 'completed') ORDER BY id""",
+                (course_id,),
+            ))
+            revisions = tuple(tuple(r) for r in database.execute(
+                """SELECT DISTINCT r.revision_id, r.material_id, r.content_hash, r.parser_version
+                   FROM processing_tasks t
+                   JOIN task_revisions tr ON tr.task_id = t.id AND tr.course_id = t.course_id
+                   JOIN material_revisions r ON r.revision_id = tr.revision_id AND r.course_id = t.course_id
+                   WHERE t.course_id = ? AND t.stage IN ('awaiting_review', 'completed')
+                   ORDER BY r.revision_id""",
+                (course_id,),
+            ))
+        finally:
+            database.execute("COMMIT")
+    return DraftState(course_id, int(row[0]), row[1], int(watermark), tasks, revisions)  # type: ignore[arg-type]
+
+
+def complete_published_tasks(database: sqlite3.Connection, course_id: str, task_watermark: int) -> int:
+    """T7（A03 §3），在调用方的提交事务里：水位以内的 ``awaiting_review`` 任务转 ``completed``。
+
+    T6 在同一事务里分配序号并进入 ``awaiting_review``，故这些任务的 ``t6_seq`` 非空；为兼容 009 之前的
+    历史行，空序号按 0 处理（它们一定早于任何水位可见）。
+    """
+    _require_transaction(database, "complete_published_tasks")
+    _count("task_watermark", task_watermark)
+    return database.execute(
+        """UPDATE processing_tasks
+           SET stage = 'completed', progress = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+           WHERE course_id = ? AND stage = 'awaiting_review' AND coalesce(t6_seq, 0) <= ?""",
+        (course_id, task_watermark),
+    ).rowcount
