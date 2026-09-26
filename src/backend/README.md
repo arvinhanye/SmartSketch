@@ -24,7 +24,7 @@ $env:AUTH_JWT_SECRET = .\.venv\Scripts\python.exe -c "import secrets; print(secr
 
 健康检查响应为 `{"status":"ok","version":"0.1.0"}`。`app/` 后续模块须遵守根目录 `AGENTS.md`。
 
-设置只读取进程环境变量，不自动加载 `.env` 文件；变量名、无敏感样例和取值约束见根目录 `.env.example` 与 `docs/integrations.md`。`python -m app` 使用 `API_HOST` 和 `API_PORT`；直接使用 Uvicorn CLI 时仍须自行传入监听参数。无效环境设置在应用导入/创建时抛出只含变量名的 `SettingsError`，密钥字段在设置对象的 `repr` 中打码。启动阶段检查 SQLite 中的向量空间；空间不一致时拒绝服务，保留原记录，待离线重新向量化。worker 入口建立时须调用同一检查函数。
+设置只读取进程环境变量，不自动加载 `.env` 文件；变量名、无敏感样例和取值约束见根目录 `.env.example` 与 `docs/integrations.md`。`python -m app` 使用 `API_HOST` 和 `API_PORT`；直接使用 Uvicorn CLI 时仍须自行传入监听参数。无效环境设置在应用导入/创建时抛出只含变量名的 `SettingsError`，密钥字段在设置对象的 `repr` 中打码。启动阶段检查 SQLite 中的向量空间；空间不一致时拒绝服务，保留原记录，待离线重新向量化（停 API 与 worker、备份 Neo4j 后运行 `python3 scripts/reembed.py --neo4j-backup-confirmed`，见 ADR-038）。worker 入口建立时须调用同一检查函数。
 
 ## Neo4j 图约束迁移（F03）
 
