@@ -1053,6 +1053,8 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G01 | DONE（待 PR 审查/合并） | 实现快照序列化和摘要 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@608be90`（#258 合并后重开） | `src/backend/app/services/versions/snapshot.py`、`tests/backend/test_g01.py`；扩围 `src/backend/app/services/versions/__init__.py`、`docs/decisions.md`（ADR-031） | `test_g01.py` 49 passed；12 处反向篡改均检出；后端全量 2870 passed；`verify.sh` exit 0；`docs/handoffs/claude-g01.md` |
+| G02 | DONE（待 PR 审查/合并） | 实现版本元数据与发布操作记录 | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/versions.py`、`src/backend/migrations/010_versions.sql`、`tests/backend/test_g02.py`；扩围 `tests/integration/test_f13.py`（009 回滚用例先回滚更新的迁移）、`docs/decisions.md`（ADR-032） | `test_g02.py` 22 passed；10 处反向篡改均检出；后端全量 2892 passed；集成（真实 Neo4j）103 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g02.md` |
 
 - 验收：规范化字节键序与数组顺序稳定（PUB-10，乱序构造摘要相同）；端点缺失、来源无效、成环、空图、谱系违规逐条拒绝并符合契约 `PublishBlockedDetails`；`load_snapshot` 读回与原快照逐字节相同、不丢任何属性；PUB-8 排除计数、PUB-9、PUB-11 均有用例。
 - G01 待决：从 Neo4j/SQLite 读出可见草稿与修订的装载归 G04（P4～P7）；快照章节带 `parent_id`，而 Neo4j 章节与契约 `Chapter` 尚无此字段，章节层级落地时需同步（ADR-031）。
+- G02 验收：同一尝试（幂等键 `version_id`）至多成为一个版本；版本号按课程连续、失败不占号，`(course_id, version)` 唯一；失败行带原因永久可查且不进版本列表；已提交版本不可删改。G02 待决：清扫过期尝试归 G05；租约时长由调用方传入（G04 读 `PUBLISH_LEASE_SECONDS`）。

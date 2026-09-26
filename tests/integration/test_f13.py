@@ -243,14 +243,21 @@ def test_course_lock_is_renewed_while_held_and_released_after(db_url):
 
 
 def test_migration_009_rolls_back(db_url):
-    text = next(MIGRATIONS_DIR.glob("*_course_locks.sql")).read_text(encoding="utf-8")
-    lines = [line.split("ROLLBACK:", 1)[1].strip() for line in text.splitlines() if "ROLLBACK:" in line]
-    assert len(lines) == 4
+    target = next(MIGRATIONS_DIR.glob("*_course_locks.sql"))
+
+    def rollback_lines(path):
+        text = path.read_text(encoding="utf-8")
+        return [line.split("ROLLBACK:", 1)[1].strip() for line in text.splitlines() if "ROLLBACK:" in line]
+
+    assert len(rollback_lines(target)) == 4
+    # Later migrations are rolled back first, newest first, as a real rollback to 009 would.
+    later = sorted((p for p in MIGRATIONS_DIR.glob("*.sql") if p.name > target.name), reverse=True)
     database = sqlite3.connect(db_url.removeprefix("sqlite:///"))
     try:
         with database:
-            for line in lines:
-                database.execute(line)
+            for path in [*later, target]:
+                for line in rollback_lines(path):
+                    database.execute(line)
         columns = {row[1] for row in database.execute("PRAGMA table_info(processing_tasks)")}
         assert "t6_seq" not in columns
         assert not database.execute("SELECT 1 FROM sqlite_master WHERE name = 'course_locks'").fetchall()
