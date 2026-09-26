@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 
 import pytest
 
-from app.services.fusion.judge import FusionEntity, FusionEvidence, validate_pair
+from app.services.ai.fake import FakeModelClient
+from app.services.ai.policy import BudgetExceededError, ModelUnavailableError
+from app.services.fusion.judge import FusionEntity, FusionEvidence, FusionJudge, FusionReviewReason, validate_pair
 
 
 def _pair() -> tuple[FusionEntity, FusionEntity]:
@@ -60,3 +63,82 @@ def test_sensitive_fields_not_in_repr() -> None:
     assert "栈是后进先出的线性表" not in repr(left)
     assert "后进先出" not in repr(left)
     assert "堆栈遵循后进先出" not in repr(right.evidence[0])
+
+
+def _judgment(same: object = True, reason: str = "含义相同", refs: list[str] | None = None) -> str:
+    return json.dumps({"same": same, "reason": reason, "source_ids": refs or ["s1", "s2"]}, ensure_ascii=False)
+
+
+def _judge(*replies: str) -> tuple[FakeModelClient, object]:
+    client = FakeModelClient()
+    client.script(*replies)
+    left, right = _pair()
+    return client, FusionJudge(client, model="fake-model", max_output_tokens=4096).judge_duplicate(left, right)
+
+
+def test_judge_same_has_reason_and_known_sources() -> None:
+    client, result = _judge(_judgment())
+    assert result.same is True and result.reason == "含义相同"
+    assert result.source_ids == ("s1", "s2")
+    assert result.model_calls == len(client.calls) == 1
+    assert result.provenance.version == 2
+    assert client.calls[0].request.response_format == "json"
+
+
+def test_judge_false_skips_summary() -> None:
+    client, result = _judge(_judgment(False, "概念不同"))
+    assert result.same is False and result.review_reason is FusionReviewReason.NOT_SAME
+    assert len(client.calls) == 1
+
+
+def test_judge_rejects_integer_same_and_repairs_once() -> None:
+    client, result = _judge(_judgment(1), _judgment())
+    assert result.same is True and result.model_calls == 2
+    assert [call.request.purpose for call in client.calls] == ["judge_duplicate", "repair"]
+
+
+def test_judge_bad_json_twice_goes_review() -> None:
+    client, result = _judge("{bad", "{still bad")
+    assert result.same is None and result.review_reason is FusionReviewReason.INVALID_JUDGMENT
+    assert result.model_calls == len(client.calls) == 2
+
+
+def test_judge_truncated_then_bad_goes_review() -> None:
+    client, result = _judge("x" * 5000, "{bad")
+    assert result.review_reason is FusionReviewReason.INVALID_JUDGMENT
+    assert result.model_calls == len(client.calls) == 2
+
+
+@pytest.mark.parametrize("reason", [" ", "x" * 501])
+def test_judge_blank_or_overlong_reason_reviews(reason: str) -> None:
+    _, result = _judge(_judgment(reason=reason), _judgment(reason=reason))
+    assert result.same is None and result.review_reason is FusionReviewReason.INVALID_JUDGMENT
+
+
+def test_judge_budget_exceeded_goes_review() -> None:
+    client = FakeModelClient(responder=lambda _request: (_ for _ in ()).throw(BudgetExceededError("task")))
+    left, right = _pair()
+    result = FusionJudge(client, model="fake-model", max_output_tokens=4096).judge_duplicate(left, right)
+    assert result.same is None and result.review_reason is FusionReviewReason.BUDGET_EXCEEDED
+
+
+def test_judge_budget_on_repair_preserves_first_call_count() -> None:
+    attempts = 0
+    def responder(_request: object) -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return "{bad"
+        raise BudgetExceededError("task")
+    client = FakeModelClient(responder=responder)
+    left, right = _pair()
+    result = FusionJudge(client, model="fake-model", max_output_tokens=4096).judge_duplicate(left, right)
+    assert result.review_reason is FusionReviewReason.BUDGET_EXCEEDED
+    assert result.model_calls == 1
+
+
+def test_judge_unavailable_propagates() -> None:
+    client = FakeModelClient(responder=lambda _request: (_ for _ in ()).throw(ModelUnavailableError()))
+    left, right = _pair()
+    with pytest.raises(ModelUnavailableError):
+        FusionJudge(client, model="fake-model", max_output_tokens=4096).judge_duplicate(left, right)

@@ -2,11 +2,53 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import StrEnum
 
-from app.services.ai.client import ModelClient
+from app.services.ai.client import Message, ModelClient, ModelOutputError, ModelRequest, ModelResult
 from app.services.ai.entities import ENTITY_TYPES
 from app.services.ai.prompts import PromptLibrary
+from app.services.ai.policy import BudgetExceededError
+
+JUDGE_PURPOSE = "judge_duplicate"
+JUDGE_VERSION = 2
+
+
+class FusionReviewReason(StrEnum):
+    NOT_SAME = "not_same"
+    INVALID_JUDGMENT = "invalid_judgment"
+    INVALID_DEFINITION = "invalid_definition"
+    BUDGET_EXCEEDED = "budget_exceeded"
+
+
+@dataclass(frozen=True, slots=True)
+class PromptUse:
+    purpose: str
+    version: int
+    sha256: str
+    model_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateJudgment:
+    same: bool | None
+    reason: str | None
+    source_ids: tuple[str, ...]
+    review_reason: FusionReviewReason | None
+    provenance: PromptUse
+    model_calls: int
+
+
+class _InvalidOutput(Exception):
+    pass
+
+
+class _BudgetAbort(Exception):
+    def __init__(self, result: ModelResult | None, calls: int) -> None:
+        self.result = result
+        self.calls = calls
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,3 +112,75 @@ class FusionJudge:
         self._model = model
         self._max_output_tokens = max_output_tokens
         self._prompts = prompts or PromptLibrary()
+
+    def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:
+        return ModelRequest(
+            purpose=purpose,
+            model=model,
+            messages=messages,
+            max_output_tokens=self._max_output_tokens,
+            response_format="json",
+        )
+
+    def _call_and_parse(
+        self, purpose: str, messages: tuple[Message, ...], parser: Callable[[object], object]
+    ) -> tuple[object | None, ModelResult | None, int]:
+        """One model call and at most one same-model repair; bad output returns no value."""
+        calls = 0
+        result: ModelResult | None = None
+        for request_purpose in (purpose, "repair"):
+            try:
+                result = self._client.complete(self._request(request_purpose, result.model_requested if result else self._model, messages))
+            except BudgetExceededError:
+                raise _BudgetAbort(result, calls) from None
+            calls += 1
+            try:
+                if result.finish_reason == "length":
+                    raise _InvalidOutput()
+                value = result.json()
+                return parser(value), result, calls
+            except (ModelOutputError, _InvalidOutput):
+                continue
+        return None, result, calls
+
+    def judge_duplicate(self, left: FusionEntity, right: FusionEntity) -> DuplicateJudgment:
+        validate_pair(left, right)
+        template = self._prompts.get(JUDGE_PURPOSE, JUDGE_VERSION)
+        def sources(entity: FusionEntity) -> str:
+            return json.dumps(
+                [{"source_id": item.source_id, "quote": item.quote} for item in entity.evidence],
+                ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            )
+        rendered = template.render({
+            "name_a": left.name, "definition_a": left.definition, "sources_a": sources(left),
+            "name_b": right.name, "definition_b": right.definition, "sources_b": sources(right),
+        })
+        messages = (Message("user", rendered.text),)
+        allowed = {item.source_id for item in (*left.evidence, *right.evidence)}
+
+        def parse(value: object) -> tuple[bool, str, tuple[str, ...]]:
+            if not isinstance(value, dict) or type(value.get("same")) is not bool:
+                raise _InvalidOutput()
+            reason = value.get("reason")
+            if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 500:
+                raise _InvalidOutput()
+            raw_ids = value.get("source_ids")
+            if (not isinstance(raw_ids, list) or not raw_ids or
+                any(not isinstance(item, str) or item not in allowed for item in raw_ids) or
+                len(raw_ids) != len(set(raw_ids))):
+                raise _InvalidOutput()
+            return value["same"], reason.strip(), tuple(sorted(raw_ids))
+
+        try:
+            parsed, result, calls = self._call_and_parse(JUDGE_PURPOSE, messages, parse)
+        except _BudgetAbort as aborted:
+            return DuplicateJudgment(None, None, (), FusionReviewReason.BUDGET_EXCEEDED,
+                                     PromptUse(JUDGE_PURPOSE, JUDGE_VERSION, template.sha256,
+                                               (aborted.result.model_responded or aborted.result.model_requested)
+                                               if aborted.result else None), aborted.calls)
+        provenance = PromptUse(JUDGE_PURPOSE, JUDGE_VERSION, template.sha256,
+                               (result.model_responded or result.model_requested) if result else None)
+        if parsed is None:
+            return DuplicateJudgment(None, None, (), FusionReviewReason.INVALID_JUDGMENT, provenance, calls)
+        same, reason, ids = parsed
+        return DuplicateJudgment(same, reason, ids, None if same else FusionReviewReason.NOT_SAME, provenance, calls)
