@@ -20,7 +20,8 @@
   - 实体数：`predictions.entities` 中 `source == "ai"` 的条目（融合去重后）不少于 20 个；恰为 20 个达标。
   - 准确率：人工判定 `correct / 已判定条数`，实体和关系分别计算，各自不低于 70%；恰为 70% 达标。比较用 `fractions.Fraction` 精确进行，7/10 达标，69/100 未达标。
   - 三项都达标才算「达标」。任一项不足写「未达标」并给出差距（`gap`）。
-- **判定状态**：没有判定时，准确率为 `null`，结论写「未判定」；`model.is_fake` 为真时，结论一律写「不可用于判定（假模型）」，不看数值。
+- **判定状态**：`model.is_fake` 为真时，结论一律写「不可用于判定（假模型）」，不看数值。否则实体数 < 20 或任一准确率 < 70% 即「未达标」；按 `judgments.seed` 重算的抽中项有缺判时写「判定不完整」；没有判定时准确率为 `null`，结论写「未判定」。准确率只统计抽中项，样本外的判定不计。
+- **统计范围**：各指标只统计 `source == "ai"` 的条目，其他来源只在 `counts.non_ai_*` 中报告数量。
 - **抽样**：`sample` 子命令对 `source == "ai"` 的实体、关系分别抽样。条目先按 `id` 排序，再用 `random.Random(seed)` 抽取，默认种子 20260926，默认样本量 100。总体不超过样本量时全量检查（`mode: "full"`）。
 - **与金标比对（辅助指标，不替代人工判定）**：
   - 名称经 NFKC、casefold 并去除全部空白后，与金标名或任一别名相同即命中。
@@ -119,20 +120,20 @@ python3 evaluation/evaluate_extraction.py score \
 
 ## 6. 管线自检（假模型，不是判定）
 
-> **这不是准确率判定。** 以下数据来自一份手写的小型金标（7 个实体、5 条关系）和手写的假模型预测（`model.is_fake: true`）。判定也是自检脚本写的，不是人工判定。它只用来确认计分管线端到端可运行、错误分类有效、假模型被拒绝判定。**假模型不充真实效果。**
+> **这不是准确率判定。** 以下数据由 K01 自编标注集 `evaluation/fixtures/synthetic.json` 按固定规则扰动出的假模型预测（`model.is_fake: true`）算得，判定由自检脚本全部填为 `correct`，不是人工判定。它只用来确认计分管线端到端可运行、错误分类有效、假模型即使数值全部达标也被拒绝判定。**假模型不充真实效果。**
 
-- 运行：`run_id = selfcheck-fake-1`，`dataset_id = k02-selfcheck`。输入文件放在会话 scratchpad 中，不入仓库；构造方法见交接 `docs/handoffs/claude-k02.md`。
-- 命令：`python3 evaluation/evaluate_extraction.py score --gold gold.json --predictions predictions.json --judgments judgments.json --out report.json`，exit 0。
-- 确定性：用 `--out` 写文件与写到标准输出两次运行，sha256 都是 `13ee80cb67411b94d53628f3bf377ad24786436bccbb464deb593e9944d91c87`。
+- 扰动规则（生成脚本在会话 scratchpad，不入仓库；按下列规则可重建）：金标实体按顺序编号 k，`k % 5 == 4` 的漏掉；`k % 7 == 3` 的类型改为五类中的下一类；追加 1 个取首个有别名实体的别名的重复项、2 个金标没有的实体（「链式前向星」「哈希冲突」）、1 个 `source = "manual"` 的实体。关系保留两端都在的金标关系，其中第一条 `PREREQUISITE` 反向、第一条 `CONTAINS` 改为 `RELATED_TO`，再追加 1 条端点不在金标里的关系。
+- 运行：`run_id = selfcheck-fake-synthetic`，`dataset_id = synthetic-ds-ch3`。命令依次为 `sample --predictions pred.json`、`score --gold evaluation/fixtures/synthetic.json --predictions pred.json --judgments judg.json --out report.json`，exit 0。
+- 确定性：`--out` 写文件与写到标准输出两次运行，sha256 都是 `843f52298de774fe0eee547b512e0dd385d280ceeb3411514323993647718fde`。
 
 | 口径 | tp | fp | fn | P | R | F1 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 实体（名称级） | 5 | 2 | 2 | 0.7143 | 0.7143 | 0.7143 |
-| 实体（有类型） | 4 | 3 | 3 | 0.5714 | 0.5714 | 0.5714 |
-| 关系 | 2 | 3 | 3 | 0.4 | 0.4 | 0.4 |
+| 实体（名称级） | 36 | 3 | 9 | 0.9231 | 0.8 | 0.8571 |
+| 实体（有类型） | 31 | 8 | 14 | 0.7949 | 0.6889 | 0.7381 |
+| 关系 | 25 | 3 | 15 | 0.8929 | 0.625 | 0.7353 |
 
-- 自检覆盖的错误类型：
-  - 实体：别名「堆栈」「ＬＩＦＯ」命中，含空格的「队 列」命中；`type_mismatch` 1、`duplicate` 1、`no_gold_match` 1。
-  - 关系：`reversed_direction` 1、`wrong_relation_type` 1、`unmapped_endpoint` 1。
-  - 空类型 `theorem` 的 P/R/F1 为 `null`。
-- 硬指标输出：实体数 7（差 13）、实体准确率 4/7 = 0.5714、关系准确率 2/5 = 0.4。结论为 **「不可用于判定（假模型）」**，`passed: null`。
+- 计数：金标 45 个实体、40 条关系；预测 40 个实体（其中 1 个非 AI，不计入指标）、28 条关系。
+- 错误分类：
+  - 实体 FP：`type_mismatch` 5、`no_gold_match` 2、`duplicate` 1；实体 FN：`not_extracted` 9、`type_mismatch` 5。
+  - 关系 FP：`reversed_direction` 1、`wrong_relation_type` 1、`unmapped_endpoint` 1；关系 FN：`endpoint_not_extracted` 13、`reversed_direction` 1、`wrong_relation_type` 1。
+- 硬指标输出：AI 实体数 39、实体准确率 39/39、关系准确率 28/28，数值全部过线，但结论为 **「不可用于判定（假模型）」**，`passed: null`。

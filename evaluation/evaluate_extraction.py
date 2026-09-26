@@ -43,6 +43,7 @@ ACCURACY_THRESHOLD = Fraction(7, 10)
 VERDICT_PASS = "达标"
 VERDICT_FAIL = "未达标"
 VERDICT_UNDETERMINED = "未判定"
+VERDICT_INCOMPLETE = "判定不完整"
 VERDICT_FAKE = "不可用于判定（假模型）"
 
 ENTITY_FP_REASONS = ("duplicate", "no_gold_match", "type_mismatch")
@@ -172,7 +173,8 @@ def _prf(tp: int, fp: int, fn: int) -> dict:
         "fn": fn,
         "precision": _ratio(tp, tp + fp),
         "recall": _ratio(tp, tp + fn),
-        "f1": _ratio(2 * tp, 2 * tp + fp + fn),
+        # README：precision 或 recall 为 null 时 F1 为 null；两者均为 0 时为 0
+        "f1": None if tp + fp == 0 or tp + fn == 0 else _ratio(2 * tp, 2 * tp + fp + fn),
     }
 
 
@@ -322,17 +324,26 @@ def _match_relations(gold_relations: list[dict], pred_relations: list[dict], ass
 # ---------------------------------------------------------------- 硬指标
 
 
-def _accuracy(verdicts: dict | None) -> dict:
-    base = {"threshold": float(ACCURACY_THRESHOLD), "threshold_fraction": str(ACCURACY_THRESHOLD)}
-    if not verdicts:
-        return {**base, "correct": 0, "judged": 0, "value": None, "passed": None, "gap": None}
-    judged = len(verdicts)
-    correct = sum(1 for v in verdicts.values() if v == "correct")
+def _accuracy(verdicts: dict | None, sampled_ids: list[str]) -> dict:
+    """人工判定准确率，只统计按固定种子抽中的条目（README「抽样」）。
+
+    ``status``：``not_judged``（无判定或总体为空）、``incomplete``（抽中项有缺判）、``judged``。
+    """
+    base = {"threshold": float(ACCURACY_THRESHOLD), "threshold_fraction": str(ACCURACY_THRESHOLD),
+            "sampled": len(sampled_ids)}
+    empty = {"correct": 0, "judged": 0, "missing": len(sampled_ids), "value": None, "passed": None, "gap": None}
+    if not verdicts or not sampled_ids:
+        return {**base, **empty, "status": "not_judged"}
+    missing = [i for i in sampled_ids if i not in verdicts]
+    if missing:
+        return {**base, **empty, "missing": len(missing), "status": "incomplete"}
+    judged = len(sampled_ids)
+    correct = sum(1 for i in sampled_ids if verdicts[i] == "correct")
     frac = Fraction(correct, judged)
     passed = frac >= ACCURACY_THRESHOLD
     gap = 0.0 if passed else round(float(ACCURACY_THRESHOLD - frac), DECIMALS)
-    return {**base, "correct": correct, "judged": judged, "value": round(float(frac), DECIMALS),
-            "passed": passed, "gap": gap}
+    return {**base, "status": "judged", "correct": correct, "judged": judged, "missing": 0,
+            "value": round(float(frac), DECIMALS), "passed": passed, "gap": gap}
 
 
 def _hard_indicators(predictions: dict, judgments: dict | None) -> dict:
@@ -343,11 +354,20 @@ def _hard_indicators(predictions: dict, judgments: dict | None) -> dict:
         "passed": ai_count >= ENTITY_COUNT_THRESHOLD,
         "gap": max(0, ENTITY_COUNT_THRESHOLD - ai_count),
     }
-    ent_acc = _accuracy(judgments.get("entities") if judgments else None)
-    rel_acc = _accuracy(judgments.get("relations") if judgments else None)
+    seed = judgments.get("seed", DEFAULT_SEED) if judgments else DEFAULT_SEED
+    drawn = sample(predictions, seed=seed)
+    ent_acc = _accuracy(judgments.get("entities") if judgments else None,
+                        [i["id"] for i in drawn["entities"]["items"]])
+    rel_acc = _accuracy(judgments.get("relations") if judgments else None,
+                        [i["id"] for i in drawn["relations"]["items"]])
     is_fake = predictions["model"]["is_fake"]
     if is_fake:
         verdict, passed = VERDICT_FAKE, None
+    elif not count["passed"] or ent_acc["passed"] is False or rel_acc["passed"] is False:
+        # README：实体数 < 20 或任一准确率 < 70% 即「未达标」，不等其余判定
+        verdict, passed = VERDICT_FAIL, False
+    elif "incomplete" in (ent_acc["status"], rel_acc["status"]):
+        verdict, passed = VERDICT_INCOMPLETE, None
     elif ent_acc["passed"] is None or rel_acc["passed"] is None:
         verdict, passed = VERDICT_UNDETERMINED, None
     else:
@@ -376,9 +396,12 @@ def score(gold: dict, predictions: dict, judgments: dict | None = None) -> dict:
         validate_judgments(judgments, predictions)
 
     g_ents, g_rels = gold["gold"]["entities"], gold["gold"]["relations"]
-    assigned, ent_result, ent_details = _match_entities(g_ents, predictions["entities"])
+    # README：各指标只统计 source = "ai" 的条目；其他来源只报告数量
+    ai_ents = [e for e in predictions["entities"] if e["source"] == "ai"]
+    ai_rels = [r for r in predictions["relations"] if r["source"] == "ai"]
+    assigned, ent_result, ent_details = _match_entities(g_ents, ai_ents)
     rel_metrics, rel_errors, rel_details = _match_relations(
-        g_rels, predictions["relations"], assigned, set(assigned.values()))
+        g_rels, ai_rels, assigned, set(assigned.values()))
 
     return {
         "schema_version": 1,
@@ -393,6 +416,8 @@ def score(gold: dict, predictions: dict, judgments: dict | None = None) -> dict:
             "gold_relations": len(g_rels),
             "predicted_entities": len(predictions["entities"]),
             "predicted_relations": len(predictions["relations"]),
+            "non_ai_entities": len(predictions["entities"]) - len(ai_ents),
+            "non_ai_relations": len(predictions["relations"]) - len(ai_rels),
         },
         "entities": ent_result["metrics"],
         "relations": rel_metrics,

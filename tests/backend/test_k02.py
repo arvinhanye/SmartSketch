@@ -231,7 +231,26 @@ def test_precision_null_when_no_predictions_but_recall_zero():
     overall = result["entities"]["typed"]["overall"]
     assert overall["precision"] is None
     assert overall["recall"] == 0.0
-    assert overall["f1"] == 0.0
+    # README：precision 或 recall 为 null 时 F1 为 null
+    assert overall["f1"] is None
+
+
+def test_f1_zero_when_precision_and_recall_both_zero():
+    result = score(BASE_GOLD, preds([p_ent("x1", "完全无关的名字")]))
+    overall = result["entities"]["typed"]["overall"]
+    assert (overall["precision"], overall["recall"], overall["f1"]) == (0.0, 0.0, 0.0)
+
+
+def test_metrics_only_count_ai_source_items():
+    # README：各指标只统计 source = "ai"；其他来源不参与任何指标，只报告数量
+    g = BASE_GOLD["gold"]["entities"][0]
+    manual = p_ent("m1", g["name"], g["type"], source="manual")
+    result = score(BASE_GOLD, preds([manual], [p_rel("mr1", "m1", "m1", "RELATED_TO", source="manual")]))
+    overall = result["entities"]["typed"]["overall"]
+    assert (overall["tp"], overall["fp"]) == (0, 0)
+    assert result["relations"]["overall"]["fp"] == 0
+    assert result["counts"]["non_ai_entities"] == 1
+    assert result["counts"]["non_ai_relations"] == 1
 
 
 def test_rounding_to_four_decimals():
@@ -273,7 +292,7 @@ def _judged(n_correct, n_total, kind="entities"):
 
 
 def test_exactly_seven_tenths_passes():
-    p = preds(many_entities(20))
+    p = preds(many_entities(10))
     j = judgments(entities=_judged(7, 10), relations={})
     hi = score(gold([]), p, j)["hard_indicators"]["entity_accuracy"]
     assert (hi["correct"], hi["judged"], hi["value"], hi["passed"]) == (7, 10, 0.7, True)
@@ -290,7 +309,7 @@ def test_sixty_nine_percent_fails():
 def test_relation_accuracy_computed_separately():
     ents = many_entities(20)
     rels = [p_rel(f"p-r{i}", "p-e000", f"p-e{i + 1:03d}", "RELATED_TO") for i in range(10)]
-    j = judgments(entities=_judged(10, 10), relations={f"p-r{i}": ("correct" if i < 6 else "incorrect") for i in range(10)})
+    j = judgments(entities=_judged(20, 20), relations={f"p-r{i}": ("correct" if i < 6 else "incorrect") for i in range(10)})
     hi = score(gold([]), preds(ents, rels), j)["hard_indicators"]
     assert hi["entity_accuracy"]["passed"] is True
     assert hi["relation_accuracy"]["passed"] is False
@@ -328,6 +347,38 @@ def test_missing_judgments_is_undetermined():
     assert hi["entity_accuracy"]["passed"] is None
     assert hi["verdict"] == "未判定"
     assert hi["passed"] is None
+
+
+def test_entity_count_short_without_judgments_is_already_fail():
+    # README：实体数 < 20 即「未达标」，不因尚未人工判定而写「未判定」
+    hi = score(gold([]), preds(many_entities(19)))["hard_indicators"]
+    assert hi["verdict"] == "未达标"
+    assert hi["passed"] is False
+
+
+def test_sampled_item_without_judgment_is_incomplete():
+    # README：抽样项中有任一项缺少判定时写「判定不完整」，不得给出达标结论
+    j = judgments(entities=_judged(19, 19))  # 20 个全量检查，只判了 19 个
+    rels = [p_rel("p-r0", "p-e000", "p-e001", "RELATED_TO")]
+    j["relations"] = {"p-r0": "correct"}
+    hi = score(gold([]), preds(many_entities(20), rels), j)["hard_indicators"]
+    assert hi["entity_accuracy"]["status"] == "incomplete"
+    assert hi["entity_accuracy"]["missing"] == 1
+    assert hi["entity_accuracy"]["passed"] is None
+    assert hi["verdict"] == "判定不完整"
+    assert hi["passed"] is None
+
+
+def test_accuracy_uses_only_the_fixed_seed_sample():
+    # 总体 150 > 100：只统计按 judgments.seed 抽中的 100 项，样本外的判定不计
+    p = preds(many_entities(150))
+    drawn = [i["id"] for i in ev.sample(p, seed=7)["entities"]["items"]]
+    verdicts = {i: "correct" for i in drawn}
+    verdicts.update({e["id"]: "incorrect" for e in p["entities"] if e["id"] not in verdicts})
+    j = judgments(entities=verdicts)
+    j["seed"] = 7
+    hi = score(gold([]), p, j)["hard_indicators"]["entity_accuracy"]
+    assert (hi["status"], hi["judged"], hi["correct"], hi["passed"]) == ("judged", 100, 100, True)
 
 
 def test_judgments_without_relation_verdicts_is_undetermined():

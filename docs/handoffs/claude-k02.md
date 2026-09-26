@@ -26,12 +26,13 @@
    - 关系 FN：`endpoint_not_extracted` > `reversed_direction` > `wrong_relation_type` > `not_predicted`。
    - 所有原因键始终输出，计数可为 0。
 4. **分组计数归属**：TP 与 FN 计入金标类型，FP 计入预测类型。
-5. **F1 计算**：F1 = 2tp/(2tp+fp+fn)，分母为 0 时为 `null`。precision 为 `null`（没有预测）但存在 FN 时，F1 为 0.0。
+5. **F1 计算**：按 `evaluation/README.md`，precision 或 recall 为 `null` 时 F1 为 `null`；两者均为 0 时为 0；其余为 2tp/(2tp+fp+fn)。（联调时由领队从「没有预测时 F1 = 0」改为与 README 一致。）
 6. **硬指标**：
    - `entity_count` 只数 `source == "ai"` 的实体。
    - 准确率用 `Fraction` 与 7/10 比较。未通过的项给出 `gap`：实体数为差几个，准确率为与 0.70 的差。
    - `model.is_fake` 优先级最高，此时结论为「不可用于判定（假模型）」，`passed: null`。
-   - 实体或关系任一侧没有判定（包括判定对象为空）时，结论为「未判定」，`passed: null`，即使实体数已不达标也是如此（按领队口径）。
+   - 结论顺序（联调时由领队按 README 修订）：假模型 →「不可用于判定（假模型）」；实体数 < 20 或任一准确率 < 70% →「未达标」；按 `judgments.seed` 重算的抽中项有缺判 →「判定不完整」；没有判定 →「未判定」。准确率只统计抽中项，样本外判定不计。
+   - 各指标只统计 `source == "ai"` 的条目，非 AI 条目数量写入 `counts.non_ai_entities` / `counts.non_ai_relations`。
 7. **抽样**：实体、关系分别用独立的 `random.Random(seed)`，总体只取 `source == "ai"` 的条目，先按 id 排序。输出按 id 排序，并附 `judgments_template`：值为 `null`，必须填成 `correct` 或 `incorrect` 才能通过 `score` 校验。
 8. **输入校验**（退出码 2，stderr 以 `evaluate_extraction: 错误：` 开头，stdout 为空）：
    - 未知实体或关系类型；实体、关系 ID 重复；悬空端点。
@@ -55,7 +56,7 @@ venv 为会话 scratchpad 中的 `venv/`，下文记作 `$VENV`。
 | `$VENV/bin/python -m pytest tests/backend/test_k02.py -q -p no:cacheprovider`（桩） | 46 failed, 1 skipped |
 | 同上（实现后） | 46 passed, 1 skipped |
 | `git diff --check` | 无输出，通过 |
-| `python3 evaluation/evaluate_extraction.py score ...`（自检，见报告第 6 节） | exit 0；`--out` 与标准输出两次运行的 sha256 相同：`13ee80cb…4d91c87` |
+| `python3 evaluation/evaluate_extraction.py score ...`（自检，见报告第 6 节，改用 K01 标注集重跑） | exit 0；`--out` 与标准输出两次运行的 sha256 相同：`843f5229…718fde` |
 | `python3 evaluation/evaluate_extraction.py sample --predictions ...` | exit 0；7 个实体，`mode: "full"` |
 | `PATH=$VENV/bin:/usr/bin:/bin ./scripts/verify.sh` | **FAIL contracts gate**，原因是环境缺工具，与本任务无关，详见下方说明 |
 
@@ -84,7 +85,7 @@ venv 为会话 scratchpad 中的 `venv/`，下文记作 `$VENV`。
 1. D-01（基准章节）、D-02（模型供应方）签收，以及付费调用确认，之后才能按报告第 3 节执行真实判定并填写第 2、4、5 节。
 2. `docs/tasks.md` 中 K02 的状态与证据由协调方更新；本任务按要求未改。
 3. `verify.sh` 的 B14 契约门禁需要在装有 `openapi-typescript` 的环境复跑。
-4. 「无判定但实体数已不达标」时结论写「未判定」还是「未达标」：目前按领队口径写「未判定」，`entity_count.passed` 单独显示为 false。如需改为「未达标」，请协调方决定。
+4. ~~「无判定但实体数已不达标」写「未判定」还是「未达标」~~：联调时按 README「实体数 < 20 即未达标」改为「未达标」。
 
 ## 下一步（下一位 Agent 的首个动作）
 
@@ -93,3 +94,7 @@ K01 合入后，运行 `python -m pytest tests/backend/test_k02.py -q`，确认�
 ## 回滚
 
 只新增 4 个文件，没有修改已有文件：`git revert <本提交>` 即可。无迁移、依赖或数据变更。
+
+## 联调记录（领队，2026-09-26）
+
+K01、K02 并行完成后合到同一分支，按 `evaluation/README.md` 对齐 4 处：F1 的 null 规则、各指标只统计 AI 条目、抽中项缺判为「判定不完整」且准确率只统计抽中项、实体数不足直接「未达标」。先加 5 个用例确认失败（5 failed / 47 passed），修改后 `test_k02.py` 52 passed（K01 夹具用例不再跳过）。报告第 6 节改用 K01 标注集重跑自检。
