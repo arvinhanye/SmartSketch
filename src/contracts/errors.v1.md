@@ -107,11 +107,11 @@
 
 | 码 | HTTP | 触发条件 | `details` | 前端处理 |
 | --- | --- | --- | --- | --- |
-| `CYCLE_DETECTED` | 409 | 新增或修改 `PREREQUISITE` 会使前置关系成环 | `cycle`: 节点 ID 链路，首尾同一节点 | **在图谱上高亮该环路**并拒绝保存 —— 规格验收条件 4 要求返回冲突信息，不是简单报错 |
+| `CYCLE_DETECTED` | 409 | 新增或修改 `PREREQUISITE`（含合并知识点后重接的边，ADR-047）会使前置关系成环 | `cycle`: 节点 ID 链路，首尾同一节点 | **在图谱上高亮该环路**并拒绝保存 —— 规格验收条件 4 要求返回冲突信息，不是简单报错 |
 | `DANGLING_ENDPOINT` | 422 | 关系端点不存在，或不属于同一课程 | `missing`: 缺失的端点 ID | 提示端点无效 |
 | `DUPLICATE_RELATION` | 409 | 同课程内已存在同类型同方向的关系 | `existing_id` | 提示已存在，可跳转至该关系 |
 | `NODE_LOCKED` | 409 | 自动流程试图覆盖 `locked = true` 的节点 | `kp_id` | 仅后台流程触发，前端一般不可见 |
-| `REVISION_CONFLICT` | 409 | 教师编辑或解锁知识点时 `expected_revision` 与当前节点修订号不一致：期间已有他人写入（ADR-035） | `kp_id`、`expected_revision`、`current_revision`、`current`（当前的 `name`、`aliases`、`type`、`definition`、`status`、`locked`，以及存在时的 `importance`、`difficulty`） | 不覆盖；向用户展示 `current` 与本地修改的差异，确认后以 `current_revision` 重新提交 |
+| `REVISION_CONFLICT` | 409 | 教师编辑、解锁、合并或删除知识点时 `expected_revision`（合并为 `expected_revisions`）与当前节点修订号不一致：期间已有他人写入（ADR-035、ADR-047、ADR-048） | `kp_id`、`expected_revision`、`current_revision`、`current`（当前的 `name`、`aliases`、`type`、`definition`、`status`、`locked`，以及存在时的 `importance`、`difficulty`） | 不覆盖；向用户展示 `current` 与本地修改的差异，确认后以 `current_revision` 重新提交 |
 
 ### 任务与发布
 

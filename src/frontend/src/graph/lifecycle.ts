@@ -1,6 +1,6 @@
 import type { GraphData, GraphOptions } from '@antv/g6'
 import type { InjectionKey } from 'vue'
-import type { AdaptedGraph, G6Edge, G6Node } from './adapter'
+import type { G6Edge, G6Node } from './adapter'
 
 /**
  * G6 画布生命周期（H04）。
@@ -15,7 +15,23 @@ import type { AdaptedGraph, G6Edge, G6Node } from './adapter'
  * G6 通过工厂创建，默认按需加载 `@antv/g6`，测试可换成替身。
  */
 
-export type GraphCanvasData = Pick<AdaptedGraph, 'nodes' | 'edges'>
+/**
+ * 画布元素状态（H05）：筛选层据审核状态与选中项给元素打标，样式见 `buildGraphOptions` 的 `state`。
+ * 状态随数据交给 G6，所以重新布局、重设数据都不会丢选中高亮。
+ */
+export type CanvasElementState = 'selected' | 'rejected' | 'lowConfidence'
+
+export type CanvasNode = G6Node & { states?: CanvasElementState[] }
+export type CanvasEdge = G6Edge & { states?: CanvasElementState[] }
+
+/** 适配图（H03 `AdaptedGraph` 的节点与边）可直接传入；筛选层可附加 `states` */
+export interface GraphCanvasData {
+  nodes: CanvasNode[]
+  edges: CanvasEdge[]
+}
+
+/** 画布布局（H05）：层次（自上而下）或力导向 */
+export type GraphLayoutName = 'hierarchical' | 'force'
 
 export interface NodeClickEvent {
   target?: { id?: string }
@@ -30,6 +46,9 @@ export interface CanvasGraph {
   fitView(): Promise<void>
   on(event: 'node:click', handler: (event: NodeClickEvent) => void): unknown
   destroy(): void
+  /** G6 `Graph` 均有；测试替身可不实现，此时布局切换不生效（H05） */
+  setLayout?(layout: NonNullable<GraphOptions['layout']>): void
+  layout?(): Promise<void>
 }
 
 export interface CanvasGraphInit {
@@ -37,6 +56,8 @@ export interface CanvasGraphInit {
   width: number
   height: number
   data: GraphCanvasData
+  /** 缺省为层次布局 */
+  layout?: GraphLayoutName
 }
 
 export type CanvasGraphFactory = (init: CanvasGraphInit) => CanvasGraph | Promise<CanvasGraph>
@@ -52,6 +73,8 @@ export type LifecycleStatus = 'waiting' | 'rendering' | 'ready' | 'error' | 'des
 
 export interface GraphLifecycleOptions {
   data: GraphCanvasData
+  /** 缺省为层次布局 */
+  layout?: GraphLayoutName
   factory?: CanvasGraphFactory
   /** 参数是知识点 ID（契约 ID，不带 `kp:` 前缀） */
   onNodeClick?: (kpId: string) => void
@@ -61,6 +84,8 @@ export interface GraphLifecycleOptions {
 export interface GraphLifecycle {
   readonly status: LifecycleStatus
   update(data: GraphCanvasData): void
+  /** 在原图上换布局并适应视口，不重建、不重设数据；尚未建图时建图即用新布局 */
+  setLayout(layout: GraphLayoutName): void
   /** 容器可能变了尺寸但观察器不会通知时（如 KeepAlive 重新激活）主动复查 */
   refreshSize(): void
   destroy(): void
@@ -69,7 +94,15 @@ export interface GraphLifecycle {
 /** 画布组件取 G6 工厂的注入键；不提供时用 `loadG6Graph` */
 export const GRAPH_FACTORY_KEY: InjectionKey<CanvasGraphFactory> = Symbol('graph-factory')
 
-/** 默认建图参数：层次布局，缩放、拖拽画布、拖拽节点，平行边分开画；边样式由适配层逐条给出 */
+/** 两种布局的 G6 参数；层次布局与 H04 默认一致 */
+export function layoutOptions(layout: GraphLayoutName): NonNullable<GraphOptions['layout']> {
+  if (layout === 'force') {
+    return { type: 'd3-force', link: { distance: 120 }, manyBody: { strength: -300 }, collide: { radius: 40 } }
+  }
+  return { type: 'antv-dagre', rankdir: 'TB', nodesep: 40, ranksep: 70 }
+}
+
+/** 默认建图参数：层次布局（可选力导向），缩放、拖拽画布、拖拽节点，平行边分开画；边样式由适配层逐条给出 */
 export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
   return {
     container: init.container,
@@ -91,12 +124,22 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         labelPlacement: 'bottom',
         labelFontSize: 12,
       },
+      // 多个状态按 states 数组顺序叠加：审核状态在前，选中在后，选中描边优先
+      state: {
+        rejected: { opacity: 0.4, stroke: '#bfbfbf', lineDash: [4, 3] },
+        lowConfidence: { stroke: '#fa8c16', lineDash: [4, 3] },
+        selected: { stroke: '#0958d9', lineWidth: 3, halo: true, haloStroke: '#1677ff', haloLineWidth: 10 },
+      },
     },
     edge: {
       // 不指定 type：平行边转换会把成组的边改为曲线
       style: { labelFontSize: 10, labelBackground: true },
+      state: {
+        rejected: { opacity: 0.3 },
+        lowConfidence: { opacity: 0.6 },
+      },
     },
-    layout: { type: 'antv-dagre', rankdir: 'TB', nodesep: 40, ranksep: 70 },
+    layout: layoutOptions(init.layout ?? 'hierarchical'),
     behaviors: ['zoom-canvas', 'drag-canvas', 'drag-element'],
     // 同一对知识点间可同时有前置与相关等多条关系，分开画避免重叠
     transforms: ['process-parallel-edges'],
@@ -109,18 +152,22 @@ export const loadG6Graph: CanvasGraphFactory = async (init) => {
   return new Graph(buildGraphOptions(init)) as unknown as CanvasGraph
 }
 
-function copyNode(node: G6Node): G6Node {
-  return { id: node.id, data: { ...node.data } }
+function copyNode(node: CanvasNode): CanvasNode {
+  const copy: CanvasNode = { id: node.id, data: { ...node.data } }
+  if (node.states !== undefined) copy.states = [...node.states]
+  return copy
 }
 
-function copyEdge(edge: G6Edge): G6Edge {
-  return {
+function copyEdge(edge: CanvasEdge): CanvasEdge {
+  const copy: CanvasEdge = {
     id: edge.id,
     source: edge.source,
     target: edge.target,
     data: { ...edge.data },
     style: { ...edge.style, lineDash: [...edge.style.lineDash] },
   }
+  if (edge.states !== undefined) copy.states = [...edge.states]
+  return copy
 }
 
 function copyData(data: GraphCanvasData): GraphCanvasData {
@@ -142,6 +189,9 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   let drawn = new Map<string, string>()
   let width = 0
   let height = 0
+  /** 期望的布局，与 G6 实例当前使用的布局 */
+  let layout: GraphLayoutName = options.layout ?? 'hierarchical'
+  let appliedLayout: GraphLayoutName = layout
   let frame: number | null = null
   /** 所有对 G6 的异步操作串行执行 */
   let chain: Promise<void> = Promise.resolve()
@@ -179,7 +229,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       setStatus('rendering')
       const data = pending ?? { nodes: [], edges: [] }
       pending = null
-      const created = await factory({ container, width, height, data })
+      appliedLayout = layout
+      const created = await factory({ container, width, height, data, layout })
       if (!alive()) {
         created.destroy()
         return
@@ -194,6 +245,26 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (!alive()) return
       if (pending !== null) flush()
       else setStatus('ready')
+      // 加载 G6 期间切换过布局
+      if (appliedLayout !== layout) relayout()
+    })
+  }
+
+  /** 可重复调用：排到时布局已是期望值即空转，连续切换因此只落在最后一次 */
+  function relayout(): void {
+    enqueue(async () => {
+      const g = graph
+      if (g === null || appliedLayout === layout) return
+      if (g.setLayout === undefined || g.layout === undefined) return
+      appliedLayout = layout
+      setStatus('rendering')
+      g.setLayout(layoutOptions(layout))
+      await g.layout()
+      if (!alive()) return
+      await g.fitView()
+      if (!alive()) return
+      // 期间又有更新或切换时，已排队的 flush / relayout 负责收尾
+      if (pending === null && appliedLayout === layout) setStatus('ready')
     })
   }
 
@@ -257,6 +328,11 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (!alive()) return
       pending = copyData(data)
       if (graph !== null) flush()
+    },
+    setLayout(next) {
+      if (!alive() || next === layout) return
+      layout = next
+      if (graph !== null) relayout()
     },
     refreshSize() {
       scheduleSize()

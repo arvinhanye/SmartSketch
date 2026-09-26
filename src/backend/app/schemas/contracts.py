@@ -32,6 +32,8 @@ KnowledgePointDetail = _module.KnowledgePointDetail
 KnowledgePointCreate = _module.KnowledgePointCreate
 KnowledgePointStatus = _module.KnowledgePointStatus
 KnowledgePointUnlock = _module.KnowledgePointUnlock
+# F10 merge.
+MergeRequest = _module.MergeRequest
 KnowledgePointRef = _module.KnowledgePointRef
 KnowledgePointType = _module.KnowledgePointType
 Relation = _module.Relation

@@ -585,8 +585,20 @@ class KnowledgePointUpdate(
 
 
 class MergeRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     primary_id: Annotated[str, Field(description='保留的主节点；其名称成为主名')]
-    merged_ids: Annotated[list[str], Field(min_length=1)]
+    merged_ids: Annotated[
+        list[str],
+        Field(description='并入主节点的知识点，不得含主节点，不得重复', min_length=1),
+    ]
+    expected_revisions: Annotated[
+        Optional[dict[str, int]],
+        Field(
+            description='可选的节点级乐观并发：键为本次合并涉及的知识点 ID（主节点或被合并节点），值为读到的 `revision`。\n任一不一致时 409 `REVISION_CONFLICT`，不写入（ADR-047）。\n'
+        ),
+    ] = None
 
 
 class RelationStandard(BaseModel):

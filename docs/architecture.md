@@ -40,6 +40,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 路由（B03）：`src/frontend/src/router/index.ts` 的 `createAppRouter({ history, getAccountRole })` 按账号类型（`users.role`）把 `/` 引到 `/teacher` 或 `/student`；错角色或未登录时回到对应页面并经 `query.notice` 由 `App.vue` 显示 `role="alert"` 提示。守卫只是界面引导，授权以后端为准（`specs/identity-access.md` §2.4）。账号类型由调用方注入；登录与会话存储由 H13 接入（D-09），在此之前入口恒为未登录。
 - 课程上下文（B04）：`src/frontend/src/stores/course.ts` 的 `useCourseStore` 持有当前课程与课程内图谱（`GraphExchange`）、问答历史（`ChatTurn[]`）。切课即清空并中止旧 `AbortController`；composables 先 `beginRequest()` 取作用域，把 `scope.signal` 交给 HTTP 客户端，再经 `setGraph` / `appendChatTurns` / `commit` 提交，作用域按代次失效，晚到响应被丢弃。store 与组件都不直接发请求。
 - 图谱画布（H03/H04）：`graph/adapter.ts` 把 `GraphExchange` 转为独立的 G6 数据；`graph/lifecycle.ts` 的 `createGraphLifecycle` 负责建图、串行更新、resize 与销毁，G6（`@antv/g6`，版本精确锁定）经工厂按需加载，工厂可由 `GRAPH_FACTORY_KEY` 注入替换；`components/GraphCanvas.vue` 只接收适配图并发出 `nodeClick(kpId)`，不发请求（ADR-040）。
+- 图谱筛选与布局（H05）：`composables/useGraphFilters.ts` 在适配图上按搜索词、关系类型、知识点类型、审核状态、章节算出可见图（关系须两端可见，无悬空边），并给元素打 `rejected`/`lowConfidence`/`selected` 状态；选中与布局独立于筛选条件。`components/GraphToolbar.vue` 是搜索、关系图例兼筛选、布局切换与清空的受控组件。`GraphCanvas` 的 `layout` 属性经 `lifecycle.setLayout` 在原图上重新布局（层次 `antv-dagre`／力导向 `d3-force`），不重建、不重设数据（ADR-052）。
 
 ## 后端启动与健康检查（B05）
 
@@ -120,7 +121,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 | `NodeSource` | `ai`、`manual` | lower | `KnowledgePoint.source`、`Relation.source` | 一致。自动降级只作用于未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`，见规格「前置关系成环处理」） |
 | `DocumentFormat` | `pdf`、`docx`、`txt`、`markdown` | lower | `Document.format` | 一致。wire 值是 `markdown`，扩展名 `.md` 不是枚举值 |
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
-| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致 |
+| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影 |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
 | `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | `ff30e0` 无此枚举。`insufficient_evidence` 取代 `740adb` 的旧值（语义为生成模型以哨兵声明证据不足），A09 决定（ADR-015 决定 3），B13 落实真源；前两者不调用生成，后两者调用了生成 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
@@ -152,7 +153,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 - SQLite：`Course`、`Material`、`ProcessingTask`（含租约与尝试字段）、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall`、`GraphVersion`、`LearningProgress`、`ChatLog`（表 `chat_logs`，每个通过鉴权与版本绑定的问答请求一行，服务端不保存会话；命名由 A09 定，ADR-015，A10 N5；覆盖范围见 ADR-015 修订 1）。其中 `ProcessingTask`、`TaskChunkCheckpoint`、`CourseLock`、`ModelCall` 的字段与迁移规则见 `specs/task-processing.md` §8（ADR-011）。`GraphVersion` 保存每个版本的规范化快照与摘要，`Course` 保存发布指针与草稿修订号（见下节「图谱版本与跨库发布」）。
 - SQLite `processing_tasks`（C09 迁移 005，ADR-017 决定 1）：租约六列 `lease_owner`、`lease_token`、`lease_expires_at`、`attempt`、`not_before`、`cleanup_pending`，与任务错误三列 `error_code`、`error_message`、`error_details`（JSON 对象文本，与契约 `Error{code, message, details}` 同构）；数据库 CHECK 强制 `stage = 'failed'` ⇔ `error_code` 非空。均为内部字段，经 `Task.error` 对外；可用码与阶段见 `specs/task-processing.md` §6 与 C08 `FAILURE_CODE_STAGES`。
 - Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联 `(:KnowledgePoint)-[:EVIDENCED_BY {task_id, chunk_id, evidence_start, evidence_end}]->(:Chunk)`（F04，ADR-024；人工来源不带 `task_id`）。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
-- F03 Neo4j DDL 在 `migrations/neo4j/001_constraints.cypher`，由 `graph_migrations.apply_migrations` 逐条重跑：知识点、章节、共享文本块的作用域复合唯一约束，四种关系各自的复合唯一约束，跨关系类型的 `RelationIdentity(course_id, version_id, rel_id)` 守卫节点唯一约束，以及贡献/修订查询索引。F06 写关系须在同一事务先 MERGE 守卫节点，才能保证 `rel_id` 跨四种类型唯一。F06 另以 `DraftWriteGuard(course_id, version_id)` 课程守卫节点串行同一课程草稿的关系写事务：先锁守卫，再读图、环检测、写入，同一事务提交（ADR-025）。Neo4j DDL 不作全批回滚；失败修复冲突数据或服务后重跑，不自动删除已有对象。向量属性与索引按空间标识散列派生并并存；F03 写入边界每次从 SQLite 读取当前空间，离线迁移上下文绑定目标空间且在当前空间切换后失效。
+- F03 Neo4j DDL 在 `migrations/neo4j/001_constraints.cypher`，由 `graph_migrations.apply_migrations` 逐条重跑：知识点、章节、共享文本块的作用域复合唯一约束，四种关系各自的复合唯一约束，跨关系类型的 `RelationIdentity(course_id, version_id, rel_id)` 守卫节点唯一约束，以及贡献/修订查询索引。F06 写关系须在同一事务先 MERGE 守卫节点，才能保证 `rel_id` 跨四种类型唯一。F06 另以 `DraftWriteGuard(course_id, version_id)` 课程守卫节点串行同一课程草稿的关系写事务：先锁守卫，再读图、环检测、写入，同一事务提交（ADR-025）；F10 合并知识点也在同一守卫下完成重接、去重、验环与删除（ADR-047），F09 删除知识点在同一守卫下只清理草稿中的节点、相连关系与关系身份（ADR-048）。Neo4j DDL 不作全批回滚；失败修复冲突数据或服务后重跑，不自动删除已有对象。向量属性与索引按空间标识散列派生并并存；F03 写入边界每次从 SQLite 读取当前空间，离线迁移上下文绑定目标空间且在当前空间切换后失效。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
 
 ## 图谱版本与跨库发布（A04 / ADR-012）
