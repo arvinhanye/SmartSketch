@@ -325,3 +325,11 @@ def test_load_rejects_non_canonical_spacing_and_bad_json():
 def test_malformed_draft_is_a_format_error_not_a_publish_reason(draft):
     with pytest.raises(SnapshotFormatError):
         build_snapshot(draft)
+
+
+def test_dangling_chapter_references_are_published_as_unassigned():  # ADR-036
+    chapters = [DraftChapter("ch1", "第一章", 1), DraftChapter("ch2", "第二节", 2, parent_id="ch-gone")]
+    build = build_snapshot(graph([node("a", chapter_id="ch-gone"), node("b", chapter_id="ch2")], chapters=chapters))
+    by_id = {n["kp_id"]: n for n in build.snapshot.data["nodes"]}
+    assert by_id["a"]["chapter_id"] is None and by_id["b"]["chapter_id"] == "ch2"
+    assert build.snapshot.data["chapters"] == [{"chapter_id": "ch2", "order": 2, "parent_id": None, "title": "第二节"}]

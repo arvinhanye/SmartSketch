@@ -1133,6 +1133,24 @@
 - **回滚**：撤销 `api/graph_nodes.py`、`services/graph/edit_node.py`、`repositories/graph_edit.py`、`main.py` 与 `schemas/contracts.py` 各一处注册、契约改动（`sources`、`KnowledgePointSourceInput`、`KnowledgePointUnlock`、解锁路径、`REVISION_CONFLICT`）及生成物、前端两处错误码副本与测试；无 SQLite 迁移与 Neo4j DDL。已写入的人工节点可按 `source = 'manual'` 查出后由教师删除（F09）。
 - **签收**：ArvinHan，2026-09-26（含人工新建节点 `status = approved`、置信度 1.0，以及任何课程教师均可解锁）。
 
+## ADR-036：G05 发布补偿与清扫的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V5 C1 与 V9 规定了补偿与清扫的步骤，但没有写死：C1 放在哪里、发布与回滚怎样共用；清扫怎样判断「过期」而不和心跳、提交抢同一行；V9 第 3 步（`failed` 行在 Neo4j 仍有副本）怎样发现；第 4、5 步告警后留下什么记录；清扫由谁调度。
+- **决定**：
+  1. C1 为 `services/versions/reconcile.compensate`，G04 发布改为调用它，G06 回滚同样调用。尝试行条件更新影响 0 行即返回，不碰 Neo4j；SQLite 写失败原样抛出，尝试行保持进行中，租约到期后由清扫补做。
+  2. 过期判定为 `state ∈ {preparing, materialized} AND expires_at < unixepoch()`。心跳要求 `expires_at >= unixepoch()`，提交要求 `expires_at > unixepoch()`，所以过期的尝试不会复活，读出后直接执行 C1，失败原因为 `LEASE_EXPIRED`。恰在 `expires_at = unixepoch()` 那一秒，双方都不动，下一轮清扫处理。
+  3. 清扫按课程逐个处理（`sweep_course`），通过 Neo4j 列出本课程所有非草稿 `version_id`（`graph_read.stored_version_ids`）与 SQLite 全部尝试行对照：`failed` 且 `cleanup_pending` 或仍有副本的删除副本并清标记；`committed` 行与租约内的尝试从不删除。
+  4. 第 4 步（孤儿副本）与第 5 步（已提交版本缺副本）只写日志（WARNING / ERROR）并在 `SweepReport` 中列出，不写任何库。
+  5. `sweep` 遍历全部课程，单个课程失败记日志后继续。调度（A06 §8.6 的 worker 周期回收步骤）尚无实现，本任务只提供可调用的 `sweep`，接入列入待决。
+  6. 调度接入之前，发布（及 G06 回滚）在插入尝试行前先对本课程执行 `reclaim_expired`（V9 第 1 步），崩溃留下的过期尝试不会让课程一直返回 `PUBLISH_IN_PROGRESS`（独立审查 2026-09-26，高）。
+  7. C1 第 1 步影响 0 行时，若尝试行是 `failed`（已被清扫判失败），而本进程已写过 Neo4j，就按 V9 第 3 步就地删除副本；`committed` 仍不碰。这补上「清扫先删、本进程后写」留下的孤儿副本（同上，中）。这是对 V5 C1「0 行即结束」的收紧：删除只针对终态为失败的尝试，不影响提交互斥。
+  8. G01 快照中，知识点的 `chapter_id` 或章节的 `parent_id` 指向草稿里不存在的可见章节时，按「未归章 / 顶层章节」发布（置 `null`），快照不留断开的引用（同上，中）。契约没有对应的阻断原因，故不阻断发布。
+  9. 删除版本副本与列出版本副本的 Cypher 按 `KnowledgePoint` / `Chapter` 标签匹配，不做无标签全库扫描（同上，低）。
+- **后果**：发布与回滚的失败都在一处补偿；清扫可重复执行，没有新变化时第二次不写库。孤儿副本会一直告警，直到人工按 K10 处理。
+- **回滚**：撤销 `services/versions/reconcile.py`，恢复 `publish.py` 中的 `_compensate` 原实现与发布前回收；撤销 `snapshot.py` 的悬空章节处理；撤销 `repositories/versions.py` 末尾的 `list_expired_attempts`/`list_course_ids` 与 `graph_read.stored_version_ids`；无数据迁移。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
 ## ADR-037：G07 统一发布版本解析器
 
 - **日期**：2026-09-26
@@ -1146,22 +1164,6 @@
 - **后果**：F07、推荐（I 组）、问答（J 组）接入时用同一个结果对象；F07 现有 `resolve_target` 仍直接读访问层带来的课程行，改为调用本解析器（并补上历史版本读取 PUB-14）不在 G07 文件范围内，列入待决。
 - **回滚**：撤销 `services/versions/resolver.py` 与 `tests/backend/test_g07.py`；无数据迁移，无调用方。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 按 V8 选定并在交接中报告）。
-
-## ADR-040：H04 G6 画布生命周期
-
-- **日期**：2026-09-26
-- **背景**：ADR-001 选定 AntV G6，但未定版本与接入方式。H04 要求画布挂载、更新、销毁可靠，反复切页不泄漏，resize 后布局正确；jsdom 没有 Canvas，G6 无法在单测中真实渲染。
-- **决定**：
-  1. 依赖 `@antv/g6@5.1.1`，`package.json` 写精确版本，锁文件用 npm 11（与 CI 的 Node 24 一致）生成，只新增条目。
-  2. `graph/lifecycle.ts` 通过工厂建图，默认工厂 `loadG6Graph` 动态 `import('@antv/g6')`，未打开图谱的页面不下载 G6；组件经 `GRAPH_FACTORY_KEY` 注入工厂，单测用替身，真实渲染由浏览器冒烟验证。
-  3. 对 G6 的建图、更新、调整尺寸串行执行；渲染中的多次更新只画最后一次。交给 G6 的是数据副本（布局会写坐标）。
-  4. 容器尺寸为 0 时推迟建图；尺寸变化由 `ResizeObserver`（缺失时退回 `window` resize）在下一帧合并处理，`setSize` 后 `fitView`；尺寸为 0 或未变时不动。KeepAlive 重新激活时主动复查尺寸。
-  5. 销毁时销毁图、断开观察、取消待执行帧；迟到的建图结果立即销毁，迟到的渲染结果不改状态。
-  6. 默认参数：`antv-dagre` 自上而下层次布局、`zoom-canvas`/`drag-canvas`/`drag-element`、适应视口（留白 32）、关闭动画、`process-parallel-edges` 把同一对知识点间的多条关系画成曲线分开。边样式沿用 H03 适配层。
-  7. 画布错误只显示「图谱渲染失败，请重试」并可重试，不展示内部错误信息。
-- **后果**：G6 不进首屏包；画布组件不发请求，数据与筛选由页面、H05 负责；布局切换、图例、节点详情分别留给 H05、H06。单测覆盖生命周期契约而非 G6 绘制细节。
-- **回滚**：撤销 `graph/lifecycle.ts`、`components/GraphCanvas.vue`、`tests/frontend/h04.test.ts`，并从 `src/frontend/package.json` 删除 `@antv/g6` 后在 `src/frontend` 执行 `npx npm@11 install` 还原锁文件（或 `git checkout <base> -- src/frontend/package.json src/frontend/package-lock.json`）；无数据迁移。
-- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
 
 ## ADR-038：F14 离线重新向量化命令的实现约定
 
@@ -1179,6 +1181,41 @@
 - **后果**：换向量模型是一次停机操作，耗时与存量文本数成正比；失败尝试的残留副本在换空间后没有任何向量，G05 清理前不可被当作版本读取（本来也不会）。
 - **回滚**：撤销 `scripts/reembed.py` 与 `tests/integration/test_f14.py`；无数据迁移。已执行过的换空间按命令打印的步骤回退（SQLite 备份 + K10 Neo4j 恢复，或用旧配置再跑一次）。
 - **签收**：ArvinHan 2026-09-26 在项目频道回复「全部合并」，接受第 2 条（Neo4j 备份由操作者确认、未完成的发布尝试不论是否过期都拒绝）等约定。
+
+## ADR-040：H04 G6 画布生命周期
+
+- **日期**：2026-09-26
+- **背景**：ADR-001 选定 AntV G6，但未定版本与接入方式。H04 要求画布挂载、更新、销毁可靠，反复切页不泄漏，resize 后布局正确；jsdom 没有 Canvas，G6 无法在单测中真实渲染。
+- **决定**：
+  1. 依赖 `@antv/g6@5.1.1`，`package.json` 写精确版本，锁文件用 npm 11（与 CI 的 Node 24 一致）生成，只新增条目。
+  2. `graph/lifecycle.ts` 通过工厂建图，默认工厂 `loadG6Graph` 动态 `import('@antv/g6')`，未打开图谱的页面不下载 G6；组件经 `GRAPH_FACTORY_KEY` 注入工厂，单测用替身，真实渲染由浏览器冒烟验证。
+  3. 对 G6 的建图、更新、调整尺寸串行执行；渲染中的多次更新只画最后一次。交给 G6 的是数据副本（布局会写坐标）。
+  4. 容器尺寸为 0 时推迟建图；尺寸变化由 `ResizeObserver`（缺失时退回 `window` resize）在下一帧合并处理，`setSize` 后 `fitView`；尺寸为 0 或未变时不动。KeepAlive 重新激活时主动复查尺寸。
+  5. 销毁时销毁图、断开观察、取消待执行帧；迟到的建图结果立即销毁，迟到的渲染结果不改状态。
+  6. 默认参数：`antv-dagre` 自上而下层次布局、`zoom-canvas`/`drag-canvas`/`drag-element`、适应视口（留白 32）、关闭动画、`process-parallel-edges` 把同一对知识点间的多条关系画成曲线分开。边样式沿用 H03 适配层。
+  7. 画布错误只显示「图谱渲染失败，请重试」并可重试，不展示内部错误信息。
+- **后果**：G6 不进首屏包；画布组件不发请求，数据与筛选由页面、H05 负责；布局切换、图例、节点详情分别留给 H05、H06。单测覆盖生命周期契约而非 G6 绘制细节。
+- **回滚**：撤销 `graph/lifecycle.ts`、`components/GraphCanvas.vue`、`tests/frontend/h04.test.ts`，并从 `src/frontend/package.json` 删除 `@antv/g6` 后在 `src/frontend` 执行 `npx npm@11 install` 还原锁文件（或 `git checkout <base> -- src/frontend/package.json src/frontend/package-lock.json`）；无数据迁移。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-041：G06 回滚、版本列表与发布接口的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V6 规定了 R1～R7，但没有写死：R5 怎样复制副本和向量；R6 在草稿不可发布时怎么办；回滚的 `PublishResult` 中 `excluded`、`stats` 取什么；`POST /publish` 路由归谁（ADR-034 第 8 条待决）；各类失败映射成哪个 HTTP 状态。
+- **决定**：
+  1. 回滚编排在 `services/versions/rollback.py`，复用 G04 的 `PublishContext`、心跳、`load_draft`，以及 G05 的 `compensate` 和 `reclaim_expired`（插入尝试行前先回收本课程过期的尝试）。
+  2. R5 为 `materialize.copy_version`：在一个 Neo4j 写事务内，先删除本尝试的副本，再按标签把源版本的章节、知识点（含向量属性）、`EVIDENCED_BY` 与四类关系复制过来，写入时用映射投影改写 `version_id`（避免与唯一约束冲突）。源版本的知识点数必须等于快照中的数量，否则报 `SourceCopyMissing`，整体回滚。复制前核对 k 自身记录的向量空间，不符则告警并返回 5xx；两种情况都不调用向量模型。复制后按 P9 用 k 的快照核对。
+  3. R6 中，等锁超时、读草稿失败，或草稿本身不可发布（`SnapshotBlocked`），都按「d 未知」处理，`published_from_revision = -1`，回滚照常进行。
+  4. 回滚的 `PublishResult` 取自新版本行：`excluded`、`stats` 是从 k 复制来的统计值；幂等时返回当前版本行的统计。
+  5. `POST /api/v1/courses/{cid}/publish` 并入 `api/versions.py`（ArvinHan 2026-09-26 同意），与回滚、列表共用教师鉴权和错误映射：
+     - `PUBLISH_BLOCKED`、`PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 返回 409；
+     - 回滚源不存在、为失败尝试或属于他课，返回 404 `NOT_FOUND`，在连 Neo4j 之前就判定；
+     - 原因链中含图库仓储错误时返回 503 `STORAGE_UNAVAILABLE`；
+     - 其余失败返回 500 `INTERNAL_ERROR`，响应体不带内部原因。
+  6. 发布上下文（Neo4j 仓储、向量适配器、当前空间读取器、租约与等锁配置）在第一次请求时构建，并缓存在 `app.state.publish_context`；这样没有 Neo4j 时应用也能启动。向量客户端在 `EMBEDDING_MODE=fake` 时用 `FakeEmbeddingClient`，否则用 `CompatibleEmbeddingClient.from_settings`。
+- **后果**：教师端的发布、回滚、版本列表三个接口全部可用；学生读取仍按 F07 当前实现解析版本，统一解析器归 G07。
+- **回滚**：撤销 `api/versions.py`、`services/versions/rollback.py`、`materialize.copy_version`，以及 `main.py` 与 `schemas/contracts.py` 各一处改动；无数据迁移。
+- **签收**：第 5 条的路由归属由 ArvinHan 2026-09-26 同意；其余由 Claude 选定并在交接中报告。
 
 ## ADR-045：K13 抽取消融的付费调用确认与单阶段对照组
 
