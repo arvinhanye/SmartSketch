@@ -294,8 +294,10 @@ def build_context(
 ) -> EvidenceContext:
     """把两路检索结果组装为编号证据上下文，或判定 P5 拒答。
 
-    ``revision_ids`` 为 G07 绑定版本的修订列表；``load_chunks`` 按请求课程读取文本块（如
-    ``functools.partial(chunks.get_chunks, sqlite_url, course_id=...)`` 包一层），未知 ID 省略。
+    ``revision_ids`` 为 G07 绑定版本的修订列表；``load_chunks`` 按请求课程读取文本块，未知 ID 省略。
+    它按**位置参数**接收 ID 序列，而 ``get_chunks`` 的 ``chunk_ids`` 是 keyword-only，故不能直接
+    ``functools.partial`` 绑定，必须包一层：``lambda ids: get_chunks(sqlite_url, course_id=course_id,
+    chunk_ids=ids)``。
     """
     if not isinstance(course_id, str) or not course_id.strip():
         raise ValueError("course_id must be a non-empty string")
