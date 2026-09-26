@@ -16,8 +16,10 @@ and a worker write on the same row are serialized and the first committed writer
   closed ``{stage, reason}`` details; nothing is written (I3).
 
 Pushing the SSE event named by ``CancelOutcome.sse_event`` belongs to the task event stream
-(C11). The SQL lives here only because ``repositories/`` was outside this task's file lock;
-see ``docs/handoffs/claude-c10.md`` (pending item on moving it to ``repositories/tasks.py``).
+(C11). The row read and the compare-and-swap write live in ``repositories/tasks.py``
+(``read_task_snapshot`` / ``mark_cancel_requested``, TD-02) and run on this module's connection,
+so both stay inside the one ``BEGIN IMMEDIATE`` transaction. ``snapshot_from_row`` is the single
+row → ``TaskSnapshot`` mapping, shared with the C11 task stream.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import sqlite3
 from dataclasses import dataclass
 
 from app.repositories.sqlite import connect
+from app.repositories.tasks import TaskSnapshotRow, mark_cancel_requested, read_task_snapshot
 from app.services.task_state import (
     Applied,
     TaskError,
@@ -35,11 +38,6 @@ from app.services.task_state import (
     apply_event,
 )
 
-_NOW_TEXT = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
-_COLUMNS = (
-    "id, course_id, document_id, stage, progress, cancel_requested, created_at, updated_at, "
-    "error_code, error_message, error_details"
-)
 # §4: the closed set of rejection reasons, each tied to the stages that produce it.
 REJECTION_REASONS = frozenset({"persisting_uninterruptible", "processing_finished", "already_terminal"})
 # One retry after a lost compare-and-swap is enough: inside BEGIN IMMEDIATE no other writer can
@@ -93,41 +91,39 @@ class TaskNotCancellable(Exception):
         return {"stage": self.stage, "reason": self.reason}
 
 
-def _snapshot_from_row(row: tuple[object, ...]) -> TaskSnapshot:
+def snapshot_from_row(row: TaskSnapshotRow) -> TaskSnapshot:
+    """The one mapping from a repository task row to ``TaskSnapshot`` (C10 and C11)."""
     error = None
-    if row[8] is not None:
-        details = json.loads(row[10]) if row[10] is not None else None
-        error = TaskError(code=row[8], message=row[9], details=details)
+    if row.error_code is not None:
+        details = json.loads(row.error_details_json) if row.error_details_json is not None else None
+        error = TaskError(code=row.error_code, message=row.error_message, details=details)
     return TaskSnapshot(
-        id=row[0],
-        course_id=row[1],
-        document_id=row[2],
-        stage=row[3],
-        progress=float(row[4]),
-        cancel_requested=bool(row[5]),
-        created_at=row[6],
-        updated_at=row[7],
+        id=row.id,
+        course_id=row.course_id,
+        document_id=row.document_id,
+        stage=row.stage,
+        progress=row.progress,
+        cancel_requested=row.cancel_requested,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
         error=error,
     )
 
 
 def _read_task(database: sqlite3.Connection, task_id: str, course_id: str) -> TaskSnapshot | None:
-    row = database.execute(
-        f"SELECT {_COLUMNS} FROM processing_tasks WHERE id = ? AND course_id = ?",
-        (task_id, course_id),
-    ).fetchone()
-    return _snapshot_from_row(row) if row else None
+    row = read_task_snapshot(database, task_id, course_id=course_id)
+    return snapshot_from_row(row) if row else None
 
 
 def _write_cancel(database: sqlite3.Connection, snapshot: TaskSnapshot, target: TaskState) -> bool:
     """Compare-and-swap: write ``target`` only if the row still holds what was decided on."""
-    return database.execute(
-        f"""UPDATE processing_tasks
-            SET stage = ?, cancel_requested = 1, updated_at = {_NOW_TEXT}
-            WHERE id = ? AND course_id = ? AND stage = ? AND cancel_requested = 0
-              AND stage IN ('queued', 'parsing', 'extracting', 'merging')""",
-        (target.stage, snapshot.id, snapshot.course_id, snapshot.stage),
-    ).rowcount == 1
+    return mark_cancel_requested(
+        database,
+        task_id=snapshot.id,
+        course_id=snapshot.course_id,
+        expected_stage=snapshot.stage,
+        target_stage=target.stage,
+    )
 
 
 def _state_of(snapshot: TaskSnapshot) -> TaskState:

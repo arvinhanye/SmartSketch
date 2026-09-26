@@ -16,8 +16,9 @@ in-process event source: every stream polls its task row and pushes only real ch
 
 Ticket authorization (``specs/identity-access.md`` §5.2) is ``authorize_ticket``: redeem the
 one-time ticket (C16), re-check the ticket owner's account, then re-run the §4.1 task checks.
-The task-row read lives here, like C10's, only because ``repositories/tasks.py`` was outside this
-task's file lock; see ``docs/handoffs/claude-c11.md``.
+The event source is the ``processing_tasks`` row itself, read through ``repositories/tasks.py``
+(``get_task_snapshot``, TD-02) and mapped by C10's ``snapshot_from_row``, the single row →
+``TaskSnapshot`` mapping.
 """
 
 from __future__ import annotations
@@ -35,19 +36,15 @@ import anyio
 
 from app.repositories.accounts import find_by_id
 from app.repositories.event_tickets import redeem_ticket
-from app.repositories.sqlite import connect
+from app.repositories.tasks import get_task_snapshot
 from app.services.access import AccessService, CourseAccess, unauthenticated
-from app.services.task_cancel import TaskSnapshot
+from app.services.task_cancel import TaskSnapshot, snapshot_from_row
 from app.services.task_state import TaskError
 
 DEFAULT_HEARTBEAT_SECONDS = 15.0
 DEFAULT_POLL_SECONDS = 1.0
 PING_FRAME = b":ping\n\n"
 
-_COLUMNS = (
-    "id, course_id, document_id, stage, progress, cancel_requested, created_at, updated_at, "
-    "error_code, error_message, error_details"
-)
 # Main line of the processing phase; terminal stages are handled separately.
 _PROCESSING_ORDER = ("queued", "parsing", "extracting", "merging", "persisting", "awaiting_review")
 _RANK = {stage: rank for rank, stage in enumerate(_PROCESSING_ORDER)}
@@ -58,32 +55,10 @@ _AWAITING_REVIEW_PROGRESS = 0.95
 # --- snapshot -----------------------------------------------------------------------------------
 
 
-def _snapshot_from_row(row: tuple[Any, ...]) -> TaskSnapshot:
-    error = None
-    if row[8] is not None:
-        details = json.loads(row[10]) if row[10] is not None else None
-        error = TaskError(code=row[8], message=row[9], details=details)
-    return TaskSnapshot(
-        id=row[0],
-        course_id=row[1],
-        document_id=row[2],
-        stage=row[3],
-        progress=float(row[4]),
-        cancel_requested=bool(row[5]),
-        created_at=row[6],
-        updated_at=row[7],
-        error=error,
-    )
-
-
 def load_task(sqlite_url: str, task_id: str, *, course_id: str) -> TaskSnapshot | None:
     """The task row constrained to its course (I7), or ``None``."""
-    with connect(sqlite_url) as database:
-        row = database.execute(
-            f"SELECT {_COLUMNS} FROM processing_tasks WHERE id = ? AND course_id = ?",
-            (task_id, course_id),
-        ).fetchone()
-    return _snapshot_from_row(row) if row else None
+    row = get_task_snapshot(sqlite_url, task_id, course_id=course_id)
+    return snapshot_from_row(row) if row else None
 
 
 def _error_body(error: TaskError) -> dict[str, Any]:
