@@ -1099,3 +1099,20 @@
 - **后果**：学生端看到的已发布知识点状态恒为 `approved`，来源类别恒为 `manual`，与草稿里的真实值无关；如果前端需要展示真实来源类别，须改规格让它进快照（并使 `snapshot_format` 加 1）。知识点详情里已发布版本的来源不带原文片段（副本没有证据区间），只有页码或章节路径。
 - **回滚**：撤销 `services/versions/materialize.py` 与测试，恢复 F07 的两处改动；已物化的版本副本可按 `(course_id, version_id)` 删除。
 - **签收**：第 5 条由 ArvinHan 2026-09-26 在会话卡片上选定「统一填默认」；其余由 Claude 选定并在交接中报告。
+
+## ADR-034：G04 发布编排的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V5 规定了 P2～P12 与 C1，但以下细节没有写死：P4 从哪里读可见草稿与修订；P3 超时的 `details.holder` 取谁；P7 幂等路径与 P11 的 T7 由谁执行；C1 在什么情况下删 Neo4j；发布路由归哪个任务；依赖图里 G04 依赖 F12（审计日志）而 F12 尚未实现。
+- **决定**：
+  1. 编排在 `services/versions/publish.py` 的 `publish(ctx, course_id, created_by=)`，不做鉴权（P1 归路由），异常各带 `code`：`PublishInProgress`、`CourseBusy`（`details.holder`）、`SnapshotBlocked`（`PUBLISH_BLOCKED`）、`PublishFailed`（5xx，已执行 C1）。
+  2. P4 在课程写锁内：SQLite 一个读事务读 `draft_revision`、发布指针、任务水位（本课程最大 `t6_seq`，无则 0）、V 与 V 内任务的全部资料修订（`versions.read_draft_state`）；Neo4j 经 F07 `GraphReader` 按 V 读节点、关系、章节与来源关联，关系来源按 F07 规则过滤 `source_pairs`；块所属修订取自 SQLite 本课程 `chunks`，他课或不存在的块交由 G01 判 `invalid_source_ref`。
+  3. 知识点向量在 P5 之后（锁外）经 E07 适配器按快照计算，不在持锁区间调用模型；这是对 V5 P4「向量读入内存」的实现取舍，适配器按「空间 + 文本哈希」缓存，重试不重复计费。
+  4. `COURSE_BUSY` 的 `holder` 为超时时刻 `course_locks` 中未过期锁的持有方（`course_locks.current_holder`），可能在返回前已释放。
+  5. T7 为 `versions.complete_published_tasks`：在 P11 或幂等路径的同一 `immediate()` 事务内，把 `t6_seq ≤ w` 的 `awaiting_review` 任务转 `completed`（进度 1）；T7 失败则提交整体回滚并走 C1。
+  6. C1 只在尝试行条件更新为 `failed` 成功时继续；只有已进入 P8 才删 Neo4j 副本，删不掉置 `cleanup_pending`。提交之后才出现的异常（例如 COMMIT 后连接报错）不会删除已提交副本。
+  7. 发布集合的 `merged_from` 读草稿节点的同名属性，缺省为空。F10/F12 落地前没有合并，空谱系就是正确值；G04 不写 F12 审计日志，发布的审计由 `graph_versions` 行（`created_by`、`created_at`、`committed_at`、`failure_reason`）承担，因此 G04 不依赖 F12。
+  8. `POST /api/v1/courses/{cid}/publish` 路由不在 G04 的文件范围内，也不属于任何已拆任务，暂不实现，列入待决。
+- **后果**：发布服务可被路由或命令行直接调用；学生读取在 G07 前仍需调用方自行解析版本。持锁区间只含 SQLite 与 Neo4j 读取，不含模型调用。
+- **回滚**：撤销 `services/versions/publish.py`，以及 `repositories/versions.py` 末尾的 `DraftState`/`read_draft_state`/`complete_published_tasks`、`course_locks.current_holder`、F07 节点投影中的 `.merged_from`；无数据迁移。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
