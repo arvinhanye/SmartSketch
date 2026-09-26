@@ -53,3 +53,13 @@
 ## 6. 下一步
 
 ArvinHan 签收 ADR-061；审计读接口与关系/审核操作接入审计另立任务。
+
+## 7. 独立审查修复（2026-09-26，协调者）
+
+独立只读审查结论 APPROVE_WITH_NOTES（无严重缺陷；2 项中、7 项轻），已按「合并前必须修的项」处理：
+
+1. **M2 去自证（已修并验证）**：`tests/backend/test_f12.py` 原以 `failures=len(audit.RETRY_DELAYS)`、`calls["n"] == len(audit.RETRY_DELAYS) + 1` 派生断言——把 `RETRY_DELAYS` 归零仍全绿，「可重试」的验收行失去可失效的证据。已改为固定值（`failures=3`、`calls["n"] == 4`）并显式钉住常量（`assert len(audit.RETRY_DELAYS) == 3`）。**验证**：篡改 `audit.py` 的 `RETRY_DELAYS: Final = ()` 后该用例失败（`assert 0 == 3`），复原后 30 passed。
+2. **M1 租约被夺的错记窗口（按选项 (a) 落文字）**：写入方停顿超过租约（默认 60 秒）时，另一教师可先取锁并把在途 `pending` 判为 `aborted`，而停顿方随后仍可能写入成功；该行已被冻结触发器保护、后续对账无法纠正。已写入 ADR-061 决定 4 的「前提补充」与「后果」，并在签收行列明；若改为加保护（对账跳过本次取锁之后创建的行）或续约失败即中止写入，需另立修复任务。
+3. **迁移号复核（无冲突）**：main 最大 011，F12 用 012，并行 PR #282（F11）用 **013** → 012 不需改名。审查提出该不确定性时的外部条件已消除。
+4. **审查记录但未在本任务修的项**（已写入 ADR-061 后果）：脱敏缺 `secret_key`/`credential`/`cookie`/`session`、URI 内嵌口令、空格分隔 `--password value`、中文「密码：」；`merged` 未按 50 项截断；`create` 摘要不含锁状态；`INSERT OR REPLACE` 可绕过只追加触发器（SQLite 默认 `recursive_triggers = 0`，当前无调用路径）。
+5. 审查独立复跑：后端 30 passed、集成 8 passed（真实 Neo4j 5.26）、回归 88 passed、6 处独立反向篡改全部检出、`git diff --check` 干净；并指出「未加 `PYTHONPATH` 时共享 `.venv` 的 editable 指向主仓」这一环境陷阱（本批全部审查与实现任务均已按 `PYTHONPATH=$PWD/src/backend` 修正）。

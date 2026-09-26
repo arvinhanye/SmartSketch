@@ -172,11 +172,14 @@ def _flaky_resolve(monkeypatch, failures):
 
 def test_transient_sqlite_failure_after_neo4j_commit_is_retried(s, monkeypatch):
     s.store.nodes["a"] = kp("a")
-    calls = _flaky_resolve(monkeypatch, failures=len(audit.RETRY_DELAYS))  # succeeds on the last attempt
+    # 退避预算写成字面量，断言不得由被测常量派生：否则把 RETRY_DELAYS 归零（重试预算消失）
+    # 仍会全绿，验收行「跨库失败可重试」就失去可失效的证据（独立审查 2026-09-26 M2）。
+    assert len(audit.RETRY_DELAYS) == 3
+    calls = _flaky_resolve(monkeypatch, failures=3)  # succeeds on the last attempt
 
     assert s.patch("a", {"expected_revision": 1, "name": "x"}).status_code == 200
 
-    assert calls["n"] == len(audit.RETRY_DELAYS) + 1
+    assert calls["n"] == 4
     [entry] = logs(s)
     assert (entry.state, entry.kp_revision_after) == ("committed", 2)
 
