@@ -927,7 +927,7 @@ H13、F03、E06 的前置均已合入 main@`8985a16`（H13：C13、B15、B03、B
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F03 | IN PROGRESS | 建立图唯一约束和索引迁移 | ArvinHan（Claude 子代理） | `claude/f03-graph-constraints` / 本认领提交 | `src/backend/migrations/neo4j/001_constraints.cypher`、`src/backend/app/repositories/graph_migrations.py`、`tests/integration/test_f03.py`、`docs/handoffs/claude-f03.md` | 待补 |
+| F03 | 撤回（改由 Codex 执行） | 建立图唯一约束和索引迁移 | ArvinHan（Claude 子代理） | `claude/f03-graph-constraints` / 本认领提交 | `src/backend/migrations/neo4j/001_constraints.cypher`、`src/backend/app/repositories/graph_migrations.py`、`tests/integration/test_f03.py`、`docs/handoffs/claude-f03.md` | Codex 已在做 F03，本认领撤回避免重复；Claude 子代理未提交的草稿留在本地 worktree `f03-graph-constraints`，未推送 |
 
 - F03 验收：同作用域 ID 唯一；版本不同可共存；迁移可重复执行；迁移失败有回滚/修复说明。验证：`python3 -m pytest tests/integration/test_f03.py -q`。
 
