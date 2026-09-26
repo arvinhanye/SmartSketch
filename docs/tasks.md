@@ -876,7 +876,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| D11 | DONE（待 PR 审查/合并） | 实现解析阶段 worker 编排 | ArvinHan（Claude） | `claude/d11-parse-worker` / 本认领提交 | `src/backend/app/workers/__init__.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_d11.py`、`docs/handoffs/claude-d11.md` | `test_d11.py` 42 passed；`tests/backend` 2147 passed（基线 2105 + 42）；`verify.sh` 通过；反向篡改 7 处全部检出；待决（PDF 管线版本 `pdf/1,cleanup/1,headings/1` 待确认等）见 `docs/handoffs/claude-d11.md` |
+| D11 | DONE（PR #239 `1df4c33`） | 实现解析阶段 worker 编排 | ArvinHan（Claude） | `claude/d11-parse-worker` / 本认领提交 | `src/backend/app/workers/__init__.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_d11.py`、`docs/handoffs/claude-d11.md` | `test_d11.py` 42 passed；`tests/backend` 2147 passed（基线 2105 + 42）；`verify.sh` 通过；反向篡改 7 处全部检出；待决（PDF 管线版本 `pdf/1,cleanup/1,headings/1` 待确认等）见 `docs/handoffs/claude-d11.md` |
 
 - D11 验收：已领取任务（C09 租约）经解析 → 分块 → 块身份（D09）→ 来源块持久化（D10）到 `parsing` 完成检查点（T4 `parsing → extracting`，带令牌条件）；解析失败 T9 `DOCUMENT_UNREADABLE`、取消在检查点 T8、租约丢失即停、重启重跑不产生新块；只做解析阶段，不接真实 LLM。验证：`python3 -m pytest tests/backend/test_d11.py -q`。
 
@@ -894,7 +894,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| J03 | DONE（待 PR 审查/合并） | 实现多轮问题改写 | ArvinHan（Claude） | `claude/j03-query-rewrite` / 本认领提交 | `src/backend/app/services/qa/__init__.py`、`src/backend/app/services/qa/rewrite.py`、`prompts/rewrite_query.yaml`、`tests/backend/test_j03.py`、`docs/handoffs/claude-j03.md`；范围扩展：`prompts/MANIFEST.md` 仅 `rewrite_query` 一行（E01 规则要求升版本同提交更新摘要） | `test_j03.py` 94 passed（与 `test_e01.py` 合计 163 passed）；后端全量 2199 passed（基线 2105 + 94）；`verify.sh` 通过；`git diff --check` 通过；反向篡改 8 处均检出；提示词 v2（草稿）；保留轮数等暂定值与 E04 重试不感知截止时刻等待决见 `docs/handoffs/claude-j03.md` |
+| J03 | DONE（PR #242） | 实现多轮问题改写 | ArvinHan（Claude） | `claude/j03-query-rewrite` / 本认领提交 | `src/backend/app/services/qa/__init__.py`、`src/backend/app/services/qa/rewrite.py`、`prompts/rewrite_query.yaml`、`tests/backend/test_j03.py`、`docs/handoffs/claude-j03.md`；范围扩展：`prompts/MANIFEST.md` 仅 `rewrite_query` 一行（E01 规则要求升版本同提交更新摘要） | `test_j03.py` 94 passed（与 `test_e01.py` 合计 163 passed）；后端全量 2199 passed（基线 2105 + 94）；`verify.sh` 通过；`git diff --check` 通过；反向篡改 8 处均检出；提示词 v2（草稿）；保留轮数等暂定值与 E04 重试不感知截止时刻等待决见 `docs/handoffs/claude-j03.md` |
 
 - J03 验收：历史按轮数/长度裁剪；只接受 `user`/`assistant` 角色，改写前剔除类标记与哨兵（`specs/grounded-qa.md` H2、QA-19）；改写出错、超时、被预算拒绝、输出为空或不合规均保留原问题；问答调用带 `request_id`、不带 `task_id`（ADR-011 修订 2）；只用 E02 fake 客户端测试。验证：`python3 -m pytest tests/backend/test_j03.py -q`。
 
@@ -906,11 +906,11 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| TD-01 | DONE（待 PR 审查/合并） | PDF 解析器版本格式定稿（ADR-018 修订 1）+ E04 问答截止时间 + 改写预写失败口径 | ArvinHan（Claude） | `claude/pdf-parser-version-tech-debt-e95eaf` / `ddbeb82` | `src/backend/app/services/parsers/pdf_headings.py`、`src/backend/app/services/chunk_identity.py`、`src/backend/app/services/ai/policy.py`、`tests/backend/test_d06.py`、`tests/backend/test_d09.py`、`tests/backend/test_e04.py`、`docs/decisions.md`（ADR-018 修订 1）、`docs/architecture.md`（资料修订一行）、`docs/integrations.md`（调用记录第 1 条、问答链路截止时间）、`specs/grounded-qa.md`（链路时限、P3）、本节、`docs/handoffs/claude-td-01.md` | `docs/handoffs/claude-td-01.md` |
+| TD-01 | DONE（PR #243 `c333bd1`） | PDF 解析器版本格式定稿（ADR-018 修订 1）+ E04 问答截止时间 + 改写预写失败口径 | ArvinHan（Claude） | `claude/pdf-parser-version-tech-debt-e95eaf` / `ddbeb82` | `src/backend/app/services/parsers/pdf_headings.py`、`src/backend/app/services/chunk_identity.py`、`src/backend/app/services/ai/policy.py`、`tests/backend/test_d06.py`、`tests/backend/test_d09.py`、`tests/backend/test_e04.py`、`docs/decisions.md`（ADR-018 修订 1）、`docs/architecture.md`（资料修订一行）、`docs/integrations.md`（调用记录第 1 条、问答链路截止时间）、`specs/grounded-qa.md`（链路时限、P3）、本节、`docs/handoffs/claude-td-01.md` | `docs/handoffs/claude-td-01.md` |
 | TD-02 | TODO | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | 未认领 | C10、C11（#241）、D11（#239）全部合并后再开始 | `src/backend/app/services/task_cancel.py`（C10）、C11 与 D11 服务层中的任务读取、`src/backend/app/repositories/tasks.py` | 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL（C10 同文件的取消 UPDATE 一并评估是否迁移）；C10/C11/D11 现有测试不改断言即通过 |
 
-TD-01 带出的跟进项（由对应 PR 的负责人在合并前处理）：
+TD-01 带出的跟进项：
 
-- **D11（#239）**：worker 删除自拼的 `PDF_PARSER_VERSION`，改为引用 `pdf_headings.CLEANED_PARSER_VERSION`（取值逐字相同，块 ID 不变）；清洗只用默认阈值。
-- **J03（#242）**：补一条测试——改写调用预写失败（`CallRecordError`）时改用原问题、不报错。
+- **D11（#239）**：worker 删除自拼的 `PDF_PARSER_VERSION`，改为引用 `pdf_headings.CLEANED_PARSER_VERSION`（取值逐字相同，块 ID 不变）；清洗只用默认阈值。 **已完成**（#239）。
+- **J03（#242）**：预写失败改用原问题已有测试覆盖；另绑定 E04 截止时间「链路截止 − 预留」并把 `CallDeadlineExceededError` 归为 `timeout`。**已完成**（#242）。
 - **J07（未开始）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
