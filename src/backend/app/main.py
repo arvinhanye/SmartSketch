@@ -13,6 +13,7 @@ from app.api.courses import router as courses_router
 from app.api.dependencies import access_error_response
 from app.api.event_tickets import router as event_tickets_router
 from app.api.graph import router as graph_router
+from app.api.graph_nodes import router as graph_nodes_router
 from app.api.health import router as health_router
 from app.api.task_cancel import router as task_cancel_router
 from app.api.tasks import router as tasks_router
@@ -90,6 +91,7 @@ def create_app() -> FastAPI:
     application.include_router(upload_policy_router)
     application.include_router(members_router)
     application.include_router(graph_router)
+    application.include_router(graph_nodes_router)
     return application
 
 

@@ -349,6 +349,9 @@ export interface paths {
         /**
          * 新增知识点（教师）
          * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         *     必须带至少一条来源 `sources`（ADR-035）：文本块须属于本课程，且其资料修订属于已提交任务
+         *     （`awaiting_review` 或 `completed`）；否则 422 `VALIDATION_ERROR`，`details.fields` 指向出错的来源。
+         *
          */
         post: operations["createKnowledgePoint"];
         delete?: never;
@@ -384,11 +387,40 @@ export interface paths {
         head?: never;
         /**
          * 修改知识点（教师）
-         * @description 请求必须携带节点级 `expected_revision`；与当前 `revision` 不一致时 409，
-         *     不覆盖先前写入。修改成功后修订号递增，`locked` 置为 true，后续自动流程不再覆盖。
+         * @description 请求必须携带节点级 `expected_revision`；与当前 `revision` 不一致时 409 `REVISION_CONFLICT`，
+         *     不覆盖先前写入，`details` 给出当前修订号与当前内容（ADR-035）。修改成功后修订号递增，
+         *     `locked` 置为 true，后续自动流程不再覆盖；本接口不能解锁，解锁见 `unlockKnowledgePoint`。
+         *     草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
          *
          */
         patch: operations["updateKnowledgePoint"];
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/kp/{kid}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                kid: components["parameters"]["KnowledgePointId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 解锁知识点（教师）
+         * @description 显式解锁（规格验收条件 11，ADR-035）：`locked` 置为 false，修订号递增，此后自动流程可以更新该节点。
+         *     须带 `expected_revision`，不一致时 409 `REVISION_CONFLICT`；节点本就未加锁时 200 原样返回，修订号不变。
+         *     草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         *
+         */
+        post: operations["unlockKnowledgePoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/courses/{cid}/kp/merge": {
@@ -696,7 +728,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT";
         PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
         /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
         PublishBlockedCycleReason: {
@@ -1109,12 +1141,25 @@ export interface components {
         };
         KnowledgePointCreate: {
             name: string;
+            /** @description 新建知识点的来源，至少一条（ADR-035） */
+            sources: components["schemas"]["KnowledgePointSourceInput"][];
             aliases?: string[];
             type: components["schemas"]["KnowledgePointType"];
             definition: string;
             chapter_id?: string;
             importance?: number;
             difficulty?: number;
+        };
+        /** @description 教师为知识点指定的一条来源。证据区间是文本块文本内的半开区间 `[evidence_start, evidence_end)`，
+         *     两端须同时给出或同时省略；省略时取整个文本块。
+         *      */
+        KnowledgePointSourceInput: {
+            chunk_id: string;
+            evidence_start?: number;
+            evidence_end?: number;
+        };
+        KnowledgePointUnlock: {
+            expected_revision: number;
         };
         /** @description 必带 expected_revision，且至少提供一个可修改字段。 */
         KnowledgePointUpdate: {
@@ -1761,7 +1806,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description 状态冲突，如 `CYCLE_DETECTED`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE` */
+        /** @description 状态冲突，如 `CYCLE_DETECTED`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`REVISION_CONFLICT`、`COURSE_BUSY` */
         Conflict: {
             headers: {
                 [name: string]: unknown;
@@ -2470,6 +2515,39 @@ export interface operations {
         };
         responses: {
             /** @description 已更新 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgePoint"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    unlockKnowledgePoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                kid: components["parameters"]["KnowledgePointId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgePointUnlock"];
+            };
+        };
+        responses: {
+            /** @description 已解锁（或本就未加锁） */
             200: {
                 headers: {
                     [name: string]: unknown;
