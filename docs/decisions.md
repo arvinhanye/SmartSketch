@@ -1273,6 +1273,21 @@
 - **回滚**：删除 `src/frontend/src/api/knowledgeDetail.ts`、`components/KnowledgeDetail.vue`、`composables/useKnowledgeDetail.ts`、`tests/frontend/h06.test.ts` 与本 ADR；无依赖、契约或数据变更。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
 
+## ADR-052：H05 图谱筛选、选中与布局切换
+
+- **日期**：2026-09-26
+- **背景**：H05 要求搜索、按关系等条件筛选、层次/力导向布局切换，验收为「筛选后无悬空边、清空恢复、切换布局不丢选中态」；H03/H04 把 `rejected`/`low_confidence` 的样式与过滤留给 H05。ADR-040 的画布只有固定层次布局，节点副本只带 `id`/`data`，没有选中概念；G6 v5 中配置项的节点样式优先级高于数据里的 `style`，所以不能靠逐节点 `style` 表达状态。
+- **决定**：
+  1. 筛选是 `composables/useGraphFilters.ts` 中的纯函数 `filterGraph(适配图, 条件, 选中)`，输入是 H03 适配图，不接触后端响应。知识点可见 ⇔ 类型、审核状态、章节均被选中且名称包含搜索词（NFKC、小写、去首尾空白后包含匹配；空白串等于不搜索）；关系可见 ⇔ 类型、审核状态被选中且两端可见。输出保持输入顺序。
+  2. 默认条件为全部四类关系、五类知识点、四种审核状态、全部章节——驳回项默认可见但淡化；调用方可用 `initial` 改默认（如教师视图默认隐藏驳回），`clear` 回到该默认。章节下拉只列图中出现的章节，标题取 `GraphExchange.chapters`，缺失时用 ID，另有「未分章」。
+  3. 状态经 G6 元素 `states` 表达：审核状态 `rejected`（节点灰色虚线框、透明度 0.4；边透明度 0.3）、`lowConfidence`（节点橙色虚线框；边透明度 0.6），选中 `selected`（深蓝粗框加光晕），数组中审核状态在前、选中在后。样式配置在 `buildGraphOptions` 的 `node.state`/`edge.state`；生命周期复制数据时保留 `states` 的副本。
+  4. 选中与布局存在组合式中，独立于筛选条件：清空、切换布局都不改选中；筛选隐藏选中节点时保留选中并由 `selectedHidden` 提示；新图里已无该知识点时清除选中。
+  5. 布局切换：`GraphCanvas` 新增 `layout` 属性（缺省 `hierarchical`），`lifecycle.setLayout` 在串行链上执行 `graph.setLayout` → `graph.layout()` → `fitView`，不重建、不 `setData`；连续切换只落在最后一次；G6 加载期间切换则建好后补做一次；未建图时建图即用新布局。力导向为 `d3-force`（连边距离 120、斥力 -300、碰撞半径 40）。`CanvasGraph` 的 `setLayout`/`layout` 为可选成员，替身不实现时切换不生效，已有测试替身无需改动。
+  6. `GraphToolbar.vue` 是受控组件（`v-model` 条件、`v-model:layout`、`clear`），只发出新对象不改 props；关系图例与按关系筛选合一，颜色、线型、箭头取自 `RELATION_STYLES`；审核状态图例与画布状态样式一致；可见数量区为 `aria-live="polite"`。
+- **后果**：筛选每次变化都会 `setData` 并按当前布局重新布局，节点位置不保持（小图可接受）。页面接入（教师/学生图谱页）留给 H11 等视图任务；H06 详情可直接用 `nodeClick` → `select`。
+- **回滚**：删除 `composables/useGraphFilters.ts`、`components/GraphToolbar.vue`、`tests/frontend/h05.test.ts`；`git checkout <base> -- src/frontend/src/graph/lifecycle.ts src/frontend/src/components/GraphCanvas.vue` 还原画布扩展；无依赖或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
 ## ADR-053：H08 教师连边编辑的乐观更新与冲突呈现
 
 - **日期**：2026-09-26
