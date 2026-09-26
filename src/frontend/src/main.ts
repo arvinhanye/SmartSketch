@@ -5,10 +5,12 @@ import App from './App.vue'
 import { AUTH_API_KEY, createAuthApi, createSessionHttpClient } from './api/auth'
 import { HTTP_CLIENT_KEY } from './api/client'
 import { COURSES_API_KEY, createCoursesApi } from './api/courses'
+import { createMembersApi, MEMBERS_API_KEY } from './api/members'
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from './router'
 import { useSessionStore } from './stores/session'
 import CoursesView from './views/CoursesView.vue'
 import LoginView from './views/LoginView.vue'
+import MembersView from './views/MembersView.vue'
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
@@ -20,6 +22,8 @@ const router = createAppRouter({
   loginComponent: LoginView,
   // H01：教师/学生首页都是课程列表，并注册 /courses/:cid
   coursesComponent: CoursesView,
+  // H12：教师成员管理页 /courses/:cid/members
+  membersComponent: MembersView,
 })
 
 // 受保护接口 401：清会话与课程上下文后回登录页
@@ -34,4 +38,5 @@ createApp(App)
   .provide(HTTP_CLIENT_KEY, http)
   .provide(AUTH_API_KEY, createAuthApi(http))
   .provide(COURSES_API_KEY, createCoursesApi(http))
+  .provide(MEMBERS_API_KEY, createMembersApi(http))
   .mount('#app')

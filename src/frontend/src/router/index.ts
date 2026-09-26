@@ -24,6 +24,8 @@ export const NOTICE_COURSE_FORBIDDEN = 'course-forbidden'
 export const ROOT_ROUTE = 'root'
 /** 单个课程页的路由名，参数 `cid` 经 `useCourseStore().selectCourse` 成为当前课程（H01） */
 export const COURSE_ROUTE = 'course'
+/** 课程成员管理页的路由名（H12），参数 `cid`；仅教师账号可进入，授权以后端课程内角色为准 */
+export const COURSE_MEMBERS_ROUTE = 'course-members'
 const HOME_ROUTE: Record<Role, string> = { teacher: 'teacher-home', student: 'student-home' }
 
 /** 该账号类型的默认首页路由名（登录成功后按 `LoginResponse.user.role` 跳转） */
@@ -42,9 +44,17 @@ export interface AppRouterOptions {
    * 省略时保持 B03 的占位首页，不注册课程路由。
    */
   coursesComponent?: Component
+  /** 课程成员管理页（H12）。注入后注册 `/courses/:cid/members`；省略时不注册 */
+  membersComponent?: Component
 }
 
-export function createAppRouter({ history, getAccountRole, loginComponent, coursesComponent }: AppRouterOptions) {
+export function createAppRouter({
+  history,
+  getAccountRole,
+  loginComponent,
+  coursesComponent,
+  membersComponent,
+}: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
     { path: '/', name: ROOT_ROUTE, component: loginComponent ?? { render: () => null } },
@@ -63,6 +73,15 @@ export function createAppRouter({ history, getAccountRole, loginComponent, cours
   ]
   if (coursesComponent) {
     routes.push({ path: '/courses/:cid', name: COURSE_ROUTE, component: coursesComponent, meta: { anyAccountRole: true } })
+  }
+  if (membersComponent) {
+    // 学生账号无入口：守卫按账号类型送回学生首页；教师账号在本课是否为教师成员由后端 403 判定
+    routes.push({
+      path: '/courses/:cid/members',
+      name: COURSE_MEMBERS_ROUTE,
+      component: membersComponent,
+      meta: { accountRole: 'teacher' },
+    })
   }
   routes.push({ path: '/:pathMatch(.*)*', redirect: '/' })
 
