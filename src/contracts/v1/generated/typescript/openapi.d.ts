@@ -437,7 +437,13 @@ export interface paths {
         put?: never;
         /**
          * 合并重复知识点（教师）
-         * @description 被合并节点的名称并入 `aliases`，关系与来源取并集后迁移到主节点。
+         * @description 被合并节点的名称并入 `aliases`，关系与来源取并集后迁移到主节点（ADR-047）：入边与出边改接到主节点，
+         *     同类型同端点的关系去重（主节点原有的关系保留字段，贡献与来源取并集），两端都在本次合并内的关系删除；
+         *     迁移后的 `PREREQUISITE` 执行 DAG 环检测，成环返回 409 `CYCLE_DETECTED` 并给出 `details.cycle`。
+         *     主节点修订号加 1 并加锁，被合并节点从草稿删除、记入主节点的合并谱系。可选 `expected_revisions`
+         *     与当前修订号不一致时 409 `REVISION_CONFLICT`。节点不存在或不可见时 422（`details.fields` 的 `reason`
+         *     为 `not_found`）。草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。任何失败都不部分提交。
+         *
          */
         post: operations["mergeKnowledgePoints"];
         delete?: never;
@@ -1189,7 +1195,14 @@ export interface components {
         MergeRequest: {
             /** @description 保留的主节点；其名称成为主名 */
             primary_id: string;
+            /** @description 并入主节点的知识点，不得含主节点，不得重复 */
             merged_ids: string[];
+            /** @description 可选的节点级乐观并发：键为本次合并涉及的知识点 ID（主节点或被合并节点），值为读到的 `revision`。
+             *     任一不一致时 409 `REVISION_CONFLICT`，不写入（ADR-047）。
+             *      */
+            expected_revisions?: {
+                [key: string]: number;
+            };
         };
         Relation: components["schemas"]["RelationStandard"] | components["schemas"]["RelationDowngraded"];
         RelationStandard: {

@@ -1243,3 +1243,20 @@
 - **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
 - **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-047：F10 合并知识点与重接边
+
+- **日期**：2026-09-26
+- **背景**：契约已有 `mergeKnowledgePoints`（`MergeRequest{primary_id, merged_ids}`），只说「名称并入别名，关系与来源取并集后迁移到主节点」。未定的是：重接后撞上的关系怎样去重、字段取谁；合并后怎样验环；不可见（失败任务留下）的关系与来源怎么处理；合并谱系 `merged_from`（ADR-012 修订 3）怎样维护；并发冲突与失败时怎样保证不部分提交；节点不存在时返回什么。
+- **决定**：
+  1. **写入顺序**同 ADR-035（V4）：输入校验 → 课程写锁（持有方 `edit`，超时 409 `COURSE_BUSY`）→ 读 V → 一个 Neo4j 写事务（先锁 `DraftWriteGuard`，再读、校验、验环，全部通过后才 `draft_revision + 1`，然后写）。校验、冲突、成环都在加修订号之前抛出，事务回滚，草稿与 `draft_revision` 不变；写入语句中途失败同样整体回滚。
+  2. **输入**：`merged_ids` 至少一个、不重复、不含主节点；`MergeRequest` 新增可选 `expected_revisions`（知识点 ID → 读到的 `revision`，键须是本次涉及的节点），任一不符 → 409 `REVISION_CONFLICT`（`details` 同 ADR-035，`kp_id` 为第一个不符的节点，主节点先查）；`MergeRequest` 加 `additionalProperties: false`。主节点或被合并节点不存在、不可见或属于他课 → 422 `VALIDATION_ERROR`，`details.fields` 为 `primary_id` 或 `merged_ids.<i>`，`reason = not_found`（与 ADR-035 的 `chapter_id` 同口径，契约不加 404）。加锁节点照常可合并（锁只约束自动流程）。
+  3. **重接**：被合并节点一端换成主节点；两端都在「主节点 + 被合并节点」内的关系删除。新 `rel_id` 按「课程 + 类型 + 起点 + 终点」重新派生，ADR-009 降级来的关系按 `PREREQUISITE` 派生（保留降级约定）。ID 相同或「类型 + 端点」相同的关系合为一条：主节点原有的关系胜出；否则按「可见 → 状态 approved > draft > low_confidence > rejected → 人工 → 置信度高 → rel_id 小」取胜出者。胜出者提供类型与字段；`contrib_tasks`、`contrib_manual`、`source_pairs` 取并集，修订号取最大值加 1。旧的 `RelationIdentity` 删除，新的建立。迁移后的关系不置 `contrib_manual`（除非某条原本就是），不改变其来源归属。
+  4. **验环**：用 F05 `check_candidates`：现有边 = 可见、未拒绝的 `PREREQUISITE` 去掉被改写的；候选 = 新形态中可见、未拒绝的 `PREREQUISITE`。成环 → 409 `CYCLE_DETECTED`，`details.cycle` 为闭合链路。草稿本已成环时同样拒绝（与 F06 一致）。
+  5. **不可见的关系与来源照样迁移**，贡献原样保留，迁移后仍不可见，由失败任务的清理（§8.4 撤销）处理；不参与验环。
+  6. **主节点**：主名与其他字段不变；被合并节点的名称与别名依次并入别名（精确去重，不含主名）；`merged_from` = 主节点、被合并节点及其 `merged_from` 的并集（展平、升序、不含主节点）；`contrib_tasks` 取并集；`locked = true`、`contrib_manual = true`、修订号加 1。被合并节点从草稿删除（`DETACH DELETE`，只删 `version_id = draft`）；已发布副本与共享文本块不动。
+  7. **来源**：被合并节点的全部 `EVIDENCED_BY` 迁到主节点，按 `(task_id, chunk_id, evidence_start, evidence_end)` 去重，保留原 `task_id`（人工来源仍无 `task_id`）。
+  8. 审计日志（直接父子关系）归 F12，本任务不记录。
+- **后果**：合并是一次原子的草稿写入，会使已发布课程变为 `revising`；发布时 G01 按 `merged_from` 生成谱系。已知限制：(a) 被合并节点的 `kp_id` 若被后续抽取任务再次写入，F04 会重建该节点，与主节点的 `merged_from` 冲突，发布时报 `invalid_lineage`（F04 尚不查谱系）；(b) 迁移关系上的 `downgrade_cycle` 保留原节点 ID，可能引用已被合并的节点；(c) 合并数量没有上限。
+- **回滚**：撤销 `services/graph/merge_nodes.py`、`repositories/graph_edit.py` 中 F10 段（`transaction`、`read_nodes` 至 `delete_merged_nodes`）、`api/graph_nodes.py` 的合并路由、`schemas/contracts.py` 一行、契约（`MergeRequest.expected_revisions`、`additionalProperties`、合并描述、`errors.v1.md` 两处措辞）并重新生成；无 SQLite 迁移与 Neo4j DDL。已合并的数据无法自动拆回，需按 F12 审计或备份恢复。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

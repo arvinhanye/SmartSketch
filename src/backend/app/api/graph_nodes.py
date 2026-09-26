@@ -1,5 +1,5 @@
 """Teacher knowledge-point writes — ``createKnowledgePoint``, ``updateKnowledgePoint`` and
-``unlockKnowledgePoint`` (F08, ADR-035).
+``unlockKnowledgePoint`` (F08, ADR-035), ``mergeKnowledgePoints`` (F10, ADR-047).
 
 Protocol translation and dependency injection only; ``app.services.graph.edit_node`` holds the
 course write lock, the revision check and the lock semantics.
@@ -7,6 +7,7 @@ course write lock, the revision check and the lock semantics.
 * course teacher members only (students 403 ``ROLE_FORBIDDEN``, non-members 403 ``COURSE_FORBIDDEN``);
 * stale ``expected_revision`` → 409 ``REVISION_CONFLICT`` with the current content;
 * course write lock not free within ``COURSE_LOCK_WAIT_SECONDS`` → 409 ``COURSE_BUSY``;
+* a merge whose re-wired ``PREREQUISITE`` edges would close a cycle → 409 ``CYCLE_DETECTED`` with ``cycle``;
 * Neo4j unreachable → 503 ``STORAGE_UNAVAILABLE``.
 
 ``KnowledgePointUpdate`` is an ``anyOf`` with ``additionalProperties: false``; the generated model
@@ -32,6 +33,7 @@ from app.schemas.contracts import (
     KnowledgePointStatus,
     KnowledgePointType,
     KnowledgePointUnlock,
+    MergeRequest,
 )
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
@@ -45,13 +47,15 @@ from app.services.graph.edit_node import (
     unlock_node,
     update_node,
 )
+from app.services.graph.merge_nodes import merge_nodes
+from app.services.graph.relations import CycleDetectedError
 
 router = APIRouter(prefix="/api/v1/courses/{cid}", tags=["graph"])
 
 _ERRORS: dict[int | str, dict[str, Any]] = {
     401: {"model": Error},
     403: {"model": Error},
-    409: {"model": Error, "description": "`REVISION_CONFLICT` 或 `COURSE_BUSY`"},
+    409: {"model": Error, "description": "`REVISION_CONFLICT`、`COURSE_BUSY` 或（合并）`CYCLE_DETECTED`"},
     422: {"model": Error},
     503: {"model": Error, "description": "图数据库暂不可用（`STORAGE_UNAVAILABLE`）"},
 }
@@ -91,6 +95,8 @@ def _run(request: Request, operation: Any, status: int = 200) -> JSONResponse:
         return _error(409, busy.code, "课程正在被其他操作写入，请稍后重试", busy.details())
     except RevisionConflict as conflict:
         return _error(409, conflict.code, "知识点已被他人修改，请查看最新内容后再提交", conflict.details())
+    except CycleDetectedError as cycle:
+        return _error(409, cycle.code, "该操作会使前置关系成环", {"cycle": list(cycle.cycle)})
     except InvalidEdit as invalid:
         raise RequestValidationError([
             {"type": f["reason"], "loc": (f["in"], *[p for p in f["field"].split(".") if p])} for f in invalid.fields
@@ -192,3 +198,15 @@ def unlock_knowledge_point(
     access: CourseAccess = Depends(course_teacher),
 ) -> JSONResponse:
     return _run(request, lambda ctx: unlock_node(ctx, access.course.id, kid, body.expected_revision))
+
+
+@router.post("/kp/merge", operation_id="mergeKnowledgePoints", response_model=KnowledgePoint, responses=_ERRORS)
+def merge_knowledge_points(
+    request: Request,
+    body: MergeRequest,
+    access: CourseAccess = Depends(course_teacher),
+) -> JSONResponse:
+    if "expected_revisions" in body.model_fields_set and body.expected_revisions is None:
+        raise RequestValidationError([{"type": "null_forbidden", "loc": ("body", "expected_revisions")}])
+    return _run(request, lambda ctx: merge_nodes(ctx, access.course.id, body.primary_id, body.merged_ids,
+                                                 body.expected_revisions))
