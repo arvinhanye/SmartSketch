@@ -1,6 +1,7 @@
 """E09：向量候选分层（``docs/atomic-tasks.json`` E09；``docs/tasks.md`` 第八批 E09 验收）。
 
-输入：同一课程、同一向量空间的实体向量与两条阈值；输出：自动合并 / 需裁决 / 保留三组。
+输入：同一课程、同一向量空间的实体向量与两条阈值；输出：自动合并 / 需裁决两组配对 + 保留组计数
+（保留组不物化配对；三组计数之和 = n(n-1)/2）。
 验收：课程隔离（跨课程、跨向量空间混传拒绝）；阈值顺序非法拒绝；边界等号规则明确：
 ``相似度 ≥ auto_merge`` → 自动合并；``review ≤ 相似度 < auto_merge`` → 需裁决；``相似度 < review`` → 保留。
 """
@@ -15,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from app.services.ai.embeddings import EmbeddedVector
+from app.services.fusion import candidates as candidates_module
 from app.services.fusion.candidates import (
     CandidateTier,
     TierThresholds,
@@ -183,7 +185,7 @@ class TestCosine:
         assert cosine_similarity(v, v) == 1.0
         t = TierThresholds(auto_merge=1, review=0.5)
         out = run([entry("a", (0.1, 0.1)), entry("b", (0.1, 0.1))], thresholds=t)
-        assert [p.tier for p in out.all_pairs()] == [CandidateTier.AUTO_MERGE]
+        assert [p.tier for p in out.candidates()] == [CandidateTier.AUTO_MERGE]
 
     def test_parallel_scaled_clamped(self):
         s = cosine_similarity(vec((1.0, 3.0)), vec((3.0, 9.0)))
@@ -306,7 +308,8 @@ class TestIsolation:
     def test_identical_vectors_across_courses_never_pair(self):
         a = run([entry("a", (1.0, 0.0))])
         b = run([entry("b", (1.0, 0.0), course_id="course_b")], course_id="course_b")
-        assert a.all_pairs() == () and b.all_pairs() == ()
+        assert a.total_pairs == b.total_pairs == 0
+        assert a.candidates() == () and b.candidates() == ()
 
 
 # ---------------------------------------------------------------- 分层
@@ -317,7 +320,8 @@ class TestTiering:
         for entries in ([], [entry("a", (1.0, 0.0))]):
             out = run(entries)
             assert out == VectorTiers(course_id=COURSE, space=SPACE, thresholds=T)
-            assert out.auto_merge == out.review == out.keep == ()
+            assert out.auto_merge == out.review == ()
+            assert out.kept_count == out.total_pairs == 0
 
     def test_three_groups(self):
         anchor = VectorEntry(entity_id="a", course_id=COURSE, vector=vec((1.0, 0.0)))
@@ -329,7 +333,8 @@ class TestTiering:
         out = run(entries)
         assert [(p.left_id, p.right_id) for p in out.auto_merge] == [("a", "b")]
         assert out.review == ()
-        assert [(p.left_id, p.right_id) for p in out.keep] == [("a", "c"), ("b", "c")]
+        assert out.kept_count == 2
+        assert out.total_pairs == 3
         for p in out.auto_merge:
             assert p.tier is CandidateTier.AUTO_MERGE and p.similarity == 1.0
 
@@ -340,7 +345,7 @@ class TestTiering:
             [entry("a", (1.0, 0.0)), entry("b", (0.6, 0.8)), entry("c", (0.8, 0.6))],
             thresholds=t,
         )
-        sims = {(p.left_id, p.right_id): (p.similarity, p.tier) for p in out.all_pairs()}
+        sims = {(p.left_id, p.right_id): (p.similarity, p.tier) for p in out.candidates()}
         assert sims[("a", "b")] == (0.6, CandidateTier.REVIEW)
         assert sims[("a", "c")] == (0.8, CandidateTier.AUTO_MERGE)
         # b·c = 0.96
@@ -353,17 +358,57 @@ class TestTiering:
             for i in range(15)
         ]
         out = run(entries, space="fake/4", thresholds=TierThresholds(auto_merge=0.7, review=0.2))
-        pairs = [(p.left_id, p.right_id) for p in out.all_pairs()]
-        assert len(pairs) == len(set(pairs)) == 15 * 14 // 2
-        ids = sorted(e.entity_id for e in entries)
-        assert set(pairs) == set(itertools.combinations(ids, 2))
-        for group, tier in ((out.auto_merge, CandidateTier.AUTO_MERGE),
-                            (out.review, CandidateTier.REVIEW),
-                            (out.keep, CandidateTier.KEEP)):
+        n = len(entries)
+        assert len(out.auto_merge) + len(out.review) + out.kept_count == n * (n - 1) // 2
+        assert out.total_pairs == n * (n - 1) // 2
+
+        # 独立逐对计算的期望划分
+        by_id = {e.entity_id: e.vector for e in entries}
+        expected = {tier: set() for tier in CandidateTier}
+        for left, right in itertools.combinations(sorted(by_id), 2):
+            s = cosine_similarity(by_id[left], by_id[right])
+            expected[classify_similarity(s, out.thresholds)].add((left, right))
+        assert all(expected.values()), "随机样本应三组都非空"
+        assert {(p.left_id, p.right_id) for p in out.auto_merge} == expected[CandidateTier.AUTO_MERGE]
+        assert {(p.left_id, p.right_id) for p in out.review} == expected[CandidateTier.REVIEW]
+        assert out.kept_count == len(expected[CandidateTier.KEEP])
+
+        pairs = [(p.left_id, p.right_id) for p in out.candidates()]
+        assert len(pairs) == len(set(pairs))
+        for group, tier in ((out.auto_merge, CandidateTier.AUTO_MERGE), (out.review, CandidateTier.REVIEW)):
             for p in group:
                 assert p.tier is tier
                 assert classify_similarity(p.similarity, out.thresholds) is tier
             assert [(p.left_id, p.right_id) for p in group] == sorted((p.left_id, p.right_id) for p in group)
+
+    def test_keep_group_not_materialized(self, monkeypatch):
+        built = []
+        real = candidates_module.VectorCandidate
+
+        def counting(*args, **kwargs):
+            candidate = real(*args, **kwargs)
+            built.append(candidate)
+            return candidate
+
+        monkeypatch.setattr(candidates_module, "VectorCandidate", counting)
+        # 20 个两两正交或反向的向量：绝大多数配对落入保留组
+        entries = [entry(f"k{i:02d}", (1.0, 0.0) if i % 2 else (0.0, 1.0)) for i in range(20)]
+        out = run(entries)
+        assert out.kept_count == 100  # 10×10 个跨组配对，余弦 0
+        assert len(out.auto_merge) == 2 * (10 * 9 // 2)
+        assert len(built) == len(out.auto_merge) + len(out.review)
+        assert all(p.tier is not CandidateTier.KEEP for p in built)
+        assert not hasattr(out, "keep")
+        assert not hasattr(out, "all_pairs")
+
+    def test_kept_count_boundary_equal_review_is_not_kept(self):
+        # 余弦恰为 review（0.6）→ 需裁决，不计入保留；紧贴其下 → 保留
+        t = TierThresholds(auto_merge=0.8, review=0.6)
+        out = run([entry("a", (1.0, 0.0)), entry("b", (0.6, 0.8))], thresholds=t)
+        assert (len(out.review), out.kept_count) == (1, 0)
+        below = math.nextafter(0.6, 0)
+        out = run([entry("a", (1.0, 0.0)), entry("b", (below, math.sqrt(1 - below * below)))], thresholds=t)
+        assert (len(out.review), out.kept_count) == (0, 1)
 
     def test_order_independent(self):
         rng = random.Random(7)
@@ -401,24 +446,46 @@ class TestTiering:
         run(entries)
         assert entries == snapshot
 
+    def test_candidates_sorted_across_groups(self):
+        t = TierThresholds(auto_merge=0.8, review=0.6)
+        out = run([entry("a", (1.0, 0.0)), entry("b", (0.6, 0.8)), entry("c", (0.8, 0.6))], thresholds=t)
+        assert [(p.left_id, p.right_id) for p in out.candidates()] == [("a", "b"), ("a", "c"), ("b", "c")]
+
     def test_result_echoes_context(self):
         out = run([entry("a", (1.0, 0.0)), entry("b", (1.0, 0.0))])
         assert (out.course_id, out.space, out.thresholds) == (COURSE, SPACE, T)
 
 
+class TestVectorTiersModel:
+    @pytest.mark.parametrize("bad", [-1, 1.0, True, "0", None])
+    def test_kept_count_validated(self, bad):
+        with pytest.raises((TypeError, ValueError)):
+            VectorTiers(course_id=COURSE, space=SPACE, thresholds=T, kept_count=bad)
+
+    def test_total_pairs(self):
+        p = VectorCandidate(left_id="a", right_id="b", similarity=0.95, tier=CandidateTier.AUTO_MERGE)
+        q = VectorCandidate(left_id="a", right_id="c", similarity=0.7, tier=CandidateTier.REVIEW)
+        out = VectorTiers(course_id=COURSE, space=SPACE, thresholds=T, auto_merge=(p,), review=(q,), kept_count=4)
+        assert out.total_pairs == 6
+
+
 class TestVectorCandidate:
     def test_ordering_enforced(self):
         with pytest.raises(ValueError):
-            VectorCandidate(left_id="b", right_id="a", similarity=0.5, tier=CandidateTier.KEEP)
+            VectorCandidate(left_id="b", right_id="a", similarity=0.5, tier=CandidateTier.REVIEW)
         with pytest.raises(ValueError):
-            VectorCandidate(left_id="a", right_id="a", similarity=0.5, tier=CandidateTier.KEEP)
+            VectorCandidate(left_id="a", right_id="a", similarity=0.5, tier=CandidateTier.REVIEW)
+
+    def test_keep_tier_not_a_candidate(self):
+        with pytest.raises(ValueError, match="keep"):
+            VectorCandidate(left_id="a", right_id="b", similarity=0.1, tier=CandidateTier.KEEP)
 
     def test_tier_type(self):
         with pytest.raises(TypeError):
             VectorCandidate(left_id="a", right_id="b", similarity=0.5, tier="keep")  # type: ignore[arg-type]
 
     def test_frozen(self):
-        p = VectorCandidate(left_id="a", right_id="b", similarity=0.5, tier=CandidateTier.KEEP)
+        p = VectorCandidate(left_id="a", right_id="b", similarity=0.7, tier=CandidateTier.REVIEW)
         with pytest.raises(dataclasses.FrozenInstanceError):
             p.similarity = 0.9  # type: ignore[misc]
 
@@ -444,3 +511,4 @@ class TestPurity:
     def test_docstring_states_boundary_rule(self):
         doc = ast.get_docstring(ast.parse(MODULE.read_text(encoding="utf-8")))
         assert doc and "≥ auto_merge" in doc and "review ≤" in doc and "< review" in doc
+        assert "kept_count" in doc

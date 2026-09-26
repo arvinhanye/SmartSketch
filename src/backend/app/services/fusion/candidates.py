@@ -1,5 +1,7 @@
 """E09：向量候选分层——同一课程、同一向量空间的实体向量 + 两条阈值 → 自动合并 / 需裁决 / 保留三组。
 
+输出中自动合并、需裁决两组返回配对；保留组**只返回数量** ``kept_count``，不物化配对。
+
 纯函数：不调用模型、不做 I/O、不记录日志、不修改输入。E09 **只分层，不合并**：「自动合并」组是给
 E10/E12 的结论输入，实际合并（含教师加锁节点不被覆盖）不在本模块。
 
@@ -33,10 +35,14 @@ E10/E12 的结论输入，实际合并（含教师加锁节点不被覆盖）不
   不做部分分层、不静默丢弃。因此不同课程、不同向量空间的实体绝不会配对。
 - 草稿可见性 V 过滤（ADR-011 修订 1，F02）仍由调用方先做；本模块只保证传入集合内部同课程同空间。
 
-输出 ``VectorTiers``：回显 ``course_id``、``space``、``thresholds``，三组 ``VectorCandidate`` 元组互斥且
-合起来覆盖全部 C(n, 2) 对（``keep`` 组即余下全部配对，复杂度 O(n²·d)，面向单课程规模）。每对
-``left_id < right_id``（码点序），组内按 ``(left_id, right_id)`` 升序，与输入顺序无关；无自配对。
-``entity_id`` 重复即 ``ValueError``。
+输出 ``VectorTiers``：回显 ``course_id``、``space``、``thresholds``；``auto_merge``、``review`` 为
+``VectorCandidate`` 元组，``kept_count`` 为保留组配对数。三组互斥，
+``len(auto_merge) + len(review) + kept_count == total_pairs == n(n-1)/2``。每对 ``left_id < right_id``
+（码点序），组内按 ``(left_id, right_id)`` 升序，与输入顺序无关；无自配对。``entity_id`` 重复即
+``ValueError``。``VectorCandidate`` 不能是 ``keep`` 层。
+
+复杂度：时间 O(n²·d)（逐对计算余弦，n 为实体数、d 为维度，面向单课程规模）；额外内存
+O(n·d + k)，k 为自动合并与需裁决两组的配对数——保留组只累加计数，不为其创建对象。
 
 与 E08 名称候选（``same_key``/``alias``/``containment``）的关系：规格未定如何合流，本模块只看向量、
 不接收名称候选（待决，见 ``docs/handoffs/claude-e09.md``）。
@@ -135,26 +141,37 @@ class VectorCandidate:
     def __post_init__(self) -> None:
         if not isinstance(self.tier, CandidateTier):
             raise TypeError("tier must be CandidateTier")
+        if self.tier is CandidateTier.KEEP:
+            raise ValueError("keep pairs are counted, not returned as candidates")
         if not self.left_id < self.right_id:
             raise ValueError("left_id must sort strictly before right_id")
 
 
 @dataclass(frozen=True, slots=True)
 class VectorTiers:
-    """三组分层结果；三组互斥，合起来覆盖全部配对。"""
+    """分层结果：自动合并与需裁决两组给出配对，保留组只给数量 ``kept_count``。"""
 
     course_id: str
     space: str
     thresholds: TierThresholds
     auto_merge: tuple[VectorCandidate, ...] = ()
     review: tuple[VectorCandidate, ...] = ()
-    keep: tuple[VectorCandidate, ...] = ()
+    kept_count: int = 0
 
-    def all_pairs(self) -> tuple[VectorCandidate, ...]:
-        """三组合并，按 ``(left_id, right_id)`` 升序。"""
-        return tuple(
-            sorted((*self.auto_merge, *self.review, *self.keep), key=lambda p: (p.left_id, p.right_id))
-        )
+    def __post_init__(self) -> None:
+        if isinstance(self.kept_count, bool) or not isinstance(self.kept_count, int):
+            raise TypeError("kept_count must be int")
+        if self.kept_count < 0:
+            raise ValueError("kept_count must be non-negative")
+
+    @property
+    def total_pairs(self) -> int:
+        """三组配对数之和，等于 n(n-1)/2。"""
+        return len(self.auto_merge) + len(self.review) + self.kept_count
+
+    def candidates(self) -> tuple[VectorCandidate, ...]:
+        """自动合并与需裁决两组合并，按 ``(left_id, right_id)`` 升序。"""
+        return tuple(sorted((*self.auto_merge, *self.review), key=lambda p: (p.left_id, p.right_id)))
 
 
 def classify_similarity(similarity: float, thresholds: TierThresholds) -> CandidateTier:
@@ -214,7 +231,7 @@ def tier_vector_candidates(
     space: str,
     thresholds: TierThresholds,
 ) -> VectorTiers:
-    """把单课程、单向量空间的实体两两配对并分成自动合并 / 需裁决 / 保留三组（只分层，不合并）。"""
+    """把单课程、单向量空间的实体两两配对并分层（只分层，不合并）；保留组只计数。"""
     if not isinstance(thresholds, TierThresholds):
         raise TypeError("thresholds must be TierThresholds")
     _require_id(course_id, "course_id")
@@ -241,17 +258,24 @@ def tier_vector_candidates(
         prepared.append((entry.entity_id, checked))
     prepared.sort(key=lambda item: item[0])
 
-    groups: dict[CandidateTier, list[VectorCandidate]] = {tier: [] for tier in CandidateTier}
+    auto_merge: list[VectorCandidate] = []
+    review: list[VectorCandidate] = []
+    kept_count = 0
     for i, (left_id, left) in enumerate(prepared):
-        for right_id, right in prepared[i + 1 :]:
+        for j in range(i + 1, len(prepared)):
+            right_id, right = prepared[j]
             similarity = _cosine(left, right)
             tier = classify_similarity(similarity, thresholds)
-            groups[tier].append(VectorCandidate(left_id, right_id, similarity, tier))
+            if tier is CandidateTier.KEEP:
+                kept_count += 1
+            else:
+                target = auto_merge if tier is CandidateTier.AUTO_MERGE else review
+                target.append(VectorCandidate(left_id, right_id, similarity, tier))
     return VectorTiers(
         course_id=course_id,
         space=space,
         thresholds=thresholds,
-        auto_merge=tuple(groups[CandidateTier.AUTO_MERGE]),
-        review=tuple(groups[CandidateTier.REVIEW]),
-        keep=tuple(groups[CandidateTier.KEEP]),
+        auto_merge=tuple(auto_merge),
+        review=tuple(review),
+        kept_count=kept_count,
     )

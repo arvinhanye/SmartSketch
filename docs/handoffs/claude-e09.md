@@ -10,7 +10,7 @@
 | 文件 | 说明 |
 | --- | --- |
 | `src/backend/app/services/fusion/candidates.py` | 新增。纯函数：阈值校验、余弦相似度、单对分层、单课程单空间两两分层 |
-| `tests/backend/test_e09.py` | 新增。84 个用例 |
+| `tests/backend/test_e09.py` | 新增。94 个用例（首版 84，接口变更后 94） |
 | `docs/handoffs/claude-e09.md` | 本文件 |
 | `docs/tasks.md` | 只改第八批 E09 行的状态与证据列 |
 
@@ -29,15 +29,18 @@ tiers = tier_vector_candidates(
     [VectorEntry("kp_1", "c1", v1), VectorEntry("kp_2", "c1", v2)],   # v1/v2 为 E07 的 EmbeddedVector
     course_id="c1", space=adapter.space, thresholds=t,
 )
-tiers.auto_merge / tiers.review / tiers.keep                # tuple[VectorCandidate, ...]
-tiers.all_pairs()                                            # 三组合并，按 (left_id, right_id) 升序
+tiers.auto_merge / tiers.review                             # tuple[VectorCandidate, ...]
+tiers.kept_count                                             # int，保留组配对数（不返回配对）
+tiers.total_pairs                                            # = len(auto_merge) + len(review) + kept_count = n(n-1)/2
+tiers.candidates()                                           # 前两组合并，按 (left_id, right_id) 升序
 ```
 
 - `TierThresholds(*, auto_merge, review)`：仅关键字、无默认值、frozen。
 - `VectorEntry(entity_id, course_id, vector: EmbeddedVector)`：ID 为非空白 `str`；向量不进 `repr`。
-- `VectorCandidate(left_id, right_id, similarity, tier)`：`left_id < right_id`，`tier` 为 `CandidateTier`。
-- `CandidateTier` wire 值：`auto_merge`、`review`、`keep`。
-- `VectorTiers(course_id, space, thresholds, auto_merge, review, keep)`：回显上下文，三组互斥、合起来覆盖全部 C(n, 2) 对。
+- `VectorCandidate(left_id, right_id, similarity, tier)`：`left_id < right_id`，`tier` 为 `CandidateTier` 且不能是 `keep`（`ValueError`）。
+- `CandidateTier` wire 值：`auto_merge`、`review`、`keep`（`keep` 只作为 `classify_similarity` 的返回值）。
+- `VectorTiers(course_id, space, thresholds, auto_merge, review, kept_count)`：回显上下文；`kept_count` 为非负 `int`（`bool`、负数拒绝）；三组互斥，计数之和 `total_pairs` = C(n, 2)。
+- **接口变更（PR #250 审查意见，用户确认）**：首版的 `keep` 元组与 `all_pairs()` 已删除，改为 `kept_count` 与 `candidates()`；新增 `total_pairs` 属性。
 - `VectorIsolationError` 是 `ValueError` 子类。
 
 ## 关键决定
@@ -47,7 +50,7 @@ tiers.all_pairs()                                            # 三组合并，�
 3. **阈值无默认值**：规格（`specs/course-knowledge-graph.md`「节点融合阈值……由 M1 设计时补入」、`specs/teacher-review-publish.md` 待细化）与 `docs/integrations.md` 均未给数值，`docs/tasks.md` D-08 未签收，因此作为必填参数；未新增环境变量。
 4. **课程与空间隔离**：调用方必须显式给出 `course_id` 与 `space`；任一条目课程不同或向量空间不同，整体拒绝（`VectorIsolationError`），不做部分分层、不静默丢弃；只传一条外来条目也拒绝。同一空间标签下维度不一致、向量长度与 `dimensions` 不符、非有限值、全零向量均 `ValueError`。草稿可见性 V 过滤仍由调用方（F02）先做。
 5. **相似度**：余弦，`math.fsum` 求点积与范数，截断到 `[-1, 1]`；`values` 逐值相同时恰为 1.0（朴素计算对 `(0.1, 0.1)` 得 0.9999999999999998，会让 `auto_merge = 1` 时相同向量掉到裁决组；有专门测试）。
-6. **保留组 = 其余全部配对**：输出是完整划分，便于审计与测试；复杂度 O(n²·d)，面向单课程规模。
+6. **保留组只计数**：逐对计算余弦，保留对只累加 `kept_count`、不创建 `VectorCandidate`。复杂度：时间 O(n²·d)（n 实体数、d 维度，面向单课程规模）；额外内存 O(n·d + k)，k 为自动合并与需裁决两组配对数，不再与 n² 成正比。测试用计数替身包装 `VectorCandidate`，断言构造次数等于前两组配对数。
 7. **不接收 E08 名称候选**：规格未定两者如何合流，本模块只看向量（见待决 1）。
 
 ## 验证（实际结果）
@@ -61,6 +64,18 @@ tiers.all_pairs()                                            # 三组合并，�
 | 后端全量 | `<venv>/bin/python -m pytest tests/backend -q` | **2605 passed**，1 warning（既有），322.62s；其中 E09 84 个，未单独跑不含 E09 的基线 |
 | 门禁 | `./scripts/verify.sh` | `PASS contracts gate`、`Scaffold verification passed.`，exit 0（改完 `docs/tasks.md` 后复跑仍 exit 0） |
 | 空白 | `git add -N . && git diff --check` | exit 0（含 `docs/tasks.md` 与本文件） |
+
+### 接口变更（保留组只计数）后复验
+
+| 步骤 | 命令 | 结果 |
+| --- | --- | --- |
+| 红 | 先只改测试，`<venv>/bin/python -m pytest tests/backend/test_e09.py -q` | 12 failed / 82 passed（缺 `kept_count`、`candidates()`、`total_pairs`，`keep` 层仍可构造候选，文档字符串无 `kept_count`） |
+| 绿 | 同上 | **94 passed** |
+| 后端全量 | `<venv>/bin/python -m pytest tests/backend -q` | **2615 passed**，1 warning（既有）；比首版 2605 多 10，即 E09 新增用例数 |
+| 门禁 | `./scripts/verify.sh` | `PASS contracts gate`、`Scaffold verification passed.`，exit 0 |
+| 空白 | `git add -N . && git diff --check` | exit 0 |
+
+反向篡改（同样备份、逐一篡改、`cmp` 恢复）：自动阈值 `>=`→`>` 4 failed；裁决阈值 `>=`→`>` 5 failed；去课程校验 3 failed；去空间校验 2 failed；`kept_count` 不累加 4 failed；允许 `keep` 层候选 1 failed；允许负 `kept_count` 1 failed；去「逐值相同恰为 1.0」1 failed；不按 ID 排序 2 failed；保留对也构造 `VectorCandidate`（物化）1 failed。10 处均检出。
 
 ### 反向篡改（备份模块，逐一单独篡改后跑 `test_e09.py`，结束 `cp` 恢复并 `cmp` 一致）
 
@@ -83,7 +98,6 @@ tiers.all_pairs()                                            # 三组合并，�
 - **待决 1（交 E10/E12/协调方）**：E08 名称候选（`same_key`/`alias`/`containment`）与 E09 向量分层如何合流，规格未定。E08 交接建议名称候选至少进入裁决组、不直接自动合并；可选做法：(a) E12 把名称候选并入裁决组，向量 `keep` 不能把名称候选降为保留；(b) 名称候选只作为向量分层的加权。需规格或 ADR 定稿后由 E10/E12 实现，本模块无需改动。
 - **待决 2（D-08，技术负责人）**：`auto_merge` 与 `review` 初始取值未签收；取值依赖 D-02c 向量模型（不同模型余弦分布差异大），建议在 K 组评测集上定。签收后在 `docs/integrations.md` 登记是否作为环境变量，由 E12 注入。
 - **待决 3（E10/E12）**：「自动合并」组仍须遵守教师加锁节点不被覆盖（`specs/teacher-review-publish.md`）；本模块不认识加锁状态，调用方须先排除加锁节点或在合并时跳过。
-- 风险：保留组输出全部配对，单课程上千实体时约 50 万对；若 E12 实测过大，可改为只返回前两组加计数（接口变更，需同步交接）。
 
 ## 回滚
 
