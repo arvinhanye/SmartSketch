@@ -2,7 +2,7 @@
   "schema_version": 1,
   "dataset_id": "synthetic-ds-ch3",
   "is_final_benchmark": true,
-  "note": "项目自编材料。D-01 已定（ADR-023，ArvinHan 2026-09-26）：本章即赛题抽取硬指标的最终判定材料。提示词、先修表述清单与阈值不在本章上调；若调过，报告须注明迭代材料与判定材料相同。",
+  "note": "项目自编材料。D-01 已定（ADR-026，ArvinHan 2026-09-26）：本章即赛题抽取硬指标的最终判定材料。提示词、先修表述清单与阈值不在本章上调；若调过，报告须注明迭代材料与判定材料相同。",
   "license": "项目自编，可随仓库分发",
   "course": {
     "id": "synthetic-ds",

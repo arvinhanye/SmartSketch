@@ -92,4 +92,4 @@ python3 -c "import json;d=json.load(open('evaluation/fixtures/synthetic.json'));
 
 ## 后续：D-01 已定（2026-09-26）
 
-ArvinHan 决定直接用本章作最终判定材料（ADR-023）。`synthetic.json` 的 `is_final_benchmark` 改为 `true`、`note` 同步；README 第 1 节与第 6 节、报告、`specs/course-knowledge-graph.md` 验收 7 随之更新。上文「签收后另建 `fixtures/<dataset>.json`，不改本开发集」不再适用。
+ArvinHan 决定直接用本章作最终判定材料（ADR-026）。`synthetic.json` 的 `is_final_benchmark` 改为 `true`、`note` 同步；README 第 1 节与第 6 节、报告、`specs/course-knowledge-graph.md` 验收 7 随之更新。上文「签收后另建 `fixtures/<dataset>.json`，不改本开发集」不再适用。
