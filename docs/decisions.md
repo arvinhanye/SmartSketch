@@ -965,3 +965,12 @@
 - **后果**：真实模型判定只剩 D-02 签收与付费调用确认两个前提。开发集如需另建，放 `evaluation/fixtures/` 下另一个文件。
 - **回滚**：`is_final_benchmark` 改回 `false`，D-01 重新开放。
 - **签收**：ArvinHan 2026-09-26（会话中「直接用这次自编的「栈与队列」一章」）。
+
+## ADR-024：主用大模型定为 DeepSeek V4.1 Flash（D-02a）
+
+- **日期**：2026-09-26
+- **背景**：真实模型的抽取准确率判定（验收 7、K02）需要先定主用供应商和模型（D-02a）。S2 §6.1 的方案以 DeepSeek 为主。
+- **决定**：主用供应商为 DeepSeek，`LLM_BASE_URL=https://api.deepseek.com`，`LLM_EXTRACTION_MODEL` 与 `LLM_CHAT_MODEL` 都用 V4.1 Flash，模型 ID 为 `deepseek-flash`。模型 ID 和基址取自第三方资料（2026-09-26 检索），官方文档站在开发环境被网络策略拦截，未直接核对；首次冒烟调用时确认 ID、是否返回 usage（含流式），结果补到 `docs/integrations.md` D-02a 行。
+- **后果**：`.env.example` 与 `docs/integrations.md` 填入基址和模型 ID；密钥仍只在本机环境变量。`deepseek-flash` 会随供应商更新指向新版本 Flash，所以每次评测报告须记下模型 ID、调用日期和响应里的 `model` 字段。备用供应商（D-02b）、向量方案（D-02c）、预算（D-02d）、超时并发（D-02e）仍未签收。付费调用仍须用户另行确认。
+- **回滚**：`.env.example` 三项恢复为空，`docs/integrations.md` 相关状态改回「取值待 D-02a」。
+- **签收**：ArvinHan 2026-09-26（会话中「主用deepseekv4.1flash」）。
