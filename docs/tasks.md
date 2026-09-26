@@ -1001,3 +1001,16 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - E10 审查修正（Claude，2026-09-26）：归并提示词带两侧名称、`FusionJudge` 可选 `timeout_seconds`、ADR-017 空行与计划文件 skill 引用；`test_e10.py` 28 passed，后端全量 2683 passed，`verify.sh` 通过；交接 `docs/handoffs/claude-e10-review-fixes.md`。
 - **输入**：同课候选对、两侧名称/定义与可定位证据；**输出**：带理由、来源引用、模型/提示词元数据的归并提案或独立待审核结果；**依赖**：E09、E04、E01、E05。**风险**：D-08 阈值未签收；E08/E09 合流与稳定候选 ID 由 E12 定；模型引用能验证来源存在，不能自动证明归并语义正确。后两项及缓存失效规则见 E10 设计规格。
+
+## 2026-09-26 E10 之后第一批：E11、H02、H12 并行（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E11 | DONE（待 PR 审查/合并） | 实现关系两阶段抽取 | ArvinHan（Claude） | `claude/project-thread-sp1d3a` / `main@5072a48`，已合入含 E10 的 `main@cc53c8d` | `src/backend/app/services/ai/relations.py`、`prompts/extract_relations.yaml`、`tests/backend/test_e11.py`；扩围 `prompts/MANIFEST.md` 一行、`docs/submission/prompt-engineering.md`（K14 交接要求同步） | `test_e11.py` 47 passed；E01/E10/E11 144 passed；后端全量 2702 passed（合入 E10 前）；9 处反向篡改均被检出；`docs/handoffs/claude-e11.md` |
+| H02 | DONE（待 PR 审查/合并） | 实现资料上传和进度页面 | ArvinHan（Claude 子代理） | 同上 | `src/frontend/src/views/MaterialsView.vue`、`src/frontend/src/composables/useMaterials.ts`、`src/frontend/src/api/materials.ts`、`tests/frontend/h02.test.ts`；扩围 `router/index.ts`、`CoursesView.vue`、`main.ts`（路由与入口） | `h02.test.ts` 53 passed；7 处反向篡改均被检出；`docs/handoffs/claude-h02.md` |
+| H12 | DONE（待 PR 审查/合并） | 实现课程成员管理页面 | ArvinHan（Claude 子代理） | 同上 | `src/frontend/src/views/MembersView.vue`、`src/frontend/src/api/members.ts`、`src/frontend/src/composables/useMembers.ts`、`tests/frontend/h12.test.ts`；扩围同 H02 | `h12.test.ts` 33 passed；5 处反向篡改均被检出；`docs/handoffs/claude-h12.md` |
+
+- 依赖：E11 ← E10（PR #253 已合入）、E05；H02 ← H01、C07、C12；H12 ← C15、B15、H01，均在 main。
+- 三项合并后验证：前端 `type-check` exit 0、全量 9 files 236 passed、`build` exit 0；`./scripts/verify.sh` exit 0（需 PATH 含 pytest 与 `openapi-typescript@7.4.4`）；`git diff --check` exit 0。H02/H12 都改了 `router/index.ts`、`CoursesView.vue`、`main.ts`，合并时两段各自保留。
+- E11 待决（详见交接）：`PREREQUISITE_CUES` 先修表述清单为本任务暂定；小节范围与实体表上限交 E12；关系抽取缓存键未定。
+- H02 待决（需契约/后端决定）：`Document` 无 `task_id`，刷新后处理中的资料无法续看进度与取消；前端 50 MiB 上限写死，与 `UPLOAD_MAX_BYTES` 可能不一致；无删除资料端点，重传后旧行保留。
