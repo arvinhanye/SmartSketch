@@ -1118,6 +1118,15 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - F08 已决（ArvinHan 2026-09-26，ADR-035）：人工新建节点 `status = approved`、置信度 1.0；任何课程教师均可解锁。
 - F08 待决：前端尚无为新建知识点选择来源块的接口与交互（无按资料列块的 API）；审计日志归 F12；删除与合并归 F09/F10。
 
+## 2026-09-26 G07 发布版本解析器（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G07 | DONE（待 PR 审查/合并） | 实现统一发布版本解析器 | ArvinHan（Claude） | `claude/project-thread-8wzxew` / `main@95d5c9a` | `src/backend/app/services/versions/resolver.py`、`tests/backend/test_g07.py`；扩围 `docs/decisions.md`（ADR-037） | `test_g07.py` 32 passed；13 处反向篡改 10 处直接检出，补 1 个用例后第 11 处检出，余 2 处为多重防护中的冗余分支（见交接）；后端全量 2994 passed；`verify.sh` exit 0；`docs/handoffs/claude-g07.md` |
+
+- 验收：从未发布返回 404 `GRAPH_NOT_PUBLISHED`（带 `version` 亦然，进行中或失败的尝试不算发布）；解析结果不可变，请求内提交 v2 不混读，下一次解析读到 v2（PUB-13）；`?version=1` 在指针指向 v2 时可读，不存在、他课、非正数版本号 404 `NOT_FOUND`（PUB-14 解析部分）；回滚得到新版本号与源版本修订；同一结果提供图谱作用域、`graph_version` 与问答修订过滤；指针或已提交版本损坏报 `INTERNAL_ERROR`，不回退、不缓存。
+- G07 待决：F07 `resolve_target`、推荐与问答服务尚未接入解析器（F07 改用后即可读历史版本，完成 PUB-14）；修订列表缓存上限 256 为占位值。
+
 ## 2026-09-26 H04 G6 画布生命周期（Claude）
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
