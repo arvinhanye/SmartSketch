@@ -959,7 +959,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C12 | IN PROGRESS | 实现前端任务流客户端 | ArvinHan（Claude 子代理） | `claude/c12-task-stream` / 本认领提交 | `src/frontend/src/api/taskEvents.ts`、`tests/frontend/c12.test.ts`、`docs/handoffs/claude-c12.md` | 待补 |
+| C12 | DONE（待 PR 审查/合并） | 实现前端任务流客户端 | ArvinHan（Claude 子代理） | `claude/c12-task-stream` / 本认领提交 | `src/frontend/src/api/taskEvents.ts`、`tests/frontend/c12.test.ts`、`docs/handoffs/claude-c12.md` | `c12.test.ts` 38 passed；前端全量 6 files / 119 passed；type-check、build、`verify.sh` 通过；交接 `docs/handoffs/claude-c12.md` |
 
 - C12 验收：分片帧/CRLF/心跳/重连；终态和卸载关闭；旧课程事件不污染当前课。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/c12.test.ts`。
 
