@@ -1028,16 +1028,18 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | K01 | DONE（部分：问答口径待 J06；D-01 已定为本章，ADR-026） | 建立自编标注集及评测口径 | ArvinHan（Claude 子代理） | `claude/project-thread-sp1d3a` / `main@6742f6a` | `evaluation/README.md`、`evaluation/fixtures/synthetic.json`、`docs/handoffs/claude-k01.md` | 自编「数据结构 第3章 栈与队列」3141 字，金标 45 个实体（五类齐全）、40 条关系（四类齐全），证据全部为原文子串、前置关系无环；夹具校验脚本 ALL PASS，4 份篡改副本均被拒；`docs/handoffs/claude-k01.md` |
-| K02 | DONE（真实模型判定未实测：待 D-01、D-02 与付费确认） | 实现抽取和融合离线评测 | ArvinHan（Claude 子代理 + 联调） | 同上 | `evaluation/evaluate_extraction.py`、`tests/backend/test_k02.py`、`evaluation/reports/extraction-accuracy.md`、`docs/handoffs/claude-k02.md` | 桩实现 46 failed → 46 passed；联调按 README 对齐 4 处，先 5 failed → `test_k02.py` 52 passed（含 K01 夹具用例）；假模型自检在 K01 标注集上跑通，两次输出 sha256 一致，数值全部过线仍判「不可用于判定（假模型）」；`docs/handoffs/claude-k02.md` |
+| K02 | DONE（真实模型已实测：三项硬指标达标，简化融合下的初步结论） | 实现抽取和融合离线评测 | ArvinHan（Claude 子代理 + 联调） | 同上 | `evaluation/evaluate_extraction.py`、`tests/backend/test_k02.py`、`evaluation/reports/extraction-accuracy.md`、`docs/handoffs/claude-k02.md` | 桩实现 46 failed → 46 passed；联调按 README 对齐 4 处，先 5 failed → `test_k02.py` 52 passed（含 K01 夹具用例）；假模型自检在 K01 标注集上跑通，两次输出 sha256 一致，数值全部过线仍判「不可用于判定（假模型）」；`docs/handoffs/claude-k02.md` |
 
 - 本机真实模型运行脚本 `evaluation/run_live_extraction.py`（`tests/backend/test_k02_run.py` 先 12 failed → 13 passed；假模型端到端：16 块、简化融合后 18 个实体、12 条关系，`score` exit 0 且判「不可用于判定（假模型）」；交接 `docs/handoffs/claude-k02-run.md`）。只做同名合并的简化融合，结果是初步数字，最终判定仍需 E12。
 - 联调对齐（以 `evaluation/README.md` 为准）：F1 在 precision 或 recall 为 null 时为 null；各指标只统计 `source = "ai"`；按 `judgments.seed` 重算的抽中项有缺判时写「判定不完整」，准确率只统计抽中项；实体数 < 20 直接「未达标」。
 - 待决：
   1. ~~D-01~~：已定为本次自编的「栈与队列」一章，`is_final_benchmark` 改为 `true`（ADR-026）。
-  2. **D-02**：D-02a 已签收（ADR-027，DeepSeek V4.1 Flash）。D-02d 与付费调用已确认（ADR-028），在能访问供应商的本机上按 `evaluation/reports/extraction-accuracy.md` 第 4 节命令跑真实模型并人工判定；完整流程（融合去重后的草稿）另需 E12。
+  2. ~~**D-02**~~：D-02a、D-02d 与付费调用都已确认（ADR-027、ADR-028）。真实模型已在本机跑通并人工全量判定（2026-09-26，`k02-live-20260926T084922Z`，DeepSeek `deepseek-flash`）：AI 实体 74 个、实体准确率 74/74、关系准确率 61/63，结论「达标」，详见 `evaluation/reports/extraction-accuracy.md` 与 `docs/handoffs/claude-k02-judge.md`。
   3. **J06** 完成后补问答夹具（K01 问答部分）并做 K03。
   4. **E11 先修表述清单**：金标 `g-r03`（证据「基于栈的后进先出特性」）不含清单中的表述，E11 会按 `prerequisite_without_cue` 丢弃；是否把「基于」加入清单待实测召回后决定。审查同时指出「基础」「才能」偏宽。
   5. **E12/F13 须对同一小节产出的反向 `PREREQUISITE` 候选做环检测**（PR #255 审查意见，E11 不去重二元环）。
+  6. **完整融合后重跑验收 7**：本次是简化融合（仅同名去重），main 上 E12/F13 的 `merging` 也还是直通（ADR-029）。E08～E10 融合接入后，把本章处理到 `awaiting_review`、导出草稿，按报告第 3 节重新抽样判定。
+  7. **抽取改进（报告第 5 节）**：小节「3.3.5 栈与队列的比较」关系抽取因 4096 token 输出上限截断；21 条未命中金标关系中 12 条跨小节；`CONTAINS` 被用于「相关」关系（判错 2 条）。
 - 看板同步：本次把已合入 main 却仍标「待 PR 审查/合并」或「IN REVIEW」的 24 行改为「DONE（PR #N 已合入 `sha`）」：F02、F03、K07、D10、E04、E05、C10、I04、E08、C11、H13、E06、C12、E09、H01、C15、K14、TD-02、E10、E11、H02、H12、ADR-021、ADR-022。
 
 ## 2026-09-26 E11 之后主线：E12、F04、F06、F13（Claude）
