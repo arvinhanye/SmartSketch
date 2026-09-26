@@ -44,3 +44,6 @@ GraphVersion = _module.GraphVersion
 PublishedGraphVersion = _module.PublishedGraphVersion
 PublishResult = _module.PublishResult
 RollbackGraphVersion = _module.RollbackGraphVersion
+# I02 learning progress.
+ProgressResponse = _module.ProgressResponse
+ProgressUpdate = _module.ProgressUpdate

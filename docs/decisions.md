@@ -1381,3 +1381,16 @@
 - **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-064：I02 掌握标记 API 的访问角色、写事务内绑定与错误形状
+
+- **日期**：2026-09-26
+- **背景**：I02 实现 `GET`/`PUT /api/v1/courses/{cid}/progress`（`specs/learning-path.md` §5，ADR-014 修订 1 决定 8、9，ADR-017 决定 4、5）。契约未写明教师能否读写进度、同批重复 `kp_id` 的 `reason` 取值，以及“发布指针在写入期间变化时按新版本复核”的实现方式；I01 仓储只提供原始行与调用方事务入口。
+- **决定**：
+  1. 两个接口都用 `course_student` 依赖：只有本课程学生成员可读写**自己**的进度；教师成员 403 `ROLE_FORBIDDEN`，非成员 403 `COURSE_FORBIDDEN`，课程从未发布 404 `GRAPH_NOT_PUBLISHED`。身份只取自令牌；请求项带 `user_id` 因 `ProgressUpdate` 闭合而 422 `extra_forbidden`，查询串中的 `user_id` 不被读取。
+  2. `PUT` 先查同批重复（通用 422，`details.fields` 每个重复出现项一项 `{in: "body", field: "<i>.kp_id", reason: "duplicate"}`，首次出现项不列），再开 `BEGIN IMMEDIATE`，在持有写锁后按 G07 重新解析发布指针。发布/回滚提交同样需要写锁，因此这就是提交时的最终绑定版本，请求开始后提交的新版本自然用于整批复核；不另做“先绑定、失败再重试”的循环。
+  3. 投影在服务层 `app/services/learning/progress.py`（`project_progress` 供 I05 推荐复用，保证同版本同投影）：已提交快照的节点集与谱系按 `version_id` 缓存；原始行经 I01 `read_progress` 读取。同值写入仍有未被覆盖的来源时以 I01 的 `force` 写入，否则交仓储判为无操作。成功后在提交之后按最终绑定版本重新投影返回。
+  4. 已提交版完整性故障（快照缺失/摘要不符/不可解析/他课、`V = ∅`、谱系违反修订 3 决定 16）以及这两个接口内其他未预期异常，一律 500 `INTERNAL_ERROR`，`details` 只含 `request_id`（`uuid4().hex`），具体原因与节点 ID 只进服务端日志。
+- **后果**：教师端若需要查看某学生进度，须另开接口与规格；I05 推荐直接调用 `project_progress` 即可与 `GET /progress` 同投影。每次投影仍扫描本课程全部已提交版本的版本行（快照解析有缓存），MVP 规模可接受。
+- **回滚**：删除 `app/api/progress.py`、`app/services/learning/progress.py`、`tests/backend/test_i02.py`，撤回 `app/main.py` 的路由注册与 `app/schemas/contracts.py` 的两行导出，删去本 ADR；无迁移、无契约与依赖变更，已写入的进度行保留。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

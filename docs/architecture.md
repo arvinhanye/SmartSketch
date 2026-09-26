@@ -121,7 +121,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 | `NodeSource` | `ai`、`manual` | lower | `KnowledgePoint.source`、`Relation.source` | 一致。自动降级只作用于未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`，见规格「前置关系成环处理」） |
 | `DocumentFormat` | `pdf`、`docx`、`txt`、`markdown` | lower | `Document.format` | 一致。wire 值是 `markdown`，扩展名 `.md` 不是枚举值 |
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
-| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影 |
+| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影；I02 的 `app/services/learning/progress.py` 负责投影与批量写入，`GET`/`PUT /progress` 仅学生成员可用（ADR-064） |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
 | `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | `ff30e0` 无此枚举。`insufficient_evidence` 取代 `740adb` 的旧值（语义为生成模型以哨兵声明证据不足），A09 决定（ADR-015 决定 3），B13 落实真源；前两者不调用生成，后两者调用了生成 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
