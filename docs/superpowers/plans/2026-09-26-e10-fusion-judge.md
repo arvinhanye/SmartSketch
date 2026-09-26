@@ -1,7 +1,5 @@
 # E10 Fusion Judge Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
-
 **Goal:** 对一对有来源的同课知识点产出可解释的重复裁决及有引用的统一定义提案，失败时保留原项供教师审核。
 
 **Architecture:** `fusion/judge.py` 是纯服务边界，注入 E02/E04 `ModelClient` 与 E01 `PromptLibrary`；不查库、不合流候选、不写图。裁决与定义归并分两次模型调用，E12 负责 V 过滤、缓存和持久化。
@@ -80,7 +78,7 @@
 
 **Interfaces:** E12 consumes `FusionJudge.evaluate_pair(...) -> FusionDecision` and must enforce V 过滤、缓存、教师锁与写入；本任务不增加该接口的持久化实现。
 
-- [x] **Step 1: 验证最小与邻接回归。** `.venv/bin/python -m pytest tests/backend/test_e10.py tests/backend/test_e01.py tests/backend/test_e04.py tests/backend/test_e05.py tests/backend/test_e08.py tests/backend/test_e09.py -q`；预期全绿。若失败，按 `superpowers:systematic-debugging` 定位，只修 E10 自有问题后复跑。
+- [x] **Step 1: 验证最小与邻接回归。** `.venv/bin/python -m pytest tests/backend/test_e10.py tests/backend/test_e01.py tests/backend/test_e04.py tests/backend/test_e05.py tests/backend/test_e08.py tests/backend/test_e09.py -q`；预期全绿。若失败，先定位根因，只修 E10 自有问题后复跑。
 - [x] **Step 2: 跑项目门禁和差异检查。** `PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh && git diff --check`；预期 `PASS contracts gate`、`Scaffold verification passed.`、exit 0。
 - [x] **Step 3: 记录交接与证据。** `docs/tasks.md` E10 行改 `DONE（待 PR 审查/合并）` 并写实测数字；`docs/handoffs/codex-e10.md` 列文件、命令/结果、接口、D-08/E12 待决、回滚步骤，不写真实课程材料。
 - [x] **Step 4: 最终复验并提交。** 重跑 E10 测试、门禁、`git diff --check`；`git add docs/tasks.md docs/handoffs/codex-e10.md && git commit -m "docs: hand off E10 fusion judge"`。是否推送/开 PR 由执行阶段按用户指示决定；未合并前不宣称主线已具备 E10。
