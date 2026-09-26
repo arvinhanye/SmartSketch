@@ -1243,3 +1243,21 @@
 - **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
 - **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-049：I01 学习进度仓储的实现约定
+
+- **日期**：2026-09-26
+- **背景**：`specs/learning-path.md` §5 与 ADR-014 修订 1、ADR-012 修订 3 规定了进度的存法（按 `(user_id, course_id, kp_id)`、不按版本复制）、读时投影（合并继承、显式写入覆盖、dormant、脏行）与写入规则（整批校验、同值写入、指针途中变化后复核），但没有定：表名与列、一次写入事务取几个写入序号、投影放在哪一层、脏行判定用哪些 ID、读写怎样拿到一致的版本历史。
+- **决定**：
+  1. 迁移 `011_progress.sql` 建表 `learning_progress(user_id, course_id, kp_id, status, write_seq, updated_at)`，主键 `(user_id, course_id, kp_id)`，外键指向 `users`、`courses`；`status` 限三值，`write_seq ≥ 1`。`commit_sequence` 沿用迁移 010，本迁移不建也不回滚它。
+  2. **一个写入事务取一个 `write_seq`**，本批实际写入的各行共用；全部为无操作时不取号。决定 9 只比较 `write_seq > T`，事务内不可能插入版本提交，所以每行各取一号与共用一号结果相同，共用可少占序号。
+  3. 仓储 `app/repositories/progress.py` 同时提供读时投影 `project_progress(sqlite_url, user_id, bound)`（`bound` 为 G07 `PublishedVersion`）与写入 `write_progress(sqlite_url, user_id, course_id, updates)`。原始行、本课程全部已提交版本的节点集、`merged_from` 与提交序号在同一个 SQLite 事务里读出；投影本身是纯计算，I02/I05 直接复用，不再各自实现。
+  4. 归属与起算版本：来源 `m` 在绑定版本中属于 `p.merged_from` 即归属 `p`；从绑定版本起按版本号逐个往前，`m` 连续属于 `p.merged_from` 的最早版本为 `k`。被覆盖判定为 `p.write_seq > commit_seq(k)`。
+  5. 脏行：原始行的 `kp_id` 不在本课程任何已提交版本的**节点**集中，记一条 WARNING（含 `kp_id` 列表与 `diagnostic_id`），投影时忽略，也不作为继承来源；只在历史版本出现过的行是 dormant，不告警。
+  6. 绑定版本违反修订 3 决定 16（来源是本版本节点或含自身、同一来源归属两个节点）、`V = ∅`、任何已提交版本的快照缺失、摘要不符、不可解析或属于他课，均抛 G07 的 `VersionIntegrityError`（500 `INTERNAL_ERROR`），不输出部分进度。已提交版本解析后的节点集与谱系按 `(sqlite_url, version_id)` 缓存（LRU 256）。
+  7. 写入在一个 `BEGIN IMMEDIATE` 事务里读发布指针，指针所指版本即「提交时的最终绑定版本」：请求开始后指针变化时，自然按新版本复核。目标不在该版本 → `ProgressNotInPublishedVersion`（`details()` 为契约 `ProgressNotInPublishedVersionDetails`，只报下标），整批零写入；课程不存在、从未发布分别为 `AccessDenied` 404 `NOT_FOUND`、`GRAPH_NOT_PUBLISHED`。
+  8. 同值写入：仅当该节点已有自身行、状态相同且投影中 `inherited_from` 为空时为无操作（A08S-R01），不取号、不改 `updated_at`。节点没有自身行时写 `unknown` 不是同值（`own_status` 由 `null` 变为 `unknown`），照常写入。
+  9. 仓储不做鉴权与成员判断，`user_id` 由调用方从已认证会话传入（I02）。批次项必须恰为 `{kp_id, status}`，多余字段（如 `user_id`）整批拒绝。
+- **后果**：I02 的路由只做鉴权、调用 `write_progress` 并映射错误；I05 在同一请求内先 `resolve_published` 再 `project_progress`，把 `view.mastered` 交给 I03/I04。投影计算放在仓储层是因为 I01 文件范围只有仓储；若以后要把纯投影移到 `services/learning/`，接口不变。
+- **回滚**：按迁移 011 文件头的 `ROLLBACK` 行回滚（`test_i01.py` 已验证，会丢失全部学生进度），或恢复 `backups/*-before-011.sqlite`；撤销 `repositories/progress.py` 与 `tests/backend/test_i01.py`。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
