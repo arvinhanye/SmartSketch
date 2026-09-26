@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from app.repositories import course_locks
-from app.repositories.graph_edit import bump_draft_revision, course_lock_holder, source_chunks
+from app.repositories.graph_edit import bump_draft_revision, source_chunks
 from app.repositories.neo4j import GraphScope
 from app.repositories.sqlite import connect
 from app.repositories.tasks import read_effective_task_ids
@@ -140,7 +140,7 @@ def _course_write(ctx: EditContext, course_id: str) -> Iterator[GraphScope]:
     lock = course_locks.acquire(ctx.sqlite_url, course_id, holder=LOCK_HOLDER, lease_seconds=ctx.lock_seconds,
                                 wait_seconds=ctx.wait_seconds)
     if lock is None:
-        raise CourseBusy(course_lock_holder(ctx.sqlite_url, course_id))
+        raise CourseBusy(course_locks.current_holder(ctx.sqlite_url, course_id))
     with course_locks.held(ctx.sqlite_url, lock, lease_seconds=ctx.lock_seconds):
         with connect(ctx.sqlite_url) as database:
             effective = read_effective_task_ids(database, course_id)

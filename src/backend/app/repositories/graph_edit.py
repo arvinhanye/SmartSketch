@@ -9,7 +9,7 @@ Neo4j 部分（``DraftNodeStore``）只放 Cypher，调用方已持课程写锁�
 - ``create``：新建 ``source = manual``、``locked = true`` 的节点及其人工来源关联（``EVIDENCED_BY`` 不带
   ``task_id``，F07 按人工来源读取）。
 
-SQLite 部分：草稿修订号加 1（V4，在写 Neo4j 之前）、课程写锁当前持有方、可作为人工来源的块
+SQLite 部分：草稿修订号加 1（V4，在写 Neo4j 之前）、可作为人工来源的块
 （块属于本课程，且其修订关联到 V 中的任务）。
 """
 
@@ -27,7 +27,6 @@ __all__ = [
     "DRAFT_VERSION",
     "DraftNodeStore",
     "bump_draft_revision",
-    "course_lock_holder",
     "source_chunks",
 ]
 
@@ -147,15 +146,6 @@ def bump_draft_revision(sqlite_url: str, course_id: str) -> int:
     if row is None:
         raise LookupError(f"course {course_id} does not exist")
     return int(row[0])
-
-
-def course_lock_holder(sqlite_url: str, course_id: str) -> str | None:
-    """未过期课程写锁的持有方（``COURSE_BUSY`` 的 ``details.holder``）；空闲或已过期为 ``None``。"""
-    with connect(sqlite_url) as database:
-        row = database.execute(
-            "SELECT holder FROM course_locks WHERE course_id = ? AND expires_at >= unixepoch()", (course_id,)
-        ).fetchone()
-    return None if row is None else str(row[0])
 
 
 def source_chunks(sqlite_url: str, course_id: str, chunk_ids: Iterable[str],

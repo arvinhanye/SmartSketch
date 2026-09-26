@@ -1076,17 +1076,28 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | G01 | DONE（待 PR 审查/合并） | 实现快照序列化和摘要 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@608be90`（#258 合并后重开） | `src/backend/app/services/versions/snapshot.py`、`tests/backend/test_g01.py`；扩围 `src/backend/app/services/versions/__init__.py`、`docs/decisions.md`（ADR-031） | `test_g01.py` 49 passed；12 处反向篡改均检出；后端全量 2870 passed；`verify.sh` exit 0；`docs/handoffs/claude-g01.md` |
 | G02 | DONE（待 PR 审查/合并） | 实现版本元数据与发布操作记录 | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/versions.py`、`src/backend/migrations/010_versions.sql`、`tests/backend/test_g02.py`；扩围 `tests/integration/test_f13.py`（009 回滚用例先回滚更新的迁移）、`docs/decisions.md`（ADR-032） | `test_g02.py` 22 passed；10 处反向篡改均检出；后端全量 2892 passed；集成（真实 Neo4j）103 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g02.md` |
 | G03 | DONE（待 PR 审查/合并） | 实现版本图与向量构建 | ArvinHan（Claude） | 同上 | `src/backend/app/services/versions/materialize.py`、`tests/integration/test_g03.py`；扩围 `src/backend/app/services/graph/read.py` 与 `src/backend/app/repositories/graph_read.py`（读版本副本、不回传向量）、`tests/backend/test_f07.py`（1 个用例）、`docs/decisions.md`（ADR-033） | `test_g03.py` 12 passed（其中 11 个连真实 Neo4j 5.26）；8 处反向篡改 7 处检出，第 8 处（删草稿）由 F02 作用域校验兜住；后端全量 2893 passed；集成 115 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g03.md` |
+| G04 | DONE（待 PR 审查/合并） | 实现原子发布指针切换 | ArvinHan（Claude） | `claude/project-thread-sqwla4` / `main@ebb0f42` | `src/backend/app/services/versions/publish.py`、`tests/integration/test_g04.py`；扩围 `src/backend/app/repositories/versions.py`（P4 读取与 T7）、`src/backend/app/repositories/course_locks.py`（`current_holder`）、`src/backend/app/repositories/graph_read.py`（投影加 `merged_from`）、`tests/backend/test_g04_sqlite.py`、`docs/decisions.md`（ADR-034） | `test_g04.py` 19 passed（真实 Neo4j 5.26）；`test_g04_sqlite.py` 3 passed；9 处反向篡改 8 处检出，1 处（C1 提交后仍删副本）补用例后检出；后端全量 2962 passed；集成 134 passed、4 skipped；`verify.sh` exit 0；`docs/handoffs/claude-g04.md` |
 
 - 验收：规范化字节键序与数组顺序稳定（PUB-10，乱序构造摘要相同）；端点缺失、来源无效、成环、空图、谱系违规逐条拒绝并符合契约 `PublishBlockedDetails`；`load_snapshot` 读回与原快照逐字节相同、不丢任何属性；PUB-8 排除计数、PUB-9、PUB-11 均有用例。
 - G01 待决：从 Neo4j/SQLite 读出可见草稿与修订的装载归 G04（P4～P7）；快照章节带 `parent_id`，而 Neo4j 章节与契约 `Chapter` 尚无此字段，章节层级落地时需同步（ADR-031）。
 - G02 验收：同一尝试（幂等键 `version_id`）至多成为一个版本；版本号按课程连续、失败不占号，`(course_id, version)` 唯一；失败行带原因永久可查且不进版本列表；已提交版本不可删改。G02 待决：清扫过期尝试归 G05；租约时长由调用方传入（G04 读 `PUBLISH_LEASE_SECONDS`）。
 - G03 验收：物化只写 `(course_id, 新 version_id)`，旧版本副本与发布指针不变，学生照读旧版；向量空间或维度不符、缺向量在连库前失败，缺来源块整体回滚；重试同一版本先删后建、不重复；P9 读回复算摘要一致。G03 已决：已发布知识点对外状态恒为 `approved`、来源类别恒为 `manual`（ArvinHan 2026-09-26，ADR-033 第 5 条）。G03 待决：已发布详情的来源没有原文片段。
+- G04 验收：先按 V3 校验（成环、来源无效、空图）再切指针；P7～P11 任一失败、提交指针被移动、写锁超时都保留旧指针且不留副本；版本号无空洞；同课程并发发布或发布与回滚并发返回 `PUBLISH_IN_PROGRESS`；内容未变走幂等路径不占号不写 Neo4j；T7 只完成水位以内的任务，锁释放后的编辑不进本次快照（PUB-1/2/4/5/6/12/21/22/23/35）。G04 待决：`POST /publish` 路由未分配任务（建议并入 G06 的 `api/versions.py`）；G04 依赖 F12 仅因谱系，发布不写审计日志（ADR-034 第 7 条）；过期尝试的清扫归 G05。
+
+## 2026-09-26 H03 图谱适配（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H03 | DONE（待 PR 审查/合并） | 实现契约到 G6 数据适配 | ArvinHan（Claude） | `claude/project-thread-m4mk7n` / `main@ebb0f42` | `src/frontend/src/graph/adapter.ts`、`tests/frontend/h03.test.ts` | `h03.test.ts` 22 passed；11 处反向篡改均检出；前端全量 285 passed；type-check、build、`verify.sh` exit 0；`docs/handoffs/claude-h03.md` |
+
+- 验收：四类边样式两两可区分且带中文图例名；`source/target` 取 `from_id/to_id`，仅 `RELATED_TO` 无箭头；缺端点、外课、重复 ID 的元素不进画布并逐条报告；空图得空数组；元素 ID 为 `kp:`/`rel:` 前缀且按码点排序，输入乱序输出逐字节相同；深冻结输入照常转换，输出不引用输入对象。
+- H03 待决：边颜色为占位方案未经设计签收；`rejected`/`low_confidence` 的样式与过滤、`issues` 是否提示给教师，留给 H04/H05。
 
 ## 2026-09-26 F08 教师节点编辑与人工编辑锁（Claude）
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F08 | DONE（待 PR 审查/合并） | 实现教师节点编辑与手改锁 | ArvinHan（Claude） | `claude/project-thread-z0m8yg` / `main@ebb0f42` | `src/backend/app/services/graph/edit_node.py`、`src/backend/app/api/graph_nodes.py`、`tests/backend/test_f08.py`；扩围 `src/backend/app/repositories/graph_edit.py`（Cypher 与 SQLite 查询）、`src/backend/app/main.py` 与 `src/backend/app/schemas/contracts.py`（各一处注册）、`tests/integration/test_f08.py`、契约（`api.v1.yaml`、`errors.v1.md`、生成物）、`src/frontend/src/api/http.ts` 与 `taskEvents.ts`（错误码副本）、`docs/decisions.md`（ADR-035）、`docs/architecture.md`（错误码表）、`specs/teacher-review-publish.md`（待细化四条） | `test_f08.py` 62 passed（实现前 61 failed）；`tests/integration/test_f08.py` 8 passed（真实 Neo4j 5.26）；后端全量 3021 passed；集成全量 123 passed / 4 skipped；前端 type-check 通过、263 passed；`verify.sh` exit 0；`docs/handoffs/claude-f08.md` |
+| F08 | DONE（待 PR 审查/合并） | 实现教师节点编辑与手改锁 | ArvinHan（Claude） | `claude/project-thread-z0m8yg` / `main@ebb0f42` | `src/backend/app/services/graph/edit_node.py`、`src/backend/app/api/graph_nodes.py`、`tests/backend/test_f08.py`；扩围 `src/backend/app/repositories/graph_edit.py`（Cypher 与 SQLite 查询）、`src/backend/app/main.py` 与 `src/backend/app/schemas/contracts.py`（各一处注册）、`tests/integration/test_f08.py`、契约（`api.v1.yaml`、`errors.v1.md`、生成物）、`src/frontend/src/api/http.ts` 与 `taskEvents.ts`（错误码副本）、`docs/decisions.md`（ADR-035）、`docs/architecture.md`（错误码表）、`specs/teacher-review-publish.md`（待细化四条） | `test_f08.py` 62 passed（实现前 61 failed）；`tests/integration/test_f08.py` 8 passed（真实 Neo4j 5.26）；后端全量 3024 passed；集成全量 142 passed / 4 skipped；前端 type-check 通过、285 passed（合入 main 后复跑）；`verify.sh` exit 0；`docs/handoffs/claude-f08.md` |
 
 - 验收：后写者 `expected_revision` 过期 → 409 `REVISION_CONFLICT` 带当前内容，不覆盖；教师修改（含只改状态）置 `locked = true`；解锁只能经单独的 `unlockKnowledgePoint`，修改接口带 `locked` 字段 → 422；F04 自动写入跳过加锁节点，解锁后恢复更新；新建知识点必须带至少一条本课程、已提交修订的来源（ADR-035）。
 - F08 待决：前端尚无为新建知识点选择来源块的接口与交互（无按资料列块的 API）；人工新建节点的状态定为 `approved` 由 Claude 选定，待签收；审计日志归 F12；删除与合并归 F09/F10。
