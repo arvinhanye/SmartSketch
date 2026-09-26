@@ -1207,3 +1207,11 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：只返回本课程、修订属于绑定版本修订列表的文本块，他课和版本外新修订即使更近也不返回；近邻被挤占时自动扩大取数补足召回，到 `max_fetch` 封顶时告警并返回已有结果；无命中或修订列表为空时返回空；查询向量空间、维度、数值不符和草稿作用域在查询前拒绝；当前空间没有索引时抛仓储错误。
 - J01 待决：运行时没有任何环节为文本块写向量（F04/F13 只建 `Chunk` 节点，G03 只为知识点算向量，仅 F14 迁移会写），J04 以后接上问答之前需要先补上这一步；`fetch_factor`、`max_fetch` 为占位值（ADR-046）。
+
+## 2026-09-26 H07 教师节点编辑面板（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H07 | DONE（待 PR 审查/合并，issue #119） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；前端全量 494 passed、type-check 与 build 通过；`./scripts/verify.sh` 通过；`docs/handoffs/claude-h07.md` |
+
+- H07 待决（需 ArvinHan）：ADR-062 签收；面板接入教师图谱页（与 H06 详情切换）留 H11；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。

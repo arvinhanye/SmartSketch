@@ -1381,3 +1381,19 @@
 - **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-062：H07 教师节点编辑面板的保存、冲突与锁交互
+
+- **日期**：2026-09-26
+- **背景**：H07 要把 F08（`updateKnowledgePoint`/`unlockKnowledgePoint`，ADR-035）与 F09（`deleteKnowledgePoint`，ADR-048）接成教师编辑面板，验收为「字段错误、revision 冲突、锁/解锁；失败不假装保存成功」。PATCH 必带节点级 `expected_revision`，冲突时 409 `REVISION_CONFLICT` 的 `details.current` 只含名称、别名、类型、定义、状态、锁与重要度/难度，不含章节与来源；删除的 `expected_revision` 可选；保存成功后服务端把节点锁定。
+- **决定**：
+  1. 新增 `api/nodeEdit.ts` 封装读、改、解锁、删四个契约操作，经 `NODE_EDIT_API_KEY` 注入；未注入时组件用 `HTTP_CLIENT_KEY` 的会话客户端构造，不改 `main.ts`。删除总是带上读到的修订号。
+  2. 不做乐观更新：表单是本地副本，只有服务端确认（且响应 `id`/`course_id` 与请求一致）后才更新基准、写回课程 store 中的图谱（改节点或删节点及相连边）并显示成功提示。任何失败都保留表单修改并写明「未保存/未解锁/未删除」；网络中断与超时写明「不能确认是否已保存」并提供重新加载，不猜测结果。
+  3. 只提交改过的字段：名称、定义去首尾空白后比较；别名按行、逗号、顿号分隔并去空项、去重；重要度、难度须为 0～1，已有值不能清空（PATCH 不接受 null）。本地校验错误在首次提交后显示；服务端 422 `details.fields` 按首段字段名落到对应输入框（`aria-invalid` + `aria-describedby`），编辑该字段后清除，认不出的字段给表单级错误。
+  4. 保存遇 `REVISION_CONFLICT`：不覆盖，列出「你的修改 / 最新内容」逐字段差异并阻止再次保存，直到教师选择「采用最新内容」（丢弃本地修改）或「保留我的修改」（以 `current_revision` 为基准重新提交；教师没改过的字段跟随最新内容，不把他人的修改改回去；与最新一致的字段不再提交）。解锁、删除遇冲突时同样换到最新基准并请教师确认后再操作。`details` 形状不完整时只提示重新加载。
+  5. 锁：面板显示锁定状态；保存成功后提示「已锁定，自动抽取不会覆盖」；只有已锁定节点显示「解锁」；服务端返回仍锁定时不提示已解锁。
+  6. 删除须二次确认（`role=alertdialog`），说明相连关系会一并删除，有未保存修改时额外提示。404 时说明「已不存在」并请页面刷新图谱，不提示「已删除」。
+  7. 一次只允许一个写请求；切换知识点或课程时中止在途请求，晚到结果（序号 + 课程作用域）丢弃，不写 store、不提示成功。错误只给固定文案，不回显服务端 message；服务端文本全部插值渲染。
+- **后果**：面板可独立挂到教师图谱页；接入页面（与 H06 详情抽屉切换、画布联动）留给 H11。`details.current` 不含章节，采用最新内容时章节沿用本地已知值；新建知识点仍缺来源块选择接口（F08 待决），本面板只编辑已有节点。
+- **回滚**：删除 `src/frontend/src/api/nodeEdit.ts`、`components/NodeEditor.vue`、`composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts` 与本 ADR；无依赖、契约或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
