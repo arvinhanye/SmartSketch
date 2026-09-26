@@ -52,6 +52,8 @@ def _error(status: int, code: str, message: str, details: dict[str, Any]) -> JSO
 def _respond(action: Callable[[], ProgressView], course_id: str) -> JSONResponse:
     try:
         view = action()
+        body = ProgressResponse.model_validate(view.to_dict())
+        return JSONResponse(content=body.model_dump(mode="json"))
     except AccessDenied:
         raise
     except DuplicateProgressTarget as error:
@@ -64,8 +66,6 @@ def _respond(action: Callable[[], ProgressView], course_id: str) -> JSONResponse
         request_id = uuid.uuid4().hex
         logger.exception("learning progress failed: course_id=%s request_id=%s", course_id, request_id)
         return _error(500, "INTERNAL_ERROR", "学习进度暂时无法读取，请稍后重试", {"request_id": request_id})
-    body = ProgressResponse.model_validate(view.to_dict())
-    return JSONResponse(content=body.model_dump(mode="json"))
 
 
 @router.get("/progress", operation_id="getProgress", response_model=ProgressResponse, responses=_ERRORS)

@@ -1388,9 +1388,10 @@
 - **背景**：I02 实现 `GET`/`PUT /api/v1/courses/{cid}/progress`（`specs/learning-path.md` §5，ADR-014 修订 1 决定 8、9，ADR-017 决定 4、5）。契约未写明教师能否读写进度、同批重复 `kp_id` 的 `reason` 取值，以及“发布指针在写入期间变化时按新版本复核”的实现方式；I01 仓储只提供原始行与调用方事务入口。
 - **决定**：
   1. 两个接口都用 `course_student` 依赖：只有本课程学生成员可读写**自己**的进度；教师成员 403 `ROLE_FORBIDDEN`，非成员 403 `COURSE_FORBIDDEN`，课程从未发布 404 `GRAPH_NOT_PUBLISHED`。身份只取自令牌；请求项带 `user_id` 因 `ProgressUpdate` 闭合而 422 `extra_forbidden`，查询串中的 `user_id` 不被读取。
+     **本条覆盖的规格条目**：`specs/identity-access.md` §2.3 第 2 条中「运行时客户端即使多传了这类字段，也只能被忽略」这一表述，以及 `specs/identity-access.md` IAM-14（§4 失败路径）中请求体夹带 `user_id` 时的预期「只改动 A 的进度」——两者都改为本条的 422 零写入。覆盖依据是契约 `api.v1.yaml` `PUT /progress` 的 422 说明（「带 `user_id` 等多余字段」属整批零写入）与 `specs/learning-path.md` §5；被覆盖的两处已就地加覆盖声明。该规格自称「访问矩阵与身份规则的唯一规范表述…不一致时回改契约，不改本文」，本 ADR 未按其路径回改契约，属单方面覆盖，待裁决；「不得从请求读取调用者身份」「不得在请求 schema 中定义 `user_id`」两条不在覆盖范围内。
   2. `PUT` 先查同批重复（通用 422，`details.fields` 每个重复出现项一项 `{in: "body", field: "<i>.kp_id", reason: "duplicate"}`，首次出现项不列），再开 `BEGIN IMMEDIATE`，在持有写锁后按 G07 重新解析发布指针。发布/回滚提交同样需要写锁，因此这就是提交时的最终绑定版本，请求开始后提交的新版本自然用于整批复核；不另做“先绑定、失败再重试”的循环。
   3. 投影在服务层 `app/services/learning/progress.py`（`project_progress` 供 I05 推荐复用，保证同版本同投影）：已提交快照的节点集与谱系按 `version_id` 缓存；原始行经 I01 `read_progress` 读取。同值写入仍有未被覆盖的来源时以 I01 的 `force` 写入，否则交仓储判为无操作。成功后在提交之后按最终绑定版本重新投影返回。
   4. 已提交版完整性故障（快照缺失/摘要不符/不可解析/他课、`V = ∅`、谱系违反修订 3 决定 16）以及这两个接口内其他未预期异常，一律 500 `INTERNAL_ERROR`，`details` 只含 `request_id`（`uuid4().hex`），具体原因与节点 ID 只进服务端日志。
 - **后果**：教师端若需要查看某学生进度，须另开接口与规格；I05 推荐直接调用 `project_progress` 即可与 `GET /progress` 同投影。每次投影仍扫描本课程全部已提交版本的版本行（快照解析有缓存），MVP 规模可接受。
 - **回滚**：删除 `app/api/progress.py`、`app/services/learning/progress.py`、`tests/backend/test_i02.py`，撤回 `app/main.py` 的路由注册与 `app/schemas/contracts.py` 的两行导出，删去本 ADR；无迁移、无契约与依赖变更，已写入的进度行保留。
-- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。**待裁决项（决定 1 ↔ `specs/identity-access.md`，2026-09-26 独立审查 M-2 提出）**：`specs/identity-access.md` §2.3 第 2 条与 IAM-14 要求请求体中多余的 `user_id`「只能被忽略」，而契约与 `specs/learning-path.md` §5 要求 422 零写入；本 ADR 决定 1 单方面取了 422，并已在该规格这两处就地加覆盖声明。请裁决二者之一：**(A) 保持 422**——现状，实现与契约不变，由产品/协调 Agent 确认覆盖声明并修正 IAM-14 的预期；**(B) 改为忽略**——须同步改 `api.v1.yaml` 该操作的 422 说明、`specs/learning-path.md` §5 与 `tests/backend/test_i02.py::test_body_user_id_is_rejected_with_zero_writes`，并撤回上述覆盖声明。裁决前实现不改。

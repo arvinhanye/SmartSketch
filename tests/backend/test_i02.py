@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import copy
+import sqlite3
 import time
 import uuid
+from contextlib import closing
 from pathlib import Path
 
 import jsonschema
@@ -17,12 +19,13 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from app.api import progress as progress_api
 from app.main import create_app
 from app.repositories import versions
 from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
 from app.repositories.progress import read_progress
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect, database_path, migrate
 from app.services.auth import issue_access_token
 from app.services.learning import progress as service
 from app.services.learning.eligible import build_prerequisite_graph, eligible_set
@@ -326,7 +329,11 @@ def test_pointer_moved_since_the_last_read_is_rechecked_as_a_whole(env):
 
 
 def test_put_binds_the_pointer_inside_its_write_transaction(env, monkeypatch):
-    """请求开始后才提交的版本也要用于复核：服务在写事务内解析指针，而不是沿用请求前的绑定。"""
+    """请求开始后才提交的版本也要用于复核：服务在写事务内解析指针，而不是沿用请求前的绑定。
+
+    本用例只说明「复核用的是请求开始后的新版本」；「解析时确实持有写锁」的鉴别性证据见
+    ``test_put_rechecks_the_pointer_while_holding_the_write_lock``。
+    """
     env.publish("a", "b")
     seen = []
     original = service.resolve_published
@@ -340,6 +347,35 @@ def test_put_binds_the_pointer_inside_its_write_transaction(env, monkeypatch):
     env.publish("a")
     assert_not_in_published(env.put(env.alice, [{"kp_id": "b", "status": "mastered"}]), [0], 2)
     assert seen == [2]
+
+
+def test_put_rechecks_the_pointer_while_holding_the_write_lock(env, monkeypatch):
+    """写事务内复核发布指针的鉴别性证据：解析指针时调用方必须已持有写锁。
+
+    上一个用例的 ``seen == [2]`` 在锁内锁外都成立（恒真）。这里换判据：在 ``resolve_published``
+    的调用点另开一个连接尝试 ``BEGIN IMMEDIATE``——写锁已被 ``update_progress`` 持有则立即以
+    ``database is locked`` 失败；把 ``resolve_published`` 移到 ``with immediate`` 之外，该连接
+    就能拿到写锁，``blocked`` 为空，用例失败。``timeout=0`` 让判定不依赖睡眠或竞态。
+    """
+    env.publish("a", "b")
+    blocked: list[str] = []
+    original = service.resolve_published
+
+    def spy(url, course_id, **kwargs):
+        with closing(sqlite3.connect(database_path(url), timeout=0)) as rival:
+            try:
+                rival.execute("BEGIN IMMEDIATE")
+            except sqlite3.OperationalError as error:
+                blocked.append(str(error))
+            else:
+                rival.execute("ROLLBACK")
+        return original(url, course_id, **kwargs)
+
+    monkeypatch.setattr(service, "resolve_published", spy)
+    env.publish("a")  # 请求开始后发布指针从版本 1 移到 2
+    assert_not_in_published(env.put(env.alice, [{"kp_id": "b", "status": "mastered"}]), [0], 2)
+    assert blocked and all("locked" in text for text in blocked), (
+        f"写事务内复核发布指针时未持有写锁：并发 BEGIN IMMEDIATE 全部成功（blocked={blocked}）")
 
 
 # --- 合并继承与显式写入覆盖（LP-9、LP-17～LP-20） ---------------------------------------------
@@ -441,6 +477,25 @@ def test_integrity_fault_is_500_with_request_id_only(env, caplog):
         assert set(body["details"]) == {"request_id"}
         assert body["details"]["request_id"] in caplog.text
     assert env.rows(env.alice) == {}
+
+
+def test_serialisation_fault_is_500_with_request_id_only(env, monkeypatch, caplog):
+    """投影无法序列化时不能逃出处理器：500 `INTERNAL_ERROR`，`details` 只含 `request_id`。"""
+    env.publish("a")
+
+    class Broken:
+        @staticmethod
+        def model_validate(value):
+            raise ValueError("projection is not serialisable")
+
+    monkeypatch.setattr(progress_api, "ProgressResponse", Broken)
+    response = env.get(env.alice)
+    assert response.status_code == 500, response.text
+    body = response.json()
+    assert_schema("Error", body)
+    assert body["code"] == "INTERNAL_ERROR"
+    assert set(body["details"]) == {"request_id"}
+    assert body["details"]["request_id"] in caplog.text
 
 
 def test_override_bound_is_the_start_of_the_continuous_merge(env):
