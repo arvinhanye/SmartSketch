@@ -970,3 +970,17 @@
 - **后果**：接管后已结束的块与小节不再调用模型（LEASE-2）；取消在块边界生效，在途调用的结果不写检查点。小节关系失败目前只在检查点和 `load_candidates().failed_sections` 中可见，审核页如需展示须另加契约字段。块与小节检查点的保留期清理（§8.6）尚未实现。
 - **回滚**：停 API 与 worker，按迁移 008 文件头的 `ROLLBACK` 行删表；撤销 `extract_task.py` 与 `extraction_checkpoints.py`。处于 `extracting` 的任务之后从阶段开头重跑。
 - **签收**：ArvinHan 2026-09-26（在会话卡片上选择「小节关系失败不计入阈值」）；其余默认值由 Claude 选定并在交接中报告。
+
+## ADR-024：F04 草稿节点与来源关联的图模型；加锁节点完全不动
+
+- **日期**：2026-09-26
+- **背景**：§8.4 规定了贡献记录（`contrib_tasks`、`contrib_manual`、来源关联带 `task_id`），但没有定来源关联在 Neo4j 中的类型与属性、共享 `Chunk` 节点带哪些字段，也没有定加锁节点遇到新资料里的同名知识点时能否补来源（`specs/teacher-review-publish.md`「待细化」列有加锁粒度）。
+- **决定**：
+  1. 知识点到文本块的来源关联为 `(:KnowledgePoint)-[:EVIDENCED_BY {task_id, chunk_id, evidence_start, evidence_end}]->(:Chunk)`，证据为块文本中的半开区间；人工添加的来源不带 `task_id`（F08 落实）。
+  2. `Chunk` 节点按 `(course_id, chunk_id)` 共享（F03 约束），自动写入时只在新建时写 `document_id`、`revision_id`；原文仍以 SQLite `chunks` 为准。
+  3. 自动写入的新节点：`source = ai`、`locked = false`、`contrib_manual = false`、`revision = 1`、`level = 0`；本任务 ID 不重复地并入 `contrib_tasks`；内容有变化才递增节点 `revision`，重试不改数据。自动流程只能写 `draft`/`low_confidence` 两种状态。
+  4. **加锁节点完全不动**：不改内容、不并入贡献、不加来源，写入结果记为「因加锁跳过」。加锁粒度为整个节点（契约 `KnowledgePoint.locked`）。
+  5. 跨课程来源在写库前拒绝：来源块必须在调用方按本课程从 SQLite 读出的块中，且资料、修订与证据区间与该块一致。
+- **后果**：F13 可以直接用 `write_draft_nodes` 写节点；审核与问答读来源时按 `EVIDENCED_BY.task_id ∈ V` 判定可见。新资料里对加锁知识点的证据不会挂上去，教师需要时手动添加。每批一个 Neo4j 事务，§8.4 要求的「撤销旧贡献 + 写入」同一事务由 F13 组合。
+- **回滚**：撤销 `graph_nodes.py` 与测试；已写入草稿的节点与关系按 `contrib_tasks`、`EVIDENCED_BY.task_id` 可定向清理。
+- **签收**：ArvinHan 2026-09-26（在会话卡片上选择「加锁节点完全不动」）；关系名与属性由 Claude 选定并在交接中报告。
