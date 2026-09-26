@@ -1,0 +1,21 @@
+# K08：镜像构建上下文是仓库根目录。Dockerfile 只 COPY 白名单路径，这里再挡一层，
+# 让本地密钥、运行数据与依赖目录根本不进入构建上下文。
+**/.env
+**/.env.*
+!.env.example
+**/*.pem
+**/*.key
+.git
+.claude/settings.local.json
+.codex/local/
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.venv
+storage/
+uploads/
+neo4j/
+*.sqlite
+*.sqlite3
+*.db
