@@ -1178,3 +1178,15 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 依赖：C01、A08、G07 已在本地代码中；I02 负责图谱谱系投影及 HTTP 校验。风险：迁移新增持久表，回滚需停 API/worker 后恢复迁移前 SQLite 备份。
 - 验证命令：`.venv/Scripts/python.exe -m pytest tests/backend/test_i01.py tests/backend/test_g02.py -q`、`./scripts/verify.sh`、`git diff --check`。
 - 验收证据：审查发现原 `write_progress` 总是另开事务，无法加入 I02 的版本绑定写事务；新增一个用例先因缺少事务入口而失败，修复后 I01 6 passed、I01+G02 28 passed。隔离 worktree 的 `verify.sh` exit 0。此次未重跑后端全量；原始交接记录中的全量结果仅属修复前快照。
+
+## 2026-09-26 J02 图结构检索（Codex 认领）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| J02 | DONE（实现完成；真实 Neo4j 验收待补） | Codex（后端） | `src/backend/app/repositories/graph_search.py`、`tests/integration/test_j02.py`、`specs/grounded-qa.md`、本节、交接 | 按绑定 `(course_id, version_id)` 从术语/知识点检索有界子图；跳数、节点数、关系数受限；跨课/草稿/旧版不混入；无匹配为空。 |
+
+- 输入：G07 `PublishedVersion.graph_scope()`、术语或 `kp_id`；输出：确定顺序的知识点与四类结构关系。
+- 依赖：G07 版本绑定与 F07 Neo4j 读取；J04 消费无编号子图，本任务不提供可引用证据。
+- 风险：图谱分支度高时限制每轮读数与总节点/关系；查询只使用参数化 Cypher，版本在请求入口绑定一次。
+- 验证命令：`.venv/Scripts/python.exe -m pytest tests/integration/test_j02.py -q`；Git Bash `./scripts/verify.sh`；`git diff --check`。
+- J02 验收证据：`tests/integration/test_j02.py` 2 passed、3 skipped（本机无隔离 Neo4j 环境变量）；`py_compile`、`git diff --check` exit 0。原工作区后端全量 3100 passed、1 failed；隔离分支在最新 `origin/main` 基线复跑排除既有 E03 后 3101 passed、1 deselected；J02+I01+G02 定向回归 30 passed、3 skipped。原失败为既有 E03 `test_stdlib_transport_connection_refused` 在本机抛出 `ModelTimeoutError`。`verify.sh` 已运行：原样执行缺 `python3`；临时映射 Python 后 B14 因缺 `datamodel-codegen` 及测试临时目录找不到映射解释器失败，契约检查另有 GBK 编码错误。详见 `docs/handoffs/codex-j02.md`。
