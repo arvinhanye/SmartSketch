@@ -1092,3 +1092,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 验收：四类边样式两两可区分且带中文图例名；`source/target` 取 `from_id/to_id`，仅 `RELATED_TO` 无箭头；缺端点、外课、重复 ID 的元素不进画布并逐条报告；空图得空数组；元素 ID 为 `kp:`/`rel:` 前缀且按码点排序，输入乱序输出逐字节相同；深冻结输入照常转换，输出不引用输入对象。
 - H03 待决：边颜色为占位方案未经设计签收；`rejected`/`low_confidence` 的样式与过滤、`issues` 是否提示给教师，留给 H04/H05。
+
+## 2026-09-26 H04 G6 画布生命周期（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H04 | DONE（待 PR 审查/合并） | 实现 G6 生命周期组件 | ArvinHan（Claude） | `claude/project-thread-3eixq2` / `main@95d5c9a` | `src/frontend/src/graph/lifecycle.ts`、`src/frontend/src/components/GraphCanvas.vue`、`tests/frontend/h04.test.ts`；另含 `src/frontend/package.json`/`package-lock.json`（新增 `@antv/g6`） | `h04.test.ts` 27 passed；16 处反向篡改均检出；前端全量 312 passed；type-check、build、`verify.sh` exit 0；Chromium 冒烟通过；`docs/handoffs/claude-h04.md`；ADR-040 |
+
+- 验收：挂载按容器尺寸建图，尺寸为 0 时推迟；更新走 `setData` + `render`，渲染中连续更新只画最后一次；resize 下一帧合并，`setSize` 后适应视口，隐藏（尺寸 0）与未变不动；销毁后图、观察器、帧、window 监听归零，迟到的建图与渲染不生效；路由来回切换 20 次无泄漏；节点点击回传知识点 ID；加载、空图、失败（可重试）状态与画布无障碍标签。
+- H04 待决：H03 的边颜色仍为占位；`rejected`/`low_confidence` 的样式与过滤仍留给 H05；画布本身不可键盘操作，键盘可达由 H11 卡片视图承担。
