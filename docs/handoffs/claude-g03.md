@@ -46,7 +46,7 @@ verify(repo, build.snapshot, attempt.version_id, current_space)  # P9；Verifica
 
 ## 待决 / 风险
 
-1. **需确认**：已发布知识点对外 `status` 恒为 `approved`、`source` 恒为 `manual`（ADR-033 第 5 条）。
+1. 已决（ArvinHan 2026-09-26）：已发布知识点对外 `status` 恒为 `approved`、`source` 恒为 `manual`（ADR-033 第 5 条）。
 2. 已发布版本的知识点详情来源没有原文片段（副本无证据区间）。
 3. 向量索引由 F03 `ensure_vector_indexes` 建立，本任务不建索引。
 4. 大课程时单事务写入的内存占用未压测。

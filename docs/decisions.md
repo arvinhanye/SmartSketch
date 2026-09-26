@@ -1071,4 +1071,4 @@
   5. F07 读已发布版本时，副本缺少的契约必填字段按「已发布」补齐：`status = approved`、`confidence = 1.0`、`source = manual`、`locked = false`、`revision = 1`。F07 的节点查询改为显式投影，不把向量属性带回应用层。
 - **后果**：学生端看到的已发布知识点状态恒为 `approved`，来源类别恒为 `manual`，与草稿里的真实值无关；如果前端需要展示真实来源类别，须改规格让它进快照（并使 `snapshot_format` 加 1）。知识点详情里已发布版本的来源不带原文片段（副本没有证据区间），只有页码或章节路径。
 - **回滚**：撤销 `services/versions/materialize.py` 与测试，恢复 F07 的两处改动；已物化的版本副本可按 `(course_id, version_id)` 删除。
-- **签收**：待 ArvinHan 审阅（第 1、5 条的取值由 Claude 选定，是学生能看到的输出，请重点确认）。
+- **签收**：第 5 条由 ArvinHan 2026-09-26 在会话卡片上选定「统一填默认」；其余由 Claude 选定并在交接中报告。
