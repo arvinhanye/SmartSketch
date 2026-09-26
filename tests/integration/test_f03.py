@@ -1,6 +1,7 @@
 """F03 schema and vector-space boundary; fake driver works without Docker."""
 from types import SimpleNamespace
 import os
+import re
 import uuid
 
 import pytest
@@ -13,10 +14,12 @@ from app.services.ai.embeddings import EmbeddedVector
 
 
 class Driver:
-    def __init__(self, fail_at=None, matched=1):
+    def __init__(self, fail_at=None, matched=1, schema_override=None):
         self.calls = []
         self.fail_at = fail_at
         self.matched = matched
+        self.schema = {}
+        self.schema_override = schema_override or {}
 
     def verify_connectivity(self):
         pass
@@ -25,6 +28,31 @@ class Driver:
         self.calls.append((query, parameters_, routing_, database_))
         if len(self.calls) == self.fail_at:
             raise RuntimeError('driver detail must not leak')
+        if query.startswith('CREATE CONSTRAINT ') or query.startswith('CREATE INDEX '):
+            name = query.split()[2]
+            relation = '[r:' in query
+            label = re.search(r'\[r:(\w+)\]' if relation else r'\(n:(\w+)\)', query).group(1)
+            variable = 'r' if relation else 'n'
+            row = {
+                'name': name,
+                'type': ('RELATIONSHIP_UNIQUENESS' if relation else 'UNIQUENESS')
+                        if query.startswith('CREATE CONSTRAINT ') else 'RANGE',
+                'entityType': 'RELATIONSHIP' if relation else 'NODE',
+                'labelsOrTypes': [label],
+                'properties': re.findall(rf'{variable}\.(\w+)', query),
+            }
+            self.schema.setdefault(name, self.schema_override.get(name, row))
+            return SimpleNamespace(records=[])
+        if query.startswith('SHOW CONSTRAINTS '):
+            return SimpleNamespace(records=[row for row in self.schema.values()
+                                            if row['type'] != 'RANGE'])
+        if query.startswith('SHOW INDEXES '):
+            # Neo4j exposes uniqueness-backed RANGE indexes with the same names
+            # as their owning constraints; they must not replace SHOW CONSTRAINTS.
+            return SimpleNamespace(records=[
+                dict(row, type='RANGE') for row in self.schema.values()
+                if row['type'] != 'RANGE'
+            ] + [row for row in self.schema.values() if row['type'] == 'RANGE'])
         return SimpleNamespace(records=[{'matched': self.matched}])
 
 
@@ -36,7 +64,7 @@ def test_migration_is_repeatable_and_scoped():
     driver = Driver()
     count = apply_migrations(driver)
     assert count >= 8
-    queries = [call[0] for call in driver.calls]
+    queries = [call[0] for call in driver.calls if call[0].startswith('CREATE ')]
     assert all('IF NOT EXISTS' in q for q in queries)
     assert any('KnowledgePoint' in q and 'course_id' in q and 'version_id' in q and 'kp_id' in q for q in queries)
     assert any('Chapter' in q and 'chapter_id' in q for q in queries)
@@ -44,7 +72,17 @@ def test_migration_is_repeatable_and_scoped():
     assert any('RelationIdentity' in q and 'rel_id' in q for q in queries)
     assert any('contrib_manual' in q for q in queries)
     assert apply_migrations(driver) == count
-    assert len(driver.calls) == 2 * count
+    assert len([call for call in driver.calls if call[0].startswith('CREATE ')]) == 2 * count
+
+
+def test_migration_replay_rejects_same_name_with_wrong_schema():
+    wrong = {
+        'name': 'kp_scope_id', 'type': 'UNIQUENESS', 'entityType': 'NODE',
+        'labelsOrTypes': ['KnowledgePoint'], 'properties': ['kp_id'],
+    }
+    driver = Driver(schema_override={'kp_scope_id': wrong})
+    with pytest.raises(GraphMigrationError, match='kp_scope_id'):
+        apply_migrations(driver)
 
 
 def test_migration_failure_identifies_statement_and_is_rerunnable():
@@ -70,7 +108,7 @@ def test_runtime_writer_accepts_current_space_only_and_checks_dimension():
     query, params, routing, _ = driver.calls[-1]
     assert 'course_id: $course_id' in query and 'version_id: $version_id' in query
     assert params['values'] == [0.1, 0.2] and routing == 'w'
-    with pytest.raises(VectorSpaceError):
+    with pytest.raises(VectorSpaceError, match='real/model-b/2.*real/model-a/2'):
         writer.write_runtime('KnowledgePoint', 'c', 'v1', 'kp', vector('real/model-b/2'))
     with pytest.raises(VectorSpaceError):
         writer.write_runtime('KnowledgePoint', 'c', 'v1', 'kp', vector('real/model-a/2', (0.1,)))

@@ -18,6 +18,19 @@ from typing import Any, Callable, Iterator, Protocol, Sequence
 
 MIGRATION = Path(__file__).resolve().parents[2] / 'migrations' / 'neo4j' / '001_constraints.cypher'
 SPACE_RE = re.compile(r'^(?:fake|real/.+)/([1-9][0-9]*)$')
+EXPECTED_SCHEMA = {
+    'kp_scope_id': ('UNIQUENESS', 'NODE', ('KnowledgePoint',), ('course_id', 'version_id', 'kp_id')),
+    'chapter_scope_id': ('UNIQUENESS', 'NODE', ('Chapter',), ('course_id', 'version_id', 'chapter_id')),
+    'chunk_course_id': ('UNIQUENESS', 'NODE', ('Chunk',), ('course_id', 'chunk_id')),
+    'relation_identity_scope_id': ('UNIQUENESS', 'NODE', ('RelationIdentity',), ('course_id', 'version_id', 'rel_id')),
+    'contains_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('CONTAINS',), ('course_id', 'version_id', 'rel_id')),
+    'prerequisite_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('PREREQUISITE',), ('course_id', 'version_id', 'rel_id')),
+    'related_to_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('RELATED_TO',), ('course_id', 'version_id', 'rel_id')),
+    'example_of_scope_id': ('RELATIONSHIP_UNIQUENESS', 'RELATIONSHIP', ('EXAMPLE_OF',), ('course_id', 'version_id', 'rel_id')),
+    'kp_contrib_manual': ('RANGE', 'NODE', ('KnowledgePoint',), ('course_id', 'version_id', 'contrib_manual')),
+    'chapter_contrib_manual': ('RANGE', 'NODE', ('Chapter',), ('course_id', 'version_id', 'contrib_manual')),
+    'chunk_revision': ('RANGE', 'NODE', ('Chunk',), ('course_id', 'revision_id')),
+}
 
 
 class GraphMigrationError(RuntimeError):
@@ -52,7 +65,33 @@ def apply_migrations(driver: Driver, path: Path = MIGRATION) -> int:
             _execute(driver, statement)
         except Exception:
             raise GraphMigrationError(f'Neo4j migration statement {number} failed; repair and rerun') from None
+    _validate_schema(driver)
     return len(statements)
+
+
+def _validate_schema(driver: Driver) -> None:
+    """Reject IF NOT EXISTS no-ops caused by a same-name, different schema."""
+    rows: dict[str, dict] = {}
+    try:
+        for kind in ('CONSTRAINTS', 'INDEXES'):
+            result = _execute(
+                driver,
+                f'SHOW {kind} YIELD name, type, entityType, labelsOrTypes, properties '
+                'RETURN name, type, entityType, labelsOrTypes, properties',
+            )
+            for record in result.records:
+                row = dict(record)
+                # SHOW INDEXES also lists indexes backing uniqueness constraints.
+                rows.setdefault(row['name'], row)
+    except Exception:
+        raise GraphMigrationError('Neo4j schema inspection failed') from None
+    for name, expected in EXPECTED_SCHEMA.items():
+        row = rows.get(name)
+        actual = None if row is None else (
+            row['type'], row['entityType'], tuple(row['labelsOrTypes']), tuple(row['properties'])
+        )
+        if actual != expected:
+            raise GraphMigrationError(f'Neo4j schema object {name} differs from F03; repair and rerun')
 
 
 def run_from_settings(settings: Any, *, driver_factory: Callable | None = None) -> int:
@@ -121,7 +160,9 @@ def sqlite_current_space(sqlite_url: str) -> Callable[[], str]:
 
 def _validate_vector(vector: Vector, expected_space: str) -> list[float]:
     if vector.space != expected_space:
-        raise VectorSpaceError('vector space differs from write context')
+        raise VectorSpaceError(
+            f'vector space {vector.space!r} differs from current/write space {expected_space!r}'
+        )
     values = vector.values
     if isinstance(values, (str, bytes)) or len(values) != _dimensions(expected_space):
         raise VectorSpaceError('vector dimensions differ from write context')
