@@ -340,20 +340,26 @@ _TARGET: Final = {"approve": "approved", "reject": "rejected"}
 def resolve_relation(ctx: EditContext, course_id: str, rel_id: str, action: str) -> ActionResult:
     target = _TARGET[action]
 
-    def work(tx: ScopedTransaction) -> bool:
-        state = store.read_relation(tx, rel_id)
-        if state is None:
-            raise not_found()
-        if state.status == target:
-            return False
-        if state.status != "low_confidence" or "rejected" in (state.from_status, state.to_status):
-            raise not_found()
-        bump_draft_revision(ctx.sqlite_url, course_id)
-        if not store.set_relation_status(tx, rel_id, target):  # 持守卫锁读过，不应落空
-            raise RuntimeError(f"relation {rel_id} changed inside the review transaction")
-        return True
-
     with _course_write(ctx, course_id) as scope:
+        bumped: list[int] = []
+
+        def bump() -> None:  # 驱动重跑事务时不重复加
+            if not bumped:
+                bumped.append(bump_draft_revision(ctx.sqlite_url, course_id))
+
+        def work(tx: ScopedTransaction) -> bool:
+            state = store.read_relation(tx, rel_id)
+            if state is None:
+                raise not_found()
+            if state.status == target:
+                return False
+            if state.status != "low_confidence" or "rejected" in (state.from_status, state.to_status):
+                raise not_found()
+            bump()
+            if not store.set_relation_status(tx, rel_id, target):  # 持守卫锁读过，不应落空
+                raise RuntimeError(f"relation {rel_id} changed inside the review transaction")
+            return True
+
         changed = ctx.store.transaction(scope, work)
     return _result(ctx, course_id, RELATIONS, action, changed)
 
@@ -368,22 +374,40 @@ def resolve_isolated(ctx: EditContext, course_id: str, kp_id: str, action: str, 
         changed = store.dismiss(ctx.sqlite_url, course_id, ISOLATED, kp_id, user_id)
         return _result(ctx, course_id, ISOLATED, action, changed)
 
-    def work(tx: ScopedTransaction) -> bool:
-        state = store.read_isolation(tx, kp_id)
-        if state is None:
-            raise not_found()
-        if state.status == "rejected":
-            return False
-        if state.relations or store.is_dismissed(ctx.sqlite_url, course_id, ISOLATED, kp_id):
-            raise not_found()
-        bump_draft_revision(ctx.sqlite_url, course_id)
-        if not store.reject_node(tx, kp_id, state.revision):
-            raise RuntimeError(f"knowledge point {kp_id} changed inside the review transaction")
-        return True
-
     with _course_write(ctx, course_id) as scope:
+        bumped: list[int] = []
+
+        def bump() -> None:  # 驱动重跑事务时不重复加
+            if not bumped:
+                bumped.append(bump_draft_revision(ctx.sqlite_url, course_id))
+
+        def work(tx: ScopedTransaction) -> bool:
+            state = store.read_isolation(tx, kp_id)
+            if state is None:
+                raise not_found()
+            if state.status == "rejected":
+                return False
+            if state.relations or store.is_dismissed(ctx.sqlite_url, course_id, ISOLATED, kp_id):
+                raise not_found()
+            bump()
+            if not store.reject_node(tx, kp_id, state.revision):
+                raise RuntimeError(f"knowledge point {kp_id} changed inside the review transaction")
+            return True
+
         changed = ctx.store.transaction(scope, work)
     return _result(ctx, course_id, ISOLATED, action, changed)
+
+
+def _duplicate_pairs(ctx: EditContext, course_id: str) -> set[tuple[str, str]]:
+    """当前「疑似重复」栏里的节点对，键为 ``(小 ID, 大 ID)``（与 ``Classified.duplicates`` 同源）。"""
+    _, c = _classified(ctx, course_id)
+    return {(str(d.left["kp_id"]), str(d.right["kp_id"])) for d in c.duplicates}
+
+
+def _require_duplicate(ctx: EditContext, course_id: str, a: str, b: str) -> None:
+    """这一对是否真在当前「疑似重复」栏：不在就是 404；``merge`` 与 ``reject`` 共用同一条复核。"""
+    if (a, b) not in _duplicate_pairs(ctx, course_id):
+        raise not_found()
 
 
 def resolve_duplicate(ctx: EditContext, course_id: str, kp_ids: Sequence[str], action: str,
@@ -401,6 +425,7 @@ def resolve_duplicate(ctx: EditContext, course_id: str, kp_ids: Sequence[str], a
             return _result(ctx, course_id, DUPLICATES, action, False)
         if len(found) != 2:
             raise not_found()
+        _require_duplicate(ctx, course_id, a, b)  # 不在疑似重复栏：与 reject 一样 404，且一个字也不写
         merge_nodes(ctx, course_id, primary_id, [other])
         return _result(ctx, course_id, DUPLICATES, action, True)
 
@@ -409,8 +434,6 @@ def resolve_duplicate(ctx: EditContext, course_id: str, kp_ids: Sequence[str], a
     key = store.pair_key(a, b)
     if store.is_dismissed(ctx.sqlite_url, course_id, DUPLICATES, key):
         return _result(ctx, course_id, DUPLICATES, action, False)
-    _, c = _classified(ctx, course_id)
-    if (a, b) not in {(str(d.left["kp_id"]), str(d.right["kp_id"])) for d in c.duplicates}:
-        raise not_found()
+    _require_duplicate(ctx, course_id, a, b)
     changed = store.dismiss(ctx.sqlite_url, course_id, DUPLICATES, key, user_id)
     return _result(ctx, course_id, DUPLICATES, action, changed)
