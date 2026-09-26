@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from app.repositories.sqlite import connect
 
-__all__ = ["CourseLock", "acquire", "held", "release", "renew", "try_acquire"]
+__all__ = ["CourseLock", "acquire", "current_holder", "held", "release", "renew", "try_acquire"]
 
 
 @dataclass(frozen=True)
@@ -83,6 +83,15 @@ def acquire(
         if lock is not None or clock() >= deadline:
             return lock
         sleep(min(poll_seconds, max(0.0, deadline - clock())))
+
+
+def current_holder(sqlite_url: str, course_id: str) -> str | None:
+    """未过期锁的持有方（``COURSE_BUSY`` 的 ``details.holder``）；空闲或已过期为 ``None``。"""
+    with connect(sqlite_url) as database:
+        row = database.execute(
+            "SELECT holder FROM course_locks WHERE course_id = ? AND expires_at >= unixepoch()", (course_id,)
+        ).fetchone()
+    return None if row is None else str(row[0])
 
 
 def renew(sqlite_url: str, lock: CourseLock, *, lease_seconds: int) -> bool:
