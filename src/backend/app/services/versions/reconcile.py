@@ -1,7 +1,8 @@
 """G05：发布/回滚失败的补偿与清扫（specs/teacher-review-publish.md V5 C1、V9；PUB-18/19/20；ADR-035）。
 
-- ``compensate``（C1，发布与回滚共用，可重复执行）：先把尝试行条件更新为 ``failed``——影响 0 行说明它已
-  提交或已被清扫处理，**到此为止，不碰 Neo4j**；否则删除该尝试的 Neo4j 副本，删不掉置 ``cleanup_pending``。
+- ``compensate``（C1，发布与回滚共用，可重复执行）：先把尝试行条件更新为 ``failed``——影响 0 行时，已提交
+  的**不碰 Neo4j**，已被清扫判失败的按 V9 第 3 步删副本；否则删除该尝试的 Neo4j 副本，删不掉置 ``cleanup_pending``。
+- ``reclaim_expired``：只对一门课执行 V9 第 1 步；发布与回滚在插入尝试行前调用。
 - ``sweep_course``（V9，按课程逐个处理，不跨课程批量删除）：
   1. 租约已过期的进行中尝试执行 C1（原因 ``LEASE_EXPIRED``）；
   2. ``cleanup_pending`` 的 ``failed`` 行重试删除，成功后清除标记；
@@ -25,7 +26,7 @@ from app.repositories.graph_read import stored_version_ids
 from app.repositories.neo4j import Neo4jRepository
 from app.services.versions.materialize import drop_version
 
-__all__ = ["LEASE_EXPIRED", "SweepReport", "compensate", "sweep", "sweep_course"]
+__all__ = ["LEASE_EXPIRED", "SweepReport", "compensate", "reclaim_expired", "sweep", "sweep_course"]
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,27 @@ def compensate(sqlite_url: str, repo: Neo4jRepository, course_id: str, version_i
     SQLite 写失败时原样抛出：尝试行保持进行中，租约到期后由清扫再执行 C1。
     """
     if not versions.fail_attempt(sqlite_url, version_id, reason):
-        return False  # 已提交或已被处理：不得删除 Neo4j 数据
+        # 0 行：已提交（不得删除副本），或已被清扫判失败。后者的副本可能是清扫之后本进程才写入的，
+        # 按 V9 第 3 步就地删除，不等下一轮清扫（ADR-036）。
+        record = versions.get_version(sqlite_url, version_id)
+        if touched_graph and record is not None and record.state == "failed":
+            _drop_or_mark(sqlite_url, repo, course_id, version_id)
+        return False
     if touched_graph:
         _drop_or_mark(sqlite_url, repo, course_id, version_id)
     return True
+
+
+def reclaim_expired(sqlite_url: str, repo: Neo4jRepository, course_id: str) -> list[str]:
+    """V9 第 1 步，只针对本课程：租约已过期的进行中尝试执行 C1，返回被判失败的 ``version_id``。
+
+    发布与回滚在插入尝试行前调用，使崩溃留下的尝试不会让本课程一直 409（清扫尚未接入调度时尤其必要）。
+    """
+    expired = []
+    for attempt in versions.list_expired_attempts(sqlite_url, course_id):
+        if compensate(sqlite_url, repo, course_id, attempt.version_id, LEASE_EXPIRED):
+            expired.append(attempt.version_id)
+    return expired
 
 
 def _drop_or_mark(sqlite_url: str, repo: Neo4jRepository, course_id: str, version_id: str) -> bool:
@@ -75,9 +93,7 @@ def sweep_course(sqlite_url: str, repo: Neo4jRepository, course_id: str) -> Swee
     report = SweepReport(course_id)
 
     # 1. 过期尝试 → C1（不知道它是否已写 Neo4j，一律尝试删除，删除可重复执行）。
-    for attempt in versions.list_expired_attempts(sqlite_url, course_id):
-        if compensate(sqlite_url, repo, course_id, attempt.version_id, LEASE_EXPIRED):
-            report.expired.append(attempt.version_id)
+    report.expired = reclaim_expired(sqlite_url, repo, course_id)
 
     rows = {r.version_id: r for r in versions.list_attempts(sqlite_url, course_id)}
     stored = stored_version_ids(repo, course_id)

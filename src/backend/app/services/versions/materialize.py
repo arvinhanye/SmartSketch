@@ -92,10 +92,10 @@ def _scope(snapshot: Snapshot, version_id: str) -> GraphScope:
     return GraphScope(str(snapshot.data["course_id"]), version_id)
 
 
+# 按标签匹配走 (course_id, version_id) 索引，不做无标签全库扫描。
 _DELETE = """
-MATCH (n {course_id: $course_id, version_id: $version_id})
-WHERE n:KnowledgePoint OR n:Chapter
-DETACH DELETE n
+CALL { MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $version_id}) DETACH DELETE k }
+CALL { MATCH (c:Chapter {course_id: $course_id, version_id: $version_id}) DETACH DELETE c }
 """
 _CHAPTERS = """
 UNWIND $rows AS row

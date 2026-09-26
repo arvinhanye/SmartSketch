@@ -37,7 +37,7 @@ from app.repositories.neo4j import GraphScope, Neo4jRepository
 from app.repositories.versions import CommitRejected, PublishInProgress
 from app.services.graph.read import _relation_chunk_ids
 from app.services.versions.materialize import Embedder, embed_snapshot_nodes, materialize, verify
-from app.services.versions.reconcile import compensate
+from app.services.versions.reconcile import compensate, reclaim_expired
 from app.services.versions.snapshot import (
     DraftChapter,
     DraftEdge,
@@ -203,6 +203,10 @@ def _compensate(ctx: PublishContext, course_id: str, version_id: str, reason: st
 def publish(ctx: PublishContext, course_id: str, *, created_by: str | None) -> PublishOutcome:
     """V5 P2～P12。调用方已完成 P1 鉴权。"""
     url = ctx.sqlite_url
+    try:  # 先回收本课程过期的尝试，崩溃留下的尝试不会让课程一直 409（ADR-036）
+        reclaim_expired(url, ctx.repo, course_id)
+    except Exception:
+        logger.exception("could not reclaim expired attempts for course %s before publishing", course_id)
     attempt = versions.begin_attempt(url, course_id, kind="publish", created_by=created_by,
                                      lease_seconds=ctx.lease_seconds)  # P2；冲突抛 PublishInProgress
     version_id = attempt.version_id

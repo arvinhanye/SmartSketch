@@ -13,9 +13,12 @@
 | `src/backend/app/services/versions/publish.py`（扩围） | `_compensate` 改为调用 `reconcile.compensate`，自身失败只记日志 |
 | `src/backend/app/repositories/versions.py`（扩围） | `list_expired_attempts`、`list_course_ids` |
 | `src/backend/app/repositories/graph_read.py`（扩围） | `stored_version_ids`：本课程 Neo4j 中的全部非草稿版本 |
-| `tests/integration/test_g05.py` | 12 个用例，连真实 Neo4j 与迁移后的 SQLite（夹具取自 `test_g04.py`） |
+| `tests/integration/test_g05.py` | 14 个用例，连真实 Neo4j 与迁移后的 SQLite（夹具取自 `test_g04.py`） |
 | `tests/backend/test_g05_sqlite.py` | 2 个用例（CI 覆盖） |
 | `tests/integration/test_g04.py`（扩围） | Neo4j 删除失败用例的打桩目标改为 `reconcile.drop_version` |
+| `src/backend/app/services/versions/snapshot.py`（扩围） | 悬空章节引用按未归章 / 顶层章节发布（审查修复） |
+| `src/backend/app/services/versions/materialize.py`（扩围） | 副本删除按标签匹配（审查修复） |
+| `tests/backend/test_g01.py`（扩围） | 1 个用例：悬空章节引用 |
 | ADR-036、`docs/tasks.md` | 决定与看板 |
 
 ## 用法（给 worker 周期回收 / G06）
@@ -38,6 +41,8 @@ compensate(sqlite_url, repo, cid, vid, reason, touched_graph=True)   # G06 回�
 | 不清仍被读的版本 | `test_sweeper_only_removes_failed_copies` |
 | V9 第 4、5 步 | `test_orphans_and_missing_copies_are_only_reported` |
 | 按课程隔离 | `test_sweep_isolates_courses` |
+| 审查：崩溃后课程不再永久 409 | `test_publish_reclaims_an_expired_attempt_without_waiting_for_the_sweeper` |
+| 审查：清扫后写入的孤儿副本 | `test_copy_written_after_the_sweeper_failed_the_attempt_is_dropped` |
 
 ## 命令与实际结果
 
@@ -45,14 +50,14 @@ compensate(sqlite_url, repo, cid, vid, reason, touched_graph=True)   # G06 回�
 
 | 命令 | 结果 |
 | --- | --- |
-| `$S/pt.sh tests/integration/test_g05.py tests/integration/test_g04.py -q`（带 Neo4j 环境变量） | 31 passed |
+| `$S/pt.sh tests/integration/test_g05.py tests/integration/test_g04.py -q`（带 Neo4j 环境变量） | 33 passed |
 | `$S/pt.sh tests/backend/test_g05_sqlite.py -q` | 2 passed |
-| `$S/pt.sh tests/backend -q` | 2964 passed |
-| `$S/pt.sh tests/integration -q`（带 Neo4j 环境变量） | 146 passed、4 skipped |
+| `$S/pt.sh tests/backend -q` | 2965 passed |
+| `$S/pt.sh tests/integration -q`（带 Neo4j 环境变量） | 148 passed、4 skipped |
 | `PATH=$S/venv/bin:$S/tools/node_modules/.bin:$PATH ./scripts/verify.sh` | exit 0 |
 | `git diff --check` | exit 0 |
 
-反向篡改（改 `reconcile.py` 后跑 `test_g05.py`，每次恢复）：C1 忽略 0 行结果（1 failed）；清扫处理租约内尝试（2 failed）；清扫删除已提交版本（8 failed）；`cleanup_pending` 不清除（1 failed）；孤儿副本被删除（1 failed）；跳过 V9 第 3 步（1 failed）；单课失败中断全部清扫（1 failed）。
+反向篡改（改 `reconcile.py` 后跑 `test_g05.py`，每次恢复）：C1 忽略 0 行结果（1 failed）；清扫处理租约内尝试（2 failed）；清扫删除已提交版本（8 failed）；`cleanup_pending` 不清除（1 failed）；孤儿副本被删除（1 failed）；跳过 V9 第 3 步（1 failed）；单课失败中断全部清扫（1 failed）；发布前不回收过期尝试（1 failed）；C1 遇已失败行不删副本（1 failed）。
 
 ## 接口 / 数据变更
 
@@ -65,6 +70,7 @@ compensate(sqlite_url, repo, cid, vid, reason, touched_graph=True)   # G06 回�
 
 ## 下一步 / 待决
 
+- 同一独立审查的其余项未在本 PR 处理：无来源人工节点详情 500（F08/F07 口径）；worker 清理重试空等课程锁；任务重跑覆盖教师已审核状态。
 - 把 `sweep` 接入 worker 周期回收（A06 §8.6）；目前仓库里没有周期回收的调度实现。
 - 孤儿副本与缺副本只告警，人工处理与副本重建归 K10。
 - G06 回滚失败时调用 `reconcile.compensate`。

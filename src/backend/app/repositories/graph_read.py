@@ -130,9 +130,13 @@ class GraphReader:
 
 # 草稿作用域只为满足 F02 的参数约定；本查询列出草稿之外的全部版本副本，不读草稿内容。
 _VERSION_IDS = """
-MATCH (n {course_id: $course_id})
-WHERE (n:KnowledgePoint OR n:Chapter) AND n.version_id <> $version_id AND $effective_task_ids IS NOT NULL
-RETURN DISTINCT n.version_id AS version_id
+MATCH (k:KnowledgePoint {course_id: $course_id})
+WHERE k.version_id <> $version_id AND $effective_task_ids IS NOT NULL
+RETURN DISTINCT k.version_id AS version_id
+UNION
+MATCH (c:Chapter {course_id: $course_id})
+WHERE c.version_id <> $version_id AND $effective_task_ids IS NOT NULL
+RETURN DISTINCT c.version_id AS version_id
 """
 
 

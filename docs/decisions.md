@@ -1127,6 +1127,10 @@
   3. 清扫按课程逐个处理（`sweep_course`），通过 Neo4j 列出本课程所有非草稿 `version_id`（`graph_read.stored_version_ids`）与 SQLite 全部尝试行对照：`failed` 且 `cleanup_pending` 或仍有副本的删除副本并清标记；`committed` 行与租约内的尝试从不删除。
   4. 第 4 步（孤儿副本）与第 5 步（已提交版本缺副本）只写日志（WARNING / ERROR）并在 `SweepReport` 中列出，不写任何库。
   5. `sweep` 遍历全部课程，单个课程失败记日志后继续。调度（A06 §8.6 的 worker 周期回收步骤）尚无实现，本任务只提供可调用的 `sweep`，接入列入待决。
+  6. 调度接入之前，发布（及 G06 回滚）在插入尝试行前先对本课程执行 `reclaim_expired`（V9 第 1 步），崩溃留下的过期尝试不会让课程一直返回 `PUBLISH_IN_PROGRESS`（独立审查 2026-09-26，高）。
+  7. C1 第 1 步影响 0 行时，若尝试行是 `failed`（已被清扫判失败），而本进程已写过 Neo4j，就按 V9 第 3 步就地删除副本；`committed` 仍不碰。这补上「清扫先删、本进程后写」留下的孤儿副本（同上，中）。这是对 V5 C1「0 行即结束」的收紧：删除只针对终态为失败的尝试，不影响提交互斥。
+  8. G01 快照中，知识点的 `chapter_id` 或章节的 `parent_id` 指向草稿里不存在的可见章节时，按「未归章 / 顶层章节」发布（置 `null`），快照不留断开的引用（同上，中）。契约没有对应的阻断原因，故不阻断发布。
+  9. 删除版本副本与列出版本副本的 Cypher 按 `KnowledgePoint` / `Chapter` 标签匹配，不做无标签全库扫描（同上，低）。
 - **后果**：发布与回滚的失败都在一处补偿；清扫可重复执行，没有新变化时第二次不写库。孤儿副本会一直告警，直到人工按 K10 处理。
-- **回滚**：撤销 `services/versions/reconcile.py`，恢复 `publish.py` 中的 `_compensate` 原实现；撤销 `repositories/versions.py` 末尾的 `list_expired_attempts`/`list_course_ids` 与 `graph_read.stored_version_ids`；无数据迁移。
+- **回滚**：撤销 `services/versions/reconcile.py`，恢复 `publish.py` 中的 `_compensate` 原实现与发布前回收；撤销 `snapshot.py` 的悬空章节处理；撤销 `repositories/versions.py` 末尾的 `list_expired_attempts`/`list_course_ids` 与 `graph_read.stored_version_ids`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

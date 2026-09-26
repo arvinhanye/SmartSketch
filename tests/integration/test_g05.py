@@ -156,6 +156,38 @@ def test_crash_between_p8_and_p11_is_swept_and_publishing_resumes(env, monkeypat
     assert stage(env, "t3") == "completed"
 
 
+def test_publish_reclaims_an_expired_attempt_without_waiting_for_the_sweeper(env, monkeypatch):
+    first = published_v1_then_edit(env)
+    crash_after(monkeypatch, publishing, "materialize")
+    with pytest.raises(_Crash):
+        run(env)
+    monkeypatch.undo()
+    crashed = last_attempt(env)
+    expire(env, crashed.version_id)
+    retry = run(env)  # 清扫尚未运行：发布自己先回收
+    assert (retry.version, retry.unchanged) == (2, False)
+    record = versions.get_version(env.url, crashed.version_id)
+    assert (record.state, record.failure_reason) == ("failed", LEASE_EXPIRED)
+    assert graph_versions(env) == {"draft", first.version_id, retry.version_id}
+
+
+def test_copy_written_after_the_sweeper_failed_the_attempt_is_dropped(env, monkeypatch):
+    first = published_v1_then_edit(env)
+    real = publishing.materialize
+
+    def swept_meanwhile(repo, snapshot, version_id, *args, **kwargs):
+        assert versions.fail_attempt(env.url, version_id, LEASE_EXPIRED)  # 清扫已判失败并删过副本
+        return real(repo, snapshot, version_id, *args, **kwargs)  # 本进程随后才写入副本
+
+    monkeypatch.setattr(publishing, "materialize", swept_meanwhile)
+    with pytest.raises(PublishFailed) as caught:
+        run(env)
+    assert caught.value.step == "P10"
+    assert last_attempt(env).failure_reason == LEASE_EXPIRED
+    assert graph_versions(env) == {"draft", first.version_id}  # 不留孤儿副本
+    assert_old_version_intact(env, first)
+
+
 # ---------------------------------------------------------------- PUB-20：提交与清扫竞争
 
 
