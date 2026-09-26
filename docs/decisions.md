@@ -1131,4 +1131,4 @@
   7. 审计日志不在本任务，归 F12。
 - **后果**：F07 的「人工新建且无来源的知识点详情 500」不再能由 API 产生。前端要为新建知识点提供选择来源块的交互（可从已有知识点的 `source_refs.chunk_id` 或问答引用中取）；尚无按资料列块的接口。编辑与解锁都算草稿写入，会使已发布课程变为 `revising`。人工节点没有向量，向量在发布物化时计算（G03），不影响草稿。
 - **回滚**：撤销 `api/graph_nodes.py`、`services/graph/edit_node.py`、`repositories/graph_edit.py`、`main.py` 与 `schemas/contracts.py` 各一处注册、契约改动（`sources`、`KnowledgePointSourceInput`、`KnowledgePointUnlock`、解锁路径、`REVISION_CONFLICT`）及生成物、前端两处错误码副本与测试；无 SQLite 迁移与 Neo4j DDL。已写入的人工节点可按 `source = 'manual'` 查出后由教师删除（F09）。
-- **签收**：待 ArvinHan 审阅（冲突错误码、`status = approved` 与来源可用性规则由 Claude 选定并在交接中报告）。
+- **签收**：ArvinHan，2026-09-26（含人工新建节点 `status = approved`、置信度 1.0，以及任何课程教师均可解锁）。

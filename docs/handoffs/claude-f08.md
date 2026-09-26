@@ -1,7 +1,7 @@
 # Claude 交接：F08 教师节点编辑与人工编辑锁
 
 - **分支**：`claude/project-thread-z0m8yg`，base `main@ebb0f42`
-- **决策**：ADR-035（待 ArvinHan 签收）
+- **决策**：ADR-035（ArvinHan 2026-09-26 签收）
 
 ## 1. 交付物
 
@@ -37,7 +37,7 @@
 ## 4. 风险与未完成
 
 1. 前端需要为新建知识点选择来源块；目前只能用已知的 `chunk_id`（来自图谱 `source_refs` 或问答引用），没有按资料列块的接口。
-2. 人工新建节点状态定为 `approved`、置信度 1.0，属 Claude 选择，待签收。
+2. 人工新建节点状态 `approved`、置信度 1.0，任何课程教师均可解锁（ArvinHan 2026-09-26 签收）。
 3. `REVISION_CONFLICT` 的 `details.current` 不含 `chapter_id` 与来源。
 4. 已合入 main（含 #261 G04、#262 H03），`COURSE_BUSY` 的持有方改用 G04 的 `course_locks.current_holder`。
 5. 审计日志归 F12；删除（F09）与合并（F10）另行实现。
