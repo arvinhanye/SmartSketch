@@ -919,7 +919,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 | ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | TD-01 | DONE（PR #243 `c333bd1`） | PDF 解析器版本格式定稿（ADR-018 修订 1）+ E04 问答截止时间 + 改写预写失败口径 | ArvinHan（Claude） | `claude/pdf-parser-version-tech-debt-e95eaf` / `ddbeb82` | `src/backend/app/services/parsers/pdf_headings.py`、`src/backend/app/services/chunk_identity.py`、`src/backend/app/services/ai/policy.py`、`tests/backend/test_d06.py`、`tests/backend/test_d09.py`、`tests/backend/test_e04.py`、`docs/decisions.md`（ADR-018 修订 1）、`docs/architecture.md`（资料修订一行）、`docs/integrations.md`（调用记录第 1 条、问答链路截止时间）、`specs/grounded-qa.md`（链路时限、P3）、本节、`docs/handoffs/claude-td-01.md` | `docs/handoffs/claude-td-01.md` |
-| TD-02 | TODO | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | 未认领 | C10、C11（#241）、D11（#239）全部合并后再开始 | `src/backend/app/services/task_cancel.py`（C10）、C11 与 D11 服务层中的任务读取、`src/backend/app/repositories/tasks.py` | 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL（C10 同文件的取消 UPDATE 一并评估是否迁移）；C10/C11/D11 现有测试不改断言即通过 |
+| TD-02 | 见第八批 | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | 见第八批 | C10、C11（#241）、D11（#239）全部合并后再开始 | `src/backend/app/services/task_cancel.py`（C10）、C11 与 D11 服务层中的任务读取、`src/backend/app/repositories/tasks.py` | 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL（C10 同文件的取消 UPDATE 一并评估是否迁移）；C10/C11/D11 现有测试不改断言即通过 |
 
 TD-01 带出的跟进项：
 
@@ -950,3 +950,45 @@ H13、F03、E06 的前置均已合入 main@`8985a16`（H13：C13、B15、B03、B
 - E06 验收：不开启时零调用；只加遗漏、不复制已有实体；预算和轮数有上限。验证：`python3 -m pytest tests/backend/test_e06.py -q`。
 
 - 合并约定：三个分支共用本认领提交；无 SQLite 迁移；F03 只新增 Neo4j 迁移文件与运行器。
+
+## 2026-09-25 第八批并行（Claude）
+
+C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C11 #241；E09：E07 #217、E08 #240；H01：B03、B04、B15、C04；C15：C03、C04、B09；K14：E01、E05 #236、E06 #245）；TD-02 的前置 C10 #237、C11 #241、D11 #239 均已合并。issue #69（C12）、#89（E09）、#113（H01）、#162（C15）、#167（K14）无人认领、无远端分支。已核对在途工作：无未合并 PR。本认领提交为六个分支共用的 base，各分支只改本节中自己那一张表的状态与证据列。
+
+共享文件分配（避免并行冲突）：`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts` 本轮只由 H01 改；`src/backend/app/main.py` 本轮只由 C15 改；`src/backend/app/repositories/tasks.py` 与 `services/task_cancel.py`、`services/task_events.py`、`workers/parse_task.py` 本轮只由 TD-02 改。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C12 | IN PROGRESS | 实现前端任务流客户端 | ArvinHan（Claude 子代理） | `claude/c12-task-stream` / 本认领提交 | `src/frontend/src/api/taskEvents.ts`、`tests/frontend/c12.test.ts`、`docs/handoffs/claude-c12.md` | 待补 |
+
+- C12 验收：分片帧/CRLF/心跳/重连；终态和卸载关闭；旧课程事件不污染当前课。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/c12.test.ts`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E09 | IN PROGRESS | 实现向量候选分层 | ArvinHan（Claude 子代理） | `claude/e09-vector-tiers` / 本认领提交 | `src/backend/app/services/fusion/candidates.py`、`tests/backend/test_e09.py`、`docs/handoffs/claude-e09.md` | 待补 |
+
+- E09 验收：课程隔离；阈值顺序非法拒绝；边界等号有明确规则。验证：`python3 -m pytest tests/backend/test_e09.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H01 | IN PROGRESS | 实现课程首页和创建表单 | ArvinHan（Claude 子代理） | `claude/h01-courses-view` / 本认领提交 | `src/frontend/src/views/CoursesView.vue`、`src/frontend/src/composables/useCourses.ts`、`src/frontend/src/api/courses.ts`（如需）、`src/frontend/src/router/index.ts`、`src/frontend/src/main.ts`、`tests/frontend/h01.test.ts`、`docs/handoffs/claude-h01.md` | 待补 |
+
+- H01 验收：加载/空/错/禁止访问；重复点提交不重复创建；切课正确。验证：`npm --prefix src/frontend run type-check && npm --prefix src/frontend run test -- --run ../../tests/frontend/h01.test.ts`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C15 | IN PROGRESS | 实现课程成员管理 API | ArvinHan（Claude 子代理） | `claude/c15-course-members` / 本认领提交 | `src/backend/app/api/members.py`、`src/backend/app/services/members.py`、`src/backend/app/main.py`（路由注册）、`tests/backend/test_c15.py`、`docs/handoffs/claude-c15.md` | 待补 |
+
+- C15 验收：仅课程教师可改；重复添加幂等且不降级教师；跨课与非成员拒绝。验证：`python3 -m pytest tests/backend/test_c15.py -q`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| K14 | IN PROGRESS | 整理提示词工程完整记录 | ArvinHan（Claude 子代理） | `claude/k14-prompt-record` / 本认领提交 | `docs/submission/prompt-engineering.md`、`docs/handoffs/claude-k14.md` | 待补 |
+
+- K14 验收：记录版本、用途、输入输出和修改依据；不含密钥或真实课程资料；引用实际评测证据。验证：`git diff --check`，逐条核对验收矩阵与源文档。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| TD-02 | IN PROGRESS | 把服务层里读任务行的 SQL 迁到 `repositories/tasks.py` | ArvinHan（Claude 子代理） | `claude/td02-task-repo` / 本认领提交 | `src/backend/app/repositories/tasks.py`、`src/backend/app/services/task_cancel.py`、`src/backend/app/services/task_events.py`、`src/backend/app/workers/parse_task.py`、`tests/backend/test_td02.py`、`docs/handoffs/claude-td-02.md` | 待补 |
+
+- TD-02 验收：只搬迁不改行为；服务层不再直接执行读取 `processing_tasks` 的 SQL；C10/C11/D11 现有测试不改断言即通过。
