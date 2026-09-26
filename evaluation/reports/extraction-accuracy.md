@@ -138,3 +138,64 @@ python3 evaluation/evaluate_extraction.py score \
   - 实体 FP：`type_mismatch` 5、`no_gold_match` 2、`duplicate` 1；实体 FN：`not_extracted` 9、`type_mismatch` 5。
   - 关系 FP：`reversed_direction` 1、`wrong_relation_type` 1、`unmapped_endpoint` 1；关系 FN：`endpoint_not_extracted` 13、`reversed_direction` 1、`wrong_relation_type` 1。
 - 硬指标输出：AI 实体数 39、实体准确率 39/39、关系准确率 28/28，数值全部过线，但结论为 **「不可用于判定（假模型）」**，`passed: null`。
+
+## 本机运行步骤
+
+开发云环境的网络策略拦截 `api.deepseek.com`，真实模型抽取须在能直连供应商的本机运行（ADR-027、ADR-028）。脚本 `evaluation/run_live_extraction.py` 用生产同一批服务完成解析、分块（D03/D08/D09）、实体抽取（E05）与关系抽取（E11），调用经 E04 策略（重试、熔断、预算）发出，输出 predictions.json 交第 3 节的 `sample`、`score` 计分。脚本测试见 `tests/backend/test_k02_run.py`（只用 fake 客户端，不联网）。
+
+> **初步数字，不是最终判定。** 真实融合（E08～E10，由 E12 编排）尚不可用，脚本只做简化融合：按 E08 `normalize_name` 主键去重，保留首次出现的名称与类型，别名、包含、向量候选和模型裁决都不做。因此实体数和准确率只是初步参考。验收 7 的最终判定须经 E12 完整流程把本章处理到 `awaiting_review` 后导出草稿。predictions.json 的 `fusion.mode` 为 `simplified`，写入报告时须注明。
+
+1. **安装后端**（在仓库根目录，Python 3.11+）：
+
+   ```bash
+   python3 -m venv .venv && . .venv/bin/activate
+   pip install -e './src/backend'
+   ```
+
+2. **设置环境变量**（只在当前终端设置，不写入任何文件；密钥不要提交或粘贴到聊天里）：
+
+   ```bash
+   export LLM_MODE=live
+   export LLM_BASE_URL=https://api.deepseek.com
+   export LLM_EXTRACTION_MODEL=deepseek-flash
+   export LLM_CHAT_MODEL=deepseek-flash          # 启动校验要求 live 模式同时设置
+   read -rs LLM_API_KEY && export LLM_API_KEY    # 交互输入，不留在 shell 历史
+   export LLM_TASK_TOKEN_BUDGET=500000           # ADR-028 签收值
+   export LLM_DAILY_TOKEN_BUDGET=5000000
+   # 可选：LLM_REQUEST_TIMEOUT_SECONDS（默认 60）、LLM_MAX_RETRIES（默认 2）
+   ```
+
+   `LLM_API_KEY` 为空时脚本拒绝运行（退出码 2）。E03 适配器直连供应商，不走 HTTP 代理。脚本的调用记录只在进程内存中计量，日预算只统计本次运行。
+
+3. **运行抽取**：
+
+   ```bash
+   RUN=~/smartsketch-k02/$(date +%Y%m%d-%H%M%S) && mkdir -p "$RUN"
+   python3 evaluation/run_live_extraction.py \
+     --gold evaluation/fixtures/synthetic.json \
+     --out "$RUN/predictions.json" --run-log "$RUN/run.json"
+   ```
+
+   - 缺省不开 E06 补漏，与生产缺省一致；`--glean-rounds 1` 可开启一轮，开启后须在报告中注明。
+   - 关系按完整章节路径分组抽取；`--section-depth 2` 可改为按「章 > 节」分组。
+   - 单块或单节失败会记入运行日志，然后继续处理。预算被拒时立即停止（退出码 3），不写 predictions.json。鉴权失败也会停止（退出码 4）。
+   - 输出目录放在仓库外（仓库没有忽略运行产物）。predictions.json 含资料原文证据，不要提交。
+
+4. **抽样与计分**：脚本结束时会打印这两条命令。
+
+   ```bash
+   python3 evaluation/evaluate_extraction.py sample \
+     --predictions "$RUN/predictions.json" --seed 20260926 --size 100 > "$RUN/sample.json"
+   python3 evaluation/evaluate_extraction.py score --gold evaluation/fixtures/synthetic.json \
+     --predictions "$RUN/predictions.json" --out "$RUN/report.json"
+   # 人工判定填好 "$RUN/judgments.json" 后，加 --judgments 重跑 score
+   ```
+
+5. **记录**：在第 3 节表格中填写以下信息：
+   - 运行日期；
+   - `run_id`；
+   - 请求的模型 ID（`deepseek-flash`）和响应中实际返回的模型名。后者见 predictions.json 的 `model.responded` 或 run.json 的 `model_calls.responded_models`。`deepseek-flash` 会随供应商更新指向新版本，所以两项都要记；
+   - 提示词版本（`prompt_versions`，run.json 另有 `prompt_sha256`）；
+   - run.json 的 `chunk_count`、`chunk_failures`、`section_failures` 和 `dropped`；
+   - `model_calls` 的调用次数与 token 用量，以及响应是否带 usage（`calls_without_usage`）。usage 的实测结果同时补到 `docs/integrations.md` D-02a 行（由协调方更新）；
+   - 注明「简化融合，初步数字」。
