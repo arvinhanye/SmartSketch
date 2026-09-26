@@ -43,6 +43,7 @@ from app.services.graph.dag import check_candidates
 
 __all__ = [
     "CycleDetectedError",
+    "apply_relations",
     "DanglingEndpointError",
     "DuplicateRelationError",
     "InvalidRelationError",
@@ -131,6 +132,10 @@ def _validate(rel: object, course_id: str, task_id: str | None, chunks: dict[str
         and rel.status in (STATUSES if task_id is None else AUTO_STATUSES)
         and rel.source == ("manual" if task_id is None else "ai")
         and isinstance(rel.chunk_ids, tuple)
+        and isinstance(rel.downgrade_cycle, tuple)
+        and (not rel.downgrade_cycle or (rel.type == "RELATED_TO" and rel.source == "ai"
+                                         and rel.status == "low_confidence" and len(rel.downgrade_cycle) >= 2
+                                         and all(_text(x) for x in rel.downgrade_cycle)))
         and _valid_id(rel, course_id)
     ):
         raise InvalidRelationError("invalid relation")
@@ -204,6 +209,25 @@ def _apply(tx: ScopedTransaction, relations: Sequence[DraftRelation], task_id: s
     return RelationWriteResult(tuple(order), tuple(created), tuple(kept), tuple(conflicts))
 
 
+def _prepare(course_id: str, relations: Iterable[DraftRelation], task_id: str | None,
+             chunks: Iterable[StoredChunk]) -> list[DraftRelation]:
+    if task_id is not None and not _text(task_id):
+        raise ValueError("task_id must be a non-empty string or None")
+    known = {chunk.chunk_id: chunk for chunk in chunks}
+    items = [_validate(rel, course_id, task_id, known) for rel in relations]
+    ids = [rel.rel_id for rel in items]
+    if len(set(ids)) != len(ids):
+        raise InvalidRelationError("duplicate rel_id in one write")
+    return items
+
+
+def _draft_scope(scope: GraphScope) -> None:
+    if scope.version_id != DRAFT_VERSION:
+        raise GraphScopeError("draft relation writes require version_id 'draft'")
+    if scope.effective_task_ids is None:
+        raise GraphScopeError("draft relation writes require effective_task_ids from SQLite")
+
+
 def write_relations(
     repo: Neo4jRepository,
     scope: GraphScope,
@@ -217,18 +241,26 @@ def write_relations(
     失败时抛出 ``RelationWriteError`` 的子类（``code`` 为契约错误码），草稿不变；
     Neo4j 故障抛出 F02 已脱敏的 ``RepositoryError``。
     """
-    if scope.version_id != DRAFT_VERSION:
-        raise GraphScopeError("draft relation writes require version_id 'draft'")
-    if scope.effective_task_ids is None:
-        raise GraphScopeError("draft relation writes require effective_task_ids from SQLite")
-    if task_id is not None and not _text(task_id):
-        raise ValueError("task_id must be a non-empty string or None")
-
-    known = {chunk.chunk_id: chunk for chunk in chunks}
-    items = [_validate(rel, scope.course_id, task_id, known) for rel in relations]
-    ids = [rel.rel_id for rel in items]
-    if len(set(ids)) != len(ids):
-        raise InvalidRelationError("duplicate rel_id in one write")
+    _draft_scope(scope)
+    items = _prepare(scope.course_id, relations, task_id, chunks)
     if not items:
         return RelationWriteResult()
     return repo.write_transaction(scope, lambda tx: _apply(tx, items, task_id))
+
+
+def apply_relations(
+    tx: ScopedTransaction,
+    *,
+    relations: Iterable[DraftRelation],
+    task_id: str | None = None,
+    chunks: Iterable[StoredChunk] = (),
+) -> RelationWriteResult:
+    """同 ``write_relations``，但在调用方已打开的写事务里执行（F13 §8.4 单事务）。
+
+    会先锁课程守卫节点（同一事务内重复加锁无副作用）；失败时抛出同样的错误，由调用方回滚整个事务。
+    """
+    _draft_scope(tx.scope)
+    items = _prepare(tx.scope.course_id, relations, task_id, chunks)
+    if not items:
+        return RelationWriteResult()
+    return _apply(tx, items, task_id)

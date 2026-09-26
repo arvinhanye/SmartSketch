@@ -999,3 +999,18 @@
 - **后果**：教师新建/修改关系（F08）与 F13 `persisting` 都能在同一事务里复用这些语句；F13 的自动降级在锁内、同一次读取上计算。守卫节点让同一课程的关系写入不能并行，吞吐按课程串行（与课程写锁一致）。Neo4j 等锁默认无上限，靠 V4 的 API 侧有界等待兜底。
 - **回滚**：撤销 `graph_relations.py`、`services/graph/relations.py`、`write_transaction` 与测试；守卫约束可 `DROP CONSTRAINT draft_write_guard_scope`，守卫节点可 `MATCH (g:DraftWriteGuard) DELETE g`，不影响知识点与关系。
 - **签收**：待 ArvinHan 审阅（守卫节点与属性编码由 Claude 选定并在交接中报告）。
+
+## ADR-028：F13 直通融合、持久化单事务、课程写锁与 T6 提交序号
+
+- **日期**：2026-09-26
+- **背景**：F13 要把 E12 的候选写进草稿并完成 T6，但 `merging` 阶段没有任务承接；完整融合（E08～E10）依赖向量与 D-08 阈值，都未就绪。§8.5 的 `course_locks` 与 §3 的 T6 提交序号也还没有迁移。节点与关系的 `draft`/`low_confidence` 分界属于 D-08，同样未签收。F02 只有「一条查询一个事务」，满足不了 §8.4 的「撤销旧贡献 + 写入」单事务。
+- **决定**：
+  1. **`merging` 直通**（ArvinHan 在会话卡片上选定）：阶段边界只做 C08 `stage_done`（T5 或 T8），不调用模型。任务内按 E06 规范化名称去重（E12 已做），每个实体写成新节点 `kp_id = derive_kp_id(课程, 任务, tent_id)`；跨资料重复交审核队列「疑似重复」。接入 E08～E10 时只替换这一步。
+  2. **状态一律 `draft`**（ArvinHan 在会话卡片上选定），置信度原值保存（缺失记 0）；D-08 签收后按阈值重算。ADR-009 降级的关系仍为 `low_confidence`。
+  3. 迁移 009：`course_locks(course_id 主键, holder, token, expires_at)` 与任务租约同构；`processing_tasks.t6_seq` 在 T6 事务里取本课程最大值 + 1，`(course_id, t6_seq)` 部分唯一索引。
+  4. `persisting` 流程：取课程写锁（持锁期间每 `L/3` 续约；等锁上限为一个锁租约 `L`，仍拿不到则按存储临时故障释放退避）→ 复核租约 → 读 V → **一个 Neo4j 写事务**：锁守卫节点（ADR-025）、撤销本任务全部贡献并删除因此无贡献的元素、F04 写节点、按 ADR-009 逐环降级（`plan_downgrades`，选环上置信度最低、并列取 `rel_id` 最小的可降级边）、F06 写关系 → T6（分配序号、清空租约，并递增 `courses.draft_revision`：任务内容此刻变为可见，已发布课程据此显示为 `revising`）→ 释放锁。
+  5. 失败：Neo4j/SQLite 故障与等锁超时 → `STORAGE_UNAVAILABLE` 释放退避，耗尽则 T9；环上无可降级边 → T9 `CYCLE_DETECTED`；其余 → T9 `INTERNAL_ERROR`。`persisting` 的任何 T9（含 C09 回收与释放时的耗尽）都置 `cleanup_pending`，随后在课程写锁下撤销本任务贡献，成功才清除；回收步骤对遗留标记重试。
+  6. 找环用 F05 `find_cycle`（按节点 ID 升序 DFS），而非规格原文「按边 ID 升序遍历邻接」；两者都只依赖边集合，结果可复现（DAG-3），降级选择规则不变。
+- **后果**：上传的资料能一路走到 `awaiting_review`，但同名知识点在不同资料间不合并，直到融合接入。直通模式下本任务的节点 ID 由任务派生，跨任务成环只可能来自草稿里已有的环（DAG-10）；降级他人未确认边的路径已实现，由纯函数测试和 `downgrade_relation` 覆盖。等锁超时会消耗一次尝试。
+- **回滚**：停 API 与 worker，按迁移 009 文件头的 `ROLLBACK` 行删表与列（`test_f13.py` 已验证），撤销 `persist_graph.py`、`course_locks.py`、`downgrade.py` 与相关改动；处于 `merging`/`persisting` 的任务会停在原阶段，直到新的 worker 接手。
+- **签收**：ArvinHan 2026-09-26 在会话卡片上选定第 1、2 条；其余由 Claude 选定并在交接中报告。

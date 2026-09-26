@@ -34,7 +34,7 @@ from enum import StrEnum
 from typing import Final
 
 from app.repositories.chunks import StoredChunk
-from app.repositories.neo4j import GraphScope, GraphScopeError, Neo4jRepository, RepositoryError
+from app.repositories.neo4j import GraphScope, GraphScopeError, Neo4jRepository, RepositoryError, ScopedTransaction
 
 __all__ = [
     "DEFAULT_BATCH_SIZE",
@@ -45,6 +45,7 @@ __all__ = [
     "RejectReason",
     "derive_kp_id",
     "write_draft_nodes",
+    "write_draft_nodes_in",
 ]
 
 logger = logging.getLogger(__name__)
@@ -219,16 +220,9 @@ def _batches(rows: Sequence[dict[str, object]], size: int) -> Iterable[Sequence[
         yield rows[start:start + size]
 
 
-def write_draft_nodes(
-    repo: Neo4jRepository,
-    scope: GraphScope,
-    *,
-    task_id: str,
-    nodes: Sequence[DraftNode],
-    chunks: Iterable[StoredChunk],
-    batch_size: int = DEFAULT_BATCH_SIZE,
-) -> NodeWriteResult:
-    """见模块说明。``chunks`` 是调用方按本课程从 SQLite 读出的来源块（D10），用于拒绝跨课程来源。"""
+def _accept(
+    scope: GraphScope, task_id: str, nodes: Sequence[DraftNode], chunks: Iterable[StoredChunk], batch_size: int
+) -> tuple[list[dict[str, object]], list[tuple[str, RejectReason]]]:
     if scope.version_id != DRAFT_VERSION:
         raise GraphScopeError("draft node writes require version_id 'draft'")
     if scope.effective_task_ids is None:
@@ -252,23 +246,63 @@ def write_draft_nodes(
             continue
         seen.add(kp_id)
         accepted.append(node)
+    return [_row(node) for node in accepted], rejected
 
-    written: list[str] = []
-    created: list[str] = []
-    locked: list[str] = []
-    for batch in _batches([_row(node) for node in accepted], batch_size):
+
+class _Collector:
+    def __init__(self) -> None:
+        self.written: list[str] = []
+        self.created: list[str] = []
+        self.locked: list[str] = []
+
+    def add(self, records: Iterable[Mapping[str, object]]) -> None:
+        for record in records:
+            kp_id = str(record["kp_id"])
+            if record["locked"]:
+                self.locked.append(kp_id)
+                continue
+            self.written.append(kp_id)
+            if not record["was_visible"]:
+                self.created.append(kp_id)
+
+    def result(self, rejected: Sequence[tuple[str, RejectReason]]) -> NodeWriteResult:
+        return NodeWriteResult(tuple(self.written), tuple(self.created), tuple(self.locked), tuple(rejected))
+
+
+def write_draft_nodes(
+    repo: Neo4jRepository,
+    scope: GraphScope,
+    *,
+    task_id: str,
+    nodes: Sequence[DraftNode],
+    chunks: Iterable[StoredChunk],
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> NodeWriteResult:
+    """见模块说明。``chunks`` 是调用方按本课程从 SQLite 读出的来源块（D10），用于拒绝跨课程来源。"""
+    rows, rejected = _accept(scope, task_id, nodes, chunks, batch_size)
+    collector = _Collector()
+    for batch in _batches(rows, batch_size):
         try:
             records = repo.write(_WRITE_BATCH, scope, parameters={"nodes": list(batch), "task_id": task_id})
         except RepositoryError as exc:
             logger.warning("draft node batch of %d failed (%s)", len(batch), exc.code)
             rejected.extend((str(row["kp_id"]), RejectReason.WRITE_FAILED) for row in batch)
             continue
-        for record in records:
-            kp_id = str(record["kp_id"])
-            if record["locked"]:
-                locked.append(kp_id)
-                continue
-            written.append(kp_id)
-            if not record["was_visible"]:
-                created.append(kp_id)
-    return NodeWriteResult(tuple(written), tuple(created), tuple(locked), tuple(rejected))
+        collector.add(records)
+    return collector.result(rejected)
+
+
+def write_draft_nodes_in(
+    tx: ScopedTransaction,
+    *,
+    task_id: str,
+    nodes: Sequence[DraftNode],
+    chunks: Iterable[StoredChunk],
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> NodeWriteResult:
+    """同上，但在调用方的写事务里执行（F13 §8.4 单事务）。写库错误不按批吞掉，而是让整个事务失败。"""
+    rows, rejected = _accept(tx.scope, task_id, nodes, chunks, batch_size)
+    collector = _Collector()
+    for batch in _batches(rows, batch_size):
+        collector.add(tx.run(_WRITE_BATCH, {"nodes": list(batch), "task_id": task_id}))
+    return collector.result(rejected)

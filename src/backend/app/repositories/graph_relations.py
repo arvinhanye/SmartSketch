@@ -30,7 +30,11 @@ __all__ = [
     "DraftRelation",
     "StoredRelation",
     "derive_rel_id",
+    "PrerequisiteEdge",
+    "downgrade_relation",
     "lock_draft",
+    "read_prerequisite_edges",
+    "revoke_task",
     "merge_relations",
     "read_prerequisite_graph",
     "read_relations",
@@ -67,6 +71,19 @@ class DraftRelation:
     status: str
     source: str
     chunk_ids: tuple[str, ...] = ()
+    #: ADR-009 自动降级的闭合环路；非空时 ``type`` 为 ``RELATED_TO``、原类型为 ``PREREQUISITE``。
+    downgrade_cycle: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PrerequisiteEdge:
+    """参与环检测的一条现有边及其是否可被自动降级（``source = ai`` 且未经教师确认）。"""
+
+    rel_id: str
+    from_id: str
+    to_id: str
+    confidence: float
+    downgradable: bool
 
 
 @dataclass(frozen=True)
@@ -129,7 +146,9 @@ MERGE (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_
 ON CREATE SET ri.type = '%(type)s', ri.from_id = row.from_id, ri.to_id = row.to_id
 MERGE (a)-[r:%(type)s {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}]->(b)
 ON CREATE SET r.confidence = row.confidence, r.status = row.status, r.source = row.source,
-              r.contrib_tasks = [], r.contrib_manual = false, r.source_pairs = [], r.revision = 1
+              r.contrib_tasks = [], r.contrib_manual = false, r.source_pairs = [], r.revision = 1,
+              r.downgraded_from_type = CASE WHEN size(row.cycle) > 0 THEN 'PREREQUISITE' END,
+              r.downgrade_cycle = CASE WHEN size(row.cycle) > 0 THEN row.cycle END
 WITH row, r,
      $task_id IS NULL AND (r.confidence <> row.confidence OR r.status <> row.status
                            OR r.source <> row.source) AS retake
@@ -147,6 +166,69 @@ _MERGE = {
     type: _MERGE_TEMPLATE % {"type": type, "a_visible": _visible("a"), "b_visible": _visible("b")}
     for type in RELATION_TYPES
 }
+
+
+_PREREQUISITE_DETAILS = f"""
+MATCH (a:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
+      -[r:PREREQUISITE {{course_id: $course_id, version_id: $version_id}}]->
+      (b:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
+WHERE coalesce(r.status, '') <> 'rejected' AND {_visible("r")} AND {_visible("a")} AND {_visible("b")}
+RETURN r.rel_id AS rel_id, a.kp_id AS from_id, b.kp_id AS to_id, coalesce(r.confidence, 0.0) AS confidence,
+       r.source = 'ai' AND NOT coalesce(r.contrib_manual, false)
+       AND r.status IN ['draft', 'low_confidence'] AS downgradable
+"""
+
+# ADR-009 第 4 步：类型改为 RELATED_TO、状态 low_confidence，保留端点、置信度、贡献与来源。
+# 只降级对写入方可见（或写入方本次也要写入同一 ID，``$force``）、仍可自动降级的边。
+_DOWNGRADE = f"""
+MATCH (a:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: $from_id}})
+      -[r:PREREQUISITE {{course_id: $course_id, version_id: $version_id, rel_id: $rel_id}}]->
+      (b:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: $to_id}})
+WHERE r.source = 'ai' AND NOT coalesce(r.contrib_manual, false) AND r.status IN ['draft', 'low_confidence']
+      AND ($force OR {_visible("r")})
+MATCH (ri:RelationIdentity {{course_id: $course_id, version_id: $version_id, rel_id: $rel_id}})
+CREATE (a)-[d:RELATED_TO]->(b)
+SET d = properties(r), d.status = 'low_confidence', d.downgraded_from_type = 'PREREQUISITE',
+    d.downgrade_cycle = $cycle, d.revision = coalesce(r.revision, 0) + 1, ri.type = 'RELATED_TO'
+DELETE r
+RETURN d.rel_id AS rel_id
+"""
+
+# §8.4：撤销一个任务的全部贡献，并删除因此不再有任何贡献的元素（及其关系身份）。
+# 与 V 无关；``$effective_task_ids IS NOT NULL`` 只为满足草稿作用域的参数约定。
+_REVOKE_RELATIONS = """
+MATCH (:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+      -[r {course_id: $course_id, version_id: $version_id}]->
+      (:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+WHERE $task_id IN coalesce(r.contrib_tasks, []) AND $effective_task_ids IS NOT NULL
+SET r.contrib_tasks = [t IN r.contrib_tasks WHERE t <> $task_id],
+    r.source_pairs = [p IN coalesce(r.source_pairs, []) WHERE NOT p STARTS WITH $pair_prefix]
+WITH r, r.rel_id AS rel_id, size(r.contrib_tasks) = 0 AND NOT coalesce(r.contrib_manual, false) AS orphan
+CALL (r, rel_id, orphan) {
+    WITH r, rel_id WHERE orphan
+    OPTIONAL MATCH (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: rel_id})
+    DELETE r, ri
+}
+RETURN count(*) AS revoked, sum(CASE WHEN orphan THEN 1 ELSE 0 END) AS deleted
+"""
+
+_REVOKE_NODES = """
+MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+WHERE $effective_task_ids IS NOT NULL AND ($task_id IN coalesce(n.contrib_tasks, [])
+   OR EXISTS { (n)-[:EVIDENCED_BY {task_id: $task_id}]->(:Chunk {course_id: $course_id}) })
+OPTIONAL MATCH (n)-[e:EVIDENCED_BY {task_id: $task_id}]->(:Chunk {course_id: $course_id})
+DELETE e
+WITH DISTINCT n
+SET n.contrib_tasks = [t IN coalesce(n.contrib_tasks, []) WHERE t <> $task_id]
+WITH n, size(n.contrib_tasks) = 0 AND NOT coalesce(n.contrib_manual, false) AS orphan
+CALL (n, orphan) {
+    WITH n WHERE orphan
+    OPTIONAL MATCH (n)-[r {course_id: $course_id, version_id: $version_id}]-(:KnowledgePoint)
+    OPTIONAL MATCH (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: r.rel_id})
+    DETACH DELETE ri, n
+}
+RETURN count(*) AS revoked, sum(CASE WHEN orphan THEN 1 ELSE 0 END) AS deleted
+"""
 
 
 def _own(task_id: str | None) -> list[str]:
@@ -201,6 +283,7 @@ def merge_relations(tx: ScopedTransaction, relations: Sequence[DraftRelation], *
                 "status": rel.status,
                 "source": rel.source,
                 "pairs": [source_pair(task_id, chunk_id) for chunk_id in rel.chunk_ids],
+                "cycle": list(rel.downgrade_cycle),
             }
             for rel in relations
             if rel.type == type
@@ -209,3 +292,38 @@ def merge_relations(tx: ScopedTransaction, relations: Sequence[DraftRelation], *
             params = {"rows": rows, "task_id": task_id, "own_tasks": _own(task_id)}
             written.extend(str(row["rel_id"]) for row in tx.run(_MERGE[type], params))
     return written
+
+
+def read_prerequisite_edges(tx: ScopedTransaction, *, task_id: str | None = None) -> list[PrerequisiteEdge]:
+    """同 ``read_prerequisite_graph``，另带置信度与是否可自动降级（ADR-009 降级算法的输入）。"""
+    return [
+        PrerequisiteEdge(str(row["rel_id"]), str(row["from_id"]), str(row["to_id"]), float(row["confidence"]),
+                         bool(row["downgradable"]))
+        for row in tx.run(_PREREQUISITE_DETAILS, {"own_tasks": _own(task_id)})
+    ]
+
+
+def downgrade_relation(tx: ScopedTransaction, *, rel_id: str, from_id: str, to_id: str,
+                       cycle: Sequence[str], task_id: str | None = None, force: bool = False) -> bool:
+    """把一条可降级的 AI ``PREREQUISITE`` 边改为 ``RELATED_TO`` + ``low_confidence``（ADR-009）。
+
+    ``force`` 用于写入方本次候选与一条对它不可见的边同 ID 的情形：写入后该边会以同一身份变为可见。
+    """
+    rows = tx.run(_DOWNGRADE, {"rel_id": rel_id, "from_id": from_id, "to_id": to_id, "cycle": list(cycle),
+                               "own_tasks": _own(task_id), "force": force})
+    return bool(rows)
+
+
+def revoke_task(tx: ScopedTransaction, task_id: str) -> tuple[int, int]:
+    """撤销 ``task_id`` 的全部贡献（§8.4），返回 ``(涉及元素数, 删除元素数)``。
+
+    关系：移出 ``contrib_tasks``，去掉该任务的来源对；已无任务贡献且非人工的关系连同其身份删除。
+    节点：删除该任务的 ``EVIDENCED_BY``，移出 ``contrib_tasks``；已无任何贡献的节点连同与它相连的关系
+    及其身份删除。其他任务或人工的贡献不动；本任务此前对他人边的降级不撤销（§8.4 已知限制）。
+    """
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ValueError("task_id must be a non-empty string")
+    params = {"task_id": task_id, "pair_prefix": source_pair(task_id, "")[:-4]}
+    [rels] = tx.run(_REVOKE_RELATIONS, params)
+    [nodes] = tx.run(_REVOKE_NODES, params)
+    return int(rels["revoked"]) + int(nodes["revoked"]), int(rels["deleted"]) + int(nodes["deleted"])
