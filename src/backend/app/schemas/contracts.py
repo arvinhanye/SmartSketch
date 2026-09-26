@@ -33,3 +33,8 @@ KnowledgePointType = _module.KnowledgePointType
 Relation = _module.Relation
 RelationType = _module.RelationType
 SourceRef = _module.SourceRef
+# G04/G06 publish, rollback and version list.
+GraphVersion = _module.GraphVersion
+PublishedGraphVersion = _module.PublishedGraphVersion
+PublishResult = _module.PublishResult
+RollbackGraphVersion = _module.RollbackGraphVersion

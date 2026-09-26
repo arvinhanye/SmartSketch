@@ -1134,3 +1134,22 @@
 - **后果**：发布与回滚的失败都在一处补偿；清扫可重复执行，没有新变化时第二次不写库。孤儿副本会一直告警，直到人工按 K10 处理。
 - **回滚**：撤销 `services/versions/reconcile.py`，恢复 `publish.py` 中的 `_compensate` 原实现与发布前回收；撤销 `snapshot.py` 的悬空章节处理；撤销 `repositories/versions.py` 末尾的 `list_expired_attempts`/`list_course_ids` 与 `graph_read.stored_version_ids`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-041：G06 回滚、版本列表与发布接口的实现约定
+
+- **日期**：2026-09-26
+- **背景**：V6 规定了 R1～R7，但没有写死：R5 怎样复制副本和向量；R6 在草稿不可发布时怎么办；回滚的 `PublishResult` 中 `excluded`、`stats` 取什么；`POST /publish` 路由归谁（ADR-034 第 8 条待决）；各类失败映射成哪个 HTTP 状态。
+- **决定**：
+  1. 回滚编排在 `services/versions/rollback.py`，复用 G04 的 `PublishContext`、心跳、`load_draft`，以及 G05 的 `compensate` 和 `reclaim_expired`（插入尝试行前先回收本课程过期的尝试）。
+  2. R5 为 `materialize.copy_version`：在一个 Neo4j 写事务内，先删除本尝试的副本，再按标签把源版本的章节、知识点（含向量属性）、`EVIDENCED_BY` 与四类关系复制过来，写入时用映射投影改写 `version_id`（避免与唯一约束冲突）。源版本的知识点数必须等于快照中的数量，否则报 `SourceCopyMissing`，整体回滚。复制前核对 k 自身记录的向量空间，不符则告警并返回 5xx；两种情况都不调用向量模型。复制后按 P9 用 k 的快照核对。
+  3. R6 中，等锁超时、读草稿失败，或草稿本身不可发布（`SnapshotBlocked`），都按「d 未知」处理，`published_from_revision = -1`，回滚照常进行。
+  4. 回滚的 `PublishResult` 取自新版本行：`excluded`、`stats` 是从 k 复制来的统计值；幂等时返回当前版本行的统计。
+  5. `POST /api/v1/courses/{cid}/publish` 并入 `api/versions.py`（ArvinHan 2026-09-26 同意），与回滚、列表共用教师鉴权和错误映射：
+     - `PUBLISH_BLOCKED`、`PUBLISH_IN_PROGRESS`、`COURSE_BUSY` 返回 409；
+     - 回滚源不存在、为失败尝试或属于他课，返回 404 `NOT_FOUND`，在连 Neo4j 之前就判定；
+     - 原因链中含图库仓储错误时返回 503 `STORAGE_UNAVAILABLE`；
+     - 其余失败返回 500 `INTERNAL_ERROR`，响应体不带内部原因。
+  6. 发布上下文（Neo4j 仓储、向量适配器、当前空间读取器、租约与等锁配置）在第一次请求时构建，并缓存在 `app.state.publish_context`；这样没有 Neo4j 时应用也能启动。向量客户端在 `EMBEDDING_MODE=fake` 时用 `FakeEmbeddingClient`，否则用 `CompatibleEmbeddingClient.from_settings`。
+- **后果**：教师端的发布、回滚、版本列表三个接口全部可用；学生读取仍按 F07 当前实现解析版本，统一解析器归 G07。
+- **回滚**：撤销 `api/versions.py`、`services/versions/rollback.py`、`materialize.copy_version`，以及 `main.py` 与 `schemas/contracts.py` 各一处改动；无数据迁移。
+- **签收**：第 5 条的路由归属由 ArvinHan 2026-09-26 同意；其余由 Claude 选定并在交接中报告。
