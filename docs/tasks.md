@@ -977,7 +977,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C15 | IN PROGRESS | 实现课程成员管理 API | ArvinHan（Claude 子代理） | `claude/c15-course-members` / 本认领提交 | `src/backend/app/api/members.py`、`src/backend/app/services/members.py`、`src/backend/app/main.py`（路由注册）、`tests/backend/test_c15.py`、`docs/handoffs/claude-c15.md` | 待补 |
+| C15 | DONE（待 PR 审查/合并） | 实现课程成员管理 API | ArvinHan（Claude 子代理） | `claude/c15-course-members` / 本认领提交 | `src/backend/app/api/members.py`、`src/backend/app/services/members.py`、`src/backend/app/main.py`（路由注册）、`tests/backend/test_c15.py`、`docs/handoffs/claude-c15.md` | `tests/backend/test_c15.py` 26 passed；`tests/backend` 2547 passed；`./scripts/verify.sh` 通过；交接 `docs/handoffs/claude-c15.md` |
 
 - C15 验收：仅课程教师可改；重复添加幂等且不降级教师；跨课与非成员拒绝。验证：`python3 -m pytest tests/backend/test_c15.py -q`。
 
