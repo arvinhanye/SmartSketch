@@ -983,7 +983,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| K14 | IN PROGRESS | 整理提示词工程完整记录 | ArvinHan（Claude 子代理） | `claude/k14-prompt-record` / 本认领提交 | `docs/submission/prompt-engineering.md`、`docs/handoffs/claude-k14.md` | 待补 |
+| K14 | DONE（待 PR 审查/合并） | 整理提示词工程完整记录 | ArvinHan（Claude 子代理） | `claude/k14-prompt-record` / 本认领提交 | `docs/submission/prompt-engineering.md`、`docs/handoffs/claude-k14.md` | `docs/handoffs/claude-k14.md`；7 个提示词文件的版本、摘要与 3 个调用方版本常量逐条核对一致；`test_e01/e05/e06/j03` 复跑 288 passed（仅 fake 模型）；尚无真实模型评测（K02、K03 未完成） |
 
 - K14 验收：记录版本、用途、输入输出和修改依据；不含密钥或真实课程资料；引用实际评测证据。验证：`git diff --check`，逐条核对验收矩阵与源文档。
 
