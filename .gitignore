@@ -33,6 +33,7 @@ coverage/
 *.db
 storage/
 uploads/
+backups/
 neo4j/data/
 neo4j/logs/
 

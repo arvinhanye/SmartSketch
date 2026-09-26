@@ -1243,3 +1243,128 @@
 - **后果**：一条 `docker compose --profile app up -d --build` 可起整套应用；worker 在 compose 下优雅停止不释放在途任务，重启后最多多等一个租约（缺省 60 秒）。镜像基底按标签固定（`python:3.12-slim-bookworm`、`node:24-bookworm-slim`、`nginxinc/nginx-unprivileged:1.27-alpine`），未钉摘要。
 - **回滚**：删除 `src/backend/Dockerfile`、`src/frontend/Dockerfile`、`src/frontend/nginx.conf`、`.dockerignore`、`app/workers/__main__.py`、`app/workers/runner.py`，恢复 `docker-compose.yml` 到 K08 之前（删去 `app` profile 服务与 `app-data` 卷）；命名卷可用 `docker volume rm <项目名>_app-data` 删除（会丢容器内数据，先备份）。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-047：F10 合并知识点与重接边
+
+- **日期**：2026-09-26
+- **背景**：契约已有 `mergeKnowledgePoints`（`MergeRequest{primary_id, merged_ids}`），只说「名称并入别名，关系与来源取并集后迁移到主节点」。未定的是：重接后撞上的关系怎样去重、字段取谁；合并后怎样验环；不可见（失败任务留下）的关系与来源怎么处理；合并谱系 `merged_from`（ADR-012 修订 3）怎样维护；并发冲突与失败时怎样保证不部分提交；节点不存在时返回什么。
+- **决定**：
+  1. **写入顺序**同 ADR-035（V4）：输入校验 → 课程写锁（持有方 `edit`，超时 409 `COURSE_BUSY`）→ 读 V → 一个 Neo4j 写事务（先锁 `DraftWriteGuard`，再读、校验、验环，全部通过后才 `draft_revision + 1`，然后写）。校验、冲突、成环都在加修订号之前抛出，事务回滚，草稿与 `draft_revision` 不变；写入语句中途失败同样整体回滚。
+  2. **输入**：`merged_ids` 至少一个、不重复、不含主节点；`MergeRequest` 新增可选 `expected_revisions`（知识点 ID → 读到的 `revision`，键须是本次涉及的节点），任一不符 → 409 `REVISION_CONFLICT`（`details` 同 ADR-035，`kp_id` 为第一个不符的节点，主节点先查）；`MergeRequest` 加 `additionalProperties: false`。主节点或被合并节点不存在、不可见或属于他课 → 422 `VALIDATION_ERROR`，`details.fields` 为 `primary_id` 或 `merged_ids.<i>`，`reason = not_found`（与 ADR-035 的 `chapter_id` 同口径，契约不加 404）。加锁节点照常可合并（锁只约束自动流程）。
+  3. **重接**：被合并节点一端换成主节点；两端都在「主节点 + 被合并节点」内的关系删除。新 `rel_id` 按「课程 + 类型 + 起点 + 终点」重新派生，ADR-009 降级来的关系按 `PREREQUISITE` 派生（保留降级约定）。ID 相同或「类型 + 端点」相同的关系合为一条：主节点原有的关系胜出；否则按「可见 → 状态 approved > draft > low_confidence > rejected → 人工 → 置信度高 → rel_id 小」取胜出者。胜出者提供类型与字段；`contrib_tasks`、`contrib_manual`、`source_pairs` 取并集，修订号取最大值加 1。旧的 `RelationIdentity` 删除，新的建立。迁移后的关系不置 `contrib_manual`（除非某条原本就是），不改变其来源归属。
+  4. **验环**：用 F05 `check_candidates`：现有边 = 可见、未拒绝的 `PREREQUISITE` 去掉被改写的；候选 = 新形态中可见、未拒绝的 `PREREQUISITE`。成环 → 409 `CYCLE_DETECTED`，`details.cycle` 为闭合链路。草稿本已成环时同样拒绝（与 F06 一致）。
+  5. **不可见的关系与来源照样迁移**，贡献原样保留，迁移后仍不可见，由失败任务的清理（§8.4 撤销）处理；不参与验环。
+  6. **主节点**：主名与其他字段不变；被合并节点的名称与别名依次并入别名（精确去重，不含主名）；`merged_from` = 主节点、被合并节点及其 `merged_from` 的并集（展平、升序、不含主节点）；`contrib_tasks` 取并集；`locked = true`、`contrib_manual = true`、修订号加 1。被合并节点从草稿删除（`DETACH DELETE`，只删 `version_id = draft`）；已发布副本与共享文本块不动。
+  7. **来源**：被合并节点的全部 `EVIDENCED_BY` 迁到主节点，按 `(task_id, chunk_id, evidence_start, evidence_end)` 去重，保留原 `task_id`（人工来源仍无 `task_id`）。
+  8. 审计日志（直接父子关系）归 F12，本任务不记录。
+- **后果**：合并是一次原子的草稿写入，会使已发布课程变为 `revising`；发布时 G01 按 `merged_from` 生成谱系。已知限制：(a) 被合并节点的 `kp_id` 若被后续抽取任务再次写入，F04 会重建该节点，与主节点的 `merged_from` 冲突，发布时报 `invalid_lineage`（F04 尚不查谱系）；(b) 迁移关系上的 `downgrade_cycle` 保留原节点 ID，可能引用已被合并的节点；(c) 合并数量没有上限。
+- **回滚**：撤销 `services/graph/merge_nodes.py`、`repositories/graph_edit.py` 中 F10 段（`transaction`、`read_nodes` 至 `delete_merged_nodes`）、`api/graph_nodes.py` 的合并路由、`schemas/contracts.py` 一行、契约（`MergeRequest.expected_revisions`、`additionalProperties`、合并描述、`errors.v1.md` 两处措辞）并重新生成；无 SQLite 迁移与 Neo4j DDL。已合并的数据无法自动拆回，需按 F12 审计或备份恢复。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-048：F09 删除知识点与关系清理
+
+- **日期**：2026-09-26
+- **背景**：契约已有 `deleteKnowledgePoint`（204，无请求体），规格只说「草稿写入持课程写锁」「`merged_from` 由 F09 删除时丢弃」。未定的是：删除哪些关系与数据、会不会波及已发布版本、节点不存在/不可见/他课时返回什么、并发删除与 `expected_revision` 怎么处理、不可见（失败任务留下）的关系是否一并清理。
+- **决定**：
+  1. **写入顺序**同 ADR-035/047：输入校验 → 课程写锁（持有方 `edit`，超时 409 `COURSE_BUSY`）→ 读 V → 一个 Neo4j 写事务（锁 `DraftWriteGuard` → 读目标 → 核对 → `draft_revision + 1` → 以修订号为条件删除）。校验失败不写任何数据，也不加 `draft_revision`。
+  2. **范围只限草稿**（`version_id = draft`）：节点、与它相连的全部草稿关系（含对 V 不可见的，否则会留下悬空边）及其 `RelationIdentity`、节点的 `EVIDENCED_BY` 与 `merged_from`。已发布版本的副本（同 `kp_id`/`rel_id`、不同 `version_id`）、SQLite 版本行与快照、发布指针、共享文本块都不动；删除使已发布课程变为 `revising`，学生在重新发布前仍读旧版本。
+  3. **明确结果**：节点不存在、对 V 不可见、属于他课，或只存在于已发布版本 → 404 `NOT_FOUND`；空白 ID 同样 404。删除成功 204。同一课程的删除经课程写锁与守卫串行，并发删除同一节点恰有一次 204，其余 404；删除与合并（F10）并发时二者之一先完成，另一方按「节点不存在」处理（合并 422 `not_found`，删除 404）。
+  4. **乐观并发**：新增可选查询参数 `expected_revision`（整数 ≥ 1）；与当前修订号不一致 → 409 `REVISION_CONFLICT`（`details` 同 ADR-035），不删除。非法值 → 422。省略时不核对，保持契约原有的无参数调用可用。
+  5. 加锁节点照常可删（锁只约束自动流程）；删除不做环检测（只删边不会产生新环）。审计日志归 F12。
+- **后果**：删除是一次原子的草稿写入。已知限制：被删节点的 `kp_id` 若被后续抽取任务再次写出，F04 会重建该节点（教师删除不留墓碑）；失败任务留下的不可见关系随节点删除，清理任务再撤销时找不到它们，属预期（撤销对不存在的元素无操作）。
+- **回滚**：撤销 `services/graph/delete_node.py`、`repositories/graph_edit.py` 中 `_TX_DELETE_NODE` 与 `delete_draft_node`、`api/graph_nodes.py` 的删除路由与 `_run` 的 204 分支、契约（`expected_revision` 查询参数、422 响应、描述、`errors.v1.md` 一处措辞）并重新生成；无 SQLite 迁移与 Neo4j DDL。已删除的草稿数据只能从备份恢复或由教师重建。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-049：I01 学习进度仓储的实现约定
+
+> **未采用（2026-09-26）**：`main` 已合入 Codex 的 I01 实现（PR #272，见 `docs/handoffs/codex-i01.md`），本 ADR 描述的实现（第九批 `9b9231e`）在合并时未采用；以下内容仅作 I02 设计读时投影的参考，不构成现行约定。
+
+- **日期**：2026-09-26
+- **背景**：`specs/learning-path.md` §5 与 ADR-014 修订 1、ADR-012 修订 3 规定了进度的存法（按 `(user_id, course_id, kp_id)`、不按版本复制）、读时投影（合并继承、显式写入覆盖、dormant、脏行）与写入规则（整批校验、同值写入、指针途中变化后复核），但没有定：表名与列、一次写入事务取几个写入序号、投影放在哪一层、脏行判定用哪些 ID、读写怎样拿到一致的版本历史。
+- **决定**：
+  1. 迁移 `011_progress.sql` 建表 `learning_progress(user_id, course_id, kp_id, status, write_seq, updated_at)`，主键 `(user_id, course_id, kp_id)`，外键指向 `users`、`courses`；`status` 限三值，`write_seq ≥ 1`。`commit_sequence` 沿用迁移 010，本迁移不建也不回滚它。
+  2. **一个写入事务取一个 `write_seq`**，本批实际写入的各行共用；全部为无操作时不取号。决定 9 只比较 `write_seq > T`，事务内不可能插入版本提交，所以每行各取一号与共用一号结果相同，共用可少占序号。
+  3. 仓储 `app/repositories/progress.py` 同时提供读时投影 `project_progress(sqlite_url, user_id, bound)`（`bound` 为 G07 `PublishedVersion`）与写入 `write_progress(sqlite_url, user_id, course_id, updates)`。原始行、本课程全部已提交版本的节点集、`merged_from` 与提交序号在同一个 SQLite 事务里读出；投影本身是纯计算，I02/I05 直接复用，不再各自实现。
+  4. 归属与起算版本：来源 `m` 在绑定版本中属于 `p.merged_from` 即归属 `p`；从绑定版本起按版本号逐个往前，`m` 连续属于 `p.merged_from` 的最早版本为 `k`。被覆盖判定为 `p.write_seq > commit_seq(k)`。
+  5. 脏行：原始行的 `kp_id` 不在本课程任何已提交版本的**节点**集中，记一条 WARNING（含 `kp_id` 列表与 `diagnostic_id`），投影时忽略，也不作为继承来源；只在历史版本出现过的行是 dormant，不告警。
+  6. 绑定版本违反修订 3 决定 16（来源是本版本节点或含自身、同一来源归属两个节点）、`V = ∅`、任何已提交版本的快照缺失、摘要不符、不可解析或属于他课，均抛 G07 的 `VersionIntegrityError`（500 `INTERNAL_ERROR`），不输出部分进度。已提交版本解析后的节点集与谱系按 `(sqlite_url, version_id)` 缓存（LRU 256）。
+  7. 写入在一个 `BEGIN IMMEDIATE` 事务里读发布指针，指针所指版本即「提交时的最终绑定版本」：请求开始后指针变化时，自然按新版本复核。目标不在该版本 → `ProgressNotInPublishedVersion`（`details()` 为契约 `ProgressNotInPublishedVersionDetails`，只报下标），整批零写入；课程不存在、从未发布分别为 `AccessDenied` 404 `NOT_FOUND`、`GRAPH_NOT_PUBLISHED`。
+  8. 同值写入：仅当该节点已有自身行、状态相同且投影中 `inherited_from` 为空时为无操作（A08S-R01），不取号、不改 `updated_at`。节点没有自身行时写 `unknown` 不是同值（`own_status` 由 `null` 变为 `unknown`），照常写入。
+  9. 仓储不做鉴权与成员判断，`user_id` 由调用方从已认证会话传入（I02）。批次项必须恰为 `{kp_id, status}`，多余字段（如 `user_id`）整批拒绝。
+- **后果**：I02 的路由只做鉴权、调用 `write_progress` 并映射错误；I05 在同一请求内先 `resolve_published` 再 `project_progress`，把 `view.mastered` 交给 I03/I04。投影计算放在仓储层是因为 I01 文件范围只有仓储；若以后要把纯投影移到 `services/learning/`，接口不变。
+- **回滚**：按迁移 011 文件头的 `ROLLBACK` 行回滚（`test_i01.py` 已验证，会丢失全部学生进度），或恢复 `backups/*-before-011.sqlite`；撤销 `repositories/progress.py` 与 `tests/backend/test_i01.py`。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-050：J02 图结构检索的匹配规则与子图上限
+
+- **日期**：2026-09-26
+- **背景**：规格只写了「并行混合检索：图谱结构检索（前置/包含/相关）」，并把「图谱扩展跳数」列为待细化（J01/J02/J04）。J03 只产出改写后的整句问题，没有关键词抽取；H4 的 `kp_id` 只用于引导检索。需要确定如何从术语找到知识点、沿哪些关系扩展、扩展到多大，以及如何保证只读绑定的发布版本。
+- **决定**：
+  1. 检索在 `repositories/graph_search.py` 的 `search_subgraph(repo, scope, revision_ids, terms, *, seed_kp_ids, max_hops, max_nodes, max_seeds, max_evidence, relation_types)`，入参风格与 J01 `search_chunks` 一致：`scope` 为 G07 `PublishedVersion.graph_scope()`，`revision_ids` 为其修订列表。只接受已发布版本作用域，草稿作用域拒绝；所有查询按 `(course_id, version_id)` 匹配节点与关系。
+  2. 种子：名称或别名（去首尾空白、小写）与某术语相等、包含在某术语中，或包含某个至少 2 个字的术语。排序为：显式 `seed_kp_ids`（属于本版本）> 相等 > 名称在术语中 > 术语在名称中；同级名称长者优先，再按 `kp_id`。单字名称（如「栈」）也能命中，但排在长名称之后。不在本版本的 `seed_kp_ids` 忽略并记 INFO 日志（H4）。
+  3. 扩展：从种子逐跳无向扩展，缺省只沿规格列出的 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`，`EXAMPLE_OF` 须调用方显式开启；同一跳内按 `kp_id` 取前者。返回的关系是结果节点间的全部四类关系。
+  4. 上限在 Cypher 的 `LIMIT` 中生效：`max_hops` 缺省 2、硬上限 3；`max_nodes` 缺省 30、硬上限 200；`max_seeds` 缺省 `min(10, max_nodes)`；证据块 `max_evidence` 缺省 60、硬上限 500。任一上限截掉内容时 `truncated = true`。以上缺省值均为占位，由 J04 按上下文预算与评测调整。
+  5. 证据块取节点的 `EVIDENCED_BY` 文本块，并只保留 `revision_id` 属于修订列表的（纵深防御，Q3.1 第 2 条）。「可定位」条件与阈值仍由 J04/J06 判断。无匹配返回空子图，不报错。
+- **后果**：图检索不依赖模型调用，也不需要全文索引。匹配时逐个扫描版本内的知识点，课程规模在数千点以内时开销可以接受。子串匹配会带来少量误命中（如问题中出现「堆」），种子上限与排序可以压低这类误命中的影响。关键词抽取接入后，J04 可以把关键词与改写后的问题一起作为 `terms` 传入。
+- **回滚**：撤销 `repositories/graph_search.py` 与 `tests/integration/test_j02.py`；无数据迁移。
+- **签收**：由 Claude 选定并在交接中报告；第 2～4 条的匹配规则与占位值待 J04 实测后确认。
+
+## ADR-051：H06 知识点详情与来源浏览的展示约定
+
+- **日期**：2026-09-26
+- **背景**：H06 要把画布点击的知识点 ID（H04 `nodeClick`）变成定义、关系与原文来源的详情抽屉。契约 `SourceRef` 要求页码或章节至少其一（ADR-003），但前端仍可能收到不合契约或无法定位的来源；已发布版本的来源不带原文片段（ADR-033 后果）；`SourceRef` 只有 `document_id` 没有资料名；目前也没有原文阅读器。快速切换节点时多个详情请求会并发返回。
+- **决定**：
+  1. 新增 `api/knowledgeDetail.ts` 只封装 `getKnowledgePoint`，经 `KNOWLEDGE_DETAIL_API_KEY` 注入；未注入时组件用 `HTTP_CLIENT_KEY` 的会话客户端构造，不改 `main.ts`。前端不传版本，草稿/发布由后端按身份决定（ADR-030）。
+  2. 来源只展示可定位的：`document_id`、`chunk_id` 非空，且页码为正整数或章节路径非空；无效页码不显示但有效章节仍保留。不满足的丢弃并提示「另有 N 条未显示」；全部无法定位时明确提示，不给定位按钮。不补页码、章节或原文；资料名由页面经 `documentNames` 传入，没有时显示「资料 <document_id>」。
+  3. 点击来源不在组件内打开原文，而是发出 `locateSource({ documentId, chunkId, page?, sectionPath? })` 并标记当前来源（`aria-pressed`）；原文阅读器接线留给页面任务（H11）。点击关联知识点发出 `selectKnowledgePoint`，由页面改选中并联动画布。
+  4. 迟到请求隔离：每次选择递增序号并中止上一次请求，同时绑定课程作用域（`useCourseStore().beginRequest()`）；只有序号与作用域都仍有效时写入。响应的 `id`/`course_id` 与请求不符按数据异常处理，不展示。课程变了而选择没变时回到空态。
+  5. 所有服务端文本以插值渲染，不用 `v-html`；原文片段按名称与别名做字面量切分高亮（`<mark>`），不拼 HTML、不解释正则。
+  6. 错误只给固定文案：`NOT_FOUND`、`GRAPH_NOT_PUBLISHED` 不可重试；网络/超时/5xx/数据异常可重试；`COURSE_FORBIDDEN` 发出 `courseForbidden` 交页面处理，组件不清课程上下文。
+- **后果**：详情组件可独立挂到任何图谱页；资料名、原文定位跳转与画布联动都由页面负责。学生看已发布版本时来源只有位置没有片段，这是后端既定行为，不是前端缺陷。
+- **回滚**：删除 `src/frontend/src/api/knowledgeDetail.ts`、`components/KnowledgeDetail.vue`、`composables/useKnowledgeDetail.ts`、`tests/frontend/h06.test.ts` 与本 ADR；无依赖、契约或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-052：H05 图谱筛选、选中与布局切换
+
+- **日期**：2026-09-26
+- **背景**：H05 要求搜索、按关系等条件筛选、层次/力导向布局切换，验收为「筛选后无悬空边、清空恢复、切换布局不丢选中态」；H03/H04 把 `rejected`/`low_confidence` 的样式与过滤留给 H05。ADR-040 的画布只有固定层次布局，节点副本只带 `id`/`data`，没有选中概念；G6 v5 中配置项的节点样式优先级高于数据里的 `style`，所以不能靠逐节点 `style` 表达状态。
+- **决定**：
+  1. 筛选是 `composables/useGraphFilters.ts` 中的纯函数 `filterGraph(适配图, 条件, 选中)`，输入是 H03 适配图，不接触后端响应。知识点可见 ⇔ 类型、审核状态、章节均被选中且名称包含搜索词（NFKC、小写、去首尾空白后包含匹配；空白串等于不搜索）；关系可见 ⇔ 类型、审核状态被选中且两端可见。输出保持输入顺序。
+  2. 默认条件为全部四类关系、五类知识点、四种审核状态、全部章节——驳回项默认可见但淡化；调用方可用 `initial` 改默认（如教师视图默认隐藏驳回），`clear` 回到该默认。章节下拉只列图中出现的章节，标题取 `GraphExchange.chapters`，缺失时用 ID，另有「未分章」。
+  3. 状态经 G6 元素 `states` 表达：审核状态 `rejected`（节点灰色虚线框、透明度 0.4；边透明度 0.3）、`lowConfidence`（节点橙色虚线框；边透明度 0.6），选中 `selected`（深蓝粗框加光晕），数组中审核状态在前、选中在后。样式配置在 `buildGraphOptions` 的 `node.state`/`edge.state`；生命周期复制数据时保留 `states` 的副本。
+  4. 选中与布局存在组合式中，独立于筛选条件：清空、切换布局都不改选中；筛选隐藏选中节点时保留选中并由 `selectedHidden` 提示；新图里已无该知识点时清除选中。
+  5. 布局切换：`GraphCanvas` 新增 `layout` 属性（缺省 `hierarchical`），`lifecycle.setLayout` 在串行链上执行 `graph.setLayout` → `graph.layout()` → `fitView`，不重建、不 `setData`；连续切换只落在最后一次；G6 加载期间切换则建好后补做一次；未建图时建图即用新布局。力导向为 `d3-force`（连边距离 120、斥力 -300、碰撞半径 40）。`CanvasGraph` 的 `setLayout`/`layout` 为可选成员，替身不实现时切换不生效，已有测试替身无需改动。
+  6. `GraphToolbar.vue` 是受控组件（`v-model` 条件、`v-model:layout`、`clear`），只发出新对象不改 props；关系图例与按关系筛选合一，颜色、线型、箭头取自 `RELATION_STYLES`；审核状态图例与画布状态样式一致；可见数量区为 `aria-live="polite"`。
+- **后果**：筛选每次变化都会 `setData` 并按当前布局重新布局，节点位置不保持（小图可接受）。页面接入（教师/学生图谱页）留给 H11 等视图任务；H06 详情可直接用 `nodeClick` → `select`。
+- **回滚**：删除 `composables/useGraphFilters.ts`、`components/GraphToolbar.vue`、`tests/frontend/h05.test.ts`；`git checkout <base> -- src/frontend/src/graph/lifecycle.ts src/frontend/src/components/GraphCanvas.vue` 还原画布扩展；无依赖或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-053：H08 教师连边编辑的乐观更新与冲突呈现
+
+- **日期**：2026-09-26
+- **背景**：H08 要求「成环错误高亮冲突路径；服务拒绝时撤销临时边；无组件 Cypher」。关系接口（`createRelation`/`updateRelation`/`deleteRelation`）只有契约，后端路由尚未实现；关系请求体不带 `expected_revision`。画布生命周期（H04）复制边样式但只复制节点的 `id`/`data`，画布上无法单独给节点着色；G6 的拖线交互需要改 `lifecycle.ts` 的建图参数，不在 H08 文件锁内。
+- **决定**：
+  1. 新建 `api/relations.ts` 封装三个关系接口；`composables/useRelationEditor.ts` 持有全部编辑状态，`components/RelationEditor.vue` 只渲染并调用组合式方法。
+  2. 乐观更新以「叠加层」实现：请求期间在课程 store 的草稿图上叠加一条临时改动（新边、改后的边或移除），不写入 store；成功后把服务端返回的关系合并进 store **当时**的图（`setGraph`，改方向时服务端可能派生新 ID，以响应为准），失败即丢弃叠加层。一次只允许一个写请求。
+  3. 409 `CYCLE_DETECTED`：`details.cycle`（首尾相同、沿边方向）转成名称路径以 `role="alert"` 有序列出；环上相邻两点之间未拒绝的 `PREREQUISITE` 边、以及本次被修改的关系，在 `canvasData` 中以冲突色（`#ff4d4f`、线宽 3）绘出。`details` 不合规时只提示、不高亮。
+  4. `REVISION_CONFLICT`、`NOT_FOUND`、`DANGLING_ENDPOINT`：撤销改动、置 `stale`，并调用 `onRefreshNeeded` 由页面重新加载草稿图；`DUPLICATE_RELATION` 标出 `details.existing_id`；`COURSE_FORBIDDEN` 清空当前课程交调用方回课程列表；其余错误码给固定文案，不回显服务端 `message`。
+  5. 「拖线」先以「在画布上依次点选起点、终点」（`GraphCanvas` 的 `nodeClick` → `pickNode`）加表单实现；节点高亮以面板路径列表与 `highlightedNodeIds` 提供。
+- **后果**：H08 不改 H04 文件即可与 `GraphCanvas` 组合；画布上的冲突节点着色与真正的 G6 拖线需在 `lifecycle.ts` 增加节点样式透传与 `create-edge` 行为（后续任务）。后端关系路由落地后，若返回的错误码或 `details` 与契约不同，须先改契约。
+- **回滚**：删除 `api/relations.ts`、`composables/useRelationEditor.ts`、`components/RelationEditor.vue` 与 `tests/frontend/h08.test.ts`，删去本 ADR；无数据或契约变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+
+## ADR-054：K10 备份与恢复演练的一致性栅栏、两条 Neo4j 路径与不覆盖原则
+
+- **日期**：2026-09-26
+- **背景**：K10 要求 SQLite 与 Neo4j 的备份对应同一时间点、发布指针与已提交版本一致，恢复在隔离副本中核对引用/图/进度，且不覆盖用户库。两库之间没有分布式事务；Neo4j 社区版的 `neo4j-admin database dump/load` 只能在数据库停止时执行，社区版也不能单独停一个库。F14（ADR-038）以 `--neo4j-backup-confirmed` 暂代 Neo4j 备份；G05 把孤儿副本与缺副本的处理留给 K10。
+- **决定**：
+  1. **栅栏**：备份先持有全部课程的写锁（`course_locks`，持有者 `k10-backup-<备份 ID>`，按 L/3 续约）——发布 P3、回滚、图编辑与 T6 写图都要这把锁；并与 F14 第 1 步同口径拒绝活动任务租约、他人的活动写锁、任何 `preparing`/`materialized` 尝试（含过期未补偿的，先跑 G05）。拒绝时退出码 2，不写任何文件。
+  2. **同一时间点的判定**：G0 读 Neo4j 全图摘要 → S1 用 SQLite 在线备份 API（单步、一个读事务）复制整库 → 导出 Neo4j → G2 摘要必须等于 G0 → S3 再做一次在线备份，逐表内容摘要必须等于 S1 → 写锁仍由本次持有。任一不等即判定有写入绕过了写锁，整份备份作废（退出码 1，`.partial` 目录删除），不尝试「修补」。代价：栅栏期间被拒的发布仍会留下一行 `failed` 尝试，使该次备份作废，需重跑（测试已覆盖）。副本中删去本次的锁行。
+  3. **发布指针**：每门课的 `published_version_id` 必须是本课程 `committed` 且版本号一致的行，且该版本的 Neo4j 副本按快照用 G03 P9 `materialize.verify` 复核通过（节点、边、来源引用、向量维度），否则备份失败。非当前版本复核失败、未提交尝试的孤儿副本、没有 SQLite 行的 `Chunk` 只记为警告写入清单（G05 留给 K10 的两类残留在此报告，不自动删除或重建）。Neo4j 中出现 SQLite 快照里没有的课程也视为不一致而失败。
+  4. **两条 Neo4j 路径**：缺省经 Bolt 导出为 gzip JSON 行（结构语句、节点、关系；元素 ID 只用于文件内连线），任何可连接的 Neo4j 都能用，且可在进程内 harness 上测试；`--neo4j-container NAME` 走 neo4j-admin：停容器 → `docker run --rm --volumes-from NAME <同镜像> neo4j-admin database dump neo4j` → 启容器 → 等 Bolt，停机期间写锁仍持有，重启后摘要必须等于停机前。两条路径的清单都含同一套检查结果（图摘要与 SQLite 行级摘要与路径无关），恢复端一视同仁地核对。属性只接受标量与标量列表，遇到时间、空间等类型直接失败（当前代码不写这些类型）。
+  5. **不覆盖**：恢复脚本的 Neo4j 目标必须以 `--neo4j-uri` 显式给出（不读 `NEO4J_URI`）；SQLite 目标必须不存在、Neo4j 目标必须没有节点，否则退出码 2 且不做任何改动。覆盖需同时给 `--replace-existing` 与 `--confirm <备份 ID>`，目标须已停机（同第 1 条），并先把目标整体做一份 K10 备份到安全目录（`--allow-inconsistent`，允许记录已损坏的状态），撤销覆盖即从该安全副本再恢复一次。
+  6. **恢复核对**：先校验清单中每个文件的 SHA-256（不符即拒绝，不动目标）；装入后用 `backup-demo.sh --inspect` 重新检查目标，并与清单逐项比较：SQLite 完整性、外键、结构、逐表行级摘要（含今后的进度表，不依赖具体表名）、发布指针；Neo4j 图摘要、计数与结构（清单中的结构必须存在）；一致性结论（复核通过的版本、指针错误、孤儿副本、悬空文本块）。有差异则退出码 1 并在报告中列出，副本不得使用。
+  7. 备份目录 0700、文件 0600，含账号口令散列等，放在已被忽略的 `backups/` 下或仓库外，不得提交或外传。
+- **后果**：恢复演练在本机可重复：Bolt 路径在进程内 Neo4j 上测试，neo4j-admin 路径在一次性 `neo4j:5.26-community` 容器上测试（无 Docker 时跳过）。Bolt 导出要全图扫描两次（G0 与导出），只适合演示规模；大库应走 neo4j-admin 路径，但要停 Neo4j。compose 部署下 SQLite 在 `app-data` 卷内，宿主机需先把卷挂到可运行脚本的容器里（见交接），整套 compose 的实机演练待人工复验。
+- **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

@@ -1178,3 +1178,23 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 依赖：C01、A08、G07 已在本地代码中；I02 负责图谱谱系投影及 HTTP 校验。风险：迁移新增持久表，回滚需停 API/worker 后恢复迁移前 SQLite 备份。
 - 验证命令：`.venv/Scripts/python.exe -m pytest tests/backend/test_i01.py tests/backend/test_g02.py -q`、`./scripts/verify.sh`、`git diff --check`。
 - 验收证据：审查发现原 `write_progress` 总是另开事务，无法加入 I02 的版本绑定写事务；新增一个用例先因缺少事务入口而失败，修复后 I01 6 passed、I01+G02 28 passed。隔离 worktree 的 `verify.sh` exit 0。此次未重跑后端全量；原始交接记录中的全量结果仅属修复前快照。
+
+## 2026-09-26 第九批并行：F10→F09、I01、J02、H06、H05、H08、K10（Claude）
+
+基线 `main@0b8aa73`；分支 `claude/upbeat-ramanujan-p4ccbq`（各任务在本地子分支开发后合入本分支）。J01 在 PR #271 进行中，不在本批。ADR 号预分配避免冲突：F10 = ADR-047、F09 = ADR-048、I01 = ADR-049、J02 = ADR-050、H06 = ADR-051、H05 = ADR-052、H08 = ADR-053、K10 = ADR-054（不需要 ADR 的任务空号）。SQLite 迁移号：I01 = `011_progress.sql`。
+
+| 原子 ID | 状态 | 任务 | 负责人 | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| F10 | DONE（本分支 `claude/upbeat-ramanujan-p4ccbq`，待 PR 审查/合并） | 实现节点合并与重接边 | ArvinHan（Claude） | `src/backend/app/services/graph/merge_nodes.py`、`tests/integration/test_f10.py`；与 F09 同一执行者顺序修改 `src/backend/app/repositories/graph_edit.py`、`src/backend/app/api/graph_nodes.py` | `test_f10.py` 27 passed（真实 Neo4j 5.26 + SQLite）；红灯为模块缺失；14 处反向篡改全部检出（1 处补强用例后）；扩围 `graph_edit.py`、`graph_nodes.py`（`POST /kp/merge`）、`schemas/contracts.py`、契约 `MergeRequest.expected_revisions`；ADR-047；`docs/handoffs/claude-f10.md` |
+| F09 | DONE（同上） | 实现节点删除与关系清理 | ArvinHan（Claude） | `src/backend/app/services/graph/delete_node.py`、`tests/integration/test_f09.py`；共享文件同上 | `test_f09.py` 17 passed（真实 Neo4j + SQLite，并发用例连跑 5 次通过）；9 处反向篡改全部检出（1 处补强用例后）；扩围 `DELETE /kp/{kid}`（204，可选 `expected_revision`）与契约；ADR-048；`docs/handoffs/claude-f09.md` |
+| I01 | SUPERSEDED（`main` 已合入 Codex 的 I01，PR #272；本批实现未采用） | 实现学习进度仓储 | ArvinHan（Claude） | `src/backend/app/repositories/progress.py`、`src/backend/migrations/011_progress.sql`、`tests/backend/test_i01.py` | 本批实现（提交 `9b9231e`，含读时投影与 46 个用例）在合入 `main` 时让位于 PR #272；投影逻辑可供 I02 参考 |
+| J02 | DONE（同上） | 实现图结构检索 | ArvinHan（Claude） | `src/backend/app/repositories/graph_search.py`、`tests/integration/test_j02.py` | `test_j02.py` 38 passed（真实 Neo4j 5.26）；15 处反向篡改检出 13，存活 2 处为冗余防护；上限在 Cypher `LIMIT` 生效（缺省 2 跳/30 节点，硬上限 3 跳/200）；ADR-050；`docs/handoffs/claude-j02.md` |
+| H06 | DONE（同上） | 实现知识点详情和来源浏览 | ArvinHan（Claude） | `src/frontend/src/components/KnowledgeDetail.vue`、`src/frontend/src/composables/useKnowledgeDetail.ts`、`tests/frontend/h06.test.ts` | `h06.test.ts` 47 passed；16 处反向篡改全部检出；扩围新建 `api/knowledgeDetail.ts`；未接入页面（留 H11）；ADR-051；`docs/handoffs/claude-h06.md` |
+| H05 | DONE（同上） | 实现图搜索筛选与布局切换 | ArvinHan（Claude） | `src/frontend/src/composables/useGraphFilters.ts`、`src/frontend/src/components/GraphToolbar.vue`、`tests/frontend/h05.test.ts` | `h05.test.ts` 44 passed；21 处反向篡改全部检出；真实 G6 Chromium 冒烟通过；扩围 `graph/lifecycle.ts`（`setLayout`、状态样式）、`GraphCanvas.vue`（`layout` 属性）、architecture 一行；ADR-052；`docs/handoffs/claude-h05.md` |
+| H08 | DONE（同上；后端无 `/relations` 路由，仅假 API 验证） | 实现教师连边编辑交互 | ArvinHan（Claude） | `src/frontend/src/components/RelationEditor.vue`、`src/frontend/src/composables/useRelationEditor.ts`、`tests/frontend/h08.test.ts` | `h08.test.ts` 35 passed；11 处反向篡改全部检出；扩围新建 `api/relations.ts`；ADR-053；`docs/handoffs/claude-h08.md` |
+| K10 | DONE（同上；compose 整套实机演练待人工） | 建立备份和恢复演练 | ArvinHan（Claude） | `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py` | `test_k10.py` 20 passed（含 neo4j-admin dump/load 真实 Docker 容器）；13 处反向篡改全部检出；`.gitignore` 增 `backups/`；ADR-054；`docs/handoffs/claude-k10.md` |
+
+- 共享文件（`docs/decisions.md`、`docs/architecture.md`、`src/contracts/`、`src/frontend/src/api/`、`src/frontend/src/router/`）的扩围改动由各执行者在交接中列明，合入本分支时由协调者解决冲突。
+- 合并后复验（协调者，HEAD 含八项合入）：后端 + 契约 + tooling 3465 passed；集成（真实 Neo4j 5.26）321 passed、3 skipped、1 failed——`test_k08.py::test_images_build`，本机 Docker 构建拉镜像遇 Docker Hub 429/构建内无网络，属环境问题，此前无 Docker 守护进程时该用例跳过，K08 镜像实机构建仍待人工复验；前端 438 passed、type-check 与 build 通过；`./scripts/verify.sh` 通过；`git diff --check` 干净。
+- 第九批待决（均需 ArvinHan）：ADR-047～054 签收；F10/F09 删除或合并后抽取重建同 ID 节点（F04 查 `merged_from` 或删除留墓碑）；关系是否加修订号（H08）；后端缺关系编辑路由 `/relations`（F06 仅服务层，H08 未联调）；H06 学生端资料名来源；J02 检索上限占位值；K10 compose 下 neo4j-admin 卷挂载与 F14 `--neo4j-backup-confirmed` 换接 K10 备份。
+- 本批合入后新解锁：F11、F12（F10+F09）、H07（H06+F09）、H11（H05+H06）、I02（I01）；J04 待 J01（PR #271）合并。
