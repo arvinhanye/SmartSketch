@@ -1214,4 +1214,4 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | --- | --- | --- | --- | --- | --- | --- |
 | H07 | DONE（待 PR 审查/合并，issue #119） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；前端全量 494 passed、type-check 与 build 通过；`./scripts/verify.sh` 通过；`docs/handoffs/claude-h07.md` |
 
-- H07 待决（需 ArvinHan）：ADR-062 签收；面板接入教师图谱页（与 H06 详情切换）留 H11；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。
+- H07 待决（需 ArvinHan）：ADR-062 签收；教师图谱编辑页无归属（依赖图中没有任务负责教师图谱编辑页：H11 是学生端浏览页（不取草稿），H09 审核队列依赖 H07 可复用本面板，但画布 + 详情 + 节点/连边编辑（H07/H08）的教师页无归属，需新增任务）；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。
