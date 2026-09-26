@@ -1117,6 +1117,36 @@
 - **回滚**：撤销 `services/versions/publish.py`，以及 `repositories/versions.py` 末尾的 `DraftState`/`read_draft_state`/`complete_published_tasks`、`course_locks.current_holder`、F07 节点投影中的 `.merged_from`；无数据迁移。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
 
+## ADR-035：F08 教师编辑知识点、人工编辑锁与新建必带来源
+
+- **日期**：2026-09-26
+- **背景**：契约已有 `updateKnowledgePoint`（节点级 `expected_revision`）与 `createKnowledgePoint`，但 `specs/teacher-review-publish.md`「待细化」里的加锁粒度、解锁方式、并发冲突策略，以及「manual 条目是否必须有来源」都没定；契约没有解锁接口，也没有「修订号过期」的错误码。ADR-030 的后果要求 F08 保证教师新建的知识点至少带一条来源，否则详情接口会 500。F04 已按 ArvinHan 2026-09-26 的决定让自动写入完全跳过加锁节点（ADR-024 决定 4）。
+- **决定**：
+  1. **写入顺序（V4）**：取课程写锁（持有方 `edit`，租约与心跳同 `course_locks`，最多等 `COURSE_LOCK_WAIT_SECONDS`，超时 409 `COURSE_BUSY`，`details.holder` 为当时的持有方）→ 读一次 V → 读目标节点并校验 → `draft_revision + 1` → 一个 Neo4j 写事务（锁守卫节点 + 以 `revision = expected_revision` 为条件的更新）→ 释放锁。校验失败（404、409、422）不写任何数据，也不加 `draft_revision`。
+  2. **并发冲突**：`expected_revision` 与当前修订号不等 → 409 `REVISION_CONFLICT`（新增错误码），不覆盖；`details` 给出 `kp_id`、`expected_revision`、`current_revision` 与当前内容 `current`（`name`、`aliases`、`type`、`definition`、`status`、`locked`，以及存在时的 `importance`、`difficulty`），后写者据此知道自己会覆盖什么（验收 10）。
+  3. **加锁粒度**：锁整个节点（全部字段与来源），不连带关系；关系的保护沿用「`manual` 或 `approved` 的边自动流程不动」。任何成功的教师修改都置 `locked = true`、`contrib_manual = true`、修订号加 1，即使值没有变化；`status` 改动（如审核通过）同样加锁。
+  4. **解锁**：单独的接口 `POST /api/v1/courses/{cid}/kp/{kid}/unlock`（`unlockKnowledgePoint`），须带 `expected_revision`；修改接口不接受 `locked` 字段（422 `extra_forbidden`），因此不能顺带解锁。没有过期策略。权限为课程教师成员：课程内没有比教师更高的角色，`courses.teacher_id` 不参与授权（`specs/identity-access.md`），所以「单独权限」落实为单独的接口与动作。解锁置 `locked = false`、修订号加 1、`draft_revision + 1`；`contrib_manual` 不回落。节点本就未加锁时 200 原样返回，不写入。
+  5. **新建必带来源**：`KnowledgePointCreate` 新增必填 `sources`（至少一条 `KnowledgePointSourceInput{chunk_id, evidence_start?, evidence_end?}`）。块须属于本课程，且其资料修订关联到 V 中的任务（内容已提交，发布时不会是 `invalid_source_ref`）；证据区间两端同给或同省，省略取整个块，须满足 `0 ≤ start < end ≤ 块长`。不满足 → 422 `VALIDATION_ERROR`，`details.fields` 指向出错的来源（`source_not_available`、`evidence_out_of_range`、`missing`）。`chapter_id` 须是可见章节，否则 422 `not_found`。新节点 `kp_id = kp_<uuid4 十六进制>`、`source = manual`、`locked = true`、`status = approved`、`confidence = 1.0`、`revision = 1`、`contrib_manual = true`，来源关联不带 `task_id`（F07 按人工来源读取）。
+  6. **自动流程守锁**：F04 跳过加锁节点，不改内容、不并入贡献、不加来源；解锁后自动写入恢复更新（验收 5、11）。`NODE_LOCKED` 仍只留给后台流程。
+  7. 审计日志不在本任务，归 F12。
+- **后果**：F07 的「人工新建且无来源的知识点详情 500」不再能由 API 产生。前端要为新建知识点提供选择来源块的交互（可从已有知识点的 `source_refs.chunk_id` 或问答引用中取）；尚无按资料列块的接口。编辑与解锁都算草稿写入，会使已发布课程变为 `revising`。人工节点没有向量，向量在发布物化时计算（G03），不影响草稿。
+- **回滚**：撤销 `api/graph_nodes.py`、`services/graph/edit_node.py`、`repositories/graph_edit.py`、`main.py` 与 `schemas/contracts.py` 各一处注册、契约改动（`sources`、`KnowledgePointSourceInput`、`KnowledgePointUnlock`、解锁路径、`REVISION_CONFLICT`）及生成物、前端两处错误码副本与测试；无 SQLite 迁移与 Neo4j DDL。已写入的人工节点可按 `source = 'manual'` 查出后由教师删除（F09）。
+- **签收**：ArvinHan，2026-09-26（含人工新建节点 `status = approved`、置信度 1.0，以及任何课程教师均可解锁）。
+
+## ADR-037：G07 统一发布版本解析器
+
+- **日期**：2026-09-26
+- **背景**：V8 规定学生请求（图谱、推荐、问答）在请求开始时只读一次发布指针，得到 `(version_id, version)` 与该版本的修订列表，实现集中在 G07。未定的是：从未发布与 `?version=n` 同时出现时先判哪个；指针与版本行怎样读才一致；修订列表从哪来、怎样缓存；指针或已提交版本损坏时怎么报。
+- **决定**：
+  1. 入口为 `services/versions/resolver.py` 的 `resolve_published(sqlite_url, course_id, *, version=None) -> PublishedVersion`。结果不可变：`course_id`、`version_id`、`version`、`revision_ids`（`frozenset`），并提供 `graph_version`、`graph_scope()`（`GraphScope(course_id, version_id)`，不带 V）与 `covers_revision(revision_id)`。调用方每个请求只调一次，此后不再读指针。
+  2. 判定顺序：课程不存在 → 404 `NOT_FOUND`；指针为 NULL → 404 `GRAPH_NOT_PUBLISHED`（即使带了 `version`）；`version` 不是本课程已提交版本号（含 0、负数、他课、未提交、失败）→ 404 `NOT_FOUND`。`version` 不是 `int`（含 `bool`）→ `TypeError`，参数校验归路由。
+  3. 指针与版本行用同一条 SQL 读出（`courses LEFT JOIN graph_versions`），二者来自同一时刻。
+  4. 修订列表取自该版本快照的 `revisions`，读时复核摘要、按 G01 `load_snapshot` 校验规范形态与课程归属。已提交版本不可变（G02 触发器），修订列表按 `(sqlite_url, version_id)` 缓存（LRU 256 条）；指针从不缓存。课程归属在读缓存之前按版本行判断。
+  5. 指针指向非提交行、他课行、`published_version` 与行号不符、快照缺失、摘要不符、快照不可解析或属于他课 → `VersionIntegrityError`（`code = INTERNAL_ERROR`，细节只进日志），**不回退到草稿或其他版本**（V9 第 5 条）；错误不进缓存。
+- **后果**：F07、推荐（I 组）、问答（J 组）接入时用同一个结果对象；F07 现有 `resolve_target` 仍直接读访问层带来的课程行，改为调用本解析器（并补上历史版本读取 PUB-14）不在 G07 文件范围内，列入待决。
+- **回滚**：撤销 `services/versions/resolver.py` 与 `tests/backend/test_g07.py`；无数据迁移，无调用方。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 按 V8 选定并在交接中报告）。
+
 ## ADR-045：K13 抽取消融的付费调用确认与单阶段对照组
 
 - **日期**：2026-09-26
