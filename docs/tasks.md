@@ -1276,3 +1276,23 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收：发布后版本修订内的全部文本块（包括没有被引用的块）都有节点和当前空间向量，J01 能检索到；已有向量的块不再调用模型；版本外修订的块不处理；向量调用失败时发布在 P8 失败，指针不变；P9 能发现缺向量、维度不对或缺 `revision_id` 的块；嵌入器空间不符时拒绝。
 - **迁移应用顺序（F11 审查 S2，实测可复现）**：`sqlite.py` 拒绝「比已应用版本更旧的迁移」。若某环境先应用了 F11 的 `013_review_dismissals.sql`，之后再引入 F12 的 `012_edit_logs.sql`，012 在该库上**永久无法应用**（需按 `backups/*-before-013.sqlite` 恢复）。本批把 F12（012）与 F11（013）放在同一合入窗口，迁移按版本号顺序 012 → 013 应用；**任何环境不得先单独跑 013**。
 - G08 待决：本任务之前已经提交的版本没有文本块向量，回滚到这些版本时检索结果不全（MVP 阶段没有真实数据）；**补齐途径未闭环**——「重新发布一次即可补齐」已被独立审查证伪（幂等路径跳过 P8；旧修订被新修订取代后永远补不上），需为 G06 或 `scripts/reembed.py` 记「按版本补齐块向量」子命令；首次发布耗时与**尝试租约覆盖**尚未实测（首次发布若超过尝试租约，`reclaim_expired` 会把仍在进行的尝试判失败，而块向量已写一部分）；**跨任务缺口（审查 M3）**：`ensure_vector_indexes` 只在 `scripts/reembed.py` 与测试夹具调用，`main.py` 启动校验与 `apply_migrations`（只接受 `CREATE CONSTRAINT`/`CREATE INDEX`）都不建 `CREATE VECTOR INDEX`，`EXPECTED_SCHEMA` 也不含它 → **P9 绿不等于 J01 可检索**，归 F03/F14 确认。另：P9 只查 `revision_id IS NULL`，非空但错误的值不检出（J01 会静默丢弃该块）；P9 不校验 `document_id`。
+
+## 2026-09-26 断点恢复批次：F11、F12、H07、H11、I02、J04、G08（Claude，协调者）
+
+**断点事实（已核实，非推测）**：上一会话中断时的现场为——本地 `main` 落后远端 28 个提交；6 个 PR（#275 H11、#276 H07、#277 J04、#278 G08、#279 F12、#280 I02）已开待收；**F11 是真正中断的任务**（issue #103 标 `status:in-progress`，无分支、无提交、三个目标文件都不存在，但 Docker 容器 `ss-neo4j-f11` 仍在运行，为其遗留开发环境）。恢复期间发现**另一会话**已在 `17:07Z` 用 PR **#282** 完整实现 F11（17 文件、+2289/-46、迁移 013、契约更新、40 用例），因此本会话派出的并行 F11 实现**作废（SUPERSEDED）**，改为对 #282 的独立审查；该分支名 `claude/f11-f12-h07-h11-i02-j04` 也印证中断批次就是这六个任务加 F11。断点前最后一笔提交为 `bceeced`（D-17 补登 H14 教师图谱编辑页 + K05 增加依赖，issue #281）。
+
+| 原子 ID | 状态 | 本批处置 | 独立审查结论 | 审查修复 |
+| --- | --- | --- | --- | --- |
+| F11 | DONE（本批合入；#282，ADR-060） | 采纳另一会话实现；本会话并行实现作废 | REQUEST_CHANGES → **已修 S1**（merge 不校验是否在疑似重复栏，无关节点可被合并）与 **M1**（`bump_draft_revision` 在可重跑事务内未记忆化） | 见 `docs/handoffs/claude-f11.md` 与本批说明；遗留项见上一小节 |
+| F12 | DONE（本批合入；#279，ADR-061） | 采纳 | APPROVE_WITH_NOTES | M2 测试去自证（篡改 `RETRY_DELAYS=()` 现在红灯）；M1 租约错记窗口与脱敏/只追加缺口写入 ADR-061；迁移 012 与 013 无冲突 |
+| H07 | DONE（本批合入；#276，ADR-062） | 采纳 | APPROVE_WITH_NOTES | 证据行按实测更正（493 passed + 1 既有 b02 flake）并补「仅假 API 验证」；删除确认的焦点管理、`aria-invalid`、别名标签一致性已修（h07 61 passed，3 处篡改检出） |
+| H11 | DONE（本批合入；#275，ADR-063） | 采纳 | APPROVE_WITH_NOTES（无阻断） | 补 IAM-11 的「课程详情 404 `GRAPH_NOT_PUBLISHED`」回归用例（h11 46 passed）；交接补 `getCourse` 未实现这一依赖 |
+| I02 | DONE（本批合入；#280，ADR-064） | 采纳 | APPROVE_WITH_NOTES | 补有鉴别力的「写事务内解析发布指针」用例（原断言恒真，审查实测该篡改存活）；`identity-access.md` 与契约的 `user_id` 多余字段口径冲突显式落文并列入签收；`reason="duplicate"` 登记进 `errors.v1.md` |
+| J04 | DONE（本批合入；#277，ADR-065） | 采纳 | APPROVE_WITH_NOTES | M1 接线示例错误已修（`functools.partial` 与 keyword-only `chunk_ids` 不兼容，J07 照抄即崩）；①② 待签收落成 ADR-065 与 `specs/grounded-qa.md` 条文 |
+| G08 | DONE（本批合入；#278，ADR-066） | 采纳 | REQUEST_CHANGES（仅文档） | ADR 撞号 047 → **066**（7 处 G08 引用；F10 语境的 ADR-047 未动，含 `src/contracts/*`）；被证伪的「重新发布一次即可补齐」按实测更正；补记补齐途径未闭环、租约覆盖未实测与向量索引无生产创建路径（M3，归 F03/F14） |
+
+- **合并方式**：七个分支按 ADR 号升序（060→066）合入集成分支 `claude/integration-0926`，`docs/decisions.md` 与 `docs/tasks.md` 的末尾追加型冲突一律「两段都保留」；唯一的代码冲突在 `api/graph_nodes.py`——取 F12 的 `_run(request, access, operation)` 签名与 `_context(request, access)`，保留 F11 的 `dict` 返回类型与 `isinstance` 分支，并同步把 `api/review.py` 的两处调用点改为传 `access`（否则审核动作会 TypeError→500）。**迁移应用顺序**：012（F12）与 013（F11）必须同一窗口合入并按版本号顺序应用，任何环境不得先单独跑 013（见 G08 待决中的 S2 记录）。
+- **环境事实（写给后续会话）**：worktree 里共享的 `.venv` 是 editable 安装、`app` 包指向**主仓**——在任何 worktree 里跑 Python 测试必须带 `PYTHONPATH=$PWD/src/backend`，否则测的是主仓代码（会假绿或 ImportError）；本批全部审查与实现任务都据此修正并在报告里附了自证输出。集成测试连真实 Neo4j 需 `SMARTSKETCH_TEST_NEO4J_URI=bolt://localhost:17687 SMARTSKETCH_TEST_NEO4J_USER=neo4j SMARTSKETCH_TEST_NEO4J_PASSWORD=testpassword1`（容器 `ss-neo4j-f11`，Neo4j 5.26.31）；注意 `.env` 里的 `NEO4J_URI` 仍写 7687，与容器端口不一致。同名校验：`tests/backend/test_f08.py` 与 `tests/integration/test_f08.py` 同名，混跑会触发 pytest import mismatch，须按目录分开跑。
+- **本批新解锁（可开工）**：H14（教师图谱编辑页，依赖 H05/H06/H07/H08，D-17 补登，issue #281）、I05（推荐查询 API，依赖 I02/I04/G07）、J05（有证据问答生成，依赖 J04/E04）；其后 H09（F11+H07）、J06（J05）、I06（I05）跟进。
+- **需 ArvinHan 签收（本批累计）**：ADR-060～066 七条；ADR-061 的租约被夺窗口如何处置（当前选择如实记录、接受残留风险）与脱敏/只追加缺口是否本轮补；ADR-065 的「图证据块在闸门打开后可被引用」与「预算 0 块复用 `below_similarity_threshold`」两点；ADR-064 的 `user_id` 多余字段覆盖 `specs/identity-access.md` 相应条目；I02 的 `reason="duplicate"` 登记。
+- **收口**：#273（codex 的 J02 draft）已被 #274 合入的 J02 取代，作为重复草稿关闭；已合入 main 但 issue 仍 open 的陈旧项（#100 F08、#110 G05、#111 G06、#130 J01、#131 J02、#117 H05、#118 H06、#120 H08、#149 K10、#101 F09、#102 F10 等）随本批一并关闭并附合并证据。
