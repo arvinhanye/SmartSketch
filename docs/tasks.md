@@ -882,7 +882,7 @@ D11、E08、C11、J03 的前置均已合入 main@`ddbeb82`（D11：C09 #220、C1
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E08 | IN PROGRESS | 实现名称归一和重复候选 | ArvinHan（Claude） | `claude/e08-name-normalize` / 本认领提交 | `src/backend/app/services/fusion/__init__.py`、`src/backend/app/services/fusion/normalize.py`、`tests/backend/test_e08.py`、`docs/handoffs/claude-e08.md` | 待补 |
+| E08 | DONE（待 PR 审查/合并） | 实现名称归一和重复候选 | ArvinHan（Claude） | `claude/e08-name-normalize` / 本认领提交 | `src/backend/app/services/fusion/__init__.py`、`src/backend/app/services/fusion/normalize.py`、`tests/backend/test_e08.py`、`docs/handoffs/claude-e08.md` | `test_e08.py` 137 passed（红：`ModuleNotFoundError`）；后端全量 2242 passed（基线 2105 + 137）；NFKC/格式字符/ASCII 小写/圆括号别名·注释·公式组/空白规则；候选 `same_key`/`alias`/`containment` 只列不合并，包含限前缀、有效字符 ≥ 2、比 ≥ 3/5、不切拉丁串，「栈/栈帧」「树/二叉树」「图/图灵机」「C/C++」等反例独立；11 处反向篡改均检出、`cmp` 恢复；`./scripts/verify.sh` exit 0、`git diff --check` exit 0；待决 4 项见 `docs/handoffs/claude-e08.md` |
 
 - E08 验收：全半角、空白、括号（含中英文括号内的别名/缩写）归一为确定性键；归一键相同才列为同键候选，名称包含只列候选、不自动合并；误合并反例（如「栈」与「栈帧」、「树」与「二叉树」）保持独立。纯函数、不调模型。验证：`python3 -m pytest tests/backend/test_e08.py -q`。
 
