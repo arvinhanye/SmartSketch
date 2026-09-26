@@ -1213,6 +1213,6 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| H07 | DONE（待 PR 审查/合并，issue #119） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；前端全量 494 passed、type-check 与 build 通过；`./scripts/verify.sh` 通过；`docs/handoffs/claude-h07.md` |
+| H07 | DONE（待 PR 审查/合并，issue #119；**独立审查 APPROVE_WITH_NOTES**） | 实现教师节点编辑面板 | ArvinHan（Claude） | `claude/project-thread-130wun` / `main@a7d8075` | `src/frontend/src/components/NodeEditor.vue`、`src/frontend/src/composables/useNodeEditor.ts`、`tests/frontend/h07.test.ts`；扩围新建 `src/frontend/src/api/nodeEdit.ts`、`docs/decisions.md`（ADR-062） | `h07.test.ts` 56 passed；25 处反向篡改全部检出（2 处补强用例后）；type-check 与 build 通过；前端全量**实测 493 passed + 1 failed**，失败项为既有 `b02.test.ts` 子进程 vitest 5 s 超时（本机慢；给 90 s 即通过，`b02.test.ts`/`vitest.config.ts`/`package.json` 本分支未改，`origin/main` 上同样失败）——原写「494 passed」不可复现，已按实测更正；**仅假 API 验证**（真实后端路由已存在但未联调）；独立审查：3 处篡改检出、契约形状与后端 `_CURRENT_FIELDS` 逐字段吻合、`verify.sh` 与 `validate_atomic_plan.py` 通过；`docs/handoffs/claude-h07.md` |
 
 - H07 待决（需 ArvinHan）：ADR-062 签收；教师图谱编辑页无归属（挂载页由新补登的 H14「实现教师图谱编辑页」负责（D-17）；H11 是学生端浏览页，不挂本面板）；`REVISION_CONFLICT` 的 `details.current` 不含章节，采用最新内容时章节沿用本地值。
