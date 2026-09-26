@@ -165,7 +165,7 @@ python3 evaluation/evaluate_extraction.py score \
    # 可选：LLM_REQUEST_TIMEOUT_SECONDS（默认 60）、LLM_MAX_RETRIES（默认 2）
    ```
 
-   `LLM_API_KEY` 为空时脚本拒绝运行（退出码 2）。E03 适配器直连供应商，不走 HTTP 代理。脚本的调用记录只在进程内存中计量，日预算只统计本次运行。
+   `LLM_API_KEY` 为空时脚本拒绝运行（退出码 2）。若日志出现 `error_class=connection` 而 `curl` 能连上，多半是本机 Python 缺根证书（`CERTIFICATE_VERIFY_FAILED`）：`pip install certifi && export SSL_CERT_FILE="$(python3 -m certifi)"`；有 HTTPS 流量检查的网络改用 `security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain /Library/Keychains/System.keychain > ~/macos-ca.pem` 并把 `SSL_CERT_FILE` 指向它。连续 5 次连接失败后熔断器会拒绝后续调用，修好后重跑即可。E03 适配器直连供应商，不走 HTTP 代理。脚本的调用记录只在进程内存中计量，日预算只统计本次运行。
 
 3. **运行抽取**：
 
