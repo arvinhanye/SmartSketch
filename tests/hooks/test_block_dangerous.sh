@@ -43,7 +43,7 @@ expect() { # $1 = 期望 block|allow，$2 = 用例名；stdin = 钩子输入
   if [[ "$got" == "$1" ]]; then
     echo "PASS  $2"
   else
-    echo "FAIL  $2（期望 $1，实际 $got）"
+    echo "FAIL  $2（期望 $1，实际 ${got}）"
     fail=1
   fi
 }
