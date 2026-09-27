@@ -1300,7 +1300,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| I02 | DONE（待 PR 审查/合并；issue #125） | 实现掌握标记 API | ArvinHan（Claude） | `claude/project-thread-fqm6l4` / `main@a7d8075` | `src/backend/app/services/learning/progress.py`、`src/backend/app/api/progress.py`、`tests/backend/test_i02.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 两行导出、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-064、`docs/handoffs/claude-i02.md` | `test_i02.py` 24 passed；8 处反向篡改检出 7 处，存活 1 处为冗余防护（绑定版本号复核，G07 已查）；后端 + 契约全量 3417 passed；`./scripts/verify.sh` 通过；`git diff --check` 干净 |
+| I02 | DONE（待 PR 审查/合并；issue #125） | 实现掌握标记 API | ArvinHan（Claude） | `claude/project-thread-fqm6l4` / `main@a7d8075` | `src/backend/app/services/learning/progress.py`、`src/backend/app/api/progress.py`、`tests/backend/test_i02.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 两行导出、`services/learning/__init__.py` 文档串、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-064、`docs/handoffs/claude-i02.md` | `test_i02.py` 24 passed；8 处反向篡改检出 7 处，存活 1 处为冗余防护（绑定版本号复核，G07 已查）；后端 + 契约全量 3417 passed；`./scripts/verify.sh` 通过；`git diff --check` 干净 |
 
 - 验收：请求体带 `user_id` 整批 422 零写入、查询串 `user_id` 不被读取、学生之间与课程之间隔离；改标后 `GET /progress` 与 I03 可学集合按新投影重算；草稿独有、已删除、他课、已并入他点的来源 `kp_id` 均 422 `not_in_published_version` 且零写入；LP-8/9/16～20 的投影与覆盖、同值写入重放无操作、写事务内复核发布指针、完整性故障 500 只含 `request_id`。
 - 依赖：I01（PR #272）、C03、B12/B12-R1（契约）、G07 均已在 main。无迁移（预分配的 014 未使用）、无契约与依赖变更。
