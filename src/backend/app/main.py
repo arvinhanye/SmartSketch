@@ -1,6 +1,7 @@
 """FastAPI application factory and ASGI entry point."""
 
 import time
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
 from app.api.dependencies import access_error_response
 from app.api.event_tickets import router as event_tickets_router
@@ -33,6 +35,7 @@ from app.services.startup import validate_embedding_space, validate_schema_curre
 
 
 APP_VERSION = "0.1.0"
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -62,7 +65,7 @@ def _field_reason(error: dict) -> dict[str, str]:
     return {"in": source, "field": ".".join(path), "reason": str(error.get("type", ""))}
 
 
-async def _validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def _validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Answer every request-validation failure with the contract ``Error`` (VALIDATION_ERROR).
 
     FastAPI's default body echoes the submitted ``input`` — including passwords — so only
@@ -73,6 +76,10 @@ async def _validation_error_handler(_: Request, exc: RequestValidationError) -> 
         message=_VALIDATION_MESSAGE,
         details={"fields": [_field_reason(error) for error in exc.errors()]},
     )
+    if request.url.path.endswith("/chat"):
+        logger.info("chat request rejected status=422 code=VALIDATION_ERROR course_id=%s user_id=%s",
+                    request.path_params.get("cid"),
+                    getattr(request.state, "authenticated_user_id", None))
     return JSONResponse(status_code=422, content=body.model_dump())
 
 
@@ -88,6 +95,7 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)
     application.include_router(tasks_router)

@@ -1,0 +1,8 @@
+[
+  {"text": "`a[1]`", "citations": [], "status": "not_covered"},
+  {"text": "```py\nx[2]\n```", "citations": [], "status": "not_covered"},
+  {"text": "~~~\nx[1]\n~~~", "citations": [], "status": "not_covered"},
+  {"text": "结论[1]。\n```\npush(x)\n```", "citations": [1], "status": "answered"},
+  {"text": "`a[1]`，结论[2]。", "citations": [2], "status": "answered"},
+  {"text": "`未闭合[1]", "citations": [], "status": "not_covered"}
+]
