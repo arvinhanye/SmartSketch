@@ -43,6 +43,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 图谱筛选与布局（H05）：`composables/useGraphFilters.ts` 在适配图上按搜索词、关系类型、知识点类型、审核状态、章节算出可见图（关系须两端可见，无悬空边），并给元素打 `rejected`/`lowConfidence`/`selected` 状态；选中与布局独立于筛选条件。`components/GraphToolbar.vue` 是搜索、关系图例兼筛选、布局切换与清空的受控组件。`GraphCanvas` 的 `layout` 属性经 `lifecycle.setLayout` 在原图上重新布局（层次 `antv-dagre`／力导向 `d3-force`），不重建、不重设数据（ADR-052）。
 - 学生图谱页（H11）：`views/StudentGraphView.vue`（`/courses/:cid/graph`）组装画布、工具栏、卡片与详情；`composables/useStudentGraph.ts` 只在课程内学生角色下、按 `Course.published_version` 经 `api/graph.ts` 读图并核对响应的 `course_id`/`graph_version`，任何入口不读草稿；`components/KnowledgeCards.vue` 是分页、可键盘操作的卡片视图，与图共用 `useGraphFilters` 的筛选与选中（ADR-063）。
 - 教师图谱编辑页（H14）：`views/TeacherGraphView.vue`（`/courses/:cid/graph/edit`，仅教师账号）组装草稿画布、工具栏与三个页签面板（H06 详情、H07 节点编辑、H08 关系编辑）；`composables/useTeacherGraph.ts` 只在课程内教师角色下经 `api/graph.ts` 的 `DraftGraphApi`（不带版本号）读草稿，核对 `course_id` 且 `graph_version` 为 null 后写入课程 store，三个编辑器共用这份图，成功写回后画布随之更新；`useSelectionGuard` 在节点面板有未保存修改时先确认再切换（ADR-067）。
+- 教师审核队列页（H09）：`views/ReviewView.vue`（`/courses/:cid/review`，仅教师账号）展示低置信度关系、疑似重复、孤立知识点三栏并转发处理；`composables/useReview.ts` 在课程内教师角色下经 `api/review.ts` 读队列（键集分页）、单项处理与合并，数量只取服务端 `totals`，一次只允许一个处理，会连带影响其他栏的处理后重读三栏；关系两端名称取自草稿图谱，读不到退回 ID（ADR-070）。
 
 ## 后端启动与健康检查（B05）
 

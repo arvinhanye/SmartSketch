@@ -8,6 +8,7 @@ import { COURSES_API_KEY, createCoursesApi } from './api/courses'
 import { createMembersApi, MEMBERS_API_KEY } from './api/members'
 import { createMaterialsApi, MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from './api/materials'
 import { createDraftGraphApi, createPublishedGraphApi, DRAFT_GRAPH_API_KEY, PUBLISHED_GRAPH_API_KEY } from './api/graph'
+import { createReviewApi, REVIEW_API_KEY } from './api/review'
 import { createTaskEventsClient } from './api/taskEvents'
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from './router'
 import { useSessionStore } from './stores/session'
@@ -16,6 +17,7 @@ import LoginView from './views/LoginView.vue'
 import MembersView from './views/MembersView.vue'
 import MaterialsView from './views/MaterialsView.vue'
 import StudentGraphView from './views/StudentGraphView.vue'
+import ReviewView from './views/ReviewView.vue'
 import TeacherGraphView from './views/TeacherGraphView.vue'
 
 const pinia = createPinia()
@@ -36,6 +38,8 @@ const router = createAppRouter({
   studentGraphComponent: StudentGraphView,
   // H14：教师图谱编辑页 /courses/:cid/graph/edit（只读写草稿）
   teacherGraphComponent: TeacherGraphView,
+  // H09：审核队列 /courses/:cid/review（处理草稿）
+  reviewComponent: ReviewView,
 })
 
 // 受保护接口 401：清会话与课程上下文后回登录页
@@ -54,5 +58,6 @@ createApp(App)
   .provide(MATERIALS_API_KEY, createMaterialsApi(http))
   .provide(PUBLISHED_GRAPH_API_KEY, createPublishedGraphApi(http))
   .provide(DRAFT_GRAPH_API_KEY, createDraftGraphApi(http))
+  .provide(REVIEW_API_KEY, createReviewApi(http))
   .provide(TASK_EVENTS_CLIENT_KEY, createTaskEventsClient({ client: http }))
   .mount('#app')
