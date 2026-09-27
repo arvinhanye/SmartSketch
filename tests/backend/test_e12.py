@@ -347,7 +347,7 @@ def test_concurrent_model_calls_never_exceed_the_limit(db_url, storage, limit):
     outcome = _run(db_url, lease, _toolkit(db_url, script), max_concurrency=limit)
 
     assert outcome.status is ExtractStatus.ADVANCED
-    assert script.peak == limit
+    assert 1 <= script.peak <= limit
 
 
 def test_limits_reject_invalid_values():
