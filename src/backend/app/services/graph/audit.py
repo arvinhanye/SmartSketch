@@ -1,8 +1,13 @@
 """F12：教师图编辑审计（ADR-061；specs/teacher-review-publish.md「图编辑审计」）。
 
-记录 F08 新建/修改/解锁、F09 删除、F10 合并这五种教师写入：**谁**（``actor_id``）、**何时**（``created_at`` /
-``resolved_at``）、**何版本**（写入后的课程 ``draft_revision`` 与节点修订号前后值）、**变更摘要**（白名单字段、
-脱敏）。只读、校验失败、冲突、未加锁节点的解锁等没有写入的请求不记录。
+记录 F08 新建/修改/解锁、F09 删除、F10 合并这五种教师写入，以及 F06 关系路由（ADR-071）的关系
+新建/修改/删除：**谁**（``actor_id``）、**何时**（``created_at`` / ``resolved_at``）、**何版本**（写入后的
+课程 ``draft_revision`` 与节点修订号前后值）、**变更摘要**（白名单字段、脱敏）。只读、校验失败、冲突、
+未加锁节点的解锁等没有写入的请求不记录。
+
+关系写入复用 ``graph_edit_logs`` 的既有动作词（迁移 012 的 ``action IN (…)`` 是数据库级闭集，新增取值要
+重建表），因此关系行以摘要里的 ``entity = "relation"`` 与节点行区分；``_applied_relation`` 用同一摘要里的
+``after`` 与图里的当前状态对账，不需要关系修订号。``kp_id`` 列对关系行存 ``rel_id``。
 
 跨库顺序（Neo4j 与 SQLite 之间没有分布式事务）：
 
@@ -13,9 +18,13 @@
    仍失败则只记日志、**不**让已提交的编辑报错（否则客户端重试会得到 ``REVISION_CONFLICT``），行留在 ``pending``。
 4. ``reconcile``：每次教师写入取得课程写锁后、做任何事之前，先把本课程遗留的 ``pending`` 行对照 Neo4j
    判定为已提交或未生效。持锁时不会有其他教师写入插进来，自动流程又不改加锁节点，所以判定是确定的
-   （规则见 ``_applied``）。
+   （规则见 ``_applied`` 与 ``_applied_relation``）。
 
 ``ctx.actor_id is None``（不经 API 的内部调用）时不记审计，只加草稿修订号，与 F08～F10 原行为相同。
+
+关系路由把 ``begin`` 放在同一 Neo4j 写事务里的写入之后（见 ``app.services.graph.edit_relation``）：这样
+成环、悬空端点、重复关系这类**写入前**的拒绝既不加草稿修订号也不留审计行（与 F08～F10 一致），
+而 ``begin`` 之后的失败照旧由 ``abort`` / ``reconcile`` 收尾。
 """
 
 from __future__ import annotations
@@ -44,6 +53,9 @@ __all__ = [
     "merge_summary",
     "reconcile",
     "redact",
+    "relation_create_summary",
+    "relation_delete_summary",
+    "relation_update_summary",
     "unlock_summary",
     "update_summary",
 ]
@@ -57,6 +69,10 @@ MAX_TEXT: Final = 500
 MAX_ITEMS: Final = 50
 #: 审计里保留的知识点字段（学生可见内容与锁状态）；其余属性（贡献、向量、谱系等）不进摘要。
 FIELDS: Final = ("name", "aliases", "type", "definition", "importance", "difficulty", "status", "chapter_id")
+#: 关系行在摘要里的标记；``graph_edit_logs.action`` 是数据库级闭集，关系行靠它与节点行区分。
+RELATION_ENTITY: Final = "relation"
+#: 关系摘要里保留的状态字段，也是 ``_applied_relation`` 对账用的字段。
+RELATION_FIELDS: Final = ("type", "from_id", "to_id", "status", "source")
 REDACTED: Final = "[REDACTED]"
 
 _SECRETS: Final = (
@@ -73,6 +89,8 @@ _ASSIGNMENT: Final = re.compile(
 
 class _Store(Protocol):
     def node(self, scope: GraphScope, kp_id: str) -> dict[str, Any] | None: ...
+
+    def relation(self, scope: GraphScope, rel_id: str) -> dict[str, Any] | None: ...
 
 
 class _Context(Protocol):
@@ -146,6 +164,30 @@ def merge_summary(primary: Mapping[str, Any], merged: Sequence[Mapping[str, Any]
         if value is not None:
             out[key] = value
     return out
+
+
+def _relation_state(relation: Mapping[str, Any]) -> dict[str, Any]:
+    """关系的白名单状态；``rel_id`` 与 ``revision`` 只在给出时附上（对账只用 ``RELATION_FIELDS``）。"""
+    state = {key: _clean(relation.get(key)) for key in RELATION_FIELDS if relation.get(key) is not None}
+    for key in ("rel_id", "revision"):
+        if relation.get(key) is not None:
+            state[key] = _clean(relation[key])
+    return state
+
+
+def relation_create_summary(relation: Mapping[str, Any]) -> dict[str, Any]:
+    """关系新建：只记写入后的状态（``after``）；``after`` 也是 ``reconcile`` 的对账依据。"""
+    return {"entity": RELATION_ENTITY, "after": _relation_state(relation)}
+
+
+def relation_update_summary(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
+    """关系修改：写前与写后的白名单状态；写入前的关系 ID 与写后不同时也一并记下。"""
+    return {"entity": RELATION_ENTITY, "before": _relation_state(before), "after": _relation_state(after)}
+
+
+def relation_delete_summary(relation: Mapping[str, Any]) -> dict[str, Any]:
+    """关系删除：记下被删关系的白名单状态（``deleted``）。"""
+    return {"entity": RELATION_ENTITY, "deleted": _relation_state(relation)}
 
 
 # ---------------------------------------------------------------- 写入路径
@@ -236,6 +278,24 @@ def _applied(entry: EditLog, node: Mapping[str, Any] | None) -> tuple[bool, int 
     return bool(node.get("locked")) and revision == before + 1, before + 1
 
 
+def _applied_relation(entry: EditLog, relation: Mapping[str, Any] | None) -> tuple[bool, int | None]:
+    """同 ``_applied``，但用于关系审计行（摘要带 ``entity = "relation"``）。
+
+    - ``create`` / ``update``：图里当前的关系状态与摘要里的 ``after``（写入后的 ``type`` / 端点 /
+      ``status`` / ``source``）逐项相同。写入没生效时要么关系不在（不可见），要么还是旧状态；自动流程
+      写不出 ``source = manual``，所以不会出现「被别人写成一样」而误判生效。
+    - ``delete``：关系对本课程草稿已不可见。
+
+    关系没有随写入变化的节点修订号，``kp_revision_after`` 一律为 ``None``；判定只用状态。
+    """
+    if entry.action == "delete":
+        return relation is None, None
+    after = entry.summary.get("after") if isinstance(entry.summary, Mapping) else None
+    if relation is None or not isinstance(after, Mapping):
+        return False, None
+    return all(relation.get(key) == after.get(key) for key in RELATION_FIELDS), None
+
+
 def reconcile(ctx: _Context, scope: GraphScope) -> list[tuple[str, str]]:
     """把本课程遗留的 ``pending`` 行判定为 ``committed`` / ``aborted``；必须持课程写锁调用。
 
@@ -243,7 +303,10 @@ def reconcile(ctx: _Context, scope: GraphScope) -> list[tuple[str, str]]:
     """
     resolved: list[tuple[str, str]] = []
     for entry in edit_logs.pending(ctx.sqlite_url, scope.course_id):
-        done, after = _applied(entry, ctx.store.node(scope, entry.kp_id))
+        if entry.summary.get("entity") == RELATION_ENTITY:
+            done, after = _applied_relation(entry, ctx.store.relation(scope, entry.kp_id))
+        else:
+            done, after = _applied(entry, ctx.store.node(scope, entry.kp_id))
         state = "committed" if done else "aborted"
         if edit_logs.resolve(ctx.sqlite_url, entry.event_id, state=state, resolved_by="reconcile",
                              kp_revision_after=after if done else None,

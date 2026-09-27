@@ -1353,6 +1353,23 @@ class KnowledgePointDetail(KnowledgePoint):
     related: Optional[list[KnowledgePointRef]] = None
 
 
+class KnowledgePointDetailWithoutSource(KnowledgePoint):
+    source_refs: Annotated[
+        list[SourceRef],
+        Field(
+            description='没有可定位来源，显式的空数组（不是缺字段，也不是伪造的引用）',
+            max_length=0,
+        ),
+    ]
+    prerequisites: Annotated[
+        Optional[list[KnowledgePointRef]], Field(description='直接前置知识点')
+    ] = None
+    successors: Annotated[
+        Optional[list[KnowledgePointRef]], Field(description='直接后继知识点')
+    ] = None
+    related: Optional[list[KnowledgePointRef]] = None
+
+
 class KnowledgePointCreate(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     sources: Annotated[
