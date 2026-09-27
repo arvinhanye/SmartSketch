@@ -183,17 +183,50 @@ def measure_qa(sqlite_url: str, course_id: str, base_url: str, token: str) -> di
     body = json.dumps({"question": QUESTION}, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url, data=body, method="POST",
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json",
+        headers={"Authorization": f"Bearer {token}", "Accept": "text/event-stream",
                  "Content-Type": "application/json"},
     )
     start = time.perf_counter_ns()
+    first_delta_ms: float | None = None
+    terminal_ms: float | None = None
+    request_id: str | None = None
+    status: str | None = None
+    terminal_event: str | None = None
     with urllib.request.urlopen(request, timeout=60) as response:
-        payload = json.load(response)
-    elapsed = (time.perf_counter_ns() - start) / 1_000_000
-    request_id = payload.get("request_id")
+        event_name = ""
+        data_lines: list[str] = []
+        for raw in response:
+            line = raw.decode("utf-8").rstrip("\r\n")
+            if line.startswith("event:"):
+                event_name = line[6:].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[5:].lstrip())
+            elif not line and data_lines:
+                event = json.loads("\n".join(data_lines))
+                if event_name == "meta":
+                    request_id = event["request_id"]
+                elif event_name == "delta" and first_delta_ms is None:
+                    first_delta_ms = round((time.perf_counter_ns() - start) / 1_000_000, 2)
+                elif event_name in ("done", "error"):
+                    terminal_ms = round((time.perf_counter_ns() - start) / 1_000_000, 2)
+                    terminal_event = event_name
+                    if event_name == "done":
+                        status = event["final"]["status"]
+                        request_id = event["final"]["request_id"]
+                    else:
+                        status = event["error"]["code"]
+                        request_id = event["error"]["details"]["request_id"]
+                    break
+                event_name = ""
+                data_lines.clear()
+    if terminal_event is None:
+        raise RuntimeError("chat SSE ended without done/error")
     return {
-        "elapsed_ms": round(elapsed, 2),
-        "status": payload.get("status"),
+        "first_token_ms": first_delta_ms,
+        "elapsed_ms": terminal_ms,
+        "status": status,
+        "terminal_event": terminal_event,
+        "complete": terminal_event == "done" and status == "answered" and first_delta_ms is not None,
         "request_id": request_id,
         "tokens": token_usage(sqlite_url, "request_id", request_id) if request_id else None,
     }
@@ -214,6 +247,7 @@ def build_report(settings: Any, workers: list[dict[str, Any]], qa: list[dict[str
     }
     return {
         "status": "measured" if workers and all(worker["complete"] for worker in workers)
+        and all(sample["complete"] for sample in qa)
         else "incomplete",
         "measured_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "fixture": {"source": str(FIXTURE_SOURCE.relative_to(ROOT)), "characters": len(fixture_text())},
@@ -222,6 +256,7 @@ def build_report(settings: Any, workers: list[dict[str, Any]], qa: list[dict[str
             "python": platform.python_version(), "cpu": platform.processor(),
             "llm_mode": settings.LLM_MODE,
             "model": settings.LLM_EXTRACTION_MODEL if settings.LLM_MODE == "live" else "fake",
+            "qa_model": settings.LLM_CHAT_MODEL if settings.LLM_MODE == "live" else "fake",
             "worker_processes": settings.WORKER_PROCESSES,
             "llm_max_concurrency": settings.LLM_MAX_CONCURRENCY,
         },
@@ -229,12 +264,15 @@ def build_report(settings: Any, workers: list[dict[str, Any]], qa: list[dict[str
         "observed": {
             "worker_samples": len(workers), "worker_total_ms": summarize(workers, "elapsed_ms"),
             "stages_ms": stages, "qa_samples": len(qa), "qa_complete_ms": summarize(qa, "elapsed_ms"),
+            "qa_first_token_ms": summarize(
+                [sample for sample in qa if sample["first_token_ms"] is not None], "first_token_ms"
+            ),
         },
         "worker_runs": workers,
         "qa_runs": qa,
         "notes": [
             "目标值与实测值分列；没有样本的 p50/p95 为 null。",
-            "JSON 问答测量为完整响应时间，不提供首字时间。",
+            "SSE 首字时间以首个 delta 为准，完整响应时间以 done/error 为准；未出字时首字时间为 null。",
             "假模型结果只代表本地流程，不代表真实模型性能。" if settings.LLM_MODE == "fake"
             else "真实模型调用会产生费用。",
         ],
@@ -283,7 +321,9 @@ def main(argv: Sequence[str] | None = None) -> int:
           for _ in range(args.qa_samples)] if all(worker["complete"] for worker in workers) else []
     args.out.write_text(json.dumps(build_report(settings, workers, qa), ensure_ascii=False, indent=2) + "\n",
                         encoding="utf-8")
-    return 0 if len(workers) == args.samples and all(worker["complete"] for worker in workers) else 1
+    complete = (len(workers) == args.samples and all(worker["complete"] for worker in workers)
+                and all(sample["complete"] for sample in qa))
+    return 0 if complete else 1
 
 
 if __name__ == "__main__":

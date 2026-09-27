@@ -1350,4 +1350,4 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 分支 | 修改范围 | 验证 |
 | --- | --- | --- | --- | --- | --- |
-| K04 | IMPLEMENTED / 待 PR 与完整验证 | 固定约 2 万字样本的 worker 阶段耗时、token 与可选问答测量 | `codex/k04-benchmark-pipeline` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py` | 定向测试 1 passed；真实服务与付费模型尚未实测，J07 问答接口待合入 |
+| K04 | IMPLEMENTED / 待实测与 PR 复审 | 固定约 2 万字样本的 worker 阶段耗时、token 与 SSE 问答测量 | `codex/k04-benchmark-pipeline` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py`、`docs/handoffs/codex-k04.md` | J07 已合入；SSE 首字/终态与 p50/p95 定向测试 3 passed；真实服务测量待环境，`verify.sh` 因本机契约工具链/编码未通过，付费调用未执行 |
