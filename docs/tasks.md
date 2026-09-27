@@ -1178,3 +1178,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 依赖：C01、A08、G07 已在本地代码中；I02 负责图谱谱系投影及 HTTP 校验。风险：迁移新增持久表，回滚需停 API/worker 后恢复迁移前 SQLite 备份。
 - 验证命令：`.venv/Scripts/python.exe -m pytest tests/backend/test_i01.py tests/backend/test_g02.py -q`、`./scripts/verify.sh`、`git diff --check`。
 - 验收证据：审查发现原 `write_progress` 总是另开事务，无法加入 I02 的版本绑定写事务；新增一个用例先因缺少事务入口而失败，修复后 I01 6 passed、I01+G02 28 passed。隔离 worktree 的 `verify.sh` exit 0。此次未重跑后端全量；原始交接记录中的全量结果仅属修复前快照。
+
+## 2026-09-27 J06 引用和终态校验（Codex）
+
+| ID | 状态 | 范围 | 验收证据 |
+| --- | --- | --- | --- |
+| J06 | DONE | `src/backend/app/services/qa/citations.py`、`tests/backend/test_j06.py`、`tests/fixtures/qa_code_spans.json` | 绑定版本复核来源；流内归一化/剔除未知编号与哨兵；逐句覆盖后构造 `answered` 或固定模板 `not_covered`；共享代码片段夹具。J06 定向 30 passed，`py_compile` exit 0，`verify.sh` exit 0，`git diff --check` exit 0。 |
+
+- 输入：待校验模型输出、允许引用文本块和 G07 已绑定发布版本；输出：仅含已验证标记的 delta、可机读终态与日志所需计数。
+- 依赖：B13 契约已合入；J05/J07 后续按本服务接口接入生成流和 SSE API。本任务未改公共契约或路由。
