@@ -118,10 +118,10 @@ class _Item:
 
 def target_space(settings: Any) -> str:
     """Same derivation as E07 ``EmbeddingAdapter.space`` and B06's startup check."""
-    if settings.EMBEDDING_MODE == "fake":
-        space = f"fake/{settings.EMBEDDING_DIMENSIONS}"
-    else:
-        space = f"real/{settings.EMBEDDING_MODEL}/{settings.EMBEDDING_DIMENSIONS}"
+    from app.config import embedding_space_identity
+
+    model, dimensions, is_fake = embedding_space_identity(settings)
+    space = f"fake/{dimensions}" if is_fake else f"real/{model}/{dimensions}"
     try:
         _dimensions(space)
     except VectorSpaceError:
@@ -432,6 +432,9 @@ def _client_from_settings(settings: Any) -> EmbeddingClient:
     if settings.EMBEDDING_MODE == "fake":
         from app.services.ai.fake import FakeEmbeddingClient
         return FakeEmbeddingClient()
+    if settings.EMBEDDING_MODE == "demo":
+        from app.services.ai.demo import DemoEmbeddingClient
+        return DemoEmbeddingClient()
     from app.services.ai.compatible import CompatibleEmbeddingClient
     return CompatibleEmbeddingClient(settings.EMBEDDING_BASE_URL, settings.EMBEDDING_API_KEY.get_secret_value(),
                                      batch_size=settings.EMBEDDING_BATCH_SIZE)

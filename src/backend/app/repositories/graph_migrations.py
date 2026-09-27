@@ -263,10 +263,10 @@ def ensure_current_vector_indexes(settings: Any, *, driver_factory: Callable | N
     The space is read from SQLite (initialized from the configuration on first run, like API startup).
     A configuration that differs from the recorded space is refused: that needs scripts/reembed.py (V12).
     """
+    from app.config import embedding_space_identity
     from app.repositories.embedding_space import read_or_initialize_space
 
-    configured = (settings.EMBEDDING_MODEL if settings.EMBEDDING_MODE != 'fake' else '',
-                  settings.EMBEDDING_DIMENSIONS, int(settings.EMBEDDING_MODE == 'fake'))
+    configured = embedding_space_identity(settings)
     try:
         recorded = read_or_initialize_space(settings.SQLITE_URL, *configured)
     except (OSError, sqlite3.Error):

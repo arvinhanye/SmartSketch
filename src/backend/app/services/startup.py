@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from app.config import Settings, SettingsError
+from app.config import Settings, SettingsError, embedding_space_identity
 from app.repositories.embedding_space import read_or_initialize_space
 from app.repositories.sqlite import MigrationError, pending_migrations
 
@@ -24,11 +24,7 @@ def validate_schema_current(settings: Settings) -> None:
 
 def validate_embedding_space(settings: Settings) -> None:
     """Fail startup when the configured embedding space differs from SQLite."""
-    configured = (
-        settings.EMBEDDING_MODEL if settings.EMBEDDING_MODE != "fake" else "",
-        settings.EMBEDDING_DIMENSIONS,
-        int(settings.EMBEDDING_MODE == "fake"),
-    )
+    configured = embedding_space_identity(settings)
     try:
         recorded = read_or_initialize_space(settings.SQLITE_URL, *configured)
     except (OSError, sqlite3.Error):

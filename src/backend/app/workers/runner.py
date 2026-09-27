@@ -38,10 +38,8 @@ from types import FrameType
 from app.config import Settings, SettingsError, load_settings
 from app.repositories.model_calls import SqliteCallStore
 from app.repositories.neo4j import Neo4jRepository
-from app.services.ai.client import ModelClient
-from app.services.ai.compatible import CompatibleModelClient
 from app.services.ai.entities import EntityExtractor
-from app.services.ai.fake import FakeModelClient
+from app.services.ai.factory import build_model_clients, model_id
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
 from app.services.startup import validate_embedding_space, validate_schema_current
@@ -56,7 +54,6 @@ HEARTBEAT_SECONDS = 10.0
 HEARTBEAT_STALE_SECONDS = 60.0
 # 与 K02 评测脚本的缺省值一致（evaluation/run_live_extraction.py）
 MAX_OUTPUT_TOKENS = 4096
-FAKE_MODEL_ID = "fake"
 HEARTBEAT_ENV = "WORKER_HEARTBEAT_FILE"
 DEFAULT_HEARTBEAT_FILE = "/tmp/smartsketch-worker.heartbeat"
 
@@ -69,16 +66,10 @@ def heartbeat_path() -> Path:
 
 
 def build_toolkit(settings: Settings) -> ExtractionToolkit:
-    """按 ``LLM_MODE`` 建模型客户端，外包 E04 策略（调用记录写应用 SQLite 的 ``model_calls``）。"""
-    fallback: ModelClient | None = None
-    primary: ModelClient
-    if settings.LLM_MODE == "live":
-        primary = CompatibleModelClient.from_settings(settings, role="primary")
-        if settings.LLM_FALLBACK_BASE_URL.strip():
-            fallback = CompatibleModelClient.from_settings(settings, role="fallback")
-    else:
-        primary = FakeModelClient()
-    model = settings.LLM_EXTRACTION_MODEL.strip() or FAKE_MODEL_ID
+    """按 ``LLM_MODE`` 建模型客户端（live / demo / fake，见 ``app.services.ai.factory``），外包 E04 策略
+    （调用记录写应用 SQLite 的 ``model_calls``）。"""
+    primary, fallback = build_model_clients(settings)
+    model = model_id(settings, "extraction")
     policy = ModelCallPolicy.from_settings(
         settings, primary=primary, fallback=fallback, store=SqliteCallStore(settings.SQLITE_URL)
     )
