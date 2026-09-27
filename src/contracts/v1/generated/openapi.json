@@ -129,6 +129,55 @@
         }
       }
     },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "学生自助注册，成功即登录",
+        "description": "只创建账号类型为 student 的账号；教师账号仍只由命令行创建（ADR-079）。\n成功返回与登录相同的 `LoginResponse`。注册不让学生进入任何课程，\n入课仍由课程教师按用户名添加（`addMember`）。\n",
+        "operationId": "register",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "已注册并登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "用户名已被占用（`USERNAME_TAKEN`）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/api/v1/courses": {
       "get": {
         "tags": [
@@ -2010,7 +2059,8 @@
           "COURSE_BUSY",
           "BUDGET_EXCEEDED",
           "DOCUMENT_NOT_DELETABLE",
-          "REVISION_CONFLICT"
+          "REVISION_CONFLICT",
+          "USERNAME_TAKEN"
         ]
       },
       "PublishBlockedReason": {
@@ -2159,6 +2209,29 @@
           "password": {
             "type": "string",
             "format": "password"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "description": "学生自助注册（ADR-079）。闭合对象，不接受 role 等其他字段；用户名入库前转小写。",
+        "required": [
+          "username",
+          "password"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "maxLength": 128
           }
         }
       },

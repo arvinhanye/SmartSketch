@@ -1669,3 +1669,31 @@
 - **后果**：导入依赖 worker 在运行；失败重试会在该课留下失败的旧资料记录（与教师手动重新上传一致）。
 - **回滚**：删除 `scripts/import-demo.py`、`app/services/demo_import.py`、`datasets/demo/`；已导入的示例课需教师在界面上处理（本任务不提供删除）。
 - **签收**：ArvinHan 2026-09-27 签收。
+
+## ADR-079：学生自助注册，教师账号仍由命令行开通（部分取代 ADR-013 决定 1）
+
+- **日期**：2026-09-27
+- **背景**：ADR-013 规定「没有注册端点」，账号只能用 `scripts/manage-accounts.py` 创建。演示和真实试用时，新学生无法自己上手，只能等管理员逐个开号。用户在前端改版讨论中选定方案「学生自助注册，教师由管理员开」（ArvinHan，2026-09-27，线程回复「A + 1」）。
+- **选项**：
+
+  | 选项 | 结论 | 理由 |
+  | --- | --- | --- |
+  | 学生自助注册，教师仍走命令行 | **采纳** | 学生能自己上手；教师可建课、看全部草稿，开号仍需管理员把关 |
+  | 学生自助注册 + 教师凭一次性邀请码注册 | 否决（本轮） | 多一张邀请码表与生成、核销、过期规则；教师数量少，命令行够用 |
+  | 保持不开放 | 否决 | 用户明确要注册页 |
+
+- **决定**：
+  1. 新增 `POST /api/v1/auth/register`（operationId `register`，`security: []`），请求体 `RegisterRequest {username, password}` 为闭合对象，不接受 `role` 等字段；**只创建账号类型为 `student` 的账号**。
+  2. 字段规则沿用 `specs/identity-access.md` §1.1/§1.4：用户名 3～32 位 `[A-Za-z0-9_.-]`，入库前转小写；口令 8～128 字符，argon2id 慢哈希。不合规返回 422 `VALIDATION_ERROR`，`details.fields` 指出字段，不回显取值。
+  3. 用户名（转小写后）已存在返回 409，新增错误码 `USERNAME_TAKEN`。这会暴露用户名是否存在；登录接口的防枚举（§1.3）不变，接受注册接口这一处泄露，靠第 5 条限流缓解。
+  4. 成功返回 201 与登录相同的 `LoginResponse`，前端直接进入学生首页。注册**不**让学生进入任何课程：入课仍由课程教师按用户名添加（ADR-013 决定 4 不变）。
+  5. 限流：每个 API 进程一个滑动窗口，60 秒内最多 60 次注册尝试（成功与失败都计，因为每次都可能付一次慢哈希），超出返回 429 `RATE_LIMITED` 与 `Retry-After`。不按 IP 计数：校园网 NAT 下全班同一出口 IP，按 IP 会挡住整班同时注册。与登录限流一样只是缓解手段。
+  6. 教师账号、协作教师、停用、重置口令仍只由命令行管理；前端注册页写明「教师账号由管理员开通」。
+- **后果**：
+  - 契约：`api.v1.yaml` 新增 `register`、`RegisterRequest`，`ErrorCode` 增加 `USERNAME_TAKEN`；`errors.v1.md`、`docs/architecture.md` 枚举表同步；生成物已重新生成。
+  - 规格：`specs/identity-access.md` §1.2「没有注册端点」改为本条，访问矩阵加 `register` 行，「明确不做」中的「开放注册」收窄为「教师自助注册」。
+  - 前端：新增 `/register` 页，登录页加入口；三处前端错误码副本加 `USERNAME_TAKEN`。
+  - 无数据迁移：沿用 `users` 表。
+  - 未做：部署级开关（如关闭自助注册的环境变量）；需要时另立任务。
+- **回滚**：删除 `api/auth.py` 的 `register` 路由、`schemas/auth.py` 的 `RegisterRequest`、`services/auth.py` 的 `RegistrationRateLimiter`/`register_student`、`main.py` 一行限流器、`tests/backend/test_adr079_register.py`，撤回契约与生成物、错误码副本、前端注册页和路由；已自助注册的学生账号保留，可用 `manage-accounts.py disable` 停用。
+- **签收**：待 ArvinHan 签收（方案已由用户在线程中选定）。

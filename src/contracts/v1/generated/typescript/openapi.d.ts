@@ -38,6 +38,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 学生自助注册，成功即登录
+         * @description 只创建账号类型为 student 的账号；教师账号仍只由命令行创建（ADR-079）。
+         *     成功返回与登录相同的 `LoginResponse`。注册不让学生进入任何课程，
+         *     入课仍由课程教师按用户名添加（`addMember`）。
+         *
+         */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses": {
         parameters: {
             query?: never;
@@ -782,7 +805,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN";
         PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
         /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
         PublishBlockedCycleReason: {
@@ -819,6 +842,12 @@ export interface components {
         /** @enum {string} */
         Role: "teacher" | "student";
         LoginRequest: {
+            username: string;
+            /** Format: password */
+            password: string;
+        };
+        /** @description 学生自助注册（ADR-079）。闭合对象，不接受 role 等其他字段；用户名入库前转小写。 */
+        RegisterRequest: {
             username: string;
             /** Format: password */
             password: string;
@@ -2074,6 +2103,41 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description 已注册并登录 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description 用户名已被占用（`USERNAME_TAKEN`） */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
         };

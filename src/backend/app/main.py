@@ -29,7 +29,11 @@ from app.api.materials import router as materials_router
 from app.api.members import router as members_router
 from app.config import check_auth_settings, load_settings
 from app.schemas.errors import Error
-from app.services.auth import LoginRateLimiter, prepare_timing_dummy_hash
+from app.services.auth import (
+    LoginRateLimiter,
+    RegistrationRateLimiter,
+    prepare_timing_dummy_hash,
+)
 from app.services.access import AccessDenied
 from app.services.startup import validate_embedding_space, validate_schema_current
 
@@ -89,6 +93,7 @@ def create_app() -> FastAPI:
     application = FastAPI(title="SmartSketch API", version=APP_VERSION, lifespan=lifespan)
     application.state.settings = settings
     application.state.login_limiter = LoginRateLimiter()
+    application.state.registration_limiter = RegistrationRateLimiter()
     application.state.auth_clock = time.time
     prepare_timing_dummy_hash()  # never let the first unknown-user login take twice as long
     application.add_exception_handler(RequestValidationError, _validation_error_handler)

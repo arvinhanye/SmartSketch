@@ -1,4 +1,4 @@
-"""Login DTOs mirroring ``LoginRequest``/``LoginResponse``/``User`` in src/contracts/api.v1.yaml.
+"""Auth DTOs mirroring ``LoginRequest``/``RegisterRequest``/``LoginResponse``/``User`` in src/contracts/api.v1.yaml.
 
 Declared by hand until the generated DTO package is importable from the backend. The length
 caps come from specs/identity-access.md §1.1 (username 3–32) and §1.4 (password 8–128); only
@@ -7,15 +7,37 @@ the upper bounds are enforced here, so short or malformed input still gets the u
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from app.services.auth import PASSWORD_MAX_LENGTH, USERNAME_MAX_LENGTH
+from app.services.auth import (
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
+    USERNAME_MAX_LENGTH,
+    USERNAME_MIN_LENGTH,
+)
 
 
 class LoginRequest(BaseModel):
     username: str = Field(max_length=USERNAME_MAX_LENGTH)
     # SecretStr masks the value in repr, validation errors and logs
     password: SecretStr = Field(max_length=PASSWORD_MAX_LENGTH)
+
+
+class RegisterRequest(BaseModel):
+    """Student self-registration (ADR-079). Closed: no role or other field is accepted.
+
+    Unlike login, the rules are checked here so the caller learns which field to fix; the
+    username is lower-cased before storage, so upper-case letters are accepted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(
+        min_length=USERNAME_MIN_LENGTH,
+        max_length=USERNAME_MAX_LENGTH,
+        pattern=r"^[A-Za-z0-9_.-]+$",
+    )
+    password: SecretStr = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
 
 
 class User(BaseModel):

@@ -498,7 +498,8 @@
         "COURSE_BUSY",
         "BUDGET_EXCEEDED",
         "DOCUMENT_NOT_DELETABLE",
-        "REVISION_CONFLICT"
+        "REVISION_CONFLICT",
+        "USERNAME_TAKEN"
       ]
     },
     "NotCoveredReason": {
