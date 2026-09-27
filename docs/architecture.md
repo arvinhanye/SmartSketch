@@ -158,6 +158,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 - Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联 `(:KnowledgePoint)-[:EVIDENCED_BY {task_id, chunk_id, evidence_start, evidence_end}]->(:Chunk)`（F04，ADR-024；人工来源不带 `task_id`）。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - F03 Neo4j DDL 在 `migrations/neo4j/001_constraints.cypher`，由 `graph_migrations.apply_migrations` 逐条重跑：知识点、章节、共享文本块的作用域复合唯一约束，四种关系各自的复合唯一约束，跨关系类型的 `RelationIdentity(course_id, version_id, rel_id)` 守卫节点唯一约束，以及贡献/修订查询索引。F06 写关系须在同一事务先 MERGE 守卫节点，才能保证 `rel_id` 跨四种类型唯一。F06 另以 `DraftWriteGuard(course_id, version_id)` 课程守卫节点串行同一课程草稿的关系写事务：先锁守卫，再读图、环检测、写入，同一事务提交（ADR-025）；F10 合并知识点也在同一守卫下完成重接、去重、验环与删除（ADR-047），F09 删除知识点在同一守卫下只清理草稿中的节点、相连关系与关系身份（ADR-048）。Neo4j DDL 不作全批回滚；失败修复冲突数据或服务后重跑，不自动删除已有对象。向量属性与索引按空间标识散列派生并并存；F03 写入边界每次从 SQLite 读取当前空间，离线迁移上下文绑定目标空间且在当前空间切换后失效。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
+- 关系编辑 HTTP 路由（F06-API，ADR-071）：`api/relations.py` 只做协议转换与依赖注入（课程教师依赖、错误映射、PATCH 请求体逐字段校验）；`services/graph/edit_relation.py` 复用 F08～F10 的课程写锁与 F12 审计（`audit.begin/commit`）以及 F06 的 `apply_relations`（守卫锁、端点校验、重复关系、DAG 环检测），改 `type`/端点时在同一事务内先删旧关系与旧身份再写新身份，只改 `status` 时就地改并保留 `source_pairs`；`repositories/graph_relation_edit.py` 放按 `rel_id` 读一条可见关系、删除关系与其 `RelationIdentity`、同身份改状态的语句。响应由写事务内读回的图与 SQLite 文本块组装，不回声请求体。关系审计行复用 `graph_edit_logs` 的 `create`/`update`/`delete` 动作，以摘要的 `entity = "relation"` 与节点行区分（迁移 012 的 `action` 是数据库级闭集）。
 
 ## 图谱版本与跨库发布（A04 / ADR-012）
 

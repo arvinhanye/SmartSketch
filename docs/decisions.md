@@ -1564,6 +1564,28 @@
 - **后果**：每次影响其他栏的处理多一次队列读取与一次草稿读取（单课程规模可接受）。重读只取第一页窗口，已加载超过 200 条的栏会截到 200 条并给出「加载更多」。本页不写课程 store 的草稿图，教师图谱编辑页进入时自行重读草稿，不会看到合并前的旧图。
 - **回滚**：撤销 `views/ReviewView.vue`、`composables/useReview.ts`、`api/review.ts`、`router/index.ts` 与 `main.ts` 的注册、`views/CoursesView.vue` 的入口、`tests/frontend/h09.test.ts`；无契约、后端或数据变更。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+## ADR-071：关系编辑 HTTP 路由（F06-API）
+
+- **日期**：2026-09-27
+- **背景**：契约 `src/contracts/api.v1.yaml` 从 A10 起就定义了 `createRelation`（POST 201）、`updateRelation`（PATCH 200）、`deleteRelation`（DELETE 204）与 `RelationCreate`/`RelationUpdate`/`Relation`，但后端 HTTP 层从未实现：F06 交付的是服务层与仓储层的「锁草稿 → 读图 → 校验 → 环检测 → 写入」单事务（ADR-025），F11 的审核动作只覆盖低置信度关系的 approve/reject。前端 H08/H14 因此只能按契约写客户端与假实现，H14 交接明确记着「**仅假 API 验证**（后端尚无 `/relations` 路由）」；ADR-061 的待决项也写着「关系编辑（F06 路由未实现）……接入审计留给对应任务」。本任务就是那个任务。
+- **决定**：
+  1. **路由位置**：新建 `src/backend/app/api/relations.py`（`prefix="/api/v1/courses/{cid}"`），在 `app/main.py` 注册；operationId 与契约逐字一致。路由只做协议转换与依赖注入：课程教师依赖、错误码到 HTTP 的映射、PATCH 请求体的逐字段校验。
+  2. **服务与仓储分层**：新增 `services/graph/edit_relation.py`（编排：课程写锁、审计时序、响应组装）与 `repositories/graph_relation_edit.py`（Cypher：按 `rel_id` 读一条可见关系、删除关系与其 `RelationIdentity`、同身份改状态）。关系写入复用 F06 的 `apply_relations`（同一事务内的守卫锁、端点校验、重复关系、DAG 环检测与 `MERGE`），不另写一套写入路径。
+  3. **修改语义**：`type`/`from_id`/`to_id` 任一变化即关系身份变化（§8.4 的 `rel_id` 由「课程 + 类型 + 起点 + 终点」派生）→ 同一事务内**先删**旧关系与旧身份，再按新身份写一条人工关系（`source = manual`，保留原 `confidence` 与 `status`）；先删后写也让环检测看见真实的边集（反转 `A → B` 为 `B → A` 时两条边不会同时存在而误报成环）。只改 `status` 时同身份**就地改**（置 `source = manual`、`contrib_manual = true`、修订号 +1），`source_pairs`（AI 的来源证据）因此不丢——改状态不该删掉来源。目标状态与当前一致且关系已是人工 → 空操作：不写入、不加修订号、不记审计（同 F08 的解锁语义）。
+  4. **环检测**：新建与改向走 F06 的 `check_candidates`；把 `rejected` 的 `PREREQUISITE` 边恢复为有效时，服务层按同一组读者（`read_visible_nodes` + `read_prerequisite_graph`）重新验环——`rejected` 的边不参与环检测，恢复它等于重新加边（规格 DAG-7），且再拒绝时不降级任何边。自环：`PREREQUISITE` 由 F06 报 409 `CYCLE_DETECTED`（`details.cycle` 首尾同 ID，验收 DAG-9）；其余三种类型没有自环语义，报 422 的字段错误。
+  5. **错误映射**：409 `CYCLE_DETECTED`（`details.cycle`）、409 `DUPLICATE_RELATION`（`details.existing_id`）、422 `DANGLING_ENDPOINT`（`details.missing`；`src/contracts/errors.v1.md` 给该码的 HTTP 状态就是 422，契约的 422 响应也是 `Error`）、409 `COURSE_BUSY`（`details.holder`）、404 `NOT_FOUND`（不存在或对本课草稿不可见）、403/401 同 `graph_nodes.py`。Neo4j 不可达 → 503 `STORAGE_UNAVAILABLE`，与既有图路由一致，但**契约未声明**（F11 审查 D-4 已记录同类差异）；本任务不改契约真源。
+  6. **PATCH 是闭合可编辑集**：契约的 `RelationUpdate` 只列四个可编辑字段且 `minProperties: 1`，但生成模型既不禁止多余键也不区分显式 `null`，因此按 `graph_nodes.py` 对 `KnowledgePointUpdate` 的同一做法逐字段检查；`course_id`、`id`、`revision` 这类路由无法实施的键返回 422 `extra_forbidden`，而不是静默丢弃（后者会让客户端以为改动已生效）。POST 的 `RelationCreate` 契约未写 `additionalProperties: false`，多余键按契约忽略，与 `createKnowledgePoint` 口径一致。
+  7. **审计接入（ADR-061）**：三种写入都经 `audit.begin/commit`：`actor_id` 为调用教师、`draft_revision` 恰加一、摘要是关系白名单状态（`type`/`from_id`/`to_id`/`status`/`source`，另附 `rel_id` 与关系修订号）。`graph_edit_logs.action` 是迁移 012 的**数据库级** CHECK 闭集，新增动作要重建表，所以关系行复用 `create`/`update`/`delete`，靠摘要里的 `entity = "relation"` 与节点行区分；`reconcile` 对关系行用摘要里的 `after` 与图里当前状态逐项比对判定是否生效（关系没有随写入变化的节点修订号），`kp_revision_before/after` 对关系行为 NULL。
+  8. **审计时序**：关系路由把 `audit.begin` 放在**同一 Neo4j 写事务内、写入语句之后**。这样成环、悬空端点、重复关系这些写入前的拒绝既不加草稿修订号也不留审计行（与 F08～F10 的「拒绝不写、不记」一致），而 `begin` 之后的失败照旧由 `abort`/`reconcile` 收尾；`commit` 失败仍只记日志、行留 `pending`，**已提交的编辑不回滚**。
+  9. **响应体来自真实图**：由写事务内读回的关系（`read_relation_detail`）与 SQLite 文本块（`read._chunks` + `_source_ref`）组装，不回声请求体；`confidence`/`status`/`source`/`source_refs` 与 `RelationStandard`/`RelationDowngraded` 的 `oneOf` 约束一致。
+- **后果**：
+  - H14 的「仅假 API 验证」缺口关闭：前端 `api/relations.ts` 与 `useRelationEditor.ts` 现在有真实后端。但**仍未做真实前后端联调**（前端测试依旧注入假实现），教师页对真实 `/relations` 的端到端行为未在浏览器里验证。
+  - 审计行对关系存 `rel_id` 到 `kp_id` 列、两个修订号列为 NULL：审计消费者必须先看摘要的 `entity` 才知道 `kp_id` 的含义。
+  - 改 `type` 或方向会重置关系 `revision` 为 1 并丢弃 `source_pairs`（新身份 = 新的人工断言；`confidence` 与 `status` 保留）；只改 `status` 保留来源证据。这是「关系身份由四元组派生」的直接后果，已写入本 ADR 的后果段。
+  - 契约未声明 503；自环（非 `PREREQUISITE`）与 `InvalidRelationError` 兜底各引入一个未在 `errors.v1.md` 登记的领域 `reason`（`self_loop`、`invalid_relation`）。契约真源在本任务冻结，两处待签收。
+  - 关系写入的守卫节点序号按调用计两次（仓储层事务先加锁，`apply_relations` 在同一事务里再加一次，与 F13 的 `_write_draft` 相同）；锁只加一次，序号只是簿记。
+- **回滚**：撤销 `src/backend/app/api/relations.py`、`src/backend/app/services/graph/edit_relation.py`、`src/backend/app/repositories/graph_relation_edit.py`、`tests/backend/test_relations_api.py`、`tests/integration/test_relations_api.py`，以及 `main.py`（2 行路由注册）、`schemas/contracts.py`（2 行导出）、`services/graph/audit.py`（关系摘要、`_applied_relation`、`reconcile` 分派）中的增量；无迁移、无契约、无依赖变更，回滚后 H14 回到「仅假 API 验证」。
+- **签收**：待 ArvinHan。
 ## ADR-072：PR #264 独立审查四项遗留的处置（sweep 调度、无来源手工节点、空清理解锁、重跑状态保护）
 
 - **日期**：2026-09-27
