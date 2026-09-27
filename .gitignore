@@ -44,3 +44,6 @@ neo4j/logs/
 
 # Office lock files (e.g. ~$foo.docx while Word has the file open)
 ~$*
+
+# 本地 worktree 沙箱（不提交）
+.worktrees/

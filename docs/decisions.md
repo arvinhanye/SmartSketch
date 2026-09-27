@@ -1612,3 +1612,17 @@
 - **后果**：审核页会额外读取课程详情与版本列表，但无需修改现有契约或 G06 后端。学生页仍按课程发布指针读旧版，教师面板明确说明 `revising` 状态。发布/回滚成功后若刷新异常，界面不猜测新指针，提示重新核对。
 - **回滚**：撤销 `api/versions.ts`、`composables/useVersions.ts`、`components/VersionPanel.vue` 与审核页/应用注入接线；不涉及数据库迁移或契约变更。
 - **签收**：用户 2026-09-27 确认审核页内嵌、服务端指针为准和回滚前展示目标版本。
+## ADR-074：问答日志的写入时机、终态判定与留存（J10）
+
+- **日期**：2026-09-27
+- **背景**：J10 由 kongsc（Codex）建表 `chat_logs`（迁移 014）与 `write_chat_log`（PR #295），但 J07 合入时尚未接入，任何请求都不写日志；验收要求的「课程用户隔离、版本/耗时齐全、留存与脱敏明确、重试不重复统计」也缺查询与统计入口。本轮由 ArvinHan（Claude）接手补齐。`specs/grounded-qa.md` Q10 已定字段与覆盖范围，本 ADR 只定实现口径。
+- **决定**：
+  1. **写入时机 = P2 之后的每个请求恰好一行**。路由在 `resolve_published` 成功并分配 `request_id` 后创建 `services/qa/audit.ChatAudit`；P1/P2 失败（未认证、非成员、教师、未发布）不创建，因此不写行（由既有应用日志承担）。P3～P4 的 `ChatFailure` 与构造服务失败记 `error`。
+  2. **终态按「已送达客户端的事件」判定**：JSON 模式在返回前、SSE 模式在 `yield` 成功后 `observe` 事件；首个 `done`/`error` 为终态（`done` 取 `final.status` → `answered`/`not_covered`），没有终态即断开 → `aborted`。首字时延是首个已送达 `delta` 的时刻（相对 `ChatRoute` 记录的请求开始）；`answered`/`not_covered` 的 `latency_ms` 取 `final.latency_ms`，与响应一致，`error`/`aborted` 取写入时的已耗时。
+  3. **公共 `final` 不带的诊断字段由服务传给记录器**：`ChatService.events(..., audit=)` 在 `finalize` 后调用 `audit.diagnose`（未知引用计数、`all_citations_invalidated` 子类、未覆盖单元数、`truncated`），不改契约与事件形状。
+  4. **写入不阻塞事件循环、不影响响应**：SSE 断开时 anyio 取消作用域会让 `finally` 中的任何 `await` 立即失败，故在 `_stream` 的 `finally` 用守护线程执行一次同步写入；JSON 与失败路径本就在线程池中，直接同步写入。`sqlite3.Error` 与课程不符只记 `warning`（仅 `request_id`、结局、异常类型，不含原问题），不改变响应。
+  5. **隔离与去重**：写入事务内核对 `version_id` 属于 `course_id`，不符拒写（`ChatLogScopeError`）；`request_id` 为主键，同一请求第二次写入抛 `IntegrityError`，`ChatAudit.record` 另有一次性标志；用户重试是新 `request_id`、新行。查询 `list_chat_logs`/`get_chat_log`/`chat_stats` 全部要求 `course_id`（新增索引 `chat_logs(course_id, created_at)`），统计以行计请求数，故重试不重复统计、模型内部重试不影响计数（用量仍按 `request_id` 从 `model_calls` 汇总）。
+  6. **留存与脱敏**：保留 30 天，每次写入在同一事务内删除更早的行（无写入不清理；无定时任务）。只存原问题与诊断字段；**不存**回答正文、被撤回的临时正文、证据原文、模型原始输出与令牌。原问题按原文保存、不做自动脱敏——学生可能在问题中输入个人信息，这是 30 天留存的已知代价。
+- **后果**：问答请求现在都有可检索的日志，教师侧统计/排障可按课程读取；本轮不新增 HTTP 查询端点（契约未定义，另开任务）。SSE 模式日志写入在响应结束后异步完成，测试需短暂轮询。
+- **回滚**：`git revert` 本轮提交即可撤销路由接线、`audit.py`、查询函数与测试；迁移 014 的回滚步骤写在文件头（`DROP INDEX` ×2、`DROP TABLE chat_logs`、删除 `schema_migrations` 行），执行前按文件头说明备份。
+- **签收**：待 ArvinHan 审阅。**需明确签收**：(a) 原问题按原文保存 30 天、不自动脱敏；(b) 断开判定以「已送达」为准（服务已生成但未送达的 `done` 记 `aborted`）；(c) 本轮不提供日志查询 HTTP 端点。

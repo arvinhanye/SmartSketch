@@ -253,7 +253,7 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
 
 ### Q10 日志
 
-**每个通过 P2 的请求**（已认证、已授权、已绑定版本）恰好一条问答日志（J10）。实体名 `ChatLog`、SQLite 表名 `chat_logs`（A10 N5 交 A09 定名，ADR-015 决定 8）；服务端不保存会话，因此不设 `QuestionSession`。P1 拒绝与 P2 失败的请求没有 `request_id`，也可能没有已认证身份或绑定版本，因此**不写 `chat_logs`**：由统一错误处理写一条结构化应用日志（HTTP 状态、错误码、路径中的课程 ID、已认证时的 `user_id`），不伪造缺失字段（ADR-015 修订 1，Codex A09-R02）。开流前在 P3～P4 失败的请求已通过 P2，照常写 `chat_logs`，结局为 `error`。结局取闭集 `answered`、`not_covered`、`error`、`aborted` 之一，字段至少包括：`request_id`、`user_id`（取自调用者身份，ADR-013）、`course_id`、`version_id`（四者均非空）、原问题、结局与 `reason` / `error.code` / `details.reason`、`citations` 的编号与文本块 ID、「未知引用」计数、`all_citations_invalidated` 的子类与未覆盖单元数、`truncated`、`latency_ms` 与首个 delta 的时延。模型用量不在日志中重复，按 `request_id` 从 `model_calls` 汇总。被撤回的临时正文不作为回答记录；是否留存模型原始输出供评测，与留存期、脱敏一并归 J10。用户重试是新请求、新日志行。
+**每个通过 P2 的请求**（已认证、已授权、已绑定版本）恰好一条问答日志（J10）。实体名 `ChatLog`、SQLite 表名 `chat_logs`（A10 N5 交 A09 定名，ADR-015 决定 8）；服务端不保存会话，因此不设 `QuestionSession`。P1 拒绝与 P2 失败的请求没有 `request_id`，也可能没有已认证身份或绑定版本，因此**不写 `chat_logs`**：由统一错误处理写一条结构化应用日志（HTTP 状态、错误码、路径中的课程 ID、已认证时的 `user_id`），不伪造缺失字段（ADR-015 修订 1，Codex A09-R02）。开流前在 P3～P4 失败的请求已通过 P2，照常写 `chat_logs`，结局为 `error`。结局取闭集 `answered`、`not_covered`、`error`、`aborted` 之一，字段至少包括：`request_id`、`user_id`（取自调用者身份，ADR-013）、`course_id`、`version_id`（四者均非空）、原问题、结局与 `reason` / `error.code` / `details.reason`、`citations` 的编号与文本块 ID、「未知引用」计数、`all_citations_invalidated` 的子类与未覆盖单元数、`truncated`、`latency_ms` 与首个 delta 的时延。模型用量不在日志中重复，按 `request_id` 从 `model_calls` 汇总。被撤回的临时正文不作为回答记录；J10 只保存原问题及上述诊断字段，不保存回答正文或模型原始输出；每次写入清理 30 天前的日志行。结局按**已送达客户端**的事件判定：首个 `done`/`error` 为终态，未送达终态即断开记 `aborted`；读取与统计一律按 `course_id` 限定（ADR-074）。用户重试是新请求、新日志行。
 
 ### Q11 与其他任务的接口
 

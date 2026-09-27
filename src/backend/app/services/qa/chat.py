@@ -17,6 +17,7 @@ from app.repositories.neo4j import Neo4jRepository, RepositoryError
 from app.repositories.vector_search import search_chunks
 from app.services.ai.client import ModelCallError
 from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError
+from app.services.qa.audit import ChatAudit
 from app.services.qa.citations import CitationStream, Evidence, not_covered
 from app.services.qa.context import ContextBudget, EvidenceContext, build_context
 from app.services.qa.generate import AnswerGeneration, AnswerGenerator, GenerationError
@@ -111,7 +112,8 @@ class ChatService:
             raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
         return PreparedChat(version, request_id, started, deadline, query, context)
 
-    def events(self, prepared: PreparedChat, stop: Event | None = None) -> Iterator[dict[str, Any]]:
+    def events(self, prepared: PreparedChat, stop: Event | None = None,
+               audit: ChatAudit | None = None) -> Iterator[dict[str, Any]]:
         context = prepared.context
         status = "answered" if context.covered else "not_covered"
         yield {"event": "meta", "status": status, "retrieved": context.retrieved,
@@ -160,6 +162,11 @@ class ChatService:
                 truncated=bool(generation.result and generation.result.truncated),
                 related_kp_ids=prepared.related_kp_ids,
             )
+            if audit is not None:
+                audit.diagnose(unknown_count=citations.unknown_count,
+                               invalidation_subtype=citations.invalidation_subtype,
+                               uncited_units=citations.uncited_units,
+                               truncated=citations.truncated)
             yield {"event": "done", "final": final}
         except GenerationError as error:
             yield {"event": "error", "error": ChatFailure(error.code, reason=error.details_reason).body(prepared.request_id)}
