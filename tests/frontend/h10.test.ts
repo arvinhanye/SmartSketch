@@ -84,6 +84,20 @@ describe('H10 version panel', () => {
     expect(publish).not.toHaveBeenCalled()
   })
 
+  it('hides cached history and write controls if a teacher loses course permission on refresh', async () => {
+    let role: Course['my_role'] = 'teacher'
+    const { wrapper } = fixture({ get: async () => ({ ...course('c1'), my_role: role }) })
+    await flushPromises()
+    expect(wrapper.find('[data-test="vp-publish"]').exists()).toBe(true)
+    role = 'student'
+    await wrapper.get('[data-test="vp-refresh"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="vp-not-teacher"]').text()).toContain('教师')
+    expect(wrapper.find('[data-test="vp-publish"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="vp-version"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="vp-current"]').exists()).toBe(false)
+  })
+
   it('keeps the old version after a rejected publish and shows a fixed error', async () => {
     const { wrapper, publish } = fixture({ publish: async () => {
       throw new ApiError(409, { code: 'PUBLISH_BLOCKED', message: 'server private text' })
@@ -123,7 +137,7 @@ describe('H10 version panel', () => {
     let reads = 0
     const { wrapper } = fixture({
       get: async () => ++reads === 1 ? course('c1') : fresh.promise,
-      list: async () => [published(1), published(2)],
+      list: async () => reads === 1 ? [published(1), published(2)] : [published(1), published(2), published(3)],
       publish: async () => result(3),
     })
     await flushPromises()
@@ -143,6 +157,19 @@ describe('H10 version panel', () => {
     await flushPromises()
     expect(wrapper.get('[data-test="vp-current"]').text()).toContain('v2')
     expect(wrapper.get('[data-test="vp-error"]').text()).toContain('状态刷新')
+    expect(wrapper.get('[data-test="vp-publish"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('does not confirm a new pointer absent from the refreshed version history', async () => {
+    let reads = 0
+    const { wrapper } = fixture({ get: async () => ++reads === 1 ? course('c1') : course('c1', 'published', 3),
+      list: async () => [published(1), published(2)], publish: async () => result(3) })
+    await flushPromises()
+    await wrapper.get('[data-test="vp-publish"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="vp-current"]').text()).toContain('v2')
+    expect(wrapper.find('[data-test="vp-notice"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="vp-error"]').text()).toContain('状态刷新未确认')
     expect(wrapper.get('[data-test="vp-publish"]').attributes('disabled')).toBeDefined()
   })
 

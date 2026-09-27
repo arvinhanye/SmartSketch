@@ -57,6 +57,9 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
       return true
     }
     if (cause.code === 'ROLE_FORBIDDEN') {
+      course.value = null
+      versions.value = []
+      pendingRollback.value = null
       status.value = 'not_teacher'
       return true
     }
@@ -83,6 +86,9 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
         return false
       }
       if (nextCourse.my_role !== 'teacher') {
+        course.value = null
+        versions.value = []
+        pendingRollback.value = null
         status.value = 'not_teacher'
         return false
       }
@@ -91,6 +97,12 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
       if (!Array.isArray(nextVersions) || !nextVersions.every(validVersion)) {
         status.value = 'error'
         error.value = '服务器返回的版本数据异常，请重试。'
+        return false
+      }
+      if (nextCourse.published_version !== null && !nextVersions.some((item) => item.version === nextCourse.published_version)) {
+        stale.value = true
+        if (course.value === null) status.value = 'error'
+        error.value = '课程发布指针与版本历史不一致，请刷新状态后核对。'
         return false
       }
       course.value = nextCourse

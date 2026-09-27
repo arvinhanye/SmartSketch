@@ -1454,4 +1454,4 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 输入：G06 发布/版本列表/回滚 API 与 `GraphVersion`、`PublishResult` 契约，H09 教师工作流；输出：教师可见的版本历史、发布状态和回滚操作入口。前置 G06、H09 均已合入 `main`。
 - 风险：发布/回滚与刷新并发时不得把在途或失败结果显示为已提交版本；回滚是前滚新版本号，确认前必须明确目标版本与影响。审核页嵌入版本面板的设计已获用户确认。
 - 验证计划：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
-- 验收证据：H10 测试先因模块缺失红灯，接入页位置、成功响应刷新指针、课程教师权限及超时后暂停写入四项后续用例也各先红后绿；最终 `h10.test.ts` 10 passed，H09+H10 47 passed，前端全量 19 files / 634 passed（B02 嵌套进程测试使用 `--testTimeout 30000`），type-check、build、`./scripts/verify.sh` 均 exit 0。前端仅 fake API 验证，真实服务联调交 K05。详见 `docs/handoffs/codex-h10.md`。
+- 验收证据：H10 测试先因模块缺失红灯，接入页位置、成功响应刷新指针、课程教师权限及超时后暂停写入四项后续用例也各先红后绿；独立审查又发现权限丧失时残留旧 UI、历史列表缺当前版时误报成功，两项均先红后绿。最终 `h10.test.ts` 12 passed，H09+H10 49 passed，前端全量 19 files / 636 passed（B02 嵌套进程测试使用 `--testTimeout 30000`），type-check、build、`./scripts/verify.sh` 均 exit 0。前端仅 fake API 验证，真实服务联调交 K05。详见 `docs/handoffs/codex-h10.md`。
