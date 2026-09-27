@@ -1385,7 +1385,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F06-API | DONE（待 PR 审查/合并） | 补上后端关系编辑接口（`POST`/`PATCH`/`DELETE /api/v1/courses/{cid}/relations[/{rid}]`），关闭 H14 交接里「仅假 API 验证（后端尚无 `/relations` 路由）」的缺口 | ArvinHan（Claude） | `claude/relations-0927` / `main@ac21e5d` | 新增 `src/backend/app/api/relations.py`、`src/backend/app/services/graph/edit_relation.py`、`src/backend/app/repositories/graph_relation_edit.py`、`tests/backend/test_relations_api.py`、`tests/integration/test_relations_api.py`、`docs/handoffs/claude-relations-api.md`；扩围 `src/backend/app/main.py`（路由注册 2 行）、`src/backend/app/schemas/contracts.py`（`RelationCreate` 导出 2 行）、`src/backend/app/services/graph/audit.py`（关系摘要、`_applied_relation`、`reconcile` 分派）、`docs/decisions.md`（ADR-071）、`docs/architecture.md`（一句接线）、`specs/course-knowledge-graph.md`（状态行一句） | 红灯：`tests/backend/test_relations_api.py` 53 failed / 3 passed（路由不存在）；实现后该文件 58 passed；集成 `tests/integration/test_relations_api.py` 11 passed（真实 Neo4j 5.26.31）；后端全量 3281 passed / 27 skipped；图编辑相关集成（F06/F08/F09/F10/F12/F13 + 本任务）126 passed；`tests/contracts` 291 passed；`scripts/gen-contracts.sh --check` PASS（未改 `src/contracts/`）；`./scripts/verify.sh` exit 0；反向篡改 8 处，检出 8 处；详见 `docs/handoffs/claude-relations-api.md` |
+| F06-API | DONE（待 PR 审查/合并） | 补上后端关系编辑接口（`POST`/`PATCH`/`DELETE /api/v1/courses/{cid}/relations[/{rid}]`），关闭 H14 交接里「仅假 API 验证（后端尚无 `/relations` 路由）」的缺口 | ArvinHan（Claude） | `claude/relations-0927` / `main@ac21e5d` | 新增 `src/backend/app/api/relations.py`、`src/backend/app/services/graph/edit_relation.py`、`src/backend/app/repositories/graph_relation_edit.py`、`tests/backend/test_relations_api.py`、`tests/integration/test_relations_api.py`、`docs/handoffs/claude-relations-api.md`；扩围 `src/backend/app/main.py`（路由注册 2 行）、`src/backend/app/schemas/contracts.py`（`RelationCreate` 导出 2 行）、`src/backend/app/services/graph/audit.py`（关系摘要、`_applied_relation`、`reconcile` 分派）、`docs/decisions.md`（ADR-071）、`docs/architecture.md`（一句接线）、`specs/course-knowledge-graph.md`（状态行一句） | 红灯：`tests/backend/test_relations_api.py` 53 failed / 3 passed（路由不存在）；实现后该文件 58 passed；集成 `tests/integration/test_relations_api.py` 11 passed（真实 Neo4j 5.26.31）；后端全量 3281 passed / 27 skipped；图编辑相关集成（F06/F08/F09/F10/F12/F13 + 本任务）126 passed；`tests/contracts` 291 passed；`scripts/gen-contracts.sh --check` PASS（未改 `src/contracts/`）；`./scripts/verify.sh` exit 0；反向篡改 9 处（矩阵见 `docs/handoffs/claude-relations-api.md`），实现者报告全部检出；协调者另独立复现其中 2 处（创建侧环检测、PATCH 侧环检测）均判红；详见 `docs/handoffs/claude-relations-api.md` |
 
 - 验收：契约的路径、方法、状态码与响应体形状逐条对照（含 `Relation` 的 `oneOf`）；教师角色与课程成员口径（学生 403 `ROLE_FORBIDDEN`、非成员 403 `COURSE_FORBIDDEN`、未认证 401）；`PREREQUISITE` 新建、改向、以及把 `rejected` 恢复为有效时写入前检测成环（409 `CYCLE_DETECTED` + `details.cycle`，拒绝时零写入、不加 `draft_revision`、不记审计）；悬空端点 422 `DANGLING_ENDPOINT`（`details.missing`）；重复关系 409 `DUPLICATE_RELATION`（`details.existing_id`）；课程写锁与 409 `COURSE_BUSY`（`details.holder`）；Neo4j 不可达 503 `STORAGE_UNAVAILABLE`；响应体来自真实图（不回声请求体）；关系新建/修改/删除各记一条 F12 审计且 `draft_revision` 恰加一，审计 `commit` 失败不回滚编辑、行留 `pending` 由下一次写入对账。
 - 依赖：F06 服务层（`apply_relations`）、F08 课程写锁与 `EditContext`、F12 审计（ADR-061）、契约 `api.v1.yaml` 的 `createRelation`/`updateRelation`/`deleteRelation`、`errors.v1.md`。无迁移、无依赖升级、未改契约真源。
@@ -1395,3 +1395,49 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
   3. **改类型/方向会丢弃 `source_pairs`**：新身份 = 新的人工断言（保留 `confidence`/`status`，来源证据归零）；若希望改向后保留 AI 证据，需要另立实现（把块 ID 迁到新身份的 `source_pairs`）。
   4. **审计行语义**：关系行复用 `create`/`update`/`delete` 动作、`kp_id` 存 `rel_id`、修订号列 NULL，靠摘要的 `entity = "relation"` 区分（迁移 012 的 `action` 是数据库级闭集，新增取值要重建表）。若审计消费者需要一个显式的 `entity` 列，需另开迁移。
   5. **前后端未联调**：H14 的教师页仍用注入的假实现，真实 `/relations` 与页面组合未在浏览器里端到端验证（K05 教师主线 E2E 的依赖）。
+
+## 2026-09-27 批次：J05/I05/H09 独立审查 + #264 遗留四项 + 后端关系接口（协调者，5 路并行）
+
+**断点事实（已核实，非推测）**：上一会话（Claude Code）已把 J05/I05/H09 实现完并开了三个 PR——**#290**（J05，分支 `claude/project-thread-bkxc2u`）、**#291**（I05，`...-98kaqt`）、**#289**（H09，`...-eo5fzo`）——三者 CI 六项全绿、可合并，缺的是**独立审查**与**合并**。另有两项新工作：#264（G05+G06）独立审查的 4 个遗留项（G05 交接「待决」列出）与「补关系接口」（H14 交接写明「后端尚无 `/relations` 路由」，故 H14 只能假 API 验证）。
+
+**本批做法**：5 路并行子代理，各占独立 worktree/分支；协调者另做独立第二意见、冲突预判、逐项**亲手复现**子代理声称的鉴别性篡改，并在 `origin/main` 前移后重整集成。**并行期间远端被 Codex 会话推进**：`origin/main` 由 `ac21e5d` → `893f341`，其间合入 **#290（J05）**、#292（J06）、#293（J07）、#294（K03）；`#290` 合入的是**未含本批判修的版本**。
+
+| 工作流 | 结果 | 独立审查结论 | 审查修复（分支上，未 push） |
+| --- | --- | --- | --- |
+| J05（PR #290，ADR-068） | 已被 Codex 合入 main（不含批修） | APPROVE_WITH_NOTES | `4bb0ca2`：补 `deadline` 类型/有限性用例（原篡改存活）、补「读取中链路到期」用例、`qa/__init__.py` 按 J03 惯例补导出、ADR-068 后果句按实测改为 `max_chunks × 8 + 2` 并落成断言；`db4e6ae` 更正证据数字 |
+| I05（PR #291，ADR-069） | DONE | APPROVE_WITH_NOTES | `cf9bb66`：补「图读摘要/他课复核（热缓存下唯一生效）」与「查询串注入 `user_id` 不被信任」断言；未动实现 |
+| H09（PR #289，ADR-070） | DONE | APPROVE_WITH_NOTES | `e2cc8c8`：钉住三栏空态文案互异、401 会话过期文案、`loadMore` 的 totals 口径、`changed=false` 的 fixture 自相矛盾、成环冲突后改选、双栏游标分栏；未动 `src/` |
+| #264 遗留四项（ADR-072） | DONE | — | `9c5d753` sweep 接入 `run_loop` maintenance（`PUBLISH_SWEEP_INTERVAL_SECONDS`，缺省 3600、0 关闭、环境变量）；`b318172` 无实际贡献时不取课程写锁（新增 `task_has_contributions`）；`38b3dbd` 重跑不把 `approved`/`rejected` 降级回 `draft`；`03ab66b` 无来源手工节点详情 200 显式空态（**新增契约 `KnowledgePointDetailWithoutSource`**，保留 `KnowledgePointDetail.minItems:1` 与 B11 负例）；`6acaa1e` 文档 |
+| 关系接口 F06-API（ADR-071） | DONE | — | `fbf163e` `api/relations.py` 三路由 + `edit_relation.py` + `graph_relation_edit.py` + F12 审计接入；契约未改 |
+
+**集成与验证（协调者实测，最终集成分支 `claude/integration-0927` 已并入 `origin/main@893f341`）**
+
+| 门禁 | 实测结果 |
+| --- | --- |
+| 后端全量 `pytest tests/backend -q` | **3434 passed / 27 skipped**，exit 0（`origin/main` 收集 3349；集成分支 3461，**+112** = J05 修复 +5、I05 +36、关系接口 +58、遗留 +13） |
+| 契约全量 `pytest tests/contracts -q` | **295 passed**，exit 0 |
+| 集成（真实 Neo4j 5.26.31，容器 `ss-neo4j-f11`） | 386 passed / 4 skipped / **2 failed**（下两项） |
+| `./scripts/verify.sh` | **exit 0**（PASS contracts gate） |
+| `./scripts/gen-contracts.sh --check` | 一致 |
+| 前端 `type-check` / `build` | **exit 0** / **exit 0** |
+| 前端 `test -- --run` | 623 passed / **1 failed**（`b02.test.ts` 既有 flake） |
+| `git diff --check` | 干净 |
+
+- **2 个集成失败已用 `origin/main` 对照证明为既有环境问题，非本批回归**（`origin/main@893f341` 上跑同两条：同样 2 failed）：`test_k08.py::test_images_build` 是 `docker compose build` 无法写 `~/.docker/buildx/activity/…`（**工作区沙箱拒绝越界写**，非代码）；`test_k10.py::test_an_unfenced_write_during_the_backup_fails_it[neo4j]` 的 hook 用硬编码口令 `x` 连 Neo4j，与本机容器口令 `testpassword1` 不符。
+- **`b02.test.ts` 既有 flake 以超时证伪**（非坏）：`--testTimeout=90000` 下 **5 passed / exit 0**；CI 该 job 一直绿。CI 的 Frontend job 把 `type-check` 作为**独立无管道步骤**，退出码真实生效。
+- **协调者亲手复现的鉴别力（不是转述）**：I05 去掉 `load_version_graph` 摘要复核 → `test_graph_read_revalidates_snapshot_with_warm_version_caches[digest-column]` 判红；H09 删 401 分支 → 新增用例判红（1 failed / 36 passed）；#264-R3 回退 `n.status = status` → `test_f13` 2 failed（approved + rejected，幂等仍绿）；#264-R2 删无工作早退 → 空清理解锁鉴别用例判红；关系接口删创建侧环检测 → 3 failed（含「409 + `details.cycle` + 零写入」）、删 PATCH 侧环检测 → 1 failed。每处复原后 `git status` 干净。
+
+**环境事实（写给后续会话，均为实测）**
+
+1. **不要把验证命令管进 `| tail`**：`npm run type-check` 在缺 `vue-tsc` 时直接跑 exit **127**、管到 `tail` 后 exit **0**（假绿）。worktree 里 `src/frontend/node_modules` 不会自动存在，需 `ln -s` 到主仓，否则前端命令静默假绿。
+2. worktree 里的 `.venv` 是 editable 安装、`app` 包指向**主仓**：任何 worktree 跑 Python 测试必须带 `PYTHONPATH=$PWD/src/backend`，否则测的是主仓代码。
+3. `tests/backend/test_relations_api.py` 与 `tests/integration/test_relations_api.py` 同名（同 F08～F13 惯例），**必须按目录分开跑**，否则 pytest import mismatch。
+4. 本轮还发现并**纠正**两处子代理证据/判断偏差：I05 审查者与我各自独立发现「app 生成的 OpenAPI 把 500 记为 `Error`、契约真源为 `LearningIntegrityError`」（全局惯例，I02 同样，待统一）；J05 审查者报的 `test_j05.py 71 / 合计 140` 经实测为 **70 / 139（+5）**，已在其分支更正（`db4e6ae`）。另：**协调者给关系接口的任务书把 `DANGLING_ENDPOINT` 误写为 409**，子代理按 `errors.v1.md`（契约真源）**422** 实现并报备，判断正确。
+
+**本批待决（需 ArvinHan）**
+
+1. **推送与合并**：三个 PR 的批修提交、#264 四项、关系接口都**未 push**；集成分支 `claude/integration-0927` 已含全部五路且通过门禁。另注：#290（J05）已被上游合入，故 J05 的批修提交需要**新开 PR**。
+2. **J06 的哨兵归属已实证**：`services/qa/citations.py` 里已有 `SENTINEL = "<<INSUFFICIENT_EVIDENCE>>"`，与 ADR-068 决定 2 及 Q11 表（J05 = 提示要求、J06 = Q3.3 状态机）一致——「哨兵无人认领」的疑虑**不成立**；仅 `docs/atomic-tasks.json` 的 J06 `acceptance` 未提 Q3.3，可补。
+3. ADR-068～072 五条签收（含 J05 的 1024 输出上限与 0.25s 容差、I05 的图读已提交快照、H09 的数量口径、#264-R1 的 sweep 缺省启用与 3600 周期、#264-R4 的两种成功形状、关系接口的 503 未声明与 `source_pairs` 归零）。
+4. 关系接口 5 项（503 未声明、两个未登记 `reason`、改向丢 `source_pairs`、审计行语义、**前后端未联调**）见上一节 ADR-071 待决。
+5. `origin/main` 前移带来的新工作（#292 J06、#293 J07、#294 K03 及在开的 #295 J10、#296 K04）不在本批审查范围内，本批只保证与其集成后门禁通过。
