@@ -1483,3 +1483,18 @@
 - **后果**：首次发布要为课程全部文本块算一次向量，耗时随资料量增长；之后只算新修订的块。本 ADR 之前已经提交的版本没有文本块向量；**「重新发布一次即可补齐」不成立**（独立审查 2026-09-26 证伪：草稿摘要未变时 P7 的幂等路径在 P8 之前返回，`publish.py` 不补齐；草稿有改动时补的是**新快照**的修订列表，被新修订取代掉的旧修订永远补不上；回滚按 PUB-26 也不补）。补齐需按修订列表的独立入口（如 `scripts/reembed.py` 的按版本补齐子命令），或在发布一个仍包含这些修订的新版本时顺带完成。回滚到这样的旧版本时检索结果不全，MVP 阶段没有真实数据，暂可接受，但不得再按「重新发布即可」操作。另：批次中途失败会在库里留下「部分块有向量」（不属任何版本副本、`materialize` 也不会删 `Chunk`），可重试续做。
 - **回滚**：撤销 `services/versions/chunk_vectors.py` 和 `publish.py` 中的两处调用；已经写入的文本块向量可以留在库中，不影响其他读取，F14 迁移时照常处理。
 - **签收**：新增任务由 ArvinHan 2026-09-26 同意；放在发布阶段及以上细节由 Claude 选定，并在交接中报告。
+
+## ADR-067：教师图谱编辑页的草稿读取、共享图与未保存确认（H14）
+
+- **日期**：2026-09-27
+- **背景**：D-17 补登 H14，把 H06 详情、H07 节点编辑面板、H08 连边编辑挂到一个教师页面上。三者都以课程 store 的 `graph` 为基准并在成功后写回；此前没有任何页面读草稿图。契约 `getGraph` 省略 `version` 时课程内教师读草稿，学生读最新发布版。
+- **决定**：
+  1. 路由 `/courses/:cid/graph/edit`（`TEACHER_GRAPH_ROUTE`），`meta.accountRole = 'teacher'`；页面再按 `Course.my_role === 'teacher'` 判断，读图时 `ROLE_FORBIDDEN` 同样按非教师处理。课程页只对课程内教师显示入口。
+  2. 草稿读取用独立的 `DraftGraphApi`（`DRAFT_GRAPH_API_KEY`），与学生页的 `PublishedGraphApi` 分开注入。响应必须 `course_id` 一致且 `graph_version` 为 null，否则按数据异常丢弃，避免把发布版本当草稿编辑。
+  3. 草稿写入课程 store，画布取 `useRelationEditor().canvasData`（含保存中的临时边与成环冲突标色）再经 `useGraphFilters` 筛选。保存/删除/连边成功时编辑器写回 store，画布自动同步；失败时 store 不变。
+  4. 编辑器要求刷新时只替换草稿、保留当前画布，失败给提示；刷新在途时若 store 已被编辑器写回，丢弃这份响应并重新拉取。课程上下文被清空（`COURSE_FORBIDDEN`、会话过期）而仍停在本页时显示错误态。
+  5. 右侧面板分「详情 / 编辑知识点 / 编辑关系」三个页签。节点编辑面板用 `v-show` 常驻，切页签不丢修改；「编辑关系」页签下画布点击用于点选起点和终点，不改变知识点选中。
+  6. H07 `NodeEditor` 新增 `defineExpose({ dirty })`（扩围一行）。有未保存修改时换节点或关闭面板先弹页内确认（`useSelectionGuard`）；离开路由或换课用 `window.confirm`；刷新或关闭标签页挂 `beforeunload`。被拒或会话失效时强制离开，不再询问。
+- **后果**：详情页签选中节点时，常驻的节点编辑面板也会读一次同一知识点（请求翻倍，体量小，接受）。离开本页不清空课程 store 里的草稿；目前学生页用自己的状态，不受影响，但以后若有页面直接读 `store.graph`，需先按角色重新加载。页面只经假 API 验证，未与真实后端联调（后端 `/relations` 路由尚不存在，见 H08）。
+- **回滚**：撤销 `views/TeacherGraphView.vue`、`composables/useTeacherGraph.ts`、`tests/frontend/h14.test.ts`，以及 `api/graph.ts`、`router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/NodeEditor.vue` 中的对应增量；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 审阅。页签布局、未保存确认方式与刷新重拉策略由 Claude 选定。

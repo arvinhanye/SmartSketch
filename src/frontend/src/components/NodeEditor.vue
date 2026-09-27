@@ -47,6 +47,9 @@ const editor = useNodeEditor({
 const { status, original, form, dirty, locked, canSave, fieldErrors, loadError, loadRetryable, error, notice, saving, conflict, stale } =
   editor
 
+// 页面（H14）切换节点前据此确认是否丢弃未保存的修改
+defineExpose({ dirty })
+
 const uid = useId()
 const id = (field: string) => `ne-${field}${uid}`
 const titleId = id('title')
