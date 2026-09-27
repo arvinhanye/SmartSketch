@@ -651,6 +651,27 @@ describe('J08 异常 EOF 与取消', () => {
     expect(t.backend.calls).toHaveLength(1)
   })
 
+  it('同一分片的首条事件回调取消后，不投递剩余事件', async () => {
+    const t = setup()
+    const stream = sseStream()
+    t.backend.streams.push(stream)
+    const controller = new AbortController()
+    const pending = capture(t.send({
+      signal: controller.signal,
+      onEvent(event) {
+        t.events.push(event)
+        if (event.kind === 'meta') controller.abort()
+      },
+    }))
+    await flush()
+    stream.push(frame('meta', META_ANSWERED) + frame('delta', DELTA_FIRST))
+    await flush()
+
+    expect(pending.error).toBeInstanceOf(AbortedError)
+    expect(t.events.map((event) => event.kind)).toEqual(['meta'])
+    expect(stream.state.cancelled).toBe(true)
+  })
+
   it('fetch 尚未返回时取消：抛 AbortedError，且不再读取事件流', async () => {
     const t = setup()
     let release!: (response: Response) => void
