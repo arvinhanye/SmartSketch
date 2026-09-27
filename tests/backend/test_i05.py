@@ -287,6 +287,8 @@ def test_students_and_courses_are_isolated(env):
     assert ids(env.get(env.alice)) == ["a"]
     assert ids(env.get(env.alice, course=env.other)) == ["b"]
     assert ids(env.get(env.bob)) == ["b"]
+    # 身份只取自已认证会话：查询串里的 user_id 不被信任
+    assert ids(env.get(env.alice, query=f"?user_id={env.bob.id}")) == ["a"]
 
 
 def test_dirty_and_dormant_rows_do_not_break_the_read(env, caplog):
@@ -451,6 +453,26 @@ def test_digest_mismatch_is_500(env, caplog):
         db.execute("DROP TRIGGER graph_versions_committed_frozen")
         db.execute("UPDATE graph_versions SET digest = ? WHERE version_id = ?", ("sha256:" + "0" * 64,
                                                                                  version.version_id))
+    assert_integrity_500(env.get(env.alice), caplog)
+
+
+@pytest.mark.parametrize("damage", ["digest-column", "foreign-course"])
+def test_graph_read_revalidates_snapshot_with_warm_version_caches(env, caplog, damage):
+    """I05 的图读自己也复核摘要与课程：G07 修订缓存、I02 谱系缓存已热时仍必须 500。
+
+    先成功请求一次预热 resolver 的修订缓存与 progress 的谱系缓存，再只让 I05 自己的图缓存转冷；
+    此时这次复核若被删掉，损坏的已提交版会以 200 返回缓存外的图，而不是 5xx。
+    """
+    version = env.publish(["a"])
+    assert body_of(env.get(env.alice))["state"] == "recommendations"
+    service.clear_cache()
+    if damage == "digest-column":
+        with connect(env.url) as db:
+            db.execute("DROP TRIGGER graph_versions_committed_frozen")
+            db.execute("UPDATE graph_versions SET digest = ? WHERE version_id = ?",
+                       ("sha256:" + "0" * 64, version.version_id))
+    else:
+        env.tamper(version, lambda raw: raw.__setitem__("course_id", "another-course"))
     assert_integrity_500(env.get(env.alice), caplog)
 
 

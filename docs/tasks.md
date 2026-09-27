@@ -1338,3 +1338,4 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验证：`python3 -m pytest tests/backend/test_i05.py -q`、`./scripts/verify.sh`、`git diff --check`。
 - 待签收：ADR-069（图读已提交快照而非 Neo4j 副本；教师 403）。
 - 解锁：I06（另需 H11，已在 main）。
+- 独立审查（2026-09-27，PR #291，worktree `.claude/worktrees/pr291`）：定向 `test_i05.py` 36 passed；后端全量 3259 passed / 27 skipped；8 处反向篡改 7 处判红，1 处存活（删除图读的摘要复核——该检查只在 G07 修订缓存与 I02 谱系缓存已热时才唯一生效），已新增 `test_graph_read_revalidates_snapshot_with_warm_version_caches`（摘要列/他课两例）闭合并复跑判红；另补「查询串 `user_id` 不能冒充身份」断言。未发现实现缺陷，未改契约真源。
