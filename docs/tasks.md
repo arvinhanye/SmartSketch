@@ -1,5 +1,16 @@
 # 任务看板
 
+## 2026-09-28 Codex 认领：登录页装饰知识图谱
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-AUTH-ART-02 | DONE | Codex（前端） | `AuthLayout.vue`、前端相关测试、身份规格、交接 | 蓝色品牌区有 8 组拓扑各异的小图谱；每次加载随机散布并避让节点文字；装饰文字不可选中复制；登录交互和布局保持可用；修改前后各有本地 Git 提交 |
+
+- 输入：现有单组 SVG 示意图、登录页左右分栏；输出：分布于品牌区下方的多组装饰图谱。依赖：`AuthLayout` 和前端测试环境。风险：装饰内容过密影响文案或矮屏布局；采用自适应 SVG 容器并在窄屏沿用隐藏品牌区的规则。
+- 验证命令：`npm run test -- --run h13.test.ts`、`npm run type-check`、`npm run build`、`./scripts/verify.sh`、浏览器视觉检查、`git diff --check`。
+- 验收证据：修改前提交 `8d3d992`。浏览器连续 3 次重新加载，8 组图谱位置均变化，37 个标签无重叠、均位于说明文字下方；装饰 SVG 的 `user-select` 与指针事件均为 `none`，拖拽后选区为空；720px 视口文档高度保持 720px。前端定向 30 passed、全量 767 passed、类型检查和构建通过；详见 `docs/handoffs/codex-ui-auth-art-02.md`。
+- `./scripts/verify.sh` 已在 Git Bash 中尝试，契约门禁缺少 `openapi-typescript` 命令，且其临时子进程无法找到 `python3`；这两项为本机工具链问题，非本次前端图谱改动。
+
 ## 2026-09-28 Codex 认领：登录页提示与视口布局
 
 | ID | 状态 | 负责人 | 范围 | 验收 |

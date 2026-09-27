@@ -220,6 +220,22 @@ function failWith(error: Error): AuthApi['login'] {
 }
 
 describe('H13 登录页', () => {
+  it('品牌区展示多组不同结构的装饰知识图谱并对读屏隐藏', async () => {
+    const { wrapper } = await mountApp()
+    const artwork = wrapper.get('.auth-layout__art')
+    const graphs = artwork.findAll('[data-test="auth-graph"]')
+
+    expect(artwork.attributes('aria-hidden')).toBe('true')
+    expect(graphs.length).toBeGreaterThanOrEqual(8)
+    expect(artwork.findAll('line').length).toBeGreaterThan(30)
+    expect(new Set(graphs.map((graph) => `${graph.findAll('rect').length}:${graph.findAll('circle').length}`)).size)
+      .toBeGreaterThanOrEqual(3)
+
+    const second = await mountApp()
+    expect(second.wrapper.get('[data-test="auth-graph"]').attributes('transform'))
+      .not.toBe(graphs[0].attributes('transform'))
+  })
+
   it('未登录访问受保护页面：回到登录页，显示未登录提示与登录表单', async () => {
     const { wrapper, router } = await mountApp({ path: '/teacher' })
     expect(router.currentRoute.value.name).toBe(ROOT_ROUTE)
