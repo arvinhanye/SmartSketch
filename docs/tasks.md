@@ -1511,3 +1511,11 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - **已签收**（ArvinHan，2026-09-27）：ADR-076（演示模型与 0.58 阈值）、ADR-077（门禁跳过白名单）、ADR-078（示例导入只增不删）。D-08 融合阈值仍待用户决定。
 - PR #307 已于 2026-09-27 合并（main `8450256`）。
 - 待人工：macOS 实测、`docker compose --profile app up` 真实守护进程验证（K08 遗留）、真实模型重跑 K02 验收 7 与 K04。详见 `docs/handoffs/claude-k06-k09-k11-k12.md`。
+
+## 2026-09-27 一键启动演示环境（Claude，新增任务）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| DEMO-01 | DONE（待 PR 审查/合并） | 一键启动脚本 `scripts/start-demo.sh` | Claude | `claude/one-click-start-2ibfrb` / `main@86bb94d` | 云端容器从零（无 `.venv`、`.env`、`node_modules`）实跑：依赖安装、Neo4j、迁移、建号、导入 v1、前端 5173 就绪，经前端代理登录 `demo_student` 并看到已发布课程；第二次运行账号 `exists, unchanged`、导入 `publish_unchanged: true`；伪终端 Ctrl+C 后无残留进程 |
+
+- 待人工：macOS 实测（脚本按 bash 3.2 写法编写，未在 Mac 上运行过）。详见 `docs/handoffs/claude-start-demo.md`。

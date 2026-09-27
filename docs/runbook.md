@@ -2,7 +2,7 @@
 
 本手册说明如何把智绘学途跑起来、导入演示课程、做验收与恢复。逐功能的验收证据见 [acceptance.md](acceptance.md)。
 
-> **已测平台**：只有 **Linux（x86_64，Ubuntu 系云端容器，Python 3.11、Node 22、Docker 29、Neo4j 5.26.31）** 上完整跑过本手册的「方式 B」「演示导入」「门禁」「端到端」各节（2026-09-27）。macOS 与 Windows **未实测**；「方式 A」（`docker compose --profile app`）尚未在真实 Docker 守护进程上跑通过，见文末「限制」。
+> **已测平台**：`scripts/start-demo.sh` 与下列各节只有 **Linux（x86_64，Ubuntu 系云端容器，Python 3.11、Node 22、Docker 29、Neo4j 5.26.31）** 上完整跑过本手册的「方式 B」「演示导入」「门禁」「端到端」各节（2026-09-27）。macOS 与 Windows **未实测**；「方式 A」（`docker compose --profile app`）尚未在真实 Docker 守护进程上跑通过，见文末「限制」。
 
 ## 1. 准备
 
@@ -30,7 +30,26 @@ cp .env.example .env        # 然后编辑 .env，见下
 | `LLM_MODE` / `EMBEDDING_MODE` | 演示用 `demo`；真实模型用 `live` / `online` | 见第 3 节 |
 | `QA_SIMILARITY_THRESHOLD` | 演示模式用 `0.58`；真实向量保持 `0.7` | ADR-076 实测 |
 
-## 2. 启动（方式 B：本机进程，已测）
+## 2. 启动
+
+### 一键启动（推荐，演示模式）
+
+```bash
+git clone https://github.com/arvinhanye/SmartSketch.git && cd SmartSketch
+scripts/start-demo.sh
+```
+
+只需要 Docker（已启动）、Python 3.11/3.12、Node.js 22.22+。脚本依次完成：创建 `.venv` 并安装后端（跳过 anaconda 的 Python）→ `npm ci` 前端 → 没有 `.env` 时按 `.env.example` 生成演示配置（随机 Neo4j 口令与登录签名密钥）→ `dev-up.sh` → SQLite 与 Neo4j 迁移 → 预置演示账号 → 后台启动 API 与 worker → 导入演示课程 → 启动前端并打开浏览器。
+
+- 账号 `demo_teacher` / `demo_student` / `demo_student2`，首次建号的口令缺省 `smartsketch-demo`（用 `SEED_DEMO_PASSWORD=… scripts/start-demo.sh` 自定）。账号已存在时沿用原口令，脚本不重置。
+- 本次进程一律用演示模型（`LLM_MODE=demo`、`EMBEDDING_MODE=demo`、`QA_SIMILARITY_THRESHOLD=0.58`），不改 `.env`，不产生付费调用。已有 `.env` 只会在 `AUTH_JWT_SECRET` 为空或过短时补一行随机值。
+- 可重复执行：已装依赖、已建账号、已导入课程都复用（导入报告 `publish_unchanged: true`）。
+- `Ctrl+C` 停止 API、worker 与前端；Neo4j 保留运行，停止用 `scripts/dev-down.sh`。
+- 选项：`--no-import` 跳过课程导入，`--no-open` 不开浏览器；`DEMO_WEB_PORT` 改前端端口。日志在 `.demo/logs/`。
+- 与手动步骤一样，后端进程从 `src/backend` 启动，相对的 `SQLITE_URL`/`STORAGE_DIR` 落在 `src/backend/storage/`，与下文手动方式共用同一份数据。
+- 若 Neo4j 库此前用 `fake` 或真实向量建过，API 会因向量空间不一致拒绝启动（见第 3 节），此时换新库或运行 `scripts/reembed.py`。
+
+### 方式 B：本机进程，手动（已测）
 
 ```bash
 ./scripts/dev-up.sh                                   # 启动 Neo4j 并检查 APOC
