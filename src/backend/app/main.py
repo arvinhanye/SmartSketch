@@ -17,6 +17,7 @@ from app.api.graph_nodes import router as graph_nodes_router
 from app.api.review import router as review_router
 from app.api.versions import router as versions_router
 from app.api.progress import router as progress_router
+from app.api.recommend import router as recommend_router
 from app.api.health import router as health_router
 from app.api.task_cancel import router as task_cancel_router
 from app.api.tasks import router as tasks_router
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     application.include_router(review_router)
     application.include_router(versions_router)
     application.include_router(progress_router)
+    application.include_router(recommend_router)
     return application
 
 

@@ -1300,7 +1300,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| I02 | DONE（待 PR 审查/合并；issue #125） | 实现掌握标记 API | ArvinHan（Claude） | `claude/project-thread-fqm6l4` / `main@a7d8075` | `src/backend/app/services/learning/progress.py`、`src/backend/app/api/progress.py`、`tests/backend/test_i02.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 两行导出、`services/learning/__init__.py` 文档串、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-064、`docs/handoffs/claude-i02.md` | `test_i02.py` 24 passed；8 处反向篡改检出 7 处，存活 1 处为冗余防护（绑定版本号复核，G07 已查）；后端 + 契约全量 3417 passed；`./scripts/verify.sh` 通过；`git diff --check` 干净 |
+| I02 | DONE（待 PR 审查/合并；issue #125） | 实现掌握标记 API | ArvinHan（Claude） | `claude/project-thread-fqm6l4` / `main@a7d8075` | `src/backend/app/services/learning/progress.py`、`src/backend/app/api/progress.py`、`tests/backend/test_i02.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 两行导出、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-064、`docs/handoffs/claude-i02.md` | `test_i02.py` 24 passed；8 处反向篡改检出 7 处，存活 1 处为冗余防护（绑定版本号复核，G07 已查）；后端 + 契约全量 3417 passed；`./scripts/verify.sh` 通过；`git diff --check` 干净 |
 
 - 验收：请求体带 `user_id` 整批 422 零写入、查询串 `user_id` 不被读取、学生之间与课程之间隔离；改标后 `GET /progress` 与 I03 可学集合按新投影重算；草稿独有、已删除、他课、已并入他点的来源 `kp_id` 均 422 `not_in_published_version` 且零写入；LP-8/9/16～20 的投影与覆盖、同值写入重放无操作、写事务内复核发布指针、完整性故障 500 只含 `request_id`。
 - 依赖：I01（PR #272）、C03、B12/B12-R1（契约）、G07 均已在 main。无迁移（预分配的 014 未使用）、无契约与依赖变更。
@@ -1326,3 +1326,15 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 断点：上一会话只给 issue #281 打了 `status:in-progress`，无分支、无提交，本轮从 `main@f2fbf1e` 从零实现。
 - H14：ADR-067 已由 ArvinHan 2026-09-27 签收（三页签布局、页内确认 + `window.confirm` 离开确认、刷新在途遇写入则重拉）；PR #285 已合入；离开本页不清空课程 store 的草稿图（目前无页面直接读 `store.graph`，已记入 ADR 后果）。
 - 解锁：K05 教师主线 E2E 的 H14 依赖满足（仍依赖 H09、H10 等）。
+
+## 2026-09-27 I05 推荐查询 API（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I05 | DONE（待 PR 审查/合并；issue #128） | 实现推荐查询 API | ArvinHan（Claude） | `claude/project-thread-98kaqt` / `main@ac21e5d` | `src/backend/app/services/learning/recommend.py`、`src/backend/app/api/recommend.py`、`tests/backend/test_i05.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 一行导出、`services/learning/__init__.py` 文档串、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-069、`docs/handoffs/claude-i05.md` | `test_i05.py` 34 passed；6 处反向篡改（途中重解析指针、截断后计 `total_eligible`、不过滤边类型、吞掉图错误、截断前改排序、去掉 `limit` 校验）均检出；后端全量 3257 passed / 27 skipped；`./scripts/verify.sh` exit 0；`git diff --check` 干净 |
+
+- 验收：绑定版本后途中提交 v2，本请求的图、投影、`graph_version` 仍为 v1，下一请求读 v2；`limit=1..n` 均为 `limit=50` 结果的前缀且 `total_eligible` 不变；未发布 404 `GRAPH_NOT_PUBLISHED` 与 200 `all_mastered` 区分；环、自环、悬空端点、`V=∅`、章节树损坏、未知章节、谱系损坏、摘要不符均 500 且 `details` 只含 `request_id`，环路节点只进日志；`limit` 越界 422。
+- 依赖：I02（#280/#288）、I04（#238）、G07（#267）均已在 main。无迁移、契约与依赖变更（ADR-069 未占用迁移号）。
+- 验证：`python3 -m pytest tests/backend/test_i05.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 待签收：ADR-069（图读已提交快照而非 Neo4j 副本；教师 403）。
+- 解锁：I06（另需 H11，已在 main）。

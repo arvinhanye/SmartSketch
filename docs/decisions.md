@@ -1521,3 +1521,17 @@
 - **后果**：详情页签选中节点时，常驻的节点编辑面板也会读一次同一知识点（请求翻倍，体量小，接受）。离开本页不清空课程 store 里的草稿；目前学生页用自己的状态，不受影响，但以后若有页面直接读 `store.graph`，需先按角色重新加载。页面只经假 API 验证，未与真实后端联调（后端 `/relations` 路由尚不存在，见 H08）。
 - **回滚**：撤销 `views/TeacherGraphView.vue`、`composables/useTeacherGraph.ts`、`tests/frontend/h14.test.ts`，以及 `api/graph.ts`、`router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/NodeEditor.vue` 中的对应增量；无迁移、契约与依赖变更。
 - **签收**：ArvinHan 2026-09-27 签收（三页签布局、页内确认 + 离开确认、刷新在途遇写入则重拉，均按原方案）。
+
+## ADR-069：I05 推荐查询从绑定版本的已提交快照读图，一次解析、全量排序后截断
+
+- **日期**：2026-09-27
+- **背景**：I05 要求「请求全程同版本」「截断稳定」「未发布 404 与全掌握区别」「已提交图损坏 5xx」「有环明确错误」。G07 规定请求开始解析一次发布版；I02 的 `project_progress` 已按绑定版本投影进度（谱系取自已提交快照）；I03/I04 是纯函数。尚未确定的是推荐的图数据（节点属性、`PREREQUISITE` 边、章节树）从哪里读。
+- **决定**：
+  1. `GET /api/v1/courses/{cid}/recommend` 仅学生成员可用（`course_student`，与 ADR-064 一致），教师 403；从未发布为 404 `GRAPH_NOT_PUBLISHED`，与 200 `state = all_mastered` 区分。
+  2. 请求开始时调用一次 `resolve_published`；图取自该 `version_id` 在 SQLite 中的已提交快照（摘要复核后 `load_snapshot`），**不读 Neo4j 副本、不读草稿**。快照不可变、与 I02 投影所用谱系同源，因此图、进度投影、理由与响应 `graph_version` 必然同版本；推荐接口不依赖 Neo4j 可用。校验通过的图按 `(sqlite_url, version_id)` 缓存，损坏的不缓存。
+  3. 节点集由 I03 `build_prerequisite_graph` 做全图校验，只取 `type = PREREQUISITE` 的边；另核对投影节点集与图节点集一致。I04 对**全部**候选排序后才截断到 `limit`，`total_eligible` 为截断前总数；排序键 `(-score, chapter_rank, kp_id)` 是全序，`limit = k` 的结果恰为 `limit = 50` 结果的前 `k` 条。
+  4. `limit` 默认 10、范围 1～50（ADR-014 修订 1 决定 7），越界或非整数为通用 422 `VALIDATION_ERROR`（`fields[].field = "limit"`）。权重只取启动时校验过的 `RECOMMEND_WEIGHT_*`，请求不能传。
+  5. 已提交版完整性故障——快照缺失、摘要不符、不可解析、他课、`V = ∅`、环、自环、悬空端点、章节树损坏、未知章节、谱系违反修订 3 决定 16——以及其他未预期异常，一律 500 `INTERNAL_ERROR`，`details` 只含 `request_id`；错误种类（如 `cycle`）与环路节点只写服务端日志（ADR-017 决定 4、§1）。
+- **后果**：推荐不受 Neo4j 副本物化或补偿状态影响；代价是每个新版本首次请求需解析一次快照 JSON（之后命中缓存），MVP 规模可接受。快照里 `importance`/`difficulty` 的范围已由 `load_snapshot` 校验，越界值在读快照时即成为 500，I04 的 `invalid_number` 分支在此路径上不会触发。候选为空只可能是 `M = V`（DAG 必有入度 0 的点），因此 `all_mastered` 与 `total_eligible = 0` 等价。
+- **回滚**：撤销 `app/services/learning/recommend.py`、`app/api/recommend.py`、`tests/backend/test_i05.py`，以及 `app/main.py` 的路由注册、`app/schemas/contracts.py` 的一行导出；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 签收（第 2 条「图读快照而非 Neo4j」与第 1 条教师 403 为 Claude 选定）。
