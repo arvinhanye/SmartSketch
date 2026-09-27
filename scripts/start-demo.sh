@@ -30,7 +30,7 @@ for arg in "$@"; do
     --no-import) do_import=0 ;;
     --no-open) open_browser=0 ;;
     -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "未知选项 $arg。用法：$0 [--live] [--no-import] [--no-open]" ;;
+    *) die "未知选项 ${arg}。用法：$0 [--live] [--no-import] [--no-open]" ;;
   esac
 done
 ((live)) && do_import=0
@@ -52,7 +52,7 @@ if [[ ! -x $PY ]]; then
     fi
   done
   [[ -n $base ]] || die "找不到 Python 3.11 或 3.12（anaconda 的除外）。macOS 可用 brew install python@3.12 安装后重试。"
-  step "创建 .venv（$base）"
+  step "创建 .venv（${base}）"
   "$base" -m venv .venv
 fi
 if ! (cd /tmp && "$PY" -c 'import app, fastapi' 2>/dev/null); then
@@ -145,7 +145,7 @@ try: s.bind(("127.0.0.1", int(sys.argv[1])))
 except OSError: sys.exit(0)
 sys.exit(1)' "$1"
 }
-port_busy "$API_PORT" && die "端口 $API_PORT 已被占用（可能上次的 API 还在运行）。关掉占用进程后重试（macOS：lsof -i :$API_PORT）。"
+port_busy "$API_PORT" && die "端口 $API_PORT 已被占用（可能上次的 API 还在运行）。关掉占用进程后重试（macOS：lsof -i :${API_PORT}）。"
 port_busy "$WEB_PORT" && die "端口 $WEB_PORT 已被占用。关掉占用进程，或用 DEMO_WEB_PORT=其他端口 重试。"
 
 # ---------------------------------------------------------------- 3. Neo4j、迁移、账号

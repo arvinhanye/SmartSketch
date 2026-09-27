@@ -37,3 +37,11 @@ scripts/start-demo.sh --no-open          # 从零：无 .venv、.env、node_modu
 
 - 未在 macOS 上实跑；bash 3.2 兼容只做了人工核对。请在 Mac 上跑一次 `scripts/start-demo.sh`。
 - 若本机 Neo4j 库此前以 fake/真实向量建过，API 会拒绝启动；脚本会打印 API 日志尾部，按运行手册第 3 节换库或 reembed。
+
+## 修复：macOS bash 3.2 报 `API_PORT�: unbound variable`（2026-09-27）
+
+- 现象：用户在 Mac 上运行，第 120 行 `:$API_PORT）` 报 unbound variable。macOS 自带 bash 3.2 在 UTF-8 locale 下把紧跟变量的全角字符首字节读成变量名的一部分。
+- 修复：所有紧跟非 ASCII 字符的变量改为 `${VAR}`（`start-demo.sh`、`e2e.sh`、`verify/integration.sh`、`tests/hooks/test_block_dangerous.sh`）。
+- 回归：`tests/tooling/test_shell_multibyte_vars.py` 扫描 `scripts/`、`tests/`、`.claude/` 下全部 `.sh`；修复前 1 failed，修复后 3 passed。`./scripts/verify.sh` exit 0；云端重跑 `start-demo.sh` 启动与 TERM 清理正常。
+- Linux 上无法复现 macOS 的字符分类行为，Mac 实测仍待用户确认。
+
