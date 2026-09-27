@@ -14,5 +14,5 @@
   - `./scripts/verify.sh`（生成器在 PATH 上）→ `PASS contracts gate`、`Scaffold verification passed.`
   - `git diff --check` 干净。
 - 风险：投影每次读取本课程全部已提交版本行（快照解析已缓存），MVP 规模可接受；`PUT` 在持有写锁时用独立连接读取指针、版本与进度行（WAL 下读者不阻塞，写锁保证其间无其他提交）。
-- 下一步：I05 推荐按同一绑定版本调用 `project_progress(...).mastered`；I06 前端消费 `ProgressResponse`；ADR-064 待签收。
+- 下一步：I05 推荐按同一绑定版本调用 `project_progress(...).mastered`；I06 前端消费 `ProgressResponse`；ADR-064 已全部签收（ArvinHan，2026-09-27）。
 - 回滚：见 ADR-064「回滚」；无持久层变更。
