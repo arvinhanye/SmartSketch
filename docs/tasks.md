@@ -1321,8 +1321,8 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| H14 | DONE（待 PR 审查/合并；issue #281） | 实现教师图谱编辑页 | ArvinHan（Claude） | `claude/project-thread-n5wcl5` / `main@f2fbf1e`（合并前并入 `main@cba4c41`） | `src/frontend/src/views/TeacherGraphView.vue`、`src/frontend/src/composables/useTeacherGraph.ts`、`src/frontend/src/router/index.ts`、`tests/frontend/h14.test.ts`；扩围 `api/graph.ts`（`DraftGraphApi`）、`main.ts`、`views/CoursesView.vue`（教师入口）、`components/NodeEditor.vue`（`defineExpose({ dirty })` 一行）、`docs/architecture.md`、`docs/decisions.md`（ADR-067） | `h14.test.ts` 42 passed；独立审查 25 处篡改 20 处检出（未检出 5 处中 2 处为等价篡改，3 处已补用例）并发现 1 中 5 低问题，均先补复现用例再修；前端全量 17 files / 587 passed；type-check、build、`verify.sh` 通过；**仅假 API 验证**（后端尚无 `/relations` 路由）；`docs/handoffs/claude-h14.md` |
+| H14 | DONE（#285 已合入；issue #281 已关闭） | 实现教师图谱编辑页 | ArvinHan（Claude） | `claude/project-thread-n5wcl5` / `main@f2fbf1e`（合并前并入 `main@cba4c41`） | `src/frontend/src/views/TeacherGraphView.vue`、`src/frontend/src/composables/useTeacherGraph.ts`、`src/frontend/src/router/index.ts`、`tests/frontend/h14.test.ts`；扩围 `api/graph.ts`（`DraftGraphApi`）、`main.ts`、`views/CoursesView.vue`（教师入口）、`components/NodeEditor.vue`（`defineExpose({ dirty })` 一行）、`docs/architecture.md`、`docs/decisions.md`（ADR-067） | `h14.test.ts` 42 passed；独立审查 25 处篡改 20 处检出（未检出 5 处中 2 处为等价篡改，3 处已补用例）并发现 1 中 5 低问题，均先补复现用例再修；前端全量 17 files / 587 passed；type-check、build、`verify.sh` 通过；**仅假 API 验证**（后端尚无 `/relations` 路由）；`docs/handoffs/claude-h14.md` |
 
 - 断点：上一会话只给 issue #281 打了 `status:in-progress`，无分支、无提交，本轮从 `main@f2fbf1e` 从零实现。
-- H14 待决（需 ArvinHan）：ADR-067 签收（三页签布局、页内确认 + `window.confirm` 离开确认、刷新在途遇写入则重拉）；离开本页不清空课程 store 的草稿图（目前无页面直接读 `store.graph`，已记入 ADR 后果）。
+- H14：ADR-067 已由 ArvinHan 2026-09-27 签收（三页签布局、页内确认 + `window.confirm` 离开确认、刷新在途遇写入则重拉）；PR #285 已合入；离开本页不清空课程 store 的草稿图（目前无页面直接读 `store.graph`，已记入 ADR 后果）。
 - 解锁：K05 教师主线 E2E 的 H14 依赖满足（仍依赖 H09、H10 等）。

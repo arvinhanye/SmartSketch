@@ -1,7 +1,7 @@
 # Claude 交接：H14 教师图谱编辑页
 
 - `task_id`: H14（`docs/atomic-tasks.json`「实现教师图谱编辑页」，D-17 补登），issue #281
-- `review_status`: ready_for_review
+- `review_status`: merged（PR #285）
 - 分支：`claude/project-thread-n5wcl5`；`base_commit`: `f2fbf1e`（origin/main，含集成 PR #283 的 H07/H11）
 - 依赖：H05（`useGraphFilters`、`GraphToolbar`）、H06（`KnowledgeDetail`）、H07（`NodeEditor`）、H08（`RelationEditor`、`useRelationEditor`）、H04（`GraphCanvas`）
 - 决策：ADR-067
@@ -48,4 +48,4 @@
 
 - **仅假 API 验证**：后端尚无 `/relations` 路由（H08 已记录），真实环境里「编辑关系」页签的写请求会 404；节点编辑与草稿读取的后端路由已存在但未联调。
 - 离开本页不清空课程 store 的草稿图；以后若有页面直接读 `store.graph`，需先按角色重新加载（ADR-067 后果）。
-- 待 ArvinHan：ADR-067 签收。K05 教师主线 E2E 可把本页作为编辑入口。
+- ADR-067 已由 ArvinHan 2026-09-27 签收。K05 教师主线 E2E 可把本页作为编辑入口。
