@@ -9,11 +9,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
 
-from app.repositories.graph_migrations import GraphVectorWriter, VectorSpaceError, vector_property
+from app.repositories.graph_migrations import (
+    GraphMigrationError,
+    GraphVectorWriter,
+    VectorSpaceError,
+    ensure_current_vector_indexes,
+    vector_property,
+)
 from app.repositories.neo4j import GraphScope
 from app.repositories.vector_search import search_chunks
 from app.services.versions import chunk_vectors, publish as publishing
@@ -182,3 +189,77 @@ def test_node_with_a_vector_but_no_revision_is_repaired(g08):  # J01 按 revisio
         verify_chunks(g08.url, g08.repo, scope, [REV], SPACE)
     assert index_chunks(g08.url, g08.repo, embedder(), scope, [REV], SPACE).embedded == 1
     assert indexed(g08)[C1] == (REV, "m1", 4)
+
+
+# ---------------------------------------------------------------- 遗留修复：索引与块身份（ADR-055）
+
+NO_INDEX_SPACE = "real/g08-no-index/4"
+
+
+def index_names(env):
+    return {r["name"] for r in env.q("SHOW VECTOR INDEXES YIELD name RETURN name")}
+
+
+def drop_indexes(env, space):
+    suffix = vector_property(space).removeprefix("embedding_")
+    for label in ("chunk", "kp"):
+        env.q(f"DROP INDEX {label}_embedding_{suffix} IF EXISTS")
+
+
+def test_verify_requires_an_online_chunk_index_for_the_space(g08):
+    base_graph(g08)
+    scope = GraphScope(g08.course, "01VERSION")
+    inner = embedder()
+    other = SimpleNamespace(space=NO_INDEX_SPACE,
+                            embed=lambda texts: [SimpleNamespace(space=NO_INDEX_SPACE, values=v.values)
+                                                 for v in inner.embed(texts)])
+    drop_indexes(g08, NO_INDEX_SPACE)
+    try:
+        index_chunks(g08.url, g08.repo, other, scope, [REV], NO_INDEX_SPACE)
+        with pytest.raises(VerificationError, match="index"):  # 向量都在，但 J01 查不了
+            verify_chunks(g08.url, g08.repo, scope, [REV], NO_INDEX_SPACE)
+        GraphVectorWriter(g08.repo._driver, lambda: NO_INDEX_SPACE).ensure_vector_indexes(NO_INDEX_SPACE)
+        g08.q("CALL db.awaitIndexes(60)")
+        verify_chunks(g08.url, g08.repo, scope, [REV], NO_INDEX_SPACE)
+    finally:
+        drop_indexes(g08, NO_INDEX_SPACE)
+
+
+@pytest.mark.parametrize("field,wrong", [("revision_id", OTHER_REV), ("document_id", "m-other")])
+def test_wrong_chunk_identity_is_caught_and_repaired(g08, field, wrong):
+    base_graph(g08)
+    scope = GraphScope(g08.course, "01VERSION")
+    index_chunks(g08.url, g08.repo, embedder(), scope, [REV], SPACE)
+    g08.q(f"MATCH (c:Chunk {{course_id: $c, chunk_id: $id}}) SET c.{field} = $v", c=g08.course, id=C1, v=wrong)
+    with pytest.raises(VerificationError):
+        verify_chunks(g08.url, g08.repo, scope, [REV], SPACE)
+    assert index_chunks(g08.url, g08.repo, embedder(), scope, [REV], SPACE).embedded == 1
+    assert indexed(g08)[C1] == (REV, "m1", 4)
+    verify_chunks(g08.url, g08.repo, scope, [REV], SPACE)
+
+
+def _settings(url, dimensions):
+    from pydantic import SecretStr
+
+    return SimpleNamespace(NEO4J_URI=os.environ["SMARTSKETCH_TEST_NEO4J_URI"],
+                           NEO4J_USER=os.environ["SMARTSKETCH_TEST_NEO4J_USER"],
+                           NEO4J_PASSWORD=SecretStr(os.environ["SMARTSKETCH_TEST_NEO4J_PASSWORD"]),
+                           SQLITE_URL=url, EMBEDDING_MODE="fake", EMBEDDING_MODEL="",
+                           EMBEDDING_DIMENSIONS=dimensions)
+
+
+def test_migration_command_creates_the_current_space_indexes(g08):
+    for space in ("fake/6", "fake/5"):
+        drop_indexes(g08, space)
+    try:
+        assert ensure_current_vector_indexes(_settings(g08.url, 6)) == "fake/6"  # 首次启动：记录并建索引
+        suffix = vector_property("fake/6").removeprefix("embedding_")
+        assert {f"chunk_embedding_{suffix}", f"kp_embedding_{suffix}"} <= index_names(g08)
+        assert ensure_current_vector_indexes(_settings(g08.url, 6)) == "fake/6"  # 可重复执行
+        with pytest.raises(GraphMigrationError, match="reembed"):  # 配置与记录不符：不建新空间索引
+            ensure_current_vector_indexes(_settings(g08.url, 5))
+        other = vector_property("fake/5").removeprefix("embedding_")
+        assert f"chunk_embedding_{other}" not in index_names(g08)
+    finally:
+        for space in ("fake/6", "fake/5"):
+            drop_indexes(g08, space)

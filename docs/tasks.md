@@ -1306,3 +1306,13 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 依赖：I01（PR #272）、C03、B12/B12-R1（契约）、G07 均已在 main。无迁移（预分配的 014 未使用）、无契约与依赖变更。
 - 验证：`python3 -m pytest tests/backend/test_i02.py -q`、`./scripts/verify.sh`、`git diff --check`。
 - I02 待决（需 ArvinHan）：ADR-064 签收——教师成员读写进度一律 403（教师查看学生进度须另立接口）；同批重复 `kp_id` 的 `reason` 取 `duplicate`。
+
+## 2026-09-27 G08 遗留修复：向量索引、P9 核对与按版本补齐（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G08-R1 | DONE（待 PR 审查/合并） | 关闭 #283 审查对 G08 的遗留：生产不建向量索引、补齐途径未闭环、P9 不核对块身份 | ArvinHan（Claude，含 1 个并行子代理） | `claude/project-thread-sqwla4` / `main@f2fbf1e` | `src/backend/app/repositories/graph_migrations.py`（`ensure_current_vector_indexes`、`main`）、`src/backend/app/services/versions/chunk_vectors.py`、`scripts/backfill_chunk_vectors.py`、`tests/integration/test_g08.py`、`tests/integration/test_g08_backfill.py`、`tests/backend/test_g08_index.py`；扩围 `tests/integration/test_g04.py`、`tests/integration/test_k10.py`（夹具按部署流程建 `fake/4` 向量索引）、`specs/teacher-review-publish.md`（P9 一句）、`docs/integrations.md`、`src/backend/README.md`、`docs/decisions.md`（ADR-055） | 红灯：新用例收集失败（函数与脚本不存在）；`test_g08.py` 14 passed、`test_g08_backfill.py` 15 passed、`test_g08_index.py` 4 passed；后端 3223 passed、集成 370 passed；`verify.sh` exit 0；详见 `docs/handoffs/claude-g08-r1.md` |
+
+- 验收：`python -m app.repositories.graph_migrations` 为记录的当前空间建知识点与文本块两个向量索引并等待上线，配置与记录不符时拒绝；P9 在索引缺失、未上线或块节点 `revision_id`/`document_id` 与 SQLite 不符时失败，`index_chunks` 覆盖改正；`scripts/backfill_chunk_vectors.py` 按已提交版本补齐（含被新修订取代的旧修订），可按课程/版本缩小范围，`--dry-run` 不调用模型，空间不符时拒绝，重复运行不重算。
+- 关闭 G08 待决中的「补齐途径未闭环」「向量索引无生产创建路径」「P9 不检出错误 `revision_id`、不校验 `document_id`」；「首次发布超过尝试租约」经核对不会发生（发布全程心跳续约，ADR-055 后果）。
+- 仍待决：补齐命令与发布的向量调用都不写 `model_calls`（F14 的 `reembed.py` 会写），是否计入预算与审计待定；首次发布耗时尚未用真实课程实测。

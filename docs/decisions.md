@@ -1382,6 +1382,29 @@
 - **回滚**：删除 `scripts/backup-demo.sh`、`scripts/restore-demo.sh`、`tests/integration/test_k10.py`；无迁移、无契约与依赖变更，已生成的备份目录可直接删除。
 - **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
 
+## ADR-055：G08 遗留修复——部署时建向量索引、P9 核对索引与块身份、按版本补齐命令
+
+- **日期**：2026-09-27
+- **背景**：#283 对 G08（ADR-066）的独立审查发现三处缺口。
+  1. 生产环境不建向量索引：`ensure_vector_indexes` 只在 `scripts/reembed.py` 和测试夹具里调用。部署的 `migrate` 步骤只执行 `CREATE CONSTRAINT`/`CREATE INDEX`，结果 P9 通过、J01 检索却因为索引不存在而报 503。
+  2. 「重新发布一次即可补齐」不成立：内容未变的发布走 P7 幂等路径，不经过 P8；被新修订取代的旧修订也再不会进入快照。
+  3. P9 只查 `revision_id IS NULL`，取值错误查不出来（J01 会静默丢掉该块），也不查 `document_id`。
+- **决定**：
+  1. `python -m app.repositories.graph_migrations` 在执行约束迁移之后，调用 `ensure_current_vector_indexes`：读取 SQLite 记录的当前空间（首次运行时按 `EMBEDDING_*` 初始化，与 API 启动一致），创建该空间的知识点与文本块两个向量索引，并用 `db.awaitIndexes` 等待上线。配置与记录不符时拒绝，提示先运行 `scripts/reembed.py`，不为未记录的空间建索引。DDL 仍只在部署步骤执行，请求路径不执行 DDL。
+  2. P9 的 `verify_chunks` 增加两项核对，任一不满足即按 `VerificationError` 走 C1，提示运行迁移命令：
+     - 当前空间的文本块向量索引存在且为 `ONLINE`；
+     - 每个块节点的 `revision_id` 和 `document_id` 与 SQLite 一致。
+  3. `index_chunks` 写入时，直接用 SQLite 的 `revision_id`、`document_id` 覆盖节点上的值。块 ID 由修订派生（D09），覆盖是安全的。
+  4. 新增运维命令 `scripts/backfill_chunk_vectors.py`：按已提交版本，对快照修订列表调用 `index_chunks`。
+     - 默认处理全部课程的全部已提交版本，可用 `--course`、`--version` 缩小范围，`--dry-run` 只统计缺向量的块、不调用模型；
+     - 同一课程的修订去重后只处理一次；
+     - 版本记录的空间与当前空间不符时拒绝（V12）；
+     - 写入是对共享、不可变块的幂等 `MERGE`，服务运行中也可以执行。
+  5. 幂等发布路径保持纯 SQLite，不补块向量。旧版本统一由第 4 条的命令补齐。
+- **后果**：部署后，发布版的块都可以被检索；索引缺失或不在线时，发布在 P9 就失败，不会让学生端静默查不到。集成测试夹具（`test_g04.py`）要自己建 `fake/4` 的索引，模拟部署步骤。审查提到的「首次发布超过尝试租约」不会发生：发布全程由 `_heartbeat` 按租约的 1/3 续约。
+- **回滚**：撤销 `graph_migrations.ensure_current_vector_indexes` 与 `main()` 中的调用、`chunk_vectors` 的两项核对与覆盖写、`scripts/backfill_chunk_vectors.py`。已经创建的索引和已写入的向量可以保留，不影响其他读取。
+- **签收**：由 Claude 选定（ArvinHan 2026-09-26 同意修复这些遗留，协调者 2026-09-27 转达开工）。
+
 ## ADR-060：F11 审核队列的三栏定义、排序分页与单项处理
 
 - **日期**：2026-09-26
