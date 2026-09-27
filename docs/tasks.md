@@ -1,5 +1,14 @@
 # 任务看板
 
+## K05 教师主线 E2E（Codex）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| K05 | IMPLEMENTED / 待审查验证 | Codex | `tests/e2e/teacher.spec.ts`、`tests/e2e/fixtures.ts`、Playwright 运行入口 | 四格式上传、上传失败重试、成环拒绝、发布后学生可见；默认 fake 模型输出不满足抽取格式，真实 E2E 尚未运行 |
+
+- 输入：自编四格式资料；输出：教师上传到发布的浏览器用例。依赖：前后端、worker、Neo4j、演示账号及能输出有效抽取结构的 fake 模型。风险：当前默认 fake 模型仅返回摘要对象，worker 无法从该输出构建图谱。
+- 本轮最小检查：`npm run test:e2e -- tests/e2e/teacher.spec.ts --list`（发现 1 个用例）；完整验证命令：`npm run test:e2e -- tests/e2e/teacher.spec.ts`（未运行）。
+
 ## 2026-09-25 Codex 认领：F03
 
 | ID | 状态 | 任务 | 负责人 | 文件范围 | 验收 |
