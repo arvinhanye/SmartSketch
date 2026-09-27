@@ -470,6 +470,7 @@ export function createChatStreamClient(options: ChatStreamClientOptions = {}): C
         // 让状态机把后续事件判为 terminal 违规，整批处理完再交还终态。
         let outcome: ChatStreamOutcome | undefined
         for (const message of messages) {
+          if (controller.signal.aborted) throw cancelledError()
           const parsed = parseChatEvent(message.event, message.data)
           if (parsed.kind === 'invalid') throw new ChatStreamInterruptedError('protocol', parsed.reason)
           const step = advanceChatGrammar(grammar, parsed.event)

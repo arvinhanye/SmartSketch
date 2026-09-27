@@ -1355,6 +1355,11 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - J07 已合入并接入日志写入；P1/P2 失败不调用此仓储。迁移编号顺延至 014，以避开已存在的 012、013。
 - PR #295 Backend CI 修复：014 迁移补回滚步骤，F11 迁移回滚用例限制迁移范围；原失败三例与 J10 定向测试共 4 passed，待 GitHub CI 重跑。
+## 2026-09-27 K04 全链路性能测量（Codex）
+
+| ID | 状态 | 任务 | 分支 | 修改范围 | 验证 |
+| --- | --- | --- | --- | --- | --- |
+| K04 | IMPLEMENTED / 待实测与 PR 复审 | 固定约 2 万字样本的 worker 阶段耗时、token 与 SSE 问答测量 | `codex/k04-benchmark-pipeline` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py`、`docs/handoffs/codex-k04.md` | J07 已合入；SSE 首字/终态与 p50/p95 定向测试 3 passed；真实服务测量待环境，`verify.sh` 因本机契约工具链/编码未通过，付费调用未执行 |
 ## 2026-09-27 I05 推荐查询 API（Claude 认领）
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
