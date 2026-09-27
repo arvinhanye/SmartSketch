@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "note": "K09 示例课程。全部资料为项目自编（与 evaluation/fixtures/synthetic.json 的 doc-ch3 同文），不含真实课程资料。scripts/import-demo.py 按本清单幂等导入。",
+  "course": {
+    "key": "smartsketch-demo-ds-ch3",
+    "name": "【示例】数据结构：栈与队列",
+    "description": "SmartSketch 演示课程（自编资料）。由 scripts/import-demo.py 创建，可安全重跑。",
+    "teacher": "demo_teacher",
+    "students": ["demo_student", "demo_student2"]
+  },
+  "documents": [
+    {
+      "path": "ch3-stack-queue.md",
+      "content_type": "text/markdown",
+      "sha256": "4847e2e4b5ef36c6fff107e39e763485019d094d0b571506927584f4b1d566a9"
+    }
+  ],
+  "publish": true
+}

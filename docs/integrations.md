@@ -30,7 +30,7 @@
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `APP_ENV` | 枚举 `development` \| `test` \| `production` | `development` | 运行环境；`production` 禁止任何 fake 模式 | 已约定（取值集合为 A07 定形） |
+| `APP_ENV` | 枚举 `development` \| `test` \| `production` | `development` | 运行环境；`production` 禁止任何 fake 与 demo 模式 | 已约定（取值集合为 A07 定形） |
 | `API_HOST` | 字符串 | `127.0.0.1` | FastAPI 监听地址 | 已约定 |
 | `API_PORT` | 整数 1～65535 | `8000` | FastAPI 监听端口 | 已约定 |
 | `WEB_ORIGIN` | URL | `http://localhost:5173` | 允许的前端来源（CORS） | 已约定 |
@@ -45,8 +45,8 @@
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `LLM_MODE` | 枚举 `fake` \| `live` | `fake` | `fake` 不联网、按输入确定性输出、可注入故障并上报模拟 usage；`live` 调用主用/备用供应商 | A07 定形 |
-| `EMBEDDING_MODE` | 枚举 `fake` \| `online` \| `local` | `fake` | `fake` 按输入确定性生成 `EMBEDDING_DIMENSIONS` 维向量；`online` 调用兼容 API；`local` 在本机 CPU 运行 | A07 定形；生产用 `online` 还是 `local` 待 D-02c |
+| `LLM_MODE` | 枚举 `fake` \| `demo` \| `live` | `fake` | `fake` 不联网、按输入确定性输出、可注入故障并上报模拟 usage；`demo` 不联网，按规则从资料原文产出能被真实解析器接受的抽取/问答输出（演示与端到端验收用，模型 ID 固定为 `smartsketch-demo-rules-v1`，不读 `LLM_*_MODEL`，ADR-076）；`live` 调用主用/备用供应商 | A07 定形；`demo` 见 ADR-076 |
+| `EMBEDDING_MODE` | 枚举 `fake` \| `demo` \| `online` \| `local` | `fake` | `fake` 按输入确定性生成 `EMBEDDING_DIMENSIONS` 维向量（与语义无关）；`demo` 不联网，字符 1-gram + 2-gram 哈希词袋向量，字面重叠的问题与文本块相似度明显更高，空间为保留模型 ID `smartsketch-demo-ngram-v1`（ADR-076）；`online` 调用兼容 API；`local` 在本机 CPU 运行 | A07 定形；生产用 `online` 还是 `local` 待 D-02c；`demo` 见 ADR-076 |
 
 ### 主用与备用大模型（OpenAI 兼容）
 
@@ -229,13 +229,14 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 
 - **LLM 版本**不另设变量：配置中的模型 ID 字符串即版本。`model_calls` 同时记录请求时的模型 ID 与响应中的 `model` 字段；缓存键（D09、E 组）包含实际给出结果的模型 ID 与提示词版本，更换模型或提示词即失效。
 - **风险**：供应商若使用会自动升级的别名，模型 ID 不变而行为改变，缓存不会失效。能选带日期或版本号的固定 ID 时优先选用；D-02a 签收时注明所选 ID 是否为别名。
-- **向量空间标识** = `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`（`fake` 模式自成一个空间，不得与真实向量混入同一索引）。任一项变化即新空间：不得与旧向量混用同一索引，须按 `specs/teacher-review-publish.md` V12 离线重新向量化（ADR-012 修订 1：向量是派生数据，重算不产生新的内容版本，全部已提交版本随之迁移）。E07 在首次调用时比对返回长度；F 组写入前比对向量的空间标识与当前空间（维度相同的两个模型只比对维度无法区分），不一致即拒绝写入并指出两边数值；唯一例外是重新向量化命令第 3 步的迁移写入：比对的是本次迁移的目标空间，只写目标空间的属性与索引，API 与 worker 不能使用（ADR-012 修订 2 补注，Codex FIX-R03）；E07 的向量缓存键含空间标识（ADR-012 修订 2）。
+- **向量空间标识** = `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`（`fake` 模式自成一个空间，不得与真实向量混入同一索引；`demo` 模式以保留模型 ID `smartsketch-demo-ngram-v1` 作为模型，空间为 `real/smartsketch-demo-ngram-v1/<维度>`，与 `fake/<维度>` 及任何供应商模型互不混用，`online`/`local` 不得把 `EMBEDDING_MODEL` 设为该保留 ID，ADR-076）。任一项变化即新空间：不得与旧向量混用同一索引，须按 `specs/teacher-review-publish.md` V12 离线重新向量化（ADR-012 修订 1：向量是派生数据，重算不产生新的内容版本，全部已提交版本随之迁移）。E07 在首次调用时比对返回长度；F 组写入前比对向量的空间标识与当前空间（维度相同的两个模型只比对维度无法区分），不一致即拒绝写入并指出两边数值；唯一例外是重新向量化命令第 3 步的迁移写入：比对的是本次迁移的目标空间，只写目标空间的属性与索引，API 与 worker 不能使用（ADR-012 修订 2 补注，Codex FIX-R03）；E07 的向量缓存键含空间标识（ADR-012 修订 2）。
 
 ### 启动校验（B06）
 
 - 类型或范围不合法时拒绝启动并指出变量名，不静默回落默认值（与 `specs/task-processing.md` §8.8 一致）。
 - 条件必填：`LLM_MODE=live` 时主用四项必填；备用四项全空或全填；`EMBEDDING_MODE=online` 时 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 必填，`local` 时 `EMBEDDING_MODEL` 必填。
-- `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake`。
+- `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake` 或 `demo`（ADR-076）。
+- 演示模式（`demo`）的相似度阈值：`QA_SIMILARITY_THRESHOLD` 缺省值 0.7 针对真实向量，演示向量的余弦分布不同，建议演示时设为 `0.58`（ADR-076 实测：覆盖问题 0.63～0.67，无关问题 ≤ 0.54）；这是环境变量取值建议，代码不按模式改阈值、不绕过闸门。
 - `STORAGE_DIR` 不得为空或全空白；启动校验不创建目录也不检查可写，目录由 `FileStorage` 首次构造时创建（C05）。
 - `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 必须小于 `LLM_CHAT_TIMEOUT_SECONDS`。
 - `RECOMMEND_WEIGHT_*` 四项成组：都不设或都为空时用缺省值；只设一部分、有负数或非有限值、全为 0、和偏离 1 超过 `1e-9` 时拒绝启动（ADR-014 修订 1 决定 6）。

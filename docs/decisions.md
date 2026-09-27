@@ -1629,3 +1629,43 @@
 - **后果**：掌握标记在弱网下会短暂显示后回滚，但界面与服务端投影始终可解释；发布指针在读或写期间变化时页面会重新读图而不是混算两个版本。`PUT` 不带版本号意味着服务端仍以「请求时的当前发布版」为准，客户端只能**事后**发现版本不一致（响应比对 + 422）——这是契约现状的代价，若要让服务端强制按客户端绑定版本写入，需要先扩展契约（新增版本参数）并与后端同步，另开任务。学习接口未注入时静默退回 H11 原状，若某一注入集只提供其中一个键，功能整体不启用（两个接口缺一不可，推荐依赖进度投影）。
 - **回滚**：撤销 `api/progress.ts`、`api/recommend.ts`、`composables/useLearning.ts`、`components/Recommendations.vue` 与 `StudentGraphView.vue`/`main.ts` 的接线，并撤销 `graph/lifecycle.ts` 的四个状态与样式即可；不涉及契约、数据库迁移或后端。
 - **签收**：待 ArvinHan 审阅。**需明确签收**：(a) 版本绑定按决定 2 的「响应比对 + 422 重读」实现，而非在 `PUT` 请求体里自造 `graph_version`（契约无此字段）；(b) 学习接口未注入时页面静默退回 H11 原状；(c) 掌握标记的三态按钮（未开始/学习中/已掌握）直接把 `MasteryStatus` 写回，不引入第四种状态或「跳过先修」操作。
+
+## ADR-076：演示模型模式（`LLM_MODE=demo`、`EMBEDDING_MODE=demo`）
+
+- **日期**：2026-09-27
+- **背景**：`LLM_MODE=fake` 的缺省输出不含抽取所需结构，上传资料必然「抽取失败的片段过多」；假向量与语义无关，J04 相似度闸门几乎永远拒答。结果是云端与本机都无法在不付费的情况下把教师→学生主线跑通，K05 教师 E2E 自合入起从未真正执行过。
+- **决定**：
+  1. 新增取值 `LLM_MODE=demo` 与 `EMBEDDING_MODE=demo`；`APP_ENV=production` 下与 `fake` 一样被拒绝。`fake` 行为不变。
+  2. 演示模型（`app/services/ai/demo.py`）按 `ModelRequest.purpose` 用确定性规则产出通过真实解析器校验的输出：标题层级、中文定义句、「X 的特点是 P」、先修句式（同一输出内先做环检测），问答从上下文块里选与问题重叠最多的 1～3 句并逐句标注引用，无重叠输出不足证据哨兵。模型 ID 固定 `smartsketch-demo-rules-v1`。
+  3. 演示向量为字符 1/2-gram 哈希词袋（每个 gram 分散到 128 维后 L2 归一化），向量空间记为 `real/smartsketch-demo-ngram-v1/<维度>`，与 fake、真实空间互不混用。
+  4. 演示模式建议 `QA_SIMILARITY_THRESHOLD=0.58`（实测覆盖问题 ≥ 0.63、无关问题 ≤ 0.54）；代码不按模式改阈值、不绕过闸门，只在 `.env.example`、runbook 与 `scripts/e2e.sh` 里设置。
+- **后果**：K05/K06 端到端、K09 示例导入与本地验收可在无付费调用下跑通；演示结果不代表真实模型的抽取质量（赛题指标仍以 K02 真实模型判定为准）。同一 Neo4j 库换模式会被启动门禁拒绝，须用新库或 F14 `scripts/reembed.py`。
+- **回滚**：删除 `demo.py`、`factory.py` 及其调用点改回原装配，去掉两个枚举值；无迁移、无契约变更。
+- **签收**：待 ArvinHan 签收（阈值 0.58 与「演示模式可用于验收演示」两点）。
+
+## ADR-077：质量门禁分档与测试报告判定（K11）
+
+- **日期**：2026-09-27
+- **背景**：`scripts/verify.sh` 只覆盖骨架与契约；前后端测试在 CI 各自跑，但「零测试」「已实现模块被静默跳过」不会让门禁变红；集成用例与端到端没有入口。
+- **决定**：
+  1. `scripts/verify.sh [basic|full|integration]`（或 `VERIFY_MODE`）：`basic` 为现状（CI 骨架任务）；`full` 加 `scripts/verify/backend.sh`、`frontend.sh`；`integration` 再加 `scripts/verify/integration.sh`（一次性 Neo4j 上的 `tests/integration`、F11 图库用例与 K05/K06 端到端）。未知模式退出 2。
+  2. 所有测试报告（pytest `--junitxml`、vitest JUnit）经 `scripts/verify/gate.py` 判定：执行数低于下限（零测试）、任何失败或错误、原因未登记在 `scripts/verify/allowed-skips.txt`（按模式）的跳过，都判失败。登记表每行写明原因。
+  3. CI 前后端任务改跑 `backend.sh full` / `frontend.sh full`，新增 `Integration and E2E` 任务跑集成档（Docker 起 Neo4j，Playwright Chromium，失败时上传 `.e2e/` 证据）。
+  4. 集成档固定 `SMARTSKETCH_SKIP_DOCKER=1`：F01 dev-up（占用开发端口）与 K08 镜像构建在登记表中列为允许跳过，需本机手动运行。
+- **后果**：新增的 `pytest.skip`/`it.skip` 若未登记会让门禁变红；CI 多一个约 10–20 分钟的任务。`test_k10.py` 子进程钩子改用与 fixture 相同的 Neo4j 凭据（原硬编码 `x` 只在无认证实例上成立）。
+- **回滚**：`verify.sh` 去掉模式分支即回到 basic；CI 恢复原 pytest/vitest 命令并删除 integration 任务。
+- **签收**：待 ArvinHan 签收（CI 增加集成任务的时长与登记表两条 Docker 跳过）。
+
+## ADR-078：示例课程幂等导入的识别与重试口径（K09）
+
+- **日期**：2026-09-27
+- **背景**：K09 要求一键导入演示数据：重跑不重复、只写示例课、失败可重试、不混入真实资料或删除他课。契约没有资料幂等键，再处理只能重新上传（D-16）；worker 队列是全局共享的。
+- **决定**：
+  1. 清单 `datasets/demo/manifest.json` 固定课程名、教师、学生与资料；资料必须位于清单目录内且 SHA-256 与清单一致，否则在任何写入前拒绝。
+  2. 课程按（教师 `demo_teacher`、课程名）识别；同名多于一门时拒绝，交人工处理。成员已存在则跳过。
+  3. 资料按内容哈希找该课最新任务：存在且未失败/取消即跳过；失败或取消则重新上传（新资料、新任务）。从不删除资料、课程或他课数据。
+  4. 导入脚本只入队并等待 worker 处理，不自己领取任务（全局队列里可能有他课任务）；超时退出 1，提示确认 worker 后重跑。
+  5. 全部资料处理完后调用 G05 发布；草稿未变时发布返回已有版本（`unchanged`）。
+- **后果**：导入依赖 worker 在运行；失败重试会在该课留下失败的旧资料记录（与教师手动重新上传一致）。
+- **回滚**：删除 `scripts/import-demo.py`、`app/services/demo_import.py`、`datasets/demo/`；已导入的示例课需教师在界面上处理（本任务不提供删除）。
+- **签收**：待 ArvinHan 签收。

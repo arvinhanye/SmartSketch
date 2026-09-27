@@ -1495,3 +1495,18 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | J09 | REVIEWED / 待 CI 验证 | `src/frontend/src/views/ChatView.vue`、`src/frontend/src/composables/useChat.ts`、`src/frontend/src/components/ChatMarkdown.vue`：问答流展示、撤回、引用、历史、切课与版本标注。 |
 
 - 审查修复：按 J08 `send` / `onEvent` 接口接入，保留 `done` 后才提交历史的规则。
+
+## 2026-09-27 K06 / K09 / K11 / K12 与演示模型（Claude）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| K06 | DONE（待 PR 审查/合并；issue #145） | 学生主线端到端 | Claude | `claude/project-thread-sa7c37` / `main@adbe106` | `tests/e2e/student.spec.ts`：`scripts/e2e.sh tests/e2e/student.spec.ts` 1 passed（真实 API、worker、一次性 Neo4j、演示模型） |
+| K09 | DONE（待 PR 审查/合并；issue #148） | 示例课程幂等导入 | Claude | 同上 | `scripts/import-demo.py`、`datasets/demo/`；`tests/backend/test_k09.py` 9 passed，`tests/integration/test_k09.py` 1 passed；实跑两次，第二次 `uploaded: []`、`publish_unchanged: true` |
+| K11 | DONE（待 PR 审查/合并；issue #150） | 质量门禁 | Claude | 同上 | `scripts/verify.sh basic/full/integration`、`scripts/verify/gate.py` + `allowed-skips.txt`；`tests/tooling/test_k11.py` 18 passed；CI 新增 integration job；`./scripts/verify.sh full` exit 0 |
+| K12 | DONE（待 PR 审查/合并；issue #151） | 运行手册与验收矩阵 | Claude | 同上 | `docs/runbook.md`、`docs/acceptance.md` |
+
+- 顺带修复：`GET /courses/{cid}` 缺失导致课程页恒显示「课程加载失败」（`tests/backend/test_course_detail.py`）；从未发布课程的版本面板误报不一致（`tests/frontend/h10.test.ts` 新增用例）。
+- 演示模型（ADR-076）：`LLM_MODE=demo`、`EMBEDDING_MODE=demo`，规则抽取 + 字符 n-gram 向量，无付费调用；`fake` 模式上传必失败，无法做端到端或验收。
+- 本轮先写的 J08/J09/J10/K04/K05/I06 已被 Codex 同名 PR 先行合入，本分支已丢弃重复实现，只保留上述增量。
+- **需签收**：ADR-076（演示模型与 0.58 阈值）、ADR-077（门禁跳过白名单）、ADR-078（示例导入只增不删）。D-08 融合阈值仍待用户决定。
+- 待人工：macOS 实测、`docker compose --profile app up` 真实守护进程验证（K08 遗留）、真实模型重跑 K02 验收 7 与 K04。详见 `docs/handoffs/claude-k06-k09-k11-k12.md`。

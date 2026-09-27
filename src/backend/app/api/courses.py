@@ -3,11 +3,12 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
 
-from app.api.dependencies import current_user, teacher_account
+from app.api.dependencies import course_reader, current_user, teacher_account
 from app.repositories.accounts import AccountRecord
 from app.schemas.contracts import Course, CourseCreate
 from app.schemas.errors import Error
-from app.services.courses import create_new_course, list_courses
+from app.services.access import CourseAccess
+from app.services.courses import course_detail, create_new_course, list_courses
 
 
 router = APIRouter(prefix="/api/v1/courses", tags=["courses"])
@@ -45,3 +46,14 @@ def create_my_course(
         name=body.name,
         description=body.description,
     )
+
+
+@router.get(
+    "/{cid}", operation_id="getCourse", response_model=Course,
+    response_model_exclude_none=True,
+    responses={401: {"model": Error}, 403: {"model": Error}, 404: {"model": Error}},
+)
+def get_my_course(request: Request, access: CourseAccess = Depends(course_reader)) -> Course:
+    # course_reader already maps non-members to 403 and students on a never-published
+    # course to 404 GRAPH_NOT_PUBLISHED (specs/identity-access.md §4.1).
+    return course_detail(request.app.state.settings.SQLITE_URL, access)

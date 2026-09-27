@@ -66,14 +66,15 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 ## E07 向量适配边界
 
-E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，并把请求维度传给客户端。输出逐条附 `model`、`dimensions`、`space`；空间格式为 `fake/<dimensions>` 或 `real/<model>/<dimensions>`，即使真实模型 ID 为 `fake` 也不与 fake 模式碰撞。响应数量、每条维度、有限数值及显式响应模型须在缓存前核对。同一次调用先按 `(space, sha256(text))` 合并待计算文本，跨批重复只请求模型一次，再按原输入位置展开。进程内缓存使用相同键，默认最多保留 1024 条向量并按最近使用顺序淘汰；淘汰后再次读取会重新计算。失败批次不写缓存，已完成批次可供重试复用。在线/本地客户端由 E03 注入，E07 不自行切换供应商或空间。
+E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，并把请求维度传给客户端。输出逐条附 `model`、`dimensions`、`space`；空间格式为 `fake/<dimensions>` 或 `real/<model>/<dimensions>`，即使真实模型 ID 为 `fake` 也不与 fake 模式碰撞；`EMBEDDING_MODE=demo` 的模型取保留 ID `smartsketch-demo-ngram-v1`（`real/smartsketch-demo-ngram-v1/<dimensions>`，ADR-076），空间推导统一由 `app.config.embedding_space_identity` 给出，E07、B06、F03 索引创建与 V12 重新向量化共用。响应数量、每条维度、有限数值及显式响应模型须在缓存前核对。同一次调用先按 `(space, sha256(text))` 合并待计算文本，跨批重复只请求模型一次，再按原输入位置展开。进程内缓存使用相同键，默认最多保留 1024 条向量并按最近使用顺序淘汰；淘汰后再次读取会重新计算。失败批次不写缓存，已完成批次可供重试复用。在线/本地客户端由 E03 注入，E07 不自行切换供应商或空间。
 
 ## 后端设置与启动校验（B06）
 
 - `src/backend/app/config.py` 定义只从环境变量构造的类型化 `Settings`；`create_app()` 在创建 FastAPI 对象前执行环境校验，并把设置放入 `app.state.settings`。应用构造/模块导入不连接外部服务，也不读取 `.env` 文件。ASGI lifespan 启动阶段执行本地 SQLite 向量空间门禁；后续 worker 入口调用同一门禁。
 - 数值范围、URL、模型模式与条件必填按 `docs/integrations.md`「启动校验」和 `specs/task-processing.md` §8.8 执行；非法配置只报告变量名。密钥使用 Pydantic `SecretStr`，设置对象的 `repr` 不含明文。
-- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`。`embedding_space_state` 是 SQLite 单行引导表：`singleton = 1`，存 `model`、`dimensions`、`is_fake`；fake 独占空间，在线与本地模式按模型 ID + 维度标识空间。表由 C01 迁移 001 创建；启动门禁只在 `BEGIN IMMEDIATE` 事务内读取该行，无记录时写入配置空间（ADR-012 补注修订 1）；已有记录不一致则拒绝启动并报告记录/配置空间及离线重新向量化要求，不改旧记录。C01 的 `001_base.sql` 与迁移运行器须保留并接管此表；回滚时用迁移前 SQLite 备份恢复，不删除此表来绕过门禁。Neo4j 向量/索引完整性仍由 F03/E07 校验。
+- 默认 fake 模式无需真实模型密钥。发布租约与课程写锁参数按 ADR-012 登记在 `.env.example`。`embedding_space_state` 是 SQLite 单行引导表：`singleton = 1`，存 `model`、`dimensions`、`is_fake`；fake 独占空间，在线与本地模式按模型 ID + 维度标识空间，demo 模式记为保留模型 ID + 维度、`is_fake = 0`（ADR-076，无需迁移）。表由 C01 迁移 001 创建；启动门禁只在 `BEGIN IMMEDIATE` 事务内读取该行，无记录时写入配置空间（ADR-012 补注修订 1）；已有记录不一致则拒绝启动并报告记录/配置空间及离线重新向量化要求，不改旧记录。C01 的 `001_base.sql` 与迁移运行器须保留并接管此表；回滚时用迁移前 SQLite 备份恢复，不删除此表来绕过门禁。Neo4j 向量/索引完整性仍由 F03/E07 校验。
 - C01 的 SQLite 连接从已校验的 `SQLITE_URL` 取路径，启用 WAL、外键，并将每个连接的 `busy_timeout` 固定为 5000 ms。迁移版本记录在 `schema_migrations(version, filename, checksum, applied_at)`；`001_base.sql` 用 `CREATE TABLE IF NOT EXISTS` 接管 B06 的 `embedding_space_state`，不覆盖现存单行，并建立以 `call_id` 为主键的 `model_calls`（字段见 `docs/integrations.md`「调用记录」）。迁移只向前，逐文件在写事务内应用并记录摘要；已应用文件摘要变化即拒绝；摘要按 LF 归一化后的内容计算，`.gitattributes` 固定迁移文件为 LF。API lifespan 先调用 `validate_schema_current`：有未执行的迁移或历史不一致即拒绝启动（C09 worker 入口须调用同一检查）。每次待执行迁移前，按 `specs/task-processing.md` §8.7 检查有效租约/课程锁、`VACUUM INTO` 备份并验证完整性，校验连接随即关闭；恢复须停机并替换数据库文件。
+- 模型与向量客户端统一由 `app.services.ai.factory` 按 `LLM_MODE` / `EMBEDDING_MODE` 装配（worker `build_toolkit`、问答 `chat_service`、发布 `publish_context`、`scripts/backfill_chunk_vectors.py` 共用；`scripts/reembed.py` 同一分支）。`demo` 模式（ADR-076）用 `app.services.ai.demo`：`DemoModelClient` 复用 E02 fake 的截断、模拟 usage 与流式切片，按 `ModelRequest.purpose` 用规则产出能被 E05/E06/E11/J03/J05/E10 真实解析器接受的输出（`PREREQUISITE` 只在含先修表述时给出，且单次输出内先做环检测）；`DemoEmbeddingClient` 为字符 n-gram 哈希词袋向量。演示结果只用于演示与端到端验收，不代表抽取或问答质量；`production` 禁用。
 - `API_HOST` 与 `API_PORT` 由 `python -m app` 的 Uvicorn 启动入口使用；直接调用 Uvicorn CLI 时，其 `--host`/`--port` 参数由调用者负责。
 
 ## 契约真源与生成物（ADR-004）

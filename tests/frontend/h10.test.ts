@@ -76,6 +76,15 @@ describe('H10 version panel', () => {
     ])
   })
 
+  it('treats a never-published course whose published_version is omitted as having no current version', async () => {
+    // 后端 Course 使用 response_model_exclude_none：从未发布时字段缺省而非 null（2026-09-27 联调发现）
+    const { id, name, status, my_role, created_at } = course('c1', 'draft', null)
+    const { wrapper } = fixture({ get: async () => ({ id, name, status, my_role, created_at }) as Course, list: async () => [] })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('不一致')
+    expect(wrapper.find('[data-test="vp-publish"]').exists()).toBe(true)
+  })
+
   it('does not query version history for a course student', async () => {
     const { wrapper, list, publish } = fixture({ get: async () => ({ ...course('c1'), my_role: 'student' }) })
     await flushPromises()

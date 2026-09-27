@@ -1,0 +1,6 @@
+# K11：允许的跳过原因（其余任何 SKIP 都让门禁失败）。
+# 格式：<模式>\t<原因正则>\t<为什么允许>；模式为 basic / full / integration，* 表示所有模式。
+# 新增一行前先问：这个模块已经实现了吗？已实现的模块只能在「缺外部依赖」的模式下跳过。
+full	^isolated Neo4j fixture not configured$	F11 等图库用例需要一次性 Neo4j；integration 模式会配置它并必须执行
+integration	^no Docker daemon available$	F01 的 dev-up/compose 用例会占用开发端口 7687，门禁固定 SMARTSKETCH_SKIP_DOCKER=1；本机手动运行
+integration	^no Docker daemon \(or SMARTSKETCH_SKIP_DOCKER=1\)$	K08 镜像构建耗时长且需联网拉基础镜像；本机或发布前手动运行

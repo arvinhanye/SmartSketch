@@ -413,7 +413,7 @@ def test_a_publish_during_the_backup_is_rejected_by_the_fence(tmp_path, neo):
         "from app.services.versions.publish import CourseBusy, PublishContext, publish\n"
         "sys.path.insert(0, sys.argv[5])\n"
         "from test_k10 import embedder\n"
-        "driver = GraphDatabase.driver(sys.argv[2], auth=('neo4j', 'x'))\n"
+        f"driver = GraphDatabase.driver(sys.argv[2], auth=({_live_user()!r}, {_live_password()!r}))\n"
         "ctx = PublishContext(sys.argv[1], Neo4jRepository(driver), embedder(), lambda: 'fake/4', "
         "lease_seconds=15, lock_wait_seconds=0)\n"
         "try:\n"
@@ -444,7 +444,7 @@ def test_an_unfenced_write_during_the_backup_fails_it(tmp_path, neo, writer):
     env = seed(tmp_path, neo.driver)
     if writer == "neo4j":
         hook = (f"{sys.executable} -c \"from neo4j import GraphDatabase; GraphDatabase.driver('{neo.uri}', "
-                f"auth=('neo4j', 'x')).execute_query(\\\"CREATE (:KnowledgePoint {{course_id: '{env.course}', "
+                f"auth=({_live_user()!r}, {_live_password()!r})).execute_query(\\\"CREATE (:KnowledgePoint {{course_id: '{env.course}', "
                 f"version_id: 'draft', kp_id: 'sneaky'}})\\\")\"")
     elif writer == "sqlite_progress":
         hook = (f"{sys.executable} -c \"import sqlite3; c = sqlite3.connect('{env.path}'); "
@@ -555,6 +555,15 @@ def _docker_ready() -> bool:
     except (OSError, subprocess.TimeoutExpired):
         return False
     return info.returncode == 0 and image.returncode == 0
+
+
+def _live_user() -> str:
+    return os.environ.get(_ENV[1], "neo4j")
+
+
+def _live_password() -> str:
+    # 子进程钩子与 ``neo`` fixture 使用同一组凭据（原先硬编码 'x'，只在无认证的 Neo4j 上成立）
+    return os.environ.get(_ENV[2], "x")
 
 
 docker = pytest.mark.skipif(not _docker_ready(), reason=f"no Docker daemon or image {IMAGE}")

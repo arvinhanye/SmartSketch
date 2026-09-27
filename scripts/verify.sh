@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
-# Single lightweight quality gate for the project scaffold.
+# 单一质量门禁入口（K11）。模式由参数或 VERIFY_MODE 指定：
+#   basic（缺省）：仓库骨架、钩子回归、契约门禁——快，CI「Repository scaffold」任务运行它。
+#   full：basic + scripts/verify/backend.sh + scripts/verify/frontend.sh（全量测试并判定报告：
+#         零测试、失败、未登记的 SKIP 都判失败，登记表见 scripts/verify/allowed-skips.txt）。
+#   integration：full + scripts/verify/integration.sh（一次性 Neo4j 上的集成用例 + K05/K06 端到端）。
+# 任一步失败都以非 0 退出；不存在「跳过也算过」的分支。
+# 用法：scripts/verify.sh [basic|full|integration]
 set -euo pipefail
+mode="${1:-${VERIFY_MODE:-basic}}"
+case "$mode" in
+  basic|full|integration) ;;
+  *) echo "Unknown verify mode: $mode (expected basic, full or integration)" >&2; exit 2 ;;
+esac
 required=(
   AGENTS.md CLAUDE.md README.md .gitignore .mcp.json .env.example
   .claude/settings.json .claude/rules/frontend.md .claude/rules/backend.md .claude/rules/testing.md
@@ -18,3 +29,17 @@ hook_tests="$(tests/hooks/test_block_dangerous.sh 2>&1)" || { printf '%s\n' "$ho
 tail -n 1 <<<"$hook_tests"
 scripts/verify/contracts.sh
 echo 'Scaffold verification passed.'
+[[ $mode == basic ]] && exit 0
+
+failed=()
+# integration 档的图库用例由 integration.sh 在一次性 Neo4j 上执行，这里按 full 判定后端报告。
+scripts/verify/backend.sh full || failed+=(backend)
+scripts/verify/frontend.sh "$mode" || failed+=(frontend)
+if [[ $mode == integration ]]; then
+  scripts/verify/integration.sh || failed+=(integration)
+fi
+if ((${#failed[@]})); then
+  echo "Verification ($mode) FAILED: ${failed[*]}" >&2
+  exit 1
+fi
+echo "Verification ($mode) passed."

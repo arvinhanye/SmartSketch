@@ -137,12 +137,8 @@ def run(*, sqlite_url: str, repo: Neo4jRepository, embedder: Any, space: str, wo
 
 def _embedder(settings: Any, client: Any) -> EmbeddingAdapter:
     if client is None:
-        if settings.EMBEDDING_MODE == "fake":
-            from app.services.ai.fake import FakeEmbeddingClient
-            client = FakeEmbeddingClient()
-        else:
-            from app.services.ai.compatible import CompatibleEmbeddingClient
-            client = CompatibleEmbeddingClient.from_settings(settings)
+        from app.services.ai.factory import build_embedding_client
+        client = build_embedding_client(settings)
     return EmbeddingAdapter(settings, client)
 
 

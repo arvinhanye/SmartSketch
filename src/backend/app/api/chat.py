@@ -24,9 +24,8 @@ from app.repositories.neo4j import Neo4jRepository
 from app.schemas.contracts import ChatRequest, ChatResponse
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
-from app.services.ai.compatible import CompatibleEmbeddingClient, CompatibleModelClient
 from app.services.ai.embeddings import EmbeddingAdapter
-from app.services.ai.fake import FakeEmbeddingClient, FakeModelClient
+from app.services.ai.factory import build_embedding_client, build_model_clients, model_id
 from app.services.ai.policy import ModelCallPolicy, new_call_id
 from app.services.qa.chat import ChatAudit, ChatFailure, ChatService
 from app.services.qa.generate import AnswerGenerator
@@ -55,19 +54,12 @@ def chat_service(request: Request) -> ChatService:
     if service is not None:
         return service
     settings = request.app.state.settings
-    if settings.LLM_MODE == "live":
-        primary = CompatibleModelClient.from_settings(settings, role="primary")
-        fallback = (CompatibleModelClient.from_settings(settings, role="fallback")
-                    if settings.LLM_FALLBACK_BASE_URL.strip() else None)
-    else:
-        primary, fallback = FakeModelClient(), None
+    primary, fallback = build_model_clients(settings)
     policy = ModelCallPolicy.from_settings(
         settings, primary=primary, fallback=fallback, store=SqliteCallStore(settings.SQLITE_URL),
     )
-    embedding_client = (FakeEmbeddingClient() if settings.EMBEDDING_MODE == "fake"
-                        else CompatibleEmbeddingClient.from_settings(settings))
-    embedding = EmbeddingAdapter(settings, embedding_client)
-    model = settings.LLM_CHAT_MODEL.strip() or "fake"
+    embedding = EmbeddingAdapter(settings, build_embedding_client(settings))
+    model = model_id(settings, "chat")
     service = ChatService(settings, Neo4jRepository.from_settings(settings), embedding,
                           QueryRewriter(policy, model=model), AnswerGenerator(policy, model=model))
     request.app.state.chat_service = service
