@@ -300,6 +300,7 @@ cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
 - **密钥**：只经 `env_file: .env` 进入 `migrate`/`api`/`worker`；`web` 没有 `env_file`、`environment` 与构建参数，前端 Dockerfile 不声明任何 `ARG`/`ENV` 形式的密钥。镜像里没有密钥。
 - **数据**：SQLite 与上传文件在本地命名卷 `app-data`（容器内 `/data`），API 与 worker 共用。compose 在容器里固定覆盖 `API_HOST=0.0.0.0`、`NEO4J_URI=bolt://neo4j:7687`、`SQLITE_URL=sqlite:////data/smartsketch.sqlite3`、`STORAGE_DIR=/data/storage`、`WEB_ORIGIN=http://localhost:${WEB_PUBLISH_PORT:-8080}`，其余取 `.env`。
 - **compose 变量**：`WEB_PUBLISH_PORT`（缺省 `8080`，只用于端口发布与 `WEB_ORIGIN`）。**镜像内变量**：`WORKER_HEARTBEAT_FILE`（缺省 `/tmp/smartsketch-worker.heartbeat`，worker 心跳文件路径，一般无需改）。
+- **K05 E2E 假抽取**：运行自编栈与队列用例时，仅在 worker 环境设置 `K05_FAKE_EXTRACTION=1` 并保持 `LLM_MODE=fake`；worker 对该夹具生成两个有原文证据的知识点，其他运行不设置此变量。
 
 ```bash
 cp .env.example .env   # 首次；填 NEO4J_PASSWORD，API 还需要 ≥ 32 字节的 AUTH_JWT_SECRET

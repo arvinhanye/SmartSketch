@@ -42,6 +42,7 @@ from app.services.ai.client import ModelClient
 from app.services.ai.compatible import CompatibleModelClient
 from app.services.ai.entities import EntityExtractor
 from app.services.ai.fake import FakeModelClient
+from app.services.ai.k05_demo_fake import respond as k05_fake_response
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
 from app.services.startup import validate_embedding_space, validate_schema_current
@@ -77,7 +78,7 @@ def build_toolkit(settings: Settings) -> ExtractionToolkit:
         if settings.LLM_FALLBACK_BASE_URL.strip():
             fallback = CompatibleModelClient.from_settings(settings, role="fallback")
     else:
-        primary = FakeModelClient()
+        primary = FakeModelClient(responder=k05_fake_response if os.environ.get("K05_FAKE_EXTRACTION") == "1" else None)
     model = settings.LLM_EXTRACTION_MODEL.strip() or FAKE_MODEL_ID
     policy = ModelCallPolicy.from_settings(
         settings, primary=primary, fallback=fallback, store=SqliteCallStore(settings.SQLITE_URL)
