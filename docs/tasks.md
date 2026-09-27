@@ -1444,3 +1444,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 3. ADR-068～072 五条签收（含 J05 的 1024 输出上限与 0.25s 容差、I05 的图读已提交快照、H09 的数量口径、#264-R1 的 sweep 缺省启用与 3600 周期、#264-R4 的两种成功形状、关系接口的 503 未声明与 `source_pairs` 归零）。
 4. 关系接口 5 项（503 未声明、两个未登记 `reason`、改向丢 `source_pairs`、审计行语义、**前后端未联调**）见上一节 ADR-071 待决。
 5. `origin/main` 前移带来的新工作（#292 J06、#293 J07、#294 K03 及在开的 #295 J10、#296 K04）不在本批审查范围内，本批只保证与其集成后门禁通过。
+## 2026-09-27 J08 问答 fetch 流客户端（Codex 认领）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（本轮唯一写入者） | 验收 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J08 | CLAIMED（issue #137） | 实现问答 fetch 流客户端 | Codex（前端） | `codex/j08-chat-stream` / `main@9c66dcf` | `src/frontend/src/api/chatStream.ts`、`tests/frontend/j08.test.ts`；规格/接线如需扩围先核对所有权 | UTF-8 跨字节、CRLF、多行 data、空帧、异常 EOF、取消；不自动重放提问。 |
+
+- 输入：J07 问答 SSE 路由、B15 HTTP/鉴权与 `src/contracts/events.v1.md`；输出：类型化、可取消的一次性 fetch 流客户端，不接入 J09 页面。J07、B15 已合入 `main`。
+- 风险：网络分片不等于字符/行/帧边界；流在 `done`/`error` 前断开必须报协议错误而非误判成功；取消不能重发问题。已有 `taskEvents.ts` SSE 解析器可复用，但问答端点鉴权和错误应按问答契约单独处理。
+- 验证计划：`npm --prefix src/frontend run test -- --run ../../tests/frontend/j08.test.ts`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
