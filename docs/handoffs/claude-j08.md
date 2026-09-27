@@ -87,6 +87,11 @@ npm --prefix src/frontend run test -- --run
 #   失败两条都在 tests/frontend/b02.test.ts「npm test 的退出码」：
 #     × 断言失败时命令非 0（26672ms）  × 一个用例都没收集到时命令非 0（6399ms）
 #   均为已知本机 flake（B02 用 spawnSync 再跑一次嵌套 vitest，本机 jsdom 环境创建慢，超 5s 默认超时）。
+
+# 4) 推送与 CI（PR #300；rebase 到 origin/main f6325fe 后重跑，结论同上）
+#   git push origin claude/impl-j08  → PR #300（changedFiles=3，MERGEABLE）
+#   gh api repos/.../commits/89eff9c/check-runs →
+#     Backend: success | Frontend: success | Repository scaffold: success（各 2 条 run 全绿）
 ```
 
 **b02 flake 对照实验（证明与 J08 无关）**：把本轮两个新文件移出后单跑 `b02.test.ts`，仍失败并超时
