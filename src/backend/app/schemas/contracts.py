@@ -53,3 +53,5 @@ RollbackGraphVersion = _module.RollbackGraphVersion
 # I02 learning progress.
 ProgressResponse = _module.ProgressResponse
 ProgressUpdate = _module.ProgressUpdate
+# I05 next-step recommendation.
+RecommendResponse = _module.RecommendResponse

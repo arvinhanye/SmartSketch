@@ -1356,3 +1356,16 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收对应：三类空态（各栏空态 + 全空「可以直接发布」）、重复操作（单写禁用、`changed = false`、404 已被处理）、合并冲突（`CYCLE_DETECTED` 名称环路、`COURSE_BUSY`、`REVISION_CONFLICT`）、刷新后数量一致（数量只取服务端 `totals`，重新进入页面数量相同）。
 - H09 待决（需 ArvinHan）：ADR-070 签收（三栏上下排列、合并先选主节点再确认、哪些处理后重读队列）。
 - 解锁：K05 教师主线 E2E 的 H09 依赖满足（仍依赖 H10 等）。
+
+## 2026-09-27 I05 推荐查询 API（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I05 | DONE（待 PR 审查/合并；issue #128） | 实现推荐查询 API | ArvinHan（Claude） | `claude/project-thread-98kaqt` / `main@ac21e5d` | `src/backend/app/services/learning/recommend.py`、`src/backend/app/api/recommend.py`、`tests/backend/test_i05.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 一行导出、`services/learning/__init__.py` 文档串、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-069、`docs/handoffs/claude-i05.md` | `test_i05.py` 34 passed；6 处反向篡改（途中重解析指针、截断后计 `total_eligible`、不过滤边类型、吞掉图错误、截断前改排序、去掉 `limit` 校验）均检出；后端全量 3257 passed / 27 skipped；`./scripts/verify.sh` exit 0；`git diff --check` 干净 |
+
+- 验收：绑定版本后途中提交 v2，本请求的图、投影、`graph_version` 仍为 v1，下一请求读 v2；`limit=1..n` 均为 `limit=50` 结果的前缀且 `total_eligible` 不变；未发布 404 `GRAPH_NOT_PUBLISHED` 与 200 `all_mastered` 区分；环、自环、悬空端点、`V=∅`、章节树损坏、未知章节、谱系损坏、摘要不符均 500 且 `details` 只含 `request_id`，环路节点只进日志；`limit` 越界 422。
+- 依赖：I02（#280/#288）、I04（#238）、G07（#267）均已在 main。无迁移、契约与依赖变更（ADR-069 未占用迁移号）。
+- 验证：`python3 -m pytest tests/backend/test_i05.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 待签收：ADR-069（图读已提交快照而非 Neo4j 副本；教师 403）。
+- 解锁：I06（另需 H11，已在 main）。
+- 独立审查（2026-09-27，PR #291，worktree `.claude/worktrees/pr291`）：定向 `test_i05.py` 36 passed；后端全量 3259 passed / 27 skipped；8 处反向篡改 7 处判红，1 处存活（删除图读的摘要复核——该检查只在 G07 修订缓存与 I02 谱系缓存已热时才唯一生效），已新增 `test_graph_read_revalidates_snapshot_with_warm_version_caches`（摘要列/他课两例）闭合并复跑判红；另补「查询串 `user_id` 不能冒充身份」断言。未发现实现缺陷，未改契约真源。
