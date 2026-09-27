@@ -1294,7 +1294,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - **合并方式**：七个分支按 ADR 号升序（060→066）合入集成分支 `claude/integration-0926`，`docs/decisions.md` 与 `docs/tasks.md` 的末尾追加型冲突一律「两段都保留」；唯一的代码冲突在 `api/graph_nodes.py`——取 F12 的 `_run(request, access, operation)` 签名与 `_context(request, access)`，保留 F11 的 `dict` 返回类型与 `isinstance` 分支，并同步把 `api/review.py` 的两处调用点改为传 `access`（否则审核动作会 TypeError→500）。**迁移应用顺序**：012（F12）与 013（F11）必须同一窗口合入并按版本号顺序应用，任何环境不得先单独跑 013（见 G08 待决中的 S2 记录）。
 - **环境事实（写给后续会话）**：worktree 里共享的 `.venv` 是 editable 安装、`app` 包指向**主仓**——在任何 worktree 里跑 Python 测试必须带 `PYTHONPATH=$PWD/src/backend`，否则测的是主仓代码（会假绿或 ImportError）；本批全部审查与实现任务都据此修正并在报告里附了自证输出。集成测试连真实 Neo4j 需 `SMARTSKETCH_TEST_NEO4J_URI=bolt://localhost:17687 SMARTSKETCH_TEST_NEO4J_USER=neo4j SMARTSKETCH_TEST_NEO4J_PASSWORD=testpassword1`（容器 `ss-neo4j-f11`，Neo4j 5.26.31）；注意 `.env` 里的 `NEO4J_URI` 仍写 7687，与容器端口不一致。同名校验：`tests/backend/test_f08.py` 与 `tests/integration/test_f08.py` 同名，混跑会触发 pytest import mismatch，须按目录分开跑。
 - **本批新解锁（可开工）**：H14（教师图谱编辑页，依赖 H05/H06/H07/H08，D-17 补登，issue #281）、I05（推荐查询 API，依赖 I02/I04/G07）、J05（有证据问答生成，依赖 J04/E04）；其后 H09（F11+H07）、J06（J05）、I06（I05）跟进。
-- **需 ArvinHan 签收（本批累计）**：ADR-060～066 七条；ADR-061 的租约被夺窗口如何处置（当前选择如实记录、接受残留风险）与脱敏/只追加缺口是否本轮补；ADR-065 的「图证据块在闸门打开后可被引用」与「预算 0 块复用 `below_similarity_threshold`」两点；ADR-064 的 `user_id` 多余字段覆盖 `specs/identity-access.md` 相应条目；I02 的 `reason="duplicate"` 登记。
+- **需 ArvinHan 签收（本批累计）**：ADR-060～066 七条；ADR-061 的租约被夺窗口如何处置（当前选择如实记录、接受残留风险）与脱敏/只追加缺口是否本轮补；ADR-065 的「图证据块在闸门打开后可被引用」与「预算 0 块复用 `below_similarity_threshold`」两点；ADR-064 的 `user_id` 多余字段覆盖 `specs/identity-access.md` 相应条目（**已裁决 (A) 保持 422，ArvinHan 2026-09-27**）；I02 的 `reason="duplicate"` 登记。
 - **收口**：#273（codex 的 J02 draft）已被 #274 合入的 J02 取代，作为重复草稿关闭；已合入 main 但 issue 仍 open 的陈旧项（#100 F08、#110 G05、#111 G06、#130 J01、#131 J02、#117 H05、#118 H06、#120 H08、#149 K10、#101 F09、#102 F10 等）随本批一并关闭并附合并证据。
 ## 2026-09-26 I02 掌握标记 API（Claude 认领）
 
@@ -1305,7 +1305,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收：请求体带 `user_id` 整批 422 零写入、查询串 `user_id` 不被读取、学生之间与课程之间隔离；改标后 `GET /progress` 与 I03 可学集合按新投影重算；草稿独有、已删除、他课、已并入他点的来源 `kp_id` 均 422 `not_in_published_version` 且零写入；LP-8/9/16～20 的投影与覆盖、同值写入重放无操作、写事务内复核发布指针、完整性故障 500 只含 `request_id`。
 - 依赖：I01（PR #272）、C03、B12/B12-R1（契约）、G07 均已在 main。无迁移（预分配的 014 未使用）、无契约与依赖变更。
 - 验证：`python3 -m pytest tests/backend/test_i02.py -q`、`./scripts/verify.sh`、`git diff --check`。
-- I02 待决（需 ArvinHan）：ADR-064 签收——教师成员读写进度一律 403（教师查看学生进度须另立接口）；同批重复 `kp_id` 的 `reason` 取 `duplicate`。
+- I02 待决（需 ArvinHan）：`user_id` 口径已裁决 (A) 保持 422（2026-09-27）；ADR-064 其余签收——教师成员读写进度一律 403（教师查看学生进度须另立接口）；同批重复 `kp_id` 的 `reason` 取 `duplicate`。
 
 ## 2026-09-27 G08 遗留修复：向量索引、P9 核对与按版本补齐（Claude）
 
