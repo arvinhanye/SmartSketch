@@ -12,7 +12,9 @@
    检查（``python -m app.workers --health``）判断；任一子进程意外退出即停掉其余子进程并以非零码退出，
    由容器重启策略拉起，未完成的任务按 §8.2 在租约到期后被接管。
 3. **子进程循环**：反复调用 F13 ``run_pipeline_once``（回收 → 领取 → 各阶段推进）；没有可领任务时
-   空闲 ``IDLE_SECONDS`` 秒。每轮之间执行 ``maintenance`` 挂点（默认空），供后续定期清扫任务接入。
+   空闲 ``IDLE_SECONDS`` 秒。每轮之间执行 ``maintenance`` 挂点，默认接 G05 ``sweep`` 的周期清扫
+   （``PUBLISH_SWEEP_INTERVAL_SECONDS``，缺省每小时一次；0 关闭，ADR-072）。清扫故障只记日志，
+   不打断任务领取。
 4. **正常退出**：收到 SIGTERM/SIGINT 后不再领取新任务；进行中的一轮跑完后退出。本入口不在阶段中途打断
    （阶段内没有协作式取消点），因此容器的停止宽限期内没跑完的任务被强杀后按租约过期接管——与崩溃同样安全，
    只是要等满一个租约。
@@ -43,6 +45,7 @@ from app.services.ai.fake import FakeModelClient
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
 from app.services.startup import validate_embedding_space, validate_schema_current
+from app.services.versions.reconcile import SweepReport, sweep
 from app.workers.extract_task import ExtractionToolkit
 from app.workers.persist_graph import run_pipeline_once
 
@@ -86,6 +89,54 @@ def build_toolkit(settings: Settings) -> ExtractionToolkit:
     )
 
 
+class PublishSweep:
+    """G05 ``sweep`` 的周期调度（A06 §8.6「建议每小时一次」；ADR-036 第 5 条待决，ADR-072 接入）。
+
+    ``run_loop`` 每轮之后调用一次本对象；只有距上次执行已满 ``interval_seconds`` 时才真正调用
+    ``sweep``。``sweep`` 自己逐课程隔离失败，这里再兜一层：任何异常只记日志，绝不抛回主循环，
+    因此清扫故障既不影响任务领取，也不影响其他维护步骤。``interval_seconds <= 0`` 表示不启用。
+
+    时钟与清扫函数可注入：测试用假时钟确定性地证明「到点调用」与「抛错不打断主循环」，不必等真实时间。
+    """
+
+    def __init__(self, sqlite_url: str, repo: Neo4jRepository, interval_seconds: float, *,
+                 sweep_fn: Callable[[str, Neo4jRepository], list[SweepReport]] = sweep,
+                 now: Callable[[], float] = time.monotonic) -> None:
+        self._sqlite_url = sqlite_url
+        self._repo = repo
+        self._interval = float(interval_seconds)
+        self._sweep = sweep_fn
+        self._now = now
+        self._next_run: float | None = None
+
+    def __call__(self) -> None:
+        if self._interval <= 0:
+            return
+        moment = self._now()
+        if self._next_run is not None and moment < self._next_run:
+            return
+        # 先排下次时间：即使本次失败也按周期重试，不会每轮都打 Neo4j。
+        self._next_run = moment + self._interval
+        try:
+            reports = self._sweep(self._sqlite_url, self._repo)
+        except Exception:  # 清扫是尽力而为，绝不打断 worker 主循环
+            LOG.exception("publish sweep failed; will retry next cycle")
+            return
+        changed = [r for r in reports if r.changed]
+        if changed:
+            LOG.info("publish sweep: %s/%s courses changed, %s expired attempts, %s copies dropped",
+                     len(changed), len(reports), sum(len(r.expired) for r in reports),
+                     sum(len(r.dropped) for r in reports))
+
+
+def build_maintenance(settings: Settings, repo: Neo4jRepository) -> tuple[Callable[[], object], ...]:
+    """常驻 worker 的周期维护步骤（``run_loop`` 每轮之后执行）；间隔为 0 时不启用。"""
+    if settings.PUBLISH_SWEEP_INTERVAL_SECONDS <= 0:
+        LOG.info("publish sweep disabled (PUBLISH_SWEEP_INTERVAL_SECONDS=0)")
+        return ()
+    return (PublishSweep(settings.SQLITE_URL, repo, settings.PUBLISH_SWEEP_INTERVAL_SECONDS),)
+
+
 def run_loop(
     settings: Settings,
     stop: threading.Event,
@@ -101,6 +152,9 @@ def run_loop(
 
         def step() -> object:
             return run_pipeline_once(settings, toolkit=toolkit, repo=repo)
+
+        if not maintenance:
+            maintenance = build_maintenance(settings, repo)
 
     rounds = 0
     while not stop.is_set():
