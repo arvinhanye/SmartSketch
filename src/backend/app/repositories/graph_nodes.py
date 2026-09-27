@@ -11,6 +11,8 @@ specs/teacher-review-publish.md「节点加锁」；ADR-011 修订 1、ADR-024�
    ``(course_id, "draft", kp_id)`` ``MERGE``；新建时 ``source = ai``、``locked = false``、
    ``contrib_manual = false``、``revision = 1``、``level = 0``。本任务 ID 并入 ``contrib_tasks``（不重复）；
    内容有变化才把节点 ``revision`` 加 1，因此重试不改变任何数据。
+   **教师已裁决的状态不被重跑降级**（ADR-072）：已有的 ``status ∈ {approved, rejected}`` 原样保留，
+   内容与来源仍按本次候选更新；``draft``/``low_confidence`` 的自动语义不变。
 3. **来源**：来源块以 ``(course_id, chunk_id)`` ``MERGE`` 为共享 ``Chunk`` 节点（只在新建时写资料与修订），
    知识点到块的 ``EVIDENCED_BY`` 关系带 ``task_id`` 与证据半开区间，按这四个值 ``MERGE``，重试不重复。
 4. **加锁节点完全不动**（ArvinHan 2026-09-26）：已加锁的草稿节点不改内容、不并入贡献、不加来源，
@@ -55,6 +57,8 @@ DEFAULT_BATCH_SIZE: Final = 200
 NODE_TYPES: Final = frozenset({"concept", "theorem", "formula", "method", "example"})
 #: 自动流程可写的状态；``approved``/``rejected`` 只由教师审核产生。
 AUTO_STATUSES: Final = frozenset({"draft", "low_confidence"})
+#: 教师已裁决的状态：任务重跑不把它们降级回 ``draft``（ADR-072）。
+TEACHER_STATUSES: Final = frozenset({"approved", "rejected"})
 
 
 class RejectReason(StrEnum):
@@ -184,6 +188,9 @@ def _row(node: DraftNode) -> dict[str, object]:
 # ---------------------------------------------------------------- 写入
 
 # 一批一个托管事务。加锁节点在子查询里被过滤，外层照常返回它的行（locked = true）供记录。
+# 状态列：教师已裁决（approved/rejected）的状态一经写入就不再被任务重跑改写，内容与来源照常更新（ADR-072）；
+# ``draft``/``low_confidence`` 仍按自动语义写入。``status`` 先算出「本次最终状态」，再用它判断 changed，
+# 所以重跑在内容未变时既不改状态也不加 ``revision``（幂等）。
 _WRITE_BATCH = """
 UNWIND $nodes AS row
 OPTIONAL MATCH (existing:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.kp_id})
@@ -196,11 +203,13 @@ CALL (row, locked) {
     ON CREATE SET n.source = 'ai', n.locked = false, n.contrib_manual = false, n.contrib_tasks = [],
                   n.revision = 0, n.level = 0
     WITH row, n,
+         CASE WHEN coalesce(n.status, '') IN ['approved', 'rejected'] THEN n.status ELSE row.status END AS status
+    WITH row, n, status,
          n.name IS NULL OR n.name <> row.name OR n.type <> row.type OR n.definition <> row.definition
-         OR n.confidence <> row.confidence OR n.status <> row.status
+         OR n.confidence <> row.confidence OR coalesce(n.status, '') <> status
          OR coalesce(n.aliases, []) <> row.aliases AS changed
     SET n.name = row.name, n.type = row.type, n.definition = row.definition,
-        n.confidence = row.confidence, n.status = row.status, n.aliases = row.aliases,
+        n.confidence = row.confidence, n.status = status, n.aliases = row.aliases,
         n.revision = CASE WHEN changed THEN n.revision + 1 ELSE n.revision END,
         n.contrib_tasks = CASE WHEN $task_id IN n.contrib_tasks THEN n.contrib_tasks
                                ELSE n.contrib_tasks + $task_id END
