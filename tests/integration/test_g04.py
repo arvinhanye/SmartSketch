@@ -20,7 +20,7 @@ from app.config import Settings
 from app.repositories import course_locks, versions
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course, get_course
-from app.repositories.graph_migrations import apply_migrations
+from app.repositories.graph_migrations import GraphVectorWriter, apply_migrations
 from app.repositories.graph_read import GraphReader
 from app.repositories.neo4j import GraphScope, Neo4jRepository
 from app.repositories.sqlite import connect, migrate
@@ -68,6 +68,8 @@ def env(tmp_path):
     neo4j = pytest.importorskip("neo4j")
     driver = neo4j.GraphDatabase.driver(os.environ[_ENV[0]], auth=(os.environ[_ENV[1]], os.environ[_ENV[2]]))
     apply_migrations(driver)
+    GraphVectorWriter(driver, lambda: SPACE).ensure_vector_indexes(SPACE)  # 部署时由迁移命令创建（ADR-055）
+    driver.execute_query("CALL db.awaitIndexes(60)", database_="neo4j")
     url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
     migrate(url)
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username="teacher1", password_hash=VALID_HASH,

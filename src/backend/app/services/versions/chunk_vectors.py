@@ -5,8 +5,9 @@
 
 - ``index_chunks``：P8 中、写副本之前调用。按快照的修订列表从 SQLite 读出全部文本块，查出 Neo4j 中
   还没有当前空间向量（或维度不对）的块，只为这些块调用向量模型，再分批 ``MERGE`` 节点并写向量。
-  缺 ``revision_id`` 的旧节点一并补上（J01 按它过滤）。可重复执行；块内容不可变，已有向量不重算。发布失败时写入的节点与向量保留，不属于版本副本，C1 不删除。
-- ``verify_chunks``：P9 中核对这些块都有当前空间、维度正确的向量，缺失即 ``VerificationError``。
+  节点的 ``revision_id``、``document_id`` 缺失或与 SQLite 不符时一并改正（J01 按修订过滤；块 ID 由修订派生，改正是安全的）。可重复执行；块内容不可变，已有向量不重算。发布失败时写入的节点与向量保留，不属于版本副本，C1 不删除。
+- ``verify_chunks``：P9 中核对这些块的身份与向量，并核对该空间的文本块向量索引在线；否则 ``VerificationError``。
+  索引由部署时的 ``python -m app.repositories.graph_migrations`` 创建（ADR-055）。
 
 回滚不调用本模块：源版本发布时已补齐，且回滚不得调用向量模型（PUB-26）。
 """
@@ -36,11 +37,13 @@ class ChunkIndexResult:
 def _missing_query(prop: str) -> str:
     # $version_id 只满足作用域参数约定：文本块跨版本共享。
     return f"""
-UNWIND $chunk_ids AS id
-OPTIONAL MATCH (c:Chunk {{course_id: $course_id, chunk_id: id}})
-WITH id, c, $version_id AS version_id
-WHERE c IS NULL OR c.revision_id IS NULL OR c.{prop} IS NULL OR size(c.{prop}) <> $dims
-RETURN id AS chunk_id
+UNWIND $expected AS row
+OPTIONAL MATCH (c:Chunk {{course_id: $course_id, chunk_id: row.chunk_id}})
+WITH row, c, $version_id AS version_id
+WHERE c IS NULL OR c.revision_id IS NULL OR c.revision_id <> row.revision_id
+   OR c.document_id IS NULL OR c.document_id <> row.document_id
+   OR c.{prop} IS NULL OR size(c.{prop}) <> $dims
+RETURN row.chunk_id AS chunk_id
 """
 
 
@@ -48,8 +51,7 @@ def _write_query(prop: str) -> str:
     return f"""
 UNWIND $rows AS row
 MERGE (c:Chunk {{course_id: $course_id, chunk_id: row.chunk_id}})
-SET c.document_id = coalesce(c.document_id, row.document_id),
-    c.revision_id = coalesce(c.revision_id, row.revision_id), c.{prop} = row.vector
+SET c.document_id = row.document_id, c.revision_id = row.revision_id, c.{prop} = row.vector
 RETURN count(c) AS written, $version_id AS version_id
 """
 
@@ -61,12 +63,28 @@ def _chunks(sqlite_url: str, course_id: str, revision_ids: Iterable[str]) -> lis
     return chunks
 
 
-def _missing(repo: Neo4jRepository, scope: GraphScope, chunk_ids: Sequence[str], space: str) -> set[str]:
-    if not chunk_ids:
+def _missing(repo: Neo4jRepository, scope: GraphScope, chunks: Sequence[StoredChunk], space: str) -> set[str]:
+    """缺节点、身份（``revision_id``、``document_id``）与 SQLite 不符、缺向量或维度不对的块。"""
+    if not chunks:
         return set()
+    expected = [{"chunk_id": c.chunk_id, "revision_id": c.revision_id, "document_id": c.material_id}
+                for c in chunks]
     rows = repo.read(_missing_query(vector_property(space)), scope, reader="worker",
-                     parameters={"chunk_ids": list(chunk_ids), "dims": _dimensions(space)})
+                     parameters={"expected": expected, "dims": _dimensions(space)})
     return {row["chunk_id"] for row in rows}
+
+
+_INDEX_STATE = """
+SHOW VECTOR INDEXES YIELD name, state
+WHERE name = $index
+RETURN state, $course_id AS course_id, $version_id AS version_id
+"""
+
+
+def _index_online(repo: Neo4jRepository, scope: GraphScope, space: str) -> bool:
+    rows = repo.read(_INDEX_STATE, scope, reader="worker",
+                     parameters={"index": "chunk_" + vector_property(space)})
+    return any(row["state"] == "ONLINE" for row in rows)
 
 
 def index_chunks(
@@ -85,7 +103,7 @@ def index_chunks(
     if embedder.space != space:
         raise VectorSpaceError(f"embedder space {embedder.space!r} differs from current space {space!r}")
     chunks = _chunks(sqlite_url, scope.course_id, revision_ids)
-    missing = _missing(repo, scope, [c.chunk_id for c in chunks], space)
+    missing = _missing(repo, scope, chunks, space)
     todo = [c for c in chunks if c.chunk_id in missing]
     if not todo:
         return ChunkIndexResult(len(chunks), 0)
@@ -113,8 +131,11 @@ def index_chunks(
 def verify_chunks(
     sqlite_url: str, repo: Neo4jRepository, scope: GraphScope, revision_ids: Iterable[str], space: str
 ) -> None:
-    """P9：``revision_ids`` 的每个文本块都有节点、``revision_id`` 与 ``space`` 的向量，且维度正确。"""
+    """P9：每个文本块都有节点、与 SQLite 一致的身份和 ``space`` 的向量；该空间的文本块向量索引在线（ADR-055）。"""
     chunks = _chunks(sqlite_url, scope.course_id, revision_ids)
-    missing = _missing(repo, scope, [c.chunk_id for c in chunks], space)
+    missing = _missing(repo, scope, chunks, space)
     if missing:
-        raise VerificationError(f"{len(missing)} text chunks lack a {space} vector")
+        raise VerificationError(f"{len(missing)} text chunks lack a {space} vector or have a wrong identity")
+    if chunks and not _index_online(repo, scope, space):
+        raise VerificationError(f"chunk vector index of {space} is missing or not online; "
+                                "run python -m app.repositories.graph_migrations")
