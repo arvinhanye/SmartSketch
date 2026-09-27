@@ -60,6 +60,10 @@ def assert_schema(name: str, instance) -> None:
     jsonschema.Draft202012Validator({"$defs": _DEFS, "$ref": f"#/$defs/{name}"}).validate(instance)
 
 
+def valid_schema(name: str, instance) -> bool:
+    return jsonschema.Draft202012Validator({"$defs": _DEFS, "$ref": f"#/$defs/{name}"}).is_valid(instance)
+
+
 # --- fakes -------------------------------------------------------------------------------
 
 
@@ -429,6 +433,55 @@ def test_detail_without_any_locatable_source_is_internal_error(s):
                                                     NodeEvidence("a", "c-missing", "doc1", 0, 2)])
     response = s.get("/kp/a", s.teacher)
     assert response.status_code == 500 and response.json()["code"] == "INTERNAL_ERROR"
+
+
+# --- ADR-072: manual nodes with no locatable source are an explicit empty state -----------------
+
+
+def test_manual_node_without_any_locatable_source_is_200_with_an_explicit_empty_state(s):
+    """教师手工新建、读取时没有任何可定位来源的节点：显式空态，不伪造来源、不报 500。"""
+    s.reader.put("draft", nodes=[kp("m", "手工节点", source="manual")])
+
+    response = s.get("/kp/m", s.teacher)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_refs"] == [] and body["source"] == "manual" and body["id"] == "m"
+    assert_schema("KnowledgePointDetailWithoutSource", body)
+    # 空数组只满足「无来源」形状；KnowledgePointDetail 仍要求至少一条可定位来源。
+    assert not valid_schema("KnowledgePointDetail", body)
+
+
+def test_ai_node_without_any_locatable_source_is_still_500_not_the_empty_state(s):
+    """AI 节点缺可定位来源是完整性故障：不得被空态掩盖成 200。"""
+    s.reader.put("draft", nodes=[kp("a", source="ai")])
+
+    response = s.get("/kp/a", s.teacher)
+
+    assert response.status_code == 500 and response.json()["code"] == "INTERNAL_ERROR"
+
+
+def test_published_copy_without_source_property_is_not_treated_as_manual(s):
+    """发布副本缺 ``source`` 属性时按 AI 口径处理：来源缺失仍是 500，不回退到空态。"""
+    s.publish(1)
+    s.reader.put("ver-1", nodes=[{"kp_id": "a", "name": "栈", "type": "concept", "definition": "d"}])
+
+    response = s.get("/kp/a", s.student)
+
+    assert response.status_code == 500 and response.json()["code"] == "INTERNAL_ERROR"
+
+
+def test_manual_node_without_source_is_in_the_graph_read_without_error(s):
+    """``GET /graph`` 聚合路径也不因手工无来源节点 500。"""
+    s.reader.put("draft", nodes=[kp("m", "手工节点", source="manual"), kp("a")],
+                 edges=[edge("RELATED_TO", "m", "a")])
+
+    response = s.get("/graph", s.teacher)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert_schema("GraphExchange", body)
+    assert [n["id"] for n in body["nodes"]] == ["m", "a"]
 
 
 def test_student_detail_reads_published_copy(s):

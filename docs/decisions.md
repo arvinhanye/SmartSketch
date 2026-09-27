@@ -1533,6 +1533,99 @@
   4. **原文注入按资料处理**：资料原文、结构上下文与问题中能伪造分段、块头或哨兵的开头（`<<`/`＜＜` 后接 `资料`、`课程资料`、`知识点结构`、`学生问题`、`INSUFFICIENT_EVIDENCE`）把 `<<` 换成 `«`，长度不增加；其余字符（含 `cout << x`）不动。注入文本不删除，仍作为数据留在资料段内。J06 的引用原文取自文本块数据，不受替换影响。
   5. 请求 `purpose = answer_with_context`、`response_format = text`、输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 1024`（暂定）；不设单次超时，由 E04 按链路剩余时间补上。经 `bind(CallAttribution(course_id, request_id), deadline=...)` 调用，首字前切备用、出字后不切由 E04 保证。
   6. **故障分类**（`GenerationErrorKind` 闭集，`code` 与 `details_reason` 直接对应契约）：E04 截止时间、读取中链路到期、无状态码且剩余时间 ≤ 0.25 秒的供应商超时 → `timeout`；401/403 → `auth`；首字前其他供应商故障（含 408、熔断、主备都失败）→ `upstream`；出字后 → `stream_interrupted`；预算拒绝 → `BUDGET_EXCEEDED`；预写失败 → `STORAGE_UNAVAILABLE`；400/404/422 与意外异常 → `INTERNAL_ERROR`。`delivered` 标明故障前是否已出字，供 J07/J09 撤回。**超时是独立错误**：与 `upstream` 同为 `LLM_UNAVAILABLE`，以 `details.reason` 区分，不新增错误码（Q5 说明）。
+- **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。J04 预算按 J04 的 `render_evidence()`（`[n]（定位）` 块头、每块以 `\n\n` 结尾）估算，实际提示的块头是 `<<资料 n>>（定位）` 且只有末块少一个 `\n\n`，故每块差 8 字节、末块再多 2 字节，上界为 `max_chunks × 8 + 2` 字节（独立审查按字节实测，已由 `test_prompt_blocks_are_no_larger_than_the_budgeted_rendering` 断言）。资料原文里的 `<<` 被换成 `«`（每个发生替换的 `<<` 少 1 字节），只会缩小该差值。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
+- **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。块头比 J04 估算用的 `[n]` 多约 9 字节/块，J04 预算按 J04 渲染估算，实际提示略大，差值有上界（`max_chunks × 9` 字节），可接受。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
 - **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+
+## ADR-069：I05 推荐查询从绑定版本的已提交快照读图，一次解析、全量排序后截断
+
+- **日期**：2026-09-27
+- **背景**：I05 要求「请求全程同版本」「截断稳定」「未发布 404 与全掌握区别」「已提交图损坏 5xx」「有环明确错误」。G07 规定请求开始解析一次发布版；I02 的 `project_progress` 已按绑定版本投影进度（谱系取自已提交快照）；I03/I04 是纯函数。尚未确定的是推荐的图数据（节点属性、`PREREQUISITE` 边、章节树）从哪里读。
+- **决定**：
+  1. `GET /api/v1/courses/{cid}/recommend` 仅学生成员可用（`course_student`，与 ADR-064 一致），教师 403；从未发布为 404 `GRAPH_NOT_PUBLISHED`，与 200 `state = all_mastered` 区分。
+  2. 请求开始时调用一次 `resolve_published`；图取自该 `version_id` 在 SQLite 中的已提交快照（摘要复核后 `load_snapshot`），**不读 Neo4j 副本、不读草稿**。快照不可变、与 I02 投影所用谱系同源，因此图、进度投影、理由与响应 `graph_version` 必然同版本；推荐接口不依赖 Neo4j 可用。校验通过的图按 `(sqlite_url, version_id)` 缓存，损坏的不缓存。
+  3. 节点集由 I03 `build_prerequisite_graph` 做全图校验，只取 `type = PREREQUISITE` 的边；另核对投影节点集与图节点集一致。I04 对**全部**候选排序后才截断到 `limit`，`total_eligible` 为截断前总数；排序键 `(-score, chapter_rank, kp_id)` 是全序，`limit = k` 的结果恰为 `limit = 50` 结果的前 `k` 条。
+  4. `limit` 默认 10、范围 1～50（ADR-014 修订 1 决定 7），越界或非整数为通用 422 `VALIDATION_ERROR`（`fields[].field = "limit"`）。权重只取启动时校验过的 `RECOMMEND_WEIGHT_*`，请求不能传。
+  5. 已提交版完整性故障——快照缺失、摘要不符、不可解析、他课、`V = ∅`、环、自环、悬空端点、章节树损坏、未知章节、谱系违反修订 3 决定 16——以及其他未预期异常，一律 500 `INTERNAL_ERROR`，`details` 只含 `request_id`；错误种类（如 `cycle`）与环路节点只写服务端日志（ADR-017 决定 4、§1）。
+- **后果**：推荐不受 Neo4j 副本物化或补偿状态影响；代价是每个新版本首次请求需解析一次快照 JSON（之后命中缓存），MVP 规模可接受。快照里 `importance`/`difficulty` 的范围已由 `load_snapshot` 校验，越界值在读快照时即成为 500，I04 的 `invalid_number` 分支在此路径上不会触发。候选为空只可能是 `M = V`（DAG 必有入度 0 的点），因此 `all_mastered` 与 `total_eligible = 0` 等价。
+- **回滚**：撤销 `app/services/learning/recommend.py`、`app/api/recommend.py`、`tests/backend/test_i05.py`，以及 `app/main.py` 的路由注册、`app/schemas/contracts.py` 的一行导出；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 签收（第 2 条「图读快照而非 Neo4j」与第 1 条教师 403 为 Claude 选定）。
+
+## ADR-070：教师审核队列页的数量口径、单写与合并交互（H09）
+
+- **日期**：2026-09-27
+- **背景**：F11（ADR-060）提供了 `getReviewQueue`（三栏、键集分页、完整 `totals`）与 `resolveReviewItem`（通过 / 拒绝 / 合并 / 不是重复 / 确认保留）。H09 的验收是「三类空态、重复操作、合并冲突；刷新后数量一致」。未定的是：页面显示的数量从哪来、处理后其他栏的连带变化怎样同步、连点与并发怎样防、合并时怎样选主节点、成环等冲突怎样呈现、关系两端只有 ID 时显示什么。
+- **决定**：
+  1. **页面与入口**：`/courses/:cid/review`（`REVIEW_ROUTE`，仅教师账号）；课程内角色非教师时不读队列。课程页只对课程内教师显示「审核队列」入口。三栏上下排列，顶部有带数量的栏目导航。
+  2. **数量以服务端为准**：栏目数量只取服务端 `totals`（读队列、加载更多、处理结果都带回），本地不加减，所以刷新页面后的数量与处理后显示的一致。
+  3. **一次只处理一条**：任一处理在途时所有处理按钮禁用，同一条连点只发一次；在途的刷新与加载更多作废。服务端返回 `changed = false`（同一动作此前已生效）时照常移除该条，提示「此前已处理」。
+  4. **连带变化不在本地猜**：拒绝关系、拒绝孤立知识点、合并成功后，以及条目已不在队列（404）、修订冲突、422、网络中断或超时（无法确认结果）后，重新读取三栏第一页，条数取「当前已加载的最大栏条数」（不少于 50，不超过 200）。通过关系、不是重复、确认保留不影响其他栏，不重新读取。加载更多遇 422（游标失效）也从第一页重读。
+  5. **合并**：疑似重复先点「合并…」展开主知识点单选（默认第一项），说明「名称并入别名，关系与来源迁到主知识点，主知识点被锁定，合并后不能自动拆回」，确认后才提交 `merge` + `primary_id`；不带 `expected_revisions`（`ReviewDuplicateAction` 契约没有该字段）。
+  6. **冲突呈现**：409 `CYCLE_DETECTED` 把 `details.cycle` 换成名称路径显示在该条下，条目保留、不重读，教师可改为「不是重复」或去图谱编辑页调整前置关系；`COURSE_BUSY` 提示稍后重试；`REVISION_CONFLICT` 提示并重读。只按错误码给固定文案，不回显服务端 message。
+  7. **名称**：关系只有两端 ID，页面同时读草稿图谱（`DraftGraphApi`）仅用于 ID → 名称；读取失败不影响审核，退回显示 ID。合并后重读时一并刷新名称。
+- **后果**：每次影响其他栏的处理多一次队列读取与一次草稿读取（单课程规模可接受）。重读只取第一页窗口，已加载超过 200 条的栏会截到 200 条并给出「加载更多」。本页不写课程 store 的草稿图，教师图谱编辑页进入时自行重读草稿，不会看到合并前的旧图。
+- **回滚**：撤销 `views/ReviewView.vue`、`composables/useReview.ts`、`api/review.ts`、`router/index.ts` 与 `main.ts` 的注册、`views/CoursesView.vue` 的入口、`tests/frontend/h09.test.ts`；无契约、后端或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。
+## ADR-071：关系编辑 HTTP 路由（F06-API）
+
+- **日期**：2026-09-27
+- **背景**：契约 `src/contracts/api.v1.yaml` 从 A10 起就定义了 `createRelation`（POST 201）、`updateRelation`（PATCH 200）、`deleteRelation`（DELETE 204）与 `RelationCreate`/`RelationUpdate`/`Relation`，但后端 HTTP 层从未实现：F06 交付的是服务层与仓储层的「锁草稿 → 读图 → 校验 → 环检测 → 写入」单事务（ADR-025），F11 的审核动作只覆盖低置信度关系的 approve/reject。前端 H08/H14 因此只能按契约写客户端与假实现，H14 交接明确记着「**仅假 API 验证**（后端尚无 `/relations` 路由）」；ADR-061 的待决项也写着「关系编辑（F06 路由未实现）……接入审计留给对应任务」。本任务就是那个任务。
+- **决定**：
+  1. **路由位置**：新建 `src/backend/app/api/relations.py`（`prefix="/api/v1/courses/{cid}"`），在 `app/main.py` 注册；operationId 与契约逐字一致。路由只做协议转换与依赖注入：课程教师依赖、错误码到 HTTP 的映射、PATCH 请求体的逐字段校验。
+  2. **服务与仓储分层**：新增 `services/graph/edit_relation.py`（编排：课程写锁、审计时序、响应组装）与 `repositories/graph_relation_edit.py`（Cypher：按 `rel_id` 读一条可见关系、删除关系与其 `RelationIdentity`、同身份改状态）。关系写入复用 F06 的 `apply_relations`（同一事务内的守卫锁、端点校验、重复关系、DAG 环检测与 `MERGE`），不另写一套写入路径。
+  3. **修改语义**：`type`/`from_id`/`to_id` 任一变化即关系身份变化（§8.4 的 `rel_id` 由「课程 + 类型 + 起点 + 终点」派生）→ 同一事务内**先删**旧关系与旧身份，再按新身份写一条人工关系（`source = manual`，保留原 `confidence` 与 `status`）；先删后写也让环检测看见真实的边集（反转 `A → B` 为 `B → A` 时两条边不会同时存在而误报成环）。只改 `status` 时同身份**就地改**（置 `source = manual`、`contrib_manual = true`、修订号 +1），`source_pairs`（AI 的来源证据）因此不丢——改状态不该删掉来源。目标状态与当前一致且关系已是人工 → 空操作：不写入、不加修订号、不记审计（同 F08 的解锁语义）。
+  4. **环检测**：新建与改向走 F06 的 `check_candidates`；把 `rejected` 的 `PREREQUISITE` 边恢复为有效时，服务层按同一组读者（`read_visible_nodes` + `read_prerequisite_graph`）重新验环——`rejected` 的边不参与环检测，恢复它等于重新加边（规格 DAG-7），且再拒绝时不降级任何边。自环：`PREREQUISITE` 由 F06 报 409 `CYCLE_DETECTED`（`details.cycle` 首尾同 ID，验收 DAG-9）；其余三种类型没有自环语义，报 422 的字段错误。
+  5. **错误映射**：409 `CYCLE_DETECTED`（`details.cycle`）、409 `DUPLICATE_RELATION`（`details.existing_id`）、422 `DANGLING_ENDPOINT`（`details.missing`；`src/contracts/errors.v1.md` 给该码的 HTTP 状态就是 422，契约的 422 响应也是 `Error`）、409 `COURSE_BUSY`（`details.holder`）、404 `NOT_FOUND`（不存在或对本课草稿不可见）、403/401 同 `graph_nodes.py`。Neo4j 不可达 → 503 `STORAGE_UNAVAILABLE`，与既有图路由一致，但**契约未声明**（F11 审查 D-4 已记录同类差异）；本任务不改契约真源。
+  6. **PATCH 是闭合可编辑集**：契约的 `RelationUpdate` 只列四个可编辑字段且 `minProperties: 1`，但生成模型既不禁止多余键也不区分显式 `null`，因此按 `graph_nodes.py` 对 `KnowledgePointUpdate` 的同一做法逐字段检查；`course_id`、`id`、`revision` 这类路由无法实施的键返回 422 `extra_forbidden`，而不是静默丢弃（后者会让客户端以为改动已生效）。POST 的 `RelationCreate` 契约未写 `additionalProperties: false`，多余键按契约忽略，与 `createKnowledgePoint` 口径一致。
+  7. **审计接入（ADR-061）**：三种写入都经 `audit.begin/commit`：`actor_id` 为调用教师、`draft_revision` 恰加一、摘要是关系白名单状态（`type`/`from_id`/`to_id`/`status`/`source`，另附 `rel_id` 与关系修订号）。`graph_edit_logs.action` 是迁移 012 的**数据库级** CHECK 闭集，新增动作要重建表，所以关系行复用 `create`/`update`/`delete`，靠摘要里的 `entity = "relation"` 与节点行区分；`reconcile` 对关系行用摘要里的 `after` 与图里当前状态逐项比对判定是否生效（关系没有随写入变化的节点修订号），`kp_revision_before/after` 对关系行为 NULL。
+  8. **审计时序**：关系路由把 `audit.begin` 放在**同一 Neo4j 写事务内、写入语句之后**。这样成环、悬空端点、重复关系这些写入前的拒绝既不加草稿修订号也不留审计行（与 F08～F10 的「拒绝不写、不记」一致），而 `begin` 之后的失败照旧由 `abort`/`reconcile` 收尾；`commit` 失败仍只记日志、行留 `pending`，**已提交的编辑不回滚**。
+  9. **响应体来自真实图**：由写事务内读回的关系（`read_relation_detail`）与 SQLite 文本块（`read._chunks` + `_source_ref`）组装，不回声请求体；`confidence`/`status`/`source`/`source_refs` 与 `RelationStandard`/`RelationDowngraded` 的 `oneOf` 约束一致。
+- **后果**：
+  - H14 的「仅假 API 验证」缺口关闭：前端 `api/relations.ts` 与 `useRelationEditor.ts` 现在有真实后端。但**仍未做真实前后端联调**（前端测试依旧注入假实现），教师页对真实 `/relations` 的端到端行为未在浏览器里验证。
+  - 审计行对关系存 `rel_id` 到 `kp_id` 列、两个修订号列为 NULL：审计消费者必须先看摘要的 `entity` 才知道 `kp_id` 的含义。
+  - 改 `type` 或方向会重置关系 `revision` 为 1 并丢弃 `source_pairs`（新身份 = 新的人工断言；`confidence` 与 `status` 保留）；只改 `status` 保留来源证据。这是「关系身份由四元组派生」的直接后果，已写入本 ADR 的后果段。
+  - 契约未声明 503；自环（非 `PREREQUISITE`）与 `InvalidRelationError` 兜底各引入一个未在 `errors.v1.md` 登记的领域 `reason`（`self_loop`、`invalid_relation`）。契约真源在本任务冻结，两处待签收。
+  - 关系写入的守卫节点序号按调用计两次（仓储层事务先加锁，`apply_relations` 在同一事务里再加一次，与 F13 的 `_write_draft` 相同）；锁只加一次，序号只是簿记。
+- **回滚**：撤销 `src/backend/app/api/relations.py`、`src/backend/app/services/graph/edit_relation.py`、`src/backend/app/repositories/graph_relation_edit.py`、`tests/backend/test_relations_api.py`、`tests/integration/test_relations_api.py`，以及 `main.py`（2 行路由注册）、`schemas/contracts.py`（2 行导出）、`services/graph/audit.py`（关系摘要、`_applied_relation`、`reconcile` 分派）中的增量；无迁移、无契约、无依赖变更，回滚后 H14 回到「仅假 API 验证」。
+- **签收**：待 ArvinHan。
+## ADR-072：PR #264 独立审查四项遗留的处置（sweep 调度、无来源手工节点、空清理解锁、重跑状态保护）
+
+- **日期**：2026-09-27
+- **背景**：G05/G06（PR #264）的独立审查留下四项未在本 PR 处理的遗留（`docs/tasks.md` 的「G05 待决」与 `docs/handoffs/claude-g05.md`）：`reconcile.sweep` 没有调度实现；无来源的人工节点详情返回 500；`cleanup_failed_task` 在没有任何需要撤销的贡献时仍要等课程写锁；任务重跑把教师已裁决的状态写回 `draft`。四项都落在既有契约、规格与测试范围内，但各自有需要选定的实现口径，故合并为一条 ADR。
+- **决定**：
+  1. **`sweep` 接入 worker 周期回收（A06 §8.6）**。在 `app/workers/runner.py` 新增 `PublishSweep`，接在 `run_loop` 已有的 `maintenance` 挂点（ADR-039 第 3 条预留）上，每轮主循环后用 `time.monotonic` 检查一次；距上次执行满 `PUBLISH_SWEEP_INTERVAL_SECONDS` 才真正调用 `reconcile.sweep`。周期与开关只从环境变量读：整数 ≥ 0，缺省 `3600`（§8.6 的「建议每小时一次」），`0` 表示不启用周期清扫（发布与回滚前的 `reclaim_expired` 仍在，ADR-036 第 6 条）。选「缺省启用」的理由：`sweep` 从不删除已提交版本与租约内的尝试（ADR-036 第 3 条），可重复执行（无变化时第二次不写库），并逐课程隔离失败，所以周期性运行是安全的，而「不启用」才会让 `cleanup_pending` 与过期尝试长期堆积。**错误隔离**：`sweep` 自身逐课程记日志继续；`PublishSweep.__call__` 再兜一层 `except Exception`（含 `list_course_ids` 的 SQLite 故障），只记日志、绝不抛回 `run_loop`；下次时间在调用**之前**排定，故障时按周期重试而不是每轮都打 Neo4j。时钟与清扫函数可注入，测试用假时钟确定性地证明「到点才调用」与「抛错不打断主循环」；真实子进程按小时触发的端到端验证不在单测内（由 K08 的进程测试与同一挂点覆盖）。
+  2. **无来源手工节点的详情表示**。**不采用**放宽 `KnowledgePointDetail.source_refs` 的 `minItems: 1`（选项 a）：那会直接推翻既有负例 `tests/contracts/test_b11.py::test_node_detail_requires_locatable_source`，而那条负例正是「AI 节点不得缺来源」的完整性不变量；OpenAPI 3.0 也没有 `if/then` 能表达「只有 `source = ai` 才要求 ≥ 1」。**采用**新增响应形状：契约加 `KnowledgePointDetailWithoutSource`（与 `KnowledgePointDetail` 字段相同，`source_refs` 为 `maxItems: 0` 的**显式空数组**），`getKnowledgePoint` 的 200 改为两者的 `oneOf`；`KnowledgePointDetail` 原样不动。真源改后按 ADR-004 用 `scripts/gen-contracts.sh` 重新生成并入库，`--check` 与 `scripts/verify/contracts.sh` 保持一致。服务端 `read_knowledge_point` 用**读到的原值** `source` 判定：`manual` 且一条可定位来源都没有 → 200 空态；其他情况（含发布副本缺 `source` 属性）→ 仍抛 `SourceUnavailable` → 500 `INTERNAL_ERROR`。**残留代价**：一个操作有两种成功形状，客户端要处理联合（生成的 TS 两种都有；前端 `useKnowledgeDetail` 本就容忍 `source_refs: []`）；「只有手工节点可以为空」无法写进契约，由服务端与测试（`test_ai_node_...`、`test_published_copy_...`）兜住。`GET /graph` 聚合路径本来就不带 `source_refs`，补回归测试。
+  3. **没有实际工作的清理不取锁**。`graph_relations.task_has_contributions` 新增一条存在性读，谓词与 `_REVOKE_RELATIONS`/`_REVOKE_NODES` 一一对应（节点/关系的 `contrib_tasks`、本任务的 `EVIDENCED_BY`）。`cleanup_failed_task` 先读：无工作 → 直接 `clear_cleanup_pending` 并返回，**不取课程写锁、不等待**；有工作 → 完全沿用原路径（取锁 → 同一写事务里 `lock_draft` + `revoke_task` → 清标记）。**一致性论证**：只有 `persisting` 会写某任务的贡献，且只在它持有租约期间；T9 清空租约，而 `claim_next` 只领取 `parsing/extracting/merging/persisting` 的任务，`failed` 任务永不再被领取，所以判断发生在 T9 之后时「没有贡献」是最终结论——把判断放在锁外不会漏掉撤销。并发清理可能都读到「有工作」，它们在锁上串行，`revoke_task` 幂等。读失败（Neo4j/SQLite 不可用）返回 `False`、保留 `cleanup_pending`，不取锁。真实清理的锁保护、ADR-025 的守卫串行与租约语义均不变。
+  4. **任务重跑不把教师已裁决的状态降级**。根因在 `graph_nodes._WRITE_BATCH`：任务写入对未被加锁的节点无条件写 `n.status = row.status`，于是**已解锁**的已裁决节点（典型路径是 F08 改状态置 `locked = true` 后再 `unlockKnowledgePoint`，ADR-035 决定 4）被重跑写回 `draft`。关系侧本来安全（`graph_relations._MERGE` 对任务写入不写 `r.status`，`contrib_manual` 让 `revoke_task` 保留它），仍补回归测试。修法：先算「本次最终状态」——已有的 `approved`/`rejected` 原样保留，其余沿用候选状态；`changed` 与这个最终状态比较，所以内容未变的重跑既不改状态也不加 `revision`（保持幂等）。内容、别名与来源仍按候选更新；只保护 `approved`/`rejected`，`draft`/`low_confidence` 的自动语义不变；加锁节点仍完全不动（F04/ADR-024 决定 4）。ADR-060 的「确认保留」存在 SQLite `review_dismissals`、按 `kp_id` 记，确定性 ID 在重跑间稳定且 `persisting` 不触碰它，永久性不受影响。**产品取舍（需签收）**：重跑**会**改写「已裁决但已解锁」节点的内容与来源，只冻结状态。理由是 `unlock` 的存在就是为了让自动流程重新更新内容（ADR-035）；若要连内容一起冻结，就需要新的图标记，本 ADR 不选。
+- **后果**：worker 缺省每小时对全部课程执行一次 `sweep`，`failed` 尝试的残留副本与 `cleanup_pending` 因此能自行收敛；孤儿副本与已提交版本缺副本仍只告警，人工处理归 K10。`getKnowledgePoint` 多一种成功形状，契约生成物必须与真源同步（ADR-004）。没有需要撤销的贡献的失败任务不再空等最多一个锁租约；有工作的清理仍按课程串行。教师对节点/关系的裁决在任务重跑后保持，`draft`/`low_confidence` 仍跟随自动流程。
+- **回滚**：四项各自独立提交，可单独 `git revert`。① 撤销 `runner.PublishSweep`/`build_maintenance` 与 `run_loop` 的默认接线、`Settings.PUBLISH_SWEEP_INTERVAL_SECONDS`、`.env.example` 与 `docs/integrations.md` 的对应行、测试；② 撤销 `read_knowledge_point` 的分支、契约的 `KnowledgePointDetailWithoutSource` 与 200 的 `oneOf`、`schemas/contracts.py` 的导出与重新生成的产物、测试；③ 撤销 `graph_relations.task_has_contributions` 与 `cleanup_failed_task` 的前置判断；④ 撤销 `_WRITE_BATCH` 的状态列与 `changed` 计算。四项都无 SQLite/Neo4j DDL 与数据迁移；已写入的数据不回滚（重跑覆盖过的状态按当时的草稿内容为准）。
+- **签收**：待 ArvinHan 审阅。**需明确签收**：(a) `sweep` 缺省启用且周期 3600 秒（`PUBLISH_SWEEP_INTERVAL_SECONDS=0` 才关闭）；(b) 契约新增 `KnowledgePointDetailWithoutSource` 与 200 的两种响应形状（不改 `KnowledgePointDetail` 的 `minItems: 1`）；(c) 重跑允许改写「已裁决但已解锁」节点的内容，只冻结 `approved`/`rejected` 状态。
+
+## ADR-073：H10 发布历史与前滚式回滚的教师交互
+
+- **日期**：2026-09-27
+- **背景**：G06 已提供发布、历史列表、回滚端点；H09 审核页提示「可以直接发布」，但没有实际入口。H10 需要在发布失败时保留旧标识、草稿修订期间说明学生仍见旧版，并在回滚前明确目标版本。
+- **决定**：在 `/courses/:cid/review` 嵌入 `VersionPanel`，不新增路由。先通过 `Course.my_role` 核对教师身份，再读版本列表；按版本号降序展示 `publish` 与 `rollback/source_version`。学生当前可见版本只取 `Course.published_version`；发布或回滚成功后重读课程详情与版本列表，只有刷新后的指针与响应版本一致、且该版本出现在历史中才确认成功。失败、网络结果不明或刷新不一致时保留上次确认的标识；超时、断网或刷新未确认时禁用继续写入直到人工刷新核对。课程教师权限丧失时清除旧历史与操作入口。回滚先选择历史版本，在页内确认目标版本、前滚生成新版本且不改变草稿，再调用后端。切课和卸载作废旧请求。
+- **后果**：审核页会额外读取课程详情与版本列表，但无需修改现有契约或 G06 后端。学生页仍按课程发布指针读旧版，教师面板明确说明 `revising` 状态。发布/回滚成功后若刷新异常，界面不猜测新指针，提示重新核对。
+- **回滚**：撤销 `api/versions.ts`、`composables/useVersions.ts`、`components/VersionPanel.vue` 与审核页/应用注入接线；不涉及数据库迁移或契约变更。
+- **签收**：用户 2026-09-27 确认审核页内嵌、服务端指针为准和回滚前展示目标版本。
+
+## ADR-075：学生掌握标记与推荐的乐观写入、版本绑定与理由展示（I06）
+
+- **编号说明**：ADR-074 由仍在审查中的 PR #295（J10 问答日志）占用；本分支的 `main` 上最大号为 ADR-073，为避免 #295 合入后撞号，本 ADR 直接取 075（原任务约定「当前最大号 +1」，当时最大号即 074）。
+- **日期**：2026-09-27
+- **背景**：I05 已交付 `GET /recommend`、I02 已交付 `GET/PUT /progress`（有效状态、`own_status`、`inherited_from[]`、`graph_version`），H11 的学生图谱页只读已发布版本。I06 要把「掌握标记」（学生自报事实的写入）与「下一步推荐」（可解释列表）接到该页上，并满足原子清单验收：「失败撤销乐观标记；切课后旧推荐不覆盖；理由与服务分量一致」。写路径的版本绑定出现一处**契约与验收字面表述的冲突**：清单验收条目 5 写「PUT progress 请求带 `graph_version`」，但 `src/contracts/api.v1.yaml` 的 `updateProgress` 请求体是 `ProgressUpdate[]`（`kp_id` + `status`，`additionalProperties: false`），该操作的 `query` 为 `never`，后端 `write_progress` 也没有版本参数——版本由服务端在请求时解析（`specs/learning-path.md` §5「请求事务所见的当前已发布版」）。契约真源是约束，故本 ADR 明确实现口径并把偏差标为**需签收**。
+- **决定**：
+  1. **乐观标记 + 失败完整回滚，单一在途写入**。`useLearning.setMastery` 先本地写入新状态（画布状态色与按钮立即变化），再 `PUT /progress`（单条 `[{kp_id, status}]`）。成功后以响应重新投影的 `entries` 为准（服务端权威）；网络/超时/4xx/5xx 一律**回滚到写前的服务端已知状态**，只给按错误码固定的文案，绝不回显服务端 `message`。`busyKpId` 非空时新的写入请求直接忽略，页面按它禁用全部掌握按钮：同一节点连点只发一次。
+  2. **版本绑定的实现口径（替代「请求带 `graph_version`」的字面做法）**。① 只在 `graphVersion` 非 null 时读写——草稿页、未发布、版本未知时组合式既不读也不写，页面也不渲染可点击入口；② `PUT` 请求体严格按契约只含 `kp_id` 与 `status`，**不自造 `graph_version` 字段或查询参数**（自造字段会被 `additionalProperties: false` 拒绝，未声明的查询参数会被服务端忽略而给出虚假的安全感）；③ 每条响应（`PUT` 的 `graph_version`、`GET /progress` 与 `GET /recommend` 的 `graph_version`）都与显示版本比对，不一致即视为「显示中的图已过期」：丢弃该投影、置 `versionStale`，并请页面重新读图（`onVersionStale`），**不把新版本的投影套到旧图上**；④ 422 `VALIDATION_ERROR` 且 `details.fields[].reason = not_in_published_version`（草稿独有/已删除/他课，或写入期间发布指针变化）→ 回滚乐观状态后重新读进度与推荐，给固定文案「该知识点已不在当前发布版本中，已撤销标记并刷新进度。」；⑤ 版本不一致的重载请求只发一次，直到某次读到的版本与显示版本一致才复位，避免服务端版本始终不收敛时的重载死循环。
+  3. **切课隔离沿用 `CourseRequestScope` + 请求序号**（照抄 `useReview`）。读进度、读推荐、写进度三类请求各自带序号并绑定课程作用域；切课后作用域失效且序号前进，课程 A 的迟到响应（推荐或进度）不写入课程 B 的界面。
+  4. **推荐理由只展示服务端事实**。`reason` 整句原样渲染；事实行逐条来自 `reason_facts`（`unlock_count`、`importance`、`centrality`、`difficulty`、章名/章秩、`primary_factor`），四类加权分量与 `score` 原样取 `weighted`/`score`。前端**不**用 `factors` 乘权重、**不**重算 `score`、**不**据 `unlock_count` 反推解锁度；只有展示时按 4 位小数舍入。
+  5. **判定顺序与不可写态**（`specs/learning-path.md` §4）：401/403 与未发布（404 `GRAPH_NOT_PUBLISHED`）不进入列表状态；已提交版完整性故障（500 `INTERNAL_ERROR`）只提示 `details.request_id`，不回显细节；`V ≠ ∅` 且全部掌握是 200 `state = all_mastered` 的**空态**；其余是 200 `state = recommendations`。本课程教师（`GraphExchange` 视图已经拦截）或学习接口返回 403 `ROLE_FORBIDDEN` 时，掌握标记与推荐区连同按钮一起消失，只给说明文案——掌握标记是学生行为。
+  6. **学习接口未注入时页面退回 H11 原状**。`PROGRESS_API_KEY`/`RECOMMEND_API_KEY` 都缺失（例如既有 H11 测试的注入集）时，`useLearning` 不发任何请求、`learningGraph` 原样返回筛选结果，页面不渲染标记与推荐区。这样新增功能不改变既有页面在旧注入下的行为。
+  7. **画布状态色集中在图适配层**。`CanvasElementState` 追加 `mastered`/`learning`/`notStarted`/`recommended`，颜色只在 `graph/lifecycle.ts` 的 `buildGraphOptions` 定义一处；`applyLearningStates` 只把服务端投影的掌握状态与推荐集合翻译成状态名（学习状态在前，筛选/选中状态叠加在后），因此测试断言的是「元素的 `states` 来自服务端状态」，而不是硬编码颜色。
+- **后果**：掌握标记在弱网下会短暂显示后回滚，但界面与服务端投影始终可解释；发布指针在读或写期间变化时页面会重新读图而不是混算两个版本。`PUT` 不带版本号意味着服务端仍以「请求时的当前发布版」为准，客户端只能**事后**发现版本不一致（响应比对 + 422）——这是契约现状的代价，若要让服务端强制按客户端绑定版本写入，需要先扩展契约（新增版本参数）并与后端同步，另开任务。学习接口未注入时静默退回 H11 原状，若某一注入集只提供其中一个键，功能整体不启用（两个接口缺一不可，推荐依赖进度投影）。
+- **回滚**：撤销 `api/progress.ts`、`api/recommend.ts`、`composables/useLearning.ts`、`components/Recommendations.vue` 与 `StudentGraphView.vue`/`main.ts` 的接线，并撤销 `graph/lifecycle.ts` 的四个状态与样式即可；不涉及契约、数据库迁移或后端。
+- **签收**：待 ArvinHan 审阅。**需明确签收**：(a) 版本绑定按决定 2 的「响应比对 + 422 重读」实现，而非在 `PUT` 请求体里自造 `graph_version`（契约无此字段）；(b) 学习接口未注入时页面静默退回 H11 原状；(c) 掌握标记的三态按钮（未开始/学习中/已掌握）直接把 `MasteryStatus` 写回，不引入第四种状态或「跳过先修」操作。

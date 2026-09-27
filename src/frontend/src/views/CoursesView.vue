@@ -12,6 +12,7 @@ import {
   ROOT_ROUTE,
   STUDENT_GRAPH_ROUTE,
   TEACHER_GRAPH_ROUTE,
+  REVIEW_ROUTE,
 } from '../router'
 import { useSessionStore } from '../stores/session'
 
@@ -66,6 +67,8 @@ const hasMaterials = router.hasRoute(MATERIALS_ROUTE)
 const hasStudentGraph = router.hasRoute(STUDENT_GRAPH_ROUTE)
 // 教师图谱编辑页（H14）只对课程内教师显示入口；页面只读写草稿
 const hasTeacherGraph = router.hasRoute(TEACHER_GRAPH_ROUTE)
+// 审核队列页（H09）只对课程内教师显示入口
+const hasReview = router.hasRoute(REVIEW_ROUTE)
 
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
 </script>
@@ -103,6 +106,11 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
         <p v-if="hasTeacherGraph && current.myRole === 'teacher'">
           <RouterLink data-test="teacher-graph-link" :to="{ name: TEACHER_GRAPH_ROUTE, params: { cid: current.id } }">
             编辑课程图谱（草稿）
+          </RouterLink>
+        </p>
+        <p v-if="hasReview && current.myRole === 'teacher'">
+          <RouterLink data-test="review-link" :to="{ name: REVIEW_ROUTE, params: { cid: current.id } }">
+            审核队列
           </RouterLink>
         </p>
         <p v-if="hasMaterials && current.myRole === 'teacher'">

@@ -926,7 +926,7 @@ TD-01 带出的跟进项：
 
 - **D11（#239）**：worker 删除自拼的 `PDF_PARSER_VERSION`，改为引用 `pdf_headings.CLEANED_PARSER_VERSION`（取值逐字相同，块 ID 不变）；清洗只用默认阈值。 **已完成**（#239）。
 - **J03（#242）**：预写失败改用原问题已有测试覆盖；另绑定 E04 截止时间「链路截止 − 预留」并把 `CallDeadlineExceededError` 归为 `timeout`。**已完成**（#242）。
-- **J07（未开始）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
+- **J07（IMPLEMENTED / 待审查验证）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
 
 ## 2026-09-25 第七批并行（Claude）
 
@@ -1339,6 +1339,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
+| J05 | DONE（待 PR 审查/合并；issue #134；**独立审查 APPROVE_WITH_NOTES，测试缺口与包导出已修**） | 实现有证据问答生成 | ArvinHan（Claude） | `claude/project-thread-bkxc2u` / `main@ac21e5d` | `src/backend/app/services/qa/generate.py`、`prompts/answer_with_context.yaml`（v1 → v2）、`tests/backend/test_j05.py`；扩围 `prompts/MANIFEST.md`（一行，E01 规则要求升版本同提交更新摘要）、`tests/backend/test_e01.py`（一行，版本改读清单）、`specs/grounded-qa.md`（「待细化」一条）、`docs/decisions.md`（ADR-068）、`src/backend/app/services/qa/__init__.py`（J05 导出）、`docs/handoffs/claude-j05.md` | 红灯：收集错误（模块不存在）；`test_j05.py` 70 passed（独立审查后补 5 个用例）；实现者 22 处反向篡改全部检出；独立审查 23 处（21 检出、1 处等价改动无观测差异、1 处测试缺口已补并复核检出）；后端全量 3293 passed / 27 skipped；`verify.sh` 通过；`git diff --check` 通过；`docs/handoffs/claude-j05.md` |
 | J05 | DONE（待 PR 审查/合并；issue #134） | 实现有证据问答生成 | ArvinHan（Claude） | `claude/project-thread-bkxc2u` / `main@ac21e5d` | `src/backend/app/services/qa/generate.py`、`prompts/answer_with_context.yaml`（v1 → v2）、`tests/backend/test_j05.py`；扩围 `prompts/MANIFEST.md`（一行，E01 规则要求升版本同提交更新摘要）、`tests/backend/test_e01.py`（一行，版本改读清单）、`specs/grounded-qa.md`（「待细化」一条）、`docs/decisions.md`（ADR-068）、`docs/handoffs/claude-j05.md` | 红灯：收集错误（模块不存在）；`test_j05.py` 65 passed；22 处反向篡改全部检出（初次 2 处存活，补 2 个用例）；后端全量 3288 passed / 27 skipped；`verify.sh` 通过；`git diff --check` 通过；`docs/handoffs/claude-j05.md` |
 
 - 验收：J04 上下文为空或低于阈值 → `SkippedGeneration`，fake 调用数与 `model_calls` 行数均为 0（QA-6、QA-7 的 J05 部分）；资料中的「忽略以上指令」、伪造的 `<<课程资料结束>>`、`<<资料 9>>` 块头与哨兵都留在资料段内且被中和，代码 `a[1]`、`cout << x` 原样保留（主验收第 10 条）；链路到期（开始前、读取中、供应商读满剩余时间）为 `LLM_UNAVAILABLE` + `timeout`，与首字前其他故障的 `upstream` 区分（O9 与 QA-24～29 的 J05 部分）；生成接口不接收历史（QA-19）。只用 fake 模型。
@@ -1354,3 +1355,122 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - J07 后续在 P2 成功后接入日志写入；P1/P2 失败不调用此仓储。迁移编号顺延至 014，以避开已存在的 012、013。
 - PR #295 Backend CI 修复：014 迁移补回滚步骤，F11 迁移回滚用例限制迁移范围；原失败三例与 J10 定向测试共 4 passed，待 GitHub CI 重跑。
+## 2026-09-27 I05 推荐查询 API（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I05 | DONE（待 PR 审查/合并；issue #128） | 实现推荐查询 API | ArvinHan（Claude） | `claude/project-thread-98kaqt` / `main@ac21e5d` | `src/backend/app/services/learning/recommend.py`、`src/backend/app/api/recommend.py`、`tests/backend/test_i05.py`；**范围扩展**：`app/main.py` 路由注册、`app/schemas/contracts.py` 一行导出、`services/learning/__init__.py` 文档串、`specs/learning-path.md` 状态行、`docs/architecture.md` 一行、ADR-069、`docs/handoffs/claude-i05.md` | `test_i05.py` 34 passed；6 处反向篡改（途中重解析指针、截断后计 `total_eligible`、不过滤边类型、吞掉图错误、截断前改排序、去掉 `limit` 校验）均检出；后端全量 3257 passed / 27 skipped；`./scripts/verify.sh` exit 0；`git diff --check` 干净 |
+
+- 验收：绑定版本后途中提交 v2，本请求的图、投影、`graph_version` 仍为 v1，下一请求读 v2；`limit=1..n` 均为 `limit=50` 结果的前缀且 `total_eligible` 不变；未发布 404 `GRAPH_NOT_PUBLISHED` 与 200 `all_mastered` 区分；环、自环、悬空端点、`V=∅`、章节树损坏、未知章节、谱系损坏、摘要不符均 500 且 `details` 只含 `request_id`，环路节点只进日志；`limit` 越界 422。
+- 依赖：I02（#280/#288）、I04（#238）、G07（#267）均已在 main。无迁移、契约与依赖变更（ADR-069 未占用迁移号）。
+- 验证：`python3 -m pytest tests/backend/test_i05.py -q`、`./scripts/verify.sh`、`git diff --check`。
+- 待签收：ADR-069（图读已提交快照而非 Neo4j 副本；教师 403）。
+- 解锁：I06（另需 H11，已在 main）。
+- 独立审查（2026-09-27，PR #291，worktree `.claude/worktrees/pr291`）：定向 `test_i05.py` 36 passed；后端全量 3259 passed / 27 skipped；8 处反向篡改 7 处判红，1 处存活（删除图读的摘要复核——该检查只在 G07 修订缓存与 I02 谱系缓存已热时才唯一生效），已新增 `test_graph_read_revalidates_snapshot_with_warm_version_caches`（摘要列/他课两例）闭合并复跑判红；另补「查询串 `user_id` 不能冒充身份」断言。未发现实现缺陷，未改契约真源。
+## 2026-09-27 H09 审核队列与节点合并 UI（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H09 | DONE（待 PR 审查/合并；issue #121） | 实现审核队列和节点合并 UI | ArvinHan（Claude） | `claude/project-thread-eo5fzo` / `main@ac21e5d` | `src/frontend/src/views/ReviewView.vue`、`src/frontend/src/composables/useReview.ts`、`tests/frontend/h09.test.ts`；扩围 `api/review.ts`（新增）、`router/index.ts`（`REVIEW_ROUTE`）、`main.ts`、`views/CoursesView.vue`（教师入口）、`docs/architecture.md`、`docs/decisions.md`（ADR-070）、`specs/teacher-review-publish.md` | `h09.test.ts` 37 passed（独立审查后补 6 项用例）；前端全量 18 files / 623 passed + 1 既有 `b02` flake；type-check、build、`verify.sh` 通过；**仅假 API 验证**（F11 后端路由已在 main，未联调）；`docs/handoffs/claude-h09.md` |
+
+- 断点：issue #121 挂着旧的 `status:in-progress`，远端无分支、无提交，本轮从 `main@ac21e5d` 从零实现。
+- 验收对应：三类空态（各栏空态 + 全空「可以直接发布」）、重复操作（单写禁用、`changed = false`、404 已被处理）、合并冲突（`CYCLE_DETECTED` 名称环路、`COURSE_BUSY`、`REVISION_CONFLICT`）、刷新后数量一致（数量只取服务端 `totals`，重新进入页面数量相同）。
+- H09 待决（需 ArvinHan）：ADR-070 签收（三栏上下排列、合并先选主节点再确认、哪些处理后重读队列）。
+- 独立审查（2026-09-27，PR #289，worktree `.claude/worktrees/pr289`）：反向篡改 16 处检出 14 处，存活 2 处不可经公开输入触发（游标写回读别栏键、`busyKey` 守卫被 UI 禁用兜住）；补 6 项用例钉住三栏空态文案互异、401 文案、`loadMore` 的 totals 口径、`changed=false` 的 fixture 自相矛盾、成环冲突后改选与双栏游标；**未改 `src/`**。
+- 解锁：K05 教师主线 E2E 的 H09 依赖满足（仍依赖 H10 等）。
+## 2026-09-27 PR #264（G05+G06）独立审查四项遗留修复（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| #264-R1 | DONE（待 PR 审查/合并） | `sweep` 接入 worker 周期回收 | ArvinHan（Claude） | `claude/leftovers264-0927` / `main@ac21e5d` | `src/backend/app/workers/runner.py`、`src/backend/app/config.py`、`.env.example`、`docs/integrations.md`、`tests/backend/test_g05_sweep_schedule.py` | 红：4 failed（`PublishSweep`/`build_maintenance` 不存在，旧路径无清扫）；绿：5 passed；篡改 3 处全检出 |
+| #264-R2 | DONE（待 PR 审查/合并） | 失败任务无实际贡献时清理不空等课程锁 | ArvinHan（Claude） | 同上 | `src/backend/app/workers/persist_graph.py`、`src/backend/app/repositories/graph_relations.py`、`tests/backend/test_264_cleanup_lock.py` | 红：2 failed（旧实现取锁 `acquired == ['w']` 且返回 False）；绿：4 passed；篡改 3 处全检出 |
+| #264-R3 | DONE（待 PR 审查/合并） | 任务重跑不把教师已裁决状态降级回 draft | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/graph_nodes.py`、`tests/integration/test_f13.py` | 红：2 failed（`approved → draft`、`rejected → draft`，真实 Neo4j）；绿：30 passed（整个 `test_f13.py`）；篡改 2 处全检出 |
+| #264-R4 | DONE（待 PR 审查/合并） | 无来源手工节点详情返回显式空态而非 500 | ArvinHan（Claude） | 同上 | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/*`、`src/backend/app/services/graph/read.py`、`src/backend/app/api/graph.py`、`src/backend/app/schemas/contracts.py`、`tests/backend/test_f07.py`、`tests/contracts/test_264_leftovers.py` | 红：`test_manual_node_...` 500 != 200；绿：38 passed（F07 25 + 新契约 4 + R1/R2 新用例 9）；篡改 3 处全检出（含 `minItems` 放宽被 B11 负例拦下） |
+
+- 四项各自独立 commit（R1 `9c5d753`、R2 `b318172`、R3 `38b3dbd`、R4 `03ab66b`），未 push、未 merge。
+- 回归：`PYTHONPATH=$PWD/src/backend .venv/bin/python -m pytest tests/backend -q` 全绿；集成（真实 Neo4j 5.26.31，容器 `ss-neo4j-f11`）：`pytest tests/integration/test_f13.py -q` 30 passed。
+- 契约：`./scripts/gen-contracts.sh --check` 与 `./scripts/verify/contracts.sh` 与真源一致。
+- 决策：ADR-072（含需 ArvinHan 签收的三项：清扫缺省启用与周期、详情响应新增形状、已审核内容可被重跑改写而状态冻结）。
+- 待决：孤儿副本与已提交版本缺副本仍只告警（处理归 K10）；`sweep` 只覆盖发布/回滚尝试的副本，§8.6 的块检查点与任务来源块保留期清理仍未接入同一调度（本轮范围外）。
+## 2026-09-27 后端关系编辑接口：/relations 三个路由（Claude 认领）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F06-API | DONE（待 PR 审查/合并） | 补上后端关系编辑接口（`POST`/`PATCH`/`DELETE /api/v1/courses/{cid}/relations[/{rid}]`），关闭 H14 交接里「仅假 API 验证（后端尚无 `/relations` 路由）」的缺口 | ArvinHan（Claude） | `claude/relations-0927` / `main@ac21e5d` | 新增 `src/backend/app/api/relations.py`、`src/backend/app/services/graph/edit_relation.py`、`src/backend/app/repositories/graph_relation_edit.py`、`tests/backend/test_relations_api.py`、`tests/integration/test_relations_api.py`、`docs/handoffs/claude-relations-api.md`；扩围 `src/backend/app/main.py`（路由注册 2 行）、`src/backend/app/schemas/contracts.py`（`RelationCreate` 导出 2 行）、`src/backend/app/services/graph/audit.py`（关系摘要、`_applied_relation`、`reconcile` 分派）、`docs/decisions.md`（ADR-071）、`docs/architecture.md`（一句接线）、`specs/course-knowledge-graph.md`（状态行一句） | 红灯：`tests/backend/test_relations_api.py` 53 failed / 3 passed（路由不存在）；实现后该文件 58 passed；集成 `tests/integration/test_relations_api.py` 11 passed（真实 Neo4j 5.26.31）；后端全量 3281 passed / 27 skipped；图编辑相关集成（F06/F08/F09/F10/F12/F13 + 本任务）126 passed；`tests/contracts` 291 passed；`scripts/gen-contracts.sh --check` PASS（未改 `src/contracts/`）；`./scripts/verify.sh` exit 0；反向篡改 9 处（矩阵见 `docs/handoffs/claude-relations-api.md`），实现者报告全部检出；协调者另独立复现其中 2 处（创建侧环检测、PATCH 侧环检测）均判红；详见 `docs/handoffs/claude-relations-api.md` |
+
+- 验收：契约的路径、方法、状态码与响应体形状逐条对照（含 `Relation` 的 `oneOf`）；教师角色与课程成员口径（学生 403 `ROLE_FORBIDDEN`、非成员 403 `COURSE_FORBIDDEN`、未认证 401）；`PREREQUISITE` 新建、改向、以及把 `rejected` 恢复为有效时写入前检测成环（409 `CYCLE_DETECTED` + `details.cycle`，拒绝时零写入、不加 `draft_revision`、不记审计）；悬空端点 422 `DANGLING_ENDPOINT`（`details.missing`）；重复关系 409 `DUPLICATE_RELATION`（`details.existing_id`）；课程写锁与 409 `COURSE_BUSY`（`details.holder`）；Neo4j 不可达 503 `STORAGE_UNAVAILABLE`；响应体来自真实图（不回声请求体）；关系新建/修改/删除各记一条 F12 审计且 `draft_revision` 恰加一，审计 `commit` 失败不回滚编辑、行留 `pending` 由下一次写入对账。
+- 依赖：F06 服务层（`apply_relations`）、F08 课程写锁与 `EditContext`、F12 审计（ADR-061）、契约 `api.v1.yaml` 的 `createRelation`/`updateRelation`/`deleteRelation`、`errors.v1.md`。无迁移、无依赖升级、未改契约真源。
+- 待决（需 ArvinHan 裁决，见 ADR-071 后果）：
+  1. **契约未声明 503**：三条路由沿用既有图路由惯例返回 503 `STORAGE_UNAVAILABLE`，但 `api.v1.yaml` 的两条路径只声明 401/403/404/409/422。要么补契约（需另开契约变更），要么把 Neo4j 故障并入 500——本任务选择「不改契约、记差异」，与 F11 审查 D-4 同类。
+  2. **两个未登记的领域 `reason`**：非 `PREREQUISITE` 自环报 422 `VALIDATION_ERROR` + `self_loop`；`InvalidRelationError` 兜底报 `invalid_relation`。`errors.v1.md` 要求领域 `reason` 先登记，契约真源本轮冻结。
+  3. **改类型/方向会丢弃 `source_pairs`**：新身份 = 新的人工断言（保留 `confidence`/`status`，来源证据归零）；若希望改向后保留 AI 证据，需要另立实现（把块 ID 迁到新身份的 `source_pairs`）。
+  4. **审计行语义**：关系行复用 `create`/`update`/`delete` 动作、`kp_id` 存 `rel_id`、修订号列 NULL，靠摘要的 `entity = "relation"` 区分（迁移 012 的 `action` 是数据库级闭集，新增取值要重建表）。若审计消费者需要一个显式的 `entity` 列，需另开迁移。
+  5. **前后端未联调**：H14 的教师页仍用注入的假实现，真实 `/relations` 与页面组合未在浏览器里端到端验证（K05 教师主线 E2E 的依赖）。
+
+## 2026-09-27 批次：J05/I05/H09 独立审查 + #264 遗留四项 + 后端关系接口（协调者，5 路并行）
+
+**断点事实（已核实，非推测）**：上一会话（Claude Code）已把 J05/I05/H09 实现完并开了三个 PR——**#290**（J05，分支 `claude/project-thread-bkxc2u`）、**#291**（I05，`...-98kaqt`）、**#289**（H09，`...-eo5fzo`）——三者 CI 六项全绿、可合并，缺的是**独立审查**与**合并**。另有两项新工作：#264（G05+G06）独立审查的 4 个遗留项（G05 交接「待决」列出）与「补关系接口」（H14 交接写明「后端尚无 `/relations` 路由」，故 H14 只能假 API 验证）。
+
+**本批做法**：5 路并行子代理，各占独立 worktree/分支；协调者另做独立第二意见、冲突预判、逐项**亲手复现**子代理声称的鉴别性篡改，并在 `origin/main` 前移后重整集成。**并行期间远端被 Codex 会话推进**：`origin/main` 由 `ac21e5d` → `893f341`，其间合入 **#290（J05）**、#292（J06）、#293（J07）、#294（K03）；`#290` 合入的是**未含本批判修的版本**。
+
+| 工作流 | 结果 | 独立审查结论 | 审查修复（分支上，未 push） |
+| --- | --- | --- | --- |
+| J05（PR #290，ADR-068） | 已被 Codex 合入 main（不含批修） | APPROVE_WITH_NOTES | `4bb0ca2`：补 `deadline` 类型/有限性用例（原篡改存活）、补「读取中链路到期」用例、`qa/__init__.py` 按 J03 惯例补导出、ADR-068 后果句按实测改为 `max_chunks × 8 + 2` 并落成断言；`db4e6ae` 更正证据数字 |
+| I05（PR #291，ADR-069） | DONE | APPROVE_WITH_NOTES | `cf9bb66`：补「图读摘要/他课复核（热缓存下唯一生效）」与「查询串注入 `user_id` 不被信任」断言；未动实现 |
+| H09（PR #289，ADR-070） | DONE | APPROVE_WITH_NOTES | `e2cc8c8`：钉住三栏空态文案互异、401 会话过期文案、`loadMore` 的 totals 口径、`changed=false` 的 fixture 自相矛盾、成环冲突后改选、双栏游标分栏；未动 `src/` |
+| #264 遗留四项（ADR-072） | DONE | — | `9c5d753` sweep 接入 `run_loop` maintenance（`PUBLISH_SWEEP_INTERVAL_SECONDS`，缺省 3600、0 关闭、环境变量）；`b318172` 无实际贡献时不取课程写锁（新增 `task_has_contributions`）；`38b3dbd` 重跑不把 `approved`/`rejected` 降级回 `draft`；`03ab66b` 无来源手工节点详情 200 显式空态（**新增契约 `KnowledgePointDetailWithoutSource`**，保留 `KnowledgePointDetail.minItems:1` 与 B11 负例）；`6acaa1e` 文档 |
+| 关系接口 F06-API（ADR-071） | DONE | — | `fbf163e` `api/relations.py` 三路由 + `edit_relation.py` + `graph_relation_edit.py` + F12 审计接入；契约未改 |
+
+**集成与验证（协调者实测，最终集成分支 `claude/integration-0927` 已并入 `origin/main@893f341`）**
+
+| 门禁 | 实测结果 |
+| --- | --- |
+| 后端全量 `pytest tests/backend -q` | **3434 passed / 27 skipped**，exit 0（`origin/main` 收集 3349；集成分支 3461，**+112** = J05 修复 +5、I05 +36、关系接口 +58、遗留 +13） |
+| 契约全量 `pytest tests/contracts -q` | **295 passed**，exit 0 |
+| 集成（真实 Neo4j 5.26.31，容器 `ss-neo4j-f11`） | 386 passed / 4 skipped / **2 failed**（下两项） |
+| `./scripts/verify.sh` | **exit 0**（PASS contracts gate） |
+| `./scripts/gen-contracts.sh --check` | 一致 |
+| 前端 `type-check` / `build` | **exit 0** / **exit 0** |
+| 前端 `test -- --run` | 623 passed / **1 failed**（`b02.test.ts` 既有 flake） |
+| `git diff --check` | 干净 |
+
+- **2 个集成失败已用 `origin/main` 对照证明为既有环境问题，非本批回归**（`origin/main@893f341` 上跑同两条：同样 2 failed）：`test_k08.py::test_images_build` 是 `docker compose build` 无法写 `~/.docker/buildx/activity/…`（**工作区沙箱拒绝越界写**，非代码）；`test_k10.py::test_an_unfenced_write_during_the_backup_fails_it[neo4j]` 的 hook 用硬编码口令 `x` 连 Neo4j，与本机容器口令 `testpassword1` 不符。
+- **`b02.test.ts` 既有 flake 以超时证伪**（非坏）：`--testTimeout=90000` 下 **5 passed / exit 0**；CI 该 job 一直绿。CI 的 Frontend job 把 `type-check` 作为**独立无管道步骤**，退出码真实生效。
+- **协调者亲手复现的鉴别力（不是转述）**：I05 去掉 `load_version_graph` 摘要复核 → `test_graph_read_revalidates_snapshot_with_warm_version_caches[digest-column]` 判红；H09 删 401 分支 → 新增用例判红（1 failed / 36 passed）；#264-R3 回退 `n.status = status` → `test_f13` 2 failed（approved + rejected，幂等仍绿）；#264-R2 删无工作早退 → 空清理解锁鉴别用例判红；关系接口删创建侧环检测 → 3 failed（含「409 + `details.cycle` + 零写入」）、删 PATCH 侧环检测 → 1 failed。每处复原后 `git status` 干净。
+
+**环境事实（写给后续会话，均为实测）**
+
+1. **不要把验证命令管进 `| tail`**：`npm run type-check` 在缺 `vue-tsc` 时直接跑 exit **127**、管到 `tail` 后 exit **0**（假绿）。worktree 里 `src/frontend/node_modules` 不会自动存在，需 `ln -s` 到主仓，否则前端命令静默假绿。
+2. worktree 里的 `.venv` 是 editable 安装、`app` 包指向**主仓**：任何 worktree 跑 Python 测试必须带 `PYTHONPATH=$PWD/src/backend`，否则测的是主仓代码。
+3. `tests/backend/test_relations_api.py` 与 `tests/integration/test_relations_api.py` 同名（同 F08～F13 惯例），**必须按目录分开跑**，否则 pytest import mismatch。
+4. 本轮还发现并**纠正**两处子代理证据/判断偏差：I05 审查者与我各自独立发现「app 生成的 OpenAPI 把 500 记为 `Error`、契约真源为 `LearningIntegrityError`」（全局惯例，I02 同样，待统一）；J05 审查者报的 `test_j05.py 71 / 合计 140` 经实测为 **70 / 139（+5）**，已在其分支更正（`db4e6ae`）。另：**协调者给关系接口的任务书把 `DANGLING_ENDPOINT` 误写为 409**，子代理按 `errors.v1.md`（契约真源）**422** 实现并报备，判断正确。
+
+**本批待决（需 ArvinHan）**
+
+1. **推送与合并**：三个 PR 的批修提交、#264 四项、关系接口都**未 push**；集成分支 `claude/integration-0927` 已含全部五路且通过门禁。另注：#290（J05）已被上游合入，故 J05 的批修提交需要**新开 PR**。
+2. **J06 的哨兵归属已实证**：`services/qa/citations.py` 里已有 `SENTINEL = "<<INSUFFICIENT_EVIDENCE>>"`，与 ADR-068 决定 2 及 Q11 表（J05 = 提示要求、J06 = Q3.3 状态机）一致——「哨兵无人认领」的疑虑**不成立**；仅 `docs/atomic-tasks.json` 的 J06 `acceptance` 未提 Q3.3，可补。
+3. ADR-068～072 五条签收（含 J05 的 1024 输出上限与 0.25s 容差、I05 的图读已提交快照、H09 的数量口径、#264-R1 的 sweep 缺省启用与 3600 周期、#264-R4 的两种成功形状、关系接口的 503 未声明与 `source_pairs` 归零）。
+4. 关系接口 5 项（503 未声明、两个未登记 `reason`、改向丢 `source_pairs`、审计行语义、**前后端未联调**）见上一节 ADR-071 待决。
+5. `origin/main` 前移带来的新工作（#292 J06、#293 J07、#294 K03 及在开的 #295 J10、#296 K04）不在本批审查范围内，本批只保证与其集成后门禁通过。
+
+## 2026-09-27 H10 发布历史和回滚 UI（Codex 认领）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（本轮唯一写入者） | 验收 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H10 | DONE（待 PR 审查/合并；issue #122） | 实现发布历史和回滚 UI | Codex（前端） | `codex/h10-version-panel` / `main@8741078` | `src/frontend/src/components/VersionPanel.vue`、`src/frontend/src/composables/useVersions.ts`、`tests/frontend/h10.test.ts`；扩围 `src/frontend/src/api/versions.ts`、`src/frontend/src/views/ReviewView.vue`、`src/frontend/src/main.ts`、`tests/frontend/h09.test.ts`（仅注入新增版本 API 测试桩）、相关规格/架构/ADR/交接（均已核对无在途文件锁） | 发布失败保持旧版本标识；草稿修订中学生仍见旧发布版；回滚确认前显示目标版本。 |
+
+- 输入：G06 发布/版本列表/回滚 API 与 `GraphVersion`、`PublishResult` 契约，H09 教师工作流；输出：教师可见的版本历史、发布状态和回滚操作入口。前置 G06、H09 均已合入 `main`。
+- 风险：发布/回滚与刷新并发时不得把在途或失败结果显示为已提交版本；回滚是前滚新版本号，确认前必须明确目标版本与影响。审核页嵌入版本面板的设计已获用户确认。
+- 验证计划：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
+- 验收证据：H10 测试先因模块缺失红灯，接入页位置、成功响应刷新指针、课程教师权限及超时后暂停写入四项后续用例也各先红后绿；独立审查又发现权限丧失时残留旧 UI、历史列表缺当前版时误报成功，两项均先红后绿。最终 `h10.test.ts` 12 passed，H09+H10 49 passed，前端全量 19 files / 636 passed（B02 嵌套进程测试使用 `--testTimeout 30000`），type-check、build、`./scripts/verify.sh` 均 exit 0。前端仅 fake API 验证，真实服务联调交 K05。详见 `docs/handoffs/codex-h10.md`。
+
+## 2026-09-27 I06 掌握标记与推荐 UI（Claude，worktree `impl-i06`）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I06 | DONE（待 PR 审查/合并；issue 见原子清单） | 实现掌握标记与推荐 UI | ArvinHan（Claude） | `claude/impl-i06`（worktree `.worktrees/impl-i06`）/ `main@HEAD` | `src/frontend/src/composables/useLearning.ts`（新建）、`src/frontend/src/components/Recommendations.vue`（新建）、`tests/frontend/i06.test.ts`（新建）；扩围新建 `src/frontend/src/api/progress.ts`、`src/frontend/src/api/recommend.ts`，小改 `src/frontend/src/views/StudentGraphView.vue`、`src/frontend/src/main.ts`、`src/frontend/src/graph/lifecycle.ts`（`CanvasElementState` 增四个学习状态与样式）、`tests/frontend/h05.test.ts`（仅同步「状态名集合完全相等」断言，同 H10 先例）、`docs/decisions.md`（ADR-075）、本文件、交接 | `i06.test.ts` 39 passed（先红灯：模块缺失）；type-check、build exit 0；17 处反向篡改 15 处判红，另 2 处「单层篡改被第二层/按钮 disabled 兜住」已澄清并补强用例后判红；全量前端 675 passed（`--testTimeout=30000`）；ADR-075；**PR [#302](https://github.com/arvinhanye/SmartSketch/pull/302)**（rebase 到 `origin/main@481d3ff`，12 文件 / +2028 −7，CI 6/6 全绿）；`docs/handoffs/claude-i06.md` |
+
+- 输入：I05 的 `GET /recommend`（`RecommendState` 闭集 `recommendations`/`all_mastered`、结构化 `reason_facts`/`weighted`）、I02 的 `GET/PUT /progress`（有效 `status`、`own_status`、`inherited_from[]`、`graph_version`）、H11 的学生图谱页；输出：节点掌握状态色 + 推荐高亮、掌握标记三态写入、可解释推荐列表。
+- 验收对应：① 乐观标记失败完整回滚且固定文案（不回显服务端 `message`）；② 同一节点在途写入只发一次、按钮禁用；③ 切课用 `CourseRequestScope` + 序号隔离，课程 A 的迟到推荐/进度不写入课程 B；④ 理由逐条取自服务端 `reason_facts`/`weighted`，前端不重算 `score`；⑤ 只在已显示发布版本上读写，响应 `graph_version` 不一致即丢弃并重读图，422 `not_in_published_version` 撤销后重读进度；⑥ 未发布 404 空白态且不读图、教师 403 不给可点击入口；⑦ `all_mastered`/`recommendations` 两个 200 状态与 404/500 的区分，完整性错误只提示 `request_id`；⑧ 状态色由 `CanvasElementState` 驱动、颜色集中在 `buildGraphOptions`。
+- **需签收（ADR-075）**：清单验收条目 5 的字面表述「PUT progress 请求带 `graph_version`」与契约冲突——`updateProgress` 的请求体是 `additionalProperties: false` 的 `ProgressUpdate[]`，该操作 `query` 为 `never`，后端 `write_progress` 也无版本参数。实现改为「只在已显示版本上写 + 响应版本比对 + 422 重读」，**不自造字段**（自造字段会被契约拒绝，未声明查询参数会被服务端忽略而给出虚假安全感）。另需签收：学习接口未注入时页面静默退回 H11 原状；掌握标记三态（未开始/学习中/已掌握）直接写 `MasteryStatus`，不引入第四种状态或「跳过先修」操作。
+- 待决：真实后端联调（I02/I05 已合入 `main`，本轮仅假 API 验证）交 K06 学生主线 E2E；推荐列表上限未在页面暴露（用服务端默认 10）；进度变化后继承来源（`inherited_from[]`）未在 UI 展示（契约已具备，是否需要展开待定）。

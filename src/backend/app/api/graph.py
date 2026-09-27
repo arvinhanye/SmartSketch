@@ -5,8 +5,11 @@ Protocol translation and dependency injection only:
 * both routes use the shared ``course_reader`` dependency (401 / 403 for non-members; a
   student on an unpublished course gets 404 ``GRAPH_NOT_PUBLISHED`` before any graph read);
 * ``app.services.graph.read`` decides draft vs published, visibility and source locating;
-* Neo4j being unreachable is 503 ``STORAGE_UNAVAILABLE``; a knowledge point without any
-  locatable source violates ``source_refs`` minItems 1 and is 500 ``INTERNAL_ERROR``.
+* Neo4j being unreachable is 503 ``STORAGE_UNAVAILABLE``;
+* a teacher's manually created knowledge point (``source = manual``) with no locatable source at read
+  time is 200 with the explicit empty state ``KnowledgePointDetailWithoutSource`` (empty ``source_refs``,
+  ADR-072); the same condition on an ``source = ai`` node violates ``source_refs`` minItems 1 and is 500
+  ``INTERNAL_ERROR`` (an integrity fault, not hidden by the empty state).
 
 Optional fields are omitted rather than sent as ``null``; ``graph_version`` is required
 by ``GraphExchange`` and is always sent (``null`` for the draft).
@@ -22,7 +25,13 @@ from fastapi.responses import JSONResponse
 from app.api.dependencies import course_reader
 from app.repositories.graph_read import GraphReader
 from app.repositories.neo4j import Neo4jRepository, RepositoryError
-from app.schemas.contracts import GraphExchange, KnowledgePointDetail, KnowledgePointType, RelationType
+from app.schemas.contracts import (
+    GraphExchange,
+    KnowledgePointDetail,
+    KnowledgePointDetailWithoutSource,
+    KnowledgePointType,
+    RelationType,
+)
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
 from app.services.graph.read import (
@@ -85,7 +94,8 @@ def get_graph(
     return JSONResponse(content=body)
 
 
-@router.get("/kp/{kid}", operation_id="getKnowledgePoint", response_model=KnowledgePointDetail,
+@router.get("/kp/{kid}", operation_id="getKnowledgePoint",
+            response_model=KnowledgePointDetail | KnowledgePointDetailWithoutSource,
             responses={**_ERRORS, 500: {"model": Error}})
 def get_knowledge_point(
     request: Request,

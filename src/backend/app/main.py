@@ -1,6 +1,7 @@
 """FastAPI application factory and ASGI entry point."""
 
 import time
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -9,14 +10,17 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
 from app.api.dependencies import access_error_response
 from app.api.event_tickets import router as event_tickets_router
 from app.api.graph import router as graph_router
 from app.api.graph_nodes import router as graph_nodes_router
+from app.api.relations import router as relations_router
 from app.api.review import router as review_router
 from app.api.versions import router as versions_router
 from app.api.progress import router as progress_router
+from app.api.recommend import router as recommend_router
 from app.api.health import router as health_router
 from app.api.task_cancel import router as task_cancel_router
 from app.api.tasks import router as tasks_router
@@ -31,6 +35,7 @@ from app.services.startup import validate_embedding_space, validate_schema_curre
 
 
 APP_VERSION = "0.1.0"
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -60,7 +65,7 @@ def _field_reason(error: dict) -> dict[str, str]:
     return {"in": source, "field": ".".join(path), "reason": str(error.get("type", ""))}
 
 
-async def _validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def _validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Answer every request-validation failure with the contract ``Error`` (VALIDATION_ERROR).
 
     FastAPI's default body echoes the submitted ``input`` — including passwords — so only
@@ -71,6 +76,10 @@ async def _validation_error_handler(_: Request, exc: RequestValidationError) -> 
         message=_VALIDATION_MESSAGE,
         details={"fields": [_field_reason(error) for error in exc.errors()]},
     )
+    if request.url.path.endswith("/chat"):
+        logger.info("chat request rejected status=422 code=VALIDATION_ERROR course_id=%s user_id=%s",
+                    request.path_params.get("cid"),
+                    getattr(request.state, "authenticated_user_id", None))
     return JSONResponse(status_code=422, content=body.model_dump())
 
 
@@ -86,6 +95,7 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)
     application.include_router(tasks_router)
@@ -95,9 +105,11 @@ def create_app() -> FastAPI:
     application.include_router(members_router)
     application.include_router(graph_router)
     application.include_router(graph_nodes_router)
+    application.include_router(relations_router)
     application.include_router(review_router)
     application.include_router(versions_router)
     application.include_router(progress_router)
+    application.include_router(recommend_router)
     return application
 
 

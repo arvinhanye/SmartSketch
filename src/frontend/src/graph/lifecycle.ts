@@ -18,8 +18,11 @@ import type { G6Edge, G6Node } from './adapter'
 /**
  * 画布元素状态（H05）：筛选层据审核状态与选中项给元素打标，样式见 `buildGraphOptions` 的 `state`。
  * 状态随数据交给 G6，所以重新布局、重设数据都不会丢选中高亮。
+ *
+ * I06 追加学习状态：学生页按服务端投影的 `MasteryStatus`（`mastered`/`learning`/`notStarted`）
+ * 与推荐项（`recommended`）给节点打标；元素只携带状态名，颜色只在 `buildGraphOptions` 定义一处。
  */
-export type CanvasElementState = 'selected' | 'rejected' | 'lowConfidence'
+export type CanvasElementState = 'selected' | 'rejected' | 'lowConfidence' | 'mastered' | 'learning' | 'notStarted' | 'recommended'
 
 export type CanvasNode = G6Node & { states?: CanvasElementState[] }
 export type CanvasEdge = G6Edge & { states?: CanvasElementState[] }
@@ -124,10 +127,15 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         labelPlacement: 'bottom',
         labelFontSize: 12,
       },
-      // 多个状态按 states 数组顺序叠加：审核状态在前，选中在后，选中描边优先
+      // 多个状态按 states 数组顺序叠加：学习状态在前、审核状态居中，选中/推荐在后
       state: {
         rejected: { opacity: 0.4, stroke: '#bfbfbf', lineDash: [4, 3] },
         lowConfidence: { stroke: '#fa8c16', lineDash: [4, 3] },
+        // I06：掌握状态色只在这里定义；元素只带状态名
+        mastered: { fill: '#f6ffed', stroke: '#52c41a', lineWidth: 2 },
+        learning: { fill: '#fffbe6', stroke: '#faad14', lineWidth: 2 },
+        notStarted: { fill: '#ffffff', stroke: '#bfbfbf' },
+        recommended: { stroke: '#722ed1', lineWidth: 3, halo: true, haloStroke: '#9254de', haloLineWidth: 10 },
         selected: { stroke: '#0958d9', lineWidth: 3, halo: true, haloStroke: '#1677ff', haloLineWidth: 10 },
       },
     },

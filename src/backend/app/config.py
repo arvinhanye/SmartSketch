@@ -54,6 +54,11 @@ class Settings(BaseModel):
     LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60, gt=0, allow_inf_nan=False)
     LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS: float = Field(default=5, gt=0, allow_inf_nan=False)
     LLM_CHAT_TIMEOUT_SECONDS: float = Field(default=15, gt=0, allow_inf_nan=False)
+    QA_SIMILARITY_THRESHOLD: float = Field(default=0.7, ge=0, le=1, allow_inf_nan=False)
+    QA_CONTEXT_CHUNK_TOKENS: int = Field(default=12000, ge=1)
+    QA_CONTEXT_GRAPH_TOKENS: int = Field(default=2000, ge=0)
+    QA_CONTEXT_MAX_CHUNKS: int = Field(default=8, ge=1)
+    QA_VECTOR_LIMIT: int = Field(default=20, ge=1)
     LLM_MAX_CONCURRENCY: int = Field(default=4, ge=1)
     LLM_MAX_RETRIES: int = Field(default=2, ge=0)
     LLM_CIRCUIT_FAILURE_THRESHOLD: int = Field(default=5, ge=1)
@@ -75,6 +80,9 @@ class Settings(BaseModel):
     TASK_ARTIFACT_RETENTION_DAYS: int = Field(default=7, ge=0)
     PUBLISH_LEASE_SECONDS: int = Field(default=60, ge=15)
     COURSE_LOCK_WAIT_SECONDS: int = Field(default=5, ge=0)
+    # G05 发布清扫的周期调度（A06 §8.6，ADR-072）：worker 每轮主循环后检查，到点调用 reconcile.sweep。
+    # 0 表示不启用周期清扫（发布/回滚前的 reclaim_expired 仍在，见 ADR-036 第 6 条）。
+    PUBLISH_SWEEP_INTERVAL_SECONDS: int = Field(default=3600, ge=0)
 
     # 本地账号登录（ADR-013、specs/identity-access.md §2.1、§6）。密钥不在 load_settings 里强制：
     # worker 与迁移命令不签发令牌；API 服务入口另行调用 check_auth_settings（C13）。

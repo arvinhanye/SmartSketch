@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import re
 import sqlite3
 from typing import Any
 
@@ -116,6 +117,14 @@ class Env:
         assert isinstance(generation, AnswerGeneration)
         return generation
 
+    def rebind(self, fake: FakeModelClient) -> None:
+        """换一个供应商客户端后重建策略与生成器（同一个临时库与时钟）。"""
+        self.fake = fake
+        self.policy = ModelCallPolicy(primary=fake, store=SqliteCallStore(self.url), max_retries=0,
+                                      failure_threshold=5, open_seconds=30, task_token_budget=1_000_000,
+                                      daily_token_budget=10_000_000, clock=self.clock)
+        self.generator = AnswerGenerator(self.policy, model=MODEL, clock=self.clock)
+
     def prompt(self, index: int = -1) -> str:
         request = self.fake.calls[index].request
         assert len(request.messages) == 1 and request.messages[0].role == "user"
@@ -162,6 +171,15 @@ def not_covered(reason: ContextReason, candidates: int = 0) -> EvidenceContext:
 
 def drain(generation: AnswerGeneration) -> list[str]:
     return list(generation)
+
+
+def _drop_blank_lines(text: str) -> str:
+    return re.sub(r"\n\n", "\n", text)
+
+
+def _without_headers(text: str) -> str:
+    """把两种块头（J04 的 ``[n]（`` 与 J05 的 ``<<资料 n>>（``）都换成占位，只留正文与定位。"""
+    return re.sub(r"(?:\[\d+\]|<<资料 \d+>>)（", "（", _drop_blank_lines(text)).rstrip("\n")
 
 
 def failure(generation: AnswerGeneration) -> tuple[GenerationError, list[str]]:
@@ -317,6 +335,26 @@ def test_evidence_numbers_match_the_context_numbers():
     assert rendered == "<<资料 1>>（第3页；3.1 栈）\n甲\n\n<<资料 2>>（第7页）\n乙\n\n<<资料 3>>（附录）\n丙"
 
 
+def test_prompt_blocks_are_no_larger_than_the_budgeted_rendering():
+    """J04 按 ``EvidenceContext.render_evidence()`` 估算 token；J05 的块头只许更小（ADR-068 后果）。
+
+    除块头、结尾空行与中和替换（``<<`` → ``«``，每个字符不增字节）外，两个渲染器逐字一致，
+    且 J05 的整块字节数不超过 J04 的估算 —— 否则 J04 的预算不再覆盖实际提示。
+    """
+    context = ready(chunk(1, STACK_TEXT), chunk(2, "入栈 push。", page=None, section="3.2"))
+    budgeted = context.render_evidence()
+    rendered = render_evidence_blocks(context)
+    for index in (1, 2):
+        assert f"<<资料 {index}>>" in rendered and f"[{index}]（" in budgeted
+    # 去掉块头、块间空行与结尾空行后，两个渲染器的正文与定位逐字一致。
+    assert _without_headers(rendered) == _without_headers(budgeted)
+    assert len(rendered.encode()) <= len(budgeted.encode()) + 8 * len(context.chunks)
+
+    # 中和只换字符、不增长度：注入块的实际字节数同样不超过 J04 的估算。
+    injected = ready(chunk(1, INJECTION))
+    assert len(render_evidence_blocks(injected).encode()) <= len(injected.render_evidence().encode()) + 8
+
+
 def test_empty_graph_context_renders_a_placeholder(env: Env):
     drain(env.stream(ready(chunk(1, STACK_TEXT), graph=())))
     assert f"<<知识点结构>>\n{EMPTY_GRAPH_CONTEXT}\n<<知识点结构结束>>" in env.prompt()
@@ -449,6 +487,37 @@ def test_close_before_iterating_sends_nothing(env: Env):
     generation.close()
     assert drain(generation) == []
     assert env.fake.calls == ()
+
+
+def test_deadline_during_read_closes_the_stream_bookkeeping(env: Env):
+    """到期时关闭的是**供应商流本身**：fake 只有在迭代器被 ``close()`` 时才会记 ``closed_early``。
+
+    判别力：若只让本层 ``finally`` 在迭代器垃圾回收时收尾，``fake.calls[0].closed_early`` 仍为
+    ``False``，而 O9/QA-26 要求服务端主动停止读取供应商流；本用例因此断言该标志与「只出第一个片段」
+    同时成立。
+    """
+    def late(request):
+        request_done = False
+        def chunks():
+            nonlocal request_done
+            yield "栈是"
+            if not request_done:
+                request_done = True
+                env.clock.now = DEADLINE  # 第一个片段之后链路到期
+            yield "线性表[1]"
+        return FakeReply(chunks=tuple(chunks()))
+
+    env.fake = FakeModelClient(responder=late)
+    env.rebind(env.fake)
+
+    generation = env.stream()
+    error, parts = failure(generation)
+
+    assert error.kind is GenerationErrorKind.TIMEOUT and error.delivered is True
+    assert parts == ["栈是"]  # 到期后不再读取下一个片段
+    assert len(env.fake.calls) == 1
+    assert env.fake.calls[0].closed_early is True  # 供应商流被主动关闭，不只是本层收尾
+    assert generation.result is None
 
 
 def test_generation_can_be_iterated_only_once(env: Env):
@@ -598,10 +667,7 @@ def test_provider_timeout_at_the_chain_deadline_is_timeout(env: Env):
         return ModelTimeoutError(MODEL)
 
     env.fake = FakeModelClient(responder=late)
-    env.policy = ModelCallPolicy(primary=env.fake, store=SqliteCallStore(env.url), max_retries=0,
-                                 failure_threshold=5, open_seconds=30, task_token_budget=1_000_000,
-                                 daily_token_budget=10_000_000, clock=env.clock)
-    env.generator = AnswerGenerator(env.policy, model=MODEL, clock=env.clock)
+    env.rebind(env.fake)
     error, _ = failure(env.stream())
     assert error.kind is GenerationErrorKind.TIMEOUT
 
@@ -655,7 +721,10 @@ def test_constructor_needs_a_policy():
     ({"course_id": ""}, ValueError),
     ({"request_id": ""}, ValueError),
     ({"deadline": float("nan")}, ValueError),
+    ({"deadline": float("inf")}, ValueError),
     ({"deadline": True}, ValueError),
+    ({"deadline": "later"}, ValueError),
+    ({"deadline": None}, ValueError),
     ({"question": "   "}, ValueError),
     ({"question": None}, TypeError),
 ])

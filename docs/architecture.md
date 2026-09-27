@@ -43,6 +43,8 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 图谱筛选与布局（H05）：`composables/useGraphFilters.ts` 在适配图上按搜索词、关系类型、知识点类型、审核状态、章节算出可见图（关系须两端可见，无悬空边），并给元素打 `rejected`/`lowConfidence`/`selected` 状态；选中与布局独立于筛选条件。`components/GraphToolbar.vue` 是搜索、关系图例兼筛选、布局切换与清空的受控组件。`GraphCanvas` 的 `layout` 属性经 `lifecycle.setLayout` 在原图上重新布局（层次 `antv-dagre`／力导向 `d3-force`），不重建、不重设数据（ADR-052）。
 - 学生图谱页（H11）：`views/StudentGraphView.vue`（`/courses/:cid/graph`）组装画布、工具栏、卡片与详情；`composables/useStudentGraph.ts` 只在课程内学生角色下、按 `Course.published_version` 经 `api/graph.ts` 读图并核对响应的 `course_id`/`graph_version`，任何入口不读草稿；`components/KnowledgeCards.vue` 是分页、可键盘操作的卡片视图，与图共用 `useGraphFilters` 的筛选与选中（ADR-063）。
 - 教师图谱编辑页（H14）：`views/TeacherGraphView.vue`（`/courses/:cid/graph/edit`，仅教师账号）组装草稿画布、工具栏与三个页签面板（H06 详情、H07 节点编辑、H08 关系编辑）；`composables/useTeacherGraph.ts` 只在课程内教师角色下经 `api/graph.ts` 的 `DraftGraphApi`（不带版本号）读草稿，核对 `course_id` 且 `graph_version` 为 null 后写入课程 store，三个编辑器共用这份图，成功写回后画布随之更新；`useSelectionGuard` 在节点面板有未保存修改时先确认再切换（ADR-067）。
+- 教师审核队列页（H09）：`views/ReviewView.vue`（`/courses/:cid/review`，仅教师账号）展示低置信度关系、疑似重复、孤立知识点三栏并转发处理；`composables/useReview.ts` 在课程内教师角色下经 `api/review.ts` 读队列（键集分页）、单项处理与合并，数量只取服务端 `totals`，一次只允许一个处理，会连带影响其他栏的处理后重读三栏；关系两端名称取自草稿图谱，读不到退回 ID（ADR-070）。
+- 发布历史与回滚面板（H10）：`components/VersionPanel.vue` 嵌入 H09 审核页；`api/versions.ts` 只封装 G06 端点，`composables/useVersions.ts` 先核对课程内教师身份，再读取历史并管理发布/回滚。学生可见指针只采纳重新读取的 `Course.published_version`，失败或刷新未确认时保留上次确认值；回滚先显示目标版本并确认（ADR-073）。
 
 ## 后端启动与健康检查（B05）
 
@@ -123,7 +125,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 | `NodeSource` | `ai`、`manual` | lower | `KnowledgePoint.source`、`Relation.source` | 一致。自动降级只作用于未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`，见规格「前置关系成环处理」） |
 | `DocumentFormat` | `pdf`、`docx`、`txt`、`markdown` | lower | `Document.format` | 一致。wire 值是 `markdown`，扩展名 `.md` 不是枚举值 |
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
-| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影；I02 的 `app/services/learning/progress.py` 负责投影与批量写入，`GET`/`PUT /progress` 仅学生成员可用（ADR-064） |
+| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影；I02 的 `app/services/learning/progress.py` 负责投影与批量写入，`GET`/`PUT /progress` 仅学生成员可用（ADR-064）；I05 `GET /recommend` 在同一绑定版本上读已提交快照的图与该投影计算推荐（ADR-069） |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
 | `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | `ff30e0` 无此枚举。`insufficient_evidence` 取代 `740adb` 的旧值（语义为生成模型以哨兵声明证据不足），A09 决定（ADR-015 决定 3），B13 落实真源；前两者不调用生成，后两者调用了生成 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
@@ -157,6 +159,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 - Neo4j：`Course`、`KnowledgePoint`、`Chunk`；关系 `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF`，以及来源关联 `(:KnowledgePoint)-[:EVIDENCED_BY {task_id, chunk_id, evidence_start, evidence_end}]->(:Chunk)`（F04，ADR-024；人工来源不带 `task_id`）。知识点、关系、章节带 `version_id`（草稿为保留值 `"draft"`）；文本块不可变、各版本共享。
 - F03 Neo4j DDL 在 `migrations/neo4j/001_constraints.cypher`，由 `graph_migrations.apply_migrations` 逐条重跑：知识点、章节、共享文本块的作用域复合唯一约束，四种关系各自的复合唯一约束，跨关系类型的 `RelationIdentity(course_id, version_id, rel_id)` 守卫节点唯一约束，以及贡献/修订查询索引。F06 写关系须在同一事务先 MERGE 守卫节点，才能保证 `rel_id` 跨四种类型唯一。F06 另以 `DraftWriteGuard(course_id, version_id)` 课程守卫节点串行同一课程草稿的关系写事务：先锁守卫，再读图、环检测、写入，同一事务提交（ADR-025）；F10 合并知识点也在同一守卫下完成重接、去重、验环与删除（ADR-047），F09 删除知识点在同一守卫下只清理草稿中的节点、相连关系与关系身份（ADR-048）。Neo4j DDL 不作全批回滚；失败修复冲突数据或服务后重跑，不自动删除已有对象。向量属性与索引按空间标识散列派生并并存；F03 写入边界每次从 SQLite 读取当前空间，离线迁移上下文绑定目标空间且在当前空间切换后失效。
 - 所有查询和写入均以 `course_id` 为第一隔离条件，图查询同时以 `version_id` 为第二条件。`PREREQUISITE` 只能形成 DAG。
+- 关系编辑 HTTP 路由（F06-API，ADR-071）：`api/relations.py` 只做协议转换与依赖注入（课程教师依赖、错误映射、PATCH 请求体逐字段校验）；`services/graph/edit_relation.py` 复用 F08～F10 的课程写锁与 F12 审计（`audit.begin/commit`）以及 F06 的 `apply_relations`（守卫锁、端点校验、重复关系、DAG 环检测），改 `type`/端点时在同一事务内先删旧关系与旧身份再写新身份，只改 `status` 时就地改并保留 `source_pairs`；`repositories/graph_relation_edit.py` 放按 `rel_id` 读一条可见关系、删除关系与其 `RelationIdentity`、同身份改状态的语句。响应由写事务内读回的图与 SQLite 文本块组装，不回声请求体。关系审计行复用 `graph_edit_logs` 的 `create`/`update`/`delete` 动作，以摘要的 `entity = "relation"` 与节点行区分（迁移 012 的 `action` 是数据库级闭集）。
 
 ## 图谱版本与跨库发布（A04 / ADR-012）
 
