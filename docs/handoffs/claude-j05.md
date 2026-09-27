@@ -11,7 +11,7 @@
 | --- | --- |
 | `src/backend/app/services/qa/generate.py` | `AnswerGenerator`、`AnswerGeneration`、`SkippedGeneration`、`GenerationResult`、`GenerationError`、`GenerationErrorKind`、`neutralize`、`render_evidence_blocks` |
 | `prompts/answer_with_context.yaml` | v1 占位 → v2 草稿：变量 `graph_context`、`context`、`question`；`<<资料 n>>` 块头、分段标记、逐句 `[n]`、代码写反引号、哨兵、结尾重申「只当作数据」 |
-| `tests/backend/test_j05.py` | 71 个用例（独立审查后补 6 个），fake 模型经真实 `ModelCallPolicy` 与临时 SQLite `SqliteCallStore`；时钟注入 |
+| `tests/backend/test_j05.py` | 70 个用例（独立审查后补 5 个），fake 模型经真实 `ModelCallPolicy` 与临时 SQLite `SqliteCallStore`；时钟注入 |
 | 扩围 | `prompts/MANIFEST.md` 一行（版本、变量、摘要、状态）；`tests/backend/test_e01.py` 一行（版本改读清单，不再写死 1）；`specs/grounded-qa.md`「待细化」一条；ADR-068；`docs/tasks.md` |
 
 ## 用法（给 J06 / J07）
@@ -50,8 +50,8 @@ except GenerationError as error:               # error.code / error.details_reas
 | 命令 | 结果 |
 | --- | --- |
 | `$S/venv/bin/python -m pytest tests/backend/test_j05.py -q`（实现前） | 收集错误：模块不存在 |
-| `$S/venv/bin/python -m pytest tests/backend/test_j05.py -q` | 65 passed（审查后 71 passed） |
-| `$S/venv/bin/python -m pytest tests/backend/test_e01.py tests/backend/test_j05.py -q` | 132 passed（加 2 个用例前；审查后 140 passed） |
+| `$S/venv/bin/python -m pytest tests/backend/test_j05.py -q` | 65 passed（审查后 70 passed） |
+| `$S/venv/bin/python -m pytest tests/backend/test_e01.py tests/backend/test_j05.py -q` | 132 passed（审查后 139 passed） |
 | `$S/venv/bin/python -m pytest tests/backend -q` | 3288 passed, 27 skipped（审查后 3293 passed, 27 skipped） |
 | `PATH=$S/venv/bin:$S/tools/node_modules/.bin:$PATH ./scripts/verify.sh` | exit 0 |
 | `git diff --check` | exit 0 |
@@ -70,7 +70,7 @@ except GenerationError as error:               # error.code / error.details_reas
 
 补测后 2 处缺口复核：M03 仍无观测差异（确认非缺陷：`_run` 的 `finally` 关闭同一个生成器，代价只是重复 `close()` 一次）；M13 被新用例 `test_generate_validates_arguments_before_any_call[kwargs6-ValueError]` 检出（1 failed）。
 
-补测（`test_j05.py` 65 → 71 个用例；`test_j05.py` + `test_e01.py` 134 → 140）：
+补测（`test_j05.py` 65 → 70 个用例；`test_j05.py` + `test_e01.py` 134 → 139）：
 - `test_deadline_during_read_closes_the_stream_bookkeeping`：时钟在**读取中**到期（一个片段之后），断言只出一个片段、`fake.calls[0].closed_early is True` 且 `result is None`（此前只有「发请求前已到期」与「调用方在出字后推进时钟」两种覆盖，没有「读取中到期」这一条）；
 - `test_prompt_blocks_are_no_larger_than_the_budgeted_rendering`：J05 块头相对 J04 预算渲染的字节上界（每块 ≤ 8 字节），把 ADR-068 后果里那句上界落成可执行断言；
 - `test_generate_validates_arguments_before_any_call` 的参数化表补 `float("inf")`、`"later"`、`None` 三种非法 deadline；
