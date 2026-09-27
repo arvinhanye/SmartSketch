@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "notice": "本目录是 SmartSketch 演示用的自编示例数据，不是真实课程资料：课程名、讲义正文与全部知识点均为本项目自编的合成内容，不含密钥、个人信息或任何第三方教材/课件的摘录，可自由修改与分发。导入脚本只读取本目录，绝不写入 datasets/demo/ 之外的内容。",
+  "course": {
+    "name": "示例课程：数据结构导论",
+    "description": "SmartSketch 一键演示用示例课（自编合成数据）。内容覆盖线性表、栈、队列、树与二叉树，用于演示「上传资料 → 解析 → 抽取 → 审核 → 发布」的教师主线。"
+  },
+  "documents": [
+    {
+      "path": "documents/linear-structures.md",
+      "title": "线性结构示例讲义.md",
+      "format": "markdown",
+      "sha256": "sha256:a1cab43370880fc04c14ed6d7ddc26f2914e4e249849668a09d98115138af183",
+      "description": "线性表、栈、队列的定义与实现要点；含两条先修关系句，供抽取器演示。"
+    },
+    {
+      "path": "documents/trees.txt",
+      "title": "树结构示例讲义.txt",
+      "format": "txt",
+      "sha256": "sha256:4d993341b1adf534ec1cfb38d8f512cae8c48dc10d3899ed533db3a10b5bf9b9",
+      "description": "树、二叉树与二叉搜索树的定义与遍历次序；含一条先修关系句。"
+    }
+  ]
+}

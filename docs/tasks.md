@@ -1478,3 +1478,19 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | K04 | DONE（未做真实/付费实测） | 问答改为 SSE 测首字与完成；报告加问答模型、首字 p50/p95、结局计数；补 12 个离线测试（表结构、报告字段、SSE 计时、付费守卫）；`evaluation/README.md` §9 | ArvinHan（Claude），接 kongsc PR #296 | 同上 + 合并 `codex/k04-benchmark-pipeline@4ad2574` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py`、`evaluation/README.md` | `test_k04.py` 13 passed；8 处反向篡改 7 处判红，1 处为等价变异（见交接）；交接 `docs/handoffs/claude-k04.md` |
 
 - 待决（ArvinHan）：ADR-074 三项签收（原问题原文留存 30 天不自动脱敏；断开以「已送达」判定；本轮无日志查询 HTTP 端点）；K04 的真实服务实测与付费执行需另行确认（D-02）；PR #295、#296 在 kongsc 名下，是否以本分支新 PR 替代并关闭原 PR 由 ArvinHan/kongsc 决定。
+
+## 2026-09-27 K09 示例课程幂等导入（Claude）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| K09 | DONE（待 PR 审查/合并） | 实现示例课程幂等导入 | ArvinHan（Claude） | `claude/impl-k09` / `9fe21bd`（含 `main@f6325fe`） | `scripts/import-demo.py`、`datasets/demo/manifest.json`、`tests/integration/test_k09.py`；**交付要求的扩展**：`datasets/demo/documents/linear-structures.md`、`datasets/demo/documents/trees.txt`、`datasets/demo/README.md`（示例包必须有正文文件，原子清单只列了 manifest）；文档：`docs/decisions.md`（ADR-077）、本节、`docs/handoffs/claude-k09.md` | `test_k09.py` **20 passed**（真实 Neo4j 5.26 容器 `ss-neo4j-f11` + 真实 SQLite 临时库）；无 Neo4j 环境时 **19 passed / 1 skipped**；后端全量 **3466 passed / 27 skipped**（exit 0）；9 处反向篡改 **9/9 判红**（见交接）；手工双跑 `created=3` → `created=0 skipped=3`；`git diff --check` 干净 |
+
+- 输入：自编课程包 `datasets/demo/`（`manifest.json` + 2 份自编讲义正文）；输出：一键可重跑的演示数据（1 门示例课 + N 条资料 + N 条 queued 任务）。
+- 验收证据（对照原子清单「重跑不重复；只写示例课；失败可重试；不混入真实资料或删除他课」）：
+  1. **重跑不重复**：第二次导入整库 `iterdump` 逐行不变、存储目录文件数不变、`created=0 skipped=3`；幂等键 = `k09::课程名::资料标题::内容 sha256`（`processing_tasks.idempotency_key`，课程内唯一），跳过判定 = 同标题 + 同 `content_hash`。
+  2. **只写示例课**：写入只经 `services.courses.create_new_course` 与 `services.materials.upload_material`，脚本没有任何删除/改写他课的分支；课名属于其他教师、教师名下多门同名、`--course-id` 不匹配、账号缺失或非教师，一律在**零写入**状态退出 2。用例 `test_other_courses_are_never_touched_or_deleted` 逐行比对另一门课的 courses/members/materials/tasks 不变。
+  3. **失败可重试**：源文件缺失或 sha256 漂移在任何写入前拒绝（退出 2，库里零行、存储零文件）；写入阶段失败（`STORAGE_DIR` 不可用）退出 1 且每门资料原子（资料+任务同事务、落盘失败补偿删除），解除故障后重跑补齐并收敛为零新增。
+  4. **不混入真实资料**：示例正文为自编合成素材，`manifest.json` 的 `notice` 与 `datasets/demo/README.md` 均声明「不是真实课程资料」；用例断言示例课的资料集合恒等于 manifest 声明的集合，且正文不含绝对路径与 password 字样。
+- 依赖：K05/K06 在原子清单中是 K09 的前置（都仍 `PROPOSED`）。本任务**不依赖 E2E 用例文件**：它只复用已合入的课程/资料/任务服务层与集成测试范式（`tests/integration/test_k10.py`、`test_g04.py`），未触碰 K05/K06 的文件锁。
+- 验证命令与实测：见交接 `docs/handoffs/claude-k09.md`（含两次 `created/skipped` 原始输出）。
+- 待决（ArvinHan）：ADR-077 三项签收（示例课保留名、内容变化即新增一条资料、少格式 `--dataset` 只告警）；`datasets/demo/documents/` 两个文件的扩围是否接受；示例包若要补 PDF/DOCX，需提供可解析的真实文件（当前只有 Markdown + TXT 两种格式）。
