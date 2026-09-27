@@ -1340,11 +1340,24 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | J05 | DONE（待 PR 审查/合并；issue #134；**独立审查 APPROVE_WITH_NOTES，测试缺口与包导出已修**） | 实现有证据问答生成 | ArvinHan（Claude） | `claude/project-thread-bkxc2u` / `main@ac21e5d` | `src/backend/app/services/qa/generate.py`、`prompts/answer_with_context.yaml`（v1 → v2）、`tests/backend/test_j05.py`；扩围 `prompts/MANIFEST.md`（一行，E01 规则要求升版本同提交更新摘要）、`tests/backend/test_e01.py`（一行，版本改读清单）、`specs/grounded-qa.md`（「待细化」一条）、`docs/decisions.md`（ADR-068）、`src/backend/app/services/qa/__init__.py`（J05 导出）、`docs/handoffs/claude-j05.md` | 红灯：收集错误（模块不存在）；`test_j05.py` 70 passed（独立审查后补 5 个用例）；实现者 22 处反向篡改全部检出；独立审查 23 处（21 检出、1 处等价改动无观测差异、1 处测试缺口已补并复核检出）；后端全量 3293 passed / 27 skipped；`verify.sh` 通过；`git diff --check` 通过；`docs/handoffs/claude-j05.md` |
+| J05 | DONE（待 PR 审查/合并；issue #134） | 实现有证据问答生成 | ArvinHan（Claude） | `claude/project-thread-bkxc2u` / `main@ac21e5d` | `src/backend/app/services/qa/generate.py`、`prompts/answer_with_context.yaml`（v1 → v2）、`tests/backend/test_j05.py`；扩围 `prompts/MANIFEST.md`（一行，E01 规则要求升版本同提交更新摘要）、`tests/backend/test_e01.py`（一行，版本改读清单）、`specs/grounded-qa.md`（「待细化」一条）、`docs/decisions.md`（ADR-068）、`docs/handoffs/claude-j05.md` | 红灯：收集错误（模块不存在）；`test_j05.py` 65 passed；22 处反向篡改全部检出（初次 2 处存活，补 2 个用例）；后端全量 3288 passed / 27 skipped；`verify.sh` 通过；`git diff --check` 通过；`docs/handoffs/claude-j05.md` |
 
 - 验收：J04 上下文为空或低于阈值 → `SkippedGeneration`，fake 调用数与 `model_calls` 行数均为 0（QA-6、QA-7 的 J05 部分）；资料中的「忽略以上指令」、伪造的 `<<课程资料结束>>`、`<<资料 9>>` 块头与哨兵都留在资料段内且被中和，代码 `a[1]`、`cout << x` 原样保留（主验收第 10 条）；链路到期（开始前、读取中、供应商读满剩余时间）为 `LLM_UNAVAILABLE` + `timeout`，与首字前其他故障的 `upstream` 区分（O9 与 QA-24～29 的 J05 部分）；生成接口不接收历史（QA-19）。只用 fake 模型。
 - 验证：`python3 -m pytest tests/backend/test_j05.py -q`。
 - 待决（ArvinHan）：ADR-068 签收（输出上限 1024 暂定、`<<资料 n>>` 块头、0.25 秒超时容差）；`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现（适配器超时覆盖整条流）；提示效果待 K03 真实模型评测，付费调用需另行同意。
 - 解锁：J06（J05 + B13）。
+
+## 2026-09-27 H09 审核队列与节点合并 UI（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H09 | DONE（待 PR 审查/合并；issue #121） | 实现审核队列和节点合并 UI | ArvinHan（Claude） | `claude/project-thread-eo5fzo` / `main@ac21e5d` | `src/frontend/src/views/ReviewView.vue`、`src/frontend/src/composables/useReview.ts`、`tests/frontend/h09.test.ts`；扩围 `api/review.ts`（新增）、`router/index.ts`（`REVIEW_ROUTE`）、`main.ts`、`views/CoursesView.vue`（教师入口）、`docs/architecture.md`、`docs/decisions.md`（ADR-070）、`specs/teacher-review-publish.md` | `h09.test.ts` 31 passed；前端全量 18 files / 618 passed；type-check、build、`verify.sh` 通过；**仅假 API 验证**（F11 后端路由已在 main，未联调）；`docs/handoffs/claude-h09.md` |
+
+- 断点：issue #121 挂着旧的 `status:in-progress`，远端无分支、无提交，本轮从 `main@ac21e5d` 从零实现。
+- 验收对应：三类空态（各栏空态 + 全空「可以直接发布」）、重复操作（单写禁用、`changed = false`、404 已被处理）、合并冲突（`CYCLE_DETECTED` 名称环路、`COURSE_BUSY`、`REVISION_CONFLICT`）、刷新后数量一致（数量只取服务端 `totals`，重新进入页面数量相同）。
+- H09 待决（需 ArvinHan）：ADR-070 签收（三栏上下排列、合并先选主节点再确认、哪些处理后重读队列）。
+- 解锁：K05 教师主线 E2E 的 H09 依赖满足（仍依赖 H10 等）。
+
 ## 2026-09-27 I05 推荐查询 API（Claude 认领）
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |

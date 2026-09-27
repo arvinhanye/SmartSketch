@@ -1536,6 +1536,10 @@
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。J04 预算按 J04 的 `render_evidence()`（`[n]（定位）` 块头、每块以 `\n\n` 结尾）估算，实际提示的块头是 `<<资料 n>>（定位）` 且只有末块少一个 `\n\n`，故每块差 8 字节、末块再多 2 字节，上界为 `max_chunks × 8 + 2` 字节（独立审查按字节实测，已由 `test_prompt_blocks_are_no_larger_than_the_budgeted_rendering` 断言）。资料原文里的 `<<` 被换成 `«`（每个发生替换的 `<<` 少 1 字节），只会缩小该差值。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
 - **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+- **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。块头比 J04 估算用的 `[n]` 多约 9 字节/块，J04 预算按 J04 渲染估算，实际提示略大，差值有上界（`max_chunks × 9` 字节），可接受。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
+- **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+
 ## ADR-069：I05 推荐查询从绑定版本的已提交快照读图，一次解析、全量排序后截断
 
 - **日期**：2026-09-27
@@ -1549,6 +1553,7 @@
 - **后果**：推荐不受 Neo4j 副本物化或补偿状态影响；代价是每个新版本首次请求需解析一次快照 JSON（之后命中缓存），MVP 规模可接受。快照里 `importance`/`difficulty` 的范围已由 `load_snapshot` 校验，越界值在读快照时即成为 500，I04 的 `invalid_number` 分支在此路径上不会触发。候选为空只可能是 `M = V`（DAG 必有入度 0 的点），因此 `all_mastered` 与 `total_eligible = 0` 等价。
 - **回滚**：撤销 `app/services/learning/recommend.py`、`app/api/recommend.py`、`tests/backend/test_i05.py`，以及 `app/main.py` 的路由注册、`app/schemas/contracts.py` 的一行导出；无迁移、契约与依赖变更。
 - **签收**：待 ArvinHan 签收（第 2 条「图读快照而非 Neo4j」与第 1 条教师 403 为 Claude 选定）。
+
 ## ADR-070：教师审核队列页的数量口径、单写与合并交互（H09）
 
 - **日期**：2026-09-27
