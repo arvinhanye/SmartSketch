@@ -7,6 +7,7 @@ import json
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from queue import Empty, Full, Queue
 from threading import Event, Thread
 from typing import Any
@@ -17,6 +18,7 @@ from fastapi.routing import APIRoute
 
 from app.api.dependencies import course_student
 from app.repositories.graph_migrations import VectorSpaceError
+from app.repositories.chat_logs import ChatLog, write_chat_log
 from app.repositories.model_calls import SqliteCallStore
 from app.repositories.neo4j import Neo4jRepository
 from app.schemas.contracts import ChatRequest, ChatResponse
@@ -26,7 +28,7 @@ from app.services.ai.compatible import CompatibleEmbeddingClient, CompatibleMode
 from app.services.ai.embeddings import EmbeddingAdapter
 from app.services.ai.fake import FakeEmbeddingClient, FakeModelClient
 from app.services.ai.policy import ModelCallPolicy, new_call_id
-from app.services.qa.chat import ChatFailure, ChatService
+from app.services.qa.chat import ChatAudit, ChatFailure, ChatService
 from app.services.qa.generate import AnswerGenerator
 from app.services.qa.rewrite import QueryRewriter
 from app.services.versions.resolver import VersionIntegrityError, resolve_published
@@ -76,7 +78,45 @@ def _sse(event: dict[str, Any]) -> str:
     return f"event: {event['event']}\ndata: {json.dumps(event, ensure_ascii=False, separators=(',', ':'))}\n\n"
 
 
-async def _stream(request: Request, service: ChatService, prepared: Any):
+def _record_outcome(
+    sqlite_url: str, *, request_id: str, user_id: str, course_id: str,
+    version_id: str, question: str, started: float,
+    terminal: dict[str, Any] | None, audit: ChatAudit | None = None,
+) -> None:
+    audit = audit or ChatAudit()
+    latency_ms = max(0, int((time.monotonic() - started) * 1000))
+    reason = error_code = error_reason = None
+    citations: tuple[tuple[int, str], ...] = ()
+    if terminal is None:
+        outcome = "aborted"
+    elif terminal["event"] == "done":
+        final = terminal["final"]
+        outcome = final["status"]
+        reason = final.get("reason")
+        latency_ms = final["latency_ms"]
+        citations = tuple((item["index"], item["chunk_id"]) for item in final["citations"])
+    else:
+        outcome = "error"
+        error = terminal["error"]
+        error_code = error["code"]
+        error_reason = error.get("details", {}).get("reason")
+    write_chat_log(sqlite_url, ChatLog(
+        request_id=request_id, user_id=user_id, course_id=course_id,
+        version_id=version_id, question=question, outcome=outcome,
+        latency_ms=latency_ms, reason=reason, error_code=error_code,
+        error_reason=error_reason, citations=citations,
+        unknown_citation_count=audit.unknown_citation_count,
+        invalidation_subtype=audit.invalidation_subtype,
+        uncovered_unit_count=audit.uncovered_unit_count,
+        truncated=audit.truncated,
+        first_delta_latency_ms=audit.first_delta_latency_ms,
+    ))
+
+
+async def _stream(
+    request: Request, service: ChatService, prepared: Any,
+    record: Callable[[dict[str, Any] | None], None],
+):
     queue: Queue[dict[str, Any] | None] = Queue(maxsize=8)
     stop = Event()
 
@@ -100,7 +140,7 @@ async def _stream(request: Request, service: ChatService, prepared: Any):
             put(None)
 
     Thread(target=produce, daemon=True, name="chat-stream").start()
-    terminal = False
+    terminal_event: dict[str, Any] | None = None
     try:
         while not stop.is_set():
             if await request.is_disconnected():
@@ -111,14 +151,16 @@ async def _stream(request: Request, service: ChatService, prepared: Any):
                 yield ":ping\n\n"
                 continue
             if event is None:
+                terminal_event = {"event": "error", "error": ChatFailure("INTERNAL_ERROR").body(prepared.request_id)}
                 break
             yield _sse(event)
             if event["event"] in ("done", "error"):
-                terminal = True
+                terminal_event = event
                 break
     finally:
         stop.set()
-        if not terminal:
+        record(terminal_event)
+        if terminal_event is None:
             logger.info("chat aborted request_id=%s", prepared.request_id)
 
 
@@ -144,6 +186,19 @@ def chat(
         failure = ChatFailure("INTERNAL_ERROR")
         return JSONResponse(status_code=failure.status_code, content=failure.body())
     request_id = new_call_id()
+    def record(terminal: dict[str, Any] | None, prepared: Any = None) -> None:
+        _record_outcome(
+            settings.SQLITE_URL, request_id=request_id, user_id=access.user.id,
+            course_id=access.course.id, version_id=version.version_id,
+            question=payload.question, started=started, terminal=terminal,
+            audit=prepared.audit if prepared is not None else None,
+        )
+
+    def failed(failure: ChatFailure) -> JSONResponse:
+        body = failure.body(request_id)
+        record({"event": "error", "error": body})
+        return JSONResponse(status_code=failure.status_code, content=body)
+
     try:
         service = chat_service(request)
         prepared = service.prepare(
@@ -151,28 +206,31 @@ def chat(
             question=payload.question, history=payload.history, kp_id=payload.kp_id,
         )
     except ChatFailure as failure:
-        return JSONResponse(status_code=failure.status_code, content=failure.body(request_id))
+        return failed(failure)
     except (VectorSpaceError, sqlite3.Error):
-        failure = ChatFailure("STORAGE_UNAVAILABLE")
-        return JSONResponse(status_code=failure.status_code, content=failure.body(request_id))
+        return failed(ChatFailure("STORAGE_UNAVAILABLE"))
     except Exception as error:
         logger.error("chat preparation failed request_id=%s error_type=%s",
                      request_id, type(error).__name__)
-        failure = ChatFailure("INTERNAL_ERROR")
-        return JSONResponse(status_code=failure.status_code, content=failure.body(request_id))
+        return failed(ChatFailure("INTERNAL_ERROR"))
 
     if request.headers.get("accept", "").split(",")[0].strip() == "application/json":
         for event in service.events(prepared):
             if event["event"] == "done":
+                record(event, prepared)
                 return JSONResponse(content=event["final"])
             if event["event"] == "error":
+                record(event, prepared)
                 failure = event["error"]
                 status = {"BUDGET_EXCEEDED": 429, "INTERNAL_ERROR": 500}.get(failure["code"], 503)
                 return JSONResponse(status_code=status, content=failure)
         failure = ChatFailure("INTERNAL_ERROR")
-        return JSONResponse(status_code=500, content=failure.body(request_id))
+        body = failure.body(request_id)
+        record({"event": "error", "error": body}, prepared)
+        return JSONResponse(status_code=500, content=body)
 
     return StreamingResponse(
-        _stream(request, service, prepared), media_type="text/event-stream",
+        _stream(request, service, prepared, lambda terminal: record(terminal, prepared)),
+        media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Event
 from typing import Any
 
@@ -51,6 +51,15 @@ class ChatFailure(Exception):
         return {"code": self.code, "message": _MESSAGES[self.code], "details": details}
 
 
+@dataclass
+class ChatAudit:
+    unknown_citation_count: int = 0
+    invalidation_subtype: str | None = None
+    uncovered_unit_count: int = 0
+    truncated: bool = False
+    first_delta_latency_ms: int | None = None
+
+
 @dataclass(frozen=True)
 class PreparedChat:
     version: PublishedVersion
@@ -59,6 +68,7 @@ class PreparedChat:
     deadline: float
     query: str
     context: EvidenceContext
+    audit: ChatAudit = field(default_factory=ChatAudit)
 
     @property
     def related_kp_ids(self) -> tuple[str, ...]:
@@ -67,6 +77,14 @@ class PreparedChat:
 
     def latency_ms(self) -> int:
         return max(0, int((time.monotonic() - self.started) * 1000))
+
+
+def _capture_audit(prepared: PreparedChat, citations: CitationStream | None) -> None:
+    if citations is not None:
+        prepared.audit.unknown_citation_count = citations.unknown_count
+        prepared.audit.invalidation_subtype = citations.invalidation_subtype
+        prepared.audit.uncovered_unit_count = citations.uncited_units
+        prepared.audit.truncated = citations.truncated
 
 
 class ChatService:
@@ -124,6 +142,7 @@ class ChatService:
             return
 
         generation: AnswerGeneration | None = None
+        citations: CitationStream | None = None
         try:
             candidate = self.generator.generate(prepared.query, context,
                                                 course_id=prepared.version.course_id,
@@ -144,6 +163,8 @@ class ChatService:
                     return
                 delta = citations.feed(raw)
                 if delta:
+                    if prepared.audit.first_delta_latency_ms is None:
+                        prepared.audit.first_delta_latency_ms = prepared.latency_ms()
                     yield {"event": "delta", "delta": delta}
                 if citations.stop_supplier:
                     generation.close()
@@ -154,18 +175,24 @@ class ChatService:
                 raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
             tail = citations.finish()
             if tail:
+                if prepared.audit.first_delta_latency_ms is None:
+                    prepared.audit.first_delta_latency_ms = prepared.latency_ms()
                 yield {"event": "delta", "delta": tail}
             final = citations.finalize(
                 latency_ms=prepared.latency_ms(),
                 truncated=bool(generation.result and generation.result.truncated),
                 related_kp_ids=prepared.related_kp_ids,
             )
+            _capture_audit(prepared, citations)
             yield {"event": "done", "final": final}
         except GenerationError as error:
+            _capture_audit(prepared, citations)
             yield {"event": "error", "error": ChatFailure(error.code, reason=error.details_reason).body(prepared.request_id)}
         except ChatFailure as error:
+            _capture_audit(prepared, citations)
             yield {"event": "error", "error": error.body(prepared.request_id)}
         except Exception:
+            _capture_audit(prepared, citations)
             yield {"event": "error", "error": ChatFailure("INTERNAL_ERROR").body(prepared.request_id)}
         finally:
             if generation is not None:

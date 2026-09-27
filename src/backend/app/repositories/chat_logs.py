@@ -54,3 +54,43 @@ def write_chat_log(sqlite_url: str, log: ChatLog) -> None:
         )
         database.execute("DELETE FROM chat_logs WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')")
         database.execute("COMMIT")
+
+
+def list_chat_logs(
+    sqlite_url: str, *, user_id: str, course_id: str, request_id: str | None = None,
+) -> tuple[ChatLog, ...]:
+    """Read outcomes only within one student's course scope."""
+    query = """SELECT request_id, user_id, course_id, version_id, question, outcome,
+                      latency_ms, reason, error_code, error_reason, citations_json,
+                      unknown_citation_count, invalidation_subtype, uncovered_unit_count,
+                      truncated, first_delta_latency_ms
+               FROM chat_logs WHERE user_id=? AND course_id=?"""
+    params: tuple[str, ...] = (user_id, course_id)
+    if request_id is not None:
+        query += " AND request_id=?"
+        params += (request_id,)
+    query += " ORDER BY created_at DESC, request_id DESC"
+    with connect(sqlite_url) as database:
+        rows = database.execute(query, params).fetchall()
+    return tuple(
+        ChatLog(
+            request_id=row[0], user_id=row[1], course_id=row[2], version_id=row[3],
+            question=row[4], outcome=row[5], latency_ms=row[6], reason=row[7],
+            error_code=row[8], error_reason=row[9],
+            citations=tuple(tuple(item) for item in json.loads(row[10])),
+            unknown_citation_count=row[11], invalidation_subtype=row[12],
+            uncovered_unit_count=row[13], truncated=bool(row[14]),
+            first_delta_latency_ms=row[15],
+        )
+        for row in rows
+    )
+
+
+def count_chat_outcomes(sqlite_url: str, *, user_id: str, course_id: str) -> dict[str, int]:
+    """Count unique logged requests by terminal outcome in one course scope."""
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            "SELECT outcome, COUNT(*) FROM chat_logs WHERE user_id=? AND course_id=? GROUP BY outcome",
+            (user_id, course_id),
+        ).fetchall()
+    return dict(rows)
