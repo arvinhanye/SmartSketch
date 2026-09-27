@@ -20,6 +20,11 @@ export async function login(page: Page, username: string, password: string): Pro
 export type UploadFile = { name: string; mimeType: string; buffer: Buffer }
 
 const lesson = 'Chapter 3: Stack and Queue. A stack is last in first out. A queue is first in first out.'
+// 中文正文供 txt/md/docx 使用：演示模型（LLM_MODE=demo）按中文定义句抽取知识点；
+// PDF 用内置 Helvetica 字体只能写 ASCII，保持英文。
+const lessonZh = '第3章 栈与队列\n\n栈是一种只允许在一端进行插入和删除的线性表，特点是后进先出。' +
+  '队列是一种只允许在一端插入、在另一端删除的线性表，特点是先进先出。' +
+  '循环队列是用数组实现队列的一种方式。学习队列之前需要先掌握栈。'
 
 function pdf(text: string): Buffer {
   const stream = `BT /F1 12 Tf 40 750 Td (${text}) Tj ET`
@@ -99,8 +104,8 @@ function docx(text: string): Buffer {
 }
 
 export const fourFormats: UploadFile[] = [
-  { name: 'stack-queue.txt', mimeType: 'text/plain', buffer: Buffer.from(lesson) },
-  { name: 'stack-queue.md', mimeType: 'text/markdown', buffer: Buffer.from(`# Stack and Queue\n\n${lesson}\n`) },
+  { name: 'stack-queue.txt', mimeType: 'text/plain', buffer: Buffer.from(lessonZh) },
+  { name: 'stack-queue.md', mimeType: 'text/markdown', buffer: Buffer.from(`# 栈与队列\n\n${lessonZh}\n`) },
   { name: 'stack-queue.pdf', mimeType: 'application/pdf', buffer: pdf(lesson) },
-  { name: 'stack-queue.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: docx(lesson) },
+  { name: 'stack-queue.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: docx(lessonZh.replace(/\n/g, ' ')) },
 ]
