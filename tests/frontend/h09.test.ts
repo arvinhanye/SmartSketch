@@ -343,6 +343,23 @@ describe('审核队列页：加载与三类空态', () => {
     expect(rows(wrapper, 'rv-relation')).toEqual(['r1', 'r2'])
   })
 
+  it('401：显示会话过期文案且不可重试（与 5xx 的通用文案区分）', async () => {
+    const f = fakes()
+    f.review.getQueue.mockRejectedValueOnce(apiError(401, 'UNAUTHENTICATED'))
+    const { wrapper } = await mountPage(f)
+    expect(wrapper.find('[data-test="rv-error"]').text()).toContain('登录已失效，请重新登录。')
+    expect(wrapper.find('[data-test="rv-retry"]').exists()).toBe(false)
+  })
+
+  it('三栏空态文案各不相同，不是共用一句', async () => {
+    const { wrapper } = await mountPage(fakes({ relations: [], duplicates: [], isolated: [] }))
+    const texts = (['low_confidence_relation', 'suspected_duplicate', 'isolated_node'] as const).map((kind) =>
+      wrapper.find(`[data-test="rv-empty-${kind}"]`).text().trim(),
+    )
+    expect(texts.every((text) => text.length > 0)).toBe(true)
+    expect(new Set(texts).size).toBe(3)
+  })
+
   it('COURSE_FORBIDDEN：回课程列表并带提示', async () => {
     const f = fakes()
     f.review.getQueue.mockRejectedValueOnce(apiError(403, 'COURSE_FORBIDDEN'))
@@ -382,6 +399,19 @@ describe('审核队列页：单项处理与重复操作', () => {
     expect(rows(again.wrapper, 'rv-relation')).toEqual(['r2'])
   })
 
+  it('通过成功但响应缺少 totals：重读队列，数量与列表一致', async () => {
+    const f = fakes({ relations: [rel('r1', 'k1', 'k2'), rel('r2', 'k2', 'k3')], duplicates: [], isolated: [] })
+    f.review.resolve.mockImplementationOnce(async () => {
+      f.server.relations = f.server.relations.filter((r) => r.id !== 'r1')
+      return { item: 'low_confidence_relation', action: 'approve', changed: true } as never
+    })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-relation"][data-id="r1"] [data-test="rv-approve"]')
+    expect(f.review.getQueue).toHaveBeenCalledTimes(2)
+    expect(totalText(wrapper, 'low_confidence_relation')).toBe('低置信度关系（1）')
+    expect(rows(wrapper, 'rv-relation')).toEqual(['r2'])
+  })
+
   it('写请求在途时所有处理按钮不可用，连点只发一次', async () => {
     const f = fakes()
     const pending = deferred<Awaited<ReturnType<ReviewApi['resolve']>>>()
@@ -400,14 +430,18 @@ describe('审核队列页：单项处理与重复操作', () => {
     expect(wrapper.find('[data-test="rv-approve"]').attributes('disabled')).toBeUndefined()
   })
 
-  it('同一动作已生效（changed = false）：移除该条并提示此前已处理', async () => {
+  it('同一动作已生效（changed = false）：移除该条、提示此前已处理，数量以响应 totals 为准', async () => {
     const f = fakes()
+    // 这条在页面上还没被移除，但服务端记着「该动作已生效」：不写入、totals 也不再算它
     f.server.handled.add('rel:r1:approve')
     const { wrapper } = await mountPage(f)
+    f.server.relations = f.server.relations.filter((r) => r.id !== 'r1')
     await click(wrapper, '[data-test="rv-relation"][data-id="r1"] [data-test="rv-approve"]')
     expect(rows(wrapper, 'rv-relation')).toEqual(['r2'])
     expect(wrapper.find('[data-test="rv-notice"]').attributes('data-tone')).toBe('info')
     expect(wrapper.find('[data-test="rv-notice"]').text()).toContain('此前已处理')
+    expect(totalText(wrapper, 'low_confidence_relation')).toBe('低置信度关系（1）')
+    expect(wrapper.find('[data-test="rv-notice"]').text()).not.toContain('已通过')
   })
 
   it('条目已不在队列（404）：移除、提示并重新读取队列，数量以服务端为准', async () => {
@@ -537,6 +571,24 @@ describe('审核队列页：疑似重复与合并', () => {
     expect(wrapper.find('[data-test="rv-item-error"]').text()).toContain('刚被修改')
     expect(f.review.getQueue).toHaveBeenCalledTimes(2)
   })
+
+  it('成环冲突后可改选另一主知识点再合并，旧错误随之清除', async () => {
+    const f = fakes()
+    f.review.resolve.mockRejectedValueOnce(apiError(409, 'CYCLE_DETECTED', { cycle: ['k1', 'k9', 'k1'] }))
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(wrapper.find('[data-test="rv-merge-panel"]').exists()).toBe(true)
+    await wrapper.findAll('[data-test="rv-primary"]')[1]!.setValue(true)
+    await flushPromises()
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(f.review.resolve).toHaveBeenLastCalledWith(
+      'c1',
+      { item: 'suspected_duplicate', kp_ids: ['k4', 'k5'], action: 'merge', primary_id: 'k5' },
+      expect.anything(),
+    )
+    expect(wrapper.find('[data-test="rv-item-error"]').exists()).toBe(false)
+  })
 })
 
 describe('审核队列页：分页', () => {
@@ -551,6 +603,21 @@ describe('审核队列页：分页', () => {
     expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { kind: 'isolated_node', cursor: 'isolated_node:50', limit: 50 }, expect.anything())
     expect(rows(wrapper, 'rv-isolated')).toHaveLength(60)
     expect(wrapper.find('[data-test="rv-more-isolated_node"]').exists()).toBe(false)
+  })
+
+  it('加载更多后的数量取该页响应的 totals（服务端期间变多则跟着变）', async () => {
+    const f = fakes({ isolated: [...many] })
+    const base = f.review.getQueue.getMockImplementation()!
+    f.review.getQueue.mockImplementation(async (cid, query) => {
+      const page = await base(cid, query)
+      if (query?.kind === 'isolated_node') page.totals = { ...page.totals, isolated_nodes: 70 }
+      return page
+    })
+    const { wrapper } = await mountPage(f)
+    expect(totalText(wrapper, 'isolated_node')).toBe('孤立知识点（60）')
+    await click(wrapper, '[data-test="rv-more-isolated_node"]')
+    expect(totalText(wrapper, 'isolated_node')).toBe('孤立知识点（70）')
+    expect(rows(wrapper, 'rv-isolated')).toHaveLength(60)
   })
 
   it('处理后重新读取时条数不少于已加载的', async () => {
@@ -570,6 +637,17 @@ describe('审核队列页：分页', () => {
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
     expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { limit: 50 }, expect.anything())
     expect(rows(wrapper, 'rv-isolated')).toHaveLength(50)
+  })
+
+  it('两栏都有下一页时各用各的游标，互不串栏', async () => {
+    const f = fakes({ relations: Array.from({ length: 60 }, (_, i) => rel(`r${String(i).padStart(2, '0')}`, 'k1', 'k2')), isolated: [...many] })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-more-isolated_node"]')
+    expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { kind: 'isolated_node', cursor: 'isolated_node:50', limit: 50 }, expect.anything())
+    await click(wrapper, '[data-test="rv-more-low_confidence_relation"]')
+    expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { kind: 'low_confidence_relation', cursor: 'low_confidence_relation:50', limit: 50 }, expect.anything())
+    expect(rows(wrapper, 'rv-isolated')).toHaveLength(60)
+    expect(rows(wrapper, 'rv-relation')).toHaveLength(60)
   })
 
   it('加载更多失败给出提示，列表不变', async () => {
