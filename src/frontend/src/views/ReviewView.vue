@@ -5,6 +5,7 @@ import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createReviewApi, REVIEW_API_KEY, type Relation, type ReviewItemKind, type SuspectedDuplicate } from '../api/review'
+import VersionPanel from '../components/VersionPanel.vue'
 import {
   DUPLICATE_REASON_LABELS,
   duplicateKey,
@@ -154,6 +155,7 @@ function otherName(pair: SuspectedDuplicate): string {
       </p>
       <p v-if="allEmpty" data-test="rv-all-empty" role="status">审核队列已清空，可以直接发布。</p>
       <p v-else class="review__hint">队列不阻塞发布：发布时只排除低置信度关系，疑似重复与孤立知识点仅作提示。</p>
+      <VersionPanel v-if="courseId" :course-id="courseId" @forbidden="leaveForbidden" />
 
       <nav class="review__summary" aria-label="审核栏目">
         <a v-for="kind in REVIEW_KINDS" :key="kind" :href="`#rv-${kind}`" :data-test="`rv-total-${kind}`">

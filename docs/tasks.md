@@ -1449,8 +1449,9 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（本轮唯一写入者） | 验收 |
 | --- | --- | --- | --- | --- | --- | --- |
-| H10 | CLAIMED（设计待确认；issue #122） | 实现发布历史和回滚 UI | Codex（前端） | `codex/h10-version-panel` / `main@8741078` | `src/frontend/src/components/VersionPanel.vue`、`src/frontend/src/composables/useVersions.ts`、`tests/frontend/h10.test.ts`；接入页/API 封装如需扩围，先核对所有权并在此补记 | 发布失败保持旧版本标识；草稿修订中学生仍见旧发布版；回滚确认前显示目标版本。 |
+| H10 | DONE（待 PR 审查/合并；issue #122） | 实现发布历史和回滚 UI | Codex（前端） | `codex/h10-version-panel` / `main@8741078` | `src/frontend/src/components/VersionPanel.vue`、`src/frontend/src/composables/useVersions.ts`、`tests/frontend/h10.test.ts`；扩围 `src/frontend/src/api/versions.ts`、`src/frontend/src/views/ReviewView.vue`、`src/frontend/src/main.ts`、`tests/frontend/h09.test.ts`（仅注入新增版本 API 测试桩）、相关规格/架构/ADR/交接（均已核对无在途文件锁） | 发布失败保持旧版本标识；草稿修订中学生仍见旧发布版；回滚确认前显示目标版本。 |
 
 - 输入：G06 发布/版本列表/回滚 API 与 `GraphVersion`、`PublishResult` 契约，H09 教师工作流；输出：教师可见的版本历史、发布状态和回滚操作入口。前置 G06、H09 均已合入 `main`。
-- 风险：发布/回滚与刷新并发时不得把在途或失败结果显示为已提交版本；回滚是前滚新版本号，确认前必须明确目标版本与影响。设计与扩围先经用户确认。
+- 风险：发布/回滚与刷新并发时不得把在途或失败结果显示为已提交版本；回滚是前滚新版本号，确认前必须明确目标版本与影响。审核页嵌入版本面板的设计已获用户确认。
 - 验证计划：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
+- 验收证据：H10 测试先因模块缺失红灯，接入页位置、成功响应刷新指针、课程教师权限及超时后暂停写入四项后续用例也各先红后绿；最终 `h10.test.ts` 10 passed，H09+H10 47 passed，前端全量 19 files / 634 passed（B02 嵌套进程测试使用 `--testTimeout 30000`），type-check、build、`./scripts/verify.sh` 均 exit 0。前端仅 fake API 验证，真实服务联调交 K05。详见 `docs/handoffs/codex-h10.md`。
