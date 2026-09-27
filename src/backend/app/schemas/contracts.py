@@ -41,6 +41,9 @@ ReviewQueue = _module.ReviewQueue
 KnowledgePointRef = _module.KnowledgePointRef
 KnowledgePointType = _module.KnowledgePointType
 Relation = _module.Relation
+# F06 relations API (ADR-071). ``RelationUpdate`` is validated field by field in
+# ``app.api.relations`` (closed editable set), so only the create body comes from here.
+RelationCreate = _module.RelationCreate
 RelationType = _module.RelationType
 SourceRef = _module.SourceRef
 # G04/G06 publish, rollback and version list.

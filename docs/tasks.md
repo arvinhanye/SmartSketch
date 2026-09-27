@@ -1326,3 +1326,18 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 断点：上一会话只给 issue #281 打了 `status:in-progress`，无分支、无提交，本轮从 `main@f2fbf1e` 从零实现。
 - H14：ADR-067 已由 ArvinHan 2026-09-27 签收（三页签布局、页内确认 + `window.confirm` 离开确认、刷新在途遇写入则重拉）；PR #285 已合入；离开本页不清空课程 store 的草稿图（目前无页面直接读 `store.graph`，已记入 ADR 后果）。
 - 解锁：K05 教师主线 E2E 的 H14 依赖满足（仍依赖 H09、H10 等）。
+
+## 2026-09-27 后端关系编辑接口：/relations 三个路由（Claude 认领）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F06-API | DONE（待 PR 审查/合并） | 补上后端关系编辑接口（`POST`/`PATCH`/`DELETE /api/v1/courses/{cid}/relations[/{rid}]`），关闭 H14 交接里「仅假 API 验证（后端尚无 `/relations` 路由）」的缺口 | ArvinHan（Claude） | `claude/relations-0927` / `main@ac21e5d` | 新增 `src/backend/app/api/relations.py`、`src/backend/app/services/graph/edit_relation.py`、`src/backend/app/repositories/graph_relation_edit.py`、`tests/backend/test_relations_api.py`、`tests/integration/test_relations_api.py`、`docs/handoffs/claude-relations-api.md`；扩围 `src/backend/app/main.py`（路由注册 2 行）、`src/backend/app/schemas/contracts.py`（`RelationCreate` 导出 2 行）、`src/backend/app/services/graph/audit.py`（关系摘要、`_applied_relation`、`reconcile` 分派）、`docs/decisions.md`（ADR-071）、`docs/architecture.md`（一句接线）、`specs/course-knowledge-graph.md`（状态行一句） | 红灯：`tests/backend/test_relations_api.py` 53 failed / 3 passed（路由不存在）；实现后该文件 58 passed；集成 `tests/integration/test_relations_api.py` 11 passed（真实 Neo4j 5.26.31）；后端全量 3281 passed / 27 skipped；图编辑相关集成（F06/F08/F09/F10/F12/F13 + 本任务）126 passed；`tests/contracts` 291 passed；`scripts/gen-contracts.sh --check` PASS（未改 `src/contracts/`）；`./scripts/verify.sh` exit 0；反向篡改 8 处，检出 8 处；详见 `docs/handoffs/claude-relations-api.md` |
+
+- 验收：契约的路径、方法、状态码与响应体形状逐条对照（含 `Relation` 的 `oneOf`）；教师角色与课程成员口径（学生 403 `ROLE_FORBIDDEN`、非成员 403 `COURSE_FORBIDDEN`、未认证 401）；`PREREQUISITE` 新建、改向、以及把 `rejected` 恢复为有效时写入前检测成环（409 `CYCLE_DETECTED` + `details.cycle`，拒绝时零写入、不加 `draft_revision`、不记审计）；悬空端点 422 `DANGLING_ENDPOINT`（`details.missing`）；重复关系 409 `DUPLICATE_RELATION`（`details.existing_id`）；课程写锁与 409 `COURSE_BUSY`（`details.holder`）；Neo4j 不可达 503 `STORAGE_UNAVAILABLE`；响应体来自真实图（不回声请求体）；关系新建/修改/删除各记一条 F12 审计且 `draft_revision` 恰加一，审计 `commit` 失败不回滚编辑、行留 `pending` 由下一次写入对账。
+- 依赖：F06 服务层（`apply_relations`）、F08 课程写锁与 `EditContext`、F12 审计（ADR-061）、契约 `api.v1.yaml` 的 `createRelation`/`updateRelation`/`deleteRelation`、`errors.v1.md`。无迁移、无依赖升级、未改契约真源。
+- 待决（需 ArvinHan 裁决，见 ADR-071 后果）：
+  1. **契约未声明 503**：三条路由沿用既有图路由惯例返回 503 `STORAGE_UNAVAILABLE`，但 `api.v1.yaml` 的两条路径只声明 401/403/404/409/422。要么补契约（需另开契约变更），要么把 Neo4j 故障并入 500——本任务选择「不改契约、记差异」，与 F11 审查 D-4 同类。
+  2. **两个未登记的领域 `reason`**：非 `PREREQUISITE` 自环报 422 `VALIDATION_ERROR` + `self_loop`；`InvalidRelationError` 兜底报 `invalid_relation`。`errors.v1.md` 要求领域 `reason` 先登记，契约真源本轮冻结。
+  3. **改类型/方向会丢弃 `source_pairs`**：新身份 = 新的人工断言（保留 `confidence`/`status`，来源证据归零）；若希望改向后保留 AI 证据，需要另立实现（把块 ID 迁到新身份的 `source_pairs`）。
+  4. **审计行语义**：关系行复用 `create`/`update`/`delete` 动作、`kp_id` 存 `rel_id`、修订号列 NULL，靠摘要的 `entity = "relation"` 区分（迁移 012 的 `action` 是数据库级闭集，新增取值要重建表）。若审计消费者需要一个显式的 `entity` 列，需另开迁移。
+  5. **前后端未联调**：H14 的教师页仍用注入的假实现，真实 `/relations` 与页面组合未在浏览器里端到端验证（K05 教师主线 E2E 的依赖）。
