@@ -373,7 +373,10 @@ export interface paths {
         };
         /**
          * 知识点详情与出处
-         * @description 必须返回至少一条 `source_refs`（规格验收条件 5）。
+         * @description 有可定位来源的知识点返回至少一条 `source_refs`（规格验收条件 5）；教师手工新建、且读取时没有任何
+         *     可定位来源的知识点返回显式空态 `KnowledgePointDetailWithoutSource`（`source_refs` 为空数组，
+         *     ADR-072）。`source = ai` 的节点缺少可定位来源仍是完整性故障，返回 500 `INTERNAL_ERROR`。
+         *
          */
         get: operations["getKnowledgePoint"];
         put?: never;
@@ -1178,6 +1181,20 @@ export interface components {
             source_refs?: components["schemas"]["SourceRef"][];
         };
         KnowledgePointDetail: components["schemas"]["KnowledgePoint"] & {
+            source_refs: components["schemas"]["SourceRef"][];
+            /** @description 直接前置知识点 */
+            prerequisites?: components["schemas"]["KnowledgePointRef"][];
+            /** @description 直接后继知识点 */
+            successors?: components["schemas"]["KnowledgePointRef"][];
+            related?: components["schemas"]["KnowledgePointRef"][];
+        };
+        /** @description 教师手工新建、且在读取时没有任何可定位来源的知识点的详情（ADR-072）。
+         *     与 `KnowledgePointDetail` 的唯一差别是 `source_refs` 必须为空数组——用一个显式空态代替 500，
+         *     不伪造来源。缺失可定位来源的 `source = ai` 节点不适用本形状，仍按完整性故障处理（500
+         *     `INTERNAL_ERROR`），`KnowledgePointDetail` 的 `minItems: 1` 因此保持不变。
+         *      */
+        KnowledgePointDetailWithoutSource: components["schemas"]["KnowledgePoint"] & {
+            /** @description 没有可定位来源，显式的空数组（不是缺字段，也不是伪造的引用） */
             source_refs: components["schemas"]["SourceRef"][];
             /** @description 直接前置知识点 */
             prerequisites?: components["schemas"]["KnowledgePointRef"][];
@@ -2580,13 +2597,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 知识点详情 */
+            /** @description 知识点详情；手工无来源节点为显式空态 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KnowledgePointDetail"];
+                    "application/json": components["schemas"]["KnowledgePointDetail"] | components["schemas"]["KnowledgePointDetailWithoutSource"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

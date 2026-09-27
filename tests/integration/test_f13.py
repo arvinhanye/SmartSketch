@@ -368,8 +368,14 @@ def graph():
 
 
 class _BrokenRepo:
+    """Neo4j 整个不可用：读（清理前的贡献判断）与写都抛 ``RepositoryError``。"""
+
     def __init__(self) -> None:
         self.calls = 0
+
+    def read(self, query, scope, *, reader, parameters):
+        self.calls += 1
+        raise RepositoryError()
 
     def write_transaction(self, scope, work):
         self.calls += 1
@@ -609,3 +615,74 @@ def test_live_pipeline_runs_a_queued_task_to_awaiting_review(db_url, storage, gr
     assert _row(db_url, task_id)["stage"] == "awaiting_review"
     assert _counts(graph)["nodes"] == 2 and len(_rels(graph)) == 1
 
+
+
+# --- ADR-072：任务重跑不把教师已裁决的状态降级回 draft ---------------------------------------
+
+
+def _draft_nodes(graph) -> list[dict]:
+    return graph.q("MATCH (n:KnowledgePoint {course_id: $c, version_id: 'draft'}) "
+                   "RETURN n.kp_id AS kp_id, n.name AS name, n.status AS status, n.revision AS revision "
+                   "ORDER BY n.name", c=graph.course)
+
+
+def _adjudicate(graph, status: str) -> None:
+    """模拟教师裁决后的节点：F08 approve + unlock / F11 reject 都置 locked，解锁后 locked = false。"""
+    graph.q("MATCH (n:KnowledgePoint {course_id: $c, version_id: 'draft'}) "
+            "SET n.status = $status, n.locked = false, n.contrib_manual = true, n.revision = n.revision + 1",
+            c=graph.course, status=status)
+
+
+def _rerun(db_url, lease, graph):
+    """同一任务重跑 ``persisting``：确定性 ID 不变，走 §8.4 第 1 步的撤销 + 重写。"""
+    _sql(db_url, "UPDATE processing_tasks SET stage = 'persisting', lease_token = ?, lease_owner = ?,"
+                 " lease_expires_at = unixepoch() + ? WHERE id = ?",
+         lease.token, lease.owner, LEASE_SECONDS, lease.task_id)
+    return _persist(db_url, _at(lease, "persisting"), graph.repo)
+
+
+@live
+def test_live_rerun_keeps_an_approved_node_approved_and_updates_its_content(db_url, storage, graph):
+    lease = _persisting(db_url, storage, graph, [], ["概念11"])
+    assert _persist(db_url, lease, graph.repo).status is PersistStatus.ADVANCED
+    _adjudicate(graph, "approved")
+    before = _draft_nodes(graph)
+
+    outcome = _rerun(db_url, lease, graph)
+
+    assert outcome.status is PersistStatus.ADVANCED
+    after = _draft_nodes(graph)
+    assert after[0]["kp_id"] == before[0]["kp_id"]
+    assert after[0]["status"] == "approved"  # 教师已裁决的状态不被重跑改写
+    assert after[0]["name"] == before[0]["name"] and after[0]["revision"] == before[0]["revision"]  # 内容相同即幂等
+
+
+@live
+def test_live_rerun_does_not_resurrect_a_rejected_node(db_url, storage, graph):
+    lease = _persisting(db_url, storage, graph, [], ["概念11"])
+    assert _persist(db_url, lease, graph.repo).status is PersistStatus.ADVANCED
+    _adjudicate(graph, "rejected")
+
+    assert _rerun(db_url, lease, graph).status is PersistStatus.ADVANCED
+
+    assert [n["status"] for n in _draft_nodes(graph)] == ["rejected"]
+
+
+@live
+def test_live_rerun_with_unchanged_candidates_is_idempotent(db_url, storage, graph):
+    lease = _persisting(db_url, storage, graph, [("概念12", "概念11")], ["概念11", "概念12"])
+    assert _persist(db_url, lease, graph.repo).status is PersistStatus.ADVANCED
+    # 另一个任务也贡献了这些元素：撤销本任务不会删除它们，重跑走的是「更新已有元素」的路径
+    # （只有本任务贡献的纯 AI 节点会被撤销删除后重建，那样测不到 revision 的幂等）。
+    graph.q("MATCH (n:KnowledgePoint {course_id: $c, version_id: 'draft'}) "
+            "SET n.contrib_tasks = n.contrib_tasks + 'another-task'", c=graph.course)
+    graph.q("MATCH ()-[r {course_id: $c, version_id: 'draft'}]->() "
+            "SET r.contrib_tasks = r.contrib_tasks + 'another-task'", c=graph.course)
+    first_nodes, first_rels = _draft_nodes(graph), _rels(graph)
+
+    assert _rerun(db_url, lease, graph).status is PersistStatus.ADVANCED
+
+    assert _draft_nodes(graph) == first_nodes  # 未审核节点仍是 draft，revision 不变
+    assert {(n["status"], n["revision"]) for n in _draft_nodes(graph)} == {("draft", 1)}
+    assert [(r["p"]["status"], r["p"]["revision"]) for r in _rels(graph)] == \
+           [(r["p"]["status"], r["p"]["revision"]) for r in first_rels]

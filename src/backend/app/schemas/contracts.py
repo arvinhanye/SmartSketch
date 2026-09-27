@@ -30,6 +30,8 @@ GraphExchange = _module.GraphExchange
 GraphStats = _module.GraphStats
 KnowledgePoint = _module.KnowledgePoint
 KnowledgePointDetail = _module.KnowledgePointDetail
+# 手工新建、读取时没有任何可定位来源的节点详情：显式空态（ADR-072）。
+KnowledgePointDetailWithoutSource = _module.KnowledgePointDetailWithoutSource
 # F08 teacher knowledge-point writes.
 KnowledgePointCreate = _module.KnowledgePointCreate
 KnowledgePointStatus = _module.KnowledgePointStatus
@@ -43,6 +45,9 @@ ReviewQueue = _module.ReviewQueue
 KnowledgePointRef = _module.KnowledgePointRef
 KnowledgePointType = _module.KnowledgePointType
 Relation = _module.Relation
+# F06 relations API (ADR-071). ``RelationUpdate`` is validated field by field in
+# ``app.api.relations`` (closed editable set), so only the create body comes from here.
+RelationCreate = _module.RelationCreate
 RelationType = _module.RelationType
 SourceRef = _module.SourceRef
 # G04/G06 publish, rollback and version list.
@@ -53,3 +58,5 @@ RollbackGraphVersion = _module.RollbackGraphVersion
 # I02 learning progress.
 ProgressResponse = _module.ProgressResponse
 ProgressUpdate = _module.ProgressUpdate
+# I05 next-step recommendation.
+RecommendResponse = _module.RecommendResponse

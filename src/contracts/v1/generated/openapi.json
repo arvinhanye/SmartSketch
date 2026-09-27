@@ -888,18 +888,25 @@
           "graph"
         ],
         "summary": "知识点详情与出处",
-        "description": "必须返回至少一条 `source_refs`（规格验收条件 5）。",
+        "description": "有可定位来源的知识点返回至少一条 `source_refs`（规格验收条件 5）；教师手工新建、且读取时没有任何\n可定位来源的知识点返回显式空态 `KnowledgePointDetailWithoutSource`（`source_refs` 为空数组，\nADR-072）。`source = ai` 的节点缺少可定位来源仍是完整性故障，返回 500 `INTERNAL_ERROR`。\n",
         "operationId": "getKnowledgePoint",
         "responses": {
           "401": {
             "$ref": "#/components/responses/Unauthenticated"
           },
           "200": {
-            "description": "知识点详情",
+            "description": "知识点详情；手工无来源节点为显式空态",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KnowledgePointDetail"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/KnowledgePointDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/KnowledgePointDetailWithoutSource"
+                    }
+                  ]
                 }
               }
             }
@@ -3260,6 +3267,50 @@
               "source_refs": {
                 "type": "array",
                 "minItems": 1,
+                "items": {
+                  "$ref": "#/components/schemas/SourceRef"
+                }
+              },
+              "prerequisites": {
+                "type": "array",
+                "description": "直接前置知识点",
+                "items": {
+                  "$ref": "#/components/schemas/KnowledgePointRef"
+                }
+              },
+              "successors": {
+                "type": "array",
+                "description": "直接后继知识点",
+                "items": {
+                  "$ref": "#/components/schemas/KnowledgePointRef"
+                }
+              },
+              "related": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/KnowledgePointRef"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "KnowledgePointDetailWithoutSource": {
+        "description": "教师手工新建、且在读取时没有任何可定位来源的知识点的详情（ADR-072）。\n与 `KnowledgePointDetail` 的唯一差别是 `source_refs` 必须为空数组——用一个显式空态代替 500，\n不伪造来源。缺失可定位来源的 `source = ai` 节点不适用本形状，仍按完整性故障处理（500\n`INTERNAL_ERROR`），`KnowledgePointDetail` 的 `minItems: 1` 因此保持不变。\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/KnowledgePoint"
+          },
+          {
+            "type": "object",
+            "required": [
+              "source_refs"
+            ],
+            "properties": {
+              "source_refs": {
+                "type": "array",
+                "maxItems": 0,
+                "description": "没有可定位来源，显式的空数组（不是缺字段，也不是伪造的引用）",
                 "items": {
                   "$ref": "#/components/schemas/SourceRef"
                 }

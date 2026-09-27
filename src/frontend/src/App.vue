@@ -2,6 +2,7 @@
 import { computed, inject } from 'vue'
 import { RouterView, routeLocationKey } from 'vue-router'
 import { NOTICE_UNAUTHENTICATED, NOTICE_WRONG_ROLE, ROOT_ROUTE } from './router'
+import './styles.css'
 
 const appName = '智绘学途'
 // 未安装路由时（如 B02 单独挂载外壳）只渲染标题，不报错
@@ -26,18 +27,16 @@ const notice = computed(() => {
 </script>
 
 <template>
-  <main>
-    <h1>{{ appName }}</h1>
-    <p v-if="notice" role="alert">{{ notice }}</p>
-    <RouterView v-if="route" />
-  </main>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-header-inner">
+        <h1>{{ appName }}</h1>
+        <p class="app-tagline">AIGC 课程知识图谱智能构建与学习导航</p>
+      </div>
+    </header>
+    <main class="app-main">
+      <p v-if="notice" role="alert">{{ notice }}</p>
+      <RouterView v-if="route" />
+    </main>
+  </div>
 </template>
-
-<style scoped>
-main {
-  max-width: 48rem;
-  margin: 4rem auto;
-  padding: 0 1.5rem;
-  font-family: system-ui, sans-serif;
-}
-</style>
