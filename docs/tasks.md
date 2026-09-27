@@ -1483,7 +1483,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | 原子 ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 文件锁（本轮唯一写入者） | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| K09 | DONE（待 PR 审查/合并） | 实现示例课程幂等导入 | ArvinHan（Claude） | `claude/impl-k09` / `9fe21bd`（含 `main@f6325fe`） | `scripts/import-demo.py`、`datasets/demo/manifest.json`、`tests/integration/test_k09.py`；**交付要求的扩展**：`datasets/demo/documents/linear-structures.md`、`datasets/demo/documents/trees.txt`、`datasets/demo/README.md`（示例包必须有正文文件，原子清单只列了 manifest）；文档：`docs/decisions.md`（ADR-077）、本节、`docs/handoffs/claude-k09.md` | `test_k09.py` **20 passed**（真实 Neo4j 5.26 容器 `ss-neo4j-f11` + 真实 SQLite 临时库）；无 Neo4j 环境时 **19 passed / 1 skipped**；后端全量 **3466 passed / 27 skipped**（exit 0）；9 处反向篡改 **9/9 判红**（见交接）；手工双跑 `created=3` → `created=0 skipped=3`；`git diff --check` 干净 |
+| K09 | DONE（PR [#301](https://github.com/arvinhanye/SmartSketch/pull/301) 待审查/合并） | 实现示例课程幂等导入 | ArvinHan（Claude） | `claude/impl-k09` / `9fe21bd`（含 `main@f6325fe`） | `scripts/import-demo.py`、`datasets/demo/manifest.json`、`tests/integration/test_k09.py`；**交付要求的扩展**：`datasets/demo/documents/linear-structures.md`、`datasets/demo/documents/trees.txt`、`datasets/demo/README.md`（示例包必须有正文文件，原子清单只列了 manifest）；文档：`docs/decisions.md`（ADR-077）、本节、`docs/handoffs/claude-k09.md` | `test_k09.py` **20 passed**（真实 Neo4j 5.26 容器 `ss-neo4j-f11` + 真实 SQLite 临时库）；无 Neo4j 环境时 **19 passed / 1 skipped**；后端全量 **3466 passed / 27 skipped**（exit 0）；9 处反向篡改 **9/9 判红**（见交接）；手工双跑 `created=3` → `created=0 skipped=3`；`git diff --check` 干净 |
 
 - 输入：自编课程包 `datasets/demo/`（`manifest.json` + 2 份自编讲义正文）；输出：一键可重跑的演示数据（1 门示例课 + N 条资料 + N 条 queued 任务）。
 - 验收证据（对照原子清单「重跑不重复；只写示例课；失败可重试；不混入真实资料或删除他课」）：

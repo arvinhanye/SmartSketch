@@ -1,6 +1,7 @@
 # K09 交接：示例课程幂等导入（Claude）
 
-- 分支：`claude/impl-k09`（git worktree `.worktrees/impl-k09`），基线 `9fe21bd`（含 `main@f6325fe`）。
+- 分支：`claude/impl-k09`（git worktree `.worktrees/impl-k09`），基线 `9fe21bd`（含 `main@f6325fe`）；提交 `abaf43b`，PR [#301](https://github.com/arvinhanye/SmartSketch/pull/301)（base `main`）。
+- 注意：`9fe21bd` 是批次分支 `claude/app-foundation-0927` 上的提交，含 J10/K04（自有 PR #295/#296）。在 #295/#296 合入 `main` 之前，PR #301 的 diff 会连带显示这些文件；它们合入后 #301 只剩本任务的 9 个文件。
 - 决定：ADR-077（待 ArvinHan 审阅）。
 - 原子清单条目：K09「实现示例课程幂等导入 / 输入：自编课程包 / 输出：一键演示数据 / 验收：重跑不重复；只写示例课；失败可重试；不混入真实资料或删除他课」。
 
