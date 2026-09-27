@@ -48,3 +48,6 @@ neo4j/logs/
 # K05/K06 端到端产物（失败截图、trace、运行时临时库）
 test-results/
 .e2e/
+
+# 一键演示（scripts/start-demo.sh）的日志
+.demo/
