@@ -226,7 +226,8 @@ def test_documented_rollback_restores_previous_schema_and_can_be_reapplied(tmp_p
     all_dir.mkdir()
     ours = MIGRATIONS / "013_review_dismissals.sql"
     for path in MIGRATIONS.glob("*.sql"):
-        shutil.copy(path, all_dir / path.name)
+        if path.name <= ours.name:
+            shutil.copy(path, all_dir / path.name)
         if path.name < ours.name:
             shutil.copy(path, before_dir / path.name)
     url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
