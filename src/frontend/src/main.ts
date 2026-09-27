@@ -8,6 +8,9 @@ import { COURSES_API_KEY, createCoursesApi } from './api/courses'
 import { createMembersApi, MEMBERS_API_KEY } from './api/members'
 import { createMaterialsApi, MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from './api/materials'
 import { createDraftGraphApi, createPublishedGraphApi, DRAFT_GRAPH_API_KEY, PUBLISHED_GRAPH_API_KEY } from './api/graph'
+// I06：掌握状态与下一步推荐（学生图谱页用；未发布的课程返回 404 GRAPH_NOT_PUBLISHED）
+import { createProgressApi, PROGRESS_API_KEY } from './api/progress'
+import { createRecommendApi, RECOMMEND_API_KEY } from './api/recommend'
 import { createReviewApi, REVIEW_API_KEY } from './api/review'
 import { createVersionsApi, VERSIONS_API_KEY } from './api/versions'
 import { createTaskEventsClient } from './api/taskEvents'
@@ -60,6 +63,8 @@ createApp(App)
   .provide(PUBLISHED_GRAPH_API_KEY, createPublishedGraphApi(http))
   .provide(DRAFT_GRAPH_API_KEY, createDraftGraphApi(http))
   .provide(REVIEW_API_KEY, createReviewApi(http))
+  .provide(PROGRESS_API_KEY, createProgressApi(http))
+  .provide(RECOMMEND_API_KEY, createRecommendApi(http))
   .provide(VERSIONS_API_KEY, createVersionsApi(http))
   .provide(TASK_EVENTS_CLIENT_KEY, createTaskEventsClient({ client: http }))
   .mount('#app')

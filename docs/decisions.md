@@ -1612,3 +1612,20 @@
 - **后果**：审核页会额外读取课程详情与版本列表，但无需修改现有契约或 G06 后端。学生页仍按课程发布指针读旧版，教师面板明确说明 `revising` 状态。发布/回滚成功后若刷新异常，界面不猜测新指针，提示重新核对。
 - **回滚**：撤销 `api/versions.ts`、`composables/useVersions.ts`、`components/VersionPanel.vue` 与审核页/应用注入接线；不涉及数据库迁移或契约变更。
 - **签收**：用户 2026-09-27 确认审核页内嵌、服务端指针为准和回滚前展示目标版本。
+
+## ADR-075：学生掌握标记与推荐的乐观写入、版本绑定与理由展示（I06）
+
+- **编号说明**：ADR-074 由仍在审查中的 PR #295（J10 问答日志）占用；本分支的 `main` 上最大号为 ADR-073，为避免 #295 合入后撞号，本 ADR 直接取 075（原任务约定「当前最大号 +1」，当时最大号即 074）。
+- **日期**：2026-09-27
+- **背景**：I05 已交付 `GET /recommend`、I02 已交付 `GET/PUT /progress`（有效状态、`own_status`、`inherited_from[]`、`graph_version`），H11 的学生图谱页只读已发布版本。I06 要把「掌握标记」（学生自报事实的写入）与「下一步推荐」（可解释列表）接到该页上，并满足原子清单验收：「失败撤销乐观标记；切课后旧推荐不覆盖；理由与服务分量一致」。写路径的版本绑定出现一处**契约与验收字面表述的冲突**：清单验收条目 5 写「PUT progress 请求带 `graph_version`」，但 `src/contracts/api.v1.yaml` 的 `updateProgress` 请求体是 `ProgressUpdate[]`（`kp_id` + `status`，`additionalProperties: false`），该操作的 `query` 为 `never`，后端 `write_progress` 也没有版本参数——版本由服务端在请求时解析（`specs/learning-path.md` §5「请求事务所见的当前已发布版」）。契约真源是约束，故本 ADR 明确实现口径并把偏差标为**需签收**。
+- **决定**：
+  1. **乐观标记 + 失败完整回滚，单一在途写入**。`useLearning.setMastery` 先本地写入新状态（画布状态色与按钮立即变化），再 `PUT /progress`（单条 `[{kp_id, status}]`）。成功后以响应重新投影的 `entries` 为准（服务端权威）；网络/超时/4xx/5xx 一律**回滚到写前的服务端已知状态**，只给按错误码固定的文案，绝不回显服务端 `message`。`busyKpId` 非空时新的写入请求直接忽略，页面按它禁用全部掌握按钮：同一节点连点只发一次。
+  2. **版本绑定的实现口径（替代「请求带 `graph_version`」的字面做法）**。① 只在 `graphVersion` 非 null 时读写——草稿页、未发布、版本未知时组合式既不读也不写，页面也不渲染可点击入口；② `PUT` 请求体严格按契约只含 `kp_id` 与 `status`，**不自造 `graph_version` 字段或查询参数**（自造字段会被 `additionalProperties: false` 拒绝，未声明的查询参数会被服务端忽略而给出虚假的安全感）；③ 每条响应（`PUT` 的 `graph_version`、`GET /progress` 与 `GET /recommend` 的 `graph_version`）都与显示版本比对，不一致即视为「显示中的图已过期」：丢弃该投影、置 `versionStale`，并请页面重新读图（`onVersionStale`），**不把新版本的投影套到旧图上**；④ 422 `VALIDATION_ERROR` 且 `details.fields[].reason = not_in_published_version`（草稿独有/已删除/他课，或写入期间发布指针变化）→ 回滚乐观状态后重新读进度与推荐，给固定文案「该知识点已不在当前发布版本中，已撤销标记并刷新进度。」；⑤ 版本不一致的重载请求只发一次，直到某次读到的版本与显示版本一致才复位，避免服务端版本始终不收敛时的重载死循环。
+  3. **切课隔离沿用 `CourseRequestScope` + 请求序号**（照抄 `useReview`）。读进度、读推荐、写进度三类请求各自带序号并绑定课程作用域；切课后作用域失效且序号前进，课程 A 的迟到响应（推荐或进度）不写入课程 B 的界面。
+  4. **推荐理由只展示服务端事实**。`reason` 整句原样渲染；事实行逐条来自 `reason_facts`（`unlock_count`、`importance`、`centrality`、`difficulty`、章名/章秩、`primary_factor`），四类加权分量与 `score` 原样取 `weighted`/`score`。前端**不**用 `factors` 乘权重、**不**重算 `score`、**不**据 `unlock_count` 反推解锁度；只有展示时按 4 位小数舍入。
+  5. **判定顺序与不可写态**（`specs/learning-path.md` §4）：401/403 与未发布（404 `GRAPH_NOT_PUBLISHED`）不进入列表状态；已提交版完整性故障（500 `INTERNAL_ERROR`）只提示 `details.request_id`，不回显细节；`V ≠ ∅` 且全部掌握是 200 `state = all_mastered` 的**空态**；其余是 200 `state = recommendations`。本课程教师（`GraphExchange` 视图已经拦截）或学习接口返回 403 `ROLE_FORBIDDEN` 时，掌握标记与推荐区连同按钮一起消失，只给说明文案——掌握标记是学生行为。
+  6. **学习接口未注入时页面退回 H11 原状**。`PROGRESS_API_KEY`/`RECOMMEND_API_KEY` 都缺失（例如既有 H11 测试的注入集）时，`useLearning` 不发任何请求、`learningGraph` 原样返回筛选结果，页面不渲染标记与推荐区。这样新增功能不改变既有页面在旧注入下的行为。
+  7. **画布状态色集中在图适配层**。`CanvasElementState` 追加 `mastered`/`learning`/`notStarted`/`recommended`，颜色只在 `graph/lifecycle.ts` 的 `buildGraphOptions` 定义一处；`applyLearningStates` 只把服务端投影的掌握状态与推荐集合翻译成状态名（学习状态在前，筛选/选中状态叠加在后），因此测试断言的是「元素的 `states` 来自服务端状态」，而不是硬编码颜色。
+- **后果**：掌握标记在弱网下会短暂显示后回滚，但界面与服务端投影始终可解释；发布指针在读或写期间变化时页面会重新读图而不是混算两个版本。`PUT` 不带版本号意味着服务端仍以「请求时的当前发布版」为准，客户端只能**事后**发现版本不一致（响应比对 + 422）——这是契约现状的代价，若要让服务端强制按客户端绑定版本写入，需要先扩展契约（新增版本参数）并与后端同步，另开任务。学习接口未注入时静默退回 H11 原状，若某一注入集只提供其中一个键，功能整体不启用（两个接口缺一不可，推荐依赖进度投影）。
+- **回滚**：撤销 `api/progress.ts`、`api/recommend.ts`、`composables/useLearning.ts`、`components/Recommendations.vue` 与 `StudentGraphView.vue`/`main.ts` 的接线，并撤销 `graph/lifecycle.ts` 的四个状态与样式即可；不涉及契约、数据库迁移或后端。
+- **签收**：待 ArvinHan 审阅。**需明确签收**：(a) 版本绑定按决定 2 的「响应比对 + 422 重读」实现，而非在 `PUT` 请求体里自造 `graph_version`（契约无此字段）；(b) 学习接口未注入时页面静默退回 H11 原状；(c) 掌握标记的三态按钮（未开始/学习中/已掌握）直接把 `MasteryStatus` 写回，不引入第四种状态或「跳过先修」操作。

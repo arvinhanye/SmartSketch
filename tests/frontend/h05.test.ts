@@ -351,10 +351,19 @@ describe('H05 布局参数', () => {
     expect(buildGraphOptions({ container: el, width: 1, height: 1, data, layout: 'force' }).layout).toEqual(layoutOptions('force'))
   })
 
-  it('节点与边定义了选中、驳回、低置信度三种状态样式', () => {
+  // I06（ADR-075）在同一个 `state` 表里追加了四个学习状态，本断言随之扩充；边状态不变
+  it('节点定义选中/驳回/低置信度与 I06 的四个学习状态样式，边定义驳回与低置信度', () => {
     const el = document.createElement('div')
     const options = buildGraphOptions({ container: el, width: 1, height: 1, data: sample() })
-    expect(Object.keys(options.node?.state ?? {}).sort()).toEqual(['lowConfidence', 'rejected', 'selected'])
+    expect(Object.keys(options.node?.state ?? {}).sort()).toEqual([
+      'learning',
+      'lowConfidence',
+      'mastered',
+      'notStarted',
+      'recommended',
+      'rejected',
+      'selected',
+    ])
     expect(Object.keys(options.edge?.state ?? {}).sort()).toEqual(['lowConfidence', 'rejected'])
   })
 })
