@@ -6,6 +6,7 @@ import { createHttpClient, type HttpClient, type HttpClientOptions, type Request
  * 登录接口与会话接线（H13）。
  *
  * - `login` 走契约 `POST /api/v1/auth/login`（`security: []`）：不带令牌，401 是凭据错误，不清会话。
+ * - `register` 走 `POST /api/v1/auth/register`（ADR-079）：只建学生账号，409 `USERNAME_TAKEN` 表示用户名已占用。
  * - `createSessionHttpClient` 把会话接到 B15 客户端：每次请求读当前令牌放进 `Authorization`；
  *   受保护接口 401 时先清会话与课程上下文（`session.signOut()`），再通知调用方回登录页。
  * - 令牌只当不透明字符串使用，不解析 JWT（`specs/identity-access.md` §2.4）。
@@ -13,9 +14,12 @@ import { createHttpClient, type HttpClient, type HttpClientOptions, type Request
 
 export type LoginRequest = components['schemas']['LoginRequest']
 export type LoginResponse = components['schemas']['LoginResponse']
+export type RegisterRequest = components['schemas']['RegisterRequest']
 
 export interface AuthApi {
   login(body: LoginRequest, control?: RequestControl): Promise<LoginResponse>
+  /** 学生自助注册（ADR-079）：成功即返回与登录相同的令牌；`security: []`，不带令牌 */
+  register(body: RegisterRequest, control?: RequestControl): Promise<LoginResponse>
 }
 
 /** 视图经 inject 取得登录接口，测试可注入假实现 */
@@ -24,6 +28,7 @@ export const AUTH_API_KEY: InjectionKey<AuthApi> = Symbol('smartsketch.auth-api'
 export function createAuthApi(client: HttpClient): AuthApi {
   return {
     login: (body, control = {}) => client.request('post', '/api/v1/auth/login', { ...control, body }),
+    register: (body, control = {}) => client.request('post', '/api/v1/auth/register', { ...control, body }),
   }
 }
 

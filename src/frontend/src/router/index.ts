@@ -12,6 +12,8 @@ declare module 'vue-router' {
     accountRole?: Role
     /** 任一已登录账号都可访问（如课程页：课程内角色由 `Course.my_role` 决定，与账号类型无关） */
     anyAccountRole?: boolean
+    /** 只给未登录访客的页面（如注册页）；已登录访问时送回该账号的首页 */
+    guestOnly?: boolean
   }
 }
 
@@ -35,6 +37,8 @@ export const TEACHER_GRAPH_ROUTE = 'course-graph-edit'
 /** 教师审核队列页（H09），参数 `cid`；仅教师账号可进入，课程内角色由页面按 `Course.my_role` 判断 */
 export const REVIEW_ROUTE = 'course-review'
 export const CHAT_ROUTE = 'course-chat'
+/** 学生自助注册页（ADR-079），只给未登录访客 */
+export const REGISTER_ROUTE = 'register'
 const HOME_ROUTE: Record<Role, string> = { teacher: 'teacher-home', student: 'student-home' }
 
 /** 该账号类型的默认首页路由名（登录成功后按 `LoginResponse.user.role` 跳转） */
@@ -65,6 +69,8 @@ export interface AppRouterOptions {
   reviewComponent?: Component
   /** J09：课程问答页，课程内权限由后端判定。 */
   chatComponent?: Component
+  /** 学生自助注册页（ADR-079）。注入后注册 `/register`，只对未登录访客开放 */
+  registerComponent?: Component
 }
 
 export function createAppRouter({
@@ -78,6 +84,7 @@ export function createAppRouter({
   teacherGraphComponent,
   reviewComponent,
   chatComponent,
+  registerComponent,
 }: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
@@ -146,6 +153,9 @@ export function createAppRouter({
   if (chatComponent) {
     routes.push({ path: '/courses/:cid/chat', name: CHAT_ROUTE, component: chatComponent, meta: { anyAccountRole: true } })
   }
+  if (registerComponent) {
+    routes.push({ path: '/register', name: REGISTER_ROUTE, component: registerComponent, meta: { guestOnly: true } })
+  }
   routes.push({ path: '/:pathMatch(.*)*', redirect: '/' })
 
   const router = createRouter({ history, routes })
@@ -153,6 +163,7 @@ export function createAppRouter({
   // 前端守卫只是界面引导，授权以后端为准（specs/identity-access.md §2.4）
   router.beforeEach((to) => {
     const role = getAccountRole()
+    if (to.meta.guestOnly) return role === null ? true : { name: HOME_ROUTE[role] }
     if (role === null) {
       if (to.name === ROOT_ROUTE && to.query.notice === NOTICE_UNAUTHENTICATED) return true
       return { name: ROOT_ROUTE, query: { notice: NOTICE_UNAUTHENTICATED } }

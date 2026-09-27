@@ -210,7 +210,7 @@ void errorCodesComplete
 const ERROR_CODE_SET: ReadonlySet<string> = new Set(ERROR_CODES)
 
 /** 契约中 `security: []` 的路径：不带令牌，401 表示凭据错误而非会话失效，不触发清会话 */
-const PUBLIC_PATHS: ReadonlySet<ApiPath> = new Set<ApiPath>(['/api/v1/auth/login'])
+const PUBLIC_PATHS: ReadonlySet<ApiPath> = new Set<ApiPath>(['/api/v1/auth/login', '/api/v1/auth/register'])
 
 // ---------------------------------------------------------------- 路径
 
