@@ -1,4 +1,5 @@
 import type { components } from '../../../contracts/v1/generated/typescript/openapi'
+import type { InjectionKey } from 'vue'
 import {
   AbortedError,
   ApiError,
@@ -349,6 +350,8 @@ export interface ChatStreamClient {
    */
   send(cid: string, request: ChatRequest, options?: ChatSendOptions): Promise<ChatStreamOutcome>
 }
+
+export const CHAT_STREAM_CLIENT_KEY: InjectionKey<ChatStreamClient> = Symbol('smartsketch.chat-stream')
 
 const EVENT_STREAM_CONTENT_TYPE = /^text\/event-stream\b/i
 const JSON_CONTENT_TYPE = /^application\/(?:problem\+)?json\b/i

@@ -13,6 +13,7 @@ import {
   STUDENT_GRAPH_ROUTE,
   TEACHER_GRAPH_ROUTE,
   REVIEW_ROUTE,
+  CHAT_ROUTE,
 } from '../router'
 import { useSessionStore } from '../stores/session'
 
@@ -63,6 +64,7 @@ const {
 const hasMembersRoute = router.hasRoute(COURSE_MEMBERS_ROUTE)
 // 资料页（H02）只对课程内教师显示入口；未注册资料路由时不显示
 const hasMaterials = router.hasRoute(MATERIALS_ROUTE)
+const hasChat = router.hasRoute(CHAT_ROUTE)
 // 学生图谱页（H11）只对课程内学生显示入口；页面只读已发布版本
 const hasStudentGraph = router.hasRoute(STUDENT_GRAPH_ROUTE)
 // 教师图谱编辑页（H14）只对课程内教师显示入口；页面只读写草稿
@@ -117,6 +119,9 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
           <RouterLink data-test="materials-link" :to="{ name: MATERIALS_ROUTE, params: { cid: current.id } }">
             资料上传与处理进度
           </RouterLink>
+        </p>
+        <p v-if="hasChat && current.myRole === 'student'">
+          <RouterLink :to="{ name: CHAT_ROUTE, params: { cid: current.id } }">课程问答</RouterLink>
         </p>
         <p v-if="hasMembersRoute && current.myRole === 'teacher'">
           <RouterLink data-test="members-link" :to="{ name: COURSE_MEMBERS_ROUTE, params: { cid: current.id } }">
