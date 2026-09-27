@@ -2769,7 +2769,7 @@
       ],
       "acceptance": "fake模型也走真实服务；成环拒绝、失败重试、发布可见；保留失败证据",
       "verification_cwd": "/Users/arvinhan/Desktop/SmartSketch",
-      "verification_command": "npm --prefix src/frontend run test:e2e -- ../../tests/e2e/teacher.spec.ts",
+      "verification_command": "npm run test:e2e -- tests/e2e/teacher.spec.ts",
       "verification_status": "NOT_RUN_PLANNED",
       "risk": "依赖未验收、所需决策未签收或范围超出单轮时停止扩展并拆子任务；不把占位/跳过当完成。",
       "handoff": "/Users/arvinhan/Desktop/SmartSketch/docs/handoffs/<agent>-k05.md",
