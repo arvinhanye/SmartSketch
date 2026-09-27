@@ -112,7 +112,7 @@ done < .env
 if ((live)); then
   # 真实大模型：主用四项缺一即退出，免得 API 启动后才报 Invalid configuration
   for key in LLM_BASE_URL LLM_API_KEY LLM_EXTRACTION_MODEL LLM_CHAT_MODEL; do
-    [[ -n ${!key:-} ]] || die "--live 需要在 .env 填写 $key（DeepSeek 的 API Key 填 LLM_API_KEY，见 docs/runbook.md 第 3 节）。"
+    [[ -n ${!key:-} ]] || die "--live 需要在 .env 填写 ${key}（DeepSeek 的 API Key 填 LLM_API_KEY，见 docs/runbook.md 第 3 节）。"
   done
   export LLM_MODE=live APP_ENV=development
   # 向量：.env 配了 online/local 就用；否则沿用演示向量，与演示课程同一向量空间，不必换库或重新向量化
@@ -229,7 +229,7 @@ else
   echo "  口令：$DEMO_PASSWORD"
 fi
 if ((live)); then
-  echo "  模型：真实大模型 $LLM_EXTRACTION_MODEL（$LLM_BASE_URL，按量计费）；向量：$EMBEDDING_MODE"
+  echo "  模型：真实大模型 ${LLM_EXTRACTION_MODEL}（${LLM_BASE_URL}，按量计费）；向量：$EMBEDDING_MODE"
   echo "  用法：教师登录 → 课程 → 资料 → 上传 PDF，处理完成后到「审核」查看草稿图谱"
 else
   echo "  模型：演示模式（不联网、不计费）；用真实大模型：scripts/start-demo.sh --live"
