@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # 一键启动演示环境（方式 B 的自动化版本，docs/runbook.md §2）：
 #   依赖检查/安装 → .env → Neo4j → 迁移 → 演示账号 → API + worker → 演示课程导入 → 前端。
-# 用演示模型（LLM_MODE=demo、EMBEDDING_MODE=demo，ADR-076）：不联网、不产生费用。
+# 缺省用演示模型（LLM_MODE=demo、EMBEDDING_MODE=demo，ADR-076）：不联网、不产生费用。
+# --live 改用 .env 里配置的真实大模型（LLM_MODE=live，D-02a DeepSeek）抽取与问答：按量计费。
 #
 # 可重复执行：已装的依赖、已有的 .env、已建的账号与已导入的课程都会复用，不会重复或覆盖。
 # Ctrl+C 停止 API、worker 与前端；Neo4j 保持运行以免下次冷启动，停止用 scripts/dev-down.sh。
 #
-# 用法：scripts/start-demo.sh [--no-import] [--no-open]
+# 用法：scripts/start-demo.sh [--live] [--no-import] [--no-open]
+#   --live       真实大模型：须在 .env 填 LLM_API_KEY；向量沿用演示向量（.env 为 online/local 时用真实向量）。
+#                不导入演示课程（首次导入会付费抽取整套示例资料），教师上传资料时才调用模型
 #   --no-import  不执行演示课程导入（scripts/import-demo.py）
 #   --no-open    启动后不自动打开浏览器
 # 环境变量：SEED_DEMO_PASSWORD（首次建演示账号用的口令，缺省 smartsketch-demo）、
@@ -20,14 +23,17 @@ set -euo pipefail
 
 do_import=1
 open_browser=1
+live=0
 for arg in "$@"; do
   case "$arg" in
+    --live) live=1 ;;
     --no-import) do_import=0 ;;
     --no-open) open_browser=0 ;;
-    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "未知选项 ${arg}。用法：$0 [--no-import] [--no-open]" ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "未知选项 ${arg}。用法：$0 [--live] [--no-import] [--no-open]" ;;
   esac
 done
+((live)) && do_import=0
 
 LOG_DIR="$REPO_ROOT/.demo/logs"
 mkdir -p "$LOG_DIR"
@@ -103,9 +109,31 @@ while IFS= read -r line || [[ -n $line ]]; do
   value="$(env_setting "$key" "")"
   [[ -n $value ]] && export "$key=$value"
 done < .env
-# 这是演示入口：无论 .env 写的是什么模式，本次进程一律用演示模型，不产生付费调用。
-export LLM_MODE=demo EMBEDDING_MODE=demo APP_ENV=development
-export QA_SIMILARITY_THRESHOLD="${DEMO_QA_SIMILARITY_THRESHOLD:-0.58}"
+if ((live)); then
+  # 真实大模型：主用四项缺一即退出，免得 API 启动后才报 Invalid configuration
+  for key in LLM_BASE_URL LLM_API_KEY LLM_EXTRACTION_MODEL LLM_CHAT_MODEL; do
+    [[ -n ${!key:-} ]] || die "--live 需要在 .env 填写 ${key}（DeepSeek 的 API Key 填 LLM_API_KEY，见 docs/runbook.md 第 3 节）。"
+  done
+  export LLM_MODE=live APP_ENV=development
+  # 向量：.env 配了 online/local 就用；否则沿用演示向量，与演示课程同一向量空间，不必换库或重新向量化
+  case "${EMBEDDING_MODE:-}" in
+    online|local) ;;
+    *) export EMBEDDING_MODE=demo ;;
+  esac
+  if [[ $EMBEDDING_MODE == demo ]]; then
+    export QA_SIMILARITY_THRESHOLD="${DEMO_QA_SIMILARITY_THRESHOLD:-0.58}"
+  fi
+  # macOS 上 python.org / Homebrew 的 Python 常找不到根证书，HTTPS 调模型会报证书错误；未设置时用 certifi 的
+  if [[ -z ${SSL_CERT_FILE:-} && $(uname -s) == Darwin ]]; then
+    (cd /tmp && "$PY" -c 'import certifi' 2>/dev/null) || "$PY" -m pip install -q certifi
+    SSL_CERT_FILE="$(cd /tmp && "$PY" -c 'import certifi; print(certifi.where())')" || die "取不到 certifi 根证书，手动 export SSL_CERT_FILE 后重试。"
+    export SSL_CERT_FILE
+  fi
+else
+  # 演示入口：无论 .env 写的是什么模式，本次进程一律用演示模型，不产生付费调用。
+  export LLM_MODE=demo EMBEDDING_MODE=demo APP_ENV=development
+  export QA_SIMILARITY_THRESHOLD="${DEMO_QA_SIMILARITY_THRESHOLD:-0.58}"
+fi
 API_HOST="${API_HOST:-127.0.0.1}"
 API_PORT="${API_PORT:-8000}"
 WEB_PORT="${DEMO_WEB_PORT:-5173}"
@@ -200,8 +228,13 @@ if ((accounts_existed)); then
 else
   echo "  口令：$DEMO_PASSWORD"
 fi
+if ((live)); then
+  echo "  模型：真实大模型 ${LLM_EXTRACTION_MODEL}（${LLM_BASE_URL}，按量计费）；向量：$EMBEDDING_MODE"
+  echo "  用法：教师登录 → 课程 → 资料 → 上传 PDF，处理完成后到「审核」查看草稿图谱"
+else
+  echo "  模型：演示模式（不联网、不计费）；用真实大模型：scripts/start-demo.sh --live"
+fi
 cat <<EOF
-  模型：演示模式（不联网、不计费）
   日志：$LOG_DIR
   按 Ctrl+C 停止。
 EOF
