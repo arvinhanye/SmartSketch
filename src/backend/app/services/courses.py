@@ -2,6 +2,7 @@
 
 from app.repositories.accounts import AccountRecord
 from app.repositories.courses import CourseRecord, create_course, list_member_courses
+from app.services.access import CourseAccess
 from app.schemas.contracts import Course, CourseStatus, Role
 
 
@@ -33,6 +34,10 @@ def list_courses(sqlite_url: str, user: AccountRecord) -> list[Course]:
         for row, role in rows
         if role != "student" or row.published_version is not None
     ]
+
+
+def course_detail(access: CourseAccess) -> Course:
+    return _wire(access.course, access.member.role)
 
 
 def create_new_course(

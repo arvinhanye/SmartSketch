@@ -99,7 +99,7 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
         error.value = '服务器返回的版本数据异常，请重试。'
         return false
       }
-      if (nextCourse.published_version !== null && !nextVersions.some((item) => item.version === nextCourse.published_version)) {
+      if (nextCourse.published_version != null && !nextVersions.some((item) => item.version === nextCourse.published_version)) {
         stale.value = true
         if (course.value === null) status.value = 'error'
         error.value = '课程发布指针与版本历史不一致，请刷新状态后核对。'
