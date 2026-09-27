@@ -1520,4 +1520,4 @@
   6. H07 `NodeEditor` 新增 `defineExpose({ dirty })`（扩围一行）。有未保存修改时换节点或关闭面板先弹页内确认（`useSelectionGuard`）；离开路由或换课用 `window.confirm`；刷新或关闭标签页挂 `beforeunload`。被拒或会话失效时强制离开，不再询问。
 - **后果**：详情页签选中节点时，常驻的节点编辑面板也会读一次同一知识点（请求翻倍，体量小，接受）。离开本页不清空课程 store 里的草稿；目前学生页用自己的状态，不受影响，但以后若有页面直接读 `store.graph`，需先按角色重新加载。页面只经假 API 验证，未与真实后端联调（后端 `/relations` 路由尚不存在，见 H08）。
 - **回滚**：撤销 `views/TeacherGraphView.vue`、`composables/useTeacherGraph.ts`、`tests/frontend/h14.test.ts`，以及 `api/graph.ts`、`router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/NodeEditor.vue` 中的对应增量；无迁移、契约与依赖变更。
-- **签收**：待 ArvinHan 审阅。页签布局、未保存确认方式与刷新重拉策略由 Claude 选定。
+- **签收**：ArvinHan 2026-09-27 签收（三页签布局、页内确认 + 离开确认、刷新在途遇写入则重拉，均按原方案）。
