@@ -108,6 +108,7 @@
 | `TASK_ARTIFACT_RETENTION_DAYS` | 整数 ≥ 0 | `7` | 中间产物保留天数；`0` 表示进入终态或 `awaiting_review` 即清理 | 已签收（ADR-011） |
 | `PUBLISH_LEASE_SECONDS` | 整数 ≥ 15 | `60` | 发布尝试租约时长 | 已签收（ADR-012） |
 | `COURSE_LOCK_WAIT_SECONDS` | 整数 ≥ 0 | `5` | 草稿写锁最大等待时间 | 已签收（ADR-012） |
+| `PUBLISH_SWEEP_INTERVAL_SECONDS` | 整数 ≥ 0 | `3600` | worker 周期清扫（G05 `sweep`）的间隔秒数；`0` 表示不启用 | 待 ArvinHan 签收（ADR-072） |
 
 ### 学习推荐权重
 

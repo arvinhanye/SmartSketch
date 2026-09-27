@@ -1,6 +1,6 @@
 # 功能规格：课程知识图谱 MVP
 
-- **状态**：DRAFT（「前置关系成环处理」与枚举取值已由 A02 签收，见 ADR-009）
+- **状态**：DRAFT（「前置关系成环处理」与枚举取值已由 A02 签收，见 ADR-009）。**关系 HTTP 路由已实现**：`POST /api/v1/courses/{cid}/relations` 与 `PATCH`/`DELETE /api/v1/courses/{cid}/relations/{rid}` 按契约落地（ADR-071，验收与证据见 `docs/tasks.md` 的 F06-API 小节）；成环处理验收 DAG-1、DAG-6、DAG-7、DAG-9 由它覆盖。
 - **负责人**：产品 / 后端 / 前端共同维护
 - **关联任务**：M1-01 ~ M1-05；验收 7 的抽取质量指标由 K01（口径与材料）、K02（计算与报告）落实（REQ-01）
 

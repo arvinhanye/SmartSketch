@@ -23,7 +23,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from app.repositories.neo4j import ScopedTransaction
+from app.repositories.neo4j import GraphScope, Neo4jRepository, ScopedTransaction
 
 __all__ = [
     "RELATION_TYPES",
@@ -35,6 +35,7 @@ __all__ = [
     "lock_draft",
     "read_prerequisite_edges",
     "revoke_task",
+    "task_has_contributions",
     "merge_relations",
     "read_prerequisite_graph",
     "read_relations",
@@ -327,3 +328,32 @@ def revoke_task(tx: ScopedTransaction, task_id: str) -> tuple[int, int]:
     [rels] = tx.run(_REVOKE_RELATIONS, params)
     [nodes] = tx.run(_REVOKE_NODES, params)
     return int(rels["revoked"]) + int(nodes["revoked"]), int(rels["deleted"]) + int(nodes["deleted"])
+
+
+# 清理的前置判断（ADR-072）：本任务是否还有 ``revoke_task`` 会撤销的东西。与 ``_REVOKE_*`` 的谓词一一
+# 对应——节点贡献、本任务的来源关联、关系贡献；``$effective_task_ids IS NOT NULL`` 只为满足草稿作用域约定。
+_TASK_HAS_CONTRIBUTIONS = """
+RETURN EXISTS {
+    MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+    WHERE $effective_task_ids IS NOT NULL
+      AND ($task_id IN coalesce(n.contrib_tasks, [])
+           OR EXISTS { (n)-[:EVIDENCED_BY {task_id: $task_id}]->(:Chunk {course_id: $course_id}) })
+} OR EXISTS {
+    MATCH (:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+          -[r {course_id: $course_id, version_id: $version_id}]->
+          (:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+    WHERE $task_id IN coalesce(r.contrib_tasks, [])
+} AS busy
+"""
+
+
+def task_has_contributions(repo: Neo4jRepository, scope: GraphScope, task_id: str) -> bool:
+    """草稿里是否还有 ``task_id`` 需要撤销的贡献（F13 清理取锁前的判断，ADR-072）。
+
+    调用方保证任务已进入终态 ``failed``：终态任务不会再产生新贡献，所以这次读到的「没有贡献」
+    就是最终结论，据此跳过取锁是安全的（判断与撤销之间不存在会漏掉工作的竞态）。
+    """
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ValueError("task_id must be a non-empty string")
+    rows = repo.read(_TASK_HAS_CONTRIBUTIONS, scope, reader="worker", parameters={"task_id": task_id})
+    return bool(rows) and bool(rows[0].get("busy"))

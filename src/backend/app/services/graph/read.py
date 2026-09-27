@@ -10,7 +10,8 @@
 
 来源定位（ADR-003）：每条 ``SourceRef`` 都从 SQLite 按本课程读出的块（D10）取定位，``page`` 与
 ``section_path`` 至少一个；知识点来源另带证据区间对应的原文片段。无法定位的来源（块已不在本课程）
-被丢弃并记日志，不返回无法回到原文的引用。
+被丢弃并记日志，不返回无法回到原文的引用。**来源一条都不剩时**：``source = manual`` 的节点返回显式
+空态 ``KnowledgePointDetailWithoutSource``（ADR-072），``source = ai`` 的节点抛 ``SourceUnavailable``。
 
 ``level`` 在读取时按返回图中有效（非 ``rejected``）``PREREQUISITE`` 边的最长前置路径计算。
 """
@@ -38,6 +39,7 @@ from app.schemas.contracts import (
     GraphStats,
     KnowledgePoint,
     KnowledgePointDetail,
+    KnowledgePointDetailWithoutSource,
     KnowledgePointRef,
     Relation,
     SourceRef,
@@ -54,7 +56,8 @@ FORMAT_VERSION = "1.0"
 
 
 class SourceUnavailable(Exception):
-    """知识点没有任何可定位的来源；契约 ``KnowledgePointDetail.source_refs`` 要求至少一条。"""
+    """``source = ai`` 的知识点没有任何可定位来源：完整性故障，契约 ``KnowledgePointDetail.source_refs``
+    要求至少一条（手工无来源节点另有显式空态，见 ``KnowledgePointDetailWithoutSource``，ADR-072）。"""
 
     code = "INTERNAL_ERROR"
 
@@ -315,8 +318,14 @@ def _evidence_refs(sqlite_url: str, course_id: str, evidence: Sequence[NodeEvide
     return refs
 
 
-def read_knowledge_point(reader: GraphReader, sqlite_url: str, target: ReadTarget, kp_id: str) -> KnowledgePointDetail:
-    """知识点详情：至少一条可定位来源，另给直接前置、直接后继与相关知识点。"""
+def read_knowledge_point(reader: GraphReader, sqlite_url: str, target: ReadTarget, kp_id: str) -> (
+        KnowledgePointDetail | KnowledgePointDetailWithoutSource):
+    """知识点详情：至少一条可定位来源，另给直接前置、直接后继与相关知识点。
+
+    教师手工新建（``source = manual``）且读取时没有任何可定位来源的节点返回显式空态
+    ``KnowledgePointDetailWithoutSource``（``source_refs`` 为空数组，ADR-072），不伪造来源、不报 500；
+    ``source = ai`` 的节点缺少可定位来源仍是完整性故障，沿用 ``SourceUnavailable`` → 500。
+    """
     scope = target.scope
     role = target.reader
     found = reader.nodes(scope, role, [kp_id])  # type: ignore[arg-type]
@@ -354,14 +363,16 @@ def read_knowledge_point(reader: GraphReader, sqlite_url: str, target: ReadTarge
         return out
 
     refs = _evidence_refs(sqlite_url, scope.course_id, reader.evidence(scope, role, [kp_id]))  # type: ignore[arg-type]
-    if not refs:
+    manual = str(found[0].get("source") or "") == "manual"  # 用读到的原值：发布副本缺 source 仍按 AI 口径处理
+    if not refs and not manual:
         raise SourceUnavailable()
     level = _levels((p.get("kp_id") for p in reader.nodes(scope, role)),  # type: ignore[arg-type]
                     reader.edges(scope, role)).get(kp_id, 0)  # type: ignore[arg-type]
     node = _node(scope.course_id, found[0], level, published=scope.version_id != DRAFT)
     if node is None:
         raise not_found()
-    return KnowledgePointDetail.model_validate({
+    model = KnowledgePointDetail if refs else KnowledgePointDetailWithoutSource
+    return model.model_validate({
         **node.model_dump(exclude_none=True),
         "source_refs": [r.model_dump(exclude_none=True) for r in refs],
         "prerequisites": [r.model_dump(exclude_none=True) for r in pick("PREREQUISITE", "in")],
