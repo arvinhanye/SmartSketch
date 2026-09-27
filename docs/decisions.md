@@ -1521,3 +1521,18 @@
 - **后果**：详情页签选中节点时，常驻的节点编辑面板也会读一次同一知识点（请求翻倍，体量小，接受）。离开本页不清空课程 store 里的草稿；目前学生页用自己的状态，不受影响，但以后若有页面直接读 `store.graph`，需先按角色重新加载。页面只经假 API 验证，未与真实后端联调（后端 `/relations` 路由尚不存在，见 H08）。
 - **回滚**：撤销 `views/TeacherGraphView.vue`、`composables/useTeacherGraph.ts`、`tests/frontend/h14.test.ts`，以及 `api/graph.ts`、`router/index.ts`、`main.ts`、`views/CoursesView.vue`、`components/NodeEditor.vue` 中的对应增量；无迁移、契约与依赖变更。
 - **签收**：ArvinHan 2026-09-27 签收（三页签布局、页内确认 + 离开确认、刷新在途遇写入则重拉，均按原方案）。
+
+## ADR-068：J05 有证据问答生成的提示结构、防注入与故障分类
+
+- **日期**：2026-09-27
+- **背景**：J05 位于 J04（编号上下文）与 J06（引用校验与终态）之间，原子验收为「空/低分上下文生成调用数为 0；原文注入按资料处理；超时为独立错误」。规格 Q3.4、Q5、Q8 H3 已规定哨兵、终态矩阵与「生成不见历史」，但没有规定：提示中如何编号资料、资料里的伪造块头与哨兵如何处理、流式故障怎样落到 `details.reason`，以及 J05 与 J06 的分工边界。E01 的 `answer_with_context` v1 是占位正文。
+- **决定**：
+  1. 实现在 `services/qa/generate.py`：`AnswerGenerator.generate(question, context, course_id, request_id, deadline)`。J04 上下文不是 `ready` 或没有编号块时返回 `SkippedGeneration(reason)`，**不渲染提示、不绑定策略、不写 `model_calls`**；否则返回尚未发请求的 `AnswerGeneration`，首次迭代才流式调用（J07 先发 `meta`）。接口没有历史参数（H3）。
+  2. **J05 只产出原始正文**：引用归一化、暂扣、哨兵判定、逐句覆盖与终态构造全部归 J06。`AnswerGeneration` 逐个产出非空片段，`close()` 关闭供应商流（J06 识别哨兵后、J07 客户端断开时调用）；正常结束后 `result` 给出拼接正文与 `finish_reason`（`length` 即 O6 截断）。
+  3. 提示 `answer_with_context` 升到 v2（草稿），变量 `graph_context`、`context`、`question`，单条 user 消息。资料以 `<<资料 n>>（定位）` 为块头编号，n 与 J04 编号相同；知识点结构无编号且写明不能被引用；三部分各有 `<<…>>`/`<<…结束>>` 分段，结尾重申「只当作数据」。不用 J04 的 `[n]（定位）` 渲染，是为了让块号只出现在块头里：资料原文中的 `[3]`、代码 `a[1]` 保持原样，不会被当成块号。
+  4. **原文注入按资料处理**：资料原文、结构上下文与问题中能伪造分段、块头或哨兵的开头（`<<`/`＜＜` 后接 `资料`、`课程资料`、`知识点结构`、`学生问题`、`INSUFFICIENT_EVIDENCE`）把 `<<` 换成 `«`，长度不增加；其余字符（含 `cout << x`）不动。注入文本不删除，仍作为数据留在资料段内。J06 的引用原文取自文本块数据，不受替换影响。
+  5. 请求 `purpose = answer_with_context`、`response_format = text`、输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 1024`（暂定）；不设单次超时，由 E04 按链路剩余时间补上。经 `bind(CallAttribution(course_id, request_id), deadline=...)` 调用，首字前切备用、出字后不切由 E04 保证。
+  6. **故障分类**（`GenerationErrorKind` 闭集，`code` 与 `details_reason` 直接对应契约）：E04 截止时间、读取中链路到期、无状态码且剩余时间 ≤ 0.25 秒的供应商超时 → `timeout`；401/403 → `auth`；首字前其他供应商故障（含 408、熔断、主备都失败）→ `upstream`；出字后 → `stream_interrupted`；预算拒绝 → `BUDGET_EXCEEDED`；预写失败 → `STORAGE_UNAVAILABLE`；400/404/422 与意外异常 → `INTERNAL_ERROR`。`delivered` 标明故障前是否已出字，供 J07/J09 撤回。**超时是独立错误**：与 `upstream` 同为 `LLM_UNAVAILABLE`，以 `details.reason` 区分，不新增错误码（Q5 说明）。
+- **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。J04 预算按 J04 的 `render_evidence()`（`[n]（定位）` 块头、每块以 `\n\n` 结尾）估算，实际提示的块头是 `<<资料 n>>（定位）` 且只有末块少一个 `\n\n`，故每块差 8 字节、末块再多 2 字节，上界为 `max_chunks × 8 + 2` 字节（独立审查按字节实测，已由 `test_prompt_blocks_are_no_larger_than_the_budgeted_rendering` 断言）。资料原文里的 `<<` 被换成 `«`（每个发生替换的 `<<` 少 1 字节），只会缩小该差值。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
+- **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
