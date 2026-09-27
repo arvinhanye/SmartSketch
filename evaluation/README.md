@@ -235,3 +235,13 @@ evaluation/
 
   由此报告 `NOT_COVERED` 的精确率、召回率与臆答率（臆答数 / 资料未覆盖问题数），空分母同样给 `null`。
 - 问答阈值同样不在测试集上调，判定对象同样只算真实模型。
+
+## 9. 全链路性能测量（K04）
+
+`evaluation/benchmark_pipeline.py` 在固定输入上测 worker 四个阶段（`parsing`→`extracting`→`merging`→`persisting`）的耗时与 token，以及可选的已发布课程问答时延。
+
+- **固定输入**：`fixture` 子命令把 `fixtures/synthetic.json` 的自编章节重复拼接并截断为 20 000 字符的 Markdown（逐字节稳定）。每个 worker 样本需要以**新资料**上传一份，脚本在运行前核对活动队列只含该输入（否则拒绝）。
+- **运行**：`python evaluation/benchmark_pipeline.py run --samples N --out report.json`。需要正常的 SQLite、存储与 Neo4j；不启动服务、不发布图谱。测前停掉该课程的 worker。
+- **问答**：另行发布该课程后加 `--course-id`、`--qa-samples M`，并设置 `BENCHMARK_API_URL`、`BENCHMARK_STUDENT_TOKEN`。经 SSE 测量：首字 = 首个 `delta` 事件到达，完成 = `done`/`error` 到达；`not_covered` 没有 `delta`，不计入首字样本。问答 token 按 `request_id` 读本机 `SQLITE_URL` 的 `model_calls`，须与被测 API 共用数据库。
+- **付费**：`LLM_MODE=live` 或任何问答样本都必须显式加 `--allow-paid`，否则在做任何工作前退出（码 2）。付费执行须按 D-02 另行确认。
+- **报告**：`environment` 注明机器、系统、Python、CPU、`llm_mode`、抽取与问答模型、`WORKER_PROCESSES`、`LLM_MAX_CONCURRENCY`；`targets_ms`（首字 3 s、完成 10 s、赛题 15 s）与 `observed`（样本数、p50/p95，无样本为 `null`）分列；假模型结果标注「只代表本地流程」。

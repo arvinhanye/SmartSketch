@@ -178,22 +178,57 @@ def measure_worker(settings: Any, toolkit: Any, repo: Any) -> dict[str, Any] | N
     }
 
 
-def measure_qa(sqlite_url: str, course_id: str, base_url: str, token: str) -> dict[str, Any]:
+def sse_events(lines: Any) -> Any:
+    """Yield ``(event, data)`` from an SSE byte-line stream; comments (``:ping``) are skipped."""
+    name, data = None, []
+    for raw in lines:
+        line = raw.decode("utf-8").rstrip("\r\n")
+        if not line:
+            if name is not None or data:
+                yield name, json.loads("\n".join(data)) if data else None
+            name, data = None, []
+        elif line.startswith(":"):
+            continue
+        elif line.startswith("event:"):
+            name = line[6:].strip()
+        elif line.startswith("data:"):
+            data.append(line[5:].lstrip())
+
+
+def measure_qa(sqlite_url: str, course_id: str, base_url: str, token: str,
+               *, timeout: float = 60) -> dict[str, Any]:
+    """One J07 SSE request: first ``delta`` time, terminal time, outcome and billed tokens."""
     url = base_url.rstrip("/") + f"/api/v1/courses/{course_id}/chat"
     body = json.dumps({"question": QUESTION}, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url, data=body, method="POST",
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json",
+        headers={"Authorization": f"Bearer {token}", "Accept": "text/event-stream",
                  "Content-Type": "application/json"},
     )
     start = time.perf_counter_ns()
-    with urllib.request.urlopen(request, timeout=60) as response:
-        payload = json.load(response)
+    first_token: float | None = None
+    status = request_id = error_code = None
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        for name, data in sse_events(response):
+            now = (time.perf_counter_ns() - start) / 1_000_000
+            if name == "meta":
+                request_id = data.get("request_id")
+            elif name == "delta" and first_token is None:
+                first_token = now
+            elif name == "done":
+                status = data["final"]["status"]
+                request_id = data["final"].get("request_id", request_id)
+                break
+            elif name == "error":
+                status, error_code = "error", data["error"]["code"]
+                request_id = data["error"].get("details", {}).get("request_id", request_id)
+                break
     elapsed = (time.perf_counter_ns() - start) / 1_000_000
-    request_id = payload.get("request_id")
     return {
         "elapsed_ms": round(elapsed, 2),
-        "status": payload.get("status"),
+        "first_token_ms": None if first_token is None else round(first_token, 2),
+        "status": status or "incomplete",
+        "error_code": error_code,
         "request_id": request_id,
         "tokens": token_usage(sqlite_url, "request_id", request_id) if request_id else None,
     }
@@ -222,19 +257,27 @@ def build_report(settings: Any, workers: list[dict[str, Any]], qa: list[dict[str
             "python": platform.python_version(), "cpu": platform.processor(),
             "llm_mode": settings.LLM_MODE,
             "model": settings.LLM_EXTRACTION_MODEL if settings.LLM_MODE == "live" else "fake",
+            "chat_model": (settings.LLM_CHAT_MODEL.strip() or "fake") if settings.LLM_MODE == "live" else "fake",
             "worker_processes": settings.WORKER_PROCESSES,
             "llm_max_concurrency": settings.LLM_MAX_CONCURRENCY,
         },
         "targets_ms": TARGETS,
         "observed": {
             "worker_samples": len(workers), "worker_total_ms": summarize(workers, "elapsed_ms"),
-            "stages_ms": stages, "qa_samples": len(qa), "qa_complete_ms": summarize(qa, "elapsed_ms"),
+            "stages_ms": stages, "qa_samples": len(qa),
+            "qa_first_token_ms": summarize([item for item in qa if item.get("first_token_ms") is not None],
+                                           "first_token_ms"),
+            "qa_complete_ms": summarize(qa, "elapsed_ms"),
+            "qa_outcomes": {status: sum(1 for item in qa if item["status"] == status)
+                            for status in sorted({item["status"] for item in qa})},
         },
         "worker_runs": workers,
         "qa_runs": qa,
         "notes": [
             "目标值与实测值分列；没有样本的 p50/p95 为 null。",
-            "JSON 问答测量为完整响应时间，不提供首字时间。",
+            "问答经 SSE 测量：首字为首个 delta 事件到达时间，完成为 done/error 到达时间；"
+            "not_covered 回答没有 delta，不计入首字样本。",
+            "问答 token 按 request_id 读取本机 SQLITE_URL 的 model_calls，须与被测 API 共用同一数据库。",
             "假模型结果只代表本地流程，不代表真实模型性能。" if settings.LLM_MODE == "fake"
             else "真实模型调用会产生费用。",
         ],
