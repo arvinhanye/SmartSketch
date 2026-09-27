@@ -1,5 +1,9 @@
 # 交接：I06 实现掌握标记与推荐 UI
 
+- **PR**：[#302](https://github.com/arvinhanye/SmartSketch/pull/302)（`claude/impl-i06` → `main`，单提交，12 文件 / +2028 −7）
+  - 已 **rebase 到 `origin/main@481d3ff`**：原分支谱系里的 J10/K04 提交（PR #295/#296 仍在审查）**不**包含在本 PR 内；rebase 后重跑 `i06 + h05 + h11` = 129 passed、`type-check` EXIT=0。
+  - CI：6/6 全绿（Frontend ×2、Backend ×2、Repository scaffold ×2），`mergeable = MERGEABLE`、`mergeStateStatus = CLEAN`。
+
 - **任务**：原子清单 I06「实现掌握标记与推荐 UI」（依赖 I05、H11；验收原文「失败撤销乐观标记；切课后旧推荐不覆盖；理由与服务分量一致」）
 - **负责人 / 日期**：ArvinHan（Claude），2026-09-27
 - **工作区**：worktree `/Users/arvinhan/Desktop/SmartSketch/.worktrees/impl-i06`，分支 `claude/impl-i06`（主仓与其他 worktree 未改动）
