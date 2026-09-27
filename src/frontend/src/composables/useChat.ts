@@ -66,8 +66,9 @@ export function useChat(client: ChatStreamClient, courseId: Ref<string | null>) 
     const controller = new AbortController()
     active = controller
     const scope = course.beginRequest()
-    const entry: ChatEntry = { id: ++serial, question: trimmed, answer: '', status: 'streaming', citations: [], relatedKpIds: [] }
-    entries.value.push(entry)
+    entries.value.push({ id: ++serial, question: trimmed, answer: '', status: 'streaming', citations: [], relatedKpIds: [] })
+    // 取回响应式代理再写：直接改原对象不会触发 computed（如 currentVersion）更新
+    const entry: ChatEntry = entries.value[entries.value.length - 1]!
     question.value = ''
     sending.value = true
     const history = [...course.chatHistory]

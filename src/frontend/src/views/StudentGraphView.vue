@@ -135,13 +135,15 @@ const selectedName = computed(() => {
     aria-labelledby="student-graph-title"
     :aria-busy="status === 'loading' ? 'true' : 'false'"
   >
-    <h2 id="student-graph-title">课程知识图谱</h2>
-    <p v-if="courseName" class="student-graph__course">
-      课程：{{ courseName }}<span v-if="graphVersion !== null" data-test="sg-version"> · 已发布版本 v{{ graphVersion }}</span>
-    </p>
-    <p v-if="courseId">
-      <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
-    </p>
+    <header class="student-graph__header">
+      <h2 id="student-graph-title">课程知识图谱</h2>
+      <p v-if="courseName" class="student-graph__course">
+        课程：{{ courseName }}<span v-if="graphVersion !== null" data-test="sg-version"> · 已发布版本 v{{ graphVersion }}</span>
+      </p>
+      <p v-if="courseId" class="student-graph__back">
+        <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
+      </p>
+    </header>
 
     <p v-if="status === 'loading'" data-test="sg-loading" role="status">正在加载已发布图谱…</p>
 
@@ -161,6 +163,8 @@ const selectedName = computed(() => {
     <p v-else-if="empty" data-test="sg-empty" role="status">已发布的图谱中暂无知识点。</p>
 
     <template v-else-if="status === 'ready' && graph !== null">
+      <div class="student-graph__layout">
+      <div class="student-graph__main">
       <div class="student-graph__modes" role="group" aria-label="视图切换">
         <button
           v-for="item in modes"
@@ -196,16 +200,10 @@ const selectedName = computed(() => {
           :selected-id="selected"
           @select="filters.select"
         />
-
-        <KnowledgeDetail
-          v-if="selected !== null"
-          :kp-id="selected"
-          @select-knowledge-point="filters.select"
-          @close="filters.select(null)"
-          @course-forbidden="leaveForbidden"
-        />
+      </div>
       </div>
 
+      <aside class="student-graph__side" aria-label="学习面板">
       <!-- I06：掌握标记与下一步推荐。不可写（未发布/非学生/加载失败）时不给任何可点击入口 -->
       <div v-if="learningEnabled" class="student-graph__learning" data-test="sg-learning">
         <p v-if="learningStatus === 'not_student'" data-test="sg-learning-forbidden" role="alert">
@@ -260,42 +258,134 @@ const selectedName = computed(() => {
           </p>
         </template>
       </div>
+        <KnowledgeDetail
+          v-if="selected !== null"
+          :kp-id="selected"
+          @select-knowledge-point="filters.select"
+          @close="filters.select(null)"
+          @course-forbidden="leaveForbidden"
+        />
+      </aside>
+      </div>
     </template>
   </section>
 </template>
 
 <style scoped>
+.student-graph {
+  display: grid;
+  gap: 0.75rem;
+}
+.student-graph__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+.student-graph__header h2 {
+  margin: 0;
+}
+.student-graph__course,
+.student-graph__back {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+/* 工作台两栏：左侧图谱，右侧推荐、掌握标记与详情 */
+.student-graph__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 21rem);
+  gap: 1rem;
+  align-items: start;
+}
+.student-graph__main {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.student-graph__side {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
 .student-graph__modes {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.student-graph__modes button {
+  background: none;
+  color: var(--color-text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.4rem 0.75rem;
+  margin-bottom: -1px;
+}
+.student-graph__modes button:hover:not(:disabled) {
+  background: none;
+  color: var(--color-text);
 }
 .student-graph__modes button[aria-pressed='true'] {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
   font-weight: 600;
-  border-color: #0958d9;
 }
 .student-graph__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
 }
 .student-graph__canvas {
-  min-height: 480px;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 18px 18px;
+  overflow: hidden;
+}
+.student-graph__canvas > :last-child {
+  flex: 1;
 }
 .student-graph__hint {
-  color: #595959;
-  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+.student-graph__canvas > .student-graph__hint {
+  padding: 0.5rem 0.75rem 0;
 }
 .student-graph__learning {
-  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
 }
 .student-graph__mastery {
-  margin-top: 1rem;
   padding: 0.75rem;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.student-graph__mastery [role='group'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.student-graph__mastery button {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 .student-graph__mastery button[aria-pressed='true'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
   font-weight: 600;
+}
+@media (max-width: 1000px) {
+  .student-graph__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>
