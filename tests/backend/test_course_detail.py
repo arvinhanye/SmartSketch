@@ -82,3 +82,19 @@ def test_non_member_and_unknown_course_are_both_403(scenario, cid):
 def test_requires_authentication(scenario):
     client, _, _, course = scenario
     assert client.get(f"/api/v1/courses/{course.id}").status_code == 401
+
+
+def test_kp_count_is_the_published_versions_node_count(scenario):
+    """The course cards showed「知识点：0」for every course: kp_count was never filled."""
+    client, url, users, course = scenario
+    teacher = auth(users["teacher1"])
+    assert "kp_count" not in client.get("/api/v1/courses", headers=teacher).json()[0]
+    with connect(url) as db:
+        db.execute("INSERT INTO graph_versions(version_id, course_id, kind, expires_at, node_count) "
+                   "VALUES (?, ?, 'publish', 1, 64)", ("v" * 26, course.id))
+        db.execute("UPDATE courses SET published_version_id = ?, published_version = 1, "
+                   "published_from_revision = draft_revision WHERE id = ?", ("v" * 26, course.id))
+    for user in ("teacher1", "student1"):
+        listed = client.get("/api/v1/courses", headers=auth(users[user])).json()
+        assert [c["kp_count"] for c in listed] == [64]
+        assert client.get(f"/api/v1/courses/{course.id}", headers=auth(users[user])).json()["kp_count"] == 64

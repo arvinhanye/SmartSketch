@@ -32,7 +32,8 @@ echo 'Scaffold verification passed.'
 [[ $mode == basic ]] && exit 0
 
 failed=()
-scripts/verify/backend.sh "$mode" || failed+=(backend)
+# integration 档的图库用例由 integration.sh 在一次性 Neo4j 上执行，这里按 full 判定后端报告。
+scripts/verify/backend.sh full || failed+=(backend)
 scripts/verify/frontend.sh "$mode" || failed+=(frontend)
 if [[ $mode == integration ]]; then
   scripts/verify/integration.sh || failed+=(integration)

@@ -31,6 +31,7 @@ python scripts/import-demo.py                     # 两次：第二次无变化
 ## 接口 / 数据变更
 
 - 新增 `GET /api/v1/courses/{cid}`（契约早已声明 `getCourse`，此前缺实现）。
+- `Course.kp_count` 现在填写为当前发布版本的 `node_count`（契约早已声明，此前从未填写）；从未发布的课程省略。
 - 新配置取值：`LLM_MODE=demo`、`EMBEDDING_MODE=demo`；演示向量空间 `real/smartsketch-demo-ngram-v1/1024` 与其他空间不可共库。
 - `tests/integration/test_k10.py` 的子进程改用实际 Neo4j 账号（此前硬编码 `x`，在非默认口令的库上失败）。
 
@@ -43,4 +44,5 @@ python scripts/import-demo.py                     # 两次：第二次无变化
 ## 下一步 / 需人工
 
 1. 签收 ADR-076、077、078；决定 D-08。
-2. 本机（macOS）按 `docs/runbook.md` 第 2、4 节跑一遍；真实模型重跑 K02 验收 7、K04。
+2. 问答页「涉及的知识点」显示原始 ID 且数量过多、出处显示文档 ID：需前端任务改为名称与文件名。
+3. 本机（macOS）按 `docs/runbook.md` 第 2、4 节跑一遍；真实模型重跑 K02 验收 7、K04。

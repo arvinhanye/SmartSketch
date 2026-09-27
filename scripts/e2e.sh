@@ -15,7 +15,8 @@ cd "$REPO_ROOT"
 
 die() { echo "错误：$*" >&2; exit 1; }
 PY="${E2E_PYTHON:-$REPO_ROOT/.venv/bin/python}"
-[[ -x $PY ]] || die "找不到 $PY；先创建 .venv 并安装后端，或用 E2E_PYTHON 指定解释器。"
+PY="$(command -v -- "$PY" || true)"   # 允许传 PATH 上的名字（CI 用 python）
+[[ -n $PY && -x $PY ]] || die "找不到 ${E2E_PYTHON:-.venv/bin/python}；先创建 .venv 并安装后端，或用 E2E_PYTHON 指定解释器。"
 [[ -d node_modules/@playwright/test ]] || die "缺 @playwright/test；先在仓库根目录 npm ci。"
 [[ -d src/frontend/node_modules ]] || die "缺前端依赖；先 npm ci --prefix src/frontend。"
 

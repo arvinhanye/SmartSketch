@@ -21,7 +21,7 @@
 | 图谱构建 | 四类关系、课程隔离、前置无环 | `tests/backend/test_e11.py`、`test_f05.py`；`tests/integration/test_demo_mode_live.py`（草稿图非空、PREREQUISITE 无环） | 通过（融合为简化版，D-08 待定） |
 | 教师审核 | 编辑节点/关系、成环拒绝、低置信度队列 | K05（添加前置关系成功，反向添加提示「前置关系会形成环路」）；`tests/backend/test_f08.py`、`test_f11.py`、`test_relations_api.py`；`tests/frontend/h07.test.ts`、`h09.test.ts`、`h14.test.ts` | 通过 |
 | 发布与回滚 | 发布版本、学生可见、回滚为前滚新版本 | K05（发布后「学生当前看到 v1」，学生页显示 v1）；`tests/backend/test_g06.py`、`tests/integration/test_g05.py`；`tests/frontend/h10.test.ts` | 通过 |
-| 课程详情 | 课程页加载课程信息 | `tests/backend/test_course_detail.py`（本轮补上 `GET /courses/{cid}`，此前课程页恒显示「课程加载失败」） | 通过 |
+| 课程详情 | 课程页加载课程信息；课程卡片显示已发布版本的知识点数 | `tests/backend/test_course_detail.py`（本轮补上 `GET /courses/{cid}`，此前课程页恒显示「课程加载失败」；`kp_count` 此前从未填写，卡片恒为「知识点：0」） | 通过 |
 
 ## 学生主线
 
@@ -50,6 +50,7 @@
 | 真实模型性能 | K04 仅有假模型数据，真实首字/总时延需本机付费运行 | 用户 |
 | macOS / Windows | 未实测 | 用户本机 |
 | 容器方式 | `docker compose --profile app up` 未在真实守护进程跑通 | 用户本机 |
+| 问答页「涉及的知识点」 | 显示原始 `kp_…` 标识而非名称，且一次列出数十个；出处显示文档 ID 而非文件名（J09 页面遗留） | 后续前端任务 |
 
 ## 集成档
 

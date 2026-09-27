@@ -151,6 +151,21 @@ def list_member_courses(sqlite_url: str, user_id: str) -> list[tuple[CourseRecor
     return [(CourseRecord(*row[:-1]), row[-1]) for row in rows]
 
 
+def published_kp_counts(sqlite_url: str, course_ids: list[str]) -> dict[str, int]:
+    """Knowledge-point count of each course's published version; never-published courses are absent."""
+    if not course_ids:
+        return {}
+    marks = ", ".join("?" for _ in course_ids)
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            "SELECT c.id, v.node_count FROM courses AS c "
+            "JOIN graph_versions AS v ON v.version_id = c.published_version_id "
+            f"WHERE c.id IN ({marks}) AND v.node_count IS NOT NULL",
+            tuple(course_ids),
+        ).fetchall()
+    return {course_id: count for course_id, count in rows}
+
+
 def get_member(sqlite_url: str, course_id: str, user_id: str) -> MemberRecord | None:
     """The member row of ``user_id`` in ``course_id`` only; None if not a member there."""
     with connect(sqlite_url) as database:

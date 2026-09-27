@@ -53,7 +53,7 @@ def create_my_course(
     response_model_exclude_none=True,
     responses={401: {"model": Error}, 403: {"model": Error}, 404: {"model": Error}},
 )
-def get_my_course(access: CourseAccess = Depends(course_reader)) -> Course:
+def get_my_course(request: Request, access: CourseAccess = Depends(course_reader)) -> Course:
     # course_reader already maps non-members to 403 and students on a never-published
     # course to 404 GRAPH_NOT_PUBLISHED (specs/identity-access.md §4.1).
-    return course_detail(access)
+    return course_detail(request.app.state.settings.SQLITE_URL, access)
