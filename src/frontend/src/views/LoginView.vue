@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { inject, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { AUTH_API_KEY } from '../api/auth'
 import { ApiError, NetworkError, TimeoutError } from '../api/http'
-import { homeRouteFor } from '../router'
+import AuthLayout from '../components/AuthLayout.vue'
+import { homeRouteFor, REGISTER_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
 
 const auth = inject(AUTH_API_KEY, null)
@@ -11,6 +12,8 @@ if (auth === null) throw new Error('LoginView 需要注入 AUTH_API_KEY')
 
 const session = useSessionStore()
 const router = useRouter()
+// 注册页由 main.ts 注入；未注入时（如单测只建最小路由）不显示入口
+const canRegister = router.hasRoute(REGISTER_ROUTE)
 
 const username = ref('')
 const password = ref('')
@@ -55,34 +58,57 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <form class="login" novalidate :aria-busy="pending" @submit.prevent="submit">
-    <fieldset :disabled="pending">
-      <legend>账号登录</legend>
-      <label>
-        用户名
-        <input v-model="username" name="username" type="text" autocomplete="username" required />
-      </label>
-      <label>
-        密码
-        <input v-model="password" name="password" type="password" autocomplete="current-password" required />
-      </label>
-      <p v-if="error" data-test="login-error" role="alert">{{ error }}</p>
-      <button type="submit" :disabled="pending">{{ pending ? '登录中…' : '登录' }}</button>
-    </fieldset>
-  </form>
+  <AuthLayout>
+    <form class="login" novalidate :aria-busy="pending" @submit.prevent="submit">
+      <fieldset :disabled="pending">
+        <legend>登录智绘学途</legend>
+        <label>
+          用户名
+          <input v-model="username" name="username" type="text" autocomplete="username" required />
+        </label>
+        <label>
+          密码
+          <input v-model="password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p v-if="error" data-test="login-error" role="alert">{{ error }}</p>
+        <button type="submit" class="login__submit" :disabled="pending">{{ pending ? '登录中…' : '登录' }}</button>
+        <p class="login__hint">
+          <template v-if="canRegister">
+            还没有账号？<RouterLink :to="{ name: REGISTER_ROUTE }" data-test="login-register-link">注册学生账号</RouterLink>。
+          </template>
+          教师账号由管理员开通。
+        </p>
+      </fieldset>
+    </form>
+  </AuthLayout>
 </template>
 
 <style scoped>
 .login fieldset {
   display: grid;
-  gap: 0.75rem;
-  max-width: 20rem;
+  gap: 0.9rem;
   border: none;
   padding: 0;
+  background: none;
 }
-
+.login legend {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
 .login label {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.3rem;
+}
+.login__submit {
+  justify-self: stretch;
+  padding-block: 0.6rem;
+}
+.login__hint {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
 }
 </style>

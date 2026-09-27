@@ -20,7 +20,7 @@
 | 新增环境变量登记到 `.env.example` 与 `docs/integrations.md` | A07 或 C03（见 §6） |
 | 口令哈希库、JWT 库的选型与版本锁 | C03 |
 
-**明确不做**（不扩展生产 SSO）：单点登录、OAuth/OIDC、LDAP、开放注册、邮箱找回或自助改密、多因素认证、刷新令牌、服务端注销与令牌黑名单、管理后台界面。
+**明确不做**（不扩展生产 SSO）：单点登录、OAuth/OIDC、LDAP、教师自助注册（学生自助注册见 ADR-079）、邮箱找回或自助改密、多因素认证、刷新令牌、服务端注销与令牌黑名单、管理后台界面。
 
 ## 术语
 
@@ -48,8 +48,8 @@
 
 ### 1.2 账号来源
 
-- **没有注册端点。** 契约中不得出现创建用户的操作。
-- 账号由后端命令行创建、停用、启用、重置口令；协作教师也由命令行加入课程（§3.3）。
+- **学生自助注册（ADR-079，取代原「没有注册端点」）。** `POST /api/v1/auth/register` 只创建账号类型为 `student` 的账号：请求体 `{username, password}` 为闭合对象，字段规则同 §1.1/§1.4，不合规 422 `VALIDATION_ERROR`；用户名已占用 409 `USERNAME_TAKEN`；成功 201 返回与登录相同的 `LoginResponse`。每进程 60 秒内最多 60 次尝试，超出 429 `RATE_LIMITED`。注册不加入任何课程，入课仍按 §3.3 由教师添加。
+- 教师账号只由后端命令行创建；所有账号的停用、启用、重置口令也只走命令行；协作教师由命令行加入课程（§3.3）。
 - 演示账号由幂等种子脚本创建：至少一个教师账号、两个学生账号（两个学生用于演示进度互不可见；用户名建议 `demo_teacher`、`demo_student`、`demo_student2`，K09 可调整）。
   - 口令读环境变量 `SEED_DEMO_PASSWORD`；**未设置时脚本非 0 退出**，不得回退到写在仓库里的默认口令。
   - 重跑不重复创建、不重置已有账号的口令。
@@ -165,7 +165,8 @@
 | --- | --- |
 | 缺令牌、签名或算法不符、过期、用户不存在或已停用 | 401 `UNAUTHENTICATED` |
 | 登录口令错误、用户名不存在或账号已停用 | 401 `UNAUTHENTICATED`（与上一行同形） |
-| 登录连续失败达到上限 | 429 `RATE_LIMITED` |
+| 登录连续失败达到上限；注册尝试超出窗口上限 | 429 `RATE_LIMITED` |
+| 自助注册的用户名已被占用 | 409 `USERNAME_TAKEN`（ADR-079） |
 | 路径带 `cid`，调用者不是成员，或课程不存在 | 403 `COURSE_FORBIDDEN` |
 | 是成员但课程内角色不符；学生账号新建课程；移除教师成员 | 403 `ROLE_FORBIDDEN` |
 | 学生成员访问从未发布的课程 | 404 `GRAPH_NOT_PUBLISHED` |
@@ -173,7 +174,7 @@
 | 子资源不在该课程内；添加成员时用户名不存在或账号已停用 | 404 `NOT_FOUND` |
 | 事件票据缺失、无效、过期、已用、与任务不符 | 401 `UNAUTHENTICATED` |
 
-不新增错误码；以上错误码均已在 `ErrorCode` 中。
+以上错误码均已在 `ErrorCode` 中；`USERNAME_TAKEN` 由 ADR-079 新增。
 
 ### 4.3 访问矩阵
 
@@ -183,6 +184,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `getHealth` | `GET /health` | ✓ | ✓ | ✓ | ✓ |
 | `login` | `POST /api/v1/auth/login` | ✓ | ✓ | ✓ | ✓ |
+| `register` | `POST /api/v1/auth/register` | ✓（只建学生账号，ADR-079） | ✓ | ✓ | ✓ |
 | `listCourses` | `GET /api/v1/courses` | 401 | ✓（§4.4 过滤） | ✓（§4.4 过滤） | ✓（§4.4 过滤） |
 | `createCourse` | `POST /api/v1/courses` | 401 | 账号类型 `teacher` 才放行，否则 ROLE | — | — |
 | `getCourse` | `GET /api/v1/courses/{cid}` | 401 | COURSE | ✓（未发布 404） | ✓ |

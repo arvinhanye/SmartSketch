@@ -197,7 +197,7 @@ async function mountApp({ login: impl, path = '/' }: { login?: AuthApi['login'];
     loginComponent: LoginView,
   })
   const login = vi.fn<AuthApi['login']>(impl ?? (async () => loginResponse('teacher')))
-  const auth: AuthApi = { login }
+  const auth: AuthApi = { login, register: vi.fn<AuthApi['register']>() }
   await router.push(path)
   await router.isReady()
   const wrapper = mount(App, { global: { plugins: [pinia, router], provide: { [AUTH_API_KEY]: auth } } })

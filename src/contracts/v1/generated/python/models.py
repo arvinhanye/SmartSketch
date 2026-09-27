@@ -37,6 +37,7 @@ class ErrorCode(Enum):
     BUDGET_EXCEEDED = 'BUDGET_EXCEEDED'
     DOCUMENT_NOT_DELETABLE = 'DOCUMENT_NOT_DELETABLE'
     REVISION_CONFLICT = 'REVISION_CONFLICT'
+    USERNAME_TAKEN = 'USERNAME_TAKEN'
 
 
 class CycleItem(RootModel[str]):
@@ -89,6 +90,16 @@ class Role(Enum):
 class LoginRequest(BaseModel):
     username: str
     password: SecretStr
+
+
+class RegisterRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: Annotated[
+        str, Field(max_length=32, min_length=3, pattern='^[A-Za-z0-9_.-]+$')
+    ]
+    password: Annotated[SecretStr, Field(max_length=128, min_length=8)]
 
 
 class TokenType(Enum):

@@ -66,6 +66,8 @@ function highlighted(kpId: string): string {
             {{ item.name }}
           </button>
           <p class="recommendations__reason" data-test="rc-reason">{{ item.reason }}</p>
+          <details class="recommendations__details">
+          <summary>评分明细</summary>
           <dl class="recommendations__facts">
             <div v-for="row in reasonFactRows(item)" :key="row.key" data-test="rc-fact" :data-fact="row.key">
               <dt>{{ row.label }}</dt>
@@ -77,6 +79,7 @@ function highlighted(kpId: string): string {
             </div>
           </dl>
           <p class="recommendations__primary">主要理由分量：{{ PRIMARY_FACTOR_LABELS[item.reason_facts.primary_factor] }}</p>
+          </details>
         </li>
       </ol>
     </template>
@@ -85,42 +88,86 @@ function highlighted(kpId: string): string {
 
 <style scoped>
 .recommendations {
-  margin: 0 0 1rem;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface, #fff);
+}
+.recommendations h3 {
+  margin: 0 0 0.25rem;
 }
 .recommendations__version,
 .recommendations__total {
-  color: #595959;
-  font-size: 0.875rem;
+  color: var(--color-text-muted, #595959);
+  font-size: 0.8rem;
+  margin: 0 0 0.4rem;
 }
 .recommendations__list {
-  padding-left: 1.25rem;
+  list-style: none;
+  padding: 0;
   margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  counter-reset: rc;
+}
+.recommendations__item {
+  counter-increment: rc;
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.5rem 0.65rem;
+}
+.recommendations__item:first-child {
+  border-color: var(--color-primary, #1c6e8c);
+  box-shadow: inset 3px 0 0 var(--color-primary, #1c6e8c);
 }
 .recommendations__item[data-highlighted='true'] {
-  background: #f9f0ff;
-  outline: 2px solid #722ed1;
+  background: var(--color-primary-soft, #f9f0ff);
+  outline: 2px solid var(--color-primary, #722ed1);
 }
 .recommendations__select {
+  background: none;
+  color: var(--color-text, inherit);
+  padding: 0;
   font-weight: 600;
+  text-align: left;
+}
+.recommendations__select::before {
+  content: counter(rc) ' · ';
+  color: var(--color-text-muted, #595959);
+  font-weight: 500;
+}
+.recommendations__select:hover:not(:disabled) {
+  background: none;
+  color: var(--color-primary, inherit);
+  text-decoration: underline;
 }
 .recommendations__reason {
-  margin: 0.25rem 0;
+  margin: 0.2rem 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #595959);
+}
+.recommendations__details summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #595959);
 }
 .recommendations__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
   gap: 0.25rem 1rem;
-  margin: 0 0 0.5rem;
-  font-size: 0.8125rem;
+  margin: 0.4rem 0;
+  font-size: 0.78rem;
 }
 .recommendations__facts dt {
-  color: #595959;
+  color: var(--color-text-muted, #595959);
 }
 .recommendations__facts dd {
   margin: 0;
 }
 .recommendations__primary {
-  color: #595959;
-  font-size: 0.8125rem;
+  color: var(--color-text-muted, #595959);
+  font-size: 0.78rem;
+  margin: 0;
 }
 </style>

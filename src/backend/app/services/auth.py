@@ -1,6 +1,7 @@
-"""Local account login and access-token issuance (specs/identity-access.md §1–§2.1, ADR-013).
+"""Local account login, student self-registration and access-token issuance.
 
-Only issuance lives here. Verifying bearer tokens on each request and resolving the caller
+See specs/identity-access.md §1–§2.1, ADR-013 and ADR-079 (self-registration creates student
+accounts only). Verifying bearer tokens on each request and resolving the caller
 identity belong to C03; the event ticket to C16; account commands and demo seeding to C14.
 Passwords, hashes and tokens are never logged or placed in exception messages.
 """
@@ -17,7 +18,7 @@ import secrets
 import threading
 import time
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
@@ -26,12 +27,21 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from app.config import Settings, check_auth_settings
-from app.repositories.accounts import AccountRecord, find_by_username, insert_account
+from app.repositories.accounts import (
+    AccountRecord,
+    DuplicateUsername,
+    find_by_username,
+    insert_account,
+)
 
 # Fixed by the spec, deliberately not configurable (§1.3, §6).
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_SECONDS = 60
 LOGIN_LIMITER_CAPACITY = 10_000
+# Self-registration (ADR-079): one process-wide window, sized so a class of 60 can sign up
+# together while a flood of new accounts (each costing one slow hash) is cut off.
+REGISTRATION_MAX_PER_WINDOW = 60
+REGISTRATION_WINDOW_SECONDS = 60
 
 USERNAME_MIN_LENGTH = 3
 USERNAME_MAX_LENGTH = 32
@@ -61,6 +71,16 @@ class LoginRateLimited(Exception):
     def __init__(self, retry_after: int) -> None:
         super().__init__("login rate limited")
         self.retry_after = retry_after
+
+
+class RegistrationRateLimited(Exception):
+    def __init__(self, retry_after: int) -> None:
+        super().__init__("registration rate limited")
+        self.retry_after = retry_after
+
+
+class UsernameTaken(Exception):
+    """Self-registration hit an existing username (ADR-079 accepts that this reveals it)."""
 
 
 # --- password hashing ---------------------------------------------------------------------
@@ -212,6 +232,38 @@ class LoginRateLimiter:
             self._locked.pop(key, None)
 
 
+class RegistrationRateLimiter:
+    """Process-wide sliding window over registration attempts (ADR-079).
+
+    Every attempt that reaches the service counts, successful or not, because each one may
+    cost a slow hash. Like the login limiter this is per API process: a mitigation only.
+    """
+
+    def __init__(
+        self,
+        clock: Callable[[], float] = time.monotonic,
+        *,
+        max_attempts: int = REGISTRATION_MAX_PER_WINDOW,
+        window_seconds: int = REGISTRATION_WINDOW_SECONDS,
+    ) -> None:
+        self._clock = clock
+        self._max_attempts = max_attempts
+        self._window = window_seconds
+        self._attempts: deque[float] = deque()
+        self._mutex = threading.Lock()
+
+    def acquire(self) -> int | None:
+        """Record one attempt and return None, or whole seconds to wait when the window is full."""
+        with self._mutex:
+            now = self._clock()
+            while self._attempts and self._attempts[0] <= now - self._window:
+                self._attempts.popleft()
+            if len(self._attempts) >= self._max_attempts:
+                return max(1, math.ceil(self._attempts[0] + self._window - now))
+            self._attempts.append(now)
+            return None
+
+
 def _limiter_key(normalized_username: str) -> str:
     # Valid usernames are at most 32 characters, so truncating at 33 keeps every real key
     # distinct while bounding the memory an attacker can make each key occupy. The API already
@@ -288,6 +340,25 @@ class AuthService:
             raise InvalidCredentials()
 
         self._limiter.reset(key)
+        return self._issue(account)
+
+    def register_student(
+        self, username: str, password: str, limiter: RegistrationRateLimiter
+    ) -> LoginResult:
+        """Create an enabled student account and sign it in (ADR-079).
+
+        Teacher accounts are never created here; they stay with the account command.
+        """
+        retry_after = limiter.acquire()
+        if retry_after is not None:
+            raise RegistrationRateLimited(retry_after)
+        try:
+            account = create_account(self._settings.SQLITE_URL, username, password, "student")
+        except DuplicateUsername:
+            raise UsernameTaken() from None
+        return self._issue(account)
+
+    def _issue(self, account: AccountRecord) -> LoginResult:
         ttl = self._settings.AUTH_ACCESS_TOKEN_TTL_SECONDS
         token = issue_access_token(
             user_id=account.id,

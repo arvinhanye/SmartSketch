@@ -25,6 +25,7 @@ import StudentGraphView from './views/StudentGraphView.vue'
 import ReviewView from './views/ReviewView.vue'
 import TeacherGraphView from './views/TeacherGraphView.vue'
 import ChatView from './views/ChatView.vue'
+import RegisterView from './views/RegisterView.vue'
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
@@ -47,6 +48,8 @@ const router = createAppRouter({
   // H09：审核队列 /courses/:cid/review（处理草稿）
   reviewComponent: ReviewView,
   chatComponent: ChatView,
+  // ADR-079：学生自助注册 /register，只对未登录访客开放
+  registerComponent: RegisterView,
 })
 
 // 受保护接口 401：清会话与课程上下文后回登录页

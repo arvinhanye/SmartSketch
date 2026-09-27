@@ -27,8 +27,10 @@ const props = withDefaults(
     selectedHidden?: boolean
     /** 是否显示审核状态筛选与图例；学生看已发布图时关闭（H11），审核状态对学生无意义 */
     showStatuses?: boolean
+    /** 竖排：放在工作台左侧筛选栏（教师图谱编辑页） */
+    vertical?: boolean
   }>(),
-  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true },
+  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false },
 )
 
 const emit = defineEmits<{
@@ -115,7 +117,13 @@ const summaryText = computed(() => {
 </script>
 
 <template>
-  <div class="graph-toolbar" role="toolbar" aria-label="图谱筛选">
+  <div
+    class="graph-toolbar"
+    :class="{ 'graph-toolbar--vertical': vertical }"
+    role="toolbar"
+    aria-label="图谱筛选"
+    :aria-orientation="vertical ? 'vertical' : 'horizontal'"
+  >
     <input
       class="graph-toolbar__search"
       type="search"
@@ -220,6 +228,7 @@ const summaryText = computed(() => {
 
 .graph-toolbar__search {
   min-width: 12em;
+  width: auto;
 }
 
 .graph-toolbar__group {
@@ -228,14 +237,16 @@ const summaryText = computed(() => {
   align-items: center;
   gap: 4px 12px;
   margin: 0;
-  padding: 2px 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface, #fff);
 }
 
 .graph-toolbar__group legend {
   padding: 0 4px;
   font-size: 12px;
+  color: var(--color-text-muted, #595959);
 }
 
 .graph-toolbar__group label,
@@ -243,6 +254,53 @@ const summaryText = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  color: var(--color-text, inherit);
+  font-size: 13px;
+}
+
+.graph-toolbar__chapter select {
+  width: auto;
+}
+
+/* 竖排：每组一列，组内一行一项 */
+.graph-toolbar--vertical {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 12px;
+  padding: 0;
+}
+
+.graph-toolbar--vertical .graph-toolbar__search {
+  min-width: 0;
+  width: 100%;
+}
+
+.graph-toolbar--vertical .graph-toolbar__group {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: none;
+  padding: 0;
+  background: none;
+}
+
+.graph-toolbar--vertical .graph-toolbar__group legend {
+  padding: 0 0 4px;
+  font-weight: 500;
+}
+
+.graph-toolbar--vertical .graph-toolbar__chapter {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.graph-toolbar--vertical .graph-toolbar__chapter select {
+  width: 100%;
+}
+
+.graph-toolbar--vertical [data-test='clear'] {
+  justify-self: stretch;
 }
 
 .graph-toolbar__swatch {

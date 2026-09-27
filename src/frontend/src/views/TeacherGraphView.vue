@@ -167,13 +167,16 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
     aria-labelledby="teacher-graph-title"
     :aria-busy="status === 'loading' ? 'true' : 'false'"
   >
-    <h2 id="teacher-graph-title">编辑课程知识图谱（草稿）</h2>
-    <p v-if="courseName" class="teacher-graph__course">
-      课程：{{ courseName }}<span v-if="status === 'ready'" data-test="tg-draft"> · 草稿，学生在发布前看不到这些修改</span>
-    </p>
-    <p v-if="courseId">
-      <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
-    </p>
+    <header class="teacher-graph__header">
+      <h2 id="teacher-graph-title">编辑课程知识图谱（草稿）</h2>
+      <span v-if="status === 'ready'" class="teacher-graph__badge">草稿</span>
+      <p v-if="courseName" class="teacher-graph__course">
+        课程：{{ courseName }}<span v-if="status === 'ready'" data-test="tg-draft"> · 草稿，学生在发布前看不到这些修改</span>
+      </p>
+      <p v-if="courseId" class="teacher-graph__back">
+        <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
+      </p>
+    </header>
 
     <p v-if="status === 'loading'" data-test="tg-loading" role="status">正在加载草稿图谱…</p>
 
@@ -201,17 +204,20 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         <button type="button" data-test="tg-refresh-retry" @click="teacher.refresh">重新刷新</button>
       </p>
 
-      <GraphToolbar
-        v-model="filters.state.value"
-        v-model:layout="filters.layout.value"
-        :chapters="chapterList"
-        :summary="summary"
-        :can-clear="!isDefault"
-        :selected-hidden="selectedHidden"
-        @clear="filters.clear"
-      />
-
       <div class="teacher-graph__body">
+        <aside class="teacher-graph__filters" aria-label="筛选">
+          <GraphToolbar
+            v-model="filters.state.value"
+            v-model:layout="filters.layout.value"
+            :chapters="chapterList"
+            :summary="summary"
+            :can-clear="!isDefault"
+            :selected-hidden="selectedHidden"
+            vertical
+            @clear="filters.clear"
+          />
+        </aside>
+
         <div class="teacher-graph__canvas" data-test="tg-graph">
           <p class="teacher-graph__hint">
             {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
@@ -280,34 +286,115 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
 </template>
 
 <style scoped>
+.teacher-graph {
+  display: grid;
+  gap: 0.75rem;
+}
+.teacher-graph__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+.teacher-graph__header h2 {
+  margin: 0;
+}
+.teacher-graph__badge {
+  font-size: 0.75rem;
+  border-radius: 4px;
+  padding: 0.05rem 0.5rem;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+.teacher-graph__course {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  flex-basis: 100%;
+}
+.teacher-graph__back {
+  margin: 0;
+  font-size: 0.875rem;
+}
+/* 工作台三栏：筛选 | 画布 | 详情与编辑 */
 .teacher-graph__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 1rem;
+  grid-template-columns: 13.5rem minmax(0, 1fr) minmax(280px, 22rem);
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  min-height: 560px;
+}
+.teacher-graph__filters {
+  background: var(--color-surface-muted);
+  border-right: 1px solid var(--color-border);
+  padding: 0.85rem;
 }
 .teacher-graph__canvas {
-  min-height: 480px;
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.teacher-graph__canvas > :last-child {
+  flex: 1;
 }
 .teacher-graph__hint {
-  color: #595959;
-  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem 0;
+}
+.teacher-graph__panel {
+  border-left: 1px solid var(--color-border);
+  padding: 0.85rem;
+  background: var(--color-surface);
+  min-width: 0;
 }
 .teacher-graph__tabs {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.teacher-graph__tabs button {
+  background: none;
+  color: var(--color-text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: -1px;
+}
+.teacher-graph__tabs button:hover:not(:disabled) {
+  background: none;
+  color: var(--color-text);
 }
 .teacher-graph__tabs button[aria-pressed='true'] {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
   font-weight: 600;
-  border-color: #0958d9;
 }
 .teacher-graph__confirm {
-  border: 1px solid #faad14;
-  background: #fffbe6;
+  border: 1px solid var(--color-warning-border);
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
 }
 .teacher-graph__confirm button + button {
   margin-left: 0.5rem;
+}
+@media (max-width: 1100px) {
+  .teacher-graph__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .teacher-graph__filters,
+  .teacher-graph__panel {
+    border: none;
+  }
 }
 </style>
