@@ -1519,3 +1519,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | DEMO-01 | DONE（待 PR 审查/合并） | 一键启动脚本 `scripts/start-demo.sh` | Claude | `claude/one-click-start-2ibfrb` / `main@86bb94d` | 云端容器从零（无 `.venv`、`.env`、`node_modules`）实跑：依赖安装、Neo4j、迁移、建号、导入 v1、前端 5173 就绪，经前端代理登录 `demo_student` 并看到已发布课程；第二次运行账号 `exists, unchanged`、导入 `publish_unchanged: true`；伪终端 Ctrl+C 后无残留进程 |
 
 - 待人工：macOS 实测（脚本按 bash 3.2 写法编写，未在 Mac 上运行过）。详见 `docs/handoffs/claude-start-demo.md`。
+
+## 2026-09-27 前端改版（方向 A 工作台）+ 学生自助注册（Claude，新增任务）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| UI-01 | DONE（待 PR 审查/合并） | 前端改版方向 A「工作台」：登录后左侧导航；教师图谱编辑三栏；学生图谱右侧学习栏；问答页显示知识点名称、出处按章节与页码 | Claude | `claude/frontend-redesign-vzvfus` / `main@fccc1ca` | 方案对比页 https://claude.ai/artifact/KgH1oJ3mqxSaWhGwZxg3Qi（用户选定「A + 1」）；`tests/frontend/redesign-chat.test.ts`；真实页面截图 `/mnt/project-files/redesign-0927/` |
+| AUTH-01 | DONE（待 PR 审查/合并；ADR-079 待签收） | 学生自助注册：`POST /api/v1/auth/register` 与 `/register` 页 | Claude | 同上 | `tests/backend/test_adr079_register.py` 14 passed；`tests/frontend/adr079.test.ts` 11 passed |
+
+- 验收条件：① 未登录可打开 `/register`，登录页有入口，已登录访问回本账号首页；② 只建学生账号，请求体带 `role` 422 且零写入；③ 用户名大小写不敏感重复 409 `USERNAME_TAKEN`，页面在用户名下提示；④ 本地校验不过不发请求；⑤ 每进程 60 秒内 60 次，超出 429 带 `Retry-After`；⑥ 问答页知识点显示名称（取回答所依据的发布版），读取失败退回标识；⑦ 退出登录清会话回登录页。
+- 顺带修复：`useChat` 直接改原始对象，`currentVersion` 不会更新（改为写响应式代理）。
+- 待决：G6 画布在 64 个节点时整体缩得很小、标签难读（改版前已存在，未在本任务处理）；是否需要关闭自助注册的部署开关（ADR-079 后果）。详见 `docs/handoffs/claude-frontend-redesign.md`。
