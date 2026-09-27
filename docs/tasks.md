@@ -1316,3 +1316,13 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收：`python -m app.repositories.graph_migrations` 为记录的当前空间建知识点与文本块两个向量索引并等待上线，配置与记录不符时拒绝；P9 在索引缺失、未上线或块节点 `revision_id`/`document_id` 与 SQLite 不符时失败，`index_chunks` 覆盖改正；`scripts/backfill_chunk_vectors.py` 按已提交版本补齐（含被新修订取代的旧修订），可按课程/版本缩小范围，`--dry-run` 不调用模型，空间不符时拒绝，重复运行不重算。
 - 关闭 G08 待决中的「补齐途径未闭环」「向量索引无生产创建路径」「P9 不检出错误 `revision_id`、不校验 `document_id`」；「首次发布超过尝试租约」经核对不会发生（发布全程心跳续约，ADR-055 后果）。
 - 仍待决：补齐命令与发布的向量调用都不写 `model_calls`（F14 的 `reembed.py` 会写），是否计入预算与审计待定；首次发布耗时尚未用真实课程实测。
+
+## 2026-09-27 H14 教师图谱编辑页（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H14 | DONE（待 PR 审查/合并；issue #281） | 实现教师图谱编辑页 | ArvinHan（Claude） | `claude/project-thread-n5wcl5` / `main@f2fbf1e`（合并前并入 `main@cba4c41`） | `src/frontend/src/views/TeacherGraphView.vue`、`src/frontend/src/composables/useTeacherGraph.ts`、`src/frontend/src/router/index.ts`、`tests/frontend/h14.test.ts`；扩围 `api/graph.ts`（`DraftGraphApi`）、`main.ts`、`views/CoursesView.vue`（教师入口）、`components/NodeEditor.vue`（`defineExpose({ dirty })` 一行）、`docs/architecture.md`、`docs/decisions.md`（ADR-067） | `h14.test.ts` 42 passed；独立审查 25 处篡改 20 处检出（未检出 5 处中 2 处为等价篡改，3 处已补用例）并发现 1 中 5 低问题，均先补复现用例再修；前端全量 17 files / 587 passed；type-check、build、`verify.sh` 通过；**仅假 API 验证**（后端尚无 `/relations` 路由）；`docs/handoffs/claude-h14.md` |
+
+- 断点：上一会话只给 issue #281 打了 `status:in-progress`，无分支、无提交，本轮从 `main@f2fbf1e` 从零实现。
+- H14 待决（需 ArvinHan）：ADR-067 签收（三页签布局、页内确认 + `window.confirm` 离开确认、刷新在途遇写入则重拉）；离开本页不清空课程 store 的草稿图（目前无页面直接读 `store.graph`，已记入 ADR 后果）。
+- 解锁：K05 教师主线 E2E 的 H14 依赖满足（仍依赖 H09、H10 等）。

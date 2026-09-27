@@ -30,3 +30,20 @@ export function createPublishedGraphApi(client: HttpClient): PublishedGraphApi {
     },
   }
 }
+
+/**
+ * 草稿图谱读取接口（H14）：`getGraph` **不带** `version`，课程内教师得到草稿（`graph_version` 为 null）。
+ * 与 `PublishedGraphApi` 分开注入，学生页拿不到本接口；是否为课程教师由页面先按 `Course.my_role` 判断。
+ */
+export interface DraftGraphApi {
+  /** 读取草稿；非课程教师 403 `COURSE_FORBIDDEN` / `ROLE_FORBIDDEN` */
+  getDraft(cid: string, control?: RequestControl): Promise<GraphExchange>
+}
+
+export const DRAFT_GRAPH_API_KEY: InjectionKey<DraftGraphApi> = Symbol('smartsketch.draft-graph-api')
+
+export function createDraftGraphApi(client: HttpClient): DraftGraphApi {
+  return {
+    getDraft: (cid, control = {}) => client.request('get', '/api/v1/courses/{cid}/graph', { ...control, params: { cid } }),
+  }
+}
