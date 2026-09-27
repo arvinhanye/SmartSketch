@@ -1603,3 +1603,12 @@
 - **后果**：worker 缺省每小时对全部课程执行一次 `sweep`，`failed` 尝试的残留副本与 `cleanup_pending` 因此能自行收敛；孤儿副本与已提交版本缺副本仍只告警，人工处理归 K10。`getKnowledgePoint` 多一种成功形状，契约生成物必须与真源同步（ADR-004）。没有需要撤销的贡献的失败任务不再空等最多一个锁租约；有工作的清理仍按课程串行。教师对节点/关系的裁决在任务重跑后保持，`draft`/`low_confidence` 仍跟随自动流程。
 - **回滚**：四项各自独立提交，可单独 `git revert`。① 撤销 `runner.PublishSweep`/`build_maintenance` 与 `run_loop` 的默认接线、`Settings.PUBLISH_SWEEP_INTERVAL_SECONDS`、`.env.example` 与 `docs/integrations.md` 的对应行、测试；② 撤销 `read_knowledge_point` 的分支、契约的 `KnowledgePointDetailWithoutSource` 与 200 的 `oneOf`、`schemas/contracts.py` 的导出与重新生成的产物、测试；③ 撤销 `graph_relations.task_has_contributions` 与 `cleanup_failed_task` 的前置判断；④ 撤销 `_WRITE_BATCH` 的状态列与 `changed` 计算。四项都无 SQLite/Neo4j DDL 与数据迁移；已写入的数据不回滚（重跑覆盖过的状态按当时的草稿内容为准）。
 - **签收**：待 ArvinHan 审阅。**需明确签收**：(a) `sweep` 缺省启用且周期 3600 秒（`PUBLISH_SWEEP_INTERVAL_SECONDS=0` 才关闭）；(b) 契约新增 `KnowledgePointDetailWithoutSource` 与 200 的两种响应形状（不改 `KnowledgePointDetail` 的 `minItems: 1`）；(c) 重跑允许改写「已裁决但已解锁」节点的内容，只冻结 `approved`/`rejected` 状态。
+
+## ADR-073：H10 发布历史与前滚式回滚的教师交互
+
+- **日期**：2026-09-27
+- **背景**：G06 已提供发布、历史列表、回滚端点；H09 审核页提示「可以直接发布」，但没有实际入口。H10 需要在发布失败时保留旧标识、草稿修订期间说明学生仍见旧版，并在回滚前明确目标版本。
+- **决定**：在 `/courses/:cid/review` 嵌入 `VersionPanel`，不新增路由。先通过 `Course.my_role` 核对教师身份，再读版本列表；按版本号降序展示 `publish` 与 `rollback/source_version`。学生当前可见版本只取 `Course.published_version`；发布或回滚成功后重读课程详情与版本列表，只有刷新后的指针与响应版本一致、且该版本出现在历史中才确认成功。失败、网络结果不明或刷新不一致时保留上次确认的标识；超时、断网或刷新未确认时禁用继续写入直到人工刷新核对。课程教师权限丧失时清除旧历史与操作入口。回滚先选择历史版本，在页内确认目标版本、前滚生成新版本且不改变草稿，再调用后端。切课和卸载作废旧请求。
+- **后果**：审核页会额外读取课程详情与版本列表，但无需修改现有契约或 G06 后端。学生页仍按课程发布指针读旧版，教师面板明确说明 `revising` 状态。发布/回滚成功后若刷新异常，界面不猜测新指针，提示重新核对。
+- **回滚**：撤销 `api/versions.ts`、`composables/useVersions.ts`、`components/VersionPanel.vue` 与审核页/应用注入接线；不涉及数据库迁移或契约变更。
+- **签收**：用户 2026-09-27 确认审核页内嵌、服务端指针为准和回滚前展示目标版本。

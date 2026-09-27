@@ -8,6 +8,7 @@ import { COURSES_API_KEY, type CoursesApi } from '../../src/frontend/src/api/cou
 import { DRAFT_GRAPH_API_KEY, type DraftGraphApi } from '../../src/frontend/src/api/graph'
 import { ApiError, createHttpClient, NetworkError, type FetchLike } from '../../src/frontend/src/api/http'
 import { createReviewApi, REVIEW_API_KEY, type ReviewAction, type ReviewApi } from '../../src/frontend/src/api/review'
+import { VERSIONS_API_KEY } from '../../src/frontend/src/api/versions'
 import { duplicateKey, isQueue } from '../../src/frontend/src/composables/useReview'
 import { createAppRouter, NOTICE_COURSE_FORBIDDEN, NOTICE_WRONG_ROLE, REVIEW_ROUTE } from '../../src/frontend/src/router/index.ts'
 import { useSessionStore } from '../../src/frontend/src/stores/session'
@@ -210,6 +211,7 @@ async function mountPage(f: Fakes, path = '/courses/c1/review', accountRole: 'st
       provide: {
         [COURSES_API_KEY as symbol]: { list: async () => [course('c1')], create: vi.fn(), get: f.courses.get },
         [REVIEW_API_KEY as symbol]: f.review,
+        [VERSIONS_API_KEY as symbol]: { list: async () => [], publish: vi.fn(), rollback: vi.fn() },
         [DRAFT_GRAPH_API_KEY as symbol]: f.draft,
       },
     },

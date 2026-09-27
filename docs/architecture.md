@@ -44,6 +44,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 学生图谱页（H11）：`views/StudentGraphView.vue`（`/courses/:cid/graph`）组装画布、工具栏、卡片与详情；`composables/useStudentGraph.ts` 只在课程内学生角色下、按 `Course.published_version` 经 `api/graph.ts` 读图并核对响应的 `course_id`/`graph_version`，任何入口不读草稿；`components/KnowledgeCards.vue` 是分页、可键盘操作的卡片视图，与图共用 `useGraphFilters` 的筛选与选中（ADR-063）。
 - 教师图谱编辑页（H14）：`views/TeacherGraphView.vue`（`/courses/:cid/graph/edit`，仅教师账号）组装草稿画布、工具栏与三个页签面板（H06 详情、H07 节点编辑、H08 关系编辑）；`composables/useTeacherGraph.ts` 只在课程内教师角色下经 `api/graph.ts` 的 `DraftGraphApi`（不带版本号）读草稿，核对 `course_id` 且 `graph_version` 为 null 后写入课程 store，三个编辑器共用这份图，成功写回后画布随之更新；`useSelectionGuard` 在节点面板有未保存修改时先确认再切换（ADR-067）。
 - 教师审核队列页（H09）：`views/ReviewView.vue`（`/courses/:cid/review`，仅教师账号）展示低置信度关系、疑似重复、孤立知识点三栏并转发处理；`composables/useReview.ts` 在课程内教师角色下经 `api/review.ts` 读队列（键集分页）、单项处理与合并，数量只取服务端 `totals`，一次只允许一个处理，会连带影响其他栏的处理后重读三栏；关系两端名称取自草稿图谱，读不到退回 ID（ADR-070）。
+- 发布历史与回滚面板（H10）：`components/VersionPanel.vue` 嵌入 H09 审核页；`api/versions.ts` 只封装 G06 端点，`composables/useVersions.ts` 先核对课程内教师身份，再读取历史并管理发布/回滚。学生可见指针只采纳重新读取的 `Course.published_version`，失败或刷新未确认时保留上次确认值；回滚先显示目标版本并确认（ADR-073）。
 
 ## 后端启动与健康检查（B05）
 
