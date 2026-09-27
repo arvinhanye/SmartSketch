@@ -1520,6 +1520,10 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 待人工：macOS 实测（脚本按 bash 3.2 写法编写，未在 Mac 上运行过）。详见 `docs/handoffs/claude-start-demo.md`。
 
+| DEMO-02 | DONE（待 PR 审查/合并） | `scripts/start-demo.sh --live`：真实大模型一键启动 | Claude | `claude/real-model-setup-zxgnka` / `main@62eb8c7` | 缺 `LLM_API_KEY` 时退出 1；假密钥与不可达地址下全流程启动，网页上传后 worker 以 `deepseek-flash` 调用主用客户端（connection 失败，无付费调用）；详见 `docs/handoffs/claude-start-demo-live.md` |
+
+- 待人工：在 Mac 上填真实 `LLM_API_KEY` 后上传一份资料，确认生成草稿图谱（付费调用）。
+
 ## 2026-09-27 前端改版（方向 A 工作台）+ 学生自助注册（Claude，新增任务）
 
 | ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |

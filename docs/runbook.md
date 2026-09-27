@@ -45,9 +45,22 @@ scripts/start-demo.sh
 - 本次进程一律用演示模型（`LLM_MODE=demo`、`EMBEDDING_MODE=demo`、`QA_SIMILARITY_THRESHOLD=0.58`），不改 `.env`，不产生付费调用。已有 `.env` 只会在 `AUTH_JWT_SECRET` 为空或过短时补一行随机值。
 - 可重复执行：已装依赖、已建账号、已导入课程都复用（导入报告 `publish_unchanged: true`）。
 - `Ctrl+C` 停止 API、worker 与前端；Neo4j 保留运行，停止用 `scripts/dev-down.sh`。
-- 选项：`--no-import` 跳过课程导入，`--no-open` 不开浏览器；`DEMO_WEB_PORT` 改前端端口。日志在 `.demo/logs/`。
+- 选项：`--live` 用真实大模型（见下），`--no-import` 跳过课程导入，`--no-open` 不开浏览器；`DEMO_WEB_PORT` 改前端端口。日志在 `.demo/logs/`。
 - 与手动步骤一样，后端进程从 `src/backend` 启动，相对的 `SQLITE_URL`/`STORAGE_DIR` 落在 `src/backend/storage/`，与下文手动方式共用同一份数据。
 - 若 Neo4j 库此前用 `fake` 或真实向量建过，API 会因向量空间不一致拒绝启动（见第 3 节），此时换新库或运行 `scripts/reembed.py`。
+
+### 一键启动，真实大模型（`--live`）
+
+网页里没有「接入 API」的设置项：模型密钥只放在服务端 `.env`，由 worker 在抽取时调用。步骤：
+
+1. 在 `.env` 填 `LLM_API_KEY=<DeepSeek 密钥>`；`LLM_BASE_URL`、`LLM_EXTRACTION_MODEL`、`LLM_CHAT_MODEL` 保持示例值（D-02a）。
+2. `scripts/start-demo.sh --live`。脚本启动前检查主用四项，缺一项就退出；本次进程用 `LLM_MODE=live`。
+3. 教师登录 → 课程 → 资料 → 上传 PDF/DOCX/TXT/Markdown；状态变为已完成后，到「审核」与「编辑图谱」查看草稿。
+
+- 向量：`.env` 的 `EMBEDDING_MODE` 为 `online`/`local` 时照用，否则沿用演示向量（D-02c 向量供应商未签收；DeepSeek 不提供向量接口）。沿用演示向量时与演示课程同一向量空间，不必换库，问答阈值仍用 0.58。
+- `--live` 不自动导入演示课程：首次导入会用真实模型抽取整套示例资料。已导入过的演示课程照常可用。
+- macOS 上未设置 `SSL_CERT_FILE` 时，脚本用 `.venv` 里的 certifi 根证书（缺时自动安装），免得 HTTPS 调模型报证书错误。
+- 每上传一份资料就会产生付费调用，受 `LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET` 限制。
 
 ### 方式 B：本机进程，手动（已测）
 
