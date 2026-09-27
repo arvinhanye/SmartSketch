@@ -1536,3 +1536,33 @@
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。块头比 J04 估算用的 `[n]` 多约 9 字节/块，J04 预算按 J04 渲染估算，实际提示略大，差值有上界（`max_chunks × 9` 字节），可接受。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
 - **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+
+## ADR-069：I05 推荐查询从绑定版本的已提交快照读图，一次解析、全量排序后截断
+
+- **日期**：2026-09-27
+- **背景**：I05 要求「请求全程同版本」「截断稳定」「未发布 404 与全掌握区别」「已提交图损坏 5xx」「有环明确错误」。G07 规定请求开始解析一次发布版；I02 的 `project_progress` 已按绑定版本投影进度（谱系取自已提交快照）；I03/I04 是纯函数。尚未确定的是推荐的图数据（节点属性、`PREREQUISITE` 边、章节树）从哪里读。
+- **决定**：
+  1. `GET /api/v1/courses/{cid}/recommend` 仅学生成员可用（`course_student`，与 ADR-064 一致），教师 403；从未发布为 404 `GRAPH_NOT_PUBLISHED`，与 200 `state = all_mastered` 区分。
+  2. 请求开始时调用一次 `resolve_published`；图取自该 `version_id` 在 SQLite 中的已提交快照（摘要复核后 `load_snapshot`），**不读 Neo4j 副本、不读草稿**。快照不可变、与 I02 投影所用谱系同源，因此图、进度投影、理由与响应 `graph_version` 必然同版本；推荐接口不依赖 Neo4j 可用。校验通过的图按 `(sqlite_url, version_id)` 缓存，损坏的不缓存。
+  3. 节点集由 I03 `build_prerequisite_graph` 做全图校验，只取 `type = PREREQUISITE` 的边；另核对投影节点集与图节点集一致。I04 对**全部**候选排序后才截断到 `limit`，`total_eligible` 为截断前总数；排序键 `(-score, chapter_rank, kp_id)` 是全序，`limit = k` 的结果恰为 `limit = 50` 结果的前 `k` 条。
+  4. `limit` 默认 10、范围 1～50（ADR-014 修订 1 决定 7），越界或非整数为通用 422 `VALIDATION_ERROR`（`fields[].field = "limit"`）。权重只取启动时校验过的 `RECOMMEND_WEIGHT_*`，请求不能传。
+  5. 已提交版完整性故障——快照缺失、摘要不符、不可解析、他课、`V = ∅`、环、自环、悬空端点、章节树损坏、未知章节、谱系违反修订 3 决定 16——以及其他未预期异常，一律 500 `INTERNAL_ERROR`，`details` 只含 `request_id`；错误种类（如 `cycle`）与环路节点只写服务端日志（ADR-017 决定 4、§1）。
+- **后果**：推荐不受 Neo4j 副本物化或补偿状态影响；代价是每个新版本首次请求需解析一次快照 JSON（之后命中缓存），MVP 规模可接受。快照里 `importance`/`difficulty` 的范围已由 `load_snapshot` 校验，越界值在读快照时即成为 500，I04 的 `invalid_number` 分支在此路径上不会触发。候选为空只可能是 `M = V`（DAG 必有入度 0 的点），因此 `all_mastered` 与 `total_eligible = 0` 等价。
+- **回滚**：撤销 `app/services/learning/recommend.py`、`app/api/recommend.py`、`tests/backend/test_i05.py`，以及 `app/main.py` 的路由注册、`app/schemas/contracts.py` 的一行导出；无迁移、契约与依赖变更。
+- **签收**：待 ArvinHan 签收（第 2 条「图读快照而非 Neo4j」与第 1 条教师 403 为 Claude 选定）。
+
+## ADR-070：教师审核队列页的数量口径、单写与合并交互（H09）
+
+- **日期**：2026-09-27
+- **背景**：F11（ADR-060）提供了 `getReviewQueue`（三栏、键集分页、完整 `totals`）与 `resolveReviewItem`（通过 / 拒绝 / 合并 / 不是重复 / 确认保留）。H09 的验收是「三类空态、重复操作、合并冲突；刷新后数量一致」。未定的是：页面显示的数量从哪来、处理后其他栏的连带变化怎样同步、连点与并发怎样防、合并时怎样选主节点、成环等冲突怎样呈现、关系两端只有 ID 时显示什么。
+- **决定**：
+  1. **页面与入口**：`/courses/:cid/review`（`REVIEW_ROUTE`，仅教师账号）；课程内角色非教师时不读队列。课程页只对课程内教师显示「审核队列」入口。三栏上下排列，顶部有带数量的栏目导航。
+  2. **数量以服务端为准**：栏目数量只取服务端 `totals`（读队列、加载更多、处理结果都带回），本地不加减，所以刷新页面后的数量与处理后显示的一致。
+  3. **一次只处理一条**：任一处理在途时所有处理按钮禁用，同一条连点只发一次；在途的刷新与加载更多作废。服务端返回 `changed = false`（同一动作此前已生效）时照常移除该条，提示「此前已处理」。
+  4. **连带变化不在本地猜**：拒绝关系、拒绝孤立知识点、合并成功后，以及条目已不在队列（404）、修订冲突、422、网络中断或超时（无法确认结果）后，重新读取三栏第一页，条数取「当前已加载的最大栏条数」（不少于 50，不超过 200）。通过关系、不是重复、确认保留不影响其他栏，不重新读取。加载更多遇 422（游标失效）也从第一页重读。
+  5. **合并**：疑似重复先点「合并…」展开主知识点单选（默认第一项），说明「名称并入别名，关系与来源迁到主知识点，主知识点被锁定，合并后不能自动拆回」，确认后才提交 `merge` + `primary_id`；不带 `expected_revisions`（`ReviewDuplicateAction` 契约没有该字段）。
+  6. **冲突呈现**：409 `CYCLE_DETECTED` 把 `details.cycle` 换成名称路径显示在该条下，条目保留、不重读，教师可改为「不是重复」或去图谱编辑页调整前置关系；`COURSE_BUSY` 提示稍后重试；`REVISION_CONFLICT` 提示并重读。只按错误码给固定文案，不回显服务端 message。
+  7. **名称**：关系只有两端 ID，页面同时读草稿图谱（`DraftGraphApi`）仅用于 ID → 名称；读取失败不影响审核，退回显示 ID。合并后重读时一并刷新名称。
+- **后果**：每次影响其他栏的处理多一次队列读取与一次草稿读取（单课程规模可接受）。重读只取第一页窗口，已加载超过 200 条的栏会截到 200 条并给出「加载更多」。本页不写课程 store 的草稿图，教师图谱编辑页进入时自行重读草稿，不会看到合并前的旧图。
+- **回滚**：撤销 `views/ReviewView.vue`、`composables/useReview.ts`、`api/review.ts`、`router/index.ts` 与 `main.ts` 的注册、`views/CoursesView.vue` 的入口、`tests/frontend/h09.test.ts`；无契约、后端或数据变更。
+- **签收**：待 ArvinHan 审阅（以上约定由 Claude 选定并在交接中报告）。

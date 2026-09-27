@@ -43,6 +43,7 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 - 图谱筛选与布局（H05）：`composables/useGraphFilters.ts` 在适配图上按搜索词、关系类型、知识点类型、审核状态、章节算出可见图（关系须两端可见，无悬空边），并给元素打 `rejected`/`lowConfidence`/`selected` 状态；选中与布局独立于筛选条件。`components/GraphToolbar.vue` 是搜索、关系图例兼筛选、布局切换与清空的受控组件。`GraphCanvas` 的 `layout` 属性经 `lifecycle.setLayout` 在原图上重新布局（层次 `antv-dagre`／力导向 `d3-force`），不重建、不重设数据（ADR-052）。
 - 学生图谱页（H11）：`views/StudentGraphView.vue`（`/courses/:cid/graph`）组装画布、工具栏、卡片与详情；`composables/useStudentGraph.ts` 只在课程内学生角色下、按 `Course.published_version` 经 `api/graph.ts` 读图并核对响应的 `course_id`/`graph_version`，任何入口不读草稿；`components/KnowledgeCards.vue` 是分页、可键盘操作的卡片视图，与图共用 `useGraphFilters` 的筛选与选中（ADR-063）。
 - 教师图谱编辑页（H14）：`views/TeacherGraphView.vue`（`/courses/:cid/graph/edit`，仅教师账号）组装草稿画布、工具栏与三个页签面板（H06 详情、H07 节点编辑、H08 关系编辑）；`composables/useTeacherGraph.ts` 只在课程内教师角色下经 `api/graph.ts` 的 `DraftGraphApi`（不带版本号）读草稿，核对 `course_id` 且 `graph_version` 为 null 后写入课程 store，三个编辑器共用这份图，成功写回后画布随之更新；`useSelectionGuard` 在节点面板有未保存修改时先确认再切换（ADR-067）。
+- 教师审核队列页（H09）：`views/ReviewView.vue`（`/courses/:cid/review`，仅教师账号）展示低置信度关系、疑似重复、孤立知识点三栏并转发处理；`composables/useReview.ts` 在课程内教师角色下经 `api/review.ts` 读队列（键集分页）、单项处理与合并，数量只取服务端 `totals`，一次只允许一个处理，会连带影响其他栏的处理后重读三栏；关系两端名称取自草稿图谱，读不到退回 ID（ADR-070）。
 
 ## 后端启动与健康检查（B05）
 
@@ -123,7 +124,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 | `NodeSource` | `ai`、`manual` | lower | `KnowledgePoint.source`、`Relation.source` | 一致。自动降级只作用于未经教师确认的 `ai` 边（`status ∈ {draft, low_confidence}`，见规格「前置关系成环处理」） |
 | `DocumentFormat` | `pdf`、`docx`、`txt`、`markdown` | lower | `Document.format` | 一致。wire 值是 `markdown`，扩展名 `.md` 不是枚举值 |
 | `Role` | `teacher`、`student` | lower | `User.role` | 一致 |
-| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影；I02 的 `app/services/learning/progress.py` 负责投影与批量写入，`GET`/`PUT /progress` 仅学生成员可用（ADR-064） |
+| `MasteryStatus` | `unknown`、`learning`、`mastered` | lower | 进度读写 | 一致；I01 的 SQLite `learning_progress` 以 `(user_id, course_id, kp_id)` 为主键保存原始状态、`updated_at` 与共享序列 `write_seq`，跨版本继承只在读时投影；I02 的 `app/services/learning/progress.py` 负责投影与批量写入，`GET`/`PUT /progress` 仅学生成员可用（ADR-064）；I05 `GET /recommend` 在同一绑定版本上读已提交快照的图与该投影计算推荐（ADR-069） |
 | `ChatStatus` | `answered`、`not_covered` | lower | `ChatResponse.status`（判别字段）、`ChatMetaEvent.status` | 一致 |
 | `NotCoveredReason` | `no_retrieval_hit`、`below_similarity_threshold`、`insufficient_evidence`、`all_citations_invalidated` | lower | `ChatNotCovered.reason` | `ff30e0` 无此枚举。`insufficient_evidence` 取代 `740adb` 的旧值（语义为生成模型以哨兵声明证据不足），A09 决定（ADR-015 决定 3），B13 落实真源；前两者不调用生成，后两者调用了生成 |
 | 内联枚举 | `ChatTurn.role`：`user`、`assistant`；`LoginResponse.token_type`：`bearer`；`/health` 的 `status`：`ok` | lower | 见左 | 一致 |
