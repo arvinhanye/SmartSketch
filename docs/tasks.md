@@ -1,5 +1,15 @@
 # 任务看板
 
+## 2026-09-28 Codex 认领：登录页提示与视口布局
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-LOGIN-01 | DONE | Codex（前端） | `App.vue`、登录页相关样式、`tests/frontend/h13.test.ts`、身份规格、交接 | 未登录提示可用按钮关闭；登录页在 720px 浏览器视口无纵向溢出；矮窗口表单栏保留内部滚动 |
+
+- 输入：现有 `query.notice` 提示和 `AuthLayout` 登录布局；输出：可关闭提示及填满剩余视口的登录页。依赖：现有 Vue 路由与 H13 登录表单。风险：矮视口下表单高度可能超过可用区域，需让表单区域独立滚动。
+- 验证：在 `src/frontend` 运行 `npm run test -- --run h13.test.ts`（29 passed）、`npm run test -- --run`（766 passed）、`npm run type-check`（通过）、`npm run build`（通过）；浏览器实测未登录提示可关闭，关闭前后 `document.documentElement.scrollHeight === window.innerHeight === 720`。`git diff --check` 通过。`./scripts/verify.sh` 已尝试，WSL 中因 Windows 检出脚本的 CRLF shebang 报 `env: bash\r: No such file or directory`，本机未安装 Git Bash。
+- 交接：`docs/handoffs/codex-ui-login-01.md`。当前工作树基线 `main@62eb8c7`，比 `origin/main` 落后 6 次提交；尝试快进时因本机 `.git` 写入权限不足失败。
+
 ## K05 教师主线 E2E（Codex）
 
 | ID | 状态 | 负责人 | 范围 | 验收 |

@@ -230,6 +230,18 @@ describe('H13 登录页', () => {
     expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('current-password')
   })
 
+  it('未登录提示可关闭，关闭后登录表单仍可使用', async () => {
+    const { wrapper } = await mountApp({ path: '/teacher' })
+    const close = wrapper.get('button[aria-label="关闭提示"]')
+    expect(wrapper.get('[role="alert"]').text()).toContain('未登录')
+
+    await close.trigger('click')
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('input[name="username"]').exists()).toBe(true)
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
+  })
+
   it.each([
     ['teacher', '/teacher', '教师首页'],
     ['student', '/student', '学生首页'],

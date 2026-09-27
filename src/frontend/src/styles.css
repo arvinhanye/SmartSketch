@@ -246,6 +246,27 @@ button[data-variant="danger"]:hover:not(:disabled) {
   color: var(--color-text-muted);
 }
 
+.app-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+}
+
+.app-notice__close {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  background: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.app-notice__close:hover:not(:disabled) {
+  background: rgb(143 35 35 / 10%);
+}
+
 /* ---------------------------------------------------------------- 卡片与列表 */
 
 ul,
@@ -342,6 +363,39 @@ tr:last-child td {
 .app:not(.app--workbench) .app-main:has(> .auth-layout) {
   max-width: none;
   padding: 0;
+}
+
+/* 登录页占满视口；提示条占自身高度，表单使用剩余空间。 */
+.app--login {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app--login .app-main {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: none;
+  padding: 0;
+}
+
+.app.app--login .auth-layout {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app.app--login .auth-layout__brand {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 窄而矮的窗口中只让表单栏内部滚动，避免隐藏提交按钮。 */
+.app.app--login .auth-layout__form {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* 组件里的 <section> 直接落在 .app-main 的网格里，统一卡片外观 */
