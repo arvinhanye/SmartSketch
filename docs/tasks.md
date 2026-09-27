@@ -1326,3 +1326,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 断点：上一会话只给 issue #281 打了 `status:in-progress`，无分支、无提交，本轮从 `main@f2fbf1e` 从零实现。
 - H14：ADR-067 已由 ArvinHan 2026-09-27 签收（三页签布局、页内确认 + `window.confirm` 离开确认、刷新在途遇写入则重拉）；PR #285 已合入；离开本页不清空课程 store 的草稿图（目前无页面直接读 `store.graph`，已记入 ADR 后果）。
 - 解锁：K05 教师主线 E2E 的 H14 依赖满足（仍依赖 H09、H10 等）。
+
+## 2026-09-27 J05 有证据问答生成（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J05 | DONE（待 PR 审查/合并；issue #134） | 实现有证据问答生成 | ArvinHan（Claude） | `claude/project-thread-bkxc2u` / `main@ac21e5d` | `src/backend/app/services/qa/generate.py`、`prompts/answer_with_context.yaml`（v1 → v2）、`tests/backend/test_j05.py`；扩围 `prompts/MANIFEST.md`（一行，E01 规则要求升版本同提交更新摘要）、`tests/backend/test_e01.py`（一行，版本改读清单）、`specs/grounded-qa.md`（「待细化」一条）、`docs/decisions.md`（ADR-068）、`docs/handoffs/claude-j05.md` | 红灯：收集错误（模块不存在）；`test_j05.py` 65 passed；22 处反向篡改全部检出（初次 2 处存活，补 2 个用例）；后端全量 3288 passed / 27 skipped；`verify.sh` 通过；`git diff --check` 通过；`docs/handoffs/claude-j05.md` |
+
+- 验收：J04 上下文为空或低于阈值 → `SkippedGeneration`，fake 调用数与 `model_calls` 行数均为 0（QA-6、QA-7 的 J05 部分）；资料中的「忽略以上指令」、伪造的 `<<课程资料结束>>`、`<<资料 9>>` 块头与哨兵都留在资料段内且被中和，代码 `a[1]`、`cout << x` 原样保留（主验收第 10 条）；链路到期（开始前、读取中、供应商读满剩余时间）为 `LLM_UNAVAILABLE` + `timeout`，与首字前其他故障的 `upstream` 区分（O9 与 QA-24～29 的 J05 部分）；生成接口不接收历史（QA-19）。只用 fake 模型。
+- 验证：`python3 -m pytest tests/backend/test_j05.py -q`。
+- 待决（ArvinHan）：ADR-068 签收（输出上限 1024 暂定、`<<资料 n>>` 块头、0.25 秒超时容差）；`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现（适配器超时覆盖整条流）；提示效果待 K03 真实模型评测，付费调用需另行同意。
+- 解锁：J06（J05 + B13）。

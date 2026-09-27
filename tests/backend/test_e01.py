@@ -349,7 +349,7 @@ def test_repo_templates_never_use_evals_spelling_and_hold_no_secrets():
 
 
 def test_answer_prompt_carries_sentinel_and_citation_contract():
-    template = PromptLibrary().get("answer_with_context", 1)
+    template = PromptLibrary().get("answer_with_context", int(_manifest_rows()["answer_with_context"][1]))
 
     assert "<<INSUFFICIENT_EVIDENCE>>" in template.template  # ADR-015 决定 3
     assert "[n]" in template.template  # ADR-015 决定 2

@@ -14,7 +14,7 @@
 | `judge_duplicate` | 2 | `name_a`、`definition_a`、`sources_a`、`name_b`、`definition_b`、`sources_b` | `evaluation/evaluate_extraction.py` | `1523521301541090a9c82c0b3398a534bfa655a30d211f9cca7d220aeada589d` | E10 | 草稿 |
 | `summarize_definition` | 2 | `name`、`definitions`、`sources` | `evaluation/evaluate_extraction.py` | `52336dd1e2c9d8108db9fdab0d373fe129b46c0f1fad0fb2c8a3bc081e550a97` | E10 | 草稿 |
 | `rewrite_query` | 2 | `history`、`question` | `evaluation/evaluate_qa.py` | `26c5779846c8a164ef25b9b68d5b6f764f26545b1dc9300ae292b93a1c3ac261` | J03 | 草稿 |
-| `answer_with_context` | 1 | `context`、`question` | `evaluation/evaluate_qa.py` | `3deb3eb06ce8f3dabdf282e4445359c36522d70b918f9938996c604d3583bcba` | J05 | 占位 |
+| `answer_with_context` | 2 | `graph_context`、`context`、`question` | `evaluation/evaluate_qa.py` | `d3eab47c7e20ce641c5bf7321acda247a08235d0e36e6a7b69b0feac681df97b` | J05 | 草稿 |
 | `gen_study_material` | — | — | — | — | O06 | 未建：待 O01 准入 |
 
 - **状态**：`占位` = E01 写的最小可用正文，只保证装载与调用链可测，不代表提示词效果；负责任务替换正文时升版本并改为 `草稿`，在自编标注集上跑过对应评测后改为 `在用`。`gen_study_material` 属加分项，`docs/atomic-task-plan.md` 规定 O01 未批准时 O 项不执行，因此不建文件，装载器对它报「未知用途」。
