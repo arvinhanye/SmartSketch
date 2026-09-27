@@ -26,6 +26,7 @@ from app.services.ai.compatible import CompatibleEmbeddingClient, CompatibleMode
 from app.services.ai.embeddings import EmbeddingAdapter
 from app.services.ai.fake import FakeEmbeddingClient, FakeModelClient
 from app.services.ai.policy import ModelCallPolicy, new_call_id
+from app.services.qa.audit import ChatAudit
 from app.services.qa.chat import ChatFailure, ChatService
 from app.services.qa.generate import AnswerGenerator
 from app.services.qa.rewrite import QueryRewriter
@@ -76,7 +77,7 @@ def _sse(event: dict[str, Any]) -> str:
     return f"event: {event['event']}\ndata: {json.dumps(event, ensure_ascii=False, separators=(',', ':'))}\n\n"
 
 
-async def _stream(request: Request, service: ChatService, prepared: Any):
+async def _stream(request: Request, service: ChatService, prepared: Any, audit: ChatAudit):
     queue: Queue[dict[str, Any] | None] = Queue(maxsize=8)
     stop = Event()
 
@@ -89,7 +90,7 @@ async def _stream(request: Request, service: ChatService, prepared: Any):
                 continue
 
     def produce() -> None:
-        events = service.events(prepared, stop)
+        events = service.events(prepared, stop, audit)
         try:
             for event in events:
                 if stop.is_set():
@@ -113,6 +114,7 @@ async def _stream(request: Request, service: ChatService, prepared: Any):
             if event is None:
                 break
             yield _sse(event)
+            audit.observe(event)
             if event["event"] in ("done", "error"):
                 terminal = True
                 break
@@ -120,6 +122,8 @@ async def _stream(request: Request, service: ChatService, prepared: Any):
         stop.set()
         if not terminal:
             logger.info("chat aborted request_id=%s", prepared.request_id)
+        # A disconnect cancels this task and any further await; write off the event loop.
+        Thread(target=audit.record, daemon=True, name="chat-log").start()
 
 
 @router.post(
@@ -144,6 +148,16 @@ def chat(
         failure = ChatFailure("INTERNAL_ERROR")
         return JSONResponse(status_code=failure.status_code, content=failure.body())
     request_id = new_call_id()
+    # P2 passed: from here on every outcome writes exactly one chat log (J10, Q10).
+    audit = ChatAudit(settings.SQLITE_URL, request_id=request_id, user_id=access.user.id,
+                      version=version, question=payload.question, started=started)
+
+    def failed(failure: ChatFailure) -> JSONResponse:
+        body = failure.body(request_id)
+        audit.fail(body)
+        audit.record()
+        return JSONResponse(status_code=failure.status_code, content=body)
+
     try:
         service = chat_service(request)
         prepared = service.prepare(
@@ -151,28 +165,28 @@ def chat(
             question=payload.question, history=payload.history, kp_id=payload.kp_id,
         )
     except ChatFailure as failure:
-        return JSONResponse(status_code=failure.status_code, content=failure.body(request_id))
+        return failed(failure)
     except (VectorSpaceError, sqlite3.Error):
-        failure = ChatFailure("STORAGE_UNAVAILABLE")
-        return JSONResponse(status_code=failure.status_code, content=failure.body(request_id))
+        return failed(ChatFailure("STORAGE_UNAVAILABLE"))
     except Exception as error:
         logger.error("chat preparation failed request_id=%s error_type=%s",
                      request_id, type(error).__name__)
-        failure = ChatFailure("INTERNAL_ERROR")
-        return JSONResponse(status_code=failure.status_code, content=failure.body(request_id))
+        return failed(ChatFailure("INTERNAL_ERROR"))
 
     if request.headers.get("accept", "").split(",")[0].strip() == "application/json":
-        for event in service.events(prepared):
+        for event in service.events(prepared, audit=audit):
+            audit.observe(event)
             if event["event"] == "done":
+                audit.record()
                 return JSONResponse(content=event["final"])
             if event["event"] == "error":
+                audit.record()
                 failure = event["error"]
                 status = {"BUDGET_EXCEEDED": 429, "INTERNAL_ERROR": 500}.get(failure["code"], 503)
                 return JSONResponse(status_code=status, content=failure)
-        failure = ChatFailure("INTERNAL_ERROR")
-        return JSONResponse(status_code=500, content=failure.body(request_id))
+        return failed(ChatFailure("INTERNAL_ERROR"))
 
     return StreamingResponse(
-        _stream(request, service, prepared), media_type="text/event-stream",
+        _stream(request, service, prepared, audit), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

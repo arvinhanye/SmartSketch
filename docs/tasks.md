@@ -1449,7 +1449,7 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 范围 | 验收证据 |
 | --- | --- | --- | --- |
-| J10 | IMPLEMENTED / 定向验证通过，待 CI | `014_chat_logs.sql`、`chat_logs.py`、`test_j10.py` | 按 Q10 建立终态日志及唯一请求 ID；保留原问题和引用编号/文本块 ID，不保存回答或模型原始输出；写入时清理 30 天前记录。`test_j10.py` 1 passed。 |
+| J10 | DONE（Claude 接手续做，见下；待 PR 审查/合并） | `014_chat_logs.sql`、`chat_logs.py`、`test_j10.py` | 按 Q10 建立终态日志及唯一请求 ID；保留原问题和引用编号/文本块 ID，不保存回答或模型原始输出；写入时清理 30 天前记录。`test_j10.py` 1 passed。 |
 
 - J07 后续在 P2 成功后接入日志写入；P1/P2 失败不调用此仓储。迁移编号顺延至 014，以避开已存在的 012、013。
 - PR #295 Backend CI 修复：014 迁移补回滚步骤，F11 迁移回滚用例限制迁移范围；原失败三例与 J10 定向测试共 4 passed，待 GitHub CI 重跑。
@@ -1458,4 +1458,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 任务 | 分支 | 修改范围 | 验证 |
 | --- | --- | --- | --- | --- | --- |
-| K04 | IMPLEMENTED / 待 PR 与完整验证 | 固定约 2 万字样本的 worker 阶段耗时、token 与可选问答测量 | `codex/k04-benchmark-pipeline` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py` | 定向测试 1 passed；真实服务与付费模型尚未实测，J07 问答接口待合入 |
+| K04 | DONE（Claude 接手续做，见下；真实服务与付费模型未实测） | 固定约 2 万字样本的 worker 阶段耗时、token 与可选问答测量 | `codex/k04-benchmark-pipeline` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py` | 定向测试 1 passed；真实服务与付费模型尚未实测，J07 问答接口待合入 |
+
+## 2026-09-27 接手 kongsc 未完成的 J10、K04（Claude）
+
+| ID | 状态 | 续做内容 | 负责人 | 分支 / 基线 | 文件锁 | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J10 | DONE（待 PR 审查/合并） | 接入 J07：P2 后每个请求恰好一行（`answered`/`not_covered`/`error`/`aborted`），诊断字段、首字时延；写入核对版本属于课程；按课程的 `list_chat_logs`/`get_chat_log`/`chat_stats`；课程索引；ADR-073 | ArvinHan（Claude），接 kongsc PR #295 | `claude/clever-dirac-y8fng3` / `main@9c66dcf` + 合并 `codex/j10-chat-logs@bfeb16c` | `src/backend/app/repositories/chat_logs.py`、`migrations/014_chat_logs.sql`、新增 `services/qa/audit.py`；范围扩展：`api/chat.py`、`services/qa/chat.py`（仅加 `audit` 参数与接线）、`tests/backend/test_j10.py` | `test_j10.py` 19 passed；12 处反向篡改全部判红（见交接）；后端全量 3466 passed / 27 skipped；`verify.sh` exit 0；交接 `docs/handoffs/claude-j10.md` |
+| K04 | DONE（未做真实/付费实测） | 问答改为 SSE 测首字与完成；报告加问答模型、首字 p50/p95、结局计数；补 12 个离线测试（表结构、报告字段、SSE 计时、付费守卫）；`evaluation/README.md` §9 | ArvinHan（Claude），接 kongsc PR #296 | 同上 + 合并 `codex/k04-benchmark-pipeline@4ad2574` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py`、`evaluation/README.md` | `test_k04.py` 13 passed；8 处反向篡改 7 处判红，1 处为等价变异（见交接）；交接 `docs/handoffs/claude-k04.md` |
+
+- 待决（ArvinHan）：ADR-073 三项签收（原问题原文留存 30 天不自动脱敏；断开以「已送达」判定；本轮无日志查询 HTTP 端点）；K04 的真实服务实测与付费执行需另行确认（D-02）；PR #295、#296 在 kongsc 名下，是否以本分支新 PR 替代并关闭原 PR 由 ArvinHan/kongsc 决定。
+

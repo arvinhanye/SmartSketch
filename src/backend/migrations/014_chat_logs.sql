@@ -1,6 +1,7 @@
 -- J10: one row for each chat request that passed P2 version binding.
 -- Rollback: stop API/worker and restore backups/*-before-014.sqlite.
 -- Manual rollback (drops chat history):
+-- ROLLBACK: DROP INDEX chat_logs_course_created_at;
 -- ROLLBACK: DROP INDEX chat_logs_created_at;
 -- ROLLBACK: DROP TABLE chat_logs;
 -- ROLLBACK: DELETE FROM schema_migrations WHERE filename LIKE '%_chat_logs.sql';
@@ -26,3 +27,4 @@ CREATE TABLE chat_logs (
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX chat_logs_created_at ON chat_logs(created_at);
+CREATE INDEX chat_logs_course_created_at ON chat_logs(course_id, created_at);
