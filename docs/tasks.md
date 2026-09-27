@@ -1466,3 +1466,10 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收对应：① 乐观标记失败完整回滚且固定文案（不回显服务端 `message`）；② 同一节点在途写入只发一次、按钮禁用；③ 切课用 `CourseRequestScope` + 序号隔离，课程 A 的迟到推荐/进度不写入课程 B；④ 理由逐条取自服务端 `reason_facts`/`weighted`，前端不重算 `score`；⑤ 只在已显示发布版本上读写，响应 `graph_version` 不一致即丢弃并重读图，422 `not_in_published_version` 撤销后重读进度；⑥ 未发布 404 空白态且不读图、教师 403 不给可点击入口；⑦ `all_mastered`/`recommendations` 两个 200 状态与 404/500 的区分，完整性错误只提示 `request_id`；⑧ 状态色由 `CanvasElementState` 驱动、颜色集中在 `buildGraphOptions`。
 - **需签收（ADR-075）**：清单验收条目 5 的字面表述「PUT progress 请求带 `graph_version`」与契约冲突——`updateProgress` 的请求体是 `additionalProperties: false` 的 `ProgressUpdate[]`，该操作 `query` 为 `never`，后端 `write_progress` 也无版本参数。实现改为「只在已显示版本上写 + 响应版本比对 + 422 重读」，**不自造字段**（自造字段会被契约拒绝，未声明查询参数会被服务端忽略而给出虚假安全感）。另需签收：学习接口未注入时页面静默退回 H11 原状；掌握标记三态（未开始/学习中/已掌握）直接写 `MasteryStatus`，不引入第四种状态或「跳过先修」操作。
 - 待决：真实后端联调（I02/I05 已合入 `main`，本轮仅假 API 验证）交 K06 学生主线 E2E；推荐列表上限未在页面暴露（用服务端默认 10）；进度变化后继承来源（`inherited_from[]`）未在 UI 展示（契约已具备，是否需要展开待定）。
+## 2026-09-27 J09 课程问答页（Codex）
+
+| ID | 状态 | 范围 |
+| --- | --- | --- |
+| J09 | REVIEWED / 待 CI 验证 | `src/frontend/src/views/ChatView.vue`、`src/frontend/src/composables/useChat.ts`、`src/frontend/src/components/ChatMarkdown.vue`：问答流展示、撤回、引用、历史、切课与版本标注。 |
+
+- 审查修复：按 J08 `send` / `onEvent` 接口接入，保留 `done` 后才提交历史的规则。

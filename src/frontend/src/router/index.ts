@@ -34,6 +34,7 @@ export const STUDENT_GRAPH_ROUTE = 'course-graph'
 export const TEACHER_GRAPH_ROUTE = 'course-graph-edit'
 /** 教师审核队列页（H09），参数 `cid`；仅教师账号可进入，课程内角色由页面按 `Course.my_role` 判断 */
 export const REVIEW_ROUTE = 'course-review'
+export const CHAT_ROUTE = 'course-chat'
 const HOME_ROUTE: Record<Role, string> = { teacher: 'teacher-home', student: 'student-home' }
 
 /** 该账号类型的默认首页路由名（登录成功后按 `LoginResponse.user.role` 跳转） */
@@ -62,6 +63,8 @@ export interface AppRouterOptions {
   teacherGraphComponent?: Component
   /** 审核队列页（H09）。注入后注册 `/courses/:cid/review` */
   reviewComponent?: Component
+  /** J09：课程问答页，课程内权限由后端判定。 */
+  chatComponent?: Component
 }
 
 export function createAppRouter({
@@ -74,6 +77,7 @@ export function createAppRouter({
   studentGraphComponent,
   teacherGraphComponent,
   reviewComponent,
+  chatComponent,
 }: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
@@ -138,6 +142,9 @@ export function createAppRouter({
       component: reviewComponent,
       meta: { accountRole: 'teacher' },
     })
+  }
+  if (chatComponent) {
+    routes.push({ path: '/courses/:cid/chat', name: CHAT_ROUTE, component: chatComponent, meta: { anyAccountRole: true } })
   }
   routes.push({ path: '/:pathMatch(.*)*', redirect: '/' })
 

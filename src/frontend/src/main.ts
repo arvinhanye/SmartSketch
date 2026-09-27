@@ -14,6 +14,7 @@ import { createRecommendApi, RECOMMEND_API_KEY } from './api/recommend'
 import { createReviewApi, REVIEW_API_KEY } from './api/review'
 import { createVersionsApi, VERSIONS_API_KEY } from './api/versions'
 import { createTaskEventsClient } from './api/taskEvents'
+import { CHAT_STREAM_CLIENT_KEY, createChatStreamClient } from './api/chatStream'
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from './router'
 import { useSessionStore } from './stores/session'
 import CoursesView from './views/CoursesView.vue'
@@ -23,6 +24,7 @@ import MaterialsView from './views/MaterialsView.vue'
 import StudentGraphView from './views/StudentGraphView.vue'
 import ReviewView from './views/ReviewView.vue'
 import TeacherGraphView from './views/TeacherGraphView.vue'
+import ChatView from './views/ChatView.vue'
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
@@ -44,6 +46,7 @@ const router = createAppRouter({
   teacherGraphComponent: TeacherGraphView,
   // H09：审核队列 /courses/:cid/review（处理草稿）
   reviewComponent: ReviewView,
+  chatComponent: ChatView,
 })
 
 // 受保护接口 401：清会话与课程上下文后回登录页
@@ -67,4 +70,11 @@ createApp(App)
   .provide(RECOMMEND_API_KEY, createRecommendApi(http))
   .provide(VERSIONS_API_KEY, createVersionsApi(http))
   .provide(TASK_EVENTS_CLIENT_KEY, createTaskEventsClient({ client: http }))
+  .provide(CHAT_STREAM_CLIENT_KEY, createChatStreamClient({
+    getAccessToken: () => session.accessToken,
+    onUnauthenticated: () => {
+      session.signOut()
+      void router.replace({ name: ROOT_ROUTE, query: { notice: NOTICE_UNAUTHENTICATED } })
+    },
+  }))
   .mount('#app')
