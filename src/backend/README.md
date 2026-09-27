@@ -34,7 +34,9 @@ $env:AUTH_JWT_SECRET = .\.venv\Scripts\python.exe -c "import secrets; print(secr
 PYTHONPATH=src/backend python3 -m app.repositories.graph_migrations
 ```
 
-`001_constraints.cypher` 使用逐条 `IF NOT EXISTS`，重复运行不重建已有约束。若历史数据违反唯一性，迁移在对应语句失败并保留已完成的 DDL；停机修复冲突数据后重跑。回滚不是删除约束或图数据：恢复迁移前的 Neo4j 备份，并按 K10 核对 SQLite/Neo4j 时间点。向量空间索引由 `GraphVectorWriter.ensure_vector_indexes(space)` 分空间创建；切换前旧索引和属性保持不变。
+`001_constraints.cypher` 使用逐条 `IF NOT EXISTS`，重复运行不重建已有约束。若历史数据违反唯一性，迁移在对应语句失败并保留已完成的 DDL；停机修复冲突数据后重跑。回滚不是删除约束或图数据：恢复迁移前的 Neo4j 备份，并按 K10 核对 SQLite/Neo4j 时间点。同一命令随后为 SQLite 记录的当前向量空间创建知识点与文本块两个向量索引，并等待其上线（首次运行时按 `EMBEDDING_*` 初始化记录；配置与记录不符时拒绝，需先运行 `scripts/reembed.py`，ADR-055）；没有这一步，发布 P9 核对失败、问答检索报存储不可用。F14 切换空间时由 `scripts/reembed.py` 为新空间建索引，切换前旧索引和属性保持不变。
+
+本 ADR 之前已经提交的版本缺文本块向量时，运行 `PYTHONPATH=src/backend python3 scripts/backfill_chunk_vectors.py`（可加 `--course`、`--version`、`--dry-run`）按版本补齐，服务运行中也可执行（ADR-055）。
 
 ## SQLite 迁移与恢复（C01）
 
