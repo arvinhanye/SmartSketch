@@ -38,7 +38,7 @@ export AUTH_JWT_SECRET="${AUTH_JWT_SECRET:-e2e-only-signing-key-0123456789abcdef
 export WORKER_HEARTBEAT_FILE="$RUN_DIR/worker.heartbeat"
 export E2E_PASSWORD="${E2E_PASSWORD:-e2e-demo-pass-1}"
 export E2E_TEACHER_PASSWORD="$E2E_PASSWORD" E2E_STUDENT_PASSWORD="$E2E_PASSWORD"
-# 演示向量下的相似度闸门（ADR-079 实测：覆盖问题 ≥ 0.63、无关问题 ≤ 0.54）
+# 演示向量下的相似度闸门（ADR-076 实测：覆盖问题 ≥ 0.63、无关问题 ≤ 0.54）
 export QA_SIMILARITY_THRESHOLD="${E2E_QA_SIMILARITY_THRESHOLD:-0.58}"
 
 set -m  # 后台任务各自成组，便于清理

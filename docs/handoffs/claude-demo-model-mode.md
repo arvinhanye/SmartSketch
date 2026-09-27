@@ -1,4 +1,4 @@
-# Claude 交接：演示模型模式（LLM_MODE=demo / EMBEDDING_MODE=demo，ADR-079）
+# Claude 交接：演示模型模式（LLM_MODE=demo / EMBEDDING_MODE=demo，ADR-076）
 
 - 分支：`claude/demo-model-mode`（基于 origin/main `f6325fe`，未 push、未开 PR）
 - 状态：完成，待审查（review_status: ready_for_review）
@@ -102,9 +102,9 @@ Neo4j 容器：`docker run -d --name ss-neo4j-demo -e NEO4J_AUTH=neo4j/testpassw
 | --- | --- | --- | --- | --- |
 | DEMO-01 | 演示模型模式：`LLM_MODE=demo` / `EMBEDDING_MODE=demo`，无付费模型跑通抽取与问答真实链路 | Claude | DONE（待审查） | `tests/backend/test_demo_mode.py` 19 passed；`tests/integration/test_demo_mode_live.py` 3 passed（Neo4j 5.26）；后端全量绿；`docs/handoffs/claude-demo-model-mode.md` |
 
-### docs/decisions.md：ADR-079
+### docs/decisions.md：ADR-076
 
-**ADR-079 演示模型模式（LLM_MODE=demo / EMBEDDING_MODE=demo）**（2026-09-27）
+**ADR-076 演示模型模式（LLM_MODE=demo / EMBEDDING_MODE=demo）**（2026-09-27）
 
 - 背景：需要不调用付费模型就把整套应用（上传→抽取→审核→发布；浏览→掌握→推荐→问答）跑起来验收，并支撑 K05/K06 端到端。`fake` 模式的缺省输出不被解析器接受（抽取任务直接失败），fake 向量与语义无关（问答闸门几乎永远拒答）；大量既有测试依赖 fake 的现有行为，不能改。
 - 决定：

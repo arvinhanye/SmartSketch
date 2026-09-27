@@ -83,7 +83,7 @@ class EmbeddingAdapter:
         self._client = client
         self._cache = cache if cache is not None else EmbeddingCache()
         is_fake = settings.EMBEDDING_MODE == "fake"
-        # demo 用保留模型 ID，自成 ``real/<ID>/<维度>`` 空间（ADR-079）
+        # demo 用保留模型 ID，自成 ``real/<ID>/<维度>`` 空间（ADR-076）
         self._model = embedding_model_id(settings)
         if not self._model:
             raise ValueError("EMBEDDING_MODEL is required for online/local embedding")

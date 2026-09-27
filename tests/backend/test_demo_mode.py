@@ -1,4 +1,4 @@
-"""演示模型模式（ADR-079）：``LLM_MODE=demo`` / ``EMBEDDING_MODE=demo``。
+"""演示模型模式（ADR-076）：``LLM_MODE=demo`` / ``EMBEDDING_MODE=demo``。
 
 确定性、无网络的规则「模型」，让真实服务链路在没有付费模型时产出合理结果：
 

@@ -1,7 +1,7 @@
 """按 ``LLM_MODE`` / ``EMBEDDING_MODE`` 装配模型与向量客户端（worker、问答、发布与离线脚本共用）。
 
 - ``live``：E03 ``CompatibleModelClient``（备用四项齐全时另建备用）；``online``/``local``：E03 向量客户端。
-- ``demo``：ADR-079 演示客户端——确定性、无网络，按规则产出能被真实解析器接受的输出。模型 ID 固定为
+- ``demo``：ADR-076 演示客户端——确定性、无网络，按规则产出能被真实解析器接受的输出。模型 ID 固定为
   ``DEMO_MODEL_ID``，不沿用 ``LLM_*_MODEL``，免得演示结果记在真实模型名下（``model_calls``、抽取缓存键）。
 - ``fake``：E02 缺省 fake 客户端，行为与原先逐字相同（大量测试依赖）。
 """

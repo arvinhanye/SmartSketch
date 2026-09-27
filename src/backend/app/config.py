@@ -21,7 +21,7 @@ RECOMMEND_WEIGHT_NAMES = (
 )
 DEFAULT_RECOMMEND_WEIGHTS = (0.35, 0.25, 0.20, 0.20)
 AUTH_JWT_SECRET_MIN_BYTES = 32
-#: EMBEDDING_MODE=demo 的保留模型 ID（ADR-079）：演示向量记为独立的真实空间 ``real/<此 ID>/<维度>``，
+#: EMBEDDING_MODE=demo 的保留模型 ID（ADR-076）：演示向量记为独立的真实空间 ``real/<此 ID>/<维度>``，
 #: 不与 ``fake/<维度>`` 或任何供应商模型混用；online/local 不得把 EMBEDDING_MODEL 设成它。
 DEMO_EMBEDDING_MODEL = "smartsketch-demo-ngram-v1"
 
@@ -43,7 +43,7 @@ class Settings(BaseModel):
     NEO4J_USER: str = Field(default="neo4j", min_length=1)
     NEO4J_PASSWORD: SecretStr = SecretStr("")
 
-    # demo：确定性、无网络的规则演示模型与字符 n-gram 向量（ADR-079），用于无付费模型的整链路验收
+    # demo：确定性、无网络的规则演示模型与字符 n-gram 向量（ADR-076），用于无付费模型的整链路验收
     LLM_MODE: Literal["fake", "demo", "live"] = "fake"
     EMBEDDING_MODE: Literal["fake", "demo", "online", "local"] = "fake"
     LLM_BASE_URL: str = ""
@@ -205,7 +205,7 @@ def embedding_model_id(settings: Settings) -> str:
 def embedding_space_identity(settings: Settings) -> tuple[str, int, int]:
     """配置的向量空间在 ``embedding_space_state`` 中的记录形状 ``(model, dimensions, is_fake)``。
 
-    E07、B06 启动门禁、F03 索引创建与 V12 重新向量化共用这一推导（ADR-012、ADR-079）。
+    E07、B06 启动门禁、F03 索引创建与 V12 重新向量化共用这一推导（ADR-012、ADR-076）。
     """
     if settings.EMBEDDING_MODE == "fake":
         return "", settings.EMBEDDING_DIMENSIONS, 1
