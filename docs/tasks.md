@@ -1347,6 +1347,11 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 待决（ArvinHan）：ADR-068 签收（输出上限 1024 暂定、`<<资料 n>>` 块头、0.25 秒超时容差）；`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现（适配器超时覆盖整条流）；提示效果待 K03 真实模型评测，付费调用需另行同意。
 - 解锁：J06（J05 + B13）。
 
+## 2026-09-27 K04 全链路性能测量（Codex）
+
+| ID | 状态 | 任务 | 分支 | 修改范围 | 验证 |
+| --- | --- | --- | --- | --- | --- |
+| K04 | IMPLEMENTED / 待实测与 PR 复审 | 固定约 2 万字样本的 worker 阶段耗时、token 与 SSE 问答测量 | `codex/k04-benchmark-pipeline` | `evaluation/benchmark_pipeline.py`、`tests/backend/test_k04.py`、`docs/handoffs/codex-k04.md` | J07 已合入；SSE 首字/终态与 p50/p95 定向测试 3 passed；真实服务测量待环境，`verify.sh` 因本机契约工具链/编码未通过，付费调用未执行 |
 ## 2026-09-27 I05 推荐查询 API（Claude 认领）
 
 | ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
