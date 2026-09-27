@@ -1359,3 +1359,17 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收对应：三类空态（各栏空态 + 全空「可以直接发布」）、重复操作（单写禁用、`changed = false`、404 已被处理）、合并冲突（`CYCLE_DETECTED` 名称环路、`COURSE_BUSY`、`REVISION_CONFLICT`）、刷新后数量一致（数量只取服务端 `totals`，重新进入页面数量相同）。
 - H09 待决（需 ArvinHan）：ADR-070 签收（三栏上下排列、合并先选主节点再确认、哪些处理后重读队列）。
 - 解锁：K05 教师主线 E2E 的 H09 依赖满足（仍依赖 H10 等）。
+## 2026-09-27 PR #264（G05+G06）独立审查四项遗留修复（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| #264-R1 | DONE（待 PR 审查/合并） | `sweep` 接入 worker 周期回收 | ArvinHan（Claude） | `claude/leftovers264-0927` / `main@ac21e5d` | `src/backend/app/workers/runner.py`、`src/backend/app/config.py`、`.env.example`、`docs/integrations.md`、`tests/backend/test_g05_sweep_schedule.py` | 红：4 failed（`PublishSweep`/`build_maintenance` 不存在，旧路径无清扫）；绿：5 passed；篡改 3 处全检出 |
+| #264-R2 | DONE（待 PR 审查/合并） | 失败任务无实际贡献时清理不空等课程锁 | ArvinHan（Claude） | 同上 | `src/backend/app/workers/persist_graph.py`、`src/backend/app/repositories/graph_relations.py`、`tests/backend/test_264_cleanup_lock.py` | 红：2 failed（旧实现取锁 `acquired == ['w']` 且返回 False）；绿：4 passed；篡改 3 处全检出 |
+| #264-R3 | DONE（待 PR 审查/合并） | 任务重跑不把教师已裁决状态降级回 draft | ArvinHan（Claude） | 同上 | `src/backend/app/repositories/graph_nodes.py`、`tests/integration/test_f13.py` | 红：2 failed（`approved → draft`、`rejected → draft`，真实 Neo4j）；绿：30 passed（整个 `test_f13.py`）；篡改 2 处全检出 |
+| #264-R4 | DONE（待 PR 审查/合并） | 无来源手工节点详情返回显式空态而非 500 | ArvinHan（Claude） | 同上 | `src/contracts/api.v1.yaml`、`src/contracts/v1/generated/*`、`src/backend/app/services/graph/read.py`、`src/backend/app/api/graph.py`、`src/backend/app/schemas/contracts.py`、`tests/backend/test_f07.py`、`tests/contracts/test_264_leftovers.py` | 红：`test_manual_node_...` 500 != 200；绿：38 passed（F07 25 + 新契约 4 + R1/R2 新用例 9）；篡改 3 处全检出（含 `minItems` 放宽被 B11 负例拦下） |
+
+- 四项各自独立 commit（R1 `9c5d753`、R2 `b318172`、R3 `38b3dbd`、R4 `03ab66b`），未 push、未 merge。
+- 回归：`PYTHONPATH=$PWD/src/backend .venv/bin/python -m pytest tests/backend -q` 全绿；集成（真实 Neo4j 5.26.31，容器 `ss-neo4j-f11`）：`pytest tests/integration/test_f13.py -q` 30 passed。
+- 契约：`./scripts/gen-contracts.sh --check` 与 `./scripts/verify/contracts.sh` 与真源一致。
+- 决策：ADR-072（含需 ArvinHan 签收的三项：清扫缺省启用与周期、详情响应新增形状、已审核内容可被重跑改写而状态冻结）。
+- 待决：孤儿副本与已提交版本缺副本仍只告警（处理归 K10）；`sweep` 只覆盖发布/回滚尝试的副本，§8.6 的块检查点与任务来源块保留期清理仍未接入同一调度（本轮范围外）。

@@ -47,6 +47,7 @@ from app.repositories.graph_relations import (
     read_relations,
     read_visible_nodes,
     revoke_task,
+    task_has_contributions,
 )
 from app.repositories.neo4j import GraphScope, Neo4jRepository, RepositoryError, ScopedTransaction
 from app.repositories.sqlite import connect
@@ -316,14 +317,29 @@ def cleanup_failed_task(
     sqlite_url: str, repo: Neo4jRepository, *, course_id: str, task_id: str, holder: str,
     lock_seconds: int, lock_wait_seconds: float,
 ) -> bool:
-    """§8.4 第 4 步：在课程写锁下撤销失败任务的全部贡献，成功后清除 ``cleanup_pending``。"""
+    """§8.4 第 4 步：在课程写锁下撤销失败任务的全部贡献，成功后清除 ``cleanup_pending``。
+
+    先判断本任务在草稿里是否还有需要撤销的贡献（ADR-072）。**没有工作时直接清 ``cleanup_pending``，
+    不取课程写锁、不等待**：任务已进入终态 ``failed``，只有 ``persisting`` 会写它的贡献，而终态任务不再被
+    领取，所以这次读到的「无工作」是最终结论——把判断与撤销分开不会漏掉工作。有工作时照旧取锁 → 撤销 →
+    清标记，锁保护不变。
+    """
+    try:
+        scope = GraphScope(course_id, DRAFT_VERSION, effective_task_ids=_effective(sqlite_url, course_id))
+        pending_work = task_has_contributions(repo, scope, task_id)
+    except (RepositoryError, sqlite3.Error) as exc:
+        logger.warning("could not check cleanup work for task %s (%s)", task_id,
+                       getattr(exc, "code", type(exc).__name__))
+        return False
+    if not pending_work:
+        return clear_cleanup_pending(sqlite_url, task_id, course_id=course_id)
+
     lock = course_locks.acquire(sqlite_url, course_id, holder=holder, lease_seconds=lock_seconds,
                                 wait_seconds=lock_wait_seconds)
     if lock is None:
         return False
     with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds):
         try:
-            scope = GraphScope(course_id, DRAFT_VERSION, effective_task_ids=_effective(sqlite_url, course_id))
             repo.write_transaction(scope, lambda tx: (lock_draft(tx), revoke_task(tx, task_id)))
         except (RepositoryError, sqlite3.Error) as exc:
             logger.warning("cleanup of task %s failed (%s)", task_id, getattr(exc, "code", type(exc).__name__))

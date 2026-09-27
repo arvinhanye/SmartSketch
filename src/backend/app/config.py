@@ -75,6 +75,9 @@ class Settings(BaseModel):
     TASK_ARTIFACT_RETENTION_DAYS: int = Field(default=7, ge=0)
     PUBLISH_LEASE_SECONDS: int = Field(default=60, ge=15)
     COURSE_LOCK_WAIT_SECONDS: int = Field(default=5, ge=0)
+    # G05 发布清扫的周期调度（A06 §8.6，ADR-072）：worker 每轮主循环后检查，到点调用 reconcile.sweep。
+    # 0 表示不启用周期清扫（发布/回滚前的 reclaim_expired 仍在，见 ADR-036 第 6 条）。
+    PUBLISH_SWEEP_INTERVAL_SECONDS: int = Field(default=3600, ge=0)
 
     # 本地账号登录（ADR-013、specs/identity-access.md §2.1、§6）。密钥不在 load_settings 里强制：
     # worker 与迁移命令不签发令牌；API 服务入口另行调用 check_auth_settings（C13）。

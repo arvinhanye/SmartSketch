@@ -28,6 +28,8 @@ GraphExchange = _module.GraphExchange
 GraphStats = _module.GraphStats
 KnowledgePoint = _module.KnowledgePoint
 KnowledgePointDetail = _module.KnowledgePointDetail
+# 手工新建、读取时没有任何可定位来源的节点详情：显式空态（ADR-072）。
+KnowledgePointDetailWithoutSource = _module.KnowledgePointDetailWithoutSource
 # F08 teacher knowledge-point writes.
 KnowledgePointCreate = _module.KnowledgePointCreate
 KnowledgePointStatus = _module.KnowledgePointStatus
