@@ -32,6 +32,8 @@ export const MATERIALS_ROUTE = 'course-materials'
 export const STUDENT_GRAPH_ROUTE = 'course-graph'
 /** 教师图谱编辑页（H14），参数 `cid`；仅教师账号可进入，只读写草稿，课程内角色由页面按 `Course.my_role` 判断 */
 export const TEACHER_GRAPH_ROUTE = 'course-graph-edit'
+/** 教师审核队列页（H09），参数 `cid`；仅教师账号可进入，课程内角色由页面按 `Course.my_role` 判断 */
+export const REVIEW_ROUTE = 'course-review'
 const HOME_ROUTE: Record<Role, string> = { teacher: 'teacher-home', student: 'student-home' }
 
 /** 该账号类型的默认首页路由名（登录成功后按 `LoginResponse.user.role` 跳转） */
@@ -58,6 +60,8 @@ export interface AppRouterOptions {
   studentGraphComponent?: Component
   /** 教师图谱编辑页（H14）。注入后注册 `/courses/:cid/graph/edit` */
   teacherGraphComponent?: Component
+  /** 审核队列页（H09）。注入后注册 `/courses/:cid/review` */
+  reviewComponent?: Component
 }
 
 export function createAppRouter({
@@ -69,6 +73,7 @@ export function createAppRouter({
   materialsComponent,
   studentGraphComponent,
   teacherGraphComponent,
+  reviewComponent,
 }: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
@@ -122,6 +127,15 @@ export function createAppRouter({
       path: '/courses/:cid/graph/edit',
       name: TEACHER_GRAPH_ROUTE,
       component: teacherGraphComponent,
+      meta: { accountRole: 'teacher' },
+    })
+  }
+  if (reviewComponent) {
+    // 学生账号无入口；教师账号在本课是否为教师由页面按 my_role 与后端 403 判定
+    routes.push({
+      path: '/courses/:cid/review',
+      name: REVIEW_ROUTE,
+      component: reviewComponent,
       meta: { accountRole: 'teacher' },
     })
   }

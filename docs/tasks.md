@@ -1345,3 +1345,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验证：`python3 -m pytest tests/backend/test_j05.py -q`。
 - 待决（ArvinHan）：ADR-068 签收（输出上限 1024 暂定、`<<资料 n>>` 块头、0.25 秒超时容差）；`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现（适配器超时覆盖整条流）；提示效果待 K03 真实模型评测，付费调用需另行同意。
 - 解锁：J06（J05 + B13）。
+
+## 2026-09-27 H09 审核队列与节点合并 UI（Claude 认领）
+
+| ID | 状态 | 任务 | 负责人 | 目标分支 / base HEAD | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H09 | DONE（待 PR 审查/合并；issue #121） | 实现审核队列和节点合并 UI | ArvinHan（Claude） | `claude/project-thread-eo5fzo` / `main@ac21e5d` | `src/frontend/src/views/ReviewView.vue`、`src/frontend/src/composables/useReview.ts`、`tests/frontend/h09.test.ts`；扩围 `api/review.ts`（新增）、`router/index.ts`（`REVIEW_ROUTE`）、`main.ts`、`views/CoursesView.vue`（教师入口）、`docs/architecture.md`、`docs/decisions.md`（ADR-070）、`specs/teacher-review-publish.md` | `h09.test.ts` 31 passed；前端全量 18 files / 618 passed；type-check、build、`verify.sh` 通过；**仅假 API 验证**（F11 后端路由已在 main，未联调）；`docs/handoffs/claude-h09.md` |
+
+- 断点：issue #121 挂着旧的 `status:in-progress`，远端无分支、无提交，本轮从 `main@ac21e5d` 从零实现。
+- 验收对应：三类空态（各栏空态 + 全空「可以直接发布」）、重复操作（单写禁用、`changed = false`、404 已被处理）、合并冲突（`CYCLE_DETECTED` 名称环路、`COURSE_BUSY`、`REVISION_CONFLICT`）、刷新后数量一致（数量只取服务端 `totals`，重新进入页面数量相同）。
+- H09 待决（需 ArvinHan）：ADR-070 签收（三栏上下排列、合并先选主节点再确认、哪些处理后重读队列）。
+- 解锁：K05 教师主线 E2E 的 H09 依赖满足（仍依赖 H10 等）。
