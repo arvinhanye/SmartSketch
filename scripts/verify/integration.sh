@@ -32,7 +32,7 @@ else
   port="${VERIFY_NEO4J_PORT:-17689}"
   container="smartsketch-verify-neo4j-$$"
   user=neo4j password="verify-neo4j-$$-pass" uri="bolt://127.0.0.1:$port"
-  echo "→ 启动一次性 Neo4j（$container，端口 $port）"
+  echo "→ 启动一次性 Neo4j（${container}，端口 ${port}）"
   docker run -d --rm --name "$container" -e NEO4J_AUTH="neo4j/$password" \
     -e NEO4J_PLUGINS='["apoc"]' -e NEO4J_dbms_security_procedures_unrestricted='apoc.*' \
     -p "127.0.0.1:$port:7687" "neo4j:${NEO4J_IMAGE_TAG:-5.26-community}" >/dev/null

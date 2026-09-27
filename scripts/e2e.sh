@@ -63,7 +63,7 @@ else
   neo4j_port="${E2E_NEO4J_PORT:-17688}"
   neo4j_container="smartsketch-e2e-neo4j-$$"
   export NEO4J_URI="bolt://127.0.0.1:$neo4j_port" NEO4J_USER=neo4j NEO4J_PASSWORD="e2e-neo4j-$$-pass"
-  echo "→ 启动一次性 Neo4j（$neo4j_container，端口 $neo4j_port）"
+  echo "→ 启动一次性 Neo4j（${neo4j_container}，端口 ${neo4j_port}）"
   docker run -d --rm --name "$neo4j_container" -e NEO4J_AUTH="neo4j/$NEO4J_PASSWORD" \
     -e NEO4J_PLUGINS='["apoc"]' -e NEO4J_dbms_security_procedures_unrestricted='apoc.*' \
     -p "127.0.0.1:$neo4j_port:7687" "neo4j:${NEO4J_IMAGE_TAG:-5.26-community}" >/dev/null
@@ -105,7 +105,7 @@ E2E_BASE_URL="http://127.0.0.1:$WEB_PORT" E2E_OUTPUT_DIR="$RUN_DIR/playwright" n
 status=$?
 set -e
 if ((status != 0)); then
-  echo "✗ 端到端失败（exit $status）；证据：$RUN_DIR" >&2
+  echo "✗ 端到端失败（exit ${status}）；证据：$RUN_DIR" >&2
 else
   echo "✓ 端到端通过；日志：$RUN_DIR"
 fi
