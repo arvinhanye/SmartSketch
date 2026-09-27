@@ -1455,3 +1455,14 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 风险：发布/回滚与刷新并发时不得把在途或失败结果显示为已提交版本；回滚是前滚新版本号，确认前必须明确目标版本与影响。审核页嵌入版本面板的设计已获用户确认。
 - 验证计划：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h10.test.ts`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
 - 验收证据：H10 测试先因模块缺失红灯，接入页位置、成功响应刷新指针、课程教师权限及超时后暂停写入四项后续用例也各先红后绿；独立审查又发现权限丧失时残留旧 UI、历史列表缺当前版时误报成功，两项均先红后绿。最终 `h10.test.ts` 12 passed，H09+H10 49 passed，前端全量 19 files / 636 passed（B02 嵌套进程测试使用 `--testTimeout 30000`），type-check、build、`./scripts/verify.sh` 均 exit 0。前端仅 fake API 验证，真实服务联调交 K05。详见 `docs/handoffs/codex-h10.md`。
+
+## 2026-09-27 I06 掌握标记与推荐 UI（Claude，worktree `impl-i06`）
+
+| 原子 ID | 状态 | 任务 | 负责人 | 分支 / base | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I06 | DONE（待 PR 审查/合并；issue 见原子清单） | 实现掌握标记与推荐 UI | ArvinHan（Claude） | `claude/impl-i06`（worktree `.worktrees/impl-i06`）/ `main@HEAD` | `src/frontend/src/composables/useLearning.ts`（新建）、`src/frontend/src/components/Recommendations.vue`（新建）、`tests/frontend/i06.test.ts`（新建）；扩围新建 `src/frontend/src/api/progress.ts`、`src/frontend/src/api/recommend.ts`，小改 `src/frontend/src/views/StudentGraphView.vue`、`src/frontend/src/main.ts`、`src/frontend/src/graph/lifecycle.ts`（`CanvasElementState` 增四个学习状态与样式）、`tests/frontend/h05.test.ts`（仅同步「状态名集合完全相等」断言，同 H10 先例）、`docs/decisions.md`（ADR-075）、本文件、交接 | `i06.test.ts` 39 passed（先红灯：模块缺失）；type-check、build exit 0；19 处反向篡改全部判红（含 2 处「单层篡改被第二层兜住」的澄清与补强用例）；ADR-075；`docs/handoffs/claude-i06.md` |
+
+- 输入：I05 的 `GET /recommend`（`RecommendState` 闭集 `recommendations`/`all_mastered`、结构化 `reason_facts`/`weighted`）、I02 的 `GET/PUT /progress`（有效 `status`、`own_status`、`inherited_from[]`、`graph_version`）、H11 的学生图谱页；输出：节点掌握状态色 + 推荐高亮、掌握标记三态写入、可解释推荐列表。
+- 验收对应：① 乐观标记失败完整回滚且固定文案（不回显服务端 `message`）；② 同一节点在途写入只发一次、按钮禁用；③ 切课用 `CourseRequestScope` + 序号隔离，课程 A 的迟到推荐/进度不写入课程 B；④ 理由逐条取自服务端 `reason_facts`/`weighted`，前端不重算 `score`；⑤ 只在已显示发布版本上读写，响应 `graph_version` 不一致即丢弃并重读图，422 `not_in_published_version` 撤销后重读进度；⑥ 未发布 404 空白态且不读图、教师 403 不给可点击入口；⑦ `all_mastered`/`recommendations` 两个 200 状态与 404/500 的区分，完整性错误只提示 `request_id`；⑧ 状态色由 `CanvasElementState` 驱动、颜色集中在 `buildGraphOptions`。
+- **需签收（ADR-075）**：清单验收条目 5 的字面表述「PUT progress 请求带 `graph_version`」与契约冲突——`updateProgress` 的请求体是 `additionalProperties: false` 的 `ProgressUpdate[]`，该操作 `query` 为 `never`，后端 `write_progress` 也无版本参数。实现改为「只在已显示版本上写 + 响应版本比对 + 422 重读」，**不自造字段**（自造字段会被契约拒绝，未声明查询参数会被服务端忽略而给出虚假安全感）。另需签收：学习接口未注入时页面静默退回 H11 原状；掌握标记三态（未开始/学习中/已掌握）直接写 `MasteryStatus`，不引入第四种状态或「跳过先修」操作。
+- 待决：真实后端联调（I02/I05 已合入 `main`，本轮仅假 API 验证）交 K06 学生主线 E2E；推荐列表上限未在页面暴露（用服务端默认 10）；进度变化后继承来源（`inherited_from[]`）未在 UI 展示（契约已具备，是否需要展开待定）。
