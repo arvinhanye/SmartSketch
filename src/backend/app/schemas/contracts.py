@@ -21,6 +21,8 @@ _spec.loader.exec_module(_module)
 Course = _module.Course
 CourseCreate = _module.CourseCreate
 CourseStatus = _module.CourseStatus
+ChatRequest = _module.ChatRequest
+ChatResponse = _module.ChatResponse
 Role = _module.Role
 # F07 graph reads.
 Chapter = _module.Chapter

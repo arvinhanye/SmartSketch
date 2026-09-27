@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import Depends, Request
 from fastapi.responses import JSONResponse
 
@@ -16,7 +18,14 @@ from app.services.access import (
 )
 
 
-def access_error_response(_: Request, error: AccessDenied) -> JSONResponse:
+logger = logging.getLogger(__name__)
+
+
+def access_error_response(request: Request, error: AccessDenied) -> JSONResponse:
+    if request.url.path.endswith("/chat"):
+        logger.info("chat request rejected status=%s code=%s course_id=%s user_id=%s",
+                    error.status_code, error.code, request.path_params.get("cid"),
+                    getattr(request.state, "authenticated_user_id", None))
     return JSONResponse(
         status_code=error.status_code,
         content={"code": error.code, "message": error.message},
@@ -39,7 +48,9 @@ def current_user(
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token or token.strip() != token:
         raise unauthenticated()
-    return service.authenticate(token)
+    user = service.authenticate(token)
+    request.state.authenticated_user_id = user.id
+    return user
 
 
 def teacher_account(user: AccountRecord = Depends(current_user)) -> AccountRecord:

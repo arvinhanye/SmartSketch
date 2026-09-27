@@ -926,7 +926,7 @@ TD-01 带出的跟进项：
 
 - **D11（#239）**：worker 删除自拼的 `PDF_PARSER_VERSION`，改为引用 `pdf_headings.CLEANED_PARSER_VERSION`（取值逐字相同，块 ID 不变）；清洗只用默认阈值。 **已完成**（#239）。
 - **J03（#242）**：预写失败改用原问题已有测试覆盖；另绑定 E04 截止时间「链路截止 − 预留」并把 `CallDeadlineExceededError` 归为 `timeout`。**已完成**（#242）。
-- **J07（未开始）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
+- **J07（IMPLEMENTED / 待审查验证）**：收到请求时计算截止时间，经 `ModelCallPolicy.bind(..., deadline=...)` 传给 J03～J05；把 `CallDeadlineExceededError` 映射为 `LLM_UNAVAILABLE`、`details.reason = timeout`（O9）。不要用关闭重试代替。
 
 ## 2026-09-25 第七批并行（Claude）
 
