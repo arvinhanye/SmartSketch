@@ -5,6 +5,7 @@ import {
   GRAPH_FACTORY_KEY,
   loadG6Graph,
   type GraphCanvasData,
+  type GraphLayoutName,
   type GraphLifecycle,
   type LifecycleStatus,
 } from '../graph/lifecycle'
@@ -13,9 +14,10 @@ import {
  * 课程知识图谱画布（H04）：只负责把适配图画出来并支持缩放、拖拽。
  * 数据请求、筛选与详情由页面和后续组件负责；`graph` 为 null 表示数据尚未到达。
  */
-const props = withDefaults(defineProps<{ graph: GraphCanvasData | null; label?: string }>(), {
-  label: '课程知识图谱',
-})
+const props = withDefaults(
+  defineProps<{ graph: GraphCanvasData | null; label?: string; layout?: GraphLayoutName }>(),
+  { label: '课程知识图谱', layout: 'hierarchical' },
+)
 
 const emit = defineEmits<{ nodeClick: [kpId: string] }>()
 
@@ -41,6 +43,7 @@ function start(): void {
   // 适配图可能是响应式代理；生命周期会复制一份交给 G6
   lifecycle = createGraphLifecycle(stage.value, {
     data: toRaw(props.graph),
+    layout: props.layout,
     factory,
     onNodeClick: (kpId) => emit('nodeClick', kpId),
     onStatus: (next) => {
@@ -69,6 +72,12 @@ watch(
     if (lifecycle === null) start()
     else lifecycle.update(toRaw(graph))
   },
+)
+
+// 布局切换在原图上进行，节点状态（含选中）随数据保留（H05）
+watch(
+  () => props.layout,
+  (layout) => lifecycle?.setLayout(layout),
 )
 
 onActivated(() => lifecycle?.refreshSize())

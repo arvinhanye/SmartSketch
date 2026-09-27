@@ -380,7 +380,11 @@ export interface paths {
         post?: never;
         /**
          * 删除知识点及其关系（教师）
-         * @description 草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         * @description 从草稿删除知识点、与它相连的全部草稿关系（含关系身份）及其来源关联；共享文本块、已发布版本的副本与快照
+         *     不变（ADR-048）。节点不存在、不可见或属于他课 → 404 `NOT_FOUND`；并发删除同一节点恰有一次 204，
+         *     其余 404。可选 `expected_revision` 与当前修订号不一致时 409 `REVISION_CONFLICT`，不删除。
+         *     草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         *
          */
         delete: operations["deleteKnowledgePoint"];
         options?: never;
@@ -437,7 +441,13 @@ export interface paths {
         put?: never;
         /**
          * 合并重复知识点（教师）
-         * @description 被合并节点的名称并入 `aliases`，关系与来源取并集后迁移到主节点。
+         * @description 被合并节点的名称并入 `aliases`，关系与来源取并集后迁移到主节点（ADR-047）：入边与出边改接到主节点，
+         *     同类型同端点的关系去重（主节点原有的关系保留字段，贡献与来源取并集），两端都在本次合并内的关系删除；
+         *     迁移后的 `PREREQUISITE` 执行 DAG 环检测，成环返回 409 `CYCLE_DETECTED` 并给出 `details.cycle`。
+         *     主节点修订号加 1 并加锁，被合并节点从草稿删除、记入主节点的合并谱系。可选 `expected_revisions`
+         *     与当前修订号不一致时 409 `REVISION_CONFLICT`。节点不存在或不可见时 422（`details.fields` 的 `reason`
+         *     为 `not_found`）。草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。任何失败都不部分提交。
+         *
          */
         post: operations["mergeKnowledgePoints"];
         delete?: never;
@@ -536,11 +546,52 @@ export interface paths {
         };
         /**
          * 审核队列（教师）
-         * @description 三栏：低置信度关系、疑似重复知识点、孤立知识点。每条附原文证据。
+         * @description 三栏：低置信度关系、疑似重复知识点、孤立知识点（ADR-060）。按请求开始时的 V 从草稿实时计算，
+         *     只含可见内容；关系附原文证据（`source_refs`）。各栏排序固定：低置信度关系按 `confidence` 升序、
+         *     `id` 升序；疑似重复按 `similarity` 降序、两端 ID 升序；孤立知识点按 `name`、`id` 升序。
+         *
+         *     分页为键集分页（keyset），处理掉已看过的条目不会让后面的条目被跳过或重复：
+         *     不带 `kind` 时三栏各返回第一页；带 `kind` 时只填该栏（其余两栏为空数组），`cursor` 取上一页
+         *     `next_cursors` 中该栏的值。`cursor` 不带 `kind`、无法解析或属于另一栏时 422。
+         *     `totals` 始终是三栏的完整条数，与分页无关。
+         *
          */
         get: operations["getReviewQueue"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/review/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 处理一条审核项（教师）
+         * @description 一键处理队列中的一条（ADR-060）：
+         *
+         *     - 低置信度关系：`approve` 置 `approved`，`reject` 置 `rejected`；关系登记人工贡献、修订号加 1。
+         *     - 疑似重复：`merge` 以 `primary_id` 为主节点执行 `mergeKnowledgePoints`（ADR-047 的全部规则与错误）；
+         *       `reject` 记为「不是重复」，这一对不再出现。
+         *     - 孤立知识点：`approve` 记为「确认保留」，不再出现；`reject` 把节点置 `rejected`（按 F08 教师修改加锁）。
+         *
+         *     图写入（关系状态、节点拒绝、合并）持课程写锁并使草稿修订号加 1，超时 409 `COURSE_BUSY`；
+         *     「不是重复」「确认保留」只记在 SQLite，不改草稿图、不加草稿修订号。条目已不在队列中时 404
+         *     `NOT_FOUND`；再次提交已生效的同一动作幂等返回 200、`changed = false`。
+         *
+         */
+        post: operations["resolveReviewItem"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1189,7 +1240,14 @@ export interface components {
         MergeRequest: {
             /** @description 保留的主节点；其名称成为主名 */
             primary_id: string;
+            /** @description 并入主节点的知识点，不得含主节点，不得重复 */
             merged_ids: string[];
+            /** @description 可选的节点级乐观并发：键为本次合并涉及的知识点 ID（主节点或被合并节点），值为读到的 `revision`。
+             *     任一不一致时 409 `REVISION_CONFLICT`，不写入（ADR-047）。
+             *      */
+            expected_revisions?: {
+                [key: string]: number;
+            };
         };
         Relation: components["schemas"]["RelationStandard"] | components["schemas"]["RelationDowngraded"];
         RelationStandard: {
@@ -1265,13 +1323,78 @@ export interface components {
             edges: components["schemas"]["Relation"][];
             stats?: components["schemas"]["GraphStats"];
         };
+        /**
+         * @description 审核队列的三栏（ADR-060）。
+         * @enum {string}
+         */
+        ReviewItemKind: "low_confidence_relation" | "suspected_duplicate" | "isolated_node";
+        ReviewCounts: {
+            low_confidence_relations: number;
+            suspected_duplicates: number;
+            isolated_nodes: number;
+        };
         ReviewQueue: {
             low_confidence_relations: components["schemas"]["Relation"][];
-            suspected_duplicates: {
-                candidates: components["schemas"]["KnowledgePointRef"][];
-                similarity: number;
-            }[];
+            suspected_duplicates: components["schemas"]["SuspectedDuplicate"][];
             isolated_nodes: components["schemas"]["KnowledgePointRef"][];
+            totals: components["schemas"]["ReviewCounts"];
+            /** @description 各栏下一页的游标；该栏已到末尾或本次未返回该栏时为 null。 */
+            next_cursors: {
+                low_confidence_relations: string | null;
+                suspected_duplicates: string | null;
+                isolated_nodes: string | null;
+            };
+        };
+        /** @description 一对名称疑似重复的知识点（ADR-060，E08 名称归一）。`reason` 为 `same_key`（归一主键相同）、
+         *     `alias`（一方的名称或别名与另一方的名称或别名归一后相同）或 `containment`（较短名称是较长名称的前缀）；
+         *     `similarity` 前两者为 1，包含候选为有效字符比 较短/较长。`candidates` 按 `id` 升序。
+         *      */
+        SuspectedDuplicate: {
+            candidates: components["schemas"]["KnowledgePointRef"][];
+            similarity: number;
+            /** @enum {string} */
+            reason: "same_key" | "alias" | "containment";
+        };
+        ReviewAction: components["schemas"]["ReviewRelationAction"] | components["schemas"]["ReviewDuplicateAction"] | components["schemas"]["ReviewIsolatedAction"];
+        ReviewRelationAction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            item: "low_confidence_relation";
+            rel_id: string;
+            /** @enum {string} */
+            action: "approve" | "reject";
+        };
+        /** @description `merge` 必带 `primary_id`，且须是 `kp_ids` 之一；`reject` 不得带 `primary_id`。 */
+        ReviewDuplicateAction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            item: "suspected_duplicate";
+            kp_ids: string[];
+            /** @enum {string} */
+            action: "merge" | "reject";
+            primary_id?: string;
+        };
+        ReviewIsolatedAction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            item: "isolated_node";
+            kp_id: string;
+            /** @enum {string} */
+            action: "approve" | "reject";
+        };
+        ReviewActionResult: {
+            item: components["schemas"]["ReviewItemKind"];
+            /** @enum {string} */
+            action: "approve" | "reject" | "merge";
+            /** @description false 表示同一动作此前已生效，本次没有写入。 */
+            changed: boolean;
+            totals: components["schemas"]["ReviewCounts"];
         };
         GraphVersion: components["schemas"]["PublishedGraphVersion"] | components["schemas"]["RollbackGraphVersion"];
         PublishedGraphVersion: {
@@ -2473,7 +2596,10 @@ export interface operations {
     };
     deleteKnowledgePoint: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 节点级乐观并发：读到的 `revision`；省略时不核对（ADR-048） */
+                expected_revision?: number;
+            };
             header?: never;
             path: {
                 /** @description 课程 ID，所有查询的第一隔离条件 */
@@ -2495,6 +2621,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateKnowledgePoint: {
@@ -2713,7 +2840,13 @@ export interface operations {
     };
     getReviewQueue: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: components["schemas"]["ReviewItemKind"];
+                /** @description 上一页 `next_cursors` 中对应栏的不透明游标；必须与 `kind` 同时给出。 */
+                cursor?: string;
+                /** @description 每栏最多返回的条数。 */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description 课程 ID，所有查询的第一隔离条件 */
@@ -2734,6 +2867,39 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    resolveReviewItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAction"];
+            };
+        };
+        responses: {
+            /** @description 处理结果与处理后的三栏条数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewActionResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     publishGraph: {

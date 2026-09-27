@@ -257,11 +257,58 @@ class _MigrationContext:
         self._active = False
 
 
+def ensure_current_vector_indexes(settings: Any, *, driver_factory: Callable | None = None) -> str:
+    """Create both vector indexes of the recorded current space and wait until they are online (ADR-055).
+
+    The space is read from SQLite (initialized from the configuration on first run, like API startup).
+    A configuration that differs from the recorded space is refused: that needs scripts/reembed.py (V12).
+    """
+    from app.repositories.embedding_space import read_or_initialize_space
+
+    configured = (settings.EMBEDDING_MODEL if settings.EMBEDDING_MODE != 'fake' else '',
+                  settings.EMBEDDING_DIMENSIONS, int(settings.EMBEDDING_MODE == 'fake'))
+    try:
+        recorded = read_or_initialize_space(settings.SQLITE_URL, *configured)
+    except (OSError, sqlite3.Error):
+        raise GraphMigrationError('current embedding space is unavailable') from None
+    if tuple(recorded) != configured:
+        raise GraphMigrationError('configured embedding space differs from the recorded one; '
+                                  'run scripts/reembed.py (V12) before creating its vector indexes')
+    model, dimensions, is_fake = recorded
+    space = f'fake/{dimensions}' if is_fake else f'real/{model}/{dimensions}'
+    _dimensions(space)
+    if driver_factory is None:
+        from neo4j import GraphDatabase
+        driver_factory = GraphDatabase.driver
+    try:
+        driver = driver_factory(
+            settings.NEO4J_URI,
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD.get_secret_value()),
+        )
+    except Exception:
+        raise GraphMigrationError('Neo4j migration connection failed') from None
+    try:
+        GraphVectorWriter(driver, lambda: space).ensure_vector_indexes(space)
+        try:
+            _execute(driver, 'CALL db.awaitIndexes(300)')
+        except Exception:
+            raise GraphMigrationError('vector indexes did not come online; check Neo4j and rerun') from None
+    finally:
+        try:
+            driver.close()
+        except Exception:
+            pass  # Keep the original outcome; connection errors stay redacted.
+    return space
+
+
 def main() -> None:
     from app.config import load_settings
 
-    count = run_from_settings(load_settings())
+    settings = load_settings()
+    count = run_from_settings(settings)
     print(f'Applied {count} repeatable Neo4j schema statements')
+    space = ensure_current_vector_indexes(settings)
+    print(f'Vector indexes for embedding space {space} are online')
 
 
 if __name__ == '__main__':

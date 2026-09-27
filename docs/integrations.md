@@ -290,7 +290,7 @@ cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
 
 | 服务 | 镜像 / 命令 | 说明 |
 | --- | --- | --- |
-| `migrate` | `smartsketch-backend:local`，`python -m app.repositories.sqlite && python -m app.repositories.graph_migrations` | 一次性：等 Neo4j 健康后执行 SQLite 与 Neo4j 迁移，成功退出后 API 与 worker 才启动（两者启动门禁拒绝未迁移的库） |
+| `migrate` | `smartsketch-backend:local`，`python -m app.repositories.sqlite && python -m app.repositories.graph_migrations` | 一次性：等 Neo4j 健康后执行 SQLite 与 Neo4j 迁移（Neo4j 迁移含当前向量空间的两个向量索引，ADR-055），成功退出后 API 与 worker 才启动（两者启动门禁拒绝未迁移的库） |
 | `api` | 同上，`python -m app` | 不发布端口；健康检查为镜像内 `GET /health` |
 | `worker` | 同上，`python -m app.workers` | 按 A06 §8.1：一个容器内起 `WORKER_PROCESSES` 个进程，互斥靠 C09 租约；不要用 scale/replicas 扩；健康检查 `python -m app.workers --health`（监督进程心跳文件 60 秒内刷新过）；停止宽限 90 秒 |
 | `web` | `smartsketch-frontend:local`（nginx 非 root，监听 8080） | 静态资源 + `/api/` 反向代理到 `api:8000`（SSE 关闭缓冲）；只绑 `127.0.0.1:${WEB_PUBLISH_PORT:-8080}` |

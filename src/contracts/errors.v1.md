@@ -48,7 +48,7 @@
 
 | 码 | HTTP | 触发条件 | 前端处理 |
 | --- | --- | --- | --- |
-| `NOT_FOUND` | 404 | 课程、资料、任务、知识点或关系不存在 | 提示并返回上一级 |
+| `NOT_FOUND` | 404 | 课程、资料、任务、知识点或关系不存在；审核项已不在审核队列中（ADR-060） | 提示并返回上一级 |
 | `GRAPH_NOT_PUBLISHED` | 404 | 学生读取尚未发布的课程图谱 | 提示「课程尚未发布」，不暴露草稿存在与否 |
 
 > `GRAPH_NOT_PUBLISHED` 用 404 而非 403，避免向学生泄露「该课程存在但你看不到」这一信息。
@@ -79,6 +79,7 @@
 
 - **不回显输入**：`details` 不含提交的值或校验器的原文说明，口令等敏感字段只以字段名出现。
 - `reason` 的取值随校验库而定，不是闭集。前端按 `in` 与 `field` 定位字段，遇到不认识的 `reason` 显示通用提示。
+- 本服务自己在业务校验中产生的**领域 `reason`** 不是校验库取值，须在本文登记后使用：`details.fields[].reason` 上当前已登记的是 `duplicate` 与 `not_in_published_version`（都在 `PUT /progress`，见下）。其他错误码的领域取值写在各自的行内（如 `DOCUMENT_NOT_DELETABLE` 的 `details.reason`）。
 - 由后端全局请求校验处理器统一产生（C13 引入），所有路由都用这个形状。
 
 **领域校验 reason `not_in_published_version`**（`PUT /progress`，ADR-017 决定 5）：请求体通过 schema 校验后，若有目标 `kp_id` 不在请求事务所见的当前发布版中，整批拒绝、零写入，返回 422 `VALIDATION_ERROR`，`details` 为闭合对象（`api.v1.yaml` 的 `ProgressValidationError` / `ProgressNotInPublishedVersionDetails`）：
@@ -101,17 +102,34 @@
 
 - 草稿独有、已删除、他课三种情况同一 `reason`，不暴露他课节点是否存在；写入期间发布指针变化、目标不在新版本时同样返回此错误。
 - 不用 404（`/progress` 资源本身存在）也不用 409：客户端处置都是重新 `GET /progress` 后再提交。
-- 同批 `kp_id` 重复仍是上文的通用 `VALIDATION_ERROR`，不带 `graph_version`。
+- 同批 `kp_id` 重复不用这个 `details` 形状，见下条。
+
+**领域校验 reason `duplicate`**（`PUT /progress`，ADR-064 决定 2）：请求体通过 schema 校验后，若同一批次里同一个 `kp_id` 出现多次（无论状态是否相同），整批拒绝、零写入，返回 422 `VALIDATION_ERROR`；`details` 只有 `fields`、不带 `graph_version`，沿用上表的通用形状（`api.v1.yaml` 的 `ProgressValidationError`）：
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `fields[]` | array | 每个**重复出现**的请求项一项，固定为 `{in: "body", field: "<i>.kp_id", reason: "duplicate"}`，`<i>` 为请求数组下标，写法同上表 `field`；首次出现的那一项不列 |
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "请求参数不符合要求，请检查标注的字段",
+  "details": { "fields": [{ "in": "body", "field": "2.kp_id", "reason": "duplicate" }] }
+}
+```
+
+- 与 `not_in_published_version` 一样是整批拒绝、零写入；`message` 用全局 422 的通用文案，不回显 `kp_id` 的值。
+- 检查在开启写事务之前完成（ADR-064 决定 2），因此本错误不涉及发布版本，不带 `graph_version`。
 
 ### 图谱编辑
 
 | 码 | HTTP | 触发条件 | `details` | 前端处理 |
 | --- | --- | --- | --- | --- |
-| `CYCLE_DETECTED` | 409 | 新增或修改 `PREREQUISITE` 会使前置关系成环 | `cycle`: 节点 ID 链路，首尾同一节点 | **在图谱上高亮该环路**并拒绝保存 —— 规格验收条件 4 要求返回冲突信息，不是简单报错 |
+| `CYCLE_DETECTED` | 409 | 新增或修改 `PREREQUISITE`（含合并知识点后重接的边，ADR-047）会使前置关系成环 | `cycle`: 节点 ID 链路，首尾同一节点 | **在图谱上高亮该环路**并拒绝保存 —— 规格验收条件 4 要求返回冲突信息，不是简单报错 |
 | `DANGLING_ENDPOINT` | 422 | 关系端点不存在，或不属于同一课程 | `missing`: 缺失的端点 ID | 提示端点无效 |
 | `DUPLICATE_RELATION` | 409 | 同课程内已存在同类型同方向的关系 | `existing_id` | 提示已存在，可跳转至该关系 |
 | `NODE_LOCKED` | 409 | 自动流程试图覆盖 `locked = true` 的节点 | `kp_id` | 仅后台流程触发，前端一般不可见 |
-| `REVISION_CONFLICT` | 409 | 教师编辑或解锁知识点时 `expected_revision` 与当前节点修订号不一致：期间已有他人写入（ADR-035） | `kp_id`、`expected_revision`、`current_revision`、`current`（当前的 `name`、`aliases`、`type`、`definition`、`status`、`locked`，以及存在时的 `importance`、`difficulty`） | 不覆盖；向用户展示 `current` 与本地修改的差异，确认后以 `current_revision` 重新提交 |
+| `REVISION_CONFLICT` | 409 | 教师编辑、解锁、合并或删除知识点时 `expected_revision`（合并为 `expected_revisions`）与当前节点修订号不一致：期间已有他人写入（ADR-035、ADR-047、ADR-048） | `kp_id`、`expected_revision`、`current_revision`、`current`（当前的 `name`、`aliases`、`type`、`definition`、`status`、`locked`，以及存在时的 `importance`、`difficulty`） | 不覆盖；向用户展示 `current` 与本地修改的差异，确认后以 `current_revision` 重新提交 |
 
 ### 任务与发布
 
