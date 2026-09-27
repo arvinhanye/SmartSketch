@@ -41,7 +41,7 @@ import pytest
 from app.config import Settings
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
-from app.repositories.graph_migrations import apply_migrations
+from app.repositories.graph_migrations import GraphVectorWriter, apply_migrations
 from app.repositories.graph_read import GraphReader
 from app.repositories.neo4j import GraphScope, Neo4jRepository
 from app.repositories.sqlite import connect, migrate
@@ -129,6 +129,8 @@ def embedder():
 def seed(tmp_path: Path, driver) -> SimpleNamespace:
     """Two courses: one published twice (pointer on v2, v1 kept), one draft-only; plus progress rows."""
     apply_migrations(driver)
+    GraphVectorWriter(driver, lambda: SPACE).ensure_vector_indexes(SPACE)  # 部署迁移的一部分（ADR-055）
+    q(driver, "CALL db.awaitIndexes(60)")
     path = tmp_path / "user" / "smartsketch.sqlite3"
     url = sqlite_url(path)
     migrate(url)
