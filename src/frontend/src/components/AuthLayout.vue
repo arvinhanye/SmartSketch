@@ -76,11 +76,13 @@ const edges = [
       </div>
     </section>
     <section class="auth-layout__form-area" aria-label="账号访问">
-      <div v-if="showLoginNotice" class="auth-layout__notice" role="alert">
-        <span>未登录：请先登录，再进入教师或学生首页。</span>
-        <button type="button" aria-label="关闭提示" @click="dismissNotice">×</button>
+      <div class="auth-layout__entry">
+        <div v-if="showLoginNotice" class="auth-layout__notice" role="alert">
+          <span>未登录：请先登录，再进入教师或学生首页。</span>
+          <button type="button" aria-label="关闭提示" @click="dismissNotice">×</button>
+        </div>
+        <div class="auth-layout__card"><slot /></div>
       </div>
-      <div class="auth-layout__card"><slot /></div>
       <p class="auth-layout__footnote">智绘学途 · 让每一步学习都有迹可循</p>
     </section>
   </div>
@@ -160,13 +162,16 @@ const edges = [
   padding: 3rem clamp(1.5rem, 4vw, 4rem);
   background: radial-gradient(circle at 88% 5%, #e4f2f1, transparent 34%), #f5f9fa;
 }
+.auth-layout__entry { position: relative; width: min(100%, 27rem); }
 .auth-layout__notice {
+  position: absolute;
+  bottom: calc(100% + 1.75rem);
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  width: min(100%, 27rem);
-  margin-bottom: -0.75rem;
+  width: 100%;
   font-size: 0.85rem;
 }
 .auth-layout__notice button {
@@ -182,7 +187,7 @@ const edges = [
 }
 .auth-layout__notice button:hover:not(:disabled) { background: rgb(143 35 35 / 10%); }
 .auth-layout__card {
-  width: min(100%, 27rem);
+  width: 100%;
   padding: clamp(1.7rem, 3vw, 2.75rem);
   border: 1px solid #e3ecee;
   border-radius: 1.25rem;

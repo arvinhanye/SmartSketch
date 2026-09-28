@@ -1543,3 +1543,4 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 - 输入：已实现的 H13 登录与 ADR-079 学生注册流程、用户确认的桌面登录页设计方向，以及用户提供的未登录提示截图。输出：认证页视觉改版，登录和注册沿用现有 API。依赖：Vue 路由和现有认证外壳；无新依赖。风险：当前基线已有注册功能，改版保留入口；窄屏隐藏品牌装饰以保证表单可用。
 - 验证命令：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts`、`npm --prefix src/frontend run test -- --run --testTimeout=30000`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
+- 2026-09-28 视觉回归修复：提示条由普通 flex 子项改为相对登录卡片的绝对定位，避免关闭后卡片上移。只做关键测试：新增 `tests/e2e/login-layout.spec.ts`，在 1400px 与 744px 视口验证提示位于卡片上方且关闭前后卡片纵坐标变化小于 1px；该用例先因位移 35.8px 失败、修复后 1 passed。H13 定向 30 passed，前端 type-check exit 0。本轮按用户要求未重跑全量测试与 `verify.sh`。
