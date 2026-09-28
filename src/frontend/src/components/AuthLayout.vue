@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
+import { advanceGraphMotion, type MotionBody } from './authGraphMotion'
+
 /**
  * 登录与注册页共用的左右分栏（前端改版方向 A「工作台」，ADR-079）。
  * 左栏是产品说明与示意图谱（纯装饰，读屏跳过），右栏放表单插槽；窄屏只留右栏。
@@ -101,6 +104,7 @@ const graphDefinitions: GraphArt[] = [
 
 type Bounds = { left: number; top: number; right: number; bottom: number }
 type PlacedGraph = GraphArt & { x: number; y: number; scale: number }
+type MovingGraph = GraphArt & MotionBody & { localCenterX: number; localCenterY: number }
 const artWidth = 910
 const artHeight = 475
 const gap = 12
@@ -140,8 +144,9 @@ function placeGraphs(): PlacedGraph[] {
       y: node.y + (Math.random() - 0.5) * 10,
     }))
     const bounds = graphBounds(nodes)
-    // 以节点避让而非矩形分格，让不同图谱能交错散开，文字之间仍保留空隙。
-    for (const scale of [0.95, 0.88, 0.8, 0.72, 0.64, 0.56, 0.48, 0.4]) {
+    // 初始尺寸各不相同，节点之间先留空隙，随后允许运动时碰撞反弹。
+    const initialScale = 0.58 + Math.random() * 0.36
+    for (const scale of [initialScale, initialScale * 0.9, initialScale * 0.8, 0.48, 0.4]) {
       for (let attempt = 0; attempt < 500; attempt++) {
         const x = -bounds.left * scale + Math.random() * (artWidth - (bounds.right - bounds.left) * scale)
         const y = -bounds.top * scale + Math.random() * (artHeight - (bounds.bottom - bounds.top) * scale)
@@ -173,7 +178,79 @@ function placeGraphs(): PlacedGraph[] {
   })
 }
 
-const graphs = placeGraphs()
+const graphs: MovingGraph[] = placeGraphs().map((graph) => {
+  const bounds = graphBounds(graph.nodes)
+  const localCenterX = (bounds.left + bounds.right) / 2
+  const localCenterY = (bounds.top + bounds.bottom) / 2
+  const direction = () => (Math.random() < 0.5 ? -1 : 1)
+  return {
+    ...graph,
+    x: graph.x + localCenterX * graph.scale,
+    y: graph.y + localCenterY * graph.scale,
+    localCenterX,
+    localCenterY,
+    vx: direction() * (16 + Math.random() * 20),
+    vy: direction() * (12 + Math.random() * 18),
+    angle: (Math.random() - 0.5) * 16,
+    angularVelocity: direction() * (2 + Math.random() * 5),
+    baseScale: graph.scale,
+    pulse: 0.06,
+    pulseSpeed: 0.5 + Math.random() * 0.5,
+    phase: Math.random() * Math.PI * 2,
+    radius: Math.max(bounds.right - bounds.left, bounds.bottom - bounds.top) * 0.45,
+  }
+})
+
+function transformFor(graph: MovingGraph): string {
+  return `translate(${graph.x} ${graph.y}) rotate(${graph.angle}) scale(${graph.scale}) translate(${-graph.localCenterX} ${-graph.localCenterY})`
+}
+
+const artwork = ref<SVGSVGElement | null>(null)
+let graphLayers: SVGGElement[][] = []
+let frameId: number | null = null
+let previousFrame = 0
+let elapsed = 0
+let motionPreference: MediaQueryList | undefined
+let narrowScreen: MediaQueryList | undefined
+
+function animate(now: number): void {
+  const delta = previousFrame === 0 ? 0 : Math.min((now - previousFrame) / 1000, 0.05)
+  previousFrame = now
+  elapsed += delta
+  advanceGraphMotion(graphs, delta, elapsed, { width: artWidth, height: artHeight })
+  graphs.forEach((graph, index) => {
+    const transform = transformFor(graph)
+    graphLayers[index].forEach((layer) => layer.setAttribute('transform', transform))
+  })
+  frameId = window.requestAnimationFrame(animate)
+}
+
+function syncMotionPreference(): void {
+  if (motionPreference?.matches || narrowScreen?.matches) {
+    if (frameId !== null) window.cancelAnimationFrame(frameId)
+    frameId = null
+    previousFrame = 0
+  } else if (frameId === null && typeof window.requestAnimationFrame === 'function') {
+    frameId = window.requestAnimationFrame(animate)
+  }
+}
+
+onMounted(() => {
+  graphLayers = graphs.map((graph) =>
+    Array.from(artwork.value?.querySelectorAll<SVGGElement>(`[data-graph-id="${graph.id}"]`) ?? []),
+  )
+  motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+  narrowScreen = window.matchMedia?.('(max-width: 760px)')
+  motionPreference?.addEventListener?.('change', syncMotionPreference)
+  narrowScreen?.addEventListener?.('change', syncMotionPreference)
+  syncMotionPreference()
+})
+
+onUnmounted(() => {
+  if (frameId !== null) window.cancelAnimationFrame(frameId)
+  motionPreference?.removeEventListener?.('change', syncMotionPreference)
+  narrowScreen?.removeEventListener?.('change', syncMotionPreference)
+})
 </script>
 
 <template>
@@ -184,8 +261,8 @@ const graphs = placeGraphs()
       <p class="auth-layout__lede">
         教师上传讲义，系统抽取知识点与关系；审核发布后，学生按前置关系获得学习路径，提问得到带出处的回答。
       </p>
-      <svg class="auth-layout__art" viewBox="0 0 910 475" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" draggable="false" @copy.prevent>
-        <g v-for="graph in graphs" :key="`${graph.id}-edges`" :transform="`translate(${graph.x} ${graph.y}) scale(${graph.scale})`">
+      <svg ref="artwork" class="auth-layout__art" viewBox="0 0 910 475" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" draggable="false" @copy.prevent>
+        <g v-for="graph in graphs" :key="`${graph.id}-edges`" :data-graph-id="graph.id" :transform="transformFor(graph)">
           <line
             v-for="([from, to, prereq], i) in graph.edges"
             :key="i"
@@ -196,7 +273,7 @@ const graphs = placeGraphs()
             :class="prereq ? 'edge edge--prereq' : 'edge'"
           />
         </g>
-        <g v-for="graph in graphs" :key="graph.id" data-test="auth-graph" :transform="`translate(${graph.x} ${graph.y}) scale(${graph.scale})`">
+        <g v-for="graph in graphs" :key="graph.id" data-test="auth-graph" :data-graph-id="graph.id" :transform="transformFor(graph)">
           <g v-for="node in graph.nodes" :key="node.label">
             <circle v-if="node.shape === 'circle'" :cx="node.x" :cy="node.y" r="24" class="node" />
             <rect v-else :x="node.x - (node.width ?? 72) / 2" :y="node.y - 17" :width="node.width ?? 72" height="34" rx="17" class="node" />

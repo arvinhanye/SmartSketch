@@ -1,5 +1,15 @@
 # 任务看板
 
+## 2026-09-28 Codex 认领：认证页动态图谱
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-AUTH-MOTION-03 | DONE | Codex（前端） | `AuthLayout.vue`、装饰图运动逻辑、相关测试、规格和交接 | 图谱大小、位置、旋转随时间变化；在蓝色绘图区内运动，碰撞时反弹；品牌文案和表单不被遮挡；减少动态效果设置可静止展示 |
+
+- 输入：`42afa2f` 的 8 组随机静态 SVG 图谱；输出：可动的装饰图谱。依赖：现有认证页绘图区与 SVG 节点。风险：运动引起文字重叠、边界裁切或不必要的性能开销；使用有限速度、边界/碰撞解算、动画帧生命周期清理和减少动态效果分支。
+- 验证命令：装饰图物理单测、`npm run test -- --run h13.test.ts`、`npm run type-check`、`npm run build`、`./scripts/verify.sh`、浏览器动态视觉检查、`git diff --check`。
+- 验收证据：前端全量测试 25 个文件、772 个用例通过；`npm run type-check`、`npm run build`、`git diff --check` 通过。浏览器观察到 8 组图谱均移动、尺寸随时间变化，旋转保持在 ±22° 内，装饰区位于说明文字下方，720px 视口无页面纵向溢出。`./scripts/verify.sh` 已尝试，但本机门禁依赖缺少 `openapi-typescript`，临时子进程无法找到 `python3`；详见 `docs/handoffs/codex-ui-auth-motion-03.md`。
+
 ## 2026-09-28 Codex 认领：登录页装饰知识图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
