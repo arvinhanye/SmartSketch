@@ -220,6 +220,19 @@ function failWith(error: Error): AuthApi['login'] {
 }
 
 describe('H13 登录页', () => {
+  it('访客登录页展示品牌、知识图谱和清晰的表单引导', async () => {
+    const { wrapper } = await mountApp()
+    expect(wrapper.find('.app-header').exists()).toBe(false)
+    expect(wrapper.get('[data-test="auth-brand-name"]').text()).toBe('智绘学途')
+    expect(wrapper.text()).toContain('AIGC 课程知识图谱智能构建与学习导航')
+    expect(wrapper.text()).toContain('把课程资料变成可审核、可导航的知识图谱')
+    expect(wrapper.get('[data-test="auth-graph"]').attributes('aria-hidden')).toBe('true')
+    expect(wrapper.get('[data-test="login-title"]').text()).toBe('欢迎回来')
+    expect(wrapper.text()).toContain('登录智绘学途，继续你的知识探索')
+    expect(wrapper.get('input[name="username"]').attributes('autocomplete')).toBe('username')
+    expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('current-password')
+  })
+
   it('未登录访问受保护页面：回到登录页，显示未登录提示与登录表单', async () => {
     const { wrapper, router } = await mountApp({ path: '/teacher' })
     expect(router.currentRoute.value.name).toBe(ROOT_ROUTE)
@@ -228,6 +241,19 @@ describe('H13 登录页', () => {
     expect(wrapper.get('input[name="password"]').attributes('type')).toBe('password')
     expect(wrapper.get('input[name="username"]').attributes('autocomplete')).toBe('username')
     expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('current-password')
+  })
+
+  it('未登录提示位于欢迎卡片上方，可关闭且不影响表单', async () => {
+    const { wrapper } = await mountApp({ path: '/teacher' })
+    const formArea = wrapper.get('.auth-layout__form-area')
+    const notice = formArea.get('[role="alert"]')
+    const card = formArea.get('.auth-layout__card')
+    expect(notice.text()).toContain('未登录')
+    expect(notice.element.compareDocumentPosition(card.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await notice.get('button[aria-label="关闭提示"]').trigger('click')
+    await flushPromises()
+    expect(formArea.find('[role="alert"]').exists()).toBe(false)
+    expect(formArea.find('form').exists()).toBe(true)
   })
 
   it.each([

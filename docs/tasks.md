@@ -1534,3 +1534,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收条件：① 未登录可打开 `/register`，登录页有入口，已登录访问回本账号首页；② 只建学生账号，请求体带 `role` 422 且零写入；③ 用户名大小写不敏感重复 409 `USERNAME_TAKEN`，页面在用户名下提示；④ 本地校验不过不发请求；⑤ 每进程 60 秒内 60 次，超出 429 带 `Retry-After`；⑥ 问答页知识点显示名称（取回答所依据的发布版），读取失败退回标识；⑦ 退出登录清会话回登录页。
 - 顺带修复：`useChat` 直接改原始对象，`currentVersion` 不会更新（改为写响应式代理）。
 - 待决：G6 画布在 64 个节点时整体缩得很小、标签难读（改版前已存在，未在本任务处理）；是否需要关闭自助注册的部署开关（ADR-079 后果）。详见 `docs/handoffs/claude-frontend-redesign.md`。
+
+## 2026-09-28 UI-02 登录页视觉改版（Codex）
+
+| ID | 状态 | 范围与负责人 | 验收条件 | 证据 |
+| --- | --- | --- | --- | --- |
+| UI-02 | IMPLEMENTED / 本地提交；仓库门禁受环境阻塞 | Codex；`src/frontend/src/App.vue`、`components/AuthLayout.vue`、`views/LoginView.vue`、`styles.css`、`tests/frontend/h13.test.ts`，以及本节、架构和交接 | 桌面左右 58/42 品牌与登录卡片；静态课程图谱；未登录提示在卡片上方可关闭；窄屏不横溢；保留登录、错误提示与已有学生注册入口；不修改后端或接口 | H13 已先红后绿；前端全量 767 passed；type-check、build exit 0；浏览器 1440×900 测得提示底部 186px、卡片顶部 214px，关闭后提示消失；`./scripts/verify.sh` 因本机缺 `openapi-typescript` 与子进程找不到 `python3` 失败，详见交接 |
+
+- 输入：已实现的 H13 登录与 ADR-079 学生注册流程、用户确认的桌面登录页设计方向，以及用户提供的未登录提示截图。输出：认证页视觉改版，登录和注册沿用现有 API。依赖：Vue 路由和现有认证外壳；无新依赖。风险：当前基线已有注册功能，改版保留入口；窄屏隐藏品牌装饰以保证表单可用。
+- 验证命令：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts`、`npm --prefix src/frontend run test -- --run --testTimeout=30000`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。

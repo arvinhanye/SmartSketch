@@ -61,7 +61,8 @@ async function submit(): Promise<void> {
   <AuthLayout>
     <form class="login" novalidate :aria-busy="pending" @submit.prevent="submit">
       <fieldset :disabled="pending">
-        <legend>登录智绘学途</legend>
+        <legend data-test="login-title">欢迎回来</legend>
+        <p class="login__intro">登录智绘学途，继续你的知识探索</p>
         <label>
           用户名
           <input v-model="username" name="username" type="text" autocomplete="username" required />
@@ -86,29 +87,41 @@ async function submit(): Promise<void> {
 <style scoped>
 .login fieldset {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
   border: none;
   padding: 0;
   background: none;
 }
 .login legend {
-  font-size: 1.4rem;
-  font-weight: 700;
+  font-size: 1.75rem;
+  font-weight: 650;
   color: var(--color-text);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.1rem;
   padding: 0;
 }
+.login__intro { margin: -0.2rem 0 1.1rem; color: var(--color-text-muted); font-size: 0.92rem; }
 .login label {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.5rem;
+  color: #314d58;
+  font-weight: 500;
 }
+.login input { min-height: 2.85rem; padding-inline: 0.9rem; border-color: #ccdadf; border-radius: 0.65rem; }
+.login input:focus { border-color: #318f89; box-shadow: 0 0 0 3px rgb(49 143 137 / 11%); outline: none; }
 .login__submit {
   justify-self: stretch;
-  padding-block: 0.6rem;
+  margin-top: 0.5rem;
+  padding-block: 0.78rem;
+  border-radius: 0.65rem;
+  background: #167d78;
+  font-weight: 600;
 }
+.login__submit:hover:not(:disabled) { background: #0f6966; }
 .login__hint {
   color: var(--color-text-muted);
   font-size: 0.85rem;
-  margin: 0;
+  margin: 0.75rem 0 0;
+  line-height: 1.8;
 }
+.login__hint a { color: #167d78; font-weight: 600; }
 </style>

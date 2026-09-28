@@ -343,6 +343,9 @@ tr:last-child td {
   max-width: none;
   padding: 0;
 }
+.app--auth .app-main { display: block; position: relative; }
+/* 真实认证页在表单区显示可关闭提示；未注入认证页的旧路由外壳仍显示自身提示。 */
+.app--auth .app-main:has(> .auth-layout) > [role="alert"] { display: none; }
 
 /* 组件里的 <section> 直接落在 .app-main 的网格里，统一卡片外观 */
 .app-main > section,
