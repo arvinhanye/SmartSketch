@@ -43,32 +43,33 @@ async function setup(failure = false) {
 }
 
 const lastPut = () => calls.filter(call => call.method === 'PUT').at(-1)?.body ?? {}
+const modelCalls = () => calls.filter(call => call.path.endsWith('/models'))
 
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; vi.unstubAllGlobals() })
 
 describe('api-settings 模型选择', () => {
   it('每个接口各自的候选列表独立获取（空地址、远端缺 Key 都先提示）', async () => {
     const page = await setup()
+    // 进页面自动获取的是大模型那一次
+    expect(modelCalls().map(call => call.body.kind)).toEqual(['llm'])
     // 向量接口默认没有地址：先给出明确提示，不发请求
     await page.get('[data-test="embedding-discover"]').trigger('click')
     await flushPromises()
     expect(page.get('[data-test="discovery-error"]').text()).toContain('请先填写 API 地址')
-    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(0)
+    expect(modelCalls()).toHaveLength(1)
 
     // 远端地址没有 Key：同样拦下（本机地址才允许不填 Key）
     await page.get('[data-test="embedding-base-url"]').setValue('https://saved.invalid/v1')
     await page.get('[data-test="embedding-discover"]').trigger('click')
     await flushPromises()
     expect(page.get('[data-test="discovery-error"]').text()).toContain('API Key')
-    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(0)
+    expect(modelCalls()).toHaveLength(1)
 
     // 本机地址无需 Key，可与大模型各自获取
     await page.get('[data-test="embedding-base-url"]').setValue('http://127.0.0.1:11434/v1')
-    for (const kind of ['llm', 'embedding']) {
-      await page.get(`[data-test="${kind}-discover"]`).trigger('click')
-      await flushPromises()
-    }
-    expect(calls.filter(call => call.path.endsWith('/models')).map(call => call.body.kind)).toEqual(['llm', 'embedding'])
+    await page.get('[data-test="embedding-discover"]').trigger('click')
+    await flushPromises()
+    expect(modelCalls().map(call => call.body.kind)).toEqual(['llm', 'embedding'])
   })
 
   it('同一用户重新打开页面时自动带回上次填的密钥', async () => {
@@ -133,35 +134,48 @@ describe('api-settings 模型选择', () => {
 
   it('地址变化后旧列表失效，填入新 Key 后再获取时使用新地址', async () => {
     const page = await setup()
+    // 进页面已自动获取过一次，这里按「增量」判断后续请求
+    const before = modelCalls().length
+    expect(before).toBe(1)
     await page.get('[data-test="llm-discover"]').trigger('click')
     await flushPromises()
     expect(page.find('[data-test="model-stale"]').exists()).toBe(false)
-    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(1)
+    expect(modelCalls()).toHaveLength(before + 1)   // 「重新获取」再拉一次
 
     await page.get('[data-test="llm-base-url"]').setValue('https://another.invalid/v1')
     await flushPromises()
     expect(page.get('[data-test="model-stale"]').text()).toContain('已失效')
 
     // 换主机又没给新 Key：拦下并提示，不发请求
+    const guardBaseline = modelCalls().length
     await page.get('[data-test="llm-discover"]').trigger('click')
     await flushPromises()
     expect(page.get('[data-test="discovery-error"]').text()).toContain('API 主机已更换')
-    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(1)
+    expect(modelCalls()).toHaveLength(guardBaseline)
 
     await page.get('[data-test="llm-api-key"]').setValue('brand-new-key')
     await page.get('[data-test="llm-discover"]').trigger('click')
     await flushPromises()
-    const modelCalls = calls.filter(call => call.path.endsWith('/models'))
-    expect(modelCalls).toHaveLength(2)
-    expect(modelCalls.at(-1)?.body.LLM_BASE_URL).toBe('https://another.invalid/v1')
+    expect(modelCalls()).toHaveLength(guardBaseline + 1)
+    expect(modelCalls().at(-1)?.body.LLM_BASE_URL).toBe('https://another.invalid/v1')
   })
 
   it('换了主机且没有新 Key 时给出提示', async () => {
     const page = await setup()
+    const before = modelCalls().length
     await page.get('[data-test="llm-base-url"]').setValue('https://another.invalid/v1')
     await page.get('[data-test="llm-discover"]').trigger('click')
     await flushPromises()
     expect(page.get('[data-test="discovery-error"]').text()).toContain('API 主机已更换')
-    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(0)
+    expect(modelCalls()).toHaveLength(before)   // 只有进页面那次自动获取
+  })
+
+  it('进页面自动获取一次，并显示接口返回的模型数量', async () => {
+    const page = await setup()
+    expect(modelCalls()).toHaveLength(1)        // 无需点按钮
+    expect(page.get('[data-test="discovery-count"]').text()).toContain('接口返回 3 个模型')
+    // 候选很少时给出「不是页面截断」的说明
+    expect(page.get('[data-test="discovery-count"]').text()).toContain('不是页面截断')
+    expect(page.get('[data-test="llm-discover"]').text()).toContain('重新获取')
   })
 })

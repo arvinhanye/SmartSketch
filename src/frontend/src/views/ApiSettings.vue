@@ -69,8 +69,8 @@ const form = reactive({
 const saved = reactive({ llmHost: '', embeddingHost: '', llmModel: '', embeddingModel: '' })
 
 const discovery = reactive({
-  llm: { options: [] as ModelOption[], count: 0, done: false, error: '', latency: null as number | null, busy: false, stale: false, seq: 0 },
-  embedding: { options: [] as ModelOption[], count: 0, done: false, error: '', latency: null as number | null, busy: false, stale: false, seq: 0 },
+  llm: { options: [] as ModelOption[], count: 0, done: false, error: '', latency: null as number | null, busy: false, stale: false, seq: 0, fetchedAt: 0 },
+  embedding: { options: [] as ModelOption[], count: 0, done: false, error: '', latency: null as number | null, busy: false, stale: false, seq: 0, fetchedAt: 0 },
 })
 const testing = reactive({ llm: false, embedding: false })
 const results = reactive<{ llm: ConnectionResult | null; embedding: ConnectionResult | null }>({ llm: null, embedding: null })
@@ -165,6 +165,30 @@ const embeddingDetail = computed(() => {
 const statusLine = computed(() =>
   `当前生效：大模型 ${runtime.llmMode === 'live' ? '在线' : '演示'} · 向量 ${runtime.embeddingMode === 'online' ? '在线' : '演示'}`)
 
+/** 服务商清单的长度：让用户一眼看出「少」是服务商只暴露了这么多，而不是页面截断 */
+const DISCOVERY_SHORT_HINT = 5
+
+/** 大模型候选：进页面自动获取一次时用它判断是否具备条件（地址 + Key 或已保存 Key） */
+const llmCandidatesReady = computed(() => Boolean(
+  form.LLM_BASE_URL.trim()
+  && (configured.llm || isLocalHost(hostOf(form.LLM_BASE_URL)) || Boolean(form.LLM_API_KEY.trim()))
+  && !keyGuard('llm'),
+))
+
+/** 列表状态一句话：接口返回多少个、什么时候取的；很少时说明不是页面截断 */
+function lastFetchLabel(kind: Kind): string {
+  const state = discovery[kind]
+  if (state.busy) return '正在获取模型列表…'
+  if (state.error) return '上次获取失败，可点「重新获取」重试'
+  if (!state.done) return '还未获取过列表'
+  const at = state.fetchedAt > 0 ? new Date(state.fetchedAt).toLocaleTimeString('zh-CN', { hour12: false }) : ''
+  const suffix = at ? ` · ${at}` : ''
+  const short = state.count <= DISCOVERY_SHORT_HINT
+    ? `：该服务商只暴露了这 ${state.count} 个，不是页面截断；需要别的模型可在下方手动填写模型 ID`
+    : ''
+  return `接口返回 ${state.count} 个模型${suffix}${short}`
+}
+
 /** 换了主机又没提供新 Key：不要把原服务商的密钥发给另一个主机 */
 function keyGuard(kind: Kind): string {
   const prefix = kind === 'llm' ? 'LLM' : 'EMBEDDING'
@@ -242,6 +266,9 @@ onMounted(async () => {
     runtime.embeddingModel = settings.active?.EMBEDDING_MODEL ?? ''
     restoreKeys()
     ready.value = true
+    // 进页面自动拉一次大模型候选：条件具备（地址 + Key 或已保存 Key）且当前没有候选时
+    // 向量接口保持手动（演示空间下没有可列举的在线向量模型）
+    if (llmCandidatesReady.value && !discovery.llm.options.length && !discovery.llm.busy) void discover('llm')
   } catch (error) { failed.value = true; message.value = error instanceof Error ? error.message : '读取失败' }
 })
 
@@ -273,7 +300,7 @@ async function discover(kind: Kind) {
     Object.assign(state, {
       options, count: response.count ?? options.length, done: true,
       latency: response.latency_ms, error: response.ok ? '' : (response.error ?? '未能获取模型列表'),
-      stale: false,
+      stale: false, fetchedAt: Date.now(),
     })
     // 接口没有返回任何模型时不算识别成功，提示手动填写
     if (response.ok && !options.length) state.error = '该地址未返回模型，请手动填写模型 ID。'
@@ -416,13 +443,14 @@ function showResult(kind: Kind) {
 
             <div class="discovery-row">
               <button type="button" class="secondary" :disabled="discovery[block.kind].busy" :data-test="`${block.kind}-discover`" @click="discover(block.kind)">
-                {{ discovery[block.kind].busy ? '正在获取…' : '获取模型列表' }}
+                {{ discovery[block.kind].busy ? '正在获取…' : (discovery[block.kind].done ? '重新获取' : '获取模型列表') }}
               </button>
               <span v-if="discovery[block.kind].done && discovery[block.kind].stale" class="note" data-test="model-stale">地址或密钥已改动，当前列表已失效，请重新获取。</span>
             </div>
+            <p class="hint-line" data-test="discovery-count">{{ lastFetchLabel(block.kind) }}</p>
             <p v-if="discovery[block.kind].error" class="warning" role="status" data-test="discovery-error">{{ discovery[block.kind].error }}</p>
             <p v-else-if="discovery[block.kind].done" class="note" data-test="discovery-ok">
-              识别到 {{ discovery[block.kind].count }} 个模型（{{ discovery[block.kind].latency }} ms）。点击下方选择框可展开全部候选，也可手动填写模型 ID。
+              点击下方选择框可展开全部 {{ discovery[block.kind].count }} 个候选（{{ discovery[block.kind].latency }} ms），也可手动填写模型 ID。
             </p>
 
             <template v-if="block.kind === 'llm'">
@@ -480,6 +508,7 @@ function showResult(kind: Kind) {
 .api-settings{max-width:1160px;padding:clamp(18px,3vw,32px);background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:8px}
 .page-heading{margin-bottom:16px}.eyebrow{color:var(--color-primary);font-size:12px;letter-spacing:.12em}h2{font-size:1.25rem}h3{font-size:1.05rem;margin:0}
 .note{color:var(--color-text-muted);font-size:13px;line-height:1.7}
+.hint-line{color:var(--color-text);font-size:13px;line-height:1.7;margin:0}
 .interface-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:24px;align-items:start}
 .interface-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:22px}
 .card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--color-border);margin-bottom:16px}
