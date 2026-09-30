@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.api_settings import router as api_settings_router
 from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
 from app.api.dependencies import access_error_response
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(api_settings_router)
     application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)

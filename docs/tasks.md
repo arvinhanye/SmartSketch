@@ -1544,3 +1544,10 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 输入：已实现的 H13 登录与 ADR-079 学生注册流程、用户确认的桌面登录页设计方向，以及用户提供的未登录提示截图。输出：认证页视觉改版，登录和注册沿用现有 API。依赖：Vue 路由和现有认证外壳；无新依赖。风险：当前基线已有注册功能，改版保留入口；窄屏隐藏品牌装饰以保证表单可用。
 - 验证命令：`npm --prefix src/frontend run test -- --run ../../tests/frontend/h13.test.ts`、`npm --prefix src/frontend run test -- --run --testTimeout=30000`、`npm --prefix src/frontend run type-check`、`npm --prefix src/frontend run build`、`./scripts/verify.sh`、`git diff --check`。
 - 2026-09-28 视觉回归修复：提示条由普通 flex 子项改为相对登录卡片的绝对定位，避免关闭后卡片上移。只做关键测试：新增 `tests/e2e/login-layout.spec.ts`，在 1400px 与 744px 视口验证提示位于卡片上方且关闭前后卡片纵坐标变化小于 1px；该用例先因位移 35.8px 失败、修复后 1 passed。H13 定向 30 passed，前端 type-check exit 0。本轮按用户要求未重跑全量测试与 `verify.sh`。
+
+## LOCAL-API-SETTINGS | IN_PROGRESS | Codex | 2026-09-30
+输入：用户指定 DeepSeek/通义 API 与本机配置需求。范围：教师设置页面、后台保存/连接测试、启动配置。验收：入口位于我的课程下方；密钥不回显；重启生效；拒绝未经迁移的向量切换。只运行最小相关测试，遵从用户禁止多余测试要求。规格：specs/api-settings.md。
+
+## LOCAL-API-SETTINGS | DONE | Codex | 2026-09-30
+交付：Vue 教师 API 设置入口与页面、后端鉴权读写/连接测试、Windows DPAPI 密钥加密、便携启动配置及嵌入式 Python bootstrap。DeepSeek 在线已启用；用户选择保留演示向量，仅保存通义配置，不执行课程迁移。
+必要验证：配置单元测试 2 passed；vue-tsc exit 0；Vite build exit 0；本机接口 smoke 验证未登录 401/学生 403/教师读取保存/密钥不回显/空值保留/向量切换门禁均通过；两份供应商 API 各一次短连接请求成功；浏览器教师登录后入口位于我的课程下方，设置页正常加载。遵从用户要求未运行全量测试或 verify.sh。前端构建存在原有大 chunk 提示，不影响构建。

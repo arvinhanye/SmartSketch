@@ -51,3 +51,8 @@ test-results/
 
 # 一键演示（scripts/start-demo.sh）的日志
 .demo/
+
+# Personal portable runtime paths and API configuration
+local-runtime.json
+api-settings.json
+api-settings.tmp

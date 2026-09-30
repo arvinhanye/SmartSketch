@@ -318,3 +318,6 @@ docker compose --profile app down        # 保留 app-data 卷
 | Neo4j | 课程知识图谱、向量索引、前置关系遍历 | 本地容器已由 F01 落地（见「本地依赖环境（F01）」）；备份策略未定；向量索引维度须等于签收后的 `EMBEDDING_DIMENSIONS` |
 | OpenAI 兼容 LLM API | 抽取、问答、改写、裁决 | 配置形状与切换/预算规则见「模型接入规则（A07）」；取值待 D-02a、D-02b、D-02d、D-02e 签收；脱敏策略未定 |
 | 向量模型 API / 本地模型 | 知识点融合与来源片段检索 | 方案、模型与维度待 D-02c 签收；维度定稿后才能建 Neo4j 向量索引 |
+
+## 本机 API 设置（2026-09-30）
+用户授权新增教师 API 设置页。便携启动设置 SMARTSKETCH_API_CONFIG，API/worker 重启后读取本机 JSON 配置覆盖模型环境变量。密钥使用 Windows 用户 DPAPI 加密，读取响应仅返回已配置标记；不写入源码。向量空间切换必须停机备份和离线迁移。

@@ -115,6 +115,9 @@ function signOut(): void {
         <RouterLink v-if="homeLink" :to="homeLink" class="app-nav__item" :class="{ 'is-active': homeActive }">
           我的课程
         </RouterLink>
+        <RouterLink v-if="role === 'teacher'" to="/api-settings" class="app-nav__item" :class="{ 'is-active': route?.name === 'api-settings' }">
+          API 设置
+        </RouterLink>
         <template v-if="courseNav.length">
           <p class="app-nav__heading">当前课程</p>
           <RouterLink

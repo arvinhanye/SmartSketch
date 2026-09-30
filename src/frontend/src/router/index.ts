@@ -3,6 +3,7 @@ import { createRouter, type RouteRecordRaw, type RouterHistory } from 'vue-route
 import type { components } from '../../../contracts/v1/generated/typescript/openapi'
 import StudentHome from '../views/StudentHome.vue'
 import TeacherHome from '../views/TeacherHome.vue'
+import ApiSettings from '../views/ApiSettings.vue'
 
 export type Role = components['schemas']['Role']
 
@@ -87,6 +88,7 @@ export function createAppRouter({
   registerComponent,
 }: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
+    { path: '/api-settings', name: 'api-settings', component: ApiSettings, meta: { accountRole: 'teacher' } },
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
     { path: '/', name: ROOT_ROUTE, component: loginComponent ?? { render: () => null } },
     {
