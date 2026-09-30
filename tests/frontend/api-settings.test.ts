@@ -170,12 +170,12 @@ describe('api-settings 模型选择', () => {
     expect(modelCalls()).toHaveLength(before)   // 只有进页面那次自动获取
   })
 
-  it('进页面自动获取一次，并显示接口返回的模型数量', async () => {
+  it('进页面自动获取一次，并只报接口返回的模型数量', async () => {
     const page = await setup()
     expect(modelCalls()).toHaveLength(1)        // 无需点按钮
-    expect(page.get('[data-test="discovery-count"]').text()).toContain('接口返回 3 个模型')
-    // 候选很少时给出「不是页面截断」的说明
-    expect(page.get('[data-test="discovery-count"]').text()).toContain('不是页面截断')
+    // 两块统一文案：只有「接口返回 N 个模型」，不带时间、延迟或其他说明
+    expect(page.findAll('[data-test="discovery-count"]').map(node => node.text())).toEqual(['接口返回 3 个模型', '接口返回 0 个模型'])
+    expect(page.find('[data-test="discovery-ok"]').exists()).toBe(false)
     expect(page.get('[data-test="llm-discover"]').text()).toContain('重新获取')
   })
 })

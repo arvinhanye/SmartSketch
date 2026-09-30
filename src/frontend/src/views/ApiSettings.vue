@@ -165,9 +165,6 @@ const embeddingDetail = computed(() => {
 const statusLine = computed(() =>
   `当前生效：大模型 ${runtime.llmMode === 'live' ? '在线' : '演示'} · 向量 ${runtime.embeddingMode === 'online' ? '在线' : '演示'}`)
 
-/** 服务商清单的长度：让用户一眼看出「少」是服务商只暴露了这么多，而不是页面截断 */
-const DISCOVERY_SHORT_HINT = 5
-
 /** 大模型候选：进页面自动获取一次时用它判断是否具备条件（地址 + Key 或已保存 Key） */
 const llmCandidatesReady = computed(() => Boolean(
   form.LLM_BASE_URL.trim()
@@ -175,18 +172,9 @@ const llmCandidatesReady = computed(() => Boolean(
   && !keyGuard('llm'),
 ))
 
-/** 列表状态一句话：接口返回多少个、什么时候取的；很少时说明不是页面截断 */
+/** 列表状态：只报数量，大模型与向量两块文案一致 */
 function lastFetchLabel(kind: Kind): string {
-  const state = discovery[kind]
-  if (state.busy) return '正在获取模型列表…'
-  if (state.error) return '上次获取失败，可点「重新获取」重试'
-  if (!state.done) return '还未获取过列表'
-  const at = state.fetchedAt > 0 ? new Date(state.fetchedAt).toLocaleTimeString('zh-CN', { hour12: false }) : ''
-  const suffix = at ? ` · ${at}` : ''
-  const short = state.count <= DISCOVERY_SHORT_HINT
-    ? `：该服务商只暴露了这 ${state.count} 个，不是页面截断；需要别的模型可在下方手动填写模型 ID`
-    : ''
-  return `接口返回 ${state.count} 个模型${suffix}${short}`
+  return `接口返回 ${discovery[kind].count} 个模型`
 }
 
 /** 换了主机又没提供新 Key：不要把原服务商的密钥发给另一个主机 */
@@ -449,9 +437,6 @@ function showResult(kind: Kind) {
             </div>
             <p class="hint-line" data-test="discovery-count">{{ lastFetchLabel(block.kind) }}</p>
             <p v-if="discovery[block.kind].error" class="warning" role="status" data-test="discovery-error">{{ discovery[block.kind].error }}</p>
-            <p v-else-if="discovery[block.kind].done" class="note" data-test="discovery-ok">
-              点击下方选择框可展开全部 {{ discovery[block.kind].count }} 个候选（{{ discovery[block.kind].latency }} ms），也可手动填写模型 ID。
-            </p>
 
             <template v-if="block.kind === 'llm'">
               <label :for="'llm-model'">大模型</label>
