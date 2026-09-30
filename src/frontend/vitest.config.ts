@@ -22,6 +22,14 @@ function resolveTestDepsFromFrontend(): Plugin {
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    resolve: {
+      alias: {
+        '@vue/test-utils': fileURLToPath(new URL('./node_modules/@vue/test-utils/dist/vue-test-utils.esm-bundler.mjs', import.meta.url)),
+        pinia: fileURLToPath(new URL('./node_modules/pinia/dist/pinia.js', import.meta.url)),
+        'vue-router': fileURLToPath(new URL('./node_modules/vue-router/vue-router.node.mjs', import.meta.url)),
+        vue: fileURLToPath(new URL('./node_modules/vue/index.mjs', import.meta.url)),
+      },
+    },
     plugins: [resolveTestDepsFromFrontend()],
     server: {
       fs: { allow: ['.', testsDir] },
