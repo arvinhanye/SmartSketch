@@ -86,6 +86,10 @@ def save_config(values):
     with LOCK:
         merged = DEFAULTS | read_config()
         merged.update({k: v.strip() if isinstance(v, str) else v for k, v in values.items() if k not in KEEP_WHEN_BLANK or v.strip()})
+        # 聊天与知识抽取共用同一个大模型：只给其中一个字段时另一个同步，避免后台任务用错模型
+        chat = merged.get("LLM_CHAT_MODEL") or merged.get("LLM_EXTRACTION_MODEL")
+        if chat:
+            merged["LLM_CHAT_MODEL"] = merged["LLM_EXTRACTION_MODEL"] = chat
         for mode, required in (("LLM_MODE", ("LLM_API_KEY",)), ("EMBEDDING_MODE", ("EMBEDDING_API_KEY",))):
             if merged[mode] != "demo" and any(not merged.get(k) for k in required):
                 raise ValueError("启用在线模式前需填写密钥")
@@ -99,6 +103,9 @@ def save_config(values):
 
 def public_config():
     values = DEFAULTS | read_config()
+    # 旧配置可能只写了知识抽取模型：界面统一显示同一个大模型
+    if not values.get("LLM_CHAT_MODEL") and values.get("LLM_EXTRACTION_MODEL"):
+        values["LLM_CHAT_MODEL"] = values["LLM_EXTRACTION_MODEL"]
     return {k: v for k, v in values.items() if k not in SECRETS} | {k + "_configured": bool(values.get(k)) for k in SECRETS}
 
 import json
@@ -137,16 +144,47 @@ def _call_json(url, key, payload=None):
     except (URLError, TimeoutError, OSError):
         raise _CallError("连接失败，请检查网络、API 地址与证书", round((perf_counter() - started) * 1000)) from None
 
-def extract_model_ids(body):
-    entries = body.get("data", body.get("models", [])) if isinstance(body, dict) else body
+def extract_model_options(body):
+    """兼容常见 OpenAI 兼容接口的模型列表返回，规范化为 [{id, name}]。
+
+    支持 data: [{id, name}]、models: [{id, name}]、字符串数组，以及 data 为
+    {"models": [...]} 的包裹；按 id 去重并保留首次出现的顺序，空值丢弃。
+    """
+    entries = body
+    if isinstance(body, dict):
+        entries = body.get("data", body.get("models", []))
+        if isinstance(entries, dict):
+            entries = entries.get("models", entries.get("data", []))
     if not isinstance(entries, list):
         return []
-    models = []
+    options = []
+    seen = set()
     for item in entries:
-        name = item.get("id", item.get("name")) if isinstance(item, dict) else item
-        if isinstance(name, str) and name.strip() and name.strip() not in models:
-            models.append(name.strip())
-    return models
+        if isinstance(item, str):
+            identifier, label = item, ""
+        elif isinstance(item, dict):
+            identifier = item.get("id") or item.get("name") or item.get("model")
+            label = item.get("name") or item.get("display_name") or ""
+        else:
+            continue
+        if not isinstance(identifier, str) or not identifier.strip():
+            continue
+        identifier = identifier.strip()
+        if identifier in seen:
+            continue
+        seen.add(identifier)
+        options.append({"id": identifier, "name": label.strip() if isinstance(label, str) else ""})
+    return options
+
+
+def extract_model_ids(body):
+    """模型 ID 列表；保留该字段以兼容既有调用方。"""
+    return [option["id"] for option in extract_model_options(body)]
+
+
+def _model_options_from_ids(models):
+    return [{"id": name, "name": ""} for name in models]
+
 
 def _looks_like_embedding(name):
     return any(word in name.lower() for word in ("embed", "bge", "gte", "m3e", "text-similarity", "rerank"))
@@ -167,16 +205,25 @@ def _resolve(kind, body):
 def list_models(kind, body):
     if kind not in ("llm", "embedding"):
         raise ValueError("测试类型错误")
-    result = {"kind": kind, "ok": False, "models": [], "count": 0, "latency_ms": None, "provider": "", "error": None}
+    result = {"kind": kind, "ok": False, "models": [], "model_options": [], "count": 0, "latency_ms": None, "provider": "", "error": None}
     try:
-        _, result["provider"], key = _resolve(kind, body)
-        response, result["latency_ms"], _ = _call_json(result["provider"] + "/models", key)
-        models = extract_model_ids(response)
+        # list_path 仅用于本次模型发现，不属于持久配置字段。
+        config_body = {k: v for k, v in body.items() if k != "list_path"}
+        _, result["provider"], key = _resolve(kind, config_body)
+        # 个别服务商的模型列表不在 /models 下，允许请求体给出路径（预设里带）
+        path = (body.get("list_path") or "").strip() or "/models"
+        if not path.startswith("/"):
+            raise ValueError("模型列表路径必须以 / 开头")
+        response, result["latency_ms"], _ = _call_json(result["provider"] + path, key)
+        options = extract_model_options(response)
         if kind == "embedding":
-            models = [name for name in models if _looks_like_embedding(name)] or models
-        if not models:
-            raise ValueError("接口未返回可识别的模型列表，可手动填写模型名")
-        result.update(ok=True, models=models, count=len(models))
+            # 只有在接口确实带能力信息时才算筛选；仅凭名称命中关键字只做「优先展示」，不排除其它
+            matched = [option for option in options if _looks_like_embedding(option["id"])]
+            if matched:
+                options = matched + [option for option in options if option not in matched]
+        if not options:
+            raise ValueError("接口未返回可识别的模型列表，可手动填写模型 ID")
+        result.update(ok=True, models=[option["id"] for option in options], model_options=options, count=len(options))
     except ValueError as exc:
         result["error"] = str(exc)
         result["latency_ms"] = getattr(exc, "latency_ms", result["latency_ms"])

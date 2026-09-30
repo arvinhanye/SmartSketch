@@ -5,19 +5,35 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import ApiSettings from '../../src/frontend/src/views/ApiSettings.vue'
 
 let wrapper: VueWrapper | undefined
-const calls: { path: string; body: Record<string, unknown> }[] = []
-const empty = { LLM_MODE: 'demo', LLM_BASE_URL: '', LLM_CHAT_MODEL: '', LLM_EXTRACTION_MODEL: '', LLM_PROVIDER_LABEL: '', EMBEDDING_MODE: 'demo', EMBEDDING_BASE_URL: '', EMBEDDING_MODEL: '', EMBEDDING_PROVIDER_LABEL: '', EMBEDDING_DIMENSIONS: 1024, LLM_API_KEY_configured: false, EMBEDDING_API_KEY_configured: false }
+const calls: { method: string; path: string; body: Record<string, unknown> }[] = []
+
+const saved = {
+  LLM_MODE: 'demo', LLM_BASE_URL: 'https://saved.invalid/v1', LLM_CHAT_MODEL: 'deepseek-flash', LLM_EXTRACTION_MODEL: 'deepseek-flash',
+  LLM_PROVIDER_LABEL: '', EMBEDDING_MODE: 'demo', EMBEDDING_BASE_URL: '', EMBEDDING_MODEL: '', EMBEDDING_DIMENSIONS: 1024,
+  EMBEDDING_PROVIDER_LABEL: '', LLM_API_KEY_configured: true, EMBEDDING_API_KEY_configured: false,
+  active: { LLM_MODE: 'live', EMBEDDING_MODE: 'demo', EMBEDDING_MODEL: '' },
+}
+
+/** 接口返回：两个带展示名的模型 + 一个只有 ID 的模型，用于验证「ID 与名称分开」 */
+const MODEL_OPTIONS = [
+  { id: 'deepseek-flash', name: 'DeepSeek-V4.1-Flash' },
+  { id: 'deepseek-pro', name: 'DeepSeek-V4-Pro' },
+  { id: 'deepseek-plain', name: '' },
+]
+
 async function setup(failure = false) {
   calls.length = 0
-  vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit) => {
+  vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit = {}) => {
     const body = options.body ? JSON.parse(options.body as string) : {}
-    calls.push({ path, body })
-    const result = path.endsWith('/models')
-      ? { kind: body.kind, ok: true, models: ['identified-model'], count: 1, latency_ms: 12, provider: 'https://test.invalid/v1', error: null }
-      : path.endsWith('/test')
-        ? { kind: body.kind, ok: !failure, latency_ms: 37, http_status: failure ? 401 : 200, detail: { model: 'selected-model' }, provider: 'https://test.invalid/v1', error: failure ? '服务商返回 HTTP 401，请核对密钥、地区、模型与额度' : null }
-        : empty
-    return { ok: true, status: 200, json: async () => result }
+    calls.push({ method: options.method ?? 'GET', path, body })
+    if (path.endsWith('/models')) {
+      return { ok: true, status: 200, json: async () => ({ kind: body.kind, ok: true, models: MODEL_OPTIONS.map(o => o.id), model_options: MODEL_OPTIONS, count: 3, latency_ms: 12, provider: 'https://saved.invalid/v1', error: null }) }
+    }
+    if (path.endsWith('/test')) {
+      return { ok: true, status: 200, json: async () => ({ kind: body.kind, ok: !failure, latency_ms: 37, http_status: failure ? 401 : 200, detail: { model: body.LLM_CHAT_MODEL ?? 'x' }, provider: 'https://saved.invalid/v1', error: failure ? '服务商返回 HTTP 401，请核对密钥、地区、模型与额度' : null }) }
+    }
+    if (options.method === 'PUT') return { ok: true, status: 200, json: async () => ({ ...saved, ...body, message: '已保存' }) }
+    return { ok: true, status: 200, json: async () => saved }
   }))
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })
   await router.push('/')
@@ -25,26 +41,104 @@ async function setup(failure = false) {
   await flushPromises()
   return wrapper
 }
+
+const lastPut = () => calls.filter(call => call.method === 'PUT').at(-1)?.body ?? {}
+
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; vi.unstubAllGlobals() })
-describe('api-settings', () => {
-  it('does not prefill any model', async () => {
+
+describe('api-settings 模型选择', () => {
+  it('每个接口各自的候选列表独立获取（空地址、远端缺 Key 都先提示）', async () => {
     const page = await setup()
-    expect(['chat-model', 'extraction-model', 'embedding-model'].map(name => (page.get(`[data-test="${name}"]`).element as HTMLInputElement).value)).toEqual(['', '', ''])
-  })
-  it('discovers each interface with its own kind', async () => {
-    const page = await setup()
-    for (const kind of ['llm', 'embedding']) { await page.get(`[data-kind="${kind}"] .discovery-row button`).trigger('click'); await flushPromises() }
+    // 向量接口默认没有地址：先给出明确提示，不发请求
+    await page.get('[data-test="embedding-discover"]').trigger('click')
+    await flushPromises()
+    expect(page.get('[data-test="discovery-error"]').text()).toContain('请先填写 API 地址')
+    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(0)
+
+    // 远端地址没有 Key：同样拦下（本机地址才允许不填 Key）
+    await page.get('[data-test="embedding-base-url"]').setValue('https://saved.invalid/v1')
+    await page.get('[data-test="embedding-discover"]').trigger('click')
+    await flushPromises()
+    expect(page.get('[data-test="discovery-error"]').text()).toContain('API Key')
+    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(0)
+
+    // 本机地址无需 Key，可与大模型各自获取
+    await page.get('[data-test="embedding-base-url"]').setValue('http://127.0.0.1:11434/v1')
+    for (const kind of ['llm', 'embedding']) {
+      await page.get(`[data-test="${kind}-discover"]`).trigger('click')
+      await flushPromises()
+    }
     expect(calls.filter(call => call.path.endsWith('/models')).map(call => call.body.kind)).toEqual(['llm', 'embedding'])
   })
-  it('shows one independent result dialog with latency', async () => {
+
+  it('已选模型时仍展开全部候选，并能改选另一个模型', async () => {
     const page = await setup()
-    await page.get('[data-kind="llm"] .test-actions button').trigger('click'); await flushPromises()
-    const dialog = document.querySelector('.dialog')
-    expect([document.querySelectorAll('.dialog').length, dialog?.textContent?.includes('37 ms'), dialog?.getAttribute('aria-label')]).toEqual([1, true, '大模型接口测试结果'])
+    await page.get('[data-test="llm-discover"]').trigger('click')
+    await flushPromises()
+    const input = page.get('[data-test="model-select-input"]')
+    expect((input.element as HTMLInputElement).value).toBe('DeepSeek-V4.1-Flash')   // 旧配置优先显示 LLM_CHAT_MODEL
+
+    await input.trigger('focus')
+    await flushPromises()
+    const options = page.findAll('[data-test="model-option"]')
+    expect(options.map(node => node.find('.model-select__name').text())).toEqual(['DeepSeek-V4.1-Flash', 'DeepSeek-V4-Pro', 'deepseek-plain'])
+    expect(options.map(node => node.find('.model-select__id').exists())).toEqual([true, true, false])  // 无展示名时只显示 ID
+
+    await options[1].trigger('mousedown')
+    await flushPromises()
+    expect((input.element as HTMLInputElement).value).toBe('DeepSeek-V4-Pro')
+    await page.get('form').trigger('submit')
+    await flushPromises()
+    expect([lastPut().LLM_CHAT_MODEL, lastPut().LLM_EXTRACTION_MODEL]).toEqual(['deepseek-pro', 'deepseek-pro'])
   })
-  it('shows the provider failure reason', async () => {
-    const page = await setup(true)
-    await page.get('[data-kind="llm"] .test-actions button').trigger('click'); await flushPromises()
-    expect(document.querySelector('.dialog')?.textContent).toContain('HTTP 401')
+
+  it('保存时写入真实模型 ID，并保留已保存的 Key（不发空 Key）', async () => {
+    const page = await setup()
+    await page.get('[data-test="llm-discover"]').trigger('click')
+    await flushPromises()
+    await page.get('[data-test="model-select-input"]').trigger('focus')
+    await flushPromises()
+    await page.findAll('[data-test="model-option"]')[0].trigger('mousedown')
+    await flushPromises()
+    await page.get('form').trigger('submit')
+    await flushPromises()
+    const body = lastPut()
+    expect(body.LLM_CHAT_MODEL).toBe('deepseek-flash')
+    expect('LLM_API_KEY' in body).toBe(false)
+    expect('EMBEDDING_MODE' in body).toBe(false)   // 不提交向量模式，保留迁移门禁
+  })
+
+  it('地址变化后旧列表失效，填入新 Key 后再获取时使用新地址', async () => {
+    const page = await setup()
+    await page.get('[data-test="llm-discover"]').trigger('click')
+    await flushPromises()
+    expect(page.find('[data-test="model-stale"]').exists()).toBe(false)
+    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(1)
+
+    await page.get('[data-test="llm-base-url"]').setValue('https://another.invalid/v1')
+    await flushPromises()
+    expect(page.get('[data-test="model-stale"]').text()).toContain('已失效')
+
+    // 换主机又没给新 Key：拦下并提示，不发请求
+    await page.get('[data-test="llm-discover"]').trigger('click')
+    await flushPromises()
+    expect(page.get('[data-test="discovery-error"]').text()).toContain('API 主机已更换')
+    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(1)
+
+    await page.get('[data-test="llm-api-key"]').setValue('brand-new-key')
+    await page.get('[data-test="llm-discover"]').trigger('click')
+    await flushPromises()
+    const modelCalls = calls.filter(call => call.path.endsWith('/models'))
+    expect(modelCalls).toHaveLength(2)
+    expect(modelCalls.at(-1)?.body.LLM_BASE_URL).toBe('https://another.invalid/v1')
+  })
+
+  it('换了主机且没有新 Key 时给出提示', async () => {
+    const page = await setup()
+    await page.get('[data-test="llm-base-url"]').setValue('https://another.invalid/v1')
+    await page.get('[data-test="llm-discover"]').trigger('click')
+    await flushPromises()
+    expect(page.get('[data-test="discovery-error"]').text()).toContain('API 主机已更换')
+    expect(calls.filter(call => call.path.endsWith('/models'))).toHaveLength(0)
   })
 })

@@ -14,12 +14,20 @@ export interface ApiSettings {
   active?: { LLM_MODE: string; EMBEDDING_MODE: string; EMBEDDING_MODEL: string }
 }
 
+/** 一个可选模型：`id` 是实际调用用的标识，`name` 只是展示名（可能为空）。 */
+export interface ModelOption {
+  id: string
+  name: string
+}
+
 export interface ConnectionResult {
   kind: string; ok: boolean; latency_ms: number | null; http_status: number | null
   detail: { model?: string; dimensions?: number }; provider: string; error: string | null
 }
+
+/** 模型列表发现结果；`model_options` 为规范化候选项，`models` 为兼容字段。 */
 export interface ModelDiscovery {
-  kind: string; ok: boolean; models: string[]; count: number
+  kind: string; ok: boolean; models: string[]; model_options?: ModelOption[]; count: number
   latency_ms: number | null; provider: string; error: string | null
 }
 
