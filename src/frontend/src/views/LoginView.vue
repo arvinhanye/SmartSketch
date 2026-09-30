@@ -103,25 +103,26 @@ async function submit(): Promise<void> {
 .login label {
   display: grid;
   gap: 0.5rem;
-  color: #314d58;
+  color: var(--color-text);
   font-weight: 500;
 }
-.login input { min-height: 2.85rem; padding-inline: 0.9rem; border-color: #ccdadf; border-radius: 0.65rem; }
-.login input:focus { border-color: #318f89; box-shadow: 0 0 0 3px rgb(49 143 137 / 11%); outline: none; }
+.login input { min-height: 2.85rem; padding-inline: 0.9rem; border-color: var(--color-border-strong); border-radius: 0.65rem; }
+/* 焦点必须清晰可见：主色描边 + 主色浅环，不只靠背景色 */
+.login input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(156 74 52 / 14%); outline: none; }
 .login__submit {
   justify-self: stretch;
   margin-top: 0.5rem;
   padding-block: 0.78rem;
   border-radius: 0.65rem;
-  background: #167d78;
+  background: var(--color-primary);
   font-weight: 600;
 }
-.login__submit:hover:not(:disabled) { background: #0f6966; }
+.login__submit:hover:not(:disabled) { background: var(--color-primary-hover); }
 .login__hint {
   color: var(--color-text-muted);
   font-size: 0.85rem;
   margin: 0.75rem 0 0;
   line-height: 1.8;
 }
-.login__hint a { color: #167d78; font-weight: 600; }
+.login__hint a { color: var(--color-primary); font-weight: 600; }
 </style>

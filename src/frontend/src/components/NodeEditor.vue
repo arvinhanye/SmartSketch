@@ -354,15 +354,15 @@ watch(
 }
 
 .node-editor__meta {
-  color: #555;
+  color: var(--color-text-muted);
 }
 
 .node-editor__error {
-  color: #c62828;
+  color: var(--color-danger-text);
 }
 
 .node-editor [aria-invalid='true'] {
-  border-color: #c62828;
+  border-color: var(--color-danger-text);
 }
 
 .node-editor__actions,
@@ -374,7 +374,7 @@ watch(
 }
 
 .node-editor__danger {
-  color: #c62828;
+  color: var(--color-danger-text);
 }
 
 .node-editor__conflict table {
@@ -384,7 +384,7 @@ watch(
 .node-editor__conflict th,
 .node-editor__conflict td {
   padding: 2px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-strong);
   text-align: left;
 }
 </style>

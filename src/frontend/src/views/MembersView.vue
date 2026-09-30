@@ -150,11 +150,11 @@ th,
 td {
   text-align: left;
   padding: 0.375rem 0.5rem;
-  border-bottom: 1px solid #d0d7de;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .muted {
-  color: #57606a;
+  color: var(--color-text-muted);
 }
 
 .add fieldset {

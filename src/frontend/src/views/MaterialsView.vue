@@ -221,7 +221,7 @@ function onFileChange(event: Event): void {
 .hint,
 .meta {
   font-size: 0.875rem;
-  color: #57606a;
+  color: var(--color-text-muted);
 }
 
 .meta {
@@ -237,7 +237,7 @@ function onFileChange(event: Event): void {
 }
 
 .rows li {
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
 }
@@ -256,11 +256,11 @@ progress {
 }
 
 .status-failed {
-  color: #cf222e;
+  color: var(--color-danger-text);
 }
 
 .status-cancelling,
 .status-cancelled {
-  color: #9a6700;
+  color: var(--color-warning-text);
 }
 </style>

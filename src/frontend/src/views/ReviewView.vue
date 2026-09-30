@@ -310,7 +310,7 @@ function otherName(pair: SuspectedDuplicate): string {
 .review__course,
 .review__hint,
 .review__meta {
-  color: #595959;
+  color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 .review__summary {
@@ -320,7 +320,7 @@ function otherName(pair: SuspectedDuplicate): string {
   margin: 0.5rem 0 1rem;
 }
 .review__column {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-border);
   padding-top: 0.5rem;
 }
 .review__list {
@@ -328,7 +328,7 @@ function otherName(pair: SuspectedDuplicate): string {
   padding: 0;
 }
 .review__list > li {
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
@@ -346,6 +346,6 @@ function otherName(pair: SuspectedDuplicate): string {
   align-items: center;
 }
 [data-tone='error'] {
-  color: #cf1322;
+  color: var(--color-danger-text);
 }
 </style>

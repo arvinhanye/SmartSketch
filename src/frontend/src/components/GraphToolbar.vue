@@ -312,18 +312,18 @@ const summaryText = computed(() => {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 1.5px solid #1677ff;
+  border: 1.5px solid var(--color-border-strong);
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .graph-toolbar__node-swatch--low_confidence {
-  border-color: #fa8c16;
+  border-color: var(--color-warning-text);
   border-style: dashed;
 }
 
 .graph-toolbar__node-swatch--rejected {
-  border-color: #bfbfbf;
+  border-color: var(--color-border-strong);
   border-style: dashed;
   opacity: 0.4;
 }

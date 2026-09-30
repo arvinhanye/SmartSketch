@@ -207,7 +207,7 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
 }
 
 .cards li {
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
 }

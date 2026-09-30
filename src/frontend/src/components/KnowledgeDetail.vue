@@ -179,18 +179,18 @@ watch(detail, async (next) => {
 }
 
 .knowledge-detail__meta {
-  color: #555;
+  color: var(--color-text-muted);
 }
 
 .knowledge-detail blockquote {
   margin: 4px 0 0;
   padding-left: 8px;
-  border-left: 3px solid #ccc;
+  border-left: 3px solid var(--color-border-strong);
   white-space: pre-wrap;
 }
 
 .knowledge-detail button[aria-pressed='true'] {
   font-weight: bold;
-  outline: 2px solid #1d6fd8;
+  outline: 2px solid var(--color-primary);
 }
 </style>

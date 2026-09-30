@@ -57,18 +57,13 @@ const edges = [
       </div>
       <div class="auth-layout__visual">
         <svg class="auth-layout__art" data-test="auth-graph" viewBox="0 0 720 425" aria-hidden="true" focusable="false">
-          <defs>
-            <radialGradient id="auth-graph-glow">
-              <stop offset="0" stop-color="#6bdacb" stop-opacity=".28" />
-              <stop offset="1" stop-color="#6bdacb" stop-opacity="0" />
-            </radialGradient>
-          </defs>
-          <circle cx="350" cy="204" r="166" fill="url(#auth-graph-glow)" />
+          <circle cx="350" cy="204" r="166" class="auth-layout__glow" />
           <circle cx="350" cy="204" r="104" class="auth-layout__orbit" />
           <circle cx="350" cy="204" r="174" class="auth-layout__orbit auth-layout__orbit--outer" />
           <path v-for="edge in edges" :key="edge" :d="edge" class="auth-layout__edge" />
           <g v-for="node in nodes" :key="node.label" :class="['auth-layout__node', `auth-layout__node--${node.kind}`]">
-            <circle :cx="node.x" :cy="node.y" :r="node.kind === 'core' ? 48 : node.kind === 'major' ? 35 : 29" />
+            <circle :cx="node.x" :cy="node.y" :r="node.kind === 'core' ? 48 : node.kind === 'major' ? 35 : 29"
+                    :fill="node.kind === 'core' ? 'var(--color-primary)' : undefined" />
             <text :x="node.x" :y="node.y + 4" text-anchor="middle">{{ node.label }}</text>
           </g>
         </svg>
@@ -101,9 +96,9 @@ const edges = [
   display: flex;
   flex-direction: column;
   padding: clamp(2rem, 4vw, 4.5rem) clamp(2rem, 5.4vw, 6.5rem) 2rem;
-  background: radial-gradient(circle at 84% 70%, rgb(49 146 145 / 22%), transparent 41%),
-    linear-gradient(145deg, #0b2638 0%, #103747 54%, #0b3a42 100%);
-  color: #d8e9ed;
+  background: radial-gradient(circle at 84% 70%, var(--color-primary-soft), transparent 42%),
+    var(--color-surface-muted);
+  color: var(--color-text);
 }
 .auth-layout__identity,
 .auth-layout__story,
@@ -115,17 +110,17 @@ const edges = [
   flex: none;
   width: 3rem;
   height: 3rem;
-  border: 1px solid rgb(171 229 221 / 34%);
+  border: 1px solid var(--color-border-strong);
   border-radius: 0.9rem;
-  background: rgb(175 236 222 / 9%);
+  background: var(--color-surface);
 }
-.auth-layout__logo svg { width: 2rem; fill: none; stroke: #b6eee1; stroke-width: 1.55; stroke-linejoin: round; }
-.auth-layout__identity h1 { margin: 0; color: #fff; font-size: 1.35rem; letter-spacing: 0.08em; }
-.auth-layout__identity p { margin: 0.15rem 0 0; color: #a9c6cd; font-size: 0.76rem; letter-spacing: 0.02em; }
+.auth-layout__logo svg { width: 2rem; fill: none; stroke: var(--color-primary); stroke-width: 1.55; stroke-linejoin: round; }
+.auth-layout__identity h1 { margin: 0; color: var(--color-text); font-size: 1.35rem; letter-spacing: 0.08em; }
+.auth-layout__identity p { margin: 0.15rem 0 0; color: var(--color-text-muted); font-size: 0.76rem; letter-spacing: 0.02em; }
 .auth-layout__story { margin-top: clamp(3rem, 9vh, 7rem); max-width: 43rem; }
-.auth-layout__eyebrow { display: inline-block; margin-bottom: 1.15rem; color: #87d4c8; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.12em; }
+.auth-layout__eyebrow { display: inline-block; margin-bottom: 1.15rem; color: var(--color-primary); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.12em; }
 .auth-layout__headline {
-  color: #f5fbfb;
+  color: var(--color-text);
   font-size: clamp(2rem, 2.7vw, 3.25rem);
   font-weight: 650;
   line-height: 1.34;
@@ -136,22 +131,24 @@ const edges = [
 .auth-layout__lede {
   max-width: 37rem;
   margin: 1.4rem 0 0;
-  color: #b9d1d5;
+  color: var(--color-text-muted);
   font-size: clamp(0.91rem, 1.1vw, 1.05rem);
   line-height: 1.9;
 }
 .auth-layout__visual { width: min(100%, 45rem); margin: auto auto 0; padding-top: 1.2rem; }
 .auth-layout__art { display: block; width: 100%; max-height: min(42vh, 24rem); overflow: visible; }
-.auth-layout__orbit { fill: none; stroke: rgb(143 214 212 / 10%); stroke-width: 1; }
+.auth-layout__glow { fill: var(--color-primary-soft); opacity: 0.55; }
+.auth-layout__orbit { fill: none; stroke: var(--color-border); stroke-width: 1; }
 .auth-layout__orbit--outer { stroke-dasharray: 4 10; }
-.auth-layout__edge { fill: none; stroke: rgb(141 215 210 / 39%); stroke-width: 1.25; }
-.auth-layout__node circle { fill: #164957; stroke: rgb(146 216 211 / 54%); stroke-width: 1.4; }
-.auth-layout__node text { fill: #e3f3f2; font-size: 11px; font-weight: 500; }
-.auth-layout__node--core circle { fill: #287a79; stroke: #9be3d5; stroke-width: 2; }
+.auth-layout__edge { fill: none; stroke: var(--color-border-strong); stroke-width: 1.25; }
+.auth-layout__node circle { fill: var(--color-surface); stroke: var(--color-border-strong); stroke-width: 1.4; }
+.auth-layout__node text { fill: var(--color-text); font-size: 11px; font-weight: 500; }
+/* 砖红点缀只给核心节点（fill 用属性写在模板上，这里补描边与字重） */
+.auth-layout__node--core circle { stroke: var(--color-primary-hover); stroke-width: 2; }
 .auth-layout__node--core text { fill: #fff; font-size: 13px; font-weight: 650; }
-.auth-layout__node--minor circle { fill: #123f4e; stroke: rgb(146 216 211 / 37%); }
-.auth-layout__node--minor text { fill: #bcdad9; font-size: 10px; }
-.auth-layout__visual-caption { margin: -0.2rem 0 0; color: #94b8bc; font-size: 0.75rem; letter-spacing: 0.12em; text-align: center; }
+.auth-layout__node--minor circle { stroke: var(--color-border); }
+.auth-layout__node--minor text { fill: var(--color-text-muted); font-size: 10px; }
+.auth-layout__visual-caption { margin: -0.2rem 0 0; color: var(--color-text-muted); font-size: 0.75rem; letter-spacing: 0.12em; text-align: center; }
 .auth-layout__form-area {
   display: flex;
   flex-direction: column;
@@ -160,7 +157,7 @@ const edges = [
   gap: 2.5rem;
   min-width: 0;
   padding: 3rem clamp(1.5rem, 4vw, 4rem);
-  background: radial-gradient(circle at 88% 5%, #e4f2f1, transparent 34%), #f5f9fa;
+  background: radial-gradient(circle at 88% 5%, var(--color-primary-soft), transparent 36%), var(--color-bg);
 }
 .auth-layout__entry { position: relative; width: min(100%, 27rem); }
 .auth-layout__notice {
@@ -185,16 +182,16 @@ const edges = [
   font-size: 1.25rem;
   line-height: 1;
 }
-.auth-layout__notice button:hover:not(:disabled) { background: rgb(143 35 35 / 10%); }
+.auth-layout__notice button:hover:not(:disabled) { background: var(--color-danger-bg); }
 .auth-layout__card {
   width: 100%;
   padding: clamp(1.7rem, 3vw, 2.75rem);
-  border: 1px solid #e3ecee;
+  border: 1px solid var(--color-border);
   border-radius: 1.25rem;
-  background: rgb(255 255 255 / 95%);
-  box-shadow: 0 22px 55px rgb(20 63 74 / 8%), 0 2px 8px rgb(20 63 74 / 3%);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
-.auth-layout__footnote { margin: 0; color: #829ba3; font-size: 0.77rem; letter-spacing: 0.04em; text-align: center; }
+.auth-layout__footnote { margin: 0; color: var(--color-text-muted); font-size: 0.77rem; letter-spacing: 0.04em; text-align: center; }
 @media (max-width: 900px) {
   .auth-layout { grid-template-columns: minmax(0, 1fr); }
   .auth-layout__brand { display: none; }

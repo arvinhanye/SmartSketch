@@ -5,36 +5,55 @@
  * 设计令牌、排版、表单控件、按钮、卡片、提示条与表格的默认外观。
  * 只用元素选择器与少数通用类，组件里已有的 class 选择器仍然优先，互不覆盖。
  *
- * 全部尺寸用 CSS 变量，改主题只动 `:root`。
+ * 全部尺寸与颜色用 CSS 变量，改主题只动 `:root`；
+ * `--graph-*` 是画布（G6）专用令牌，由 `graph/theme.ts` 在建图时读取一次。
  */
 
 :root {
-  /* 方向 A「工作台」：浅灰底、白色面板、青蓝主色（前端改版，2026-09-27） */
-  --color-bg: #f5f7f9;
-  --color-surface: #ffffff;
-  --color-surface-muted: #eef2f5;
-  --color-border: #dfe4ea;
-  --color-border-strong: #c3ccd6;
-  --color-text: #17212b;
-  --color-text-muted: #5b6875;
-  --color-primary: #1c6e8c;
-  --color-primary-hover: #155871;
-  --color-primary-soft: #e4f0f4;
-  --color-brand-deep: #0f3b4c;
-  --color-danger-bg: #fdecec;
-  --color-danger-border: #f0b4b4;
-  --color-danger-text: #8f2323;
-  --color-success-bg: #eaf6ee;
-  --color-success-border: #a9d8b8;
-  --color-success-text: #1f6b3a;
-  --color-warning-bg: #fdf4e3;
-  --color-warning-border: #efd39a;
-  --color-warning-text: #8a5a10;
+  /* 暖纸墨色：暖纸底、暖白面板、墨色正文、砖红主色、松绿成功（与 API 设置页同一套色，2026-10-01） */
+  --color-bg: #faf8f4;
+  --color-surface: #fffdfa;
+  --color-surface-muted: #f3efe7;
+  --color-border: #e6e0d6;
+  --color-border-strong: #c9bfb1;
+  --color-text: #23201c;
+  --color-text-muted: #71685e;
+  --color-primary: #9c4a34;
+  --color-primary-hover: #7f3a27;
+  --color-primary-soft: #f6ece7;
+  --color-brand-deep: #4b3027;
+  --color-danger-bg: #fbeee8;
+  --color-danger-border: #e8c9bd;
+  --color-danger-text: #8a3b26;
+  --color-success-bg: #eef3ef;
+  --color-success-border: #c9d8cf;
+  --color-success-text: #3f6157;
+  --color-warning-bg: #fdf7e8;
+  --color-warning-border: #e9d8ac;
+  --color-warning-text: #8a6a1f;
+
+  /* 画布（G6）不继承 CSS，颜色在建图时由 graph/theme.ts 读一次这些变量 */
+  --graph-edge-contains: #8a8175;
+  --graph-edge-prerequisite: #9c4a34;
+  --graph-edge-related: #3f6157;
+  --graph-edge-example: #b1791f;
+  --graph-state-rejected: #c9bfb1;
+  --graph-state-low-confidence: #8a6a1f;
+  --graph-state-mastered-fill: #eef3ef;
+  --graph-state-mastered-stroke: #3f6157;
+  --graph-state-learning-fill: #fdf7e8;
+  --graph-state-learning-stroke: #b1791f;
+  --graph-state-not-started-fill: #fffdfa;
+  --graph-state-not-started-stroke: #c9bfb1;
+  --graph-state-recommended: #6b4a3a;
+  --graph-state-recommended-halo: #9c4a34;
+  --graph-state-selected: #7f3a27;
+  --graph-state-selected-halo: #9c4a34;
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --shadow-card: 0 1px 2px rgb(29 36 51 / 6%), 0 6px 18px rgb(29 36 51 / 6%);
+  --shadow-card: 0 1px 2px rgb(35 32 28 / 4%), 0 6px 18px rgb(35 32 28 / 5%);
   --space: 1rem;
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -225,11 +244,11 @@ button[data-variant="secondary"]:hover:not(:disabled) {
 }
 
 button[data-variant="danger"] {
-  background: #c0392b;
+  background: var(--color-danger-text);
 }
 
 button[data-variant="danger"]:hover:not(:disabled) {
-  background: #9c2d21;
+  background: var(--color-primary-hover);
 }
 
 /* ---------------------------------------------------------------- 提示条 */
