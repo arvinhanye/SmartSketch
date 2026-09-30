@@ -71,6 +71,29 @@ describe('api-settings 模型选择', () => {
     expect(calls.filter(call => call.path.endsWith('/models')).map(call => call.body.kind)).toEqual(['llm', 'embedding'])
   })
 
+  it('同一用户重新打开页面时自动带回上次填的密钥', async () => {
+    window.localStorage.setItem('smartsketch.apiKeys', JSON.stringify({ llm: 'remembered-key' }))
+    const page = await setup()
+    expect((page.get('[data-test="llm-api-key"]').element as HTMLInputElement).value).toBe('remembered-key')
+    expect(page.get('[data-test="key-restored"]').text()).toContain('已自动带回')
+  })
+
+  it('换到别的主机后不再带回旧密钥，保存成功后清除本机留存', async () => {
+    window.localStorage.setItem('smartsketch.apiKeys', JSON.stringify({ llm: 'remembered-key' }))
+    const page = await setup()
+    await page.get('[data-test="llm-base-url"]').setValue('https://another.invalid/v1')
+    await flushPromises()
+    expect((page.get('[data-test="llm-api-key"]').element as HTMLInputElement).value).toBe('')
+    expect(window.localStorage.getItem('smartsketch.apiKeys') ?? '').not.toContain('remembered-key')
+
+    // 填一把新钥匙并保存：字段与本机留存都应清空（密钥已写入本机加密配置）
+    await page.get('[data-test="llm-api-key"]').setValue('fresh-key')
+    await page.get('form').trigger('submit')
+    await flushPromises()
+    expect((page.get('[data-test="llm-api-key"]').element as HTMLInputElement).value).toBe('')
+    expect(window.localStorage.getItem('smartsketch.apiKeys') ?? '').not.toContain('fresh-key')
+  })
+
   it('已选模型时仍展开全部候选，并能改选另一个模型', async () => {
     const page = await setup()
     await page.get('[data-test="llm-discover"]').trigger('click')

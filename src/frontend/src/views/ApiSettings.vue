@@ -94,6 +94,66 @@ const llmComplete = computed(() => {
   const host = hostOf(form.LLM_BASE_URL)
   return Boolean(form.LLM_API_KEY.trim()) || configured.llm || isLocalHost(host)
 })
+
+/**
+ * API Key 的本机留存：只在**本浏览器**记住用户自己填过的密钥，重启软件或切换页面后自动带回，
+ * 免得每次重新输入。它只在同一 API 主机下复用（换服务商立即清除），保存成功后也会清除；
+ * 密钥不会进入接口响应、日志或后端明文回显，后端仍以 DPAPI 加密存储。
+ */
+const KEY_STORAGE = 'smartsketch.apiKeys'
+const keyRestored = reactive({ llm: false, embedding: false })
+
+function readStoredKeys(): Record<string, string> {
+  try {
+    const raw = window.localStorage.getItem(KEY_STORAGE)
+    return raw ? JSON.parse(raw) as Record<string, string> : {}
+  } catch { return {} }
+}
+function writeStoredKey(kind: Kind, key: string): void {
+  try {
+    const all = readStoredKeys()
+    if (key) all[kind] = key
+    else delete all[kind]
+    window.localStorage.setItem(KEY_STORAGE, JSON.stringify(all))
+  } catch { /* 隐私模式等场景下忽略：仅影响自动带回 */ }
+}
+function clearStoredKey(kind: Kind): void {
+  writeStoredKey(kind, '')
+}
+function clearKeys(): void {
+  keyRestored.llm = false
+  keyRestored.embedding = false
+  form.LLM_API_KEY = ''
+  form.EMBEDDING_API_KEY = ''
+  clearStoredKey('llm')
+  clearStoredKey('embedding')
+}
+/** 挂载时把本机留存的密钥带回输入框（仅当主机与上次保存的一致） */
+function restoreKeys(): void {
+  const stored = readStoredKeys()
+  for (const kind of ['llm', 'embedding'] as Kind[]) {
+    const prefix = kind === 'llm' ? 'LLM' : 'EMBEDDING'
+    const key = stored[kind] ?? ''
+    const host = hostOf(form[`${prefix}_BASE_URL`])
+    if (key && host && host === saved[`${kind}Host`]) {
+      form[`${prefix}_API_KEY`] = key
+      keyRestored[kind] = true
+    } else if (key) {
+      clearStoredKey(kind)   // 地址已换到别的主机：不把旧主机的密钥带过来
+    }
+  }
+}
+/** 地址改到别的主机时，立即丢掉自动带回的密钥，避免误发给另一个服务商 */
+function dropKeyOnHostChange(kind: Kind): void {
+  const prefix = kind === 'llm' ? 'LLM' : 'EMBEDDING'
+  const host = hostOf(form[`${prefix}_BASE_URL`])
+  if (!host || host === saved[`${kind}Host`]) return
+  clearStoredKey(kind)
+  if (keyRestored[kind]) {
+    keyRestored[kind] = false
+    form[`${prefix}_API_KEY`] = ''
+  }
+}
 /** 保存后生效的模式：配置完整即在线的，否则仍是演示 */
 const llmModeAfterSave = computed(() => (llmComplete.value ? 'live' : 'demo'))
 const embeddingConfigured = computed(() => Boolean(form.EMBEDDING_BASE_URL.trim() && form.EMBEDDING_MODEL.trim()))
@@ -180,15 +240,24 @@ onMounted(async () => {
     runtime.llmMode = settings.active?.LLM_MODE ?? settings.LLM_MODE ?? 'demo'
     runtime.embeddingMode = settings.active?.EMBEDDING_MODE ?? settings.EMBEDDING_MODE ?? 'demo'
     runtime.embeddingModel = settings.active?.EMBEDDING_MODEL ?? ''
+    restoreKeys()
     ready.value = true
   } catch (error) { failed.value = true; message.value = error instanceof Error ? error.message : '读取失败' }
 })
 
 // 地址或 Key 改变后，已获取的候选列表标记为失效，下次获取必须用新表单值
-watch(() => form.LLM_BASE_URL, () => { discovery.llm.stale = discovery.llm.done })
-watch(() => form.LLM_API_KEY, () => { discovery.llm.stale = discovery.llm.done })
-watch(() => form.EMBEDDING_BASE_URL, () => { discovery.embedding.stale = discovery.embedding.done })
-watch(() => form.EMBEDDING_API_KEY, () => { discovery.embedding.stale = discovery.embedding.done })
+watch(() => form.LLM_BASE_URL, () => { discovery.llm.stale = discovery.llm.done; dropKeyOnHostChange('llm') })
+watch(() => form.LLM_API_KEY, (value) => {
+  discovery.llm.stale = discovery.llm.done
+  if (!value.trim()) keyRestored.llm = false
+  else if (!keyRestored.llm) writeStoredKey('llm', value.trim())
+})
+watch(() => form.EMBEDDING_BASE_URL, () => { discovery.embedding.stale = discovery.embedding.done; dropKeyOnHostChange('embedding') })
+watch(() => form.EMBEDDING_API_KEY, (value) => {
+  discovery.embedding.stale = discovery.embedding.done
+  if (!value.trim()) keyRestored.embedding = false
+  else if (!keyRestored.embedding) writeStoredKey('embedding', value.trim())
+})
 
 async function discover(kind: Kind) {
   const state = discovery[kind]
@@ -260,7 +329,8 @@ async function save() {
     saved.llmModel = form.LLM_MODEL
     saved.llmHost = hostOf(form.LLM_BASE_URL)
     saved.embeddingHost = hostOf(form.EMBEDDING_BASE_URL)
-    form.LLM_API_KEY = ''; form.EMBEDDING_API_KEY = ''
+    // 已写入本机加密配置：输入框与本机留存都清空，不让密钥长期停留在页面上
+    clearKeys()
     const needsRestart = runtime.llmMode !== llmModeAfterSave.value
     message.value = settings.message ?? (needsRestart ? '已保存，需要重启智绘学途后生效。' : '已保存，配置未改变运行模式，无需重启。')
   } catch (error) {
@@ -340,6 +410,9 @@ function showResult(kind: Kind) {
                 :data-test="`${block.kind}-api-key`"
               />
             </label>
+            <p v-if="keyRestored[block.kind]" class="note" data-test="key-restored">
+              已自动带回本机保存的密钥（重启软件或切换页面后仍保留）；保存成功后该密钥会从页面与本机留存中清除。
+            </p>
 
             <div class="discovery-row">
               <button type="button" class="secondary" :disabled="discovery[block.kind].busy" :data-test="`${block.kind}-discover`" @click="discover(block.kind)">
