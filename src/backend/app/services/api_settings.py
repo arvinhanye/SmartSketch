@@ -6,8 +6,21 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 LOCK = threading.RLock()
-FIELDS = {"LLM_MODE", "LLM_BASE_URL", "LLM_API_KEY", "LLM_CHAT_MODEL", "LLM_EXTRACTION_MODEL", "EMBEDDING_MODE", "EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS"}
+FIELDS = {"LLM_MODE", "LLM_BASE_URL", "LLM_API_KEY", "LLM_CHAT_MODEL", "LLM_EXTRACTION_MODEL", "LLM_PROVIDER_LABEL", "EMBEDDING_MODE", "EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS", "EMBEDDING_PROVIDER_LABEL"}
 SECRETS = {"LLM_API_KEY", "EMBEDDING_API_KEY"}
+KEEP_WHEN_BLANK = {"LLM_CHAT_MODEL", "LLM_EXTRACTION_MODEL", "EMBEDDING_MODEL", "LLM_PROVIDER_LABEL", "EMBEDDING_PROVIDER_LABEL", *SECRETS}
+TIMEOUT_SECONDS = 20
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+
+def _is_local_host(name):
+    import ipaddress
+    if name in LOCAL_HOSTS:
+        return True
+    try:
+        address = ipaddress.ip_address(name)
+        return address in ipaddress.ip_network("192.168.0.0/16") or address in ipaddress.ip_network("10.0.0.0/8")
+    except ValueError:
+        return False
 def _secret_value(value, encrypt=False):
     """Use Windows user-bound DPAPI encryption for persisted keys."""
     if os.name != "nt" or not value:
@@ -34,7 +47,7 @@ def _secret_value(value, encrypt=False):
         kernel = ctypes.WinDLL("kernel32")
         kernel.LocalFree.argtypes = [ctypes.c_void_p]
         kernel.LocalFree(ctypes.cast(target.data, ctypes.c_void_p))
-DEFAULTS = {"LLM_MODE": "demo", "LLM_BASE_URL": "https://api.deepseek.com/v1", "LLM_CHAT_MODEL": "deepseek-chat", "LLM_EXTRACTION_MODEL": "deepseek-chat", "EMBEDDING_MODE": "demo", "EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1", "EMBEDDING_MODEL": "text-embedding-v4", "EMBEDDING_DIMENSIONS": 1024}
+DEFAULTS = {"LLM_MODE": "demo", "LLM_BASE_URL": "", "LLM_CHAT_MODEL": "", "LLM_EXTRACTION_MODEL": "", "LLM_PROVIDER_LABEL": "", "EMBEDDING_MODE": "demo", "EMBEDDING_BASE_URL": "", "EMBEDDING_MODEL": "", "EMBEDDING_DIMENSIONS": 1024, "EMBEDDING_PROVIDER_LABEL": ""}
 
 def config_path():
     return Path(os.environ.get("SMARTSKETCH_API_CONFIG") or (Path(os.environ.get("LOCALAPPDATA", ".")) / "SmartSketch-External" / "api-settings.json"))
@@ -57,13 +70,14 @@ def validate_config(values):
                 raise ValueError("当前版本使用 1024 维向量")
         elif not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 for c in value):
             raise ValueError("配置格式错误")
-        if name.endswith("BASE_URL"):
+        if name.endswith("BASE_URL") and value:
             try:
                 parsed = urlsplit(value)
-                if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
-                    raise ValueError("API 地址必须为 HTTPS 地址")
+                valid_scheme = parsed.scheme == "https" or (parsed.scheme == "http" and _is_local_host(parsed.hostname))
+                if not valid_scheme or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.port == 0 or any(c.isspace() for c in value):
+                    raise ValueError("API 地址必须为 HTTPS；本机地址可用 HTTP")
             except ValueError:
-                raise ValueError("API 地址格式错误") from None
+                raise ValueError("API 地址必须为 HTTPS；本机地址可用 HTTP") from None
     if values.get("LLM_MODE", "demo") not in ("demo", "live") or values.get("EMBEDDING_MODE", "demo") not in ("demo", "online"):
         raise ValueError("运行模式错误")
 
@@ -71,10 +85,10 @@ def save_config(values):
     validate_config(values)
     with LOCK:
         merged = DEFAULTS | read_config()
-        merged.update({k: v.strip() if isinstance(v, str) else v for k, v in values.items() if k not in SECRETS or v.strip()})
-        for mode, required in (("LLM_MODE", ("LLM_API_KEY", "LLM_CHAT_MODEL", "LLM_EXTRACTION_MODEL")), ("EMBEDDING_MODE", ("EMBEDDING_API_KEY", "EMBEDDING_MODEL"))):
+        merged.update({k: v.strip() if isinstance(v, str) else v for k, v in values.items() if k not in KEEP_WHEN_BLANK or v.strip()})
+        for mode, required in (("LLM_MODE", ("LLM_API_KEY",)), ("EMBEDDING_MODE", ("EMBEDDING_API_KEY",))):
             if merged[mode] != "demo" and any(not merged.get(k) for k in required):
-                raise ValueError("启用在线模式前需填写密钥和模型")
+                raise ValueError("启用在线模式前需填写密钥")
         path = config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".tmp")
@@ -90,6 +104,117 @@ def public_config():
 import json
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
+from time import perf_counter
+
+class _CallError(ValueError):
+    def __init__(self, message, latency_ms, http_status=None):
+        super().__init__(message)
+        self.latency_ms = latency_ms
+        self.http_status = http_status
+
+def _api_base(value):
+    base = value.strip().rstrip("/")
+    if not base:
+        raise ValueError("请填写 API 地址")
+    validate_config({"LLM_BASE_URL": base})
+    return base + "/v1" if not urlsplit(base).path else base
+
+def _call_json(url, key, payload=None):
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["Authorization"] = "Bearer " + key
+    request = UrlRequest(url, data=json.dumps(payload).encode() if payload is not None else None, headers=headers)
+    started = perf_counter()
+    try:
+        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            body = json.loads(response.read(2_000_000).decode("utf-8"))
+            status = getattr(response, "status", 200)
+        return body, round((perf_counter() - started) * 1000), status
+    except HTTPError as exc:
+        raise _CallError(f"服务商返回 HTTP {exc.code}，请核对密钥、地区、模型与额度", round((perf_counter() - started) * 1000), exc.code) from None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise _CallError("服务商响应不是 JSON，请确认 API 地址", round((perf_counter() - started) * 1000)) from None
+    except (URLError, TimeoutError, OSError):
+        raise _CallError("连接失败，请检查网络、API 地址与证书", round((perf_counter() - started) * 1000)) from None
+
+def extract_model_ids(body):
+    entries = body.get("data", body.get("models", [])) if isinstance(body, dict) else body
+    if not isinstance(entries, list):
+        return []
+    models = []
+    for item in entries:
+        name = item.get("id", item.get("name")) if isinstance(item, dict) else item
+        if isinstance(name, str) and name.strip() and name.strip() not in models:
+            models.append(name.strip())
+    return models
+
+def _looks_like_embedding(name):
+    return any(word in name.lower() for word in ("embed", "bge", "gte", "m3e", "text-similarity", "rerank"))
+
+def _resolve(kind, body):
+    if kind not in ("llm", "embedding"):
+        raise ValueError("测试类型错误")
+    supplied = {k: v for k, v in body.items() if k != "kind"}
+    validate_config(supplied)
+    values = DEFAULTS | read_config() | {k: v.strip() if isinstance(v, str) else v for k, v in supplied.items() if k not in KEEP_WHEN_BLANK or v.strip()}
+    prefix = "EMBEDDING" if kind == "embedding" else "LLM"
+    base = _api_base(values[prefix + "_BASE_URL"])
+    key = values.get(prefix + "_API_KEY", "")
+    if not key and not _is_local_host(urlsplit(base).hostname):
+        raise ValueError("请填写 API Key")
+    return prefix, base, key
+
+def list_models(kind, body):
+    if kind not in ("llm", "embedding"):
+        raise ValueError("测试类型错误")
+    result = {"kind": kind, "ok": False, "models": [], "count": 0, "latency_ms": None, "provider": "", "error": None}
+    try:
+        _, result["provider"], key = _resolve(kind, body)
+        response, result["latency_ms"], _ = _call_json(result["provider"] + "/models", key)
+        models = extract_model_ids(response)
+        if kind == "embedding":
+            models = [name for name in models if _looks_like_embedding(name)] or models
+        if not models:
+            raise ValueError("接口未返回可识别的模型列表，可手动填写模型名")
+        result.update(ok=True, models=models, count=len(models))
+    except ValueError as exc:
+        result["error"] = str(exc)
+        result["latency_ms"] = getattr(exc, "latency_ms", result["latency_ms"])
+    return result
+
+def test_connection(body):
+    kind = body.get("kind", "llm")
+    if kind not in ("llm", "embedding"):
+        raise ValueError("测试类型错误")
+    result = {"kind": kind, "ok": False, "latency_ms": None, "http_status": None, "detail": {}, "provider": "", "error": None}
+    try:
+        prefix, result["provider"], key = _resolve(kind, body)
+        saved = read_config()
+        model_field = "EMBEDDING_MODEL" if kind == "embedding" else "LLM_CHAT_MODEL"
+        model = body.get(model_field, "").strip() or saved.get(model_field, "")
+        if kind == "llm" and not model:
+            model = body.get("LLM_EXTRACTION_MODEL", "").strip() or saved.get("LLM_EXTRACTION_MODEL", "")
+        if not model:
+            raise ValueError("请先获取并选择一个模型，或手动填写模型名")
+        result["detail"]["model"] = model
+        payload = {"model": model, "input": ["连接测试"], "dimensions": 1024} if kind == "embedding" else {"model": model, "messages": [{"role": "user", "content": "Reply OK"}], "max_tokens": 5}
+        path = "/embeddings" if kind == "embedding" else "/chat/completions"
+        response, result["latency_ms"], result["http_status"] = _call_json(result["provider"] + path, key, payload)
+        if kind == "embedding":
+            data = response.get("data") if isinstance(response, dict) else None
+            vector = data[0].get("embedding") if isinstance(data, list) and data and isinstance(data[0], dict) else None
+            if not isinstance(vector, list) or not vector:
+                raise ValueError("响应缺少向量数据，请确认接口支持 embeddings")
+            result["detail"]["dimensions"] = len(vector)
+        else:
+            choices = response.get("choices") if isinstance(response, dict) else None
+            if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+                raise ValueError("响应缺少 choices，请确认接口支持 chat/completions")
+            result["detail"]["model"] = choices[0].get("model") or model
+        result["ok"] = True
+    except ValueError as exc:
+        result.update(error=str(exc), latency_ms=getattr(exc, "latency_ms", result["latency_ms"]), http_status=getattr(exc, "http_status", result["http_status"]))
+    return result
 def save_for_active_space(body, settings):
     validate_config(body)
     target = body.get("EMBEDDING_MODE", public_config()["EMBEDDING_MODE"])
@@ -98,28 +223,3 @@ def save_for_active_space(body, settings):
     if target != settings.EMBEDDING_MODE or (target == "online" and (model != settings.EMBEDDING_MODEL or target_base != settings.EMBEDDING_BASE_URL.rstrip("/"))):
         raise ValueError("更换向量模型需要离线迁移；请先完成迁移，或保留当前向量模式后保存其他配置。")
     return save_config(body)
-def test_settings(body: dict):
-    kind = body.pop("kind", "llm")
-    if kind not in ("llm", "embedding"):
-        raise ValueError("测试类型错误")
-    try:
-        validate_config(body)
-        values = DEFAULTS | read_config() | {k: v for k, v in body.items() if not k.endswith("API_KEY") or v}
-        prefix = "EMBEDDING" if kind == "embedding" else "LLM"
-        key = values.get(prefix + "_API_KEY", "")
-        if not key:
-            raise ValueError("请填写 API Key")
-        data = {"model": values["EMBEDDING_MODEL"], "input": ["连接测试"], "dimensions": 1024} if kind == "embedding" else {"model": values["LLM_CHAT_MODEL"], "messages": [{"role": "user", "content": "Reply OK"}], "max_tokens": 5}
-        suffix = "/embeddings" if kind == "embedding" else "/chat/completions"
-        request = UrlRequest(values[prefix + "_BASE_URL"].rstrip("/") + suffix, data=json.dumps(data).encode(), headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
-        with urlopen(request, timeout=20) as response:
-            result = json.loads(response.read(2_000_000))
-        if kind == "embedding" and len(result["data"][0]["embedding"]) != 1024:
-            raise ValueError("向量维度不匹配")
-        if kind != "embedding" and not result.get("choices"):
-            raise ValueError("模型响应格式不匹配")
-        return {"message": "连接成功"}
-    except HTTPError as exc:
-        raise ValueError(f"服务商返回 HTTP {exc.code}，请核对密钥、地区、模型和额度。") from None
-    except (URLError, TimeoutError, OSError, KeyError, ValueError):
-        raise ValueError("连接失败，请检查网络、API 地址、密钥和模型配置。") from None

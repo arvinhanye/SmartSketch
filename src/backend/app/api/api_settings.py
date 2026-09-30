@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from app.api.dependencies import teacher_account
-from app.services.api_settings import public_config, save_for_active_space, test_settings
+from app.services.api_settings import public_config, save_for_active_space, test_connection, list_models
 
 router = APIRouter(prefix="/api/v1/api-settings", tags=["api-settings"], dependencies=[Depends(teacher_account)])
 
@@ -21,6 +21,13 @@ def put_settings(body: dict, request: Request):
 @router.post("/test")
 def connection_test(body: dict):
     try:
-        return test_settings(body)
+        return test_connection(body)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"code": "VALIDATION_ERROR", "message": str(exc)})
+
+@router.post("/models")
+def available_models(body: dict):
+    try:
+        return list_models(body.get("kind", "llm"), body)
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"code": "VALIDATION_ERROR", "message": str(exc)})

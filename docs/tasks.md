@@ -1551,3 +1551,5 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 ## LOCAL-API-SETTINGS | DONE | Codex | 2026-09-30
 交付：Vue 教师 API 设置入口与页面、后端鉴权读写/连接测试、Windows DPAPI 密钥加密、便携启动配置及嵌入式 Python bootstrap。DeepSeek 在线已启用；用户选择保留演示向量，仅保存通义配置，不执行课程迁移。
 必要验证：配置单元测试 2 passed；vue-tsc exit 0；Vite build exit 0；本机接口 smoke 验证未登录 401/学生 403/教师读取保存/密钥不回显/空值保留/向量切换门禁均通过；两份供应商 API 各一次短连接请求成功；浏览器教师登录后入口位于我的课程下方，设置页正常加载。遵从用户要求未运行全量测试或 verify.sh。前端构建存在原有大 chunk 提示，不影响构建。
+
+API-SETTINGS-REFRESH | DONE（前端单测/运行态验收未验证）| Codex | 2026-10-01：独立结果弹窗、延迟、模型识别与暖纸墨色；后端 6 passed/type-check/build 通过；前端依赖解析重试达限，服务未运行 smoke 跳过；仅本地提交。
