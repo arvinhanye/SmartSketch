@@ -1534,3 +1534,13 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收条件：① 未登录可打开 `/register`，登录页有入口，已登录访问回本账号首页；② 只建学生账号，请求体带 `role` 422 且零写入；③ 用户名大小写不敏感重复 409 `USERNAME_TAKEN`，页面在用户名下提示；④ 本地校验不过不发请求；⑤ 每进程 60 秒内 60 次，超出 429 带 `Retry-After`；⑥ 问答页知识点显示名称（取回答所依据的发布版），读取失败退回标识；⑦ 退出登录清会话回登录页。
 - 顺带修复：`useChat` 直接改原始对象，`currentVersion` 不会更新（改为写响应式代理）。
 - 待决：G6 画布在 64 个节点时整体缩得很小、标签难读（改版前已存在，未在本任务处理）；是否需要关闭自助注册的部署开关（ADR-079 后果）。详见 `docs/handoffs/claude-frontend-redesign.md`。
+
+## 2026-10-01 dev-up.sh 启动诊断：Neo4j 起不来时说清原因（Claude，新增任务）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| DEMO-03 | DONE（待 PR 审查/合并） | `scripts/dev-up.sh` 端口预检、退出/反复重启/口令不一致立即报告、失败时打印容器状态与日志及对症提示；`unhealthy` 等到截止时间 | Claude | `claude/project-thread-diyack` / `main@2a67189` | `tests/tooling/test_dev_up_diagnostics.py` 8 passed（改前 7 failed）；F01/K07 回归通过；真实 Docker 29 + Neo4j 5.26.31 实跑内存超限、端口被占、口令不一致、正常启动四种情形，详见 `docs/handoffs/claude-dev-up-diagnostics.md` |
+
+- 起因：用户在 macOS（Intel，Docker Desktop 29.8）运行 `scripts/start-demo.sh`，只得到「Neo4j 健康检查失败」。实际原因两个：另一个目录里的 SmartSketch 副本的 Neo4j 容器（`smartsketch-neo4j-1`）一直占着 7474/7687；本目录的 Neo4j 数据/日志在反复崩溃后留下坏状态，以退出码 3、无 ERROR 反复重启。停掉另一份、换全新数据卷后启动成功（2026-10-01 用户确认）。
+- 验收条件：① 容器未运行且端口被占时不启动容器、给出 `lsof` 命令；② 容器停在 created/exited 或重启次数增加时立即失败，打印 Docker 报错、退出码与最近 40 行日志；③ 认证被拒时立即失败并说明口令只在首次初始化生效，输出不含口令；④ `unhealthy` 不立即失败，截止时打印最后一次连接输出；⑤ 正常启动行为不变。
+- 已排除：「桌面」目录挂载（改用 Docker 卷后照旧退出）；镜像、APOC、内存设置（原版镜像三组对照在该 Mac 上都正常）。坏状态的具体文件未定位，数据已随旧卷删除。

@@ -157,6 +157,27 @@ scripts/restore-demo.sh --from backups/k10/<备份目录> \
 | 学生看不到课程 | 未加入课程或课程从未发布 | 教师在「管理成员」添加学生并发布 |
 | 发布返回 409 课程忙 | 另一写操作持有课程写锁 | 稍后重试；卡住超过租约时长（`PUBLISH_LEASE_SECONDS`）会自动回收 |
 | 前端页面接口全部失败 | 开发服务器没反代到 API | 确认 API 在 8000，或设 `SMARTSKETCH_API_TARGET` 后重启 `npm run dev` |
+| `dev-up.sh` 报端口 7474/7687 被占用，或容器停在 created、Docker 报 `port is already allocated` | 本机另有 Neo4j：另一个目录里的 SmartSketch 副本（Docker Desktop 上 `lsof` 只显示 `com.docker`）、Neo4j Desktop 或 Homebrew | 脚本会列出占端口的容器，`docker stop <容器名>` 停掉（不删数据）；非容器用 `lsof -nP -iTCP:7474 -iTCP:7687 -sTCP:LISTEN` 找；或在 `.env` 设 `NEO4J_HTTP_PORT`/`NEO4J_BOLT_PORT`（改 Bolt 端口时同步改 `NEO4J_URI`） |
+| Neo4j 反复重启，日志有 `Invalid memory configuration`，或 `OOMKilled=true` | Docker 可用内存小于 1G 堆 + 512M 页缓存 | `.env` 设 `NEO4J_HEAP_MAX=512M`、`NEO4J_PAGECACHE=256M`，或调大 Docker Desktop 内存；再 `docker compose up -d --force-recreate neo4j` |
+| Neo4j 反复重启，退出码 3，日志在 `Logging config in use` 后直接 `shutdown initiated by request`，没有 ERROR | Neo4j 初始化日志时出错（退出码 3 且无 ERROR 只有这一条代码路径）。2026-10-01 macOS 实例：之前反复崩溃后 `neo4j/data`、`neo4j/logs` 留下坏状态；原版镜像、APOC、内存设置单独测试都正常，换全新目录即启动 | 无数据要保留时 `docker compose down`，把 `neo4j/data`、`neo4j/logs` 挪走（`mv neo4j/data neo4j/data.bak-$(date +%s)`）后重启；用了下方 Docker 卷的改用 `docker compose down -v` |
+| `dev-up.sh` 报「Neo4j 拒绝了 .env 里的 NEO4J_PASSWORD」 | `neo4j/data` 首次初始化时用的口令与现在 `.env` 不一致，改 `.env` 不会改库里的口令 | 改回原口令；或无数据要保留时 `docker compose down && mv neo4j/data neo4j/data.bak-$(date +%s)` 后重启 |
+
+### 可选：数据与日志改存 Docker 卷
+
+不想把 `neo4j/data`、`neo4j/logs` 放在项目目录里时，可在仓库根目录建 `docker-compose.override.yml`（已在 `.gitignore` 中，compose 自动读取），让 Neo4j 改用 Docker 管理的卷：
+
+```yaml
+services:
+  neo4j:
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+volumes:
+  neo4j-data:
+  neo4j-logs:
+```
+
+然后 `docker compose down && scripts/start-demo.sh`。日志改用 `docker compose logs neo4j` 查看；`scripts/dev-down.sh --destroy` 会删除这两个卷。撤销：删掉该文件后重启，数据回到 `neo4j/data`。
 
 ## 9. 限制
 
