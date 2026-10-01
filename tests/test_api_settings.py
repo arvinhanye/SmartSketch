@@ -69,6 +69,23 @@ class ApiSettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             save_config({"LLM_BASE_URL": "file:///private"})
 
+    def test_rollback_preserves_demo_space_when_saving_target(self):
+        save_config({"LLM_MODE": "demo", "EMBEDDING_MODE": "demo",
+                     "EMBEDDING_MODEL": "text-embedding-v4", "EMBEDDING_DIMENSIONS": 1024,
+                     "EMBEDDING_TARGET_MODEL": "text-embedding-v4", "EMBEDDING_TARGET_DIMENSIONS": 768})
+        values = read_config()
+        self.assertEqual(values["LLM_MODE"], "demo")
+        self.assertEqual(values["EMBEDDING_MODE"], "demo")
+        self.assertEqual(values["EMBEDDING_DIMENSIONS"], 1024)
+        self.assertEqual(values["EMBEDDING_TARGET_DIMENSIONS"], 768)
+
+    def test_rollback_allows_partial_settings_without_switching_vectors(self):
+        settings = Settings(LLM_MODE="demo", EMBEDDING_MODE="demo")
+        result = api_settings.save_for_active_space({"LLM_BASE_URL": "https://example.invalid/v1"}, settings)
+        self.assertEqual(result["LLM_BASE_URL"], "https://example.invalid/v1")
+        self.assertEqual(result["EMBEDDING_MODE"], "demo")
+        self.assertFalse(result["LLM_API_KEY_configured"])
+
     def test_extract_model_ids_shapes(self):
         self.assertEqual(api_settings.extract_model_ids({"data": [{"id": "chat"}, {"id": "chat"}]}), ["chat"])
         self.assertEqual(api_settings.extract_model_ids({"models": [{"name": "embed"}]}), ["embed"])
@@ -152,106 +169,9 @@ class ApiSettingsTests(unittest.TestCase):
         values = public_config()
         self.assertEqual([values["LLM_CHAT_MODEL"], values["LLM_EXTRACTION_MODEL"]], ["legacy-model", "legacy-model"])
 
-    def test_saving_requires_complete_real_api_config(self):
-        """只看真实服务：配置不完整时保存被拒，并提示要填什么。"""
-        with self.assertRaises(ValueError) as incomplete:
-            api_settings.save_for_active_space({"LLM_BASE_URL": "https://api.deepseek.com/v1"}, Settings())
-        self.assertIn("请选择大模型和向量模型", str(incomplete.exception))
-
-        # 配全之后可以保存，并且不再接受演示模式
-        api_settings.save_for_active_space({
-            "LLM_BASE_URL": "https://api.deepseek.com/v1", "LLM_API_KEY": "k", "LLM_CHAT_MODEL": "deepseek-flash",
-            "EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1", "EMBEDDING_API_KEY": "k",
-            "EMBEDDING_TARGET_MODEL": "text-embedding-v4", "EMBEDDING_TARGET_DIMENSIONS": 1024,
-        }, Settings())
-        values = read_config()
-        self.assertEqual(values["LLM_MODE"], "live")
-        self.assertEqual(values["EMBEDDING_MODE"], "online")
-
-    def test_runtime_embedding_fields_cannot_be_written_from_the_page(self):
-        """页面不能直接改写正在使用的向量模型/维度，只能保存「新设置」。"""
-        with self.assertRaises(ValueError) as rejected:
-            api_settings.save_for_active_space({"EMBEDDING_MODEL": "text-embedding-v4"}, Settings())
-        self.assertIn("新设置", str(rejected.exception))
-        # 目标字段可以写（完整性由保存入口另行校验，这里直接走底层服务）
-        save_config({"EMBEDDING_TARGET_MODEL": "text-embedding-v4", "EMBEDDING_TARGET_DIMENSIONS": 768})
-        self.assertEqual(read_config()["EMBEDDING_TARGET_DIMENSIONS"], 768)
 
 
-class ReadinessTests(unittest.TestCase):
-    """必须配置真实 API：没配好就不能假装能用。"""
 
-    def setUp(self):
-        root = Path(__file__).parent / '.tmp-api-settings'
-        root.mkdir(exist_ok=True)
-        self.folder = tempfile.TemporaryDirectory(dir=root)
-        self.addCleanup(self.folder.cleanup)
-        env = patch.dict(os.environ, {"SMARTSKETCH_API_CONFIG": str(Path(self.folder.name) / "config.json")})
-        env.start()
-        self.addCleanup(env.stop)
-
-    def test_missing_requirements_are_listed_for_users(self):
-        labels = api_settings.missing_requirements()
-        self.assertIn("大模型 API Key", labels)
-        self.assertIn("向量模型", labels)
-
-    def test_status_reports_restart_after_save(self):
-        class Active:
-            LLM_MODE = "live"
-            LLM_CHAT_MODEL = "deepseek-flash"
-            EMBEDDING_MODE = "online"
-            EMBEDDING_MODEL = "text-embedding-v4"
-            EMBEDDING_DIMENSIONS = 1024
-
-        before = api_settings.config_status(Active())
-        self.assertFalse(before["ready"])
-        self.assertFalse(before["restart_needed"])
-        api_settings.save_config({
-            "LLM_BASE_URL": "https://api.deepseek.com/v1", "LLM_API_KEY": "k", "LLM_CHAT_MODEL": "deepseek-flash",
-            "EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1", "EMBEDDING_API_KEY": "k",
-            "EMBEDDING_MODEL": "text-embedding-v4",
-        })
-        after = api_settings.config_status(Active())
-        self.assertTrue(after["ready"])
-        # 刚保存过的配置还没被进程读到，必须提示重启
-        self.assertTrue(after["restart_needed"])
-
-    def test_status_reports_not_ready_while_process_still_demo(self):
-        """配置已填好但进程还没重启（仍在演示实现）时，不能算可用。"""
-        class Active:
-            LLM_MODE = "live"
-            LLM_CHAT_MODEL = "deepseek-flash"
-            EMBEDDING_MODE = "demo"
-            EMBEDDING_MODEL = "text-embedding-v4"
-            EMBEDDING_DIMENSIONS = 1024
-
-        api_settings.save_config({
-            "LLM_BASE_URL": "https://api.deepseek.com/v1", "LLM_API_KEY": "k", "LLM_CHAT_MODEL": "deepseek-flash",
-            "EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1", "EMBEDDING_API_KEY": "k",
-            "EMBEDDING_MODEL": "text-embedding-v4",
-        })
-        status = api_settings.config_status(Active())
-        self.assertTrue(status["configured"])
-        self.assertFalse(status["ready"])
-        self.assertTrue(any("向量模型" in label for label in status["missing"]))
-
-    def test_settings_ready_needs_real_services(self):
-        class Demo:
-            LLM_MODE = "demo"
-            EMBEDDING_MODE = "demo"
-
-        self.assertFalse(api_settings.settings_ready(Demo()))
-        api_settings.save_config({
-            "LLM_BASE_URL": "https://api.deepseek.com/v1", "LLM_API_KEY": "k", "LLM_CHAT_MODEL": "deepseek-flash",
-            "EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1", "EMBEDDING_API_KEY": "k",
-            "EMBEDDING_MODEL": "text-embedding-v4",
-        })
-
-        class Live:
-            LLM_MODE = "live"
-            EMBEDDING_MODE = "online"
-
-        self.assertTrue(api_settings.settings_ready(Live()))
 
 
 class ApiSettingsDimensionTests(unittest.TestCase):
@@ -301,12 +221,12 @@ class ApiSettingsDimensionTests(unittest.TestCase):
         target = target_embedding_space(public_config())
         self.assertEqual((target["model"], target["dimensions"]), ("text-embedding-v4", 1536))
 
-    def test_chat_model_target_body_is_leaked_into_config(self):
-        """首次配置：还没有正在使用的向量模型时，新设置直接作为启用配置。"""
+    def test_target_model_does_not_activate_on_first_save(self):
+        """首次保存目标配置也不得自动启用或改写现有向量空间。"""
         save_config({"EMBEDDING_TARGET_MODEL": "text-embedding-v3"})
         values = read_config()
         self.assertEqual(values["EMBEDDING_TARGET_MODEL"], "text-embedding-v3")
-        self.assertEqual(values["EMBEDDING_MODEL"], "text-embedding-v3")
+        self.assertEqual(values["EMBEDDING_MODEL"], "")
 
     def test_target_field_never_overwrites_an_existing_runtime_model(self):
         """已有正在使用的向量模型时，新设置只作为「待重新处理」的目标。"""

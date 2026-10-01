@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { COURSES_API_KEY, type CourseIntelligence, type CoursesApi } from '../api/courses'
+import { COURSES_API_KEY } from '../api/courses'
 import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, useCourses } from '../composables/useCourses'
 import {
   COURSE_MEMBERS_ROUTE,
@@ -17,9 +17,8 @@ import {
 } from '../router'
 import { useSessionStore } from '../stores/session'
 
-const injected = inject(COURSES_API_KEY, null)
-if (injected === null) throw new Error('CoursesView 需要注入 COURSES_API_KEY')
-const api: CoursesApi = injected
+const api = inject(COURSES_API_KEY, null)
+if (api === null) throw new Error('CoursesView 需要注入 COURSES_API_KEY')
 
 const route = useRoute()
 const router = useRouter()
@@ -75,40 +74,6 @@ const hasReview = router.hasRoute(REVIEW_ROUTE)
 
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
 
-/** 当前课程的智能功能状态：旧演示向量需要用户主动重新处理资料 */
-const intelligence = ref<CourseIntelligence | null>(null)
-const reprocessing = ref(false)
-const reprocessMessage = ref('')
-const needsReprocess = computed(() => intelligence.value?.needs_reprocess === true)
-
-async function loadIntelligence(): Promise<void> {
-  const cid = courseId.value
-  reprocessMessage.value = ''
-  if (cid === null || api.intelligence === undefined) { intelligence.value = null; return }
-  try {
-    intelligence.value = await api.intelligence(cid)
-  } catch {
-    // 状态读不到时不打扰用户：页面本身仍可用
-    intelligence.value = null
-  }
-}
-async function startReprocess(): Promise<void> {
-  const cid = courseId.value
-  if (cid === null || reprocessing.value || api.reprocess === undefined) return
-  reprocessing.value = true
-  reprocessMessage.value = ''
-  try {
-    const result = await api.reprocess(cid)
-    reprocessMessage.value = `已提交重新处理（${result.count} 份资料），进度可在「教学资料」中查看。`
-    await loadIntelligence()
-  } catch (error) {
-    reprocessMessage.value = error instanceof Error ? error.message : '提交失败，请稍后重试。'
-  } finally {
-    reprocessing.value = false
-  }
-}
-
-watch(courseId, () => { void loadIntelligence() }, { immediate: true })
 </script>
 
 <template>
@@ -139,20 +104,6 @@ watch(courseId, () => { void loadIntelligence() }, { immediate: true })
           · 状态：{{ current.statusLabel }}
         </p>
         <p v-if="current.description">{{ current.description }}</p>
-        <!-- 旧数据是演示向量：不能直接当在线数据用，要求用户主动重新处理资料 -->
-        <div v-if="needsReprocess" class="intelligence-note" data-test="course-needs-reprocess" role="status">
-          <p>{{ intelligence?.message || '这门课程需要重新处理资料后才能使用智能功能。' }}</p>
-          <button
-            v-if="current.myRole === 'teacher' && intelligence?.can_reprocess"
-            type="button"
-            :disabled="reprocessing"
-            data-test="course-reprocess"
-            @click="startReprocess"
-          >
-            {{ reprocessing ? '正在提交…' : '重新处理资料' }}
-          </button>
-          <p v-if="reprocessMessage" class="intelligence-note__result" data-test="reprocess-result">{{ reprocessMessage }}</p>
-        </div>
         <p v-if="hasStudentGraph && current.myRole === 'student'">
           <RouterLink data-test="student-graph-link" :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: current.id } }">
             浏览课程图谱
@@ -301,23 +252,4 @@ watch(courseId, () => { void loadIntelligence() }, { immediate: true })
   gap: 0.25rem;
 }
 
-/* 旧数据（演示向量）需要重新处理资料：提示 + 用户主动触发的操作 */
-.intelligence-note {
-  display: grid;
-  gap: 0.5rem;
-  justify-items: start;
-  margin: 0.5rem 0;
-  padding: 0.75rem 0.9rem;
-  background: var(--color-warning-bg);
-  border: 1px solid var(--color-warning-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-warning-text);
-  font-size: 0.875rem;
-}
-.intelligence-note p {
-  margin: 0;
-}
-.intelligence-note__result {
-  color: var(--color-text-muted);
-}
 </style>

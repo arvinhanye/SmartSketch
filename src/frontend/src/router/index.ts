@@ -4,7 +4,6 @@ import type { components } from '../../../contracts/v1/generated/typescript/open
 import StudentHome from '../views/StudentHome.vue'
 import TeacherHome from '../views/TeacherHome.vue'
 import ApiSettings from '../views/ApiSettings.vue'
-import { NOT_CONFIGURED_MESSAGE, apiConfigured, requiresConfiguredApi } from '../composables/useConfigStatus'
 
 export type Role = components['schemas']['Role']
 
@@ -164,7 +163,7 @@ export function createAppRouter({
   const router = createRouter({ history, routes })
 
   // 前端守卫只是界面引导，授权以后端为准（specs/identity-access.md §2.4）
-  router.beforeEach(async (to) => {
+  router.beforeEach((to) => {
     const role = getAccountRole()
     if (to.meta.guestOnly) return role === null ? true : { name: HOME_ROUTE[role] }
     if (role === null) {
@@ -175,10 +174,6 @@ export function createAppRouter({
     const required = to.meta.accountRole
     if (required === undefined) return { name: HOME_ROUTE[role] }
     if (required !== role) return { name: HOME_ROUTE[role], query: { notice: NOTICE_WRONG_ROLE } }
-    // 必须配置真实 API：没配好就把教师引导到「API 设置」；学生看不到该页，不拦
-    if (role === 'teacher' && requiresConfiguredApi(to.name as string) && !(await apiConfigured())) {
-      return { name: 'api-settings', query: { notice: NOT_CONFIGURED_MESSAGE } }
-    }
     return true
   })
 

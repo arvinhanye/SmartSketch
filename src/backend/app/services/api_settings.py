@@ -102,17 +102,6 @@ def _validate_string_field(name, value):
         except ValueError:
             raise ValueError("API 地址必须为 HTTPS；本机地址可用 HTTP") from None
 
-def require_complete(values=None):
-    """保存入口的完整性检查：必须配好真实的大模型与向量模型，才允许保存生效。
-
-    面向用户的说法，只提「要填什么」，不提内部字段。还没启用向量模型时，页面上的
-    「新设置」就足够（保存后即成为启用配置）。
-    """
-    values = DEFAULTS | read_config() if values is None else values
-    if not values.get("EMBEDDING_MODEL") and values.get("EMBEDDING_TARGET_MODEL"):
-        values = values | {"EMBEDDING_MODEL": values["EMBEDDING_TARGET_MODEL"]}
-    if missing_requirements(values):
-        raise ValueError("请选择大模型和向量模型，并填写对应的 API Key。")
 
 
 def save_config(values):
@@ -120,16 +109,13 @@ def save_config(values):
     with LOCK:
         merged = DEFAULTS | read_config()
         merged.update({k: v.strip() if isinstance(v, str) else v for k, v in values.items() if k not in KEEP_WHEN_BLANK or v.strip()})
-        # 只用真实服务：不再提供演示模式（模式字段只由本机环境变量或配置决定，不接受演示取值）
-        merged["LLM_MODE"] = "live"
-        if merged.get("EMBEDDING_MODE") in ("demo", "fake", ""):
-            merged["EMBEDDING_MODE"] = "online"
         # 聊天与知识抽取共用同一个大模型：只给其中一个字段时另一个同步，避免后台任务用错模型
         chat = merged.get("LLM_CHAT_MODEL") or merged.get("LLM_EXTRACTION_MODEL")
         if chat:
             merged["LLM_CHAT_MODEL"] = merged["LLM_EXTRACTION_MODEL"] = chat
-        # 完整性只由用户保存入口校验（见 save_for_active_space → require_complete）；
-        # 这里保持宽松，方便工具与分步保存。
+        for mode, required in (("LLM_MODE", ("LLM_API_KEY",)), ("EMBEDDING_MODE", ("EMBEDDING_API_KEY",))):
+            if merged[mode] != "demo" and any(not merged.get(k) for k in required):
+                raise ValueError("启用在线模式前需填写密钥")
         # 目标向量空间：只做校验与记录，不改变运行时使用的 EMBEDDING_MODEL/EMBEDDING_DIMENSIONS
         if merged.get("EMBEDDING_TARGET_DIMENSIONS"):
             # 目标模型缺失时按当前模型校验（多为固定维度模型，维度必须与之一致）
@@ -137,10 +123,6 @@ def save_config(values):
             validate_target_dimension(target_model, merged["EMBEDDING_TARGET_DIMENSIONS"], bool(merged.get(ASSUME_FLAG)))
         else:
             merged["EMBEDDING_TARGET_DIMENSIONS"] = 0
-        # 首次配置：还没有正在使用的向量模型时，新设置直接作为启用配置，装好重启即可使用
-        if not merged.get("EMBEDDING_MODEL") and merged.get("EMBEDDING_TARGET_MODEL"):
-            merged["EMBEDDING_MODEL"] = merged["EMBEDDING_TARGET_MODEL"]
-            merged["EMBEDDING_DIMENSIONS"] = merged.get("EMBEDDING_TARGET_DIMENSIONS") or merged["EMBEDDING_DIMENSIONS"]
         path = config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".tmp")
@@ -157,77 +139,6 @@ def public_config():
     # 向量维度页面上要显示，但它不是可自由编辑的配置项
     values["EMBEDDING_DIMENSIONS"] = int(values.get("EMBEDDING_DIMENSIONS") or 0)
     return {k: v for k, v in values.items() if k not in SECRETS} | {k + "_configured": bool(values.get(k)) for k in SECRETS}
-
-
-#: 缺少哪些配置就不能正常工作（面向用户的字段名）
-REQUIRED_FIELDS = (
-    ("LLM_BASE_URL", "大模型 API 地址"),
-    ("LLM_API_KEY", "大模型 API Key"),
-    ("LLM_CHAT_MODEL", "大模型"),
-    ("EMBEDDING_BASE_URL", "向量模型 API 地址"),
-    ("EMBEDDING_API_KEY", "向量模型 API Key"),
-    ("EMBEDDING_MODEL", "向量模型"),
-)
-
-
-def missing_requirements(values=None):
-    values = DEFAULTS | read_config() if values is None else values
-    return [label for name, label in REQUIRED_FIELDS if not values.get(name)]
-
-
-def settings_ready(settings) -> bool:
-    """本进程是否已具备使用智能功能的条件（真实大模型 + 真实向量模型）。
-
-    没配好时调用方应提示用户去「API 设置」，不得回退到演示实现。
-    """
-    if settings.LLM_MODE != "live" or settings.EMBEDDING_MODE not in ("online", "local"):
-        return False
-    return not missing_requirements()
-
-
-def _not_live_labels(active) -> list[str]:
-    """本进程仍在用非真实实现时，按用户能看懂的说法列出原因。"""
-    labels: list[str] = []
-    if active.LLM_MODE != "live":
-        labels.append("大模型（完成设置后重启软件）")
-    if active.EMBEDDING_MODE not in ("online", "local"):
-        labels.append("向量模型（完成设置后重启软件）")
-    return labels
-
-
-def config_status(active, environ=None):
-    """配置状态：是否已配好、是否需要重启才生效、当前实际在用什么模型。
-
-    只用真实服务：``ready`` 为假时前端只引导用户去「API 设置」，不去假装还能用。
-    即使配置文件已经填好，只要本进程还没重启、仍在用演示实现，也一律算未就绪。
-    """
-    values = DEFAULTS | read_config()
-    missing = missing_requirements(values) + _not_live_labels(active)
-    ready = not missing
-    # 保存后还没加载到进程里：配置文件比进程启动时间新，就是不重启不生效
-    from app.services.startup_clock import process_started_at
-
-    restart_needed = False
-    try:
-        path = config_path()
-        if path.exists() and path.stat().st_mtime > process_started_at():
-            restart_needed = True
-    except OSError:
-        restart_needed = False
-    return {
-        "ready": ready,
-        # configured 只表示「该填的都填了」，是否可用还取决于进程有没有用上（ready）
-        "configured": not missing_requirements(values),
-        "restart_needed": restart_needed,
-        "missing": missing,
-        "active": {
-            "LLM_MODE": active.LLM_MODE,
-            "LLM_CHAT_MODEL": active.LLM_CHAT_MODEL,
-            "EMBEDDING_MODE": active.EMBEDDING_MODE,
-            "EMBEDDING_MODEL": active.EMBEDDING_MODEL,
-            "EMBEDDING_DIMENSIONS": int(active.EMBEDDING_DIMENSIONS),
-        },
-    }
 
 
 def target_embedding_space(values):
@@ -447,14 +358,15 @@ def test_connection(body):
         result.update(error=str(exc), latency_ms=getattr(exc, "latency_ms", result["latency_ms"]), http_status=getattr(exc, "http_status", result["http_status"]))
     return result
 def save_for_active_space(body, settings):
-    """保存设置。
-
-    向量模型与维度以「新设置」形式保存到 ``EMBEDDING_TARGET_*``：现有课程内容仍按原设置生成向量，
-    用户需要在课程页点「重新处理资料」，处理完成后才会启用新设置。页面不直接改写正在使用中的
-    向量模型或维度，避免新旧数据混用。
-    """
-    rejected = [name for name in ("EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS") if name in body]
-    if rejected:
-        raise ValueError("向量模型与维度请通过「新设置」保存，处理完资料后才会启用。")
-    require_complete(DEFAULTS | read_config() | {k: v for k, v in body.items() if k not in KEEP_WHEN_BLANK or (isinstance(v, str) and v.strip())})
+    """保存目标配置，保留当前向量模式与数据空间；切换仍需离线迁移。"""
+    validate_config(body)
+    if any(name in body for name in ("EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS")):
+        raise ValueError("向量模型与维度请通过目标配置保存；当前空间需离线迁移后才能切换。")
+    saved = public_config()
+    target_mode = body.get("EMBEDDING_MODE", saved["EMBEDDING_MODE"])
+    target_base = body.get("EMBEDDING_BASE_URL", saved["EMBEDDING_BASE_URL"]).rstrip("/")
+    if target_mode != settings.EMBEDDING_MODE or (
+        target_mode == "online" and target_base != settings.EMBEDDING_BASE_URL.rstrip("/")
+    ):
+        raise ValueError("更换向量模型需要离线迁移；请先完成迁移，或保留当前向量模式后保存其他配置。")
     return save_config(body)

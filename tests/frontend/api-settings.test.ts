@@ -278,6 +278,6 @@ describe('api-settings 向量维度', () => {
     // 两个状态分开显示，且明确提示待迁移
     expect(page.get('[data-test="embedding-current"]').text()).toContain('当前使用')
     expect(page.get('[data-test="embedding-target"]').text()).toContain('1536 维')
-    expect(page.get('[data-test="embedding-pending"]').text()).toContain('重新处理资料')
+    expect(page.get('[data-test="embedding-pending"]').text()).toContain('离线迁移')
   })
 })

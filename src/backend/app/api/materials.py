@@ -21,7 +21,6 @@ from app.api.dependencies import course_teacher
 from app.schemas.errors import Error
 from app.schemas.materials import Document, DocumentNotDeletableDetails, UploadAccepted, UploadPolicy
 from app.services.access import CourseAccess, not_found
-from app.services.course_intelligence import course_vector_status, reprocess_course
 from app.services.file_storage import FileStorageError, FileTooLargeError, iter_file
 from app.services.materials import (
     MaterialNotDeletable,
@@ -33,8 +32,6 @@ from app.services.materials import (
 router = APIRouter(prefix="/api/v1/courses/{cid}/documents", tags=["documents"])
 # ADR-022：上传策略与资料同属 documents 标签，但路径不在 /documents 之下。
 policy_router = APIRouter(prefix="/api/v1/courses/{cid}", tags=["documents"])
-# 课程智能功能可用状态与「重新处理资料」：同样挂在课程下，标签仍属 documents。
-intelligence_router = APIRouter(prefix="/api/v1/courses/{cid}", tags=["documents"])
 
 _STATUS_BY_CODE = {
     "UNSUPPORTED_FORMAT": 415,
@@ -233,47 +230,3 @@ async def _read_bounded_form(request: Request, max_file_bytes: int) -> FormData:
 def get_upload_policy(request: Request, access: CourseAccess = Depends(course_teacher)) -> UploadPolicy:
     """ADR-022：返回服务端当前的 ``UPLOAD_MAX_BYTES``，与 413 的 ``limit_bytes`` 同源。"""
     return UploadPolicy(max_bytes=request.app.state.settings.UPLOAD_MAX_BYTES)
-
-
-@intelligence_router.get(
-    "/intelligence",
-    operation_id="getCourseIntelligence",
-    summary="课程智能功能是否可用（教师、本课成员）",
-    responses=_ACCESS_RESPONSES,
-)
-def get_course_intelligence(request: Request, access: CourseAccess = Depends(course_teacher)) -> dict:
-    """课程向量是否由真实模型生成；需要重新处理时给出用户能看懂的原因。"""
-    return course_vector_status(request.app.state.settings, access.course.id).as_dict()
-
-
-@intelligence_router.post(
-    "/reprocess",
-    operation_id="reprocessCourseMaterials",
-    summary="重新处理本课程资料（教师）",
-    status_code=202,
-    responses=_ACCESS_RESPONSES,
-)
-def reprocess_course_materials(
-    request: Request, access: CourseAccess = Depends(course_teacher)
-) -> JSONResponse:
-    """用已上传的原文件重新排队处理，保留原有资料与图谱；进度在资料页可见。"""
-    task_ids, documents = reprocess_course(request.app.state.settings, access.course.id)
-    if not task_ids and documents:
-        return JSONResponse(
-            status_code=409,
-            content={
-                "code": "REPROCESS_UNAVAILABLE",
-                "message": "原有资料文件已不可用，请重新上传课程资料。",
-                "details": {},
-            },
-        )
-    if not task_ids:
-        return JSONResponse(
-            status_code=409,
-            content={
-                "code": "NO_MATERIALS",
-                "message": "这门课程还没有可重新处理的资料，请先上传课程资料。",
-                "details": {},
-            },
-        )
-    return JSONResponse(status_code=202, content={"task_ids": task_ids, "count": len(task_ids)})

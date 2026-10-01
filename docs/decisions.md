@@ -1697,3 +1697,7 @@
   - 未做：部署级开关（如关闭自助注册的环境变量）；需要时另立任务。
 - **回滚**：删除 `api/auth.py` 的 `register` 路由、`schemas/auth.py` 的 `RegisterRequest`、`services/auth.py` 的 `RegistrationRateLimiter`/`register_student`、`main.py` 一行限流器、`tests/backend/test_adr079_register.py`，撤回契约与生成物、错误码副本、前端注册页和路由；已自助注册的学生账号保留，可用 `manage-accounts.py disable` 停用。
 - **签收**：待 ArvinHan 签收（方案已由用户在线程中选定）。
+
+## 2026-10-01 决策补充：撤销取消演示模式任务
+
+背景：用户要求保留之前全部改动并取消本轮强制联网与课程重新处理逻辑。决定：先提交完整快照，再选择性回退；恢复演示/在线逻辑，目标向量配置只保存，切换仍需原有离线迁移。后果：暖色主题、API 设置和维度选择保留，课程数据与密钥不变；不实施尚未完成的在线向量迁移。签收：用户本轮明确授权。

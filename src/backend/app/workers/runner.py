@@ -38,22 +38,14 @@ from types import FrameType
 from app.config import Settings, SettingsError, load_settings
 from app.repositories.model_calls import SqliteCallStore
 from app.repositories.neo4j import Neo4jRepository
-from app.repositories.task_leases import claim_next, reclaim_expired
 from app.services.ai.entities import EntityExtractor
 from app.services.ai.factory import build_model_clients, model_id
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
-from app.services.api_settings import settings_ready
-from app.services.startup import check_embedding_space_change, validate_schema_current
+from app.services.startup import validate_embedding_space, validate_schema_current
 from app.services.versions.reconcile import SweepReport, sweep
 from app.workers.extract_task import ExtractionToolkit
-from app.workers.parse_task import default_owner
-from app.workers.persist_graph import (
-    PipelineResult,
-    _fail,
-    cleanup_failed_task,
-    run_pipeline_once,
-)
+from app.workers.persist_graph import run_pipeline_once
 
 LOG = logging.getLogger("app.workers")
 
@@ -74,9 +66,8 @@ def heartbeat_path() -> Path:
 
 
 def build_toolkit(settings: Settings) -> ExtractionToolkit:
-    """按 ``LLM_MODE`` 建模型客户端（只用真实服务；fake 仅测试替身会用），外包 E04 策略
-    （调用记录写应用 SQLite 的 ``model_calls``）。
-    """
+    """按 ``LLM_MODE`` 建模型客户端（live / demo / fake，见 ``app.services.ai.factory``），外包 E04 策略
+    （调用记录写应用 SQLite 的 ``model_calls``）。"""
     primary, fallback = build_model_clients(settings)
     model = model_id(settings, "extraction")
     policy = ModelCallPolicy.from_settings(
@@ -137,33 +128,6 @@ def build_maintenance(settings: Settings, repo: Neo4jRepository) -> tuple[Callab
     return (PublishSweep(settings.SQLITE_URL, repo, settings.PUBLISH_SWEEP_INTERVAL_SECONDS),)
 
 
-def fail_pending_without_api(settings: Settings, repo: Neo4jRepository) -> PipelineResult:
-    """没完成 API 设置时：领一个任务并以明确原因失败，不产出任何结果。
-
-    这样用户能在资料页看到「请先完成 API 设置」，而不是拿到演示模型生成的内容。
-    """
-    url = settings.SQLITE_URL
-    holder = default_owner()
-    lock = dict(lock_seconds=settings.TASK_LEASE_SECONDS, lock_wait_seconds=settings.TASK_LEASE_SECONDS)
-    reclaimed = reclaim_expired(url, max_attempts=settings.TASK_MAX_ATTEMPTS)
-    lease = claim_next(
-        url, owner=holder, lease_seconds=settings.TASK_LEASE_SECONDS, max_attempts=settings.TASK_MAX_ATTEMPTS
-    )
-    if lease is None:
-        return PipelineResult(reclaimed, (), None, ())
-    failed = _fail(
-        url, lease, "API_NOT_CONFIGURED", {"message": "请先完成 API 设置，再处理课程资料"}, details=None
-    )
-    cleaned = ()
-    if failed:
-        cleaned = tuple(
-            [lease.task_id]
-            if cleanup_failed_task(url, repo, course_id=lease.course_id, task_id=lease.task_id, holder=holder, **lock)
-            else []
-        )
-    return PipelineResult(reclaimed, cleaned, lease, ((lease.stage, "failed"),))
-
-
 def run_loop(
     settings: Settings,
     stop: threading.Event,
@@ -172,18 +136,13 @@ def run_loop(
     maintenance: Sequence[Callable[[], object]] = (),
     idle_seconds: float = IDLE_SECONDS,
 ) -> int:
-    """反复推进直到 ``stop`` 置位；返回完成的轮数。``step`` 只供测试注入（替代真实流水线）。
-
-    没完成 API 设置时 worker 仍要活着（否则软件起不来、用户也没法去设置），
-    但不再处理任何资料任务：任务会被明确标记失败并提示去「API 设置」。
-    """
+    """反复推进直到 ``stop`` 置位；返回完成的轮数。``step`` 只供测试注入（替代真实流水线）。"""
     if step is None:
+        toolkit = build_toolkit(settings)
         repo = Neo4jRepository.from_settings(settings)
 
         def step() -> object:
-            if settings.APP_ENV != "test" and not settings_ready(settings):
-                return fail_pending_without_api(settings, repo)
-            return run_pipeline_once(settings, toolkit=build_toolkit(settings), repo=repo)
+            return run_pipeline_once(settings, toolkit=toolkit, repo=repo)
 
         if not maintenance:
             maintenance = build_maintenance(settings, repo)
@@ -217,14 +176,9 @@ def _child_main() -> None:
 
 
 def check_startup(settings: Settings) -> None:
-    """与 API lifespan 相同的启动检查（C01 R02、B06）。
-
-    向量空间与旧数据不一致时只记日志：worker 必须能起来，否则用户无法去「重新处理资料」。
-    """
+    """与 API lifespan 相同的两道门禁（C01 R02、B06）。"""
     validate_schema_current(settings)
-    notice = check_embedding_space_change(settings)
-    if notice:
-        LOG.warning("embedding space differs from existing data; reprocessing required")
+    validate_embedding_space(settings)
 
 
 def supervise(settings: Settings, *, target: Callable[[], None] = _child_main) -> int:

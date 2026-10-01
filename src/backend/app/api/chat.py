@@ -26,7 +26,6 @@ from app.schemas.errors import Error
 from app.services.access import CourseAccess
 from app.services.ai.embeddings import EmbeddingAdapter
 from app.services.ai.factory import build_embedding_client, build_model_clients, model_id
-from app.services.api_settings import settings_ready
 from app.services.ai.policy import ModelCallPolicy, new_call_id
 from app.services.qa.chat import ChatAudit, ChatFailure, ChatService
 from app.services.qa.generate import AnswerGenerator
@@ -55,9 +54,6 @@ def chat_service(request: Request) -> ChatService:
     if service is not None:
         return service
     settings = request.app.state.settings
-    # 只用真实服务：没完成 API 设置就明确告知，不切换到演示模型继续生成
-    if not settings_ready(settings):
-        raise ChatFailure("API_NOT_CONFIGURED")
     primary, fallback = build_model_clients(settings)
     policy = ModelCallPolicy.from_settings(
         settings, primary=primary, fallback=fallback, store=SqliteCallStore(settings.SQLITE_URL),

@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from app.api.dependencies import teacher_account
 from app.services.api_settings import (
-    config_status,
     embedding_capability,
     list_models,
     public_config,
@@ -24,15 +23,10 @@ def get_settings(request: Request):
         "target": target_embedding_space(values),
     }
 
-@router.get("/status")
-def get_status(request: Request):
-    """是否已配置好、是否需要重启才生效；没配好时前端只把人引导到本页。"""
-    return config_status(request.app.state.settings)
-
 @router.put("")
 def put_settings(body: dict, request: Request):
     try:
-        return save_for_active_space(body, request.app.state.settings)
+        return save_for_active_space(body, request.app.state.settings) | {"message": "已保存，请重启智绘学途使设置生效。"}
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"code": "VALIDATION_ERROR", "message": str(exc)})
 

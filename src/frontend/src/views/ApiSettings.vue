@@ -9,9 +9,8 @@
  * - 向量接口只读展示当前生效状态，切换向量模型仍需离线迁移，页面不提供切换入口。
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { createApiSettingsClient, type ConnectionResult, type EmbeddingCapability, type ModelOption } from '../api/apiSettings'
-import { refreshConfigStatus } from '../composables/useConfigStatus'
 import { useSessionStore } from '../stores/session'
 import ConnectionResultDialog from '../components/ConnectionResultDialog.vue'
 import ModelSelect from '../components/ModelSelect.vue'
@@ -53,7 +52,6 @@ const PROVIDERS: Provider[] = [
 
 const session = useSessionStore()
 const router = useRouter()
-const route = useRoute()
 const api = createApiSettingsClient(() => session.accessToken, () => { session.signOut(); void router.replace('/') })
 
 const saving = ref(false)
@@ -61,9 +59,7 @@ const ready = ref(false)
 const message = ref('')
 const failed = ref(false)
 const configured = reactive({ llm: false, embedding: false })
-const runtime = reactive({ embeddingModel: '', embeddingDimensions: 0 })
-/** 保存后还没重启：由后端比较「保存时间」与「本次启动时间」得出 */
-const restartNeeded = ref(false)
+const runtime = reactive({ llmMode: '', embeddingMode: '', embeddingModel: '', embeddingDimensions: 0 })
 
 const form = reactive({
   LLM_BASE_URL: '', LLM_MODEL: '', LLM_API_KEY: '',
@@ -210,6 +206,14 @@ async function loadCapability(): Promise<void> {
 }
 
 
+const llmComplete = computed(() => {
+  if (!form.LLM_BASE_URL.trim() || !form.LLM_MODEL.trim()) return false
+  return Boolean(form.LLM_API_KEY.trim()) || configured.llm || isLocalHost(hostOf(form.LLM_BASE_URL))
+})
+const llmModeAfterSave = computed(() => (llmComplete.value ? 'live' : 'demo'))
+const statusLine = computed(() =>
+  `当前生效：大模型 ${runtime.llmMode === 'live' ? '在线' : '演示'} · 向量 ${runtime.embeddingMode === 'online' ? '在线' : '演示'}`)
+
 /** 大模型候选：进页面自动获取一次时用它判断是否具备条件（地址 + Key 或已保存 Key） */
 const llmCandidatesReady = computed(() => Boolean(
   form.LLM_BASE_URL.trim()
@@ -290,9 +294,6 @@ function embeddingPayload(): Record<string, unknown> {
 }
 
 onMounted(async () => {
-  // 路由守卫把人送到这里时会带一句话，直接显示在页面上
-  const notice = route.query.notice
-  if (typeof notice === 'string' && notice.trim()) message.value = notice.trim()
   try {
     const settings = await api.read()
     form.LLM_BASE_URL = settings.LLM_BASE_URL
@@ -309,6 +310,8 @@ onMounted(async () => {
     saved.embeddingHost = hostOf(form.EMBEDDING_BASE_URL)
     saved.llmModel = form.LLM_MODEL
     saved.embeddingModel = form.EMBEDDING_TARGET_MODEL
+    runtime.llmMode = settings.active?.LLM_MODE ?? settings.LLM_MODE
+    runtime.embeddingMode = settings.active?.EMBEDDING_MODE ?? settings.EMBEDDING_MODE
     runtime.embeddingModel = settings.active?.EMBEDDING_MODEL ?? settings.EMBEDDING_MODEL
     runtime.embeddingDimensions = settings.active?.EMBEDDING_DIMENSIONS ?? settings.EMBEDDING_DIMENSIONS
     restoreKeys()
@@ -318,9 +321,6 @@ onMounted(async () => {
     if (llmCandidatesReady.value && !discovery.llm.options.length && !discovery.llm.busy) void discover('llm')
     // 目标模型已定时补一次能力，用于渲染维度候选（不触发任何保存）
     if (form.EMBEDDING_TARGET_MODEL.trim()) void loadCapability()
-    // 是否还需要重启：由后端比较「保存时间」与「本次启动时间」，不在前端猜
-    const status = await api.status()
-    restartNeeded.value = Boolean(status.restart_needed)
   } catch (error) { failed.value = true; message.value = error instanceof Error ? error.message : '读取失败' }
 })
 
@@ -396,7 +396,7 @@ async function save() {
   saving.value = true; message.value = ''; failed.value = false
   try {
     // 只提交配置字段：list_path 是获取列表用的请求参数，不能写进配置
-    const body: Record<string, unknown> = { ...llmPayload(), ...embeddingPayload() }
+    const body: Record<string, unknown> = { ...llmPayload(), ...embeddingPayload(), LLM_MODE: llmModeAfterSave.value }
     delete body.list_path
     delete body.LLM_PROVIDER_LABEL
     delete body.LLM_CHAT_MODEL
@@ -405,7 +405,7 @@ async function save() {
       body.LLM_CHAT_MODEL = form.LLM_MODEL.trim()
       body.LLM_EXTRACTION_MODEL = form.LLM_MODEL.trim()
     }
-    // 不提交向量模式：软件在启动时读取一次设置，切换向量模型仍需重新处理资料后生效
+    // 保留当前向量模式；目标模型与维度只保存，离线迁移后才能启用。
     const settings = await api.save(body)
     configured.llm = settings.LLM_API_KEY_configured
     configured.embedding = settings.EMBEDDING_API_KEY_configured
@@ -415,10 +415,7 @@ async function save() {
     saved.embeddingHost = hostOf(form.EMBEDDING_BASE_URL)
     // 已写入本机加密配置：输入框与本机留存都清空，不让密钥长期停留在页面上
     clearKeys()
-    // 本机软件启动时读取一次设置，所以保存后要重启才会用上新配置（是否需要由后端状态判定）
-    const status = await refreshConfigStatus(session.accessToken, true)
-    restartNeeded.value = Boolean(status?.restart_needed)
-    message.value = restartNeeded.value ? '设置已保存，请重启软件后使用。' : '设置已保存'
+    message.value = settings.message ?? '已保存，请重启智绘学途使设置生效。'
   } catch (error) {
     failed.value = true; message.value = error instanceof Error ? error.message : '保存失败'
   } finally { saving.value = false }
@@ -452,9 +449,11 @@ function showResult(kind: Kind) {
   <div class="page api-settings">
     <header class="page__heading">
       <h2>API 设置</h2>
+      <p class="page__lede">{{ statusLine }}</p>
     </header>
+    <p class="api-settings__note">设置由本机所有课程共用。密钥留空表示保留已保存的密钥，保存后重启软件生效。</p>
+    <p class="api-settings__note">外部服务要求 HTTPS，本机地址可用 HTTP。先选服务商或填写地址，再获取模型列表并选择模型。</p>
     <p v-if="message" role="status" class="notice" :class="{ error: failed }">{{ message }}</p>
-    <p v-else-if="restartNeeded" role="status" class="notice" data-test="restart-needed">设置已保存，请重启软件后使用。</p>
 
     <form @submit.prevent="save">
       <div class="interface-grid">
@@ -600,7 +599,7 @@ function showResult(kind: Kind) {
               <p class="api-settings__note" data-test="embedding-current">当前使用：{{ currentSpace }}</p>
               <p v-if="targetDiffersFromActive" class="api-settings__note" data-test="embedding-target">新设置：{{ targetSpace }}</p>
               <p v-if="targetDiffersFromActive" class="api-settings__pending" data-test="embedding-pending">
-                新设置已保存。请在课程页点「重新处理资料」，处理完成后才会使用新的向量。
+                目标配置已保存；完成离线迁移后才能启用，当前向量空间保持不变。
               </p>
             </template>
 

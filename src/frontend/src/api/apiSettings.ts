@@ -20,21 +20,6 @@ export interface ApiSettings {
   target?: { model: string; dimensions: number; assumed: boolean }
 }
 
-/** 配置状态：没配好时只引导用户去「API 设置」，不假装还能用。 */
-export interface ApiSettingsStatus {
-  ready: boolean
-  configured: boolean
-  restart_needed: boolean
-  missing: string[]
-  active: {
-    LLM_MODE: string
-    LLM_CHAT_MODEL: string
-    EMBEDDING_MODE: string
-    EMBEDDING_MODEL: string
-    EMBEDDING_DIMENSIONS: number
-  }
-}
-
 /** 向量模型能力：只来自后端能力表（已核对官方文档）；未登记即 known=false，不推测。 */
 export interface EmbeddingCapability {
   known: boolean
@@ -80,7 +65,6 @@ export function createApiSettingsClient(token: () => string | null, expired: () 
   }
   return {
     read: () => request<ApiSettings>('GET'),
-    status: () => request<ApiSettingsStatus>('GET', '/status'),
     save: (body: Record<string, unknown>) => request<ApiSettings & { message?: string }>('PUT', '', body),
     test: (body: Record<string, unknown>, kind: string) => request<ConnectionResult>('POST', '/test', { ...body, kind }),
     models: (body: Record<string, unknown>, kind: string) => request<ModelDiscovery>('POST', '/models', { ...body, kind }),
