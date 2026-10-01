@@ -1,5 +1,36 @@
 # 任务看板
 
+## 2026-09-28 Codex 认领：认证页动态图谱
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-AUTH-MOTION-03 | DONE | Codex（前端） | `AuthLayout.vue`、装饰图运动逻辑、相关测试、规格和交接 | 图谱大小、位置、旋转随时间变化；在蓝色绘图区内运动，碰撞时反弹；品牌文案和表单不被遮挡；减少动态效果设置可静止展示 |
+
+- 输入：`42afa2f` 的 8 组随机静态 SVG 图谱；输出：可动的装饰图谱。依赖：现有认证页绘图区与 SVG 节点。风险：运动引起文字重叠、边界裁切或不必要的性能开销；使用有限速度、边界/碰撞解算、动画帧生命周期清理和减少动态效果分支。
+- 验证命令：装饰图物理单测、`npm run test -- --run h13.test.ts`、`npm run type-check`、`npm run build`、`./scripts/verify.sh`、浏览器动态视觉检查、`git diff --check`。
+- 验收证据：前端全量测试 25 个文件、772 个用例通过；`npm run type-check`、`npm run build`、`git diff --check` 通过。浏览器观察到 8 组图谱均移动、尺寸随时间变化，旋转保持在 ±22° 内，装饰区位于说明文字下方，720px 视口无页面纵向溢出。`./scripts/verify.sh` 已尝试，但本机门禁依赖缺少 `openapi-typescript`，临时子进程无法找到 `python3`；详见 `docs/handoffs/codex-ui-auth-motion-03.md`。
+
+## 2026-09-28 Codex 认领：登录页装饰知识图谱
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-AUTH-ART-02 | DONE | Codex（前端） | `AuthLayout.vue`、前端相关测试、身份规格、交接 | 蓝色品牌区有 8 组拓扑各异的小图谱；每次加载随机散布并避让节点文字；装饰文字不可选中复制；登录交互和布局保持可用；修改前后各有本地 Git 提交 |
+
+- 输入：现有单组 SVG 示意图、登录页左右分栏；输出：分布于品牌区下方的多组装饰图谱。依赖：`AuthLayout` 和前端测试环境。风险：装饰内容过密影响文案或矮屏布局；采用自适应 SVG 容器并在窄屏沿用隐藏品牌区的规则。
+- 验证命令：`npm run test -- --run h13.test.ts`、`npm run type-check`、`npm run build`、`./scripts/verify.sh`、浏览器视觉检查、`git diff --check`。
+- 验收证据：修改前提交 `8d3d992`。浏览器连续 3 次重新加载，8 组图谱位置均变化，37 个标签无重叠、均位于说明文字下方；装饰 SVG 的 `user-select` 与指针事件均为 `none`，拖拽后选区为空；720px 视口文档高度保持 720px。前端定向 30 passed、全量 767 passed、类型检查和构建通过；详见 `docs/handoffs/codex-ui-auth-art-02.md`。
+- `./scripts/verify.sh` 已在 Git Bash 中尝试，契约门禁缺少 `openapi-typescript` 命令，且其临时子进程无法找到 `python3`；这两项为本机工具链问题，非本次前端图谱改动。
+
+## 2026-09-28 Codex 认领：登录页提示与视口布局
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-LOGIN-01 | DONE | Codex（前端） | `App.vue`、登录页相关样式、`tests/frontend/h13.test.ts`、身份规格、交接 | 未登录提示可用按钮关闭；登录页在 720px 浏览器视口无纵向溢出；矮窗口表单栏保留内部滚动 |
+
+- 输入：现有 `query.notice` 提示和 `AuthLayout` 登录布局；输出：可关闭提示及填满剩余视口的登录页。依赖：现有 Vue 路由与 H13 登录表单。风险：矮视口下表单高度可能超过可用区域，需让表单区域独立滚动。
+- 验证：在 `src/frontend` 运行 `npm run test -- --run h13.test.ts`（29 passed）、`npm run test -- --run`（766 passed）、`npm run type-check`（通过）、`npm run build`（通过）；浏览器实测未登录提示可关闭，关闭前后 `document.documentElement.scrollHeight === window.innerHeight === 720`。`git diff --check` 通过。`./scripts/verify.sh` 已尝试，WSL 中因 Windows 检出脚本的 CRLF shebang 报 `env: bash\r: No such file or directory`，本机未安装 Git Bash。
+- 交接：`docs/handoffs/codex-ui-login-01.md`。当前工作树基线 `main@62eb8c7`，比 `origin/main` 落后 6 次提交；尝试快进时因本机 `.git` 写入权限不足失败。
+
 ## K05 教师主线 E2E（Codex）
 
 | ID | 状态 | 负责人 | 范围 | 验收 |

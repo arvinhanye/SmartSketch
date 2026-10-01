@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getActivePinia } from 'pinia'
-import { computed, inject } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { RouterLink, RouterView, routeLocationKey, routerKey, type RouteLocationRaw } from 'vue-router'
 import {
   CHAT_ROUTE,
@@ -24,10 +24,15 @@ const route = inject(routeLocationKey, null)
 const router = inject(routerKey, null)
 // 未安装 Pinia 时（如 B03 只测路由守卫）不显示侧栏，外壳退回顶栏
 const session = getActivePinia() ? useSessionStore() : null
+const dismissedNotice = ref(false)
+watch(
+  () => route?.fullPath,
+  () => { dismissedNotice.value = false },
+)
 
 // 提示码来自守卫写入的 query；只在与当前页面相符时显示
 const notice = computed(() => {
-  if (!route) return null
+  if (!route || dismissedNotice.value) return null
   const code = route.query.notice
   const role = route.meta.accountRole
   if (code === NOTICE_UNAUTHENTICATED && route.name === ROOT_ROUTE) {
@@ -45,6 +50,7 @@ const notice = computed(() => {
 const role = computed(() => session?.role ?? null)
 // 方向 A「工作台」：登录后左侧常驻导航；未登录（登录、注册页）只留顶栏
 const withSidebar = computed(() => route !== null && role.value !== null)
+const onLoginPage = computed(() => route?.name === ROOT_ROUTE && role.value === null)
 
 interface NavItem {
   label: string
@@ -91,7 +97,7 @@ function signOut(): void {
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--workbench': withSidebar }">
+  <div class="app" :class="{ 'app--workbench': withSidebar, 'app--login': onLoginPage }">
     <header v-if="!withSidebar" class="app-header">
       <div class="app-header-inner">
         <span class="app-logo" aria-hidden="true">智</span>
@@ -100,7 +106,10 @@ function signOut(): void {
       </div>
     </header>
     <main class="app-main">
-      <p v-if="notice" role="alert">{{ notice }}</p>
+      <div v-if="notice" class="app-notice" role="alert">
+        <span>{{ notice }}</span>
+        <button type="button" class="app-notice__close" aria-label="关闭提示" @click="dismissedNotice = true">×</button>
+      </div>
       <RouterView v-if="route" />
     </main>
     <!-- 侧栏在 DOM 中位于主内容之后，读屏与键盘先到页面内容；视觉上由网格放在左侧 -->

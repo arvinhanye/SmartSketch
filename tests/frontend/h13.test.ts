@@ -46,6 +46,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 // ---------------------------------------------------------------- 会话存储
@@ -220,6 +221,55 @@ function failWith(error: Error): AuthApi['login'] {
 }
 
 describe('H13 登录页', () => {
+  it('品牌区展示多组不同结构的装饰知识图谱并对读屏隐藏', async () => {
+    const { wrapper } = await mountApp()
+    const artwork = wrapper.get('.auth-layout__art')
+    const graphs = artwork.findAll('[data-test="auth-graph"]')
+
+    expect(artwork.attributes('aria-hidden')).toBe('true')
+    expect(graphs.length).toBeGreaterThanOrEqual(8)
+    expect(artwork.findAll('line').length).toBeGreaterThan(30)
+    expect(new Set(graphs.map((graph) => `${graph.findAll('rect').length}:${graph.findAll('circle').length}`)).size)
+      .toBeGreaterThanOrEqual(3)
+
+    const second = await mountApp()
+    expect(second.wrapper.get('[data-test="auth-graph"]').attributes('transform'))
+      .not.toBe(graphs[0].attributes('transform'))
+  })
+
+  it('品牌区图谱在动画帧中改变位置', async () => {
+    let nextFrame: FrameRequestCallback | undefined
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      nextFrame = callback
+      return 1
+    }))
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    const { wrapper } = await mountApp()
+    const graph = wrapper.get('[data-test="auth-graph"]')
+    const before = graph.attributes('transform')
+
+    expect(nextFrame).toBeDefined()
+    nextFrame?.(1000)
+    nextFrame?.(2000)
+
+    expect(graph.attributes('transform')).not.toBe(before)
+  })
+
+  it('用户启用减少动态效果时不启动品牌区动画', async () => {
+    const requestFrame = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', requestFrame)
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+
+    const { wrapper } = await mountApp()
+
+    expect(wrapper.findAll('[data-test="auth-graph"]')).toHaveLength(8)
+    expect(requestFrame).not.toHaveBeenCalled()
+  })
+
   it('未登录访问受保护页面：回到登录页，显示未登录提示与登录表单', async () => {
     const { wrapper, router } = await mountApp({ path: '/teacher' })
     expect(router.currentRoute.value.name).toBe(ROOT_ROUTE)
@@ -228,6 +278,18 @@ describe('H13 登录页', () => {
     expect(wrapper.get('input[name="password"]').attributes('type')).toBe('password')
     expect(wrapper.get('input[name="username"]').attributes('autocomplete')).toBe('username')
     expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('current-password')
+  })
+
+  it('未登录提示可关闭，关闭后登录表单仍可使用', async () => {
+    const { wrapper } = await mountApp({ path: '/teacher' })
+    const close = wrapper.get('button[aria-label="关闭提示"]')
+    expect(wrapper.get('[role="alert"]').text()).toContain('未登录')
+
+    await close.trigger('click')
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('input[name="username"]').exists()).toBe(true)
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
   })
 
   it.each([

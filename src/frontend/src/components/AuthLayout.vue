@@ -1,25 +1,256 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
+import { advanceGraphMotion, type MotionBody } from './authGraphMotion'
+
 /**
  * 登录与注册页共用的左右分栏（前端改版方向 A「工作台」，ADR-079）。
  * 左栏是产品说明与示意图谱（纯装饰，读屏跳过），右栏放表单插槽；窄屏只留右栏。
  */
-const nodes = [
-  { x: 150, y: 30, label: '线性表' },
-  { x: 70, y: 95, label: '栈' },
-  { x: 230, y: 95, label: '队列' },
-  { x: 30, y: 160, label: '顺序栈' },
-  { x: 110, y: 160, label: '后进先出' },
-  { x: 200, y: 160, label: '循环队列' },
-  { x: 275, y: 160, label: '链队列' },
+type GraphNode = { x: number; y: number; label: string; shape: 'circle' | 'pill'; width?: number }
+type GraphArt = {
+  id: string
+  nodes: GraphNode[]
+  edges: Array<[number, number, boolean]>
+}
+
+// 各组采用不同连接关系，位置在下方独立绘图区中随机散开。
+const graphDefinitions: GraphArt[] = [
+  {
+    id: 'materials',
+    nodes: [
+      { x: 85, y: 74, label: '课程', shape: 'circle' },
+      { x: 28, y: 24, label: '讲义', shape: 'circle' },
+      { x: 185, y: 25, label: '章节', shape: 'pill', width: 72 },
+      { x: 203, y: 113, label: '知识点', shape: 'pill', width: 84 },
+      { x: 28, y: 148, label: '材料', shape: 'circle' },
+    ],
+    edges: [[0, 1, false], [0, 2, false], [0, 3, true], [0, 4, false]],
+  },
+  {
+    id: 'prerequisites',
+    nodes: [
+      { x: 32, y: 35, label: '基础', shape: 'circle' },
+      { x: 125, y: 71, label: '线性表', shape: 'pill', width: 84 },
+      { x: 227, y: 22, label: '栈', shape: 'circle' },
+      { x: 224, y: 118, label: '队列', shape: 'circle' },
+      { x: 303, y: 72, label: '算法', shape: 'circle' },
+    ],
+    edges: [[0, 1, true], [1, 2, true], [1, 3, true], [2, 4, false], [3, 4, false]],
+  },
+  {
+    id: 'questions',
+    nodes: [
+      { x: 25, y: 69, label: '提问', shape: 'circle' },
+      { x: 111, y: 20, label: '检索', shape: 'circle' },
+      { x: 113, y: 124, label: '片段', shape: 'circle' },
+      { x: 198, y: 70, label: '回答', shape: 'circle' },
+    ],
+    edges: [[0, 1, false], [0, 2, false], [1, 3, true], [2, 3, false], [1, 2, false]],
+  },
+  {
+    id: 'progress',
+    nodes: [
+      { x: 95, y: 20, label: '发布', shape: 'circle' },
+      { x: 20, y: 100, label: '浏览', shape: 'circle' },
+      { x: 174, y: 97, label: '掌握', shape: 'circle' },
+      { x: 96, y: 175, label: '复习', shape: 'circle' },
+    ],
+    edges: [[0, 1, false], [0, 2, false], [1, 3, false], [2, 3, true], [3, 0, false]],
+  },
+  {
+    id: 'learning-path',
+    nodes: [
+      { x: 116, y: 20, label: '学习路径', shape: 'pill', width: 96 },
+      { x: 28, y: 97, label: '先修', shape: 'circle' },
+      { x: 208, y: 94, label: '目标', shape: 'circle' },
+      { x: 62, y: 183, label: '进度', shape: 'circle' },
+      { x: 186, y: 184, label: '下一步', shape: 'pill', width: 82 },
+      { x: 120, y: 105, label: '导航', shape: 'circle' },
+    ],
+    edges: [[0, 1, true], [0, 2, false], [1, 3, false], [2, 4, true], [3, 5, false], [4, 5, false], [0, 5, false]],
+  },
+  {
+    id: 'concepts',
+    nodes: [
+      { x: 35, y: 35, label: '概念', shape: 'circle' },
+      { x: 129, y: 18, label: '关联', shape: 'circle' },
+      { x: 223, y: 65, label: '例子', shape: 'circle' },
+      { x: 72, y: 152, label: '理解', shape: 'circle' },
+      { x: 182, y: 161, label: '应用', shape: 'circle' },
+    ],
+    edges: [[0, 1, false], [1, 2, false], [0, 3, true], [1, 3, false], [2, 4, false], [3, 4, true], [1, 4, false]],
+  },
+  {
+    id: 'sources',
+    nodes: [
+      { x: 22, y: 28, label: '文档', shape: 'circle' },
+      { x: 104, y: 55, label: '片段', shape: 'circle' },
+      { x: 35, y: 125, label: '页码', shape: 'circle' },
+      { x: 176, y: 122, label: '来源', shape: 'circle' },
+    ],
+    edges: [[0, 1, false], [1, 2, false], [1, 3, true]],
+  },
+  {
+    id: 'review',
+    nodes: [
+      { x: 20, y: 34, label: '抽取', shape: 'circle' },
+      { x: 107, y: 18, label: '候选', shape: 'circle' },
+      { x: 82, y: 118, label: '审核', shape: 'circle' },
+      { x: 183, y: 90, label: '发布', shape: 'circle' },
+    ],
+    edges: [[0, 1, false], [1, 2, false], [2, 3, true], [1, 3, false]],
+  },
 ]
-const edges: Array<[number, number, boolean]> = [
-  [0, 1, false],
-  [0, 2, false],
-  [1, 3, false],
-  [1, 4, true],
-  [2, 5, false],
-  [2, 6, false],
-]
+
+type Bounds = { left: number; top: number; right: number; bottom: number }
+type PlacedGraph = GraphArt & { x: number; y: number; scale: number }
+type MovingGraph = GraphArt & MotionBody & { localCenterX: number; localCenterY: number }
+const artWidth = 910
+const artHeight = 475
+const gap = 12
+
+function nodeBounds(node: GraphNode): Bounds {
+  const halfWidth = node.shape === 'circle' ? 24 : (node.width ?? 72) / 2
+  const halfHeight = node.shape === 'circle' ? 24 : 17
+  return {
+    left: node.x - halfWidth,
+    right: node.x + halfWidth,
+    top: node.y - halfHeight,
+    bottom: node.y + halfHeight,
+  }
+}
+
+function graphBounds(nodes: GraphNode[]): Bounds {
+  const bounds = nodes.map(nodeBounds)
+  return {
+    left: Math.min(...bounds.map((box) => box.left)),
+    top: Math.min(...bounds.map((box) => box.top)),
+    right: Math.max(...bounds.map((box) => box.right)),
+    bottom: Math.max(...bounds.map((box) => box.bottom)),
+  }
+}
+
+function overlaps(a: Bounds, b: Bounds): boolean {
+  return a.left < b.right + gap && a.right + gap > b.left && a.top < b.bottom + gap && a.bottom + gap > b.top
+}
+
+function placeGraphs(): PlacedGraph[] {
+  const occupiedNodes: Bounds[] = []
+  const centers: Array<{ x: number; y: number }> = []
+  return graphDefinitions.map((graph) => {
+    const nodes = graph.nodes.map((node) => ({
+      ...node,
+      x: node.x + (Math.random() - 0.5) * 10,
+      y: node.y + (Math.random() - 0.5) * 10,
+    }))
+    const bounds = graphBounds(nodes)
+    // 初始尺寸各不相同，节点之间先留空隙，随后允许运动时碰撞反弹。
+    const initialScale = 0.58 + Math.random() * 0.36
+    for (const scale of [initialScale, initialScale * 0.9, initialScale * 0.8, 0.48, 0.4]) {
+      for (let attempt = 0; attempt < 500; attempt++) {
+        const x = -bounds.left * scale + Math.random() * (artWidth - (bounds.right - bounds.left) * scale)
+        const y = -bounds.top * scale + Math.random() * (artHeight - (bounds.bottom - bounds.top) * scale)
+        const center = {
+          x: x + ((bounds.left + bounds.right) / 2) * scale,
+          y: y + ((bounds.top + bounds.bottom) / 2) * scale,
+        }
+        const boxes = nodes.map((node) => {
+          const box = nodeBounds(node)
+          return {
+            left: x + box.left * scale,
+            top: y + box.top * scale,
+            right: x + box.right * scale,
+            bottom: y + box.bottom * scale,
+          }
+        })
+        if (
+          centers.every((other) => Math.hypot(center.x - other.x, center.y - other.y) > 110) &&
+          boxes.every((box) => occupiedNodes.every((existing) => !overlaps(box, existing)))
+        ) {
+          occupiedNodes.push(...boxes)
+          centers.push(center)
+          return { ...graph, nodes, x, y, scale }
+        }
+      }
+    }
+    // 极端随机序列也要保持页面可用；末组缩小后放在绘图区边缘。
+    return { ...graph, nodes, x: 0, y: 0, scale: 0.4 }
+  })
+}
+
+const graphs: MovingGraph[] = placeGraphs().map((graph) => {
+  const bounds = graphBounds(graph.nodes)
+  const localCenterX = (bounds.left + bounds.right) / 2
+  const localCenterY = (bounds.top + bounds.bottom) / 2
+  const direction = () => (Math.random() < 0.5 ? -1 : 1)
+  return {
+    ...graph,
+    x: graph.x + localCenterX * graph.scale,
+    y: graph.y + localCenterY * graph.scale,
+    localCenterX,
+    localCenterY,
+    vx: direction() * (16 + Math.random() * 20),
+    vy: direction() * (12 + Math.random() * 18),
+    angle: (Math.random() - 0.5) * 16,
+    angularVelocity: direction() * (2 + Math.random() * 5),
+    baseScale: graph.scale,
+    pulse: 0.06,
+    pulseSpeed: 0.5 + Math.random() * 0.5,
+    phase: Math.random() * Math.PI * 2,
+    radius: Math.max(bounds.right - bounds.left, bounds.bottom - bounds.top) * 0.45,
+  }
+})
+
+function transformFor(graph: MovingGraph): string {
+  return `translate(${graph.x} ${graph.y}) rotate(${graph.angle}) scale(${graph.scale}) translate(${-graph.localCenterX} ${-graph.localCenterY})`
+}
+
+const artwork = ref<SVGSVGElement | null>(null)
+let graphLayers: SVGGElement[][] = []
+let frameId: number | null = null
+let previousFrame = 0
+let elapsed = 0
+let motionPreference: MediaQueryList | undefined
+let narrowScreen: MediaQueryList | undefined
+
+function animate(now: number): void {
+  const delta = previousFrame === 0 ? 0 : Math.min((now - previousFrame) / 1000, 0.05)
+  previousFrame = now
+  elapsed += delta
+  advanceGraphMotion(graphs, delta, elapsed, { width: artWidth, height: artHeight })
+  graphs.forEach((graph, index) => {
+    const transform = transformFor(graph)
+    graphLayers[index].forEach((layer) => layer.setAttribute('transform', transform))
+  })
+  frameId = window.requestAnimationFrame(animate)
+}
+
+function syncMotionPreference(): void {
+  if (motionPreference?.matches || narrowScreen?.matches) {
+    if (frameId !== null) window.cancelAnimationFrame(frameId)
+    frameId = null
+    previousFrame = 0
+  } else if (frameId === null && typeof window.requestAnimationFrame === 'function') {
+    frameId = window.requestAnimationFrame(animate)
+  }
+}
+
+onMounted(() => {
+  graphLayers = graphs.map((graph) =>
+    Array.from(artwork.value?.querySelectorAll<SVGGElement>(`[data-graph-id="${graph.id}"]`) ?? []),
+  )
+  motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+  narrowScreen = window.matchMedia?.('(max-width: 760px)')
+  motionPreference?.addEventListener?.('change', syncMotionPreference)
+  narrowScreen?.addEventListener?.('change', syncMotionPreference)
+  syncMotionPreference()
+})
+
+onUnmounted(() => {
+  if (frameId !== null) window.cancelAnimationFrame(frameId)
+  motionPreference?.removeEventListener?.('change', syncMotionPreference)
+  narrowScreen?.removeEventListener?.('change', syncMotionPreference)
+})
 </script>
 
 <template>
@@ -30,19 +261,24 @@ const edges: Array<[number, number, boolean]> = [
       <p class="auth-layout__lede">
         教师上传讲义，系统抽取知识点与关系；审核发布后，学生按前置关系获得学习路径，提问得到带出处的回答。
       </p>
-      <svg class="auth-layout__art" viewBox="0 0 310 190" aria-hidden="true" focusable="false">
-        <line
-          v-for="([from, to, prereq], i) in edges"
-          :key="i"
-          :x1="nodes[from].x"
-          :y1="nodes[from].y"
-          :x2="nodes[to].x"
-          :y2="nodes[to].y"
-          :class="prereq ? 'edge edge--prereq' : 'edge'"
-        />
-        <g v-for="node in nodes" :key="node.label">
-          <rect :x="node.x - 30" :y="node.y - 11" width="60" height="22" rx="5" class="node" />
-          <text :x="node.x" :y="node.y + 4" text-anchor="middle" class="label">{{ node.label }}</text>
+      <svg ref="artwork" class="auth-layout__art" viewBox="0 0 910 475" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" draggable="false" @copy.prevent>
+        <g v-for="graph in graphs" :key="`${graph.id}-edges`" :data-graph-id="graph.id" :transform="transformFor(graph)">
+          <line
+            v-for="([from, to, prereq], i) in graph.edges"
+            :key="i"
+            :x1="graph.nodes[from].x"
+            :y1="graph.nodes[from].y"
+            :x2="graph.nodes[to].x"
+            :y2="graph.nodes[to].y"
+            :class="prereq ? 'edge edge--prereq' : 'edge'"
+          />
+        </g>
+        <g v-for="graph in graphs" :key="graph.id" data-test="auth-graph" :data-graph-id="graph.id" :transform="transformFor(graph)">
+          <g v-for="node in graph.nodes" :key="node.label">
+            <circle v-if="node.shape === 'circle'" :cx="node.x" :cy="node.y" r="24" class="node" />
+            <rect v-else :x="node.x - (node.width ?? 72) / 2" :y="node.y - 17" :width="node.width ?? 72" height="34" rx="17" class="node" />
+            <text :x="node.x" :y="node.y" text-anchor="middle" dominant-baseline="central" class="label">{{ node.label }}</text>
+          </g>
         </g>
       </svg>
     </aside>
@@ -85,9 +321,13 @@ const edges: Array<[number, number, boolean]> = [
   margin: 0;
 }
 .auth-layout__art {
-  margin-top: auto;
+  flex: 1;
+  min-height: 0;
+  margin-top: 1.75rem;
   width: 100%;
-  max-width: 460px;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
 }
 .edge {
   stroke: rgb(160 210 228 / 45%);
@@ -98,12 +338,15 @@ const edges: Array<[number, number, boolean]> = [
   stroke-width: 1.8;
 }
 .node {
-  fill: rgb(255 255 255 / 6%);
-  stroke: rgb(160 210 228 / 60%);
+  fill: #1b4b5c;
+  stroke: rgb(160 210 228 / 70%);
+  stroke-width: 1.2;
 }
 .label {
   fill: #cfe6ef;
-  font-size: 10px;
+  font-size: 16px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .auth-layout__form {
   background: var(--color-surface);
