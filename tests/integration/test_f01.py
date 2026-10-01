@@ -125,7 +125,8 @@ def test_dev_up_waits_for_healthy_then_checks_apoc(tmp_path):
 
 
 def test_unhealthy_container_is_not_reported_ready(tmp_path):
-    root = _sandbox(tmp_path, {"NEO4J_PASSWORD": PASSWORD})
+    # unhealthy 之后 Neo4j 仍可能就绪，dev-up 会等到截止时间；这里把等待上限设为 0 秒。
+    root = _sandbox(tmp_path, {"NEO4J_PASSWORD": PASSWORD, "NEO4J_WAIT_SECONDS": "0"})
     log = tmp_path / "docker.log"
 
     result = _run(
@@ -134,7 +135,7 @@ def test_unhealthy_container_is_not_reported_ready(tmp_path):
 
     assert result.returncode != 0
     assert "logs neo4j" in result.stderr
-    assert not any(c.startswith("compose exec") for c in log.read_text().splitlines())
+    assert not any("apoc" in c for c in log.read_text().splitlines())
 
 
 def test_missing_apoc_fails_with_hint(tmp_path):

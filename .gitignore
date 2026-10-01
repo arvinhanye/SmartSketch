@@ -36,6 +36,8 @@ uploads/
 backups/
 neo4j/data/
 neo4j/logs/
+# 本机 compose 覆盖（如 macOS 改用 Docker 卷，docs/runbook.md §8）
+docker-compose.override.yml
 
 # Editors and OS
 .DS_Store
