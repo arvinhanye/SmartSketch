@@ -110,9 +110,10 @@ neo4j_diagnose() {
       elif [[ $logs == *"password"*"minimum"* || $logs == *"Invalid value for password"* ]]; then
         echo "提示：.env 的 NEO4J_PASSWORD 不符合 Neo4j 要求（至少 8 位）。"
       elif [[ $info == *"ExitCode=3 "* || ( $logs == *"shutdown initiated by request"* && $logs != *" ERROR "* ) ]]; then
-        echo "提示：Neo4j 在读取配置或初始化日志时出错（退出码 3），日志里却没有 ERROR："
-        echo "      多半是挂载的 neo4j/logs、neo4j/data 读写异常（macOS 上项目放在「桌面」「文稿」或 iCloud 同步目录时常见）。"
-        echo "      按 docs/runbook.md 第 8 节用 docker-compose.override.yml 改存 Docker 卷，或把项目移到其他目录。"
+        echo "提示：Neo4j 在读取配置或初始化日志时出错（退出码 3），日志里却没有 ERROR。"
+        echo "      已知情形：之前反复崩溃后，neo4j/data、neo4j/logs 留下了坏状态，换成全新目录即可启动。"
+        echo "      库里没有要保留的数据时：${COMPOSE[*]} down && mv neo4j/data neo4j/data.bak-\$(date +%s) && mv neo4j/logs neo4j/logs.bak-\$(date +%s)"
+        echo "      （用 docker-compose.override.yml 改存 Docker 卷的，改用 ${COMPOSE[*]} down -v），然后重试。"
       fi
     fi
   } >&2

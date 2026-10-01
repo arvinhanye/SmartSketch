@@ -22,6 +22,7 @@ case "$*" in
   info*) exit 0 ;;
   "compose ps -q neo4j") [[ -n ${FAKE_RUNNING_CID:-} ]] && echo "$FAKE_RUNNING_CID" ;;
   "compose ps -aq neo4j") echo fakecid ;;
+  "ps --filter publish="*) [[ -n ${FAKE_PUBLISHER:-} ]] && echo "$FAKE_PUBLISHER" ;;
   "compose logs"*) echo "${FAKE_LOGS:-neo4j-1  | INFO  Neo4j Server shutdown initiated by request}" ;;
   inspect*ExitCode*) echo "${FAKE_INFO:-Status=running ExitCode=0 OOMKilled=false RestartCount=0 Error=}" ;;
   inspect*)
@@ -91,6 +92,24 @@ def test_busy_port_with_stopped_container_fails_before_compose_up(tmp_path: Path
     assert not any(c.startswith("compose up") for c in calls(log))
 
 
+def test_busy_port_held_by_another_container_names_it(tmp_path: Path):
+    # Docker Desktop 上 lsof 只显示 com.docker，所以要直接说出是哪个容器占着端口。
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+        root, log, env = sandbox(tmp_path, NEO4J_HTTP_PORT=str(port))
+        env.update(FAKE_RUNNING_CID="", FAKE_STATE="none created 0", FAKE_PUBLISHER="smartsketch-neo4j-1")
+
+        result = run(root, env)
+
+    assert result.returncode != 0
+    assert "已被容器 smartsketch-neo4j-1 占用" in result.stderr
+    assert "docker stop smartsketch-neo4j-1" in result.stderr
+    assert any(c == f"ps --filter publish={port} --format {{{{.Names}}}}" for c in calls(log))
+    assert not any(c.startswith("compose up") for c in calls(log))
+
+
 def test_busy_port_is_ignored_when_neo4j_itself_is_running(tmp_path: Path):
     with socket.socket() as busy:
         busy.bind(("127.0.0.1", 0))
@@ -133,7 +152,7 @@ def test_restarting_container_fails_fast_with_exit_code_3_hint_and_logs(tmp_path
 
     assert result.returncode != 0
     assert "反复重启" in result.stderr
-    assert "退出码 3" in result.stderr and "docker-compose.override.yml" in result.stderr
+    assert "退出码 3" in result.stderr and "mv neo4j/data neo4j/data.bak-$(date +%s)" in result.stderr
     assert "shutdown initiated by request" in result.stderr
     assert any(c.startswith("compose logs --tail 40 neo4j") for c in calls(log))
 

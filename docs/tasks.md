@@ -1541,6 +1541,6 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | --- | --- | --- | --- | --- | --- |
 | DEMO-03 | DONE（待 PR 审查/合并） | `scripts/dev-up.sh` 端口预检、退出/反复重启/口令不一致立即报告、失败时打印容器状态与日志及对症提示；`unhealthy` 等到截止时间 | Claude | `claude/project-thread-diyack` / `main@2a67189` | `tests/tooling/test_dev_up_diagnostics.py` 8 passed（改前 7 failed）；F01/K07 回归通过；真实 Docker 29 + Neo4j 5.26.31 实跑内存超限、端口被占、口令不一致、正常启动四种情形，详见 `docs/handoffs/claude-dev-up-diagnostics.md` |
 
-- 起因：用户在 macOS（Docker Desktop，项目在「桌面」）运行 `scripts/start-demo.sh`，只得到「Neo4j 健康检查失败」。实际为 7474 端口被占，以及 Neo4j 以退出码 3、无 ERROR 反复重启。
+- 起因：用户在 macOS（Intel，Docker Desktop 29.8）运行 `scripts/start-demo.sh`，只得到「Neo4j 健康检查失败」。实际原因两个：另一个目录里的 SmartSketch 副本的 Neo4j 容器（`smartsketch-neo4j-1`）一直占着 7474/7687；本目录的 Neo4j 数据/日志在反复崩溃后留下坏状态，以退出码 3、无 ERROR 反复重启。停掉另一份、换全新数据卷后启动成功（2026-10-01 用户确认）。
 - 验收条件：① 容器未运行且端口被占时不启动容器、给出 `lsof` 命令；② 容器停在 created/exited 或重启次数增加时立即失败，打印 Docker 报错、退出码与最近 40 行日志；③ 认证被拒时立即失败并说明口令只在首次初始化生效，输出不含口令；④ `unhealthy` 不立即失败，截止时打印最后一次连接输出；⑤ 正常启动行为不变。
-- 待人工：macOS 上确认退出码 3 的根因（推测为「桌面」目录挂载读写异常），以及 `docker-compose.override.yml` 改用 Docker 卷后可正常启动。
+- 已排除：「桌面」目录挂载（改用 Docker 卷后照旧退出）；镜像、APOC、内存设置（原版镜像三组对照在该 Mac 上都正常）。坏状态的具体文件未定位，数据已随旧卷删除。

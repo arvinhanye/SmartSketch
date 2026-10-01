@@ -281,7 +281,7 @@ cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
 ```
 
 - 健康检查和 APOC 检查都在容器内从 `NEO4J_AUTH` 取出凭据，通过 `cypher-shell` 认识的 `NEO4J_USERNAME`/`NEO4J_PASSWORD` 环境变量传入，口令不出现在宿主机或容器内的任何命令行参数里。
-- 健康状态必须完整等于 `healthy` 才算就绪。容器未运行时先检查 HTTP/Bolt 端口是否被其他程序占用；容器停在 created/exited、或启动后退出被反复重启时立即失败；认证被拒（`neo4j/data` 初始化时的口令与 `.env` 不一致）时立即失败；`unhealthy` 不再立即失败，等到 `NEO4J_WAIT_SECONDS` 截止，因为慢机器上 Neo4j 之后仍会就绪。失败时打印容器状态（退出码、OOM、Docker 报错）、最近 40 行日志和对症提示，常见情形见 `docs/runbook.md` 第 8 节。
+- 健康状态必须完整等于 `healthy` 才算就绪。容器未运行时先检查 HTTP/Bolt 端口是否被占用，被其他容器占用时直接列出容器名；容器停在 created/exited、或启动后退出被反复重启时立即失败；认证被拒（`neo4j/data` 初始化时的口令与 `.env` 不一致）时立即失败；`unhealthy` 不再立即失败，等到 `NEO4J_WAIT_SECONDS` 截止，因为慢机器上 Neo4j 之后仍会就绪。失败时打印容器状态（退出码、OOM、Docker 报错）、最近 40 行日志和对症提示，常见情形见 `docs/runbook.md` 第 8 节。
 - Docker Desktop 装好后如果终端里找不到 `docker`，把 `~/.docker/bin` 加进 `PATH`，或者重开终端。
 - `dev-down.sh` 默认只停止 Neo4j，保留 Compose 卷和绑定数据；`--destroy` 需要显式开关及交互终端精确确认，拒绝或非交互执行不会删卷。`compose down -v` 不删除绑定目录 `neo4j/data`、`neo4j/logs`，也不清理 `storage/`。
 - 验收测试：`python3 -m pytest tests/integration/test_f01.py -q`。没有 Docker 守护进程时，真实容器用例自动跳过；设 `SMARTSKETCH_SKIP_DOCKER=1` 也可跳过。

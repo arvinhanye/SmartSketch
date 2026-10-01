@@ -20,7 +20,14 @@ bolt_port="$(env_setting NEO4J_BOLT_PORT 7687)"
 read -r health status restarts <<<"$(neo4j_state)"
 if [[ $health == missing || $status == created || $status == exited || $status == dead ]]; then
   for port in "$http_port" "$bolt_port"; do
-    port_listening "$port" && die "本机端口 ${port} 已被其他程序占用，Neo4j 无法启动（常见：Neo4j Desktop、Homebrew 的 neo4j、另一个目录起的 SmartSketch）。
+    port_listening "$port" || continue
+    # Docker Desktop 上 lsof 只能看到 com.docker 进程，所以直接列出发布了这个端口的容器。
+    holders="$("$ENGINE" ps --filter "publish=${port}" --format '{{.Names}}' 2>/dev/null | paste -sd ' ' - || true)"
+    if [[ -n $holders ]]; then
+      die "本机端口 ${port} 已被容器 ${holders} 占用（常见：另一个目录里的 SmartSketch 副本），Neo4j 无法启动。
+      停掉它再重试：$ENGINE stop ${holders}（只是停止，不删数据；以后可用 $ENGINE start 恢复）"
+    fi
+    die "本机端口 ${port} 已被其他程序占用，Neo4j 无法启动（常见：Neo4j Desktop、Homebrew 的 neo4j）。
       查占用者：lsof -nP -iTCP:${port} -sTCP:LISTEN，关掉后重试；
       或在 .env 设 NEO4J_HTTP_PORT / NEO4J_BOLT_PORT 换端口（改 Bolt 端口时同步改 NEO4J_URI）。"
   done
