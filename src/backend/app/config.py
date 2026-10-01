@@ -229,6 +229,9 @@ def check_auth_settings(settings: Settings) -> None:
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     """Validate environment values without reading a .env file or contacting services."""
     source = dict(os.environ if environ is None else environ)
+    if environ is None and os.environ.get("SMARTSKETCH_API_CONFIG"):
+        from app.services.api_settings import read_config
+        source.update(read_config())
     # 空字符串等同未设置，与「都为空时用缺省值」一致
     for name in RECOMMEND_WEIGHT_NAMES:
         if name in source and not source[name].strip():

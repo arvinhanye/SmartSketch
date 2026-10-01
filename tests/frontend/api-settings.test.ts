@@ -21,13 +21,31 @@ const MODEL_OPTIONS = [
   { id: 'deepseek-plain', name: '' },
 ]
 
+/** 向量模型候选与能力：一个多档可选、一个固定维度、一个能力未知 */
+const EMBEDDING_OPTIONS = [
+  { id: 'text-embedding-v4', name: '通义 text-embedding-v4' },
+  { id: 'text-embedding-v3', name: '通义 text-embedding-v3' },
+  { id: 'my-private-embedding', name: '' },
+]
+
+const CAPABILITIES: Record<string, Record<string, unknown>> = {
+  'text-embedding-v4': { known: true, model: 'text-embedding-v4', dimensions: [64, 256, 768, 1024, 1536, 2048], default: 1024, flexible: 'flexible', label: '通义 text-embedding-v4', source: 'https://www.alibabacloud.com/help/en/model-studio/embedding-rerank-model/' },
+  'text-embedding-v3': { known: true, model: 'text-embedding-v3', dimensions: [1024], default: 1024, flexible: 'fixed', label: '通义 text-embedding-v3', source: 'https://www.alibabacloud.com/help/en/model-studio/embedding-rerank-model/' },
+  'my-private-embedding': { known: false, model: 'my-private-embedding', dimensions: [], default: null, flexible: 'unknown', label: '', source: '' },
+}
+
 async function setup(failure = false) {
   calls.length = 0
   vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit = {}) => {
     const body = options.body ? JSON.parse(options.body as string) : {}
     calls.push({ method: options.method ?? 'GET', path, body })
     if (path.endsWith('/models')) {
-      return { ok: true, status: 200, json: async () => ({ kind: body.kind, ok: true, models: MODEL_OPTIONS.map(o => o.id), model_options: MODEL_OPTIONS, count: 3, latency_ms: 12, provider: 'https://saved.invalid/v1', error: null }) }
+      const options = body.kind === 'embedding' ? EMBEDDING_OPTIONS : MODEL_OPTIONS
+      return { ok: true, status: 200, json: async () => ({ kind: body.kind, ok: true, models: options.map(o => o.id), model_options: options, count: options.length, latency_ms: 12, provider: 'https://saved.invalid/v1', error: null }) }
+    }
+    if (path.endsWith('/capability')) {
+      const model = String(body.EMBEDDING_TARGET_MODEL ?? '')
+      return { ok: true, status: 200, json: async () => CAPABILITIES[model] ?? CAPABILITIES['my-private-embedding'] }
     }
     if (path.endsWith('/test')) {
       return { ok: true, status: 200, json: async () => ({ kind: body.kind, ok: !failure, latency_ms: 37, http_status: failure ? 401 : 200, detail: { model: body.LLM_CHAT_MODEL ?? 'x' }, provider: 'https://saved.invalid/v1', error: failure ? '服务商返回 HTTP 401，请核对密钥、地区、模型与额度' : null }) }
@@ -55,7 +73,7 @@ describe('api-settings 模型选择', () => {
     // 向量接口默认没有地址：先给出明确提示，不发请求
     await page.get('[data-test="embedding-discover"]').trigger('click')
     await flushPromises()
-    expect(page.get('[data-test="discovery-error"]').text()).toContain('请先填写 API 地址')
+    expect(page.get('[data-test="discovery-error"]').text()).toContain('请填写 API 地址')
     expect(modelCalls()).toHaveLength(1)
 
     // 远端地址没有 Key：同样拦下（本机地址才允许不填 Key）
@@ -177,5 +195,89 @@ describe('api-settings 模型选择', () => {
     expect(page.findAll('[data-test="discovery-count"]').map(node => node.text())).toEqual(['接口返回 3 个模型', '接口返回 0 个模型'])
     expect(page.find('[data-test="discovery-ok"]').exists()).toBe(false)
     expect(page.get('[data-test="llm-discover"]').text()).toContain('重新获取')
+  })
+})
+
+/** 选中向量模型：填地址与 Key → 获取候选 → 在向量卡片里选模型 */
+async function pickEmbeddingModel(page: VueWrapper, model: string): Promise<void> {
+  await page.get('[data-test="embedding-base-url"]').setValue('https://saved.invalid/v1')
+  await page.get('[data-test="embedding-api-key"]').setValue('embedding-key')
+  await page.get('[data-test="embedding-discover"]').trigger('click')
+  await flushPromises()
+  const input = page.get('[data-test="embedding-model"] [data-test="model-select-input"]')
+  await input.trigger('focus')
+  await flushPromises()
+  const option = page.findAll('[data-test="embedding-model"] [data-test="model-option"]')
+    .find(node => node.text().includes(model))
+  if (!option) throw new Error(`未找到候选：${model}`)
+  await option.trigger('mousedown')
+  await flushPromises()
+}
+
+describe('api-settings 向量维度', () => {
+  it('维度选项跟随模型能力变化', async () => {
+    const page = await setup()
+    await pickEmbeddingModel(page, 'text-embedding-v4')
+    const select = page.get('[data-test="embedding-dimensions"]')
+    expect(select.element.tagName).toBe('SELECT')
+    const values = Array.from((select.element as HTMLSelectElement).options).map(option => option.value)
+    expect(values).toEqual(['64', '256', '768', '1024', '1536', '2048'])
+    expect(page.get('[data-test="capability-state"]').text()).toContain('推荐默认 1024 维')
+
+    // 换成固定维度模型：变成只读输入，且只能用它自身的维度
+    await pickEmbeddingModel(page, 'text-embedding-v3')
+    const fixed = page.get('[data-test="embedding-dimensions"]')
+    expect(fixed.element.tagName).toBe('INPUT')
+    expect((fixed.element as HTMLInputElement).value).toBe('1024')
+    expect(page.get('[data-test="capability-state"]').text()).toContain('维度固定')
+  })
+
+  it('能力未知的模型要求手动填写并勾选确认', async () => {
+    const page = await setup()
+    await pickEmbeddingModel(page, 'my-private-embedding')
+    expect(page.find('[data-test="embedding-dimensions"]').exists()).toBe(false)
+    expect(page.get('[data-test="capability-unknown"]').text()).toContain('维度说明我们没有收录')
+    await page.get('[data-test="embedding-dimensions-manual"]').setValue('512')
+    await page.get('[data-test="assume-dimensions"]').setValue(true)
+    await page.get('form').trigger('submit')
+    await flushPromises()
+    const body = lastPut()
+    expect(body.EMBEDDING_TARGET_MODEL).toBe('my-private-embedding')
+    expect(body.EMBEDDING_TARGET_DIMENSIONS).toBe(512)
+    expect(body.EMBEDDING_TARGET_ASSUME_DIMENSIONS).toBe(true)
+  })
+
+  it('维度说明默认收起，点「!」按钮才展开', async () => {
+    const page = await setup()
+    await pickEmbeddingModel(page, 'text-embedding-v4')
+    // 默认不占版面：解释文字不出现，能力行也不暴露参数名
+    expect(page.find('[data-test="embedding-help"]').exists()).toBe(false)
+    expect(page.get('[data-test="capability-state"]').text()).not.toContain('dimensions')
+    const toggle = page.get('[data-test="embedding-help-toggle"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    await toggle.trigger('click')
+    expect(page.get('[data-test="embedding-help"]').text()).toContain('维度表示每段文本生成的向量长度，需要与数据库索引保持一致。')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    await toggle.trigger('click')
+    expect(page.find('[data-test="embedding-help"]').exists()).toBe(false)
+  })
+
+  it('保存目标维度不改写当前向量空间，并提示需迁移', async () => {
+    const page = await setup()
+    await pickEmbeddingModel(page, 'text-embedding-v4')
+    await page.get('[data-test="embedding-dimensions"]').setValue('1536')
+    await page.get('form').trigger('submit')
+    await flushPromises()
+    const body = lastPut()
+    expect(body.EMBEDDING_TARGET_MODEL).toBe('text-embedding-v4')
+    expect(body.EMBEDDING_TARGET_DIMENSIONS).toBe(1536)
+    // 运行时字段不得被改写，也不提交向量模式
+    expect('EMBEDDING_MODEL' in body).toBe(false)
+    expect('EMBEDDING_DIMENSIONS' in body).toBe(false)
+    expect('EMBEDDING_MODE' in body).toBe(false)
+    // 两个状态分开显示，且明确提示待迁移
+    expect(page.get('[data-test="embedding-current"]').text()).toContain('当前使用')
+    expect(page.get('[data-test="embedding-target"]').text()).toContain('1536 维')
+    expect(page.get('[data-test="embedding-pending"]').text()).toContain('重新处理资料')
   })
 })

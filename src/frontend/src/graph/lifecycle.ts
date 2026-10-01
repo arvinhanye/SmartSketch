@@ -1,6 +1,7 @@
 import type { GraphData, GraphOptions } from '@antv/g6'
 import type { InjectionKey } from 'vue'
 import type { G6Edge, G6Node } from './adapter'
+import { FALLBACK_GRAPH_THEME, type GraphTheme } from './theme'
 
 /**
  * G6 画布生命周期（H04）。
@@ -61,6 +62,8 @@ export interface CanvasGraphInit {
   data: GraphCanvasData
   /** 缺省为层次布局 */
   layout?: GraphLayoutName
+  /** 画布颜色；缺省用 `FALLBACK_GRAPH_THEME`（测试替身与非浏览器环境） */
+  theme?: GraphTheme
 }
 
 export type CanvasGraphFactory = (init: CanvasGraphInit) => CanvasGraph | Promise<CanvasGraph>
@@ -79,6 +82,8 @@ export interface GraphLifecycleOptions {
   /** 缺省为层次布局 */
   layout?: GraphLayoutName
   factory?: CanvasGraphFactory
+  /** 画布颜色；调用方应在建图前读一次主题（`readGraphTheme`），这里只做透传 */
+  theme?: GraphTheme
   /** 参数是知识点 ID（契约 ID，不带 `kp:` 前缀） */
   onNodeClick?: (kpId: string) => void
   onStatus?: (status: LifecycleStatus, error?: unknown) => void
@@ -107,6 +112,8 @@ export function layoutOptions(layout: GraphLayoutName): NonNullable<GraphOptions
 
 /** 默认建图参数：层次布局（可选力导向），缩放、拖拽画布、拖拽节点，平行边分开画；边样式由适配层逐条给出 */
 export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
+  // 颜色来自建图时读取的主题（graph/theme.ts）；未提供时用兜底色，保证测试替身与旧调用照常工作
+  const theme = init.theme ?? FALLBACK_GRAPH_THEME
   return {
     container: init.container,
     width: init.width,
@@ -116,32 +123,34 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
     padding: 32,
     animation: false,
     zoomRange: [0.2, 4],
+    background: theme.canvas,
     node: {
       type: 'circle',
       style: {
         size: 28,
-        fill: '#ffffff',
-        stroke: '#1677ff',
+        fill: theme.node.fill,
+        stroke: theme.node.stroke,
         lineWidth: 1.5,
         labelText: (datum: unknown) => (datum as G6Node).data.name,
         labelPlacement: 'bottom',
         labelFontSize: 12,
+        labelFill: theme.node.label,
       },
       // 多个状态按 states 数组顺序叠加：学习状态在前、审核状态居中，选中/推荐在后
       state: {
-        rejected: { opacity: 0.4, stroke: '#bfbfbf', lineDash: [4, 3] },
-        lowConfidence: { stroke: '#fa8c16', lineDash: [4, 3] },
+        rejected: { opacity: 0.4, stroke: theme.state.rejectedStroke, lineDash: [4, 3] },
+        lowConfidence: { stroke: theme.state.lowConfidenceStroke, lineDash: [4, 3] },
         // I06：掌握状态色只在这里定义；元素只带状态名
-        mastered: { fill: '#f6ffed', stroke: '#52c41a', lineWidth: 2 },
-        learning: { fill: '#fffbe6', stroke: '#faad14', lineWidth: 2 },
-        notStarted: { fill: '#ffffff', stroke: '#bfbfbf' },
-        recommended: { stroke: '#722ed1', lineWidth: 3, halo: true, haloStroke: '#9254de', haloLineWidth: 10 },
-        selected: { stroke: '#0958d9', lineWidth: 3, halo: true, haloStroke: '#1677ff', haloLineWidth: 10 },
+        mastered: { fill: theme.state.masteredFill, stroke: theme.state.masteredStroke, lineWidth: 2 },
+        learning: { fill: theme.state.learningFill, stroke: theme.state.learningStroke, lineWidth: 2 },
+        notStarted: { fill: theme.state.notStartedFill, stroke: theme.state.notStartedStroke },
+        recommended: { stroke: theme.state.recommendedStroke, lineWidth: 3, halo: true, haloStroke: theme.state.recommendedHalo, haloLineWidth: 10 },
+        selected: { stroke: theme.state.selectedStroke, lineWidth: 3, halo: true, haloStroke: theme.state.selectedHalo, haloLineWidth: 10 },
       },
     },
     edge: {
       // 不指定 type：平行边转换会把成组的边改为曲线
-      style: { labelFontSize: 10, labelBackground: true },
+      style: { labelFontSize: 10, labelBackground: true, labelFill: theme.node.label },
       state: {
         rejected: { opacity: 0.3 },
         lowConfidence: { opacity: 0.6 },
@@ -238,7 +247,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       const data = pending ?? { nodes: [], edges: [] }
       pending = null
       appliedLayout = layout
-      const created = await factory({ container, width, height, data, layout })
+      const created = await factory({ container, width, height, data, layout, theme: options.theme })
       if (!alive()) {
         created.destroy()
         return

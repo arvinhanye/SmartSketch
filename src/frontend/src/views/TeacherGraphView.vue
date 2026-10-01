@@ -162,7 +162,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
 
 <template>
   <section
-    class="teacher-graph"
+    class="page surface-card teacher-graph"
     data-test="teacher-graph-page"
     aria-labelledby="teacher-graph-title"
     :aria-busy="status === 'loading' ? 'true' : 'false'"

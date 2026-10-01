@@ -39,3 +39,22 @@ def validate_embedding_space(settings: Settings) -> None:
             f"recorded {describe(recorded)}, configured {describe(configured)}; "
             "需运行离线重新向量化命令（见 specs/teacher-review-publish.md V12）"
         )
+
+
+def check_embedding_space_change(settings: Settings) -> str:
+    """向量空间与已有数据是否一致：一致返回空串，不一致返回用户可读说明。
+
+    不能因为「设置改了、旧数据还是旧的」就拒绝启动：用户必须能打开软件、进「API 设置」和
+    课程页去重新处理资料。真正需要隔离的读写仍由各自的服务校验。
+    """
+    configured = embedding_space_identity(settings)
+    try:
+        recorded = read_or_initialize_space(settings.SQLITE_URL, *configured)
+    except (OSError, sqlite3.Error):
+        return ""
+    if recorded == configured:
+        return ""
+    return (
+        "课程里已有内容是用之前的向量设置生成的：请在课程页点「重新处理资料」，"
+        "处理完成后才会使用新设置。"
+    )

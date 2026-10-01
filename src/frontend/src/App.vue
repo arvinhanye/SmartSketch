@@ -11,6 +11,7 @@ import {
   NOTICE_UNAUTHENTICATED,
   NOTICE_WRONG_ROLE,
   REVIEW_ROUTE,
+  REGISTER_ROUTE,
   ROOT_ROUTE,
   STUDENT_GRAPH_ROUTE,
   TEACHER_GRAPH_ROUTE,
@@ -43,8 +44,9 @@ const notice = computed(() => {
 })
 
 const role = computed(() => session?.role ?? null)
-// 方向 A「工作台」：登录后左侧常驻导航；未登录（登录、注册页）只留顶栏
+// 工作台保留侧栏；登录与注册页使用独立的全屏认证外壳。
 const withSidebar = computed(() => route !== null && role.value !== null)
+const authPage = computed(() => !withSidebar.value && (route?.name === ROOT_ROUTE || route?.name === REGISTER_ROUTE))
 
 interface NavItem {
   label: string
@@ -91,8 +93,8 @@ function signOut(): void {
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--workbench': withSidebar }">
-    <header v-if="!withSidebar" class="app-header">
+  <div class="app" :class="{ 'app--workbench': withSidebar, 'app--auth': authPage }">
+    <header v-if="!withSidebar && !authPage" class="app-header">
       <div class="app-header-inner">
         <span class="app-logo" aria-hidden="true">智</span>
         <h1>{{ appName }}</h1>
@@ -112,6 +114,9 @@ function signOut(): void {
       <nav class="app-nav" aria-label="主导航">
         <RouterLink v-if="homeLink" :to="homeLink" class="app-nav__item" :class="{ 'is-active': homeActive }">
           我的课程
+        </RouterLink>
+        <RouterLink v-if="role === 'teacher'" to="/api-settings" class="app-nav__item" :class="{ 'is-active': route?.name === 'api-settings' }">
+          API 设置
         </RouterLink>
         <template v-if="courseNav.length">
           <p class="app-nav__heading">当前课程</p>

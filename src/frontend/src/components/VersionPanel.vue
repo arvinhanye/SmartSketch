@@ -63,9 +63,9 @@ const state = useVersions({ courseId: computed(() => props.courseId), coursesApi
 </template>
 
 <style scoped>
-.version-panel { border: 1px solid #d9d9d9; border-radius: 6px; padding: 0.75rem; margin: 1rem 0; }
+.version-panel { border: 1px solid var(--color-border); border-radius: 6px; padding: 0.75rem; margin: 1rem 0; }
 .version-panel__actions { display: flex; gap: 0.5rem; }
 .version-panel__history { padding-left: 1.5rem; }
 .version-panel__history li { margin: 0.5rem 0; }
-.version-panel__confirm { border: 1px solid #d48806; border-radius: 4px; padding: 0.5rem; }
+.version-panel__confirm { border: 1px solid var(--color-warning-border); border-radius: 4px; padding: 0.5rem; }
 </style>

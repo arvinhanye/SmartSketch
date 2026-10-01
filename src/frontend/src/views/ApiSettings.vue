@@ -9,8 +9,9 @@
  * - 向量接口只读展示当前生效状态，切换向量模型仍需离线迁移，页面不提供切换入口。
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { createApiSettingsClient, type ConnectionResult, type ModelOption } from '../api/apiSettings'
+import { useRoute, useRouter } from 'vue-router'
+import { createApiSettingsClient, type ConnectionResult, type EmbeddingCapability, type ModelOption } from '../api/apiSettings'
+import { refreshConfigStatus } from '../composables/useConfigStatus'
 import { useSessionStore } from '../stores/session'
 import ConnectionResultDialog from '../components/ConnectionResultDialog.vue'
 import ModelSelect from '../components/ModelSelect.vue'
@@ -52,6 +53,7 @@ const PROVIDERS: Provider[] = [
 
 const session = useSessionStore()
 const router = useRouter()
+const route = useRoute()
 const api = createApiSettingsClient(() => session.accessToken, () => { session.signOut(); void router.replace('/') })
 
 const saving = ref(false)
@@ -59,14 +61,25 @@ const ready = ref(false)
 const message = ref('')
 const failed = ref(false)
 const configured = reactive({ llm: false, embedding: false })
-const runtime = reactive({ llmMode: 'demo', embeddingMode: 'demo', embeddingModel: '' })
+const runtime = reactive({ embeddingModel: '', embeddingDimensions: 0 })
+/** 保存后还没重启：由后端比较「保存时间」与「本次启动时间」得出 */
+const restartNeeded = ref(false)
 
 const form = reactive({
   LLM_BASE_URL: '', LLM_MODEL: '', LLM_API_KEY: '',
-  EMBEDDING_BASE_URL: '', EMBEDDING_MODEL: '', EMBEDDING_DIMENSIONS: 1024, EMBEDDING_API_KEY: '',
+  // 向量侧表单是「目标配置」：保存到 EMBEDDING_TARGET_*，不改变运行时 EMBEDDING_MODEL/DIMENSIONS
+  EMBEDDING_BASE_URL: '', EMBEDDING_TARGET_MODEL: '', EMBEDDING_TARGET_DIMENSIONS: 0, EMBEDDING_API_KEY: '',
 })
 /** 已保存的地址与模型：用于判断「是否换了主机」「旧列表是否失效」 */
 const saved = reactive({ llmHost: '', embeddingHost: '', llmModel: '', embeddingModel: '' })
+
+/** 目标（待启用）向量模型的能力：来自后端能力表；未知即不提供候选维度 */
+const embeddingCapability = ref<EmbeddingCapability | null>(null)
+const capabilityLoading = ref(false)
+const assumeDimensions = ref(false)
+const manualDimension = ref<number | null>(null)
+/** 向量维度的说明默认收起，点「!」按钮才展开 */
+const helpOpen = ref(false)
 
 const discovery = reactive({
   llm: { options: [] as ModelOption[], count: 0, done: false, error: '', latency: null as number | null, busy: false, stale: false, seq: 0, fetchedAt: 0 },
@@ -87,13 +100,6 @@ function hostOf(url: string): string {
   try { return new URL(url).host.toLowerCase() } catch { return '' }
 }
 const isLocalHost = (host: string) => /^(localhost|127\.0\.0\.1|\[::1\]|192\.168\.|10\.)/.test(host)
-
-/** 大模型是否配置完整：地址 + 模型 +（非本机时）Key */
-const llmComplete = computed(() => {
-  if (!form.LLM_BASE_URL.trim() || !form.LLM_MODEL.trim()) return false
-  const host = hostOf(form.LLM_BASE_URL)
-  return Boolean(form.LLM_API_KEY.trim()) || configured.llm || isLocalHost(host)
-})
 
 /**
  * API Key 的本机留存：只在**本浏览器**记住用户自己填过的密钥，重启软件或切换页面后自动带回，
@@ -154,16 +160,55 @@ function dropKeyOnHostChange(kind: Kind): void {
     form[`${prefix}_API_KEY`] = ''
   }
 }
-/** 保存后生效的模式：配置完整即在线的，否则仍是演示 */
-const llmModeAfterSave = computed(() => (llmComplete.value ? 'live' : 'demo'))
-const embeddingConfigured = computed(() => Boolean(form.EMBEDDING_BASE_URL.trim() && form.EMBEDDING_MODEL.trim()))
-const embeddingDetail = computed(() => {
-  if (runtime.embeddingMode === 'online') return `当前生效：在线 · ${runtime.embeddingModel || form.EMBEDDING_MODEL || '未命名模型'}`
-  if (embeddingConfigured.value) return '当前生效：演示向量（配置已保存，尚未迁移到在线向量空间，页面不提供切换）'
-  return '当前生效：演示向量（未配置在线向量模型）'
+/** 目标向量模型的能力：已知时给出候选维度；未知时要求手动填写并确认 */
+const capabilityKnown = computed(() => embeddingCapability.value?.known === true)
+const dimensionOptions = computed(() => embeddingCapability.value?.dimensions ?? [])
+const fixedDimension = computed(() => (capabilityKnown.value && dimensionOptions.value.length === 1 ? dimensionOptions.value[0] : null))
+/** 能力行文案：加载中 / 固定维度 / 多档可选；用使用者能看懂的说法，不提参数名 */
+const capabilityStateText = computed(() => {
+  if (capabilityLoading.value) return '正在读取该模型支持的维度…'
+  const capability = embeddingCapability.value
+  if (!capability?.known) return ''
+  if (fixedDimension.value !== null) return `${capability.label || capability.model}：该模型输出维度固定，只能使用 ${fixedDimension.value} 维。`
+  const recommended = capability.default ? `，推荐默认 ${capability.default} 维` : ''
+  return `${capability.label || capability.model}：可选 ${capability.dimensions.join(' / ')} 维${recommended}。`
 })
-const statusLine = computed(() =>
-  `当前生效：大模型 ${runtime.llmMode === 'live' ? '在线' : '演示'} · 向量 ${runtime.embeddingMode === 'online' ? '在线' : '演示'}`)
+/** 目标模型/维度与当前实际使用的不一致：需要重新处理资料后才生效 */
+const targetDiffersFromActive = computed(() => (
+  Boolean(form.EMBEDDING_TARGET_MODEL.trim() || form.EMBEDDING_TARGET_DIMENSIONS)
+  && (form.EMBEDDING_TARGET_MODEL.trim() !== runtime.embeddingModel
+    || (form.EMBEDDING_TARGET_DIMENSIONS || 0) !== (runtime.embeddingDimensions || 0))
+))
+const currentSpace = computed(() => `${runtime.embeddingModel || '未设置'} · ${runtime.embeddingDimensions || 0} 维`)
+const targetSpace = computed(() => {
+  const model = form.EMBEDDING_TARGET_MODEL.trim()
+  const dimensions = form.EMBEDDING_TARGET_DIMENSIONS
+  if (!model && !dimensions) return `${runtime.embeddingModel || '未设置'} · ${runtime.embeddingDimensions || 0} 维（未设置新目标）`
+  return `${model || '未选择模型'} · ${dimensions ? `${dimensions} 维` : '未选择维度'}`
+})
+
+/** 选择目标向量模型后拉取该模型的能力（是否支持 dimensions、可选维度） */
+async function loadCapability(): Promise<void> {
+  const model = form.EMBEDDING_TARGET_MODEL.trim()
+  if (!model) { embeddingCapability.value = null; return }
+  capabilityLoading.value = true
+  try {
+    embeddingCapability.value = await api.capability(embeddingPayload(), 'embedding')
+    const capability = embeddingCapability.value
+    if (capability?.known) {
+      // 换了模型后重新计算：原选择不受支持时清空，等用户重新选
+      if (!capability.dimensions.includes(form.EMBEDDING_TARGET_DIMENSIONS)) {
+        form.EMBEDDING_TARGET_DIMENSIONS = capability.default ?? 0
+      }
+      assumeDimensions.value = false
+    }
+  } catch {
+    embeddingCapability.value = null
+  } finally {
+    capabilityLoading.value = false
+  }
+}
+
 
 /** 大模型候选：进页面自动获取一次时用它判断是否具备条件（地址 + Key 或已保存 Key） */
 const llmCandidatesReady = computed(() => Boolean(
@@ -190,9 +235,9 @@ function keyGuard(kind: Kind): string {
 function fieldWarning(kind: Kind): string {
   const prefix = kind === 'llm' ? 'LLM' : 'EMBEDDING'
   const base = form[`${prefix}_BASE_URL`].trim()
-  const model = kind === 'llm' ? form.LLM_MODEL.trim() : form.EMBEDDING_MODEL.trim()
-  if (!base) return '请先填写 API 地址。'
-  if (!model && kind === 'llm') return '请先获取模型列表并选择「大模型」，或手动填写模型 ID。'
+  const model = kind === 'llm' ? form.LLM_MODEL.trim() : form.EMBEDDING_TARGET_MODEL.trim()
+  if (!base) return '请填写 API 地址。'
+  if (!model && kind === 'llm') return '请获取可用模型并选择「大模型」，或手动填写模型名称。'
   const host = hostOf(base)
   if (!isLocalHost(host) && !form[`${prefix}_API_KEY`].trim() && !configured[kind]) return '请先填写该服务商的 API Key。'
   return ''
@@ -200,7 +245,7 @@ function fieldWarning(kind: Kind): string {
 
 const modelOptions = computed<Record<Kind, ModelOption[]>>(() => ({
   llm: mergeOptions(discovery.llm.options, form.LLM_MODEL),
-  embedding: mergeOptions(discovery.embedding.options, form.EMBEDDING_MODEL),
+  embedding: mergeOptions(discovery.embedding.options, form.EMBEDDING_TARGET_MODEL),
 }))
 /** 当前选择不在已发现列表中时补齐一项，避免选择器显示为空 */
 function mergeOptions(options: ModelOption[], current: string): ModelOption[] {
@@ -223,40 +268,59 @@ function llmPayload(): Record<string, unknown> {
   if (form.LLM_API_KEY.trim()) body.LLM_API_KEY = form.LLM_API_KEY.trim()
   return body
 }
+function targetDimensions(): number {
+  // 能力未知时以手动填写的维度为准（并要求勾选确认，后端同样校验）
+  if (!capabilityKnown.value && manualDimension.value) return Number(manualDimension.value)
+  return form.EMBEDDING_TARGET_DIMENSIONS || Number(manualDimension.value ?? 0) || 0
+}
+
 function embeddingPayload(): Record<string, unknown> {
+  // 只提交「目标」字段：运行时 EMBEDDING_MODEL / EMBEDDING_DIMENSIONS 保持不变，
+  // 迁移完成前重启也不会切换到不兼容的维度（启动门禁继续以运行时配置为准）。
   const body: Record<string, unknown> = {
     EMBEDDING_BASE_URL: form.EMBEDDING_BASE_URL.trim(),
-    EMBEDDING_DIMENSIONS: form.EMBEDDING_DIMENSIONS,
     list_path: listPathFor('embedding'),
   }
-  if (form.EMBEDDING_MODEL.trim()) body.EMBEDDING_MODEL = form.EMBEDDING_MODEL.trim()
+  if (form.EMBEDDING_TARGET_MODEL.trim()) body.EMBEDDING_TARGET_MODEL = form.EMBEDDING_TARGET_MODEL.trim()
+  const dimensions = targetDimensions()
+  if (dimensions > 0) body.EMBEDDING_TARGET_DIMENSIONS = dimensions
+  body.EMBEDDING_TARGET_ASSUME_DIMENSIONS = assumeDimensions.value
   if (form.EMBEDDING_API_KEY.trim()) body.EMBEDDING_API_KEY = form.EMBEDDING_API_KEY.trim()
   return body
 }
 
 onMounted(async () => {
+  // 路由守卫把人送到这里时会带一句话，直接显示在页面上
+  const notice = route.query.notice
+  if (typeof notice === 'string' && notice.trim()) message.value = notice.trim()
   try {
     const settings = await api.read()
     form.LLM_BASE_URL = settings.LLM_BASE_URL
     // 旧配置可能只写了知识抽取模型：优先聊天模型，缺失时用知识抽取模型
     form.LLM_MODEL = settings.LLM_CHAT_MODEL || settings.LLM_EXTRACTION_MODEL
     form.EMBEDDING_BASE_URL = settings.EMBEDDING_BASE_URL
-    form.EMBEDDING_MODEL = settings.EMBEDDING_MODEL
-    form.EMBEDDING_DIMENSIONS = settings.EMBEDDING_DIMENSIONS
+    // 目标配置：优先已保存的目标，缺失时回落到当前实际使用的模型与维度
+    form.EMBEDDING_TARGET_MODEL = settings.EMBEDDING_TARGET_MODEL || settings.EMBEDDING_MODEL
+    form.EMBEDDING_TARGET_DIMENSIONS = settings.EMBEDDING_TARGET_DIMENSIONS || settings.EMBEDDING_DIMENSIONS || 0
+    assumeDimensions.value = Boolean(settings.EMBEDDING_TARGET_ASSUME_DIMENSIONS)
     configured.llm = settings.LLM_API_KEY_configured
     configured.embedding = settings.EMBEDDING_API_KEY_configured
     saved.llmHost = hostOf(form.LLM_BASE_URL)
     saved.embeddingHost = hostOf(form.EMBEDDING_BASE_URL)
     saved.llmModel = form.LLM_MODEL
-    saved.embeddingModel = form.EMBEDDING_MODEL
-    runtime.llmMode = settings.active?.LLM_MODE ?? settings.LLM_MODE ?? 'demo'
-    runtime.embeddingMode = settings.active?.EMBEDDING_MODE ?? settings.EMBEDDING_MODE ?? 'demo'
-    runtime.embeddingModel = settings.active?.EMBEDDING_MODEL ?? ''
+    saved.embeddingModel = form.EMBEDDING_TARGET_MODEL
+    runtime.embeddingModel = settings.active?.EMBEDDING_MODEL ?? settings.EMBEDDING_MODEL
+    runtime.embeddingDimensions = settings.active?.EMBEDDING_DIMENSIONS ?? settings.EMBEDDING_DIMENSIONS
     restoreKeys()
     ready.value = true
     // 进页面自动拉一次大模型候选：条件具备（地址 + Key 或已保存 Key）且当前没有候选时
-    // 向量接口保持手动（演示空间下没有可列举的在线向量模型）
+    // 向量接口保持手动（没配好之前列不出可用模型）
     if (llmCandidatesReady.value && !discovery.llm.options.length && !discovery.llm.busy) void discover('llm')
+    // 目标模型已定时补一次能力，用于渲染维度候选（不触发任何保存）
+    if (form.EMBEDDING_TARGET_MODEL.trim()) void loadCapability()
+    // 是否还需要重启：由后端比较「保存时间」与「本次启动时间」，不在前端猜
+    const status = await api.status()
+    restartNeeded.value = Boolean(status.restart_needed)
   } catch (error) { failed.value = true; message.value = error instanceof Error ? error.message : '读取失败' }
 })
 
@@ -272,6 +336,11 @@ watch(() => form.EMBEDDING_API_KEY, (value) => {
   discovery.embedding.stale = discovery.embedding.done
   if (!value.trim()) keyRestored.embedding = false
   else if (!keyRestored.embedding) writeStoredKey('embedding', value.trim())
+})
+// 改选目标向量模型后重算维度候选；能力未知时清空，交由用户手动填写并确认
+watch(() => form.EMBEDDING_TARGET_MODEL, () => {
+  manualDimension.value = null
+  void loadCapability()
 })
 
 async function discover(kind: Kind) {
@@ -327,7 +396,7 @@ async function save() {
   saving.value = true; message.value = ''; failed.value = false
   try {
     // 只提交配置字段：list_path 是获取列表用的请求参数，不能写进配置
-    const body: Record<string, unknown> = { ...llmPayload(), ...embeddingPayload(), LLM_MODE: llmModeAfterSave.value }
+    const body: Record<string, unknown> = { ...llmPayload(), ...embeddingPayload() }
     delete body.list_path
     delete body.LLM_PROVIDER_LABEL
     delete body.LLM_CHAT_MODEL
@@ -336,7 +405,7 @@ async function save() {
       body.LLM_CHAT_MODEL = form.LLM_MODEL.trim()
       body.LLM_EXTRACTION_MODEL = form.LLM_MODEL.trim()
     }
-    // 不提交 EMBEDDING_MODE：向量空间切换仍需离线迁移，页面不提供该入口
+    // 不提交向量模式：软件在启动时读取一次设置，切换向量模型仍需重新处理资料后生效
     const settings = await api.save(body)
     configured.llm = settings.LLM_API_KEY_configured
     configured.embedding = settings.EMBEDDING_API_KEY_configured
@@ -346,8 +415,10 @@ async function save() {
     saved.embeddingHost = hostOf(form.EMBEDDING_BASE_URL)
     // 已写入本机加密配置：输入框与本机留存都清空，不让密钥长期停留在页面上
     clearKeys()
-    const needsRestart = runtime.llmMode !== llmModeAfterSave.value
-    message.value = settings.message ?? (needsRestart ? '已保存，需要重启智绘学途后生效。' : '已保存，配置未改变运行模式，无需重启。')
+    // 本机软件启动时读取一次设置，所以保存后要重启才会用上新配置（是否需要由后端状态判定）
+    const status = await refreshConfigStatus(session.accessToken, true)
+    restartNeeded.value = Boolean(status?.restart_needed)
+    message.value = restartNeeded.value ? '设置已保存，请重启软件后使用。' : '设置已保存'
   } catch (error) {
     failed.value = true; message.value = error instanceof Error ? error.message : '保存失败'
   } finally { saving.value = false }
@@ -377,18 +448,20 @@ function showResult(kind: Kind) {
 </script>
 
 <template>
-  <section class="api-settings">
-    <header class="page-heading"><p class="eyebrow">接口与模型</p><h2>API 设置</h2><p>{{ statusLine }}</p></header>
-    <p class="note">设置由本机所有课程共用。密钥留空表示保留已保存的密钥，保存后重启软件生效。</p>
-    <p class="note">外部服务要求 HTTPS，本机地址可用 HTTP。先选服务商或填写地址，再获取模型列表并选择模型。</p>
+  <!-- 本页是整站视觉基准：外层 .page（米灰背景）+ 内容 .surface-card（暖白卡片），其余页面引用同一套公共类 -->
+  <div class="page api-settings">
+    <header class="page__heading">
+      <h2>API 设置</h2>
+    </header>
     <p v-if="message" role="status" class="notice" :class="{ error: failed }">{{ message }}</p>
+    <p v-else-if="restartNeeded" role="status" class="notice" data-test="restart-needed">设置已保存，请重启软件后使用。</p>
 
     <form @submit.prevent="save">
       <div class="interface-grid">
-        <section v-for="block in blocks" :key="block.kind" :data-kind="block.kind" class="interface-card" :aria-labelledby="`${block.kind}-title`">
+        <section v-for="block in blocks" :key="block.kind" :data-kind="block.kind" class="surface-card interface-card" :aria-labelledby="`${block.kind}-title`">
           <header class="card-heading">
             <h3 :id="`${block.kind}-title`">{{ block.title }}</h3>
-            <span class="key-status">{{ configured[block.kind] ? '密钥已配置' : '密钥未配置' }}</span>
+            <span class="key-status">{{ configured[block.kind] ? '已保存，留空可保留' : '请输入 API Key' }}</span>
           </header>
           <fieldset :disabled="!ready || saving">
             <label :for="`${block.kind}-provider`">API 服务预设
@@ -402,7 +475,7 @@ function showResult(kind: Kind) {
                 <option value="custom">自定义地址</option>
               </select>
             </label>
-            <p v-if="activeProvider(block.kind)?.note" class="note" data-test="provider-note">{{ activeProvider(block.kind)?.note }}</p>
+            <p v-if="activeProvider(block.kind)?.note" class="api-settings__note" data-test="provider-note">{{ activeProvider(block.kind)?.note }}</p>
 
             <label :for="`${block.kind}-base-url`">API 地址
               <input
@@ -425,17 +498,17 @@ function showResult(kind: Kind) {
                 :data-test="`${block.kind}-api-key`"
               />
             </label>
-            <p v-if="keyRestored[block.kind]" class="note" data-test="key-restored">
+            <p v-if="keyRestored[block.kind]" class="api-settings__note" data-test="key-restored">
               已自动带回本机保存的密钥（重启软件或切换页面后仍保留）；保存成功后该密钥会从页面与本机留存中清除。
             </p>
 
             <div class="discovery-row">
               <button type="button" class="secondary" :disabled="discovery[block.kind].busy" :data-test="`${block.kind}-discover`" @click="discover(block.kind)">
-                {{ discovery[block.kind].busy ? '正在获取…' : (discovery[block.kind].done ? '重新获取' : '获取模型列表') }}
+                {{ discovery[block.kind].busy ? '正在获取…' : (discovery[block.kind].done ? '重新获取' : '获取可用模型') }}
               </button>
-              <span v-if="discovery[block.kind].done && discovery[block.kind].stale" class="note" data-test="model-stale">地址或密钥已改动，当前列表已失效，请重新获取。</span>
+              <span v-if="discovery[block.kind].done && discovery[block.kind].stale" class="api-settings__note" data-test="model-stale">地址或密钥已改动，当前列表已失效，请重新获取。</span>
             </div>
-            <p class="hint-line" data-test="discovery-count">{{ lastFetchLabel(block.kind) }}</p>
+            <p class="api-settings__hint" data-test="discovery-count">{{ lastFetchLabel(block.kind) }}</p>
             <p v-if="discovery[block.kind].error" class="warning" role="status" data-test="discovery-error">{{ discovery[block.kind].error }}</p>
 
             <template v-if="block.kind === 'llm'">
@@ -445,22 +518,90 @@ function showResult(kind: Kind) {
                 :options="modelOptions.llm"
                 input-id="llm-model"
                 test="llm-model"
-                placeholder="获取模型列表后选择，或手动填写模型 ID"
+                placeholder="获取模型列表后选择，或手动填写模型名称"
               />
-              <p class="note">用于聊天与知识抽取。</p>
+              <p class="api-settings__note">用于聊天与知识抽取。</p>
             </template>
             <template v-else>
-              <label :for="'embedding-model'">向量模型</label>
+              <label :for="'embedding-target-model'">向量模型</label>
               <ModelSelect
-                v-model="form.EMBEDDING_MODEL"
+                v-model="form.EMBEDDING_TARGET_MODEL"
                 :options="modelOptions.embedding"
-                input-id="embedding-model"
+                input-id="embedding-target-model"
                 test="embedding-model"
-                placeholder="获取模型列表后选择，或手动填写模型 ID"
+                placeholder="获取模型列表后选择，或手动填写模型名称"
               />
-              <label :for="'embedding-dimensions'">向量维度<input id="embedding-dimensions" :value="form.EMBEDDING_DIMENSIONS" readonly /></label>
-              <p class="note" data-test="embedding-status">{{ embeddingDetail }}</p>
-              <p class="note">更换向量模型前需备份并离线迁移现有课程向量，页面不会切换向量空间。</p>
+
+              <details class="advanced" data-test="advanced-settings">
+                <summary>高级设置</summary>
+                <p class="api-settings__note">通常保持默认值即可。</p>
+                <div class="field">
+                  <label :for="'embedding-target-dimensions'">向量维度</label>
+                  <!-- 说明收进「!」按钮：默认只留一行状态，点开才展开给用户看的解释 -->
+                  <button
+                    type="button"
+                    class="help-toggle"
+                    :aria-expanded="helpOpen"
+                    aria-controls="embedding-help"
+                    aria-label="向量维度说明"
+                    title="向量维度说明"
+                    data-test="embedding-help-toggle"
+                    @click="helpOpen = !helpOpen"
+                  >
+                    <span aria-hidden="true">!</span>
+                  </button>
+                  <select
+                    v-if="capabilityKnown && !fixedDimension"
+                    id="embedding-target-dimensions"
+                    v-model.number="form.EMBEDDING_TARGET_DIMENSIONS"
+                    data-test="embedding-dimensions"
+                  >
+                    <option v-for="value in dimensionOptions" :key="value" :value="value">
+                      {{ value }}{{ value === embeddingCapability?.default ? '（推荐默认）' : '' }}
+                    </option>
+                  </select>
+                  <input
+                    v-else-if="fixedDimension"
+                    id="embedding-target-dimensions"
+                    :value="fixedDimension"
+                    readonly
+                    data-test="embedding-dimensions"
+                  />
+                  <input
+                    v-else
+                    id="embedding-target-dimensions"
+                    v-model.number="manualDimension"
+                    type="number"
+                    min="1"
+                    placeholder="手动填写维度"
+                    data-test="embedding-dimensions-manual"
+                  />
+                  <div v-if="helpOpen" id="embedding-help" class="help-card" data-test="embedding-help">
+                    <p class="help-card__title">关于向量维度</p>
+                    <ul>
+                      <li>维度表示每段文本生成的向量长度，需要与数据库索引保持一致。</li>
+                      <li>换成别的维度后，原有课程内容需要重新生成向量，才能和新设置一起使用。</li>
+                      <li v-if="capabilityKnown && !fixedDimension">不知道选哪个时，用带「推荐默认」的那一项就好。</li>
+                      <li v-else-if="fixedDimension">该模型输出维度固定，这里只能用它自己的维度。</li>
+                      <li v-else>这个模型我们没有它的维度说明：请按服务商给的值填写，并勾选下方「按该维度调用」确认。</li>
+                    </ul>
+                  </div>
+                </div>
+                <p v-if="capabilityStateText" class="api-settings__note" data-test="capability-state">{{ capabilityStateText }}</p>
+                <div v-if="!capabilityKnown && form.EMBEDDING_TARGET_MODEL.trim()" class="api-settings__note" data-test="capability-unknown">
+                  <p>这个模型的维度说明我们没有收录，请手动填写维度并确认后再保存。</p>
+                  <label class="inline-check">
+                    <input v-model="assumeDimensions" type="checkbox" data-test="assume-dimensions" />
+                    按该维度调用（我已确认该模型支持此维度）
+                  </label>
+                </div>
+              </details>
+
+              <p class="api-settings__note" data-test="embedding-current">当前使用：{{ currentSpace }}</p>
+              <p v-if="targetDiffersFromActive" class="api-settings__note" data-test="embedding-target">新设置：{{ targetSpace }}</p>
+              <p v-if="targetDiffersFromActive" class="api-settings__pending" data-test="embedding-pending">
+                新设置已保存。请在课程页点「重新处理资料」，处理完成后才会使用新的向量。
+              </p>
             </template>
 
             <div class="test-actions">
@@ -483,19 +624,40 @@ function showResult(kind: Kind) {
 
       <footer class="save-row">
         <button type="submit" class="primary" :disabled="saving || !ready">{{ saving ? '保存中…' : '保存设置' }}</button>
-        <span class="note">保存后大模型将使用：{{ llmModeAfterSave === 'live' ? '在线 API' : '演示模式（配置不完整）' }}；保存后{{ runtime.llmMode !== llmModeAfterSave ? '需要重启软件生效' : '无需重启' }}。</span>
       </footer>
     </form>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.api-settings{max-width:1160px;padding:clamp(18px,3vw,32px);background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:8px}
-.page-heading{margin-bottom:16px}.eyebrow{color:var(--color-primary);font-size:12px;letter-spacing:.12em}h2{font-size:1.25rem}h3{font-size:1.05rem;margin:0}
-.note{color:var(--color-text-muted);font-size:13px;line-height:1.7}
-.hint-line{color:var(--color-text);font-size:13px;line-height:1.7;margin:0}
-.interface-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:24px;align-items:start}
-.interface-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:22px}
+/* 页面外层、标题与卡片外观全部来自全局公共类（.page / .page__* / .surface-card）；
+ * 这里只保留本页特有的表单、按钮与状态提示样式，避免再次出现两套风格。 */
+.api-settings{max-width:1160px;min-width:0}
+.api-settings h2{margin:0}
+.api-settings h3{margin:0}
+.api-settings__note{color:var(--color-text-muted);font-size:13px;line-height:1.7;margin:0}
+.api-settings__hint{color:var(--color-text);font-size:13px;line-height:1.7;margin:0}
+.inline-check{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px}
+.inline-check input{width:auto;min-width:0}
+/* 字段行：标签（可带「!」说明按钮）在上一行，控件占满下一行 */
+.field{display:grid;grid-template-columns:auto 1fr;grid-template-areas:'label help' 'control control';align-items:center;gap:6px;min-width:0}
+.field > label{grid-area:label}
+.field > select,.field > input{grid-area:control}
+.help-toggle{grid-area:help;justify-self:start;display:inline-grid;place-items:center;width:18px;height:18px;min-height:0;padding:0;border-radius:50%;font-size:12px;font-weight:700;line-height:1;background:var(--color-surface-muted);color:var(--color-text-muted);border:1px solid var(--color-border-strong);cursor:pointer}
+.help-toggle:hover{background:var(--color-primary-soft);color:var(--color-primary);border-color:var(--color-primary)}
+.help-toggle:focus-visible{outline:2px solid var(--color-primary);outline-offset:1px}
+.help-card{grid-area:control;margin-top:8px;padding:12px 14px;background:var(--color-surface-muted);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text);font-size:13px;line-height:1.7}
+.help-card__title{margin:0 0 4px;font-weight:600}
+.help-card ul{margin:0;padding-left:1.1rem;display:grid;gap:4px}
+.api-settings__pending{margin:0;color:var(--color-warning-text);font-size:13px;line-height:1.7}
+/* 高级设置：默认收起，避免普通用户被维度等Options干扰 */
+.advanced{display:grid;gap:10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px 12px;background:var(--color-surface-muted)}
+.advanced summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--color-text)}
+.advanced[open] summary{margin-bottom:8px}
+.advanced .field{gap:8px}
+.interface-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+/* 卡片外观来自全局 .surface-card；这里只声明一列不溢出 */
+.interface-card{min-width:0}
 .card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--color-border);margin-bottom:16px}
 .key-status{font-size:12px;color:var(--color-success-text)}
 fieldset{border:0;padding:0;margin:0;display:grid;gap:14px;min-width:0}
@@ -511,9 +673,12 @@ button.secondary:hover{background:var(--color-primary-soft)}
 button:disabled{opacity:.55;cursor:not-allowed}
 .discovery-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .test-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding-top:12px;border-top:1px solid var(--color-border)}
-.save-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border)}
+.save-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding-top:20px;border-top:1px solid var(--color-border)}
 .warning{background:var(--color-warning-bg);border:1px solid var(--color-warning-border);color:var(--color-warning-text);padding:10px;font-size:13px;border-radius:var(--radius-sm)}
+/* 保存结果提示：成功用松绿、失败用砖红，二者都保持可辨识 */
 .notice{color:var(--color-success-text);padding:12px;border:1px solid var(--color-border);background:var(--color-surface);font-size:13px;border-radius:var(--radius-sm)}
 .notice.error{color:var(--color-danger-text);border-color:var(--color-danger-border);background:var(--color-danger-bg)}
-@media(max-width:850px){.interface-grid{grid-template-columns:1fr}.interface-card{padding:18px}}
+/* 窄屏：卡片单列，且表单控件不撑破容器（避免横向溢出） */
+@media(max-width:850px){.interface-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){.api-settings{padding-inline:0}}
 </style>

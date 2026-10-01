@@ -25,6 +25,7 @@ from app.services.versions.resolver import PublishedVersion
 
 
 _MESSAGES = {
+    "API_NOT_CONFIGURED": "请先完成 API 设置，再使用智能问答",
     "LLM_UNAVAILABLE": "问答模型暂不可用，请稍后重试",
     "STORAGE_UNAVAILABLE": "课程资料暂不可用，请稍后重试",
     "BUDGET_EXCEEDED": "当前模型调用额度不足，请稍后重试",

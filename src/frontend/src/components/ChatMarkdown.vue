@@ -92,7 +92,7 @@ const blocks = computed<Block[]>(() => {
 </template>
 
 <style scoped>
-pre { overflow-x: auto; padding: .75rem; background: #f4f6f8; }
-code { background: #f4f6f8; }
-.citation { color: #175ab4; border: 0; background: none; cursor: pointer; text-decoration: underline; }
+pre { overflow-x: auto; padding: .75rem; background: var(--color-surface-muted); }
+code { background: var(--color-surface-muted); }
+.citation { color: var(--color-primary); border: 0; background: none; cursor: pointer; text-decoration: underline; }
 </style>

@@ -377,7 +377,8 @@ describe('I06 掌握状态到节点视觉属性（纯函数）', () => {
     const options = buildGraphOptions({ container: document.createElement('div'), width: 100, height: 100, data: graph })
     const nodeState = (options.node as { state: Record<string, unknown> }).state
     expect(Object.keys(nodeState).sort()).toEqual(['learning', 'lowConfidence', 'mastered', 'notStarted', 'recommended', 'rejected', 'selected'])
-    expect(nodeState.mastered).toMatchObject({ stroke: '#52c41a' })
+    // 暖色主题下「已掌握」用松绿 #3f6157（与 styles.css 的 --graph-state-mastered 一致）
+    expect(nodeState.mastered).toMatchObject({ stroke: '#3f6157' })
   })
 })
 

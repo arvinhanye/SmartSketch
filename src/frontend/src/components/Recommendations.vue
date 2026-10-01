@@ -90,16 +90,16 @@ function highlighted(kpId: string): string {
 .recommendations {
   margin: 0;
   padding: 0.85rem;
-  border: 1px solid var(--color-border, #d9d9d9);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
-  background: var(--color-surface, #fff);
+  background: var(--color-surface);
 }
 .recommendations h3 {
   margin: 0 0 0.25rem;
 }
 .recommendations__version,
 .recommendations__total {
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
   font-size: 0.8rem;
   margin: 0 0 0.4rem;
 }
@@ -113,17 +113,17 @@ function highlighted(kpId: string): string {
 }
 .recommendations__item {
   counter-increment: rc;
-  border: 1px solid var(--color-border, #d9d9d9);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm, 6px);
   padding: 0.5rem 0.65rem;
 }
 .recommendations__item:first-child {
-  border-color: var(--color-primary, #1c6e8c);
-  box-shadow: inset 3px 0 0 var(--color-primary, #1c6e8c);
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 .recommendations__item[data-highlighted='true'] {
-  background: var(--color-primary-soft, #f9f0ff);
-  outline: 2px solid var(--color-primary, #722ed1);
+  background: var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
 }
 .recommendations__select {
   background: none;
@@ -134,7 +134,7 @@ function highlighted(kpId: string): string {
 }
 .recommendations__select::before {
   content: counter(rc) ' · ';
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 .recommendations__select:hover:not(:disabled) {
@@ -145,12 +145,12 @@ function highlighted(kpId: string): string {
 .recommendations__reason {
   margin: 0.2rem 0;
   font-size: 0.85rem;
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
 }
 .recommendations__details summary {
   cursor: pointer;
   font-size: 0.78rem;
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
 }
 .recommendations__facts {
   display: grid;
@@ -160,13 +160,13 @@ function highlighted(kpId: string): string {
   font-size: 0.78rem;
 }
 .recommendations__facts dt {
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
 }
 .recommendations__facts dd {
   margin: 0;
 }
 .recommendations__primary {
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
   font-size: 0.78rem;
   margin: 0;
 }

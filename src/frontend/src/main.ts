@@ -15,6 +15,7 @@ import { createReviewApi, REVIEW_API_KEY } from './api/review'
 import { createVersionsApi, VERSIONS_API_KEY } from './api/versions'
 import { createTaskEventsClient } from './api/taskEvents'
 import { CHAT_STREAM_CLIENT_KEY, createChatStreamClient } from './api/chatStream'
+import { bindConfigStatusToken } from './composables/useConfigStatus'
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from './router'
 import { useSessionStore } from './stores/session'
 import CoursesView from './views/CoursesView.vue'
@@ -29,6 +30,8 @@ import RegisterView from './views/RegisterView.vue'
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
+// 配置状态守卫要读令牌；在这里注入，避免 composable 直接依赖 store
+bindConfigStatusToken(() => session.accessToken)
 
 // 路由守卫只用 LoginResponse.user.role 选首页；授权以后端为准（specs/identity-access.md §2.4）
 const router = createAppRouter({
@@ -63,7 +66,7 @@ createApp(App)
   .use(router)
   .provide(HTTP_CLIENT_KEY, http)
   .provide(AUTH_API_KEY, createAuthApi(http))
-  .provide(COURSES_API_KEY, createCoursesApi(http))
+  .provide(COURSES_API_KEY, createCoursesApi(http, () => session.accessToken))
   .provide(MEMBERS_API_KEY, createMembersApi(http))
   .provide(MATERIALS_API_KEY, createMaterialsApi(http))
   .provide(PUBLISHED_GRAPH_API_KEY, createPublishedGraphApi(http))

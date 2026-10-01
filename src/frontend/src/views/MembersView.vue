@@ -47,7 +47,7 @@ const {
 </script>
 
 <template>
-  <section class="members" data-test="members" aria-labelledby="members-title">
+  <section class="page surface-card members" data-test="members" aria-labelledby="members-title">
     <h2 id="members-title">课程成员管理</h2>
     <p v-if="courseId">
       <RouterLink data-test="members-back" :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
@@ -150,11 +150,11 @@ th,
 td {
   text-align: left;
   padding: 0.375rem 0.5rem;
-  border-bottom: 1px solid #d0d7de;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .muted {
-  color: #57606a;
+  color: var(--color-text-muted);
 }
 
 .add fieldset {

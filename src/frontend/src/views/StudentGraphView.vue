@@ -130,7 +130,7 @@ const selectedName = computed(() => {
 
 <template>
   <section
-    class="student-graph"
+    class="page surface-card student-graph"
     data-test="student-graph-page"
     aria-labelledby="student-graph-title"
     :aria-busy="status === 'loading' ? 'true' : 'false'"

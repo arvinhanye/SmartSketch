@@ -170,24 +170,24 @@ function onKeydown(event: KeyboardEvent, index: number): void {
   width: 100%;
   padding: 0.75rem;
   text-align: left;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
 }
 .knowledge-cards__card[aria-pressed='true'] {
-  border-color: #0958d9;
-  box-shadow: 0 0 0 1px #0958d9;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
 }
 .knowledge-cards__card:focus-visible {
-  outline: 2px solid #0958d9;
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 .knowledge-cards__name {
   font-weight: 600;
 }
 .knowledge-cards__meta {
-  color: #595959;
+  color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 .knowledge-cards__pager {

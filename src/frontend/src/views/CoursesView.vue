@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { COURSES_API_KEY } from '../api/courses'
+import { COURSES_API_KEY, type CourseIntelligence, type CoursesApi } from '../api/courses'
 import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, useCourses } from '../composables/useCourses'
 import {
   COURSE_MEMBERS_ROUTE,
@@ -17,8 +17,9 @@ import {
 } from '../router'
 import { useSessionStore } from '../stores/session'
 
-const api = inject(COURSES_API_KEY, null)
-if (api === null) throw new Error('CoursesView 需要注入 COURSES_API_KEY')
+const injected = inject(COURSES_API_KEY, null)
+if (injected === null) throw new Error('CoursesView 需要注入 COURSES_API_KEY')
+const api: CoursesApi = injected
 
 const route = useRoute()
 const router = useRouter()
@@ -73,11 +74,49 @@ const hasTeacherGraph = router.hasRoute(TEACHER_GRAPH_ROUTE)
 const hasReview = router.hasRoute(REVIEW_ROUTE)
 
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
+
+/** 当前课程的智能功能状态：旧演示向量需要用户主动重新处理资料 */
+const intelligence = ref<CourseIntelligence | null>(null)
+const reprocessing = ref(false)
+const reprocessMessage = ref('')
+const needsReprocess = computed(() => intelligence.value?.needs_reprocess === true)
+
+async function loadIntelligence(): Promise<void> {
+  const cid = courseId.value
+  reprocessMessage.value = ''
+  if (cid === null || api.intelligence === undefined) { intelligence.value = null; return }
+  try {
+    intelligence.value = await api.intelligence(cid)
+  } catch {
+    // 状态读不到时不打扰用户：页面本身仍可用
+    intelligence.value = null
+  }
+}
+async function startReprocess(): Promise<void> {
+  const cid = courseId.value
+  if (cid === null || reprocessing.value || api.reprocess === undefined) return
+  reprocessing.value = true
+  reprocessMessage.value = ''
+  try {
+    const result = await api.reprocess(cid)
+    reprocessMessage.value = `已提交重新处理（${result.count} 份资料），进度可在「教学资料」中查看。`
+    await loadIntelligence()
+  } catch (error) {
+    reprocessMessage.value = error instanceof Error ? error.message : '提交失败，请稍后重试。'
+  } finally {
+    reprocessing.value = false
+  }
+}
+
+watch(courseId, () => { void loadIntelligence() }, { immediate: true })
 </script>
 
 <template>
-  <section class="courses" aria-labelledby="courses-title">
-    <h2 id="courses-title">我的课程</h2>
+  <div class="page courses" aria-labelledby="courses-title">
+    <header class="page__heading">
+      <h2 id="courses-title">我的课程</h2>
+      <p class="page__lede">选择一门课程进入课程工作台；教师可以在下方创建新课程。</p>
+    </header>
 
     <p v-if="courseForbidden" data-test="course-forbidden" role="alert">
       你无权访问该课程（可能已被移出课程），已返回课程列表。
@@ -85,7 +124,7 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
 
     <section
       v-if="courseId !== null"
-      class="current"
+      class="surface-card current"
       data-test="current-course"
       aria-labelledby="current-course-title"
       :aria-busy="currentStatus === 'loading'"
@@ -100,6 +139,20 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
           · 状态：{{ current.statusLabel }}
         </p>
         <p v-if="current.description">{{ current.description }}</p>
+        <!-- 旧数据是演示向量：不能直接当在线数据用，要求用户主动重新处理资料 -->
+        <div v-if="needsReprocess" class="intelligence-note" data-test="course-needs-reprocess" role="status">
+          <p>{{ intelligence?.message || '这门课程需要重新处理资料后才能使用智能功能。' }}</p>
+          <button
+            v-if="current.myRole === 'teacher' && intelligence?.can_reprocess"
+            type="button"
+            :disabled="reprocessing"
+            data-test="course-reprocess"
+            @click="startReprocess"
+          >
+            {{ reprocessing ? '正在提交…' : '重新处理资料' }}
+          </button>
+          <p v-if="reprocessMessage" class="intelligence-note__result" data-test="reprocess-result">{{ reprocessMessage }}</p>
+        </div>
         <p v-if="hasStudentGraph && current.myRole === 'student'">
           <RouterLink data-test="student-graph-link" :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: current.id } }">
             浏览课程图谱
@@ -132,7 +185,7 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
     </section>
 
     <section
-      class="list"
+      class="surface-card list"
       data-test="course-list-region"
       aria-labelledby="course-list-title"
       :aria-busy="listStatus === 'loading'"
@@ -167,7 +220,7 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
 
     <form
       v-if="canCreate"
-      class="create"
+      class="surface-card create"
       data-test="course-create"
       novalidate
       :aria-busy="creating"
@@ -188,13 +241,13 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
         <button type="submit" :disabled="creating">{{ creating ? '创建中…' : '创建课程' }}</button>
       </fieldset>
     </form>
-  </section>
+  </div>
 </template>
 
 <style scoped>
+/* 布局只管排列；背景、卡片、边框与阴影统一来自全局 .page / .surface-card（API 设置页是基准） */
 .courses {
-  display: grid;
-  gap: 1.5rem;
+  align-content: start;
 }
 
 .cards {
@@ -206,10 +259,16 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
   margin: 0;
 }
 
+/* 课程卡片：与 API 页接口卡片同款（暖白底 + 细边框 + 圆角 + 暖色阴影） */
 .cards li {
-  border: 1px solid #d0d7de;
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  padding: 0.9rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
 .cards a[aria-current='page'] {
@@ -221,6 +280,11 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.current .current-name {
+  font-weight: 600;
 }
 
 .create fieldset {
@@ -229,10 +293,31 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
   max-width: 28rem;
   border: none;
   padding: 0;
+  background: none;
 }
 
 .create label {
   display: grid;
   gap: 0.25rem;
+}
+
+/* 旧数据（演示向量）需要重新处理资料：提示 + 用户主动触发的操作 */
+.intelligence-note {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  margin: 0.5rem 0;
+  padding: 0.75rem 0.9rem;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-warning-text);
+  font-size: 0.875rem;
+}
+.intelligence-note p {
+  margin: 0;
+}
+.intelligence-note__result {
+  color: var(--color-text-muted);
 }
 </style>

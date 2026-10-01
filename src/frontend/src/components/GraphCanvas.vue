@@ -9,6 +9,7 @@ import {
   type GraphLifecycle,
   type LifecycleStatus,
 } from '../graph/lifecycle'
+import { readGraphTheme } from '../graph/theme'
 
 /**
  * 课程知识图谱画布（H04）：只负责把适配图画出来并支持缩放、拖拽。
@@ -40,11 +41,14 @@ const ariaLabel = computed(() =>
 function start(): void {
   if (stage.value === null || props.graph === null) return
   drawnOnce.value = false
+  // G6 不继承 CSS：建图前读一次画布主题，之后不再调用 getComputedStyle（重试/重建时重新读）
+  const theme = readGraphTheme(stage.value)
   // 适配图可能是响应式代理；生命周期会复制一份交给 G6
   lifecycle = createGraphLifecycle(stage.value, {
     data: toRaw(props.graph),
     layout: props.layout,
     factory,
+    theme,
     onNodeClick: (kpId) => emit('nodeClick', kpId),
     onStatus: (next) => {
       status.value = next

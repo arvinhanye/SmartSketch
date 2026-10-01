@@ -69,6 +69,8 @@ from collections.abc import Callable, Generator, Iterator, Mapping
 from typing import TYPE_CHECKING, Any, Final, Literal, Protocol
 from urllib.parse import urlsplit
 
+from app.services.embedding_models import supports_dimension_parameter
+
 from .client import (
     FINISH_REASONS,
     EmbeddingRequest,
@@ -795,9 +797,11 @@ class CompatibleEmbeddingClient(_CompatibleHttpClient):
         payload = {
             "model": model,
             "input": list(batch),
-            "dimensions": request.dimensions,
             "encoding_format": "float",
         }
+        # 只有已核对过支持 dimensions 参数的模型才发送该参数；固定维度模型按其自身默认维度调用
+        if supports_dimension_parameter(model):
+            payload["dimensions"] = request.dimensions
         response, deadline = self._post(payload, model, self._default_timeout, accept="application/json")
         parsed, status = self._read_json(response, deadline, model)
         usage = _parse_embedding_usage(parsed.get("usage"))

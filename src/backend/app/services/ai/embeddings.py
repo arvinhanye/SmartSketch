@@ -139,7 +139,13 @@ class EmbeddingAdapter:
             validated: list[EmbeddedVector] = []
             for ((_, text_hash), _), values in zip(batch, response.vectors, strict=True):
                 if len(values) != self._dimensions:
-                    raise EmbeddingBatchError("dimensions mismatch", batch_index, completed)
+                    # 明确报出实际与期望维度：入库长度必须等于向量索引维度，不能只记 malformed
+                    raise EmbeddingBatchError(
+                        f"dimensions mismatch: 返回 {len(values)} 维，期望 {self._dimensions} 维"
+                        f"（模型 {self._model}）",
+                        batch_index,
+                        completed,
+                    )
                 if any(type(value) not in (int, float) or not math.isfinite(value) for value in values):
                     raise EmbeddingBatchError("non-finite vector value", batch_index, completed)
                 validated.append(

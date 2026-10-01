@@ -3,6 +3,8 @@ import { createRouter, type RouteRecordRaw, type RouterHistory } from 'vue-route
 import type { components } from '../../../contracts/v1/generated/typescript/openapi'
 import StudentHome from '../views/StudentHome.vue'
 import TeacherHome from '../views/TeacherHome.vue'
+import ApiSettings from '../views/ApiSettings.vue'
+import { NOT_CONFIGURED_MESSAGE, apiConfigured, requiresConfiguredApi } from '../composables/useConfigStatus'
 
 export type Role = components['schemas']['Role']
 
@@ -87,6 +89,7 @@ export function createAppRouter({
   registerComponent,
 }: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
+    { path: '/api-settings', name: 'api-settings', component: ApiSettings, meta: { accountRole: 'teacher' } },
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
     { path: '/', name: ROOT_ROUTE, component: loginComponent ?? { render: () => null } },
     {
@@ -161,7 +164,7 @@ export function createAppRouter({
   const router = createRouter({ history, routes })
 
   // 前端守卫只是界面引导，授权以后端为准（specs/identity-access.md §2.4）
-  router.beforeEach((to) => {
+  router.beforeEach(async (to) => {
     const role = getAccountRole()
     if (to.meta.guestOnly) return role === null ? true : { name: HOME_ROUTE[role] }
     if (role === null) {
@@ -172,6 +175,10 @@ export function createAppRouter({
     const required = to.meta.accountRole
     if (required === undefined) return { name: HOME_ROUTE[role] }
     if (required !== role) return { name: HOME_ROUTE[role], query: { notice: NOTICE_WRONG_ROLE } }
+    // 必须配置真实 API：没配好就把教师引导到「API 设置」；学生看不到该页，不拦
+    if (role === 'teacher' && requiresConfiguredApi(to.name as string) && !(await apiConfigured())) {
+      return { name: 'api-settings', query: { notice: NOT_CONFIGURED_MESSAGE } }
+    }
     return true
   })
 

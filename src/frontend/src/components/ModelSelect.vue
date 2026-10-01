@@ -19,7 +19,11 @@ const props = withDefaults(defineProps<{
   test?: string
 }>(), { placeholder: '获取模型列表后选择，或手动填写模型 ID', test: '' })
 
-const emit = defineEmits<{ (event: 'update:modelValue', value: string): void }>()
+const emit = defineEmits<{
+  (event: 'update:modelValue', value: string): void
+  /** 用户明确改选模型时发出（用于重新计算该模型的能力与维度选项） */
+  (event: 'change', value: string): void
+}>()
 
 const open = ref(false)
 const search = ref('')
@@ -68,6 +72,7 @@ function filter(): void {
 
 function choose(id: string): void {
   emit('update:modelValue', id)
+  emit('change', id)
   open.value = false
   highlight.value = -1
 }

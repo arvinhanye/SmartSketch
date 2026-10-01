@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.api_settings import router as api_settings_router
 from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
 from app.api.dependencies import access_error_response
@@ -24,6 +25,7 @@ from app.api.recommend import router as recommend_router
 from app.api.health import router as health_router
 from app.api.task_cancel import router as task_cancel_router
 from app.api.tasks import router as tasks_router
+from app.api.materials import intelligence_router as course_intelligence_router
 from app.api.materials import policy_router as upload_policy_router
 from app.api.materials import router as materials_router
 from app.api.members import router as members_router
@@ -35,7 +37,7 @@ from app.services.auth import (
     prepare_timing_dummy_hash,
 )
 from app.services.access import AccessDenied
-from app.services.startup import validate_embedding_space, validate_schema_current
+from app.services.startup import check_embedding_space_change, validate_schema_current
 
 
 APP_VERSION = "0.1.0"
@@ -46,7 +48,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Check persistent runtime invariants before serving requests."""
     validate_schema_current(application.state.settings)
-    validate_embedding_space(application.state.settings)
+    # 向量空间与旧数据不一致时不拒绝启动：用户要能打开软件去「重新处理资料」，
+    # 不一致的情况由课程页与各服务在使用时明确提示／校验。
+    space_notice = check_embedding_space_change(application.state.settings)
+    if space_notice:
+        application.state.embedding_space_notice = space_notice
+        logger.warning("embedding space differs from existing data; reprocessing required")
     yield
 
 
@@ -100,6 +107,7 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AccessDenied, access_error_response)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(api_settings_router)
     application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)
@@ -107,6 +115,7 @@ def create_app() -> FastAPI:
     application.include_router(courses_router)
     application.include_router(materials_router)
     application.include_router(upload_policy_router)
+    application.include_router(course_intelligence_router)
     application.include_router(members_router)
     application.include_router(graph_router)
     application.include_router(graph_nodes_router)

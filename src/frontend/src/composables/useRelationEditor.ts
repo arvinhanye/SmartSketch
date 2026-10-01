@@ -25,8 +25,8 @@ type KnowledgePoint = components['schemas']['KnowledgePoint']
 
 export const RELATION_TYPES: readonly RelationType[] = ['PREREQUISITE', 'CONTAINS', 'RELATED_TO', 'EXAMPLE_OF']
 
-/** 冲突路径上的边在画布上的颜色 */
-export const CONFLICT_EDGE_STROKE = '#ff4d4f'
+/** 冲突路径上的边在画布上的颜色（暖纸墨色的危险色） */
+export const CONFLICT_EDGE_STROKE = '#8a3b26'
 export const CONFLICT_EDGE_WIDTH = 3
 /** 保存中的临时边：标签后缀与虚线 */
 export const PENDING_EDGE_SUFFIX = '（保存中）'
