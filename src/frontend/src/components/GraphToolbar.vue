@@ -312,9 +312,9 @@ const summaryText = computed(() => {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 1.5px solid #1677ff;
+  border: 1.5px solid var(--color-border-strong);
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .graph-toolbar__node-swatch--low_confidence {

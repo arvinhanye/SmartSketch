@@ -118,8 +118,8 @@ function highlighted(kpId: string): string {
   padding: 0.5rem 0.65rem;
 }
 .recommendations__item:first-child {
-  border-color: var(--color-primary, #1c6e8c);
-  box-shadow: inset 3px 0 0 var(--color-primary, #1c6e8c);
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 .recommendations__item[data-highlighted='true'] {
   background: var(--color-primary-soft, #f9f0ff);
