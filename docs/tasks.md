@@ -1,5 +1,18 @@
 # 任务看板
 
+## 2026-10-02 Claude 认领：A10 一周参赛冲刺设计
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| L00 | DONE（规格与计划 A 已获用户确认，2026-10-02；本会话内逐任务执行） | Claude（协调） | `docs/superpowers/specs/2026-10-02-contest-sprint-design.md`、本节、`docs/handoffs/claude-l00-sprint-design.md` | 精简设计规格覆盖两条闭环、个人模型凭据与任务绑定、问答隔离、向量方案、性能测量、原子任务候选 L01–L19 与待用户决定事项；用户批准后再写实施计划 |
+
+- 输入：Codex 交接 prompt 与两份审查（仅在 Codex 工作区 `/Users/arvinhan/.codex/worktrees/e92f/SmartSketch`，未提交，按绝对路径引用，不复制）；用户确认只做学生提问与 AI 回答、不做自动出题。输出：设计规格与交接。
+- 依赖：基线 `6ff8a8d`；现有规格、契约与源码只读核验。风险：赛题 DOCX 原文未独立复核；Codex 对本文件有未提交改动，后续合并时两段都保留；规格中的接口、迁移、规则调整均未签收。
+- 验证命令：`./scripts/verify.sh`、`git status --short`、`git diff --check`。无模型调用、依赖安装、数据写入、契约或迁移变更。
+- 验收证据：`./scripts/verify.sh` exit 0（基础档，系统 Python）；`full` / `integration` 未跑。交接 `docs/handoffs/claude-l00-sprint-design.md`。
+- 已决（ArvinHan，2026-10-02）：在线向量 `text-embedding-v4`；DeepSeek `deepseek-flash`，预算 30 元（累计计费 token ≤ 500 万）；两门课自编；同意规则调整与新增 `cryptography`。工作区 `.env` 已生成（未跟踪），两个供应商 key 待用户填写。
+- 计划 A：`docs/superpowers/plans/2026-10-02-contest-sprint-a-personal-model-api.md`，用户确认在本会话内逐任务执行；L01–L10 的认领见下一节。
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
