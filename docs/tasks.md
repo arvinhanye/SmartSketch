@@ -13,6 +13,23 @@
 - 已决（ArvinHan，2026-10-02）：在线向量 `text-embedding-v4`；DeepSeek `deepseek-flash`，预算 30 元（累计计费 token ≤ 500 万）；两门课自编；同意规则调整与新增 `cryptography`。工作区 `.env` 已生成（未跟踪），两个供应商 key 待用户填写。
 - 计划 A：`docs/superpowers/plans/2026-10-02-contest-sprint-a-personal-model-api.md`，用户确认在本会话内逐任务执行；L01–L10 的认领见下一节。
 
+## 2026-10-02 Claude 认领：冲刺计划 A（个人模型 API 与真实运行路径）
+
+计划：`docs/superpowers/plans/2026-10-02-contest-sprint-a-personal-model-api.md`；规格：`docs/superpowers/specs/2026-10-02-contest-sprint-design.md`。每项的输入、输出、风险与验证命令见计划对应 Task；验收证据写入 `docs/handoffs/claude-l<nn>.md`。
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| L01 | DONE | Claude | 隔离环境：`.venv`（Python 3.11.9）、`npm ci`、独立 Neo4j（7688/7475）；三档门禁基线；不改业务文件 | basic exit 0；full exit 0（后端 3559 通过/27 跳过，前端 772 通过）；integration exit 1，仅因本机未装 Playwright 浏览器，改用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向 Chrome 后两条端到端通过。另发现北京地域向量服务在本机网络不可达。交接 `docs/handoffs/claude-l01.md` |
+| L02 | IN_PROGRESS | Claude | `evaluation/measure_web_flow.py`、基线报告；需要用户在 `.env` 填两个供应商 key | 带条件的抽取与问答实测数字、累计计费 token |
+| L03 | TODO | Claude | ADR-080/081、`AGENTS.md` §4/§6、`docs/`、`src/contracts/`、生成物 | 契约门禁通过 |
+| L04 | TODO | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py` | 加解密、关联数据、快照、回滚说明 |
+| L05 | TODO | Claude | `services/ai/outbound.py` | 内网、元数据、重定向、DNS 变化用例 |
+| L06 | TODO | Claude | `services/model_configs.py`、`api/model_config.py` | 越权、脱敏、无泄漏、限流用例 |
+| L07 | TODO | Claude | 上传绑定、`workers/`、调用归属用户 | 改/清配置、重启接管、两教师不同 key 用例 |
+| L08 | TODO | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 两用户隔离、一人坏 key 不影响另一人 |
+| L09 | TODO | Claude | 在线向量联调、`local` 明确拒绝、`scripts/start.sh` | 真实检索可用；正式入口不静默切 demo |
+| L10 | TODO | Claude | 前端设置页、未配置引导、模式标识 | 组件测试 + 真实页面走查 |
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
