@@ -21,9 +21,10 @@ function errorText(code: string, reason?: string): string {
   if (code === 'LLM_UNAVAILABLE') {
     if (reason === 'timeout') return '回答超时，请稍后重试。'
     if (reason === 'stream_interrupted') return '连接中断，回答已撤回。'
-    if (reason === 'auth') return '问答服务鉴权失败，请稍后重试。'
+    if (reason === 'auth') return '你的模型 API 密钥被拒绝，请到「模型 API 设置」检查配置。'
     return '问答服务暂不可用，请稍后重试。'
   }
+  if (code === 'MODEL_CONFIG_REQUIRED') return '尚未配置模型 API，请先到「模型 API 设置」保存配置。'
   if (code === 'BUDGET_EXCEEDED') return '当前问答额度不足，请稍后重试。'
   if (code === 'STORAGE_UNAVAILABLE') return '课程资料暂不可用，请稍后重试。'
   if (code === 'RATE_LIMITED') return '提问过于频繁，请稍后重试。'

@@ -39,6 +39,8 @@ export const REVIEW_ROUTE = 'course-review'
 export const CHAT_ROUTE = 'course-chat'
 /** 学生自助注册页（ADR-079），只给未登录访客 */
 export const REGISTER_ROUTE = 'register'
+/** 个人模型 API 设置页（L10，ADR-080）；任一已登录账号可进入 */
+export const SETTINGS_ROUTE = 'model-settings'
 const HOME_ROUTE: Record<Role, string> = { teacher: 'teacher-home', student: 'student-home' }
 
 /** 该账号类型的默认首页路由名（登录成功后按 `LoginResponse.user.role` 跳转） */
@@ -71,6 +73,8 @@ export interface AppRouterOptions {
   chatComponent?: Component
   /** 学生自助注册页（ADR-079）。注入后注册 `/register`，只对未登录访客开放 */
   registerComponent?: Component
+  /** 个人模型 API 设置页（L10，ADR-080）。注入后注册 `/settings/model`，任一已登录账号可进入 */
+  settingsComponent?: Component
 }
 
 export function createAppRouter({
@@ -85,6 +89,7 @@ export function createAppRouter({
   reviewComponent,
   chatComponent,
   registerComponent,
+  settingsComponent,
 }: AppRouterOptions) {
   const routes: RouteRecordRaw[] = [
     // 未登录时停在这里：显示登录页（未注入时为空页），提示由外壳显示；已登录则被守卫送往首页
@@ -155,6 +160,9 @@ export function createAppRouter({
   }
   if (registerComponent) {
     routes.push({ path: '/register', name: REGISTER_ROUTE, component: registerComponent, meta: { guestOnly: true } })
+  }
+  if (settingsComponent) {
+    routes.push({ path: '/settings/model', name: SETTINGS_ROUTE, component: settingsComponent, meta: { anyAccountRole: true } })
   }
   routes.push({ path: '/:pathMatch(.*)*', redirect: '/' })
 

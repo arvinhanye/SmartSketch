@@ -28,7 +28,7 @@
 | L07 | DONE（集成测试待 Docker 恢复后补跑） | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
 | L08 | DONE | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 9 个新用例；后端 3645 通过/27 跳过；交接 `docs/handoffs/claude-l08.md` |
 | L09 | TODO | Claude | 在线向量联调、`local` 明确拒绝、`scripts/start.sh` | 真实检索可用；正式入口不静默切 demo |
-| L10 | TODO | Claude | 前端设置页、未配置引导、模式标识 | 组件测试 + 真实页面走查 |
+| L10 | IN_PROGRESS（代码与 10 个组件用例完成；真实页面走查等 L09） | Claude | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过；交接 `docs/handoffs/claude-l10.md` |
 
 ## 2026-09-28 Codex 认领：认证页动态图谱
 

@@ -174,6 +174,9 @@ function uploadFailure(cause: unknown, maxBytes: number | null): UploadFailure {
       const text = limit === null ? '服务器上限' : `服务器上限 ${formatBytes(limit)}`
       return { message: `文件超过${text}，请压缩或拆分后上传。`, retryable: false, fileInvalid: true }
     }
+    if (cause.code === 'MODEL_CONFIG_REQUIRED') {
+      return { message: '尚未配置模型 API，请先到「模型 API 设置」保存配置后再上传。', retryable: false, fileInvalid: false }
+    }
     if (cause.code === 'VALIDATION_ERROR') {
       return { message: '文件名不符合要求（可能为空或过长），请重命名后上传。', retryable: false, fileInvalid: true }
     }

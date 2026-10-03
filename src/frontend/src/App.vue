@@ -12,9 +12,12 @@ import {
   NOTICE_WRONG_ROLE,
   REVIEW_ROUTE,
   ROOT_ROUTE,
+  SETTINGS_ROUTE,
   STUDENT_GRAPH_ROUTE,
   TEACHER_GRAPH_ROUTE,
 } from './router'
+import { MODEL_CONFIG_API_KEY } from './api/modelConfig'
+import { useRuntimeStore } from './stores/runtime'
 import { useSessionStore } from './stores/session'
 import './styles.css'
 
@@ -90,6 +93,32 @@ const homeLink = computed<RouteLocationRaw | null>(() => (role.value === null ? 
 const homeActive = computed(() => role.value !== null && route?.name === homeRouteFor(role.value))
 const roleLabel = computed(() => (role.value === 'teacher' ? '教师' : '学生'))
 
+// L10（ADR-080）：登录后读取一次运行模式与本人配置状态，供侧栏提示与上传/问答页的引导；
+// 读取失败不阻断外壳（设置页自有错误态）。未注入接口或未装 Pinia 时（单独挂载外壳的测试）跳过。
+const modelConfigApi = inject(MODEL_CONFIG_API_KEY, null)
+const runtime = getActivePinia() ? useRuntimeStore() : null
+watch(
+  role,
+  async (value) => {
+    if (runtime === null) return
+    if (value === null) {
+      runtime.reset()
+      return
+    }
+    if (modelConfigApi === null) return
+    try {
+      runtime.apply(await modelConfigApi.get())
+    } catch {
+      // 忽略：设置页会显示加载错误
+    }
+  },
+  { immediate: true },
+)
+const settingsLink = computed<RouteLocationRaw | null>(() =>
+  router !== null && role.value !== null && router.hasRoute(SETTINGS_ROUTE) ? { name: SETTINGS_ROUTE } : null,
+)
+const settingsActive = computed(() => route?.name === SETTINGS_ROUTE)
+
 function signOut(): void {
   session?.signOut()
   void router?.replace({ name: ROOT_ROUTE })
@@ -135,7 +164,19 @@ function signOut(): void {
             {{ item.label }}
           </RouterLink>
         </template>
+        <RouterLink
+          v-if="settingsLink"
+          :to="settingsLink"
+          class="app-nav__item"
+          :class="{ 'is-active': settingsActive }"
+          :aria-current="settingsActive ? 'page' : undefined"
+          data-test="nav-model-settings"
+        >
+          模型 API 设置
+          <span v-if="runtime?.needsConfig" class="app-nav__badge" data-test="nav-model-settings-pending">未配置</span>
+        </RouterLink>
       </nav>
+      <p v-if="runtime?.isDemo" class="app-mode" data-test="mode-demo" role="status">演示模式 · 使用内置演示模型，不调用个人 API</p>
       <div class="app-sidebar__user">
         <span data-test="app-user">{{ session?.user?.username }} · {{ roleLabel }}</span>
         <button type="button" data-variant="secondary" data-test="app-sign-out" @click="signOut">退出登录</button>

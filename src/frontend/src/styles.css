@@ -509,3 +509,29 @@ tr:last-child td {
     display: none;
   }
 }
+
+/* L10：侧栏的个人模型 API 未配置提示与演示模式标识（ADR-080） */
+.app-nav__badge {
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: 0.75rem;
+}
+.app-mode {
+  margin: 0.75rem 0 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: 0.8rem;
+}
+.model-required {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}

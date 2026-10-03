@@ -6,6 +6,7 @@ import { AUTH_API_KEY, createAuthApi, createSessionHttpClient } from './api/auth
 import { HTTP_CLIENT_KEY } from './api/client'
 import { COURSES_API_KEY, createCoursesApi } from './api/courses'
 import { createMembersApi, MEMBERS_API_KEY } from './api/members'
+import { createModelConfigApi, MODEL_CONFIG_API_KEY } from './api/modelConfig'
 import { createMaterialsApi, MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from './api/materials'
 import { createDraftGraphApi, createPublishedGraphApi, DRAFT_GRAPH_API_KEY, PUBLISHED_GRAPH_API_KEY } from './api/graph'
 // I06：掌握状态与下一步推荐（学生图谱页用；未发布的课程返回 404 GRAPH_NOT_PUBLISHED）
@@ -26,6 +27,7 @@ import ReviewView from './views/ReviewView.vue'
 import TeacherGraphView from './views/TeacherGraphView.vue'
 import ChatView from './views/ChatView.vue'
 import RegisterView from './views/RegisterView.vue'
+import ModelSettingsView from './views/ModelSettingsView.vue'
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
@@ -50,6 +52,8 @@ const router = createAppRouter({
   chatComponent: ChatView,
   // ADR-079：学生自助注册 /register，只对未登录访客开放
   registerComponent: RegisterView,
+  // L10：个人模型 API 设置页 /settings/model（ADR-080）
+  settingsComponent: ModelSettingsView,
 })
 
 // 受保护接口 401：清会话与课程上下文后回登录页
@@ -65,6 +69,7 @@ createApp(App)
   .provide(AUTH_API_KEY, createAuthApi(http))
   .provide(COURSES_API_KEY, createCoursesApi(http))
   .provide(MEMBERS_API_KEY, createMembersApi(http))
+  .provide(MODEL_CONFIG_API_KEY, createModelConfigApi(http))
   .provide(MATERIALS_API_KEY, createMaterialsApi(http))
   .provide(PUBLISHED_GRAPH_API_KEY, createPublishedGraphApi(http))
   .provide(DRAFT_GRAPH_API_KEY, createDraftGraphApi(http))
