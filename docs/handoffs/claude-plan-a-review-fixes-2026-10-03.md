@@ -90,6 +90,15 @@ git diff --check e86f4b9 HEAD
 4. **未做的真实验证**：没有在真实供应商或真实向量服务上复测（需要用户确认预算后再做），也没有重测性能和准确率（属计划 C 的 L16）。
 5. **N02 也适用于 `live` 模式**：全站 key 遇到 401/403 同样终止任务，不重试。
 
+## 收尾记录（2026-10-03）
+
+- **分支**：本分支已按用户指示快进合回 `claude/smartsketch-contest-sprint-77644f`（`e86f4b9 → d766f40`，没有合并提交）。两个工作树 HEAD 相同，未推送。
+- **未提交文件**：无。
+- **调用台账**：累计计费 140230 / 5000000 token（L02 抽取 101054、V1 问答 16101、V2 23075）。本轮修复与门禁全程没有真实模型调用；端到端用演示模型，不产生费用。
+- **冲刺环境**：SQLite 尚未执行迁移 016，下次 `scripts/start.sh` 启动时会自动备份并迁移。
+- **日志**：`verify.sh integration` 的完整日志与补跑的端到端日志在会话草稿目录 `.../scratchpad/logs/verify-integration.log`、`e2e.log`（临时）；端到端运行目录 `.e2e/20261003-072042`（本工作树，git 忽略）。
+- **后续计划**：计划 B 规划见 `docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md`，基线即本版本。
+
 ## 下一步
 
 - Codex 复审：base 为 `e86f4b9`，代码 HEAD 为 `959331e`，目前处于 ready_for_review，复审期间这批代码保持不动。

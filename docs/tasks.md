@@ -81,6 +81,20 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - 2026-10-03 全部 11 项及 §3.7 已修并提交（`0745ea6` `cc26d4c` `8e539a8` `a787b0b` `45dd86e` `f580b74` `29a10f6` `959331e`），ready_for_review。**门禁（代码 HEAD `959331e`）**：`./scripts/verify.sh integration` 中基础档 PASS；后端 full 3725 passed / 27 skipped（已登记）PASS；前端 full 29 文件 811 passed、type-check 与 build 通过；集成用例 393 passed / 4 skipped（已登记）PASS；图库后端用例 44 passed PASS；端到端首次因本工作树缺根目录 `@playwright/test` 失败（环境原因），补齐依赖后单独运行 `scripts/e2e.sh` 2 passed（演示模型，无费用）。同一次 `verify.sh integration` 未整体 exit 0，端到端为补跑。`git diff --check e86f4b9 HEAD` exit 0。未决：D1 的输出上限是否提高或增加有限重试，需人工按 15 秒与费用实测决定。详见交接。
 - 计划 B/C（L11–L19）不在本节范围。
 
+## 2026-10-03 Claude 规划：冲刺计划 B（L11–L15 功能闭环）——规划待确认
+
+计划：`docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md`；交接 `docs/handoffs/claude-plan-b-planning.md`。基线 `d766f40`（计划 A 审查修复版本，代码 HEAD `959331e`）。用户确认前不实施。
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| L11 | 规划待确认 | Claude | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量（需预算确认） | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告分列 |
+| L12 | 规划待确认 | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-083）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
+| L13 | 规划待确认 | Claude | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
+| L14 | 规划待确认 | Claude | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
+| L15 | 规划待确认 | Claude | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15_isolation.py`；`verify.sh integration` 与 D/N 回归 |
+
+- 未决（待用户）：是否批准执行；是否批准约 30～53 万 token 的真实调用；问答输出上限是否在 L16 前调整；第二门课主题（默认「操作系统 第 2 章 进程与线程」）。
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
