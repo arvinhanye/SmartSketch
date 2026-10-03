@@ -1286,6 +1286,8 @@ export interface components {
             page?: number;
             /** @description 原文片段，供前端高亮 */
             text?: string;
+            /** @description 资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。 */
+            document_name?: string;
         } | unknown | unknown;
         Chapter: {
             id: string;
@@ -1856,6 +1858,8 @@ export interface components {
             section_path?: string;
             page?: number;
             text: string;
+            /** @description 资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。 */
+            document_name?: string;
         } | unknown | unknown;
         /**
          * @description 问答的两种终态。结构差异由 `ChatAnswered` / `ChatNotCovered` 两个

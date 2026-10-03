@@ -502,6 +502,14 @@ class SourceRef1(BaseModel):
     text: Annotated[
         Optional[str], Field(description='原文片段，供前端高亮', min_length=1)
     ] = None
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
+    ] = None
 
 
 class SourceRef2(BaseModel):
@@ -520,6 +528,14 @@ class SourceRef2(BaseModel):
     ] = None
     text: Annotated[
         Optional[str], Field(description='原文片段，供前端高亮', min_length=1)
+    ] = None
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
     ] = None
 
 
@@ -1175,6 +1191,14 @@ class Citation1(BaseModel):
     section_path: Annotated[Optional[str], Field(min_length=1)] = None
     page: Annotated[int, Field(ge=1)]
     text: Annotated[str, Field(min_length=1)]
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
+    ] = None
 
 
 class Citation2(BaseModel):
@@ -1184,6 +1208,14 @@ class Citation2(BaseModel):
     section_path: Annotated[str, Field(min_length=1)]
     page: Annotated[Optional[int], Field(ge=1)] = None
     text: Annotated[str, Field(min_length=1)]
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
+    ] = None
 
 
 class Citation(RootModel[Union[Citation1, Citation2]]):

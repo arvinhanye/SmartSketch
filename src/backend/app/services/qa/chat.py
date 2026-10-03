@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import sqlite3
 import time
 from collections.abc import Iterator
@@ -12,6 +13,7 @@ from typing import Any
 
 from app.config import Settings
 from app.repositories.chunks import ChunkStoreError, get_chunks
+from app.repositories.materials import material_names
 from app.repositories.graph_migrations import VectorSpaceError, sqlite_current_space
 from app.repositories.graph_search import search_subgraph
 from app.repositories.neo4j import Neo4jRepository, RepositoryError, read_deadline
@@ -26,6 +28,8 @@ from app.services.qa.generate import AnswerGeneration, AnswerGenerator, Generati
 from app.services.qa.rewrite import QueryRewriter
 from app.services.versions.resolver import PublishedVersion
 
+
+logger = logging.getLogger(__name__)
 
 _MESSAGES = {
     "LLM_UNAVAILABLE": "问答模型暂不可用，请稍后重试",
@@ -159,6 +163,15 @@ class ChatService:
         check()
         return PreparedChat(version, request_id, started, deadline, query, context)
 
+    def _document_names(self, course_id: str, context: EvidenceContext) -> dict[str, str]:
+        """引用的资料文件名（L12，ADR-085）；只取同课资料，查不到或出错都只是省略文件名，不影响回答。"""
+        try:
+            return material_names(self.settings.SQLITE_URL, course_id=course_id,
+                                  material_ids={chunk.document_id for chunk in context.chunks})
+        except sqlite3.Error as error:
+            logger.warning("chat citation document names unavailable (%s)", type(error).__name__)
+            return {}
+
     def events(self, prepared: PreparedChat, stop: Event | None = None) -> Iterator[dict[str, Any]]:
         context = prepared.context
         status = "answered" if context.covered else "not_covered"
@@ -181,11 +194,13 @@ class ChatService:
             if not isinstance(candidate, AnswerGeneration):
                 raise ChatFailure("INTERNAL_ERROR")
             generation = candidate
+            names = self._document_names(prepared.version.course_id, context)
             citations = CitationStream(
                 prepared.version, prepared.request_id,
                 (Evidence(chunk.index, chunk.chunk_id, chunk.document_id,
                           prepared.version.course_id, chunk.revision_id, chunk.text,
-                          page=chunk.page, section_path=chunk.section_path)
+                          page=chunk.page, section_path=chunk.section_path,
+                          document_name=names.get(chunk.document_id))
                  for chunk in context.chunks),
             )
             for raw in generation:

@@ -28,6 +28,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.repositories.materials import material_names
 from app.repositories.chunks import StoredChunk, get_chunks
 from app.repositories.graph_read import GraphReader, NodeEvidence
 from app.repositories.neo4j import GraphScope
@@ -110,11 +111,14 @@ def _locate(chunk: StoredChunk, start: int | None, end: int | None) -> dict[str,
 
 
 def _source_ref(chunk: StoredChunk | None, document_id: str | None, start: int | None,
-                end: int | None) -> SourceRef | None:
+                end: int | None, names: Mapping[str, str] | None = None) -> SourceRef | None:
     if chunk is None:
         return None
     fields: dict[str, Any] = {"chunk_id": chunk.chunk_id, "document_id": document_id or chunk.material_id,
                               **_locate(chunk, start, end)}
+    name = (names or {}).get(fields["document_id"])
+    if name:
+        fields["document_name"] = name
     if "page" not in fields and "section_path" not in fields:
         return None
     if isinstance(start, int) and isinstance(end, int) and 0 <= start < end <= len(chunk.text):
@@ -122,6 +126,11 @@ def _source_ref(chunk: StoredChunk | None, document_id: str | None, start: int |
         if text.strip():
             fields["text"] = text
     return SourceRef.model_validate(fields)
+
+
+def _chunk_names(sqlite_url: str, course_id: str, chunks: Mapping[str, StoredChunk]) -> dict[str, str]:
+    """文本块所属资料的同课文件名（L12，ADR-085），供关系来源使用。"""
+    return material_names(sqlite_url, course_id=course_id, material_ids={c.material_id for c in chunks.values()})
 
 
 def _chunks(sqlite_url: str, course_id: str, chunk_ids: Iterable[str]) -> dict[str, StoredChunk]:
@@ -274,10 +283,11 @@ def read_graph(reader: GraphReader, sqlite_url: str, target: ReadTarget, graph_f
                  and (wanted is None or e["type"] in wanted)]
     chunk_ids = {cid for e in raw_edges for cid in _relation_chunk_ids(e, scope)}
     chunks = _chunks(sqlite_url, scope.course_id, chunk_ids)
+    names = _chunk_names(sqlite_url, scope.course_id, chunks)
     edges = []
     for e in raw_edges:
         refs = [ref for cid in _relation_chunk_ids(e, scope)
-                if (ref := _source_ref(chunks.get(cid), None, None, None)) is not None]
+                if (ref := _source_ref(chunks.get(cid), None, None, None, names)) is not None]
         relation = _relation(scope.course_id, e, refs, published=scope.version_id != DRAFT)
         if relation is not None:
             edges.append(relation)
@@ -304,10 +314,14 @@ def read_graph(reader: GraphReader, sqlite_url: str, target: ReadTarget, graph_f
 
 def _evidence_refs(sqlite_url: str, course_id: str, evidence: Sequence[NodeEvidence]) -> list[SourceRef]:
     chunks = _chunks(sqlite_url, course_id, (e.chunk_id for e in evidence))
+    # 同课资料文件名（L12，ADR-085）：他课或已删除的资料不给名字，来源本身照常返回
+    names = material_names(sqlite_url, course_id=course_id,
+                           material_ids={e.document_id or c.material_id
+                                         for e in evidence if (c := chunks.get(e.chunk_id)) is not None})
     refs: list[SourceRef] = []
     seen: set[tuple[object, ...]] = set()
     for e in evidence:
-        ref = _source_ref(chunks.get(e.chunk_id), e.document_id, e.evidence_start, e.evidence_end)
+        ref = _source_ref(chunks.get(e.chunk_id), e.document_id, e.evidence_start, e.evidence_end, names)
         if ref is None:
             logger.warning("dropping a knowledge point source that cannot be located")
             continue
