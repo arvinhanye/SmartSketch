@@ -81,17 +81,17 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - 2026-10-03 全部 11 项及 §3.7 已修并提交（`0745ea6` `cc26d4c` `8e539a8` `a787b0b` `45dd86e` `f580b74` `29a10f6` `959331e`），ready_for_review。**门禁（代码 HEAD `959331e`）**：`./scripts/verify.sh integration` 中基础档 PASS；后端 full 3725 passed / 27 skipped（已登记）PASS；前端 full 29 文件 811 passed、type-check 与 build 通过；集成用例 393 passed / 4 skipped（已登记）PASS；图库后端用例 44 passed PASS；端到端首次因本工作树缺根目录 `@playwright/test` 失败（环境原因），补齐依赖后单独运行 `scripts/e2e.sh` 2 passed（演示模型，无费用）。同一次 `verify.sh integration` 未整体 exit 0，端到端为补跑。`git diff --check e86f4b9 HEAD` exit 0。未决：D1 的输出上限是否提高或增加有限重试，需人工按 15 秒与费用实测决定。详见交接。
 - 计划 B/C（L11–L19）不在本节范围。
 
-## 2026-10-03 Claude 认领：冲刺计划 B（L11–L15 功能闭环）——用户已批准（2026-10-03），逐任务执行中
+## 2026-10-03 Claude 认领：冲刺计划 B（L11–L15 功能闭环）——功能交付已收尾，质量/性能验收有保留（2026-10-03）
 
 计划：`docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md`；交接 `docs/handoffs/claude-plan-b-planning.md`。基线 `d766f40`（计划 A 审查修复版本，代码 HEAD `959331e`）。用户 2026-10-03 批准执行；需要阿里云百炼向量或真实模型的测试写交接稿交 DeepSeek harness 运行，本会话不调用真实模型。
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| L11 | IN_PROGRESS（L11-1～L11-7 已完成；L11-7 真实模型复测待 DeepSeek） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
-| L12 | REVIEWED / 本地门禁通过（Codex 复审修复） | Claude → Codex | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
-| L13 | REVIEWED / 本地门禁通过（Codex 复审修复） | Claude → Codex | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
+| L11 | IMPLEMENTED（功能代码完成；L11-7 真实模型复测 OPEN） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
+| L12 | DONE（Codex 复审修复；本地验收） | Claude → Codex | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
+| L13 | DONE（Codex 复审修复；本地验收） | Claude → Codex | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
 | L14 | DONE（Codex 已修回归；完整本地门禁通过） | Claude → Codex | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
-| L15 | DONE（本地闭环；真实 QA 抽样已交 DeepSeek 待执行） | Codex | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15.py`、`l15-creation-scope.test.ts`；`verify.sh integration` 与 D/N 回归 |
+| L15 | DONE（本地闭环与真实 QA 抽样完成；性能/质量有保留） | Codex | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15.py`、`l15-creation-scope.test.ts`；`verify.sh integration` 与 D/N 回归 |
 
 - 2026-10-03 L11-1 完成：`datasets/contest/` 两门课各一章（Markdown 为源，PDF 由 `scripts/build-contest-pdfs.sh` 用 Chrome 无头打印：第 3 章 5 页、第 2 章 4 页），`tests/backend/test_l11_datasets.py` red（无清单）→ green。**发现并修复阻断**：macOS 字体 PDF 的部首形近字（⽬⾃⻓⻅），ADR-083、解析器 `pdf/2`，red 4 failed → green；解析相关 1840 passed。已知：pdfminer 对 Chrome 字体打印大量 FontBBox 告警，不影响提取。
 - 2026-10-03 L11-2～L11-5 完成：本机 OpenAI 兼容假供应商（`scripts/fake_provider.py`，`tests/tooling/test_l11_fake_provider.py` 13 passed）；个人模式端到端 `tests/e2e/personal.spec.ts` 3 passed（教师 PDF+MD 闭环、处理中取消后重传、供应商拒绝密钥）。走查发现并修复两个前端阻断：教师图谱页没有画布外的选节点方式、没有新建知识点入口（`tests/frontend/l11.test.ts`）；发布被拦时逐条列出原因（L11-4）。`e2e.sh` 修复 bash 3.2 下清理报错导致的容器残留；B02 嵌套 vitest 用例超时与子进程对齐。前端全量 818 passed。
@@ -1688,11 +1688,35 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 
 | ID | 状态 | 负责人 | 范围及验收 |
 | --- | --- | --- | --- |
-| B-TAKEOVER | DONE（本地修复与完整门禁；真实测量已交接） | Codex | 复审 5a34fec..56610d4、修复推荐按钮及确认缺陷、L15、QA 2048；最终稳定代码 integration 门禁；真实模型只交 DeepSeek |
-| L15 | DONE（本地闭环；真实测量待 DeepSeek） | Codex | 课程内角色导航、阶段下一步、入课空态、课程隔离/恶意文本、个人模式双课程 E2E |
+| B-TAKEOVER | DONE（本地修复/完整门禁；96f3885 实测已复核） | Codex | 复审 5a34fec..56610d4、修复推荐按钮及确认缺陷、L15、QA 2048；最终稳定代码 integration 门禁；真实模型只交 DeepSeek |
+| L15 | DONE（本地闭环与真实测量复核；有保留） | Codex | 课程内角色导航、阶段下一步、入课空态、课程隔离/恶意文本、个人模式双课程 E2E |
 
 输入：claude-plan-b-handoff-to-codex.md 与 c85ee53 文档提交。输出：修复、测试、Codex 审查和 DeepSeek 交接。依赖：现有接口/本地演示与假供应商；风险：切课/换号迟到响应、1024->2048 延迟费用待实测。验证：最小前后端回归、type-check/build、./scripts/verify.sh integration、git diff --check。文件所有权：本轮 Codex 顺序修改相关前后端、契约和文档；不写 Claude 工作树，不推送不合并。旧 Codex 工作树基线较早且有文档改动，保留；新托管 worktree codex/plan-b-takeover 基于 c85ee53。
 
 验收证据（Codex，最终稳定代码）：./scripts/verify.sh integration 整体 exit 0；后端3780 passed/27白名单skip，前端901 passed，集成393 passed/4白名单skip，图库44 passed，演示E2E2 passed、个人假供应商E2E4 passed（包含两课程隔离）；type-check/build与契约门禁均通过，git diff --check exit0。独立 D/N 后端116与前端107均通过。报告 docs/reviews/codex-plan-b-c85ee53.md；接手交接 docs/handoffs/codex-plan-b-takeover.md；真实模型交接 docs/handoffs/codex-plan-b-deepseek-qa.md。
 
-未决归属：DeepSeek L11-7 PDF 复测报告未到；L15-6 Step4 两课各5题/2048完整耗时、首字、出处质量、在线向量费用待真实测量与预算核对。计划 B 本地功能验收完成，不宣称赛题质量和时限全部达标，不推送不合并不快进冲刺分支。
+2026-10-03 收尾更新：96f3885 的 L15-6 Step4 真实 QA 已执行并由 Codex 对照 HTTP/只读日志核验：10题=7回答/1截断错误/2课外未覆盖，全部≤15秒；回答成功率7/8，不是抽取准确率；已回答首个delta全超3秒。生成累计648168/5000000，向量累计11943另计。补齐失败题关联与19条调用证据，测量脚本存在时间字符串筛选漏行与两类预算混算（正式报告总量正确）。报告 docs/reviews/codex-plan-b-96f3885-closeout.md，交接 docs/handoffs/codex-plan-b-closeout.md。第二阶段功能交付已收尾；L11-7、抽取准确率/60秒和QA质量/首字目标保留OPEN，不推送不合并不快进冲刺分支。
+
+
+## 2026-10-03 Codex 认领：第二阶段收尾（96f3885）
+
+| ID | 状态 | 负责人 | 范围及验收 |
+| --- | --- | --- | --- |
+| B-CLOSEOUT | DONE（证据复核/本地门禁/状态与交接完成） | Codex | 复核 96f3885 十题证据、日志关联、预算和出处；补齐可移交证据；区分功能闭环与性能/质量未达标；更新任务状态与收尾交接 |
+
+输入：96f3885、L15 脱敏证据、既有本地 SQLite（仅只读查询允许字段）、计划 B/L11-7 交接。输出：Codex 审查报告、脱敏核验产物、第二阶段状态及后续待办。依赖：257750e 功能基线和个人模型实测；风险：HTTP 错误与 chat_logs 字段混用、首字口径不是浏览器 SSE、预算汇总漏计中断调用、将未测项误标通过。验证：只读证据核验脚本、相关 D/L 回归、./scripts/verify.sh full、git diff --check。只编辑本 worktree 的 docs/specs/evaluation 核验产物；不改 DeepSeek 原始报告，不调用真实模型，不修改数据、接口或部署配置，不推送不合并。
+
+
+### 第二阶段收尾后的显式待办（不是已实施的计划 C）
+
+| ID | 状态 | 下一阶段归属 | 验收/首个动作 |
+| --- | --- | --- | --- |
+| B-EVAL-01 | OPEN | L16 / 待认领 | 固定测量脚本：错误 details.request_id、毫秒时间边界、生成/向量分账、未知 usage；离线负例先测，真实 SSE 首字单独抓取 |
+| B-QA-01 | OPEN | L16 / 待认领 | 比较题2048仍截断；研究短答案/上下文和首字分段延迟，不放宽出处/15秒；模型付费复测仍交 DeepSeek且先确认新预算 |
+| B-PDF-01 / L11-7-real | OPEN（未收到复测报告） | L11 验收留项 / DeepSeek待接手 | 两份PDF headings/2真实复测；执行前最新生成起点648168（或最新值），旧850000累计止损余201832；预算临界先确认，不自动调额 |
+| B-QUALITY-01 | OPEN | L16 / 待认领 | 未改写抽取快照人工评估实体/关系准确率≥70%；抽取≤60秒旧四份全部未达；数量/类型达标不替代准确率 |
+| B-INTEGRATE-01 | WAITING_USER | 发布集成 | 当前本地 codex/plan-b-takeover 保留，推送/PR/合并方式及目标分支由用户决定；不自动清理测量数据 |
+
+无新接口、数据模型、迁移、依赖或业务改动。下一阶段范围沿用L16–L19，先质量/性能再美化与材料，不在收尾时增加自动出题或管理员统一模型功能。
+
+收尾验收证据（Codex本轮）：./scripts/verify.sh full 整体exit0，后端3780 passed/27白名单skip，前端901 passed，type-check/build/契约通过；D1/D2/D3/L15/PDF-reflow定向56 passed；只读关联核验十题+额外尝试/19调用通过；git diff --check通过；DeepSeek原始三文件未改。此次无新的真实调用、未重跑integration/E2E，257750e的完整integration仅作为既有代码证据。完整命令、日志、限制和后续首个动作见docs/handoffs/codex-plan-b-closeout.md。
