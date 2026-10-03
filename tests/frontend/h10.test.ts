@@ -70,10 +70,58 @@ describe('H10 version panel', () => {
     const { wrapper } = fixture({ list: async () => [published(1), published(2)] })
     await flushPromises()
     expect(wrapper.get('[data-test="vp-current"]').text()).toContain('v2')
-    expect(wrapper.get('[data-test="vp-revising"]').text()).toContain('学生仍看到 v2')
+    expect(wrapper.get('[data-test="vp-revising"]').text()).toContain('草稿修订中')
+    // 修订状态下仍说明学生当前看到的版本
+    expect(wrapper.get('[data-test="vp-current"]').text()).toContain('学生当前看到')
     expect(wrapper.findAll('[data-test="vp-version"]').map((item) => item.text())).toEqual([
       expect.stringContaining('v2'), expect.stringContaining('v1'),
     ])
+  })
+
+  it('collapses version history by default without dropping the version state', async () => {
+    const { wrapper, list } = fixture({ list: async () => [published(1), published(2)] })
+    await flushPromises()
+    const details = wrapper.get('details')
+    expect(details.attributes('open')).toBeUndefined()
+    // 折叠只影响展示：历史数据仍在，展开后可见
+    expect(wrapper.get('[data-test="vp-version"]').isVisible()).toBe(false)
+    await wrapper.get('summary').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('details').attributes('open')).toBeDefined()
+    expect(wrapper.findAll('[data-test="vp-version"]').map((item) => item.text())).toEqual([
+      expect.stringContaining('v2'), expect.stringContaining('v1'),
+    ])
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('formats the published time in Chinese with an explicit timezone and never shows Invalid Date', async () => {
+    const { wrapper } = fixture({
+      list: async () => [
+        { version: 2, kind: 'rollback', source_version: 1, published_at: '2026-09-25T00:00:00Z' },
+        { version: 1, kind: 'publish', published_at: '' },
+      ],
+    })
+    await flushPromises()
+    await wrapper.get('summary').trigger('click')
+    await flushPromises()
+    const text = wrapper.text()
+    expect(text).toContain('回滚自 v1')
+    // 固定 Asia/Shanghai：UTC 零点显示为当地 08:00，并带出时区说明
+    expect(text).toContain('2026年9月25日')
+    expect(text).toContain('UTC+8')
+    expect(text).toContain('发布时间未知')
+    expect(text).not.toContain('Invalid Date')
+    expect(text).not.toContain('2026-09-25T00:00:00Z')
+  })
+
+  it('keeps the rollback confirmation visible even when the history section is collapsed', async () => {
+    const { wrapper } = fixture()
+    await flushPromises()
+    await wrapper.get('[data-test="vp-rollback"][data-version="1"]').trigger('click')
+    // 触发回滚按钮需要展开历史；确认区不随折叠一起隐藏
+    expect(wrapper.get('[data-test="vp-confirm"]').text()).toContain('v1')
+    expect(wrapper.get('details').attributes('open')).toBeUndefined()
+    expect(wrapper.get('[data-test="vp-confirm-rollback"]').isVisible()).toBe(true)
   })
 
   it('treats a never-published course whose published_version is omitted as having no current version', async () => {

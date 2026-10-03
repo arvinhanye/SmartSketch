@@ -1540,3 +1540,12 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 | ID | 状态 | 任务 | 负责人 | 证据 |
 | --- | --- | --- | --- | --- |
 | API-GATE-ROLLBACK | DONE | 完整本地快照后选择性撤销取消演示模式任务，保留暖色主题、API 设置与向量维度选择 | Codex | 快照 485d196；后端25/前端12、类型检查与构建通过；docs/handoffs/codex-api-settings-rollback.md |
+
+## 2026-10-03 审核队列页改版（前端，新增任务）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| UI-02 | DONE（待 PR 审查/合并） | 审核队列页重构：紧凑发布状态栏 + 分类切换（tablist）+ 宽松单列审核列表 + 默认折叠版本历史；发布状态只有一份 `useVersions`（审核区作为 `review-content` 插槽） | Claude | `codex/api-settings-demo-restored`（基线 `e51dd67`，未切分支） | `tests/frontend/h09.test.ts` 43 passed、`tests/frontend/h10.test.ts` 16 passed；`npm run type-check` 0 错；`npm run build` 成功；全量前端 811 passed；无头 Chrome 截图核对 1440px / 375px；详见 `docs/handoffs/claude-review-queue-redesign.md` |
+
+- 范围：只改 `src/frontend/src/views/ReviewView.vue`、`src/frontend/src/components/VersionPanel.vue` 的模板、局部展示状态与 scoped CSS，以及直接相关的 `tests/frontend/h09.test.ts`、`h10.test.ts`。后端、契约、router/store/composable 业务逻辑、图谱与其它页面未改。
+- 未验证：`scripts/verify.sh full` 在本机（Windows）无法执行（`bash` 只有 WSL 存根，无 `/bin/bash`）；已用等价的三条命令（type-check / build / vitest）替代，详见交接。
