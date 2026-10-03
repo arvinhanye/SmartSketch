@@ -17,7 +17,9 @@ from app.repositories.graph_search import search_subgraph
 from app.repositories.neo4j import Neo4jRepository, RepositoryError, read_deadline
 from app.repositories.vector_search import search_chunks
 from app.services.ai.client import ModelCallError
-from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError, EmbeddingDeadlineExceeded
+from app.services.ai.embeddings import (
+    EmbeddingAdapter, EmbeddingBatchError, EmbeddingDeadlineExceeded, EmbeddingRecordError, embedding_calls,
+)
 from app.services.qa.citations import CitationStream, Evidence, TruncatedAnswer, not_covered
 from app.services.qa.context import ContextBudget, EvidenceContext, build_context
 from app.services.qa.generate import AnswerGeneration, AnswerGenerator, GenerationError
@@ -122,7 +124,7 @@ class ChatService:
         query = rewritten.query
         check()
         try:
-            with read_deadline(deadline):
+            with read_deadline(deadline), embedding_calls(course_id=version.course_id, request_id=request_id):
                 [vector] = self.embedding.embed((query,), deadline=deadline)
                 check()
                 space = self.current_space()
@@ -145,6 +147,9 @@ class ChatService:
                 )
         except EmbeddingDeadlineExceeded as error:
             raise ChatFailure("LLM_UNAVAILABLE", reason="timeout") from error
+        except EmbeddingRecordError as error:      # model_calls 预写失败：请求未发出（ADR-082 决定 6）
+            check()
+            raise ChatFailure("STORAGE_UNAVAILABLE") from error
         except (EmbeddingBatchError, ModelCallError) as error:
             check()
             raise ChatFailure("LLM_UNAVAILABLE") from error

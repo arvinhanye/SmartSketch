@@ -72,7 +72,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 | §3.7 | 既有缺口 | DONE（待复审） | Claude | `ChatView.vue`、`useChat.ts`、`specs/grounded-qa.md` Q6.5 | 发送期间按钮、Enter、逻辑入口都不再提交；显式「停止」后可再发。`tests/frontend/chat-send-lock.test.ts` red → green；前端全量 811 中 810 通过，唯一失败为 B02 嵌套 vitest 在满载下超时 5 s，单独重跑 5/5 通过；type-check exit 0 |
 | N07 | P2 | DONE（待复审） | Claude | `services/model_configs.py`（`run_test` 开头统一检查存储）、ADR-082 决定 5 | 存储未启用时 `/test` 任何分支在 DNS/传输前返回 503 `credential_store_disabled`。`tests/backend/test_n07_n08.py`（demo/fake × 完整/空请求体、残留配置；启用时仍可测）red → green |
 | N08 | P2 | DONE（待复审） | Claude | `services/model_configs.py`（共享 `normalize_model`）、`api/model_config.py`、契约 `model` 说明（已重生成） | 空白模型名 PUT 与 /test 均 422 `VALIDATION_ERROR`（`model`/`blank`），不写库不出站。同上测试文件（空格/制表符/换行，新建、保留密钥修改、测试三入口）red 20 failed/2 passed（含 N07）→ green 22；连同 L06 42 passed |
-| D2 | P2 | TODO | Claude | `services/ai/embeddings.py`、`api/versions.py`、`api/chat.py`、`repositories/model_calls.py` | 发布与查询的每次实际向量出站先预写、再回写；缓存命中/回滚复制不记；不计入个人日预算 |
+| D2 | P2 | DONE（待复审；发布端到端待 integration） | Claude | `services/ai/embeddings.py`（可选调用存储 + `embedding_calls` 归属）、`services/ai/factory.py`（`build_embedding_adapter`，仅 online 记账）、`api/versions.py`、`api/chat.py`、`services/versions/publish.py`、`services/qa/chat.py`、ADR-082 决定 6 | 发布与查询的每次实际向量出站先预写、再回写；缓存命中/回滚复制不记；不计入个人日预算。`tests/backend/test_d2.py` red 9 failed/1 passed（接口先行后）→ green 10；`tests/integration/test_d2_publish.py`（发布、未变重复发布、回滚）需一次性 Neo4j，随 integration 档运行 |
 
 - 输入：上述审查与 prompt、已签收冲刺规格与 ADR-080/081、计划 A 代码（`e86f4b9`）。输出：修复代码、仓库回归（先红后绿）、必要的规格/ADR/契约更新、交接。
 - 依赖：顺序 N01+N06 → D1+D3 → N02 → N03–N05 与 §3.7 → N07–N08 → D2。共享边界（配置身份、错误闭集、记账归属）先写 ADR-082 再写代码。

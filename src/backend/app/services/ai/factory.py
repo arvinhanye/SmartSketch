@@ -8,14 +8,17 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from app.config import Settings
 from app.services.ai.client import EmbeddingClient, ModelClient
 from app.services.ai.demo import DEMO_MODEL_ID, DemoEmbeddingClient, DemoModelClient
 from app.services.ai.fake import FakeEmbeddingClient, FakeModelClient
 
-__all__ = ["FAKE_MODEL_ID", "build_embedding_client", "build_model_clients", "model_id"]
+if TYPE_CHECKING:
+    from app.services.ai.embeddings import EmbeddingAdapter
+
+__all__ = ["FAKE_MODEL_ID", "build_embedding_adapter", "build_embedding_client", "build_model_clients", "model_id"]
 
 FAKE_MODEL_ID = "fake"
 
@@ -52,3 +55,13 @@ def build_embedding_client(settings: Settings) -> EmbeddingClient:
     from app.services.ai.compatible import CompatibleEmbeddingClient
 
     return CompatibleEmbeddingClient.from_settings(settings)
+
+
+def build_embedding_adapter(settings: Settings) -> EmbeddingAdapter:
+    """发布与问答共用的系统级向量装配（ADR-082 决定 6）：真实在线向量的每次请求都写 ``model_calls``；
+    fake/demo 不出站，不记账。离线脚本自行装配（``scripts/reembed.py`` 有自己的调用台账）。"""
+    from app.repositories.model_calls import SqliteCallStore
+    from app.services.ai.embeddings import EmbeddingAdapter
+
+    store = SqliteCallStore(settings.SQLITE_URL) if settings.EMBEDDING_MODE == "online" else None
+    return EmbeddingAdapter(settings, build_embedding_client(settings), store=store)

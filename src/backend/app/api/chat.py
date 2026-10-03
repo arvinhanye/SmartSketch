@@ -24,8 +24,7 @@ from app.repositories.neo4j import Neo4jRepository
 from app.schemas.contracts import ChatRequest, ChatResponse
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
-from app.services.ai.embeddings import EmbeddingAdapter
-from app.services.ai.factory import build_embedding_client, build_model_clients, model_id
+from app.services.ai.factory import build_embedding_adapter, build_model_clients, model_id
 from app.services.ai.policy import ModelCallPolicy, new_call_id
 from app.services.credentials import CredentialUnavailable, ModelConfigRequired
 from app.services.qa.chat import ChatAudit, ChatFailure, ChatService
@@ -56,7 +55,7 @@ def chat_service(request: Request) -> ChatService:
     if service is not None:
         return service
     settings = request.app.state.settings
-    embedding = EmbeddingAdapter(settings, build_embedding_client(settings))
+    embedding = build_embedding_adapter(settings)
     repo = Neo4jRepository.from_settings(settings)
     if settings.LLM_MODE == "personal":
         # ADR-080：没有全站模型；每个请求由 user_chat_service 换上提问者自己的改写器与生成器
