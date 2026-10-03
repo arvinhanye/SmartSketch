@@ -131,6 +131,24 @@ async function submitAdd(wrapper: Awaited<ReturnType<typeof mountApp>>['wrapper'
   await wrapper.get('[data-test="member-add"]').trigger('submit')
 }
 
+/**
+ * 用户名输入框的「独立标签」：label 只含自己的文字，且不含输入框与提交按钮。
+ * 回归点：label 曾把输入框与按钮一起包住，浏览器于是把按钮文案也算进输入框的无障碍名称
+ * （提交期间还会变成「学生用户名 添加中…」）。
+ */
+function usernameLabel(wrapper: Awaited<ReturnType<typeof mountApp>>['wrapper']) {
+  const form = wrapper.get('[data-test="member-add"]')
+  const label = form.get('label[for="member-username"]')
+  return {
+    label,
+    text: label.text().trim(),
+    wrapsInput: label.element.querySelector('input') !== null,
+    wrapsButton: label.element.querySelector('button') !== null,
+    /** 无障碍名称的来源文字：label 内不含任何表单控件，文字即控件名 */
+    controlName: (label.element.textContent ?? '').trim(),
+  }
+}
+
 // ---------------------------------------------------------------- API 封装
 
 describe('H12 成员 API 封装', () => {
@@ -241,10 +259,14 @@ describe('H12 成员列表状态', () => {
     expect(rows(wrapper).map((r) => r.text())).toEqual([expect.stringContaining('teacher'), expect.stringContaining('alice')])
   })
 
-  it('成员表可访问：有 caption 与列头，教师行无移除按钮，学生行按钮带用户名', async () => {
+  it('成员表可访问：caption 只作表格名称，不重复教师维护说明；教师行无移除按钮，学生行按钮带用户名', async () => {
     const { wrapper } = await mountApp()
     const table = wrapper.get('[data-test="members-table"]')
-    expect(table.find('caption').exists()).toBe(true)
+    expect(table.get('caption').text().trim()).toBe('课程成员列表')
+    // 教师维护说明只留在上方提示条，不在 caption 里重复
+    expect(table.get('caption').text()).not.toContain('管理员')
+    expect(wrapper.get('[data-test="members-region"]')).toBeDefined()
+    expect(wrapper.get('.members__notice').text()).toContain('教师成员仅可由管理员通过命令行调整。')
     expect(table.findAll('th[scope="col"]').length).toBeGreaterThanOrEqual(3)
     const [teacherRow, aliceRow] = rows(wrapper)
     expect(teacherRow!.find('[data-test="member-remove"]').exists()).toBe(false)
@@ -333,7 +355,10 @@ describe('H12 添加学生成员', () => {
   it('表单控件有 label；添加成功后新行出现、输入清空并以 role=status 提示', async () => {
     const { wrapper, api } = await mountApp()
     const input = wrapper.get('[data-test="member-add"] input[name="username"]')
-    expect(input.element.closest('label')?.textContent).toContain('学生用户名')
+    const { text, wrapsInput, wrapsButton } = usernameLabel(wrapper)
+    expect(text).toBe('学生用户名')
+    expect(wrapsInput).toBe(false)
+    expect(wrapsButton).toBe(false)
     expect(input.attributes('autocomplete')).toBe('off')
     await submitAdd(wrapper, '  bob  ')
     await flushPromises()
@@ -345,6 +370,32 @@ describe('H12 添加学生成员', () => {
     const status = wrapper.get('[data-test="member-add-success"]')
     expect(status.attributes('role')).toBe('status')
     expect(status.text()).toContain('bob')
+  })
+
+  it('输入框的无障碍名称始终是「学生用户名」：独立 label + for，且不含提交按钮文案', async () => {
+    const { wrapper } = await mountApp()
+    const input = wrapper.get('[data-test="member-add"] input[name="username"]')
+    // 关联方式：label[for] 指向输入框的 id，而不是把控件包进 label
+    expect(input.attributes('id')).toBe('member-username')
+    const first = usernameLabel(wrapper)
+    expect(first.controlName).toBe('学生用户名')
+    expect(first.label.attributes('for')).toBe('member-username')
+    expect(input.element.closest('label')).toBeNull()
+
+    // 提交期间按钮文案变成「添加中…」也不应污染输入框名称
+    const pending = deferred<CourseMember>()
+    const busy = await mountApp({ api: fakeMembersApi({ add: () => pending.promise }) })
+    const busyInput = busy.wrapper.get('[data-test="member-add"] input[name="username"]')
+    expect(busyInput.attributes('id')).toBe('member-username')
+    await submitAdd(busy.wrapper, 'bob')
+    expect(busy.wrapper.get('[data-test="member-add"] button[type="submit"]').text()).toContain('添加中')
+    const busyLabel = usernameLabel(busy.wrapper)
+    expect(busyLabel.controlName).toBe('学生用户名')
+    expect(busyLabel.controlName).not.toContain('添加中')
+    expect(busyLabel.controlName).not.toContain('添加学生')
+    pending.resolve(member('u_bob', 'bob'))
+    await flushPromises()
+    expect(usernameLabel(wrapper).controlName).toBe('学生用户名')
   })
 
   it('用户名为空不发请求并以 role=alert 提示', async () => {
@@ -581,7 +632,10 @@ describe('H12 成员页布局', () => {
     expect(card.text()).toContain('将已注册的学生账号加入本课程。')
     const input = card.get('input[name="username"]')
     expect(input.attributes('placeholder')).toBe('输入学生用户名')
-    expect(input.element.closest('label')?.textContent).toContain('学生用户名')
+    const { text, wrapsInput, wrapsButton } = usernameLabel(wrapper)
+    expect(text).toBe('学生用户名')
+    expect(wrapsInput).toBe(false)
+    expect(wrapsButton).toBe(false)
     const submit = card.get('button[type="submit"]')
     expect(submit.text().replace(/\s+/g, '')).toBe('添加学生')
     expect(submit.attributes('disabled')).toBeUndefined()

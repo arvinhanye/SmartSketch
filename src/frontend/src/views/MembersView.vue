@@ -122,9 +122,11 @@ const counts = computed(() => ({
           <legend id="member-add-title" class="members__card-title">添加学生</legend>
           <p class="members__card-hint">将已注册的学生账号加入本课程。</p>
 
-          <label class="members__field" for="member-username">
-            <span class="members__field-label">学生用户名</span>
-            <span class="members__field-row">
+          <div class="members__field">
+            <!-- label 只含「学生用户名」并靠 for 关联；输入框与按钮在 label 之外，
+                 否则按钮文案（含提交中的「添加中…」）会被算进输入框的无障碍名称 -->
+            <label class="members__field-label" for="member-username">学生用户名</label>
+            <div class="members__field-row">
               <input
                 id="member-username"
                 v-model="username"
@@ -140,8 +142,8 @@ const counts = computed(() => ({
                 </svg>
                 {{ adding ? '添加中…' : '添加学生' }}
               </button>
-            </span>
-          </label>
+            </div>
+          </div>
 
           <div class="members__feedback">
             <p v-if="addError" class="members__alert" data-test="member-add-error" role="alert">
@@ -210,8 +212,9 @@ const counts = computed(() => ({
 
         <div v-if="members.length > 0" class="members__table-wrap">
           <table data-test="members-table">
+            <!-- 只作表格名称：教师成员只能由管理员维护的说明留在上方提示条，避免两处重复 -->
             <caption class="members__caption">
-              本课程成员（{{ members.length }} 人）；教师成员只能由管理员通过命令行调整
+              课程成员列表
             </caption>
             <thead>
               <tr>
@@ -415,7 +418,12 @@ const counts = computed(() => ({
   font-size: 0.875rem;
 }
 
+/* 标签独立成行，只包「学生用户名」；宽度贴合文字，点击区不横跨整行 */
 .members__field-label {
+  display: block;
+  width: fit-content;
+  color: var(--color-text);
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
