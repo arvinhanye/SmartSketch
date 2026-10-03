@@ -10,6 +10,8 @@
  * - 高亮边：f 的入边、指向 `unlocks` 节点的全部入边。其余节点为 `dimmed`。
  */
 
+import type { G6Edge, G6Node } from './adapter'
+
 export type PathRole = 'mastered' | 'prereqMissing' | 'next' | 'unlocks' | 'dimmed'
 
 export interface LearningPath {
@@ -52,13 +54,14 @@ export function buildLearningPath(
   }
   const roles = new Map<string, PathRole>(nodes.map((node) => [node.id, 'dimmed']))
   const highlighted = new Set<string>()
-  const f = focus !== null && order.has(focus) ? focus : (order.keys().next().value ?? null)
+  const first: string | undefined = order.keys().next().value
+  const f: string | null = focus !== null && order.has(focus) ? focus : (first ?? null)
   if (f === null) return { focus: null, order, roles, edges: highlighted, narrative: narrate(nodes, roles) }
 
-  const prereqs = edges.filter(
+  const prereqs: PathEdge[] = edges.filter(
     (edge) => edge.type === 'PREREQUISITE' && edge.status !== 'rejected' && known.has(edge.from_id) && known.has(edge.to_id),
   )
-  const incoming = (id: string) => prereqs.filter((edge) => edge.to_id === id)
+  const incoming = (id: string): PathEdge[] => prereqs.filter((edge) => edge.to_id === id)
   const mastered = (id: string) => mastery.get(id) === 'mastered'
 
   roles.set(f, 'next')
@@ -67,15 +70,15 @@ export function buildLearningPath(
     highlighted.add(edge.id)
   }
   for (const out of prereqs.filter((edge) => edge.from_id === f)) {
-    const target = out.to_id
+    const target: string = out.to_id
     if (roles.get(target) === 'unlocks' || target === f) continue
-    const into = incoming(target)
+    const into: PathEdge[] = incoming(target)
     if (!into.every((edge) => edge.from_id === f || mastered(edge.from_id))) continue
     roles.set(target, 'unlocks')
-    for (const edge of into) {
+    into.forEach((edge: PathEdge) => {
       highlighted.add(edge.id)
       if (edge.from_id !== f && roles.get(edge.from_id) === 'dimmed') roles.set(edge.from_id, 'mastered')
-    }
+    })
   }
   return { focus: f, order, roles, edges: highlighted, narrative: narrate(nodes, roles) }
 }
@@ -83,4 +86,20 @@ export function buildLearningPath(
 function narrate(nodes: ReadonlyArray<PathNode>, roles: ReadonlyMap<string, PathRole>): LearningPath['narrative'] {
   const named = (role: PathRole) => nodes.filter((node) => roles.get(node.id) === role).map((node) => node.name)
   return { mastered: named('mastered'), missing: named('prereqMissing'), next: named('next'), unlocks: named('unlocks') }
+}
+
+/** 画布数据（适配层输出）→ 路径输入：节点用 kpId、边用 relation id 与两端 kpId */
+export function pathInputFromCanvas(graph: { nodes: readonly G6Node[]; edges: readonly G6Edge[] }): {
+  nodes: PathNode[]
+  edges: PathEdge[]
+} {
+  const kpOf = new Map(graph.nodes.map((node) => [node.id, node.data.kpId]))
+  const edges: PathEdge[] = []
+  for (const edge of graph.edges) {
+    const from = kpOf.get(edge.source)
+    const to = kpOf.get(edge.target)
+    if (from === undefined || to === undefined) continue
+    edges.push({ id: edge.data.relationId, type: edge.data.type, from_id: from, to_id: to, status: edge.data.status })
+  }
+  return { nodes: graph.nodes.map((node) => ({ id: node.data.kpId, name: node.data.name })), edges }
 }

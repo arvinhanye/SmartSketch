@@ -274,9 +274,11 @@ async function selectNode(wrapper: VueWrapper, kpId: string): Promise<void> {
   await flushPromises()
 }
 
+/** 掌握与推荐状态；L14 叠加的学习路径状态在 l14.test.ts 单独断言，这里滤掉 */
+const PATH_STATES: ReadonlySet<string> = new Set(['dimmed', 'pathPrereq', 'pathUnlock'])
 function nodeStates(wrapper: VueWrapper): Map<string, readonly string[]> {
   const graph = wrapper.findComponent(GraphCanvas).props('graph') as GraphCanvasData | null
-  return new Map((graph?.nodes ?? []).map((node) => [node.data.kpId, node.states ?? []]))
+  return new Map((graph?.nodes ?? []).map((node) => [node.data.kpId, (node.states ?? []).filter((s) => !PATH_STATES.has(s))]))
 }
 
 function masteryButtons(wrapper: VueWrapper): Array<ReturnType<VueWrapper['get']>> {
@@ -376,7 +378,10 @@ describe('I06 掌握状态到节点视觉属性（纯函数）', () => {
   it('画布为四个学习状态定义了样式（状态色真实接线，不是测试里的硬编码）', () => {
     const options = buildGraphOptions({ container: document.createElement('div'), width: 100, height: 100, data: graph })
     const nodeState = (options.node as { state: Record<string, unknown> }).state
-    expect(Object.keys(nodeState).sort()).toEqual(['learning', 'lowConfidence', 'mastered', 'notStarted', 'recommended', 'rejected', 'selected'])
+    // L14 追加的学习路径状态（dimmed/pathPrereq/pathUnlock）另见 l14.test.ts
+    expect(Object.keys(nodeState).sort()).toEqual(
+      ['dimmed', 'learning', 'lowConfidence', 'mastered', 'notStarted', 'pathPrereq', 'pathUnlock', 'recommended', 'rejected', 'selected'],
+    )
     expect(nodeState.mastered).toMatchObject({ stroke: '#52c41a' })
   })
 })

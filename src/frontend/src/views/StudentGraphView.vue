@@ -135,6 +135,7 @@ const {
   busyKpId,
   notice: learningNotice,
   learningGraph,
+  learningPath,
   statusOf,
   setMastery,
   reload: reloadLearning,
@@ -147,6 +148,9 @@ const {
   graphVersion,
   ready: computed(() => status.value === 'ready'),
   graph: visible,
+  // L14：路径按完整已发布图计算；点推荐项（即选中它）就解释它，否则解释第一个推荐项
+  pathGraph: graph,
+  focus: selected,
   onCourseForbidden: leaveForbidden,
   // 显示版本落后于服务端绑定版本：重新加载图谱与进度，而不是把新投影套到旧图
   onVersionStale: reload,

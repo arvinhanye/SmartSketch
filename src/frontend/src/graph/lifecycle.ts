@@ -22,7 +22,24 @@ import { nodeElementId, type G6Edge, type G6Node } from './adapter'
  * I06 追加学习状态：学生页按服务端投影的 `MasteryStatus`（`mastered`/`learning`/`notStarted`）
  * 与推荐项（`recommended`）给节点打标；元素只携带状态名，颜色只在 `buildGraphOptions` 定义一处。
  */
-export type CanvasElementState = 'selected' | 'rejected' | 'lowConfidence' | 'mastered' | 'learning' | 'notStarted' | 'recommended'
+export type CanvasElementState =
+  | 'selected'
+  | 'rejected'
+  | 'lowConfidence'
+  | 'mastered'
+  | 'learning'
+  | 'notStarted'
+  | 'recommended'
+  // L14 学习路径：未满足的前置、之后解锁、与当前路径无关（淡化）；边：路径上的先修边
+  | 'pathPrereq'
+  | 'pathUnlock'
+  | 'dimmed'
+  | 'pathEdge'
+
+/** 节点标签：推荐项前加序号「1. 」（L14），其余为名称 */
+export function nodeLabel(data: Pick<G6Node['data'], 'name' | 'pathOrder'>): string {
+  return data.pathOrder === undefined ? data.name : `${data.pathOrder}. ${data.name}`
+}
 
 export type CanvasNode = G6Node & { states?: CanvasElementState[] }
 export type CanvasEdge = G6Edge & { states?: CanvasElementState[] }
@@ -137,7 +154,7 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         fill: '#ffffff',
         stroke: '#1677ff',
         lineWidth: 1.5,
-        labelText: (datum: unknown) => (datum as G6Node).data.name,
+        labelText: (datum: unknown) => nodeLabel((datum as G6Node).data),
         labelPlacement: 'bottom',
         labelFontSize: 12,
       },
@@ -150,6 +167,10 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         learning: { fill: '#fffbe6', stroke: '#faad14', lineWidth: 2 },
         notStarted: { fill: '#ffffff', stroke: '#bfbfbf' },
         recommended: { stroke: '#722ed1', lineWidth: 3, halo: true, haloStroke: '#9254de', haloLineWidth: 10 },
+        // L14：学习路径。淡化在推荐/选中之前叠加，选中的节点不会被淡化（`applyLearningStates`）
+        pathPrereq: { stroke: '#fa541c', lineWidth: 2.5, lineDash: [4, 3] },
+        pathUnlock: { stroke: '#13c2c2', lineWidth: 2.5 },
+        dimmed: { opacity: 0.25 },
         selected: { stroke: '#0958d9', lineWidth: 3, halo: true, haloStroke: '#1677ff', haloLineWidth: 10 },
       },
     },
@@ -159,6 +180,8 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
       state: {
         rejected: { opacity: 0.3 },
         lowConfidence: { opacity: 0.6 },
+        pathEdge: { stroke: '#722ed1', lineWidth: 3.5, opacity: 1 },
+        dimmed: { opacity: 0.2 },
       },
     },
     layout: layoutOptions(init.layout ?? 'hierarchical'),

@@ -109,3 +109,198 @@ describe('L14-1 学习路径纯函数', () => {
     expect(JSON.stringify({ edges, m: [...m] })).toBe(snapshot)
   })
 })
+
+// ---------------------------------------------------------------- L14-2 画布：路径高亮、序号与淡化
+
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { vi } from 'vitest'
+import { defineComponent, h } from 'vue'
+import { createMemoryHistory, RouterView } from 'vue-router'
+import type { components } from '../../src/contracts/v1/generated/typescript/openapi'
+import { COURSES_API_KEY } from '../../src/frontend/src/api/courses'
+import { PUBLISHED_GRAPH_API_KEY } from '../../src/frontend/src/api/graph'
+import { KNOWLEDGE_DETAIL_API_KEY } from '../../src/frontend/src/api/knowledgeDetail'
+import { PROGRESS_API_KEY, type ProgressApi, type ProgressEntry } from '../../src/frontend/src/api/progress'
+import { RECOMMEND_API_KEY, type Recommendation, type RecommendApi } from '../../src/frontend/src/api/recommend'
+import GraphCanvas from '../../src/frontend/src/components/GraphCanvas.vue'
+import { applyLearningStates } from '../../src/frontend/src/composables/useLearning'
+import { toG6Data } from '../../src/frontend/src/graph/adapter'
+import { pathInputFromCanvas } from '../../src/frontend/src/graph/learningPath'
+import {
+  buildGraphOptions,
+  GRAPH_FACTORY_KEY,
+  nodeLabel,
+  type CanvasGraph,
+  type CanvasGraphFactory,
+  type GraphCanvasData,
+} from '../../src/frontend/src/graph/lifecycle'
+import { createAppRouter } from '../../src/frontend/src/router/index.ts'
+import { useSessionStore } from '../../src/frontend/src/stores/session'
+import CoursesView from '../../src/frontend/src/views/CoursesView.vue'
+import StudentGraphView from '../../src/frontend/src/views/StudentGraphView.vue'
+
+type KnowledgePoint = components['schemas']['KnowledgePoint']
+type GraphExchange = components['schemas']['GraphExchange']
+
+function kpOf(id: string): KnowledgePoint {
+  return { id, course_id: 'c1', name: `知识点${id}`, type: 'concept', definition: `${id} 的定义`, level: 1,
+    confidence: 0.9, status: 'approved', source: 'ai', locked: false, revision: 1, chapter_id: 'ch1' }
+}
+
+function exchangeOf(): GraphExchange {
+  const edges = EDGES.map((edge) => ({
+    id: edge.id, course_id: 'c1', type: edge.type, from_id: edge.from_id, to_id: edge.to_id,
+    confidence: 0.9, status: edge.status ?? 'approved', source: 'ai', revision: 1,
+  }))
+  return { format_version: '1.0', course_id: 'c1', graph_version: 3, generated_at: '2026-10-03T00:00:00Z',
+    chapters: [{ id: 'ch1', title: '第一章', order: 1 }], nodes: NODES.map((n) => kpOf(n.id)), edges } as unknown as GraphExchange
+}
+
+function canvasData(): GraphCanvasData {
+  const adapted = toG6Data(exchangeOf())
+  return { nodes: adapted.nodes, edges: adapted.edges }
+}
+
+function entries(...mastered: string[]): Map<string, ProgressEntry> {
+  return new Map(mastered.map((id) => [id, { kp_id: id, status: 'mastered', own_status: 'mastered', inherited_from: [], updated_at: 'x' }]))
+}
+
+function statesOf(graph: GraphCanvasData) {
+  return {
+    node: new Map(graph.nodes.map((n) => [n.data.kpId, n.states ?? []])),
+    edge: new Map(graph.edges.map((e) => [e.data.relationId, e.states ?? []])),
+  }
+}
+
+describe('L14-2 画布路径状态', () => {
+  it('画布数据可转成路径输入（kpId 与 relation id，保留类型与状态）', () => {
+    const input = pathInputFromCanvas(canvasData())
+    expect(input.nodes.find((n) => n.id === 'A')).toEqual({ id: 'A', name: '知识点A' })
+    expect(input.edges.find((e) => e.id === 'gf')).toEqual({ id: 'gf', type: 'PREREQUISITE', from_id: 'G', to_id: 'F', status: 'rejected' })
+  })
+
+  it('推荐项带序号标签；缺失前置、解锁、淡化与高亮边各有状态', () => {
+    const graph = canvasData()
+    const m = entries('B')
+    const input = pathInputFromCanvas(graph)
+    const path = buildLearningPath(input.nodes, input.edges, new Map([['B', 'mastered']]), recs('C', 'G'), null)
+    const result = applyLearningStates(graph, m, new Set(['C', 'G']), path)
+    const c = result.nodes.find((n) => n.data.kpId === 'C')!
+    expect(c.data.pathOrder).toBe(1)
+    expect(nodeLabel(c.data)).toBe('1. 知识点C')
+    expect(nodeLabel(result.nodes.find((n) => n.data.kpId === 'G')!.data)).toBe('2. 知识点G')
+    expect(nodeLabel(result.nodes.find((n) => n.data.kpId === 'A')!.data)).toBe('知识点A')
+    const { node, edge } = statesOf(result)
+    expect(node.get('C')).toEqual(['notStarted', 'recommended'])
+    expect(node.get('A')).toEqual(['notStarted', 'pathPrereq'])
+    expect(node.get('B')).toEqual(['mastered'])
+    expect(node.get('D')).toEqual(['notStarted', 'pathUnlock'])
+    expect(node.get('F')).toEqual(['notStarted', 'dimmed'])
+    // 第二个推荐项 G 不在当前焦点的路径上：仍保留推荐色，同时淡化
+    expect(node.get('G')).toEqual(['notStarted', 'recommended', 'dimmed'])
+    expect(edge.get('ac')).toEqual(['pathEdge'])
+    expect(edge.get('cd')).toEqual(['pathEdge'])
+    expect(edge.get('ef')).toEqual(['dimmed'])
+    // 输入不被修改
+    expect(graph.nodes.find((n) => n.data.kpId === 'C')!.data.pathOrder).toBeUndefined()
+  })
+
+  it('选中的节点不淡化；没有焦点（全部掌握）时不叠加任何路径状态', () => {
+    const graph = canvasData()
+    graph.nodes = graph.nodes.map((n) => (n.data.kpId === 'F' ? { ...n, states: ['selected'] } : n))
+    const input = pathInputFromCanvas(graph)
+    const path = buildLearningPath(input.nodes, input.edges, new Map(), recs('A'), null)
+    expect(statesOf(applyLearningStates(graph, new Map(), new Set(['A']), path)).node.get('F')).toEqual(['notStarted', 'selected'])
+    const none = buildLearningPath(input.nodes, input.edges, new Map(), [], null)
+    const { node, edge } = statesOf(applyLearningStates(graph, new Map(), new Set(), none))
+    expect(node.get('D')).toEqual(['notStarted'])
+    expect(edge.get('cd')).toEqual([])
+  })
+
+  it('状态样式只在 buildGraphOptions 定义：节点 pathPrereq/pathUnlock/dimmed，边 pathEdge/dimmed', () => {
+    const el = document.createElement('div')
+    const options = buildGraphOptions({ container: el, width: 1, height: 1, data: canvasData() }) as unknown as {
+      node: { state: Record<string, unknown>; style: { labelText: (d: unknown) => string } }
+      edge: { state: Record<string, unknown> }
+    }
+    expect(Object.keys(options.node.state)).toEqual(expect.arrayContaining(['pathPrereq', 'pathUnlock', 'dimmed']))
+    expect(Object.keys(options.edge.state)).toEqual(expect.arrayContaining(['pathEdge', 'dimmed']))
+    expect(options.node.style.labelText({ data: { name: '栈', pathOrder: 2 } })).toBe('2. 栈')
+  })
+})
+
+// ---------------------------------------------------------------- 学生图谱页：点推荐项切换路径焦点
+
+function rec(kpId: string, extra: Partial<Recommendation['reason_facts']> = {}): Recommendation {
+  return {
+    kp_id: kpId, name: `知识点${kpId}`, graph_version: 3, score: 0.6,
+    factors: { unlock: 0.5, importance: 0.5, chapter_order: 1, ease: 0.5 },
+    weighted: { unlock: 0.175, importance: 0.125, chapter_order: 0.2, ease: 0.1 },
+    unlock_count: 1, reason: `完成 ${kpId} 可解锁后继`,
+    reason_facts: { primary_factor: 'unlock', chapter_id: 'ch1', chapter_name: '第一章', chapter_rank: 0,
+      importance: 0.5, centrality: 0.3, difficulty: 0.5, ...extra },
+  }
+}
+
+function fakeCanvas(): CanvasGraphFactory {
+  return (() => ({
+    destroyed: false, render: () => Promise.resolve(), setData: () => {}, setSize: () => {},
+    fitView: () => Promise.resolve(), on() { return this }, destroy: () => {},
+  }) as unknown as CanvasGraph) as CanvasGraphFactory
+}
+
+async function mountStudent(mastered: string[], recommended: string[]) {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const session = useSessionStore(pinia)
+  session.signIn({ access_token: 't', token_type: 'bearer', expires_in: 3600, user: { id: 'u_s', username: 's', role: 'student' } })
+  const router = createAppRouter({ history: createMemoryHistory(), getAccountRole: () => session.role,
+    coursesComponent: CoursesView, studentGraphComponent: StudentGraphView })
+  await router.push('/courses/c1/graph')
+  await router.isReady()
+  const progress: ProgressApi = {
+    get: vi.fn(async () => ({ graph_version: 3, entries: NODES.map((n) => ({
+      kp_id: n.id, status: mastered.includes(n.id) ? 'mastered' : 'unknown',
+      own_status: mastered.includes(n.id) ? 'mastered' : 'unknown', inherited_from: [], updated_at: 'x' })) })),
+    update: vi.fn(),
+  } as unknown as ProgressApi
+  const recommend: RecommendApi = {
+    get: vi.fn(async () => ({ state: 'recommendations', graph_version: 3, total_eligible: recommended.length,
+      recommendations: recommended.map((id) => rec(id)) })),
+  } as unknown as RecommendApi
+  const course = { id: 'c1', name: '课', status: 'published', my_role: 'student', published_version: 3, created_at: 'x' }
+  const wrapper = mount(defineComponent({ render: () => h(RouterView) }), {
+    attachTo: document.body,
+    global: {
+      plugins: [pinia, router],
+      provide: {
+        [COURSES_API_KEY as symbol]: { list: async () => [], create: vi.fn(), get: async () => course },
+        [PUBLISHED_GRAPH_API_KEY as symbol]: { getPublished: async () => exchangeOf() },
+        [KNOWLEDGE_DETAIL_API_KEY as symbol]: { get: async (_c: string, k: string) => ({ ...kpOf(k), source_refs: [], prerequisites: [], successors: [], related: [] }) },
+        [GRAPH_FACTORY_KEY as symbol]: fakeCanvas(),
+        [PROGRESS_API_KEY as symbol]: progress,
+        [RECOMMEND_API_KEY as symbol]: recommend,
+      },
+    },
+  })
+  await flushPromises()
+  return wrapper
+}
+
+function pageStates(wrapper: VueWrapper) {
+  return statesOf(wrapper.findComponent(GraphCanvas).props('graph') as GraphCanvasData)
+}
+
+describe('L14-2 学生图谱页路径焦点', () => {
+  it('默认解释第一个推荐项；点击第二个推荐项后路径改为它', async () => {
+    const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
+    expect(pageStates(wrapper).node.get('D')).toContain('pathUnlock')
+    expect(pageStates(wrapper).node.get('G')).toContain('dimmed')
+    await wrapper.get('[data-test="rc-select-G"]').trigger('click')
+    await flushPromises()
+    expect(pageStates(wrapper).node.get('G')).not.toContain('dimmed')
+    expect(pageStates(wrapper).node.get('D')).toContain('dimmed')
+    wrapper.unmount()
+  })
+})
