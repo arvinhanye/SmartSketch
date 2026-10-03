@@ -20,11 +20,15 @@ import { useSessionStore } from '../stores/session'
 /**
  * 教师审核队列页（H09，ADR-070）：低置信度关系、疑似重复知识点、孤立知识点三类。
  *
- * 展示结构（2026-10 改版）：紧凑发布状态栏 + 分类切换 + 宽松单列审核列表 + 默认折叠的版本历史。
+ * 展示结构（2026-10 改版）：返回课程 / 编辑图谱导航 + 审核队列标题与课程说明 + 紧凑发布状态栏
+ * + 分类切换与宽松单列审核列表 + 默认折叠的版本历史。
+ * 标题必须排在发布栏之前，因此导航与标题放在 `VersionPanel` 的 `review-header` 插槽，
+ * 待处理事项、分类标签、当前分类内容与版本历史留在 `review-content` 插槽之后。
  * 同一时刻只渲染当前分类的条目，分类数量与「共 N 项」都取服务端 `totals`，不用已加载数组长度代替。
+ * 空状态互斥：三类都为空只显示一条总提示，只有当前分类为空才显示该分类的空提示。
  * 业务状态与请求全部在 `useReview` / `useVersions`，本页只做展示与转发，并保留三个**局部** UI 状态：
  * 当前分类、每条关系的证据展开集合、课程切换时的展示状态重置。版本状态只有一份：
- * 页面把审核区作为 `review-content` 插槽交给 `VersionPanel`，顶部发布栏与底部历史复用同一个 `useVersions` 实例。
+ * 页面把导航标题与审核区作为插槽交给 `VersionPanel`，发布栏与版本历史复用同一个 `useVersions` 实例。
  */
 const coursesApi = inject(COURSES_API_KEY, null)
 if (coursesApi === null) throw new Error('ReviewView 需要注入 COURSES_API_KEY')
@@ -208,9 +212,9 @@ function otherName(pair: SuspectedDuplicate): string {
 
 <template>
   <VersionPanel v-if="courseId" :course-id="courseId" @forbidden="leaveForbidden">
-    <template #review-content>
-      <div class="page review" data-test="review-page" aria-labelledby="review-title" :aria-busy="status === 'loading' ? 'true' : 'false'">
-        <p v-if="courseId" class="review__back">
+    <template #review-header>
+      <div class="review__top">
+        <p class="review__back">
           <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }" data-test="rv-back">
             <span aria-hidden="true">←</span>
             返回课程
@@ -227,7 +231,11 @@ function otherName(pair: SuspectedDuplicate): string {
             {{ courseName }}<span v-if="status === 'ready'"> · 当前处理的是草稿</span>
           </p>
         </header>
+      </div>
+    </template>
 
+    <template #review-content>
+      <div class="page review" data-test="review-page" aria-labelledby="review-title" :aria-busy="status === 'loading' ? 'true' : 'false'">
         <p v-if="status === 'loading'" data-test="rv-loading" role="status">正在加载审核队列…</p>
 
         <p v-else-if="status === 'not_teacher'" data-test="rv-not-teacher" role="status">只有本课程的教师可以审核图谱。</p>
@@ -296,7 +304,14 @@ function otherName(pair: SuspectedDuplicate): string {
               :aria-labelledby="`rv-tab-${selected.kind}`"
               tabindex="0"
             >
-              <p v-if="selected.count === 0" class="review__empty" :data-test="`rv-empty-${selected.kind}`" role="status">
+              <!-- 空状态互斥：三类都为空时只留总提示，避免总提示与分类空提示同时出现；
+                   分类是否为空看服务端 totals（selected.count），不用已加载数组长度代替 -->
+              <p
+                v-if="!allEmpty && selected.count === 0"
+                class="review__empty"
+                :data-test="`rv-empty-${selected.kind}`"
+                role="status"
+              >
                 {{ EMPTY_TEXT[selected.kind] }}
               </p>
 
@@ -543,10 +558,18 @@ function otherName(pair: SuspectedDuplicate): string {
 </template>
 
 <style scoped>
-/* 审核页宽度只由 VersionPanel 根元素（含本插槽内容）统一限制，这里不再单独设上限 */
+/* 审核页宽度只由 VersionPanel 根元素（含两个插槽内容）统一限制，这里不再单独设上限 */
 .review {
   width: 100%;
   gap: 1.1rem;
+}
+
+/* 导航与标题段：与发布栏、审核卡共用同一条左右基线 */
+.review__top {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .review__back {

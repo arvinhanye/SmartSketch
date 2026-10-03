@@ -8,7 +8,7 @@ import { COURSES_API_KEY, type CoursesApi } from '../../src/frontend/src/api/cou
 import { DRAFT_GRAPH_API_KEY, type DraftGraphApi } from '../../src/frontend/src/api/graph'
 import { ApiError, createHttpClient, NetworkError, type FetchLike } from '../../src/frontend/src/api/http'
 import { createReviewApi, REVIEW_API_KEY, type ReviewAction, type ReviewApi } from '../../src/frontend/src/api/review'
-import { VERSIONS_API_KEY } from '../../src/frontend/src/api/versions'
+import { VERSIONS_API_KEY, type VersionsApi } from '../../src/frontend/src/api/versions'
 import { duplicateKey, isQueue } from '../../src/frontend/src/composables/useReview'
 import { createAppRouter, NOTICE_COURSE_FORBIDDEN, NOTICE_WRONG_ROLE, REVIEW_ROUTE } from '../../src/frontend/src/router/index.ts'
 import { useSessionStore } from '../../src/frontend/src/stores/session'
@@ -188,7 +188,16 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-async function mountPage(f: Fakes, path = '/courses/c1/review', accountRole: 'student' | 'teacher' = 'teacher') {
+async function mountPage(
+  f: Fakes,
+  path = '/courses/c1/review',
+  accountRole: 'student' | 'teacher' = 'teacher',
+  versions: { list: VersionsApi['list']; publish: VersionsApi['publish']; rollback: VersionsApi['rollback'] } = {
+    list: async () => [],
+    publish: vi.fn(),
+    rollback: vi.fn(),
+  },
+) {
   const session = useSessionStore(pinia)
   session.signIn({
     access_token: 'tok',
@@ -211,7 +220,7 @@ async function mountPage(f: Fakes, path = '/courses/c1/review', accountRole: 'st
       provide: {
         [COURSES_API_KEY as symbol]: { list: async () => [course('c1')], create: vi.fn(), get: f.courses.get },
         [REVIEW_API_KEY as symbol]: f.review,
-        [VERSIONS_API_KEY as symbol]: { list: async () => [], publish: vi.fn(), rollback: vi.fn() },
+        [VERSIONS_API_KEY as symbol]: versions,
         [DRAFT_GRAPH_API_KEY as symbol]: f.draft,
       },
     },
@@ -318,15 +327,21 @@ describe('审核队列页：加载与三类空态', () => {
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
   })
 
-  it('三栏全空：一张紧凑完成提示，不重复三张空卡', async () => {
+  it('三栏全空：只有一条总空提示，不再同时出现分类空提示', async () => {
     const f = fakes({ relations: [], duplicates: [], isolated: [] })
     const { wrapper } = await mountPage(f)
     expect(wrapper.find('[data-test="rv-all-empty"]').text()).toContain('当前没有待处理的审核项')
-    // 三类都为空时默认选中第一类，只显示该类的空态提示
-    expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="rv-empty-suspected_duplicate"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="rv-empty-isolated_node"]').exists()).toBe(false)
-    expect(wrapper.findAll('[data-test^="rv-empty-"]')).toHaveLength(1)
+    // 三类都为空时只留总提示：分类空提示一律不渲染，避免两句空话叠在一起
+    expect(wrapper.findAll('[data-test^="rv-empty-"]')).toHaveLength(0)
+    // 分类标签与真实数量仍然保留
+    expect(headingCounts(wrapper)).toEqual(['低置信度关系0', '疑似重复知识点0', '孤立知识点0'])
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(3)
+    // 逐个切换分类也不出现分类空提示
+    for (const kind of ['suspected_duplicate', 'isolated_node', 'low_confidence_relation'] as const) {
+      await switchKind(wrapper, kind)
+      expect(wrapper.find(`[data-test="rv-empty-${kind}"]`).exists()).toBe(false)
+      expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(true)
+    }
   })
 
   it.each<[Kind, Parameters<typeof fakes>[0]]>([
@@ -343,13 +358,33 @@ describe('审核队列页：加载与三类空态', () => {
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
   })
 
-  it('处理完最后一条后当前分类进入空态；三栏都处理完显示完成提示', async () => {
+  it('当前分类为空但其他分类有待处理项：只显示该分类空提示', async () => {
+    const { wrapper } = await mountPage(fakes({ relations: [] }))
+    // 默认落在第一个有待处理项的分类（孤立知识点），显式切到为空的低置信度分类
+    await switchKind(wrapper, 'low_confidence_relation')
+    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test^="rv-empty-"]')).toHaveLength(1)
+    expect(totalCount(wrapper, 'suspected_duplicate')).toBe(1)
+    expect(totalCount(wrapper, 'isolated_node')).toBe(2)
+  })
+
+  it('分类有待处理项：显示该分类列表，不显示任何空提示', async () => {
+    const { wrapper } = await mountPage(fakes())
+    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-test^="rv-empty-"]')).toHaveLength(0)
+    expect(rows(wrapper, 'rv-relation')).toEqual(['r1', 'r2'])
+    expect(totalCount(wrapper, 'low_confidence_relation')).toBe(2)
+  })
+
+  it('处理完最后一条后当前分类进入空态；三栏都处理完只显示完成提示', async () => {
     const f = fakes({ relations: [rel('r1', 'k1', 'k2')], duplicates: [], isolated: [] })
     const { wrapper } = await mountPage(f)
     await click(wrapper, '[data-test="rv-approve"]')
-    expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="rv-all-empty"]').text()).toContain('当前没有待处理的审核项')
+    // 总提示与分类空提示互斥
+    expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(false)
   })
 
   it('草稿名称读取失败不影响审核，关系两端退回显示 ID', async () => {
@@ -385,9 +420,12 @@ describe('审核队列页：加载与三类空态', () => {
   })
 
   it('三类空态文案各不相同，不是共用一句', async () => {
-    const { wrapper } = await mountPage(fakes({ relations: [], duplicates: [], isolated: [] }))
+    // 逐类构造「只有这一类为空」：三类全空时按设计只显示总提示，分类文案无从比较
+    const opts: Array<Parameters<typeof fakes>[0]> = [{ relations: [] }, { duplicates: [] }, { isolated: [] }]
+    const kinds = ['low_confidence_relation', 'suspected_duplicate', 'isolated_node'] as const
     const texts: string[] = []
-    for (const kind of ['low_confidence_relation', 'suspected_duplicate', 'isolated_node'] as const) {
+    for (const [index, kind] of kinds.entries()) {
+      const { wrapper } = await mountPage(fakes(opts[index]!))
       await switchKind(wrapper, kind)
       texts.push(wrapper.find(`[data-test="rv-empty-${kind}"]`).text().trim())
     }
@@ -412,6 +450,60 @@ describe('审核队列页：加载与三类空态', () => {
   it('课程页对课程教师显示审核入口', async () => {
     const { wrapper } = await mountPage(fakes(), '/courses/c1')
     expect(wrapper.find('[data-test="review-link"]').attributes('href')).toBe('/courses/c1/review')
+  })
+})
+
+describe('审核队列页：导航、标题与发布栏的顺序', () => {
+  /** 元素在整棵子树里的文档顺序；找不到时返回 -1（便于断言「必须同时存在」） */
+  function order(wrapper: VueWrapper, selector: string): number {
+    const target = wrapper.find(selector)
+    if (!target.exists()) return -1
+    const all = Array.from(wrapper.element.querySelectorAll('*'))
+    return all.indexOf(target.element as Element)
+  }
+
+  it('导航与标题排在发布状态栏之前，版本历史排在审核区之后', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const back = order(wrapper, '[data-test="rv-back"]')
+    const title = order(wrapper, '#review-title')
+    const publish = order(wrapper, '[data-test="version-panel"] [data-test="vp-publish"]')
+    const reviewCard = order(wrapper, '.review-card')
+    const history = order(wrapper, '.history')
+    for (const [name, value] of Object.entries({ back, title, publish, reviewCard, history })) {
+      expect(value, `${name} 应在页面上出现`).toBeGreaterThanOrEqual(0)
+    }
+    expect(back).toBeLessThan(title)
+    expect(title).toBeLessThan(publish)
+    expect(publish).toBeLessThan(reviewCard)
+    expect(reviewCard).toBeLessThan(history)
+  })
+
+  it('版本接口加载中或失败时，导航、标题与审核内容仍独立显示', async () => {
+    const pending = deferred<never[]>()
+    // 版本历史一直挂着：分类、列表与空态都由审核接口驱动，应当照常渲染
+    const loading = await mountPage(fakes(), '/courses/c1/review', 'teacher', {
+      list: () => pending.promise,
+      publish: vi.fn(),
+      rollback: vi.fn(),
+    })
+    expect(loading.wrapper.find('[data-test="vp-loading"]').exists()).toBe(true)
+    expect(loading.wrapper.find('[data-test="rv-back"]').exists()).toBe(true)
+    expect(loading.wrapper.find('#review-title').text()).toBe('审核队列')
+    expect(rows(loading.wrapper, 'rv-relation')).toEqual(['r1', 'r2'])
+    expect(loading.wrapper.find('[data-test="version-panel"]').exists()).toBe(true)
+
+    // 版本历史读取失败：审核内容与标题不受影响，发布栏只是少了学生可见版本
+    const failing = await mountPage(fakes(), '/courses/c1/review', 'teacher', {
+      list: vi.fn(async () => {
+        throw new NetworkError('offline')
+      }),
+      publish: vi.fn(),
+      rollback: vi.fn(),
+    })
+    expect(failing.wrapper.find('[data-test="rv-back"]').exists()).toBe(true)
+    expect(failing.wrapper.find('#review-title').exists()).toBe(true)
+    expect(rows(failing.wrapper, 'rv-relation')).toEqual(['r1', 'r2'])
+    expect(failing.wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
   })
 })
 
@@ -776,11 +868,12 @@ describe('审核队列页：关系证据与分类切换', () => {
     expect(wrapper.find('[data-test="rv-evidence-r1"]').exists()).toBe(true)
     await router.push('/courses/c2/review')
     await flushPromises()
-    // 回到第一类（c2 三类都为空时的默认），旧分类与证据展开都不残留
+    // 回到第一类（c2 三类都为空时的默认），旧分类与证据展开都不残留；
+    // c2 三类全空，按设计只显示一条总提示，分类空提示一律不渲染
     expect(wrapper.find('[data-test="rv-total-low_confidence_relation"]').attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="rv-total-isolated_node"]').attributes('aria-selected')).toBe('false')
-    expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="rv-empty-isolated_node"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test^="rv-empty-"]')).toHaveLength(0)
     expect(wrapper.find('[data-test="rv-evidence-r1"]').exists()).toBe(false)
   })
 })

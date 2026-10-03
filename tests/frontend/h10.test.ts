@@ -285,4 +285,74 @@ describe('H10 review-page integration', () => {
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="version-panel"]').text()).toContain('学生当前看到 v2')
   })
+
+  it('keeps the version history folded and after the review area without duplicating panel state', async () => {
+    sessionStorage.clear()
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const session = useSessionStore(pinia)
+    session.signIn({ access_token: 'tok', token_type: 'bearer', expires_in: 3600,
+      user: { id: 'u1', username: 'teacher', role: 'teacher' } })
+    const router = createAppRouter({ history: createMemoryHistory(), getAccountRole: () => session.role,
+      coursesComponent: defineComponent({ render: () => h('div') }), reviewComponent: ReviewView })
+    await router.push('/courses/c1/review')
+    await router.isReady()
+    const review: ReviewApi = {
+      getQueue: async () => ({ low_confidence_relations: [], suspected_duplicates: [], isolated_nodes: [],
+        totals: { low_confidence_relations: 0, suspected_duplicates: 0, isolated_nodes: 0 },
+        next_cursors: { low_confidence_relations: null, suspected_duplicates: null, isolated_nodes: null } }),
+      resolve: vi.fn(),
+    }
+    const list = vi.fn(async () => [published(1), published(2)])
+    const wrapper = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [pinia, router], provide: {
+      [COURSES_API_KEY as symbol]: { get: async () => course('c1'), list: vi.fn(), create: vi.fn() },
+      [REVIEW_API_KEY as symbol]: review,
+      [VERSIONS_API_KEY as symbol]: { list, publish: vi.fn(), rollback: vi.fn() },
+    } } })
+    await flushPromises()
+    // 只挂载一个版本面板、只请求一次版本历史：发布栏与历史共用同一份版本状态
+    expect(wrapper.findAll('[data-test="version-panel"]')).toHaveLength(1)
+    expect(list).toHaveBeenCalledTimes(1)
+    // 标题在发布栏之前，版本历史在审核区之后
+    const all = Array.from(wrapper.element.querySelectorAll('*'))
+    const at = (selector: string) => all.indexOf(wrapper.get(selector).element as Element)
+    expect(at('#review-title')).toBeLessThan(at('[data-test="vp-publish"]'))
+    expect(at('.review-card')).toBeLessThan(at('.history'))
+    // 版本历史仍默认折叠
+    expect(wrapper.get('details').attributes('open')).toBeUndefined()
+  })
+
+  it('keeps the navigation and title visible while the version request is pending or failing', async () => {
+    sessionStorage.clear()
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const session = useSessionStore(pinia)
+    session.signIn({ access_token: 'tok', token_type: 'bearer', expires_in: 3600,
+      user: { id: 'u1', username: 'teacher', role: 'teacher' } })
+    const router = createAppRouter({ history: createMemoryHistory(), getAccountRole: () => session.role,
+      coursesComponent: defineComponent({ render: () => h('div') }), reviewComponent: ReviewView })
+    await router.push('/courses/c1/review')
+    await router.isReady()
+    const review: ReviewApi = {
+      getQueue: async () => ({ low_confidence_relations: [], suspected_duplicates: [], isolated_nodes: [],
+        totals: { low_confidence_relations: 1, suspected_duplicates: 0, isolated_nodes: 0 },
+        next_cursors: { low_confidence_relations: null, suspected_duplicates: null, isolated_nodes: null } }),
+      resolve: vi.fn(),
+    }
+    const gateway = deferred<GraphVersion[]>()
+    const wrapper = mount(defineComponent({ render: () => h(RouterView) }), { global: { plugins: [pinia, router], provide: {
+      [COURSES_API_KEY as symbol]: { get: async () => course('c1'), list: vi.fn(), create: vi.fn() },
+      [REVIEW_API_KEY as symbol]: review,
+      [VERSIONS_API_KEY as symbol]: { list: () => gateway.promise, publish: vi.fn(), rollback: vi.fn() },
+    } } })
+    await flushPromises()
+    expect(wrapper.find('[data-test="vp-loading"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="rv-back"]').exists()).toBe(true)
+    expect(wrapper.get('#review-title').text()).toBe('审核队列')
+    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
+    gateway.resolve([published(1), published(2)])
+    await flushPromises()
+    expect(wrapper.get('[data-test="vp-current"]').text()).toContain('v2')
+    expect(wrapper.get('[data-test="rv-back"]').exists()).toBe(true)
+  })
 })

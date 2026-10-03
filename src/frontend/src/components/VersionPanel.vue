@@ -8,15 +8,16 @@ import { useVersions } from '../composables/useVersions'
 /**
  * H10: 已提交版本以课程详情为准，发布/回滚响应不做乐观替换。
  *
- * 组件由上到下渲染三段：顶部发布状态栏、`review-content` 插槽（审核区）、底部默认折叠的版本历史。
- * 版本状态只有这一份（`useVersions`），审核页把它作为插槽内容嵌进中间，不再单独挂载第二个版本面板。
- * 插槽不放进版本专属的 `state.course.value` 条件里：版本数据加载失败时审核内容仍然可见。
+ * 组件由上到下渲染：`review-header` 插槽（导航与标题）、紧凑发布状态栏、`review-content` 插槽（审核区）、
+ * 底部默认折叠的版本历史。标题必须排在发布栏之前，因此审核页把导航与标题交给 `review-header`，
+ * 审核内容交给 `review-content`：两个插槽都留在版本条件之外，版本加载中或加载失败时它们仍独立显示。
+ * 版本状态只有这一份（`useVersions`），审核页不再单独挂载第二个版本面板。
  * 不传插槽时组件仍可独立用作「发布与版本历史」面板。
  */
 const props = defineProps<{ courseId: string }>()
 const emit = defineEmits<{ forbidden: [] }>()
 const slots = useSlots()
-const hasReviewContent = computed(() => slots['review-content'] !== undefined)
+const hasReviewContent = computed(() => slots['review-header'] !== undefined || slots['review-content'] !== undefined)
 const coursesApi = inject(COURSES_API_KEY, null)
 if (coursesApi === null) throw new Error('VersionPanel 需要注入 COURSES_API_KEY')
 const client = inject(HTTP_CLIENT_KEY, null)
@@ -56,6 +57,9 @@ function formatPublishedAt(value: string | undefined): string {
     aria-labelledby="version-panel-title"
   >
     <h2 id="version-panel-title" class="version-panel__sr">发布与版本历史</h2>
+
+    <!-- 0. 导航与页面标题：排在发布状态栏之前，版本加载中或失败时照常显示 -->
+    <slot name="review-header"></slot>
 
     <p v-if="state.status.value === 'loading'" data-test="vp-loading" role="status">正在加载版本历史…</p>
     <p v-else-if="state.status.value === 'not_teacher'" data-test="vp-not-teacher" role="status">只有本课程教师可以发布或回滚。</p>
@@ -116,7 +120,7 @@ function formatPublishedAt(value: string | undefined): string {
       <p v-if="state.refreshing.value" data-test="vp-refreshing" role="status">正在核对发布状态…</p>
     </div>
 
-    <!-- 2. 审核区：插槽留在版本条件之外，版本加载失败不会连带隐藏审核内容 -->
+    <!-- 2. 审核区：两个插槽都留在版本条件之外，版本加载失败不会连带隐藏标题与审核内容 -->
     <slot name="review-content"></slot>
 
     <!-- 3. 版本历史：默认折叠只影响展示，展开控件是原生 details/summary，键盘可直接操作 -->
@@ -170,8 +174,8 @@ function formatPublishedAt(value: string | undefined): string {
 </template>
 
 <style scoped>
-/* 组件根只做纵向排布与间距；卡片外观交给下面的三段各自持有，避免最外层套一层大白卡。
- * 审核页把整页放进插槽，因此宽度上限放在组件根上：发布栏、审核卡、版本历史三段左右对齐。 */
+/* 组件根只做纵向排布与间距；卡片外观交给下面的各段各自持有，避免最外层套一层大白卡。
+ * 审核页把整页放进两个插槽，因此宽度上限放在组件根上：导航标题、发布栏、审核卡、版本历史四段左右对齐。 */
 .version-panel {
   display: grid;
   gap: 1.25rem;
@@ -181,7 +185,7 @@ function formatPublishedAt(value: string | undefined): string {
   min-width: 0;
 }
 
-/* 有审核插槽时：发布栏与审核卡贴合成一个整体，历史区再留出更大的间隔 */
+/* 有审核插槽时：导航标题、发布栏与审核卡贴合成一个整体，历史区再留出更大的间隔 */
 .version-panel--with-review {
   gap: 0.75rem;
 }
