@@ -362,14 +362,45 @@ tr:last-child td {
   max-width: none;
   padding: 0;
 }
-.app--auth .app-main { display: block; position: relative; }
-/* 真实认证页在表单区显示可关闭提示；未注入认证页的旧路由外壳仍显示自身提示。 */
-.app--auth .app-main:has(> .auth-layout) > [role="alert"] { display: none; }
+/* 认证页（登录、注册）：全屏左右分栏，表单栏在窄而矮的窗口里内部滚动，避免提交按钮被挤出视口。
+ * 目标的 AuthLayout 依赖这套全屏布局，因此把目标原先挂在 `.app--login` 上的规则迁到 `.app--auth`。 */
+.app.app--auth .app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: none;
+  min-height: 0;
+  padding: 0;
+}
+.app.app--auth .auth-layout {
+  flex: 1;
+  min-height: 0;
+}
+.app.app--auth .auth-layout__brand {
+  min-height: 0;
+  overflow: hidden;
+}
+.app.app--auth .auth-layout__form {
+  min-height: 0;
+  overflow-y: auto;
+}
+/* 这里不隐藏 role="alert"：认证页的跳转提示（未登录、角色不符）必须对用户可见，
+ * 目标的 AuthLayout 没有在表单内渲染同一条提示，隐藏就会让人看不到被跳转的原因。 */
 
-/* 组件里的 <section> 直接落在 .app-main 的网格里，统一铺满一列 */
-.app-main > section,
-.app-main > form {
+/* 直接落在 .app-main 网格里的 <section>/<form>：尚未迁移的页面靠这条兜底保持卡片外观与留白。
+ * 排除两类已经自带外观的容器，避免双重卡片：
+ *   `.page`        迁移后的透明页面外层（标题落在背景上，内层卡片各自承担外观）
+ *   `.surface-card` 已经是卡片，不需要再叠一层背景与内边距 */
+.app-main > section:not(.page):not(.surface-card),
+.app-main > form:not(.page):not(.surface-card) {
+  display: grid;
+  gap: 0.75rem;
   min-width: 0;
+  padding: 1.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
 /* ---------------------------------------------------------------- 页面骨架与卡片（API 设置页是视觉基准）

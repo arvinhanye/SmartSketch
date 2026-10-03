@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createMemoryHistory } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../../src/contracts/v1/generated/typescript/openapi'
@@ -290,6 +292,45 @@ describe('H13 登录页', () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(wrapper.find('input[name="username"]').exists()).toBe(true)
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
+  })
+
+  it('认证页不隐藏跳转提示：提示是带关闭按钮的可关闭提示条', async () => {
+    // 回归（审查 R2）：来源的样式曾用 .app--auth .app-main > [role="alert"] { display: none }
+    // 假定认证组件自己渲染同一条提示；目标的 AuthLayout 没有该逻辑，隐藏后用户看不到跳转原因。
+    const { wrapper } = await mountApp({ path: '/teacher' })
+    const notice = wrapper.get('[role="alert"]')
+    expect(notice.classes()).toContain('app-notice')
+    expect(notice.text()).toContain('未登录：请先登录，再进入教师或学生首页。')
+    // 提示条与登录表单同时存在（不是被隐藏后只留 DOM）
+    expect(wrapper.find('.auth-layout').exists()).toBe(true)
+    expect(notice.element.closest('.app-main')).not.toBeNull()
+  })
+
+  it('样式表里没有任何隐藏外壳提示的规则', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+    // 逐条检查规则体：不允许出现「把 .app-notice 或 role=alert 关掉」的声明
+    const hidingRules = css
+      .split('}')
+      .filter((block) => /app-notice|\[role=["']?alert/.test(block.split('{')[0] ?? ''))
+      .filter((block) => /display:\s*none|visibility:\s*hidden/.test(block))
+    expect(hidingRules, `发现隐藏提示的规则：${hidingRules.join(' | ')}`).toEqual([])
+    // 认证页不再走「隐藏重复提示」的旧语义
+    expect(css).not.toContain('.app--auth .app-main:has(> .auth-layout) > [role="alert"]')
+  })
+
+  it('卡片兜底只作用于未迁移页面：排除透明页面外层与卡片自身', () => {
+    // 回归（审查 R3）：删掉 .app-main > section 的卡片外观后，未迁移页面丢失卡片与留白；
+    // 恢复时必须排除 .page（迁移后的透明外层）与 .surface-card（自带外观），否则双重卡片。
+    const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+    const fallback = css.split('}').find((block) => block.includes('.app-main > section'))
+    expect(fallback).toBeDefined()
+    expect(fallback!).toContain(':not(.page)')
+    expect(fallback!).toContain(':not(.surface-card)')
+    expect(fallback!).toMatch(/background:\s*var\(--color-surface\)/)
+    expect(fallback!).toMatch(/border:\s*1px solid var\(--color-border\)/)
+    expect(fallback!).toMatch(/border-radius:/)
+    expect(fallback!).toMatch(/box-shadow:\s*var\(--shadow-card\)/)
+    expect(fallback!).toMatch(/padding:/)
   })
 
   it.each([
