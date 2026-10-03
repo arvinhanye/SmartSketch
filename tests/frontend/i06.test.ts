@@ -393,7 +393,8 @@ describe('I06 推荐理由与服务端分量一致（纯函数）', () => {
     expect(rows.get('unlock_count')).toBe('2 个')
     expect(rows.get('importance')).toBe('1.0000')
     expect(rows.get('centrality')).toBe('1.0000')
-    expect(rows.get('difficulty')).toBe('0.5000')
+    // L14-3：缺失属性的中性值 0.5 不冒充测量值
+    expect(rows.get('difficulty')).toBe('未标注（按中性值 0.5 排序）')
     expect(rows.get('chapter')).toBe('第一章 线性表（秩 0）')
     expect(rows.get('primary_factor')).toBe(PRIMARY_FACTOR_LABELS.unlock)
     const weighted = new Map(weightedFactRows(item).map((row) => [row.key, row.value]))

@@ -274,6 +274,7 @@ const selectedName = computed(() => {
             :loading="recommendLoading"
             :error="recommendError"
             :selected-id="selected"
+            :narrative="learningPath?.narrative ?? null"
             @select="filters.select"
             @retry="refreshRecommend"
           />

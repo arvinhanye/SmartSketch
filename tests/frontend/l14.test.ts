@@ -304,3 +304,55 @@ describe('L14-2 学生图谱页路径焦点', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------- L14-3 推荐解释
+
+import Recommendations from '../../src/frontend/src/components/Recommendations.vue'
+import { pathLine, reasonFactRows } from '../../src/frontend/src/composables/useLearning'
+
+describe('L14-3 推荐解释：先修事实优先，缺省值不冒充测量', () => {
+  it('路径行：已掌握 → 还需先学 → 下一步 → 之后解锁；空段省略；没有下一步时为空', () => {
+    expect(pathLine({ mastered: ['A', 'B'], missing: [], next: ['C'], unlocks: ['D', 'E'] }))
+      .toBe('已掌握：A、B → 下一步：C → 之后解锁：D、E')
+    expect(pathLine({ mastered: [], missing: ['A'], next: ['C'], unlocks: [] })).toBe('还需先学：A → 下一步：C')
+    expect(pathLine({ mastered: [], missing: [], next: [], unlocks: [] })).toBe('')
+  })
+
+  it('重要度、难度为中性值 0.5 时写「未标注」，其他值照常显示', () => {
+    const rows = new Map(reasonFactRows(rec('C')).map((row) => [row.key, row]))
+    expect(rows.get('importance')!.value).toBe('未标注（按中性值 0.5 排序）')
+    expect(rows.get('importance')!.labelledDefault).toBe(true)
+    expect(rows.get('difficulty')!.value).toBe('未标注（按中性值 0.5 排序）')
+    const marked = new Map(reasonFactRows(rec('C', { importance: 0.8, difficulty: 0.3 })).map((row) => [row.key, row]))
+    expect(marked.get('importance')!.value).toBe('0.8000')
+    expect(marked.get('importance')!.labelledDefault).toBe(false)
+    expect(marked.get('difficulty')!.value).toBe('0.3000')
+  })
+
+  it('列表：顶部路径行、每项序号、「排序参考」', () => {
+    const wrapper = mount(Recommendations, {
+      props: {
+        state: 'recommendations', items: [rec('C'), rec('G')], totalEligible: 2,
+        narrative: { mastered: ['知识点A'], missing: [], next: ['知识点C'], unlocks: ['知识点D'] },
+      },
+    })
+    expect(wrapper.get('[data-test="rc-path-line"]').text()).toBe('已掌握：知识点A → 下一步：知识点C → 之后解锁：知识点D')
+    expect(wrapper.findAll('[data-test="rc-order"]').map((el) => el.text())).toEqual(['1.', '2.'])
+    expect(wrapper.get('.recommendations__details summary').text()).toBe('排序参考')
+    expect(wrapper.find('[data-fact="importance"]').text()).toContain('未标注')
+  })
+
+  it('没有路径叙述时不渲染路径行', () => {
+    const wrapper = mount(Recommendations, { props: { state: 'recommendations', items: [rec('C')], totalEligible: 1 } })
+    expect(wrapper.find('[data-test="rc-path-line"]').exists()).toBe(false)
+  })
+
+  it('学生图谱页：路径行随选中的推荐项更新', async () => {
+    const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
+    expect(wrapper.get('[data-test="rc-path-line"]').text()).toBe('已掌握：知识点A、知识点B → 下一步：知识点C → 之后解锁：知识点D、知识点E')
+    await wrapper.get('[data-test="rc-select-G"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="rc-path-line"]').text()).toBe('下一步：知识点G')
+    wrapper.unmount()
+  })
+})

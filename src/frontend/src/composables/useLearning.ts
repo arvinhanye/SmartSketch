@@ -34,6 +34,8 @@ export interface ReasonFactRow {
   key: string
   label: string
   value: string
+  /** L14：该值是缺失属性时的中性值 0.5（ADR-014 修订 1 决定 5），展示为「未标注」而不是测量值 */
+  labelledDefault?: boolean
 }
 
 export const MASTERY_LABELS: Readonly<Record<MasteryStatus, string>> = Object.freeze({
@@ -128,17 +130,37 @@ export function formatFactor(value: number): string {
   return Number.isFinite(value) ? value.toFixed(4) : String(value)
 }
 
+/** 抽取与教师编辑目前都不填重要度、难度；缺失时服务端按中性值 0.5 参与排序（`specs/learning-path.md` §3） */
+export const NEUTRAL_ATTRIBUTE = 0.5
+const UNLABELLED_TEXT = '未标注（按中性值 0.5 排序）'
+
+function attributeRow(key: string, label: string, value: number): ReasonFactRow {
+  const labelledDefault = value === NEUTRAL_ATTRIBUTE
+  return { key, label, value: labelledDefault ? UNLABELLED_TEXT : formatFactor(value), labelledDefault }
+}
+
 /** 理由的结构化事实行：逐条取自服务端 `reason_facts`，不做任何换算 */
 export function reasonFactRows(item: Recommendation): ReasonFactRow[] {
   const facts = item.reason_facts
   return [
     { key: 'unlock_count', label: '可立即解锁', value: `${item.unlock_count} 个` },
-    { key: 'importance', label: '重要度', value: formatFactor(facts.importance) },
+    attributeRow('importance', '重要度', facts.importance),
     { key: 'centrality', label: '中心度', value: formatFactor(facts.centrality) },
-    { key: 'difficulty', label: '难度', value: formatFactor(facts.difficulty) },
+    attributeRow('difficulty', '难度', facts.difficulty),
     { key: 'chapter', label: '章节', value: facts.chapter_name === null ? '未分章' : `${facts.chapter_name}（秩 ${facts.chapter_rank}）` },
     { key: 'primary_factor', label: '主要理由', value: PRIMARY_FACTOR_LABELS[facts.primary_factor] },
   ]
+}
+
+/** L14：「已掌握：A、B → 还需先学：X → 下一步：C → 之后解锁：D、E」；空段省略，没有下一步时为空串 */
+export function pathLine(narrative: LearningPath['narrative']): string {
+  if (narrative.next.length === 0) return ''
+  const parts: string[] = []
+  if (narrative.mastered.length > 0) parts.push(`已掌握：${narrative.mastered.join('、')}`)
+  if (narrative.missing.length > 0) parts.push(`还需先学：${narrative.missing.join('、')}`)
+  parts.push(`下一步：${narrative.next.join('、')}`)
+  if (narrative.unlocks.length > 0) parts.push(`之后解锁：${narrative.unlocks.join('、')}`)
+  return parts.join(' → ')
 }
 
 /** 服务端的四类加权分量与总分：原样展示，不用 `factors` 乘权重重算 */
