@@ -160,6 +160,9 @@ const summaryText = computed(() => {
       </label>
     </fieldset>
 
+    <!-- L13-3：不常用的筛选默认收起，给画布留出空间；关系图例与按关系筛选常显（验收要求） -->
+    <details class="graph-toolbar__advanced" data-test="gt-advanced">
+      <summary>更多筛选（类型、状态、章节）</summary>
     <fieldset class="graph-toolbar__group">
       <legend>知识点类型</legend>
       <label v-for="item in nodeTypeItems" :key="item.type" :data-node-type="item.type">
@@ -197,6 +200,7 @@ const summaryText = computed(() => {
         <option v-for="(option, index) in chapters" :key="index" :value="String(index)">{{ option.label }}</option>
       </select>
     </label>
+    </details>
 
     <div class="graph-toolbar__group" role="radiogroup" aria-label="布局">
       <label v-for="item in layoutItems" :key="item.value">
@@ -229,6 +233,15 @@ const summaryText = computed(() => {
   padding: 8px 0;
 }
 
+.graph-toolbar__advanced summary {
+  cursor: pointer;
+  color: var(--color-text-muted, #555);
+}
+.graph-toolbar__advanced[open] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
 .graph-toolbar__search {
   min-width: 12em;
   width: auto;

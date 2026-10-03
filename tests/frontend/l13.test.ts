@@ -181,3 +181,21 @@ describe('L13-2 搜索定位', () => {
     expect(wrapper.emitted('locate')).toEqual([['队列']])
   })
 })
+
+describe('L13-3 高级筛选折叠', () => {
+  it('搜索框、关系图例与布局常显；类型、状态、章节收进默认收起的「更多筛选」', () => {
+    const wrapper = mount(GraphToolbar, {
+      props: { modelValue: defaultFilterState(), layout: 'hierarchical', chapters: [], summary: null, canClear: false },
+    })
+    const advanced = wrapper.get('[data-test="gt-advanced"]')
+    expect(advanced.element.tagName).toBe('DETAILS')
+    expect(advanced.attributes('open')).toBeUndefined()
+    expect(advanced.get('summary').text()).toContain('更多筛选')
+    expect(advanced.find('[data-node-type]').exists()).toBe(true)
+    expect(advanced.find('[data-test="status-filter"]').exists()).toBe(true)
+    expect(advanced.find('select').exists()).toBe(true)
+    expect(advanced.find('input[type="search"]').exists()).toBe(false)
+    expect(advanced.find('[data-test="relation-legend"]').exists()).toBe(false)
+    expect(advanced.find('[role="radiogroup"]').exists()).toBe(false)
+  })
+})
