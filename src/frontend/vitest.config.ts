@@ -22,6 +22,16 @@ function resolveTestDepsFromFrontend(): Plugin {
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    resolve: {
+      // setup.ts 位于仓库外（tests/frontend），裸模块导入在它那里解析不到前端包的 node_modules；
+      // 上面的 resolveId 插件覆盖不到 setupFiles 这一层，故对四个共享依赖显式指向前端包内的入口。
+      alias: {
+        '@vue/test-utils': fileURLToPath(new URL('./node_modules/@vue/test-utils/dist/vue-test-utils.esm-bundler.mjs', import.meta.url)),
+        pinia: fileURLToPath(new URL('./node_modules/pinia/dist/pinia.js', import.meta.url)),
+        'vue-router': fileURLToPath(new URL('./node_modules/vue-router/vue-router.node.mjs', import.meta.url)),
+        vue: fileURLToPath(new URL('./node_modules/vue/index.mjs', import.meta.url)),
+      },
+    },
     plugins: [resolveTestDepsFromFrontend()],
     server: {
       fs: { allow: ['.', testsDir] },
