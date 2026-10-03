@@ -184,12 +184,12 @@ function fakeTaskEvents() {
     })
     finish(taskId, 'cancelled')
   }
-  function failed(taskId: string, code: ErrorCode) {
+  function failed(taskId: string, code: ErrorCode, details?: Record<string, unknown>) {
     last(taskId).handlers.onUpdate({
       source: 'stream',
       event: 'error',
       final: true,
-      data: { task_id: taskId, stage: 'failed', progress: 0.3, error: { code, message: '服务端原文不应被展示' } },
+      data: { task_id: taskId, stage: 'failed', progress: 0.3, error: { code, message: '服务端原文不应被展示', ...(details ? { details } : {}) } },
     })
     finish(taskId, 'failed')
   }
@@ -785,6 +785,23 @@ describe('H02 取消', () => {
 // ---------------------------------------------------------------- 失败与重试
 
 describe('H02 任务失败与重试', () => {
+  it.each(['auth', 'credential_revoked', 'credential_missing', 'credential_unreadable'])(
+    'LLM_UNAVAILABLE + %s：提示检查「模型 API 设置」（ADR-080、ADR-082 决定 4）', async (reason) => {
+      const { wrapper, events } = await uploaded()
+      events.failed('t1', 'LLM_UNAVAILABLE', { reason })
+      await flushPromises()
+      const text = row(wrapper, 'd_t1').get('[data-test="task-error"]').text()
+      expect(text).toContain('模型 API 设置')
+      expect(text).not.toContain('服务端原文')
+    })
+
+  it('LLM_UNAVAILABLE 没有凭据原因时仍是通用文案', async () => {
+    const { wrapper, events } = await uploaded()
+    events.failed('t1', 'LLM_UNAVAILABLE')
+    await flushPromises()
+    expect(row(wrapper, 'd_t1').get('[data-test="task-error"]').text()).toBe('模型服务暂不可用，抽取未完成。')
+  })
+
   it('任务失败：按错误码显示固定文案（不回显服务端 message），可用同一文件重新上传', async () => {
     const { wrapper, events, materials } = await uploaded()
     events.failed('t1', 'DOCUMENT_UNREADABLE')

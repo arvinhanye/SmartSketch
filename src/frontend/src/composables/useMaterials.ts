@@ -134,7 +134,16 @@ const TASK_ERROR_MESSAGE: Partial<Record<ErrorBody['code'], string>> = {
   INTERNAL_ERROR: '处理过程中发生内部错误。',
 }
 
+/** 个人模型凭据导致的任务失败（ADR-080 决定 3、ADR-082 决定 4）：引导用户检查自己的配置 */
+const CREDENTIAL_REASONS: ReadonlySet<string> = new Set(['auth', 'credential_revoked', 'credential_missing', 'credential_unreadable'])
+
 function taskErrorMessage(error: ErrorBody | null): string {
+  const reason = error?.details?.reason
+  if (error?.code === 'LLM_UNAVAILABLE' && typeof reason === 'string' && CREDENTIAL_REASONS.has(reason)) {
+    return reason === 'auth'
+      ? '模型服务拒绝了你的 API 密钥，任务已终止。请到「模型 API 设置」检查后重新上传。'
+      : '你的模型 API 配置已清除或不可用，任务已终止。请到「模型 API 设置」保存后重新上传。'
+  }
   return (error && TASK_ERROR_MESSAGE[error.code]) ?? '处理失败。'
 }
 
