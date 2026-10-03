@@ -4,7 +4,7 @@
 task_id: L09
 review_status: handoff（Claude 未实现；由 DeepSeek harness 认领并实现）
 worktree: /Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-contest-sprint-77644f
-branch: claude/smartsketch-contest-sprint-77644f（只在本机，未推送 GitHub）
+branch: claude/smartsketch-contest-sprint-77644f（已推送 GitHub：origin/claude/smartsketch-contest-sprint-77644f，2026-10-03）
 base_commit: 本交接所在提交（L00–L08、L10 代码已提交）
 author: Claude（Opus 5.5）
 ```
@@ -248,7 +248,7 @@ scripts/start.sh --no-open                       # 另开终端：curl -s http:/
 - L09 只改：`src/backend/app/config.py`（仅 6.2 一处）、`tests/backend/test_l09.py`、`tests/backend/test_b06.py`（仅 6.3 三处）、`scripts/check-embedding.py`、`scripts/start-demo.sh`、`scripts/start.sh`、`docs/runbook.md`、`docs/integrations.md`（若向量地址需更正）、`docs/tasks.md`（L09 一行）、你自己的交接文件。
 - 不要改 L03–L08、L10 已提交的其他文件；发现它们有问题，写进交接，不要顺手改。
 - 交接文件命名 `docs/handoffs/deepseek-l09.md`，字段同本文件头（task_id、review_status、worktree、base/head、changed_files、verification、unverified、api_and_data_changes、rollback、next_action）。
-- 提交只在本分支本地；提交信息说明作者是 DeepSeek harness；不推送、不合并（需用户另行授权）。
+- 提交在本分支；提交信息说明作者是 DeepSeek harness；推送与合并需用户另行授权（本分支已推送过一次，不代表之后的推送已获授权）。
 - 预算：冲刺累计计费 token 约 101054 / 5000000；向量联调与测试连接用量很小，仍请在交接里登记。
 
 ## 9. L09 之后的下一步（由用户决定谁来做）
