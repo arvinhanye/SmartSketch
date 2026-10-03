@@ -34,6 +34,8 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  /** 搜索框按回车：页面据此定位并选中匹配的知识点（L13-2） */
+  locate: [query: string]
   'update:modelValue': [state: GraphFilterState]
   'update:layout': [layout: GraphLayoutName]
   clear: []
@@ -130,6 +132,7 @@ const summaryText = computed(() => {
       aria-label="搜索知识点"
       placeholder="搜索知识点"
       :value="modelValue.query"
+      @keydown.enter.prevent="emit('locate', ($event.target as HTMLInputElement).value)"
       @input="onQuery"
     />
 

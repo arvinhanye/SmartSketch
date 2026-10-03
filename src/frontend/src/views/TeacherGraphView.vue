@@ -13,7 +13,7 @@ import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
-import { chapterOptions, useGraphFilters } from '../composables/useGraphFilters'
+import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
@@ -94,6 +94,18 @@ const pendingName = computed(() => {
   return graph.value?.nodes.find((n) => n.id === target.kpId)?.name ?? target.kpId
 })
 const currentName = computed(() => graph.value?.nodes.find((n) => n.id === selected.value)?.name ?? null)
+
+// L13-2：搜索框回车定位；选中经过「未保存修改」守卫，画布聚焦到该节点
+const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
+const searchNotice = ref<string | null>(null)
+function onLocate(query: string): void {
+  const full = graph.value === null ? null : relations.canvasData.value
+  const kpId = full === null ? null : locateNode(full, filters.state.value, query)
+  searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
+  if (kpId === null) return
+  guard.request(kpId)
+  canvas.value?.focus(kpId)
+}
 
 // L11：画布之外的可访问选择方式（键盘与自动化可用），选择同样经过「未保存修改」守卫
 const pickerOptions = computed(() => nodePickerOptions(graph.value))
@@ -246,7 +258,9 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             :selected-hidden="selectedHidden"
             vertical
             @clear="filters.clear"
+            @locate="onLocate"
           />
+          <p v-if="searchNotice" data-test="tg-search-notice" role="status">{{ searchNotice }}</p>
         </aside>
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
@@ -260,7 +274,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
               <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </label>
-          <GraphCanvas :graph="visible" :layout="filters.layout.value" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div class="teacher-graph__panel">

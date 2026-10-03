@@ -132,3 +132,52 @@ describe('L13-1 可读的初始视口', () => {
     expect(statuses.at(-1)).toBe('ready')
   })
 })
+
+// ---------------------------------------------------------------- L13-2 搜索定位并选中
+
+import { mount } from '@vue/test-utils'
+import { effectScope } from 'vue'
+import GraphToolbar from '../../src/frontend/src/components/GraphToolbar.vue'
+import { defaultFilterState, locateNode, useGraphFilters } from '../../src/frontend/src/composables/useGraphFilters'
+
+function named(id: string, name: string, type = 'concept'): G6Node {
+  return { ...node(id), data: { ...node(id).data, name, type } } as G6Node
+}
+
+const SEARCH: GraphCanvasData = {
+  nodes: [named('q', '循环队列'), named('d', '队列'), named('s', '栈'), named('x', '队列的应用', 'example')],
+  edges: [],
+}
+
+describe('L13-2 搜索定位', () => {
+  it('名称完全一致优先于包含匹配；忽略首尾空白与全半角', () => {
+    expect(locateNode(SEARCH, defaultFilterState(), ' 队列 ')).toBe('d')
+    expect(locateNode(SEARCH, defaultFilterState(), '循环')).toBe('q')
+  })
+
+  it('被筛选隐藏的节点不参与匹配；没有匹配返回 null', () => {
+    const onlyConcepts = { ...defaultFilterState(), nodeTypes: ['concept'] } as ReturnType<typeof defaultFilterState>
+    expect(locateNode(SEARCH, onlyConcepts, '应用')).toBe(null)
+    expect(locateNode(SEARCH, defaultFilterState(), '不存在的知识点')).toBe(null)
+    expect(locateNode(SEARCH, defaultFilterState(), '   ')).toBe(null)
+  })
+
+  it('filters.locate 命中即选中；未命中不清空当前选中', () => {
+    const scope = effectScope()
+    const filters = scope.run(() => useGraphFilters(() => SEARCH))!
+    filters.select('s')
+    expect(filters.locate('循环队列')).toBe('q')
+    expect(filters.selected.value).toBe('q')
+    expect(filters.locate('不存在')).toBe(null)
+    expect(filters.selected.value).toBe('q')
+    scope.stop()
+  })
+
+  it('工具栏在搜索框按回车时发出 locate（带当前关键字）', async () => {
+    const wrapper = mount(GraphToolbar, {
+      props: { modelValue: { ...defaultFilterState(), query: '队列' }, layout: 'hierarchical', chapters: [], summary: null, canClear: false },
+    })
+    await wrapper.get('input[type="search"]').trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('locate')).toEqual([['队列']])
+  })
+})

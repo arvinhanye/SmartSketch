@@ -72,6 +72,15 @@ const { status, error, retryable, courseName, graphVersion, graph, chapters, rel
 const filters = useGraphFilters(graph)
 const { selected, visible, summary, isDefault, selectedHidden } = filters
 
+// L13-2：搜索框回车定位并选中，画布聚焦到该节点；未找到时提示
+const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
+const searchNotice = ref<string | null>(null)
+function onLocate(query: string): void {
+  const kpId = filters.locate(query)
+  searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
+  if (kpId !== null) canvas.value?.focus(kpId)
+}
+
 type ViewMode = 'graph' | 'cards'
 const mode = ref<ViewMode>('graph')
 const modes: Array<{ value: ViewMode; label: string }> = [
@@ -187,12 +196,14 @@ const selectedName = computed(() => {
         :selected-hidden="selectedHidden"
         :show-statuses="false"
         @clear="filters.clear"
+        @locate="onLocate"
       />
+      <p v-if="searchNotice" data-test="sg-search-notice" role="status">{{ searchNotice }}</p>
 
       <div class="student-graph__body">
         <div v-if="mode === 'graph'" class="student-graph__canvas" data-test="sg-graph">
           <p class="student-graph__hint">画布支持鼠标缩放与拖拽；使用键盘请切换到「卡片」视图。</p>
-          <GraphCanvas :graph="learningGraph" :layout="filters.layout.value" @node-click="filters.select" />
+          <GraphCanvas ref="canvas" :graph="learningGraph" :layout="filters.layout.value" @node-click="filters.select" />
         </div>
         <KnowledgeCards
           v-else
