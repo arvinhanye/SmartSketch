@@ -4,7 +4,7 @@ import pytest
 import json
 from pathlib import Path
 
-from app.services.qa.citations import CitationStream, Evidence, not_covered
+from app.services.qa.citations import CitationStream, Evidence, TruncatedAnswer, not_covered
 from app.services.versions.resolver import PublishedVersion
 
 
@@ -142,9 +142,9 @@ def test_each_claim_unit_must_be_cited(raw, covered, count):
 
 
 def test_truncation_still_checks_tail_unit():
-    parser, _, final = finish(["结论[1]。未完成"], evidence(1), truncated=True)
-    assert parser.truncated and parser.invalidation_subtype == "uncited_sentence"
-    assert final["status"] == "not_covered"
+    # ADR-082 决定 2：截断且尾句无出处是生成故障（TruncatedAnswer → LLM_UNAVAILABLE/truncated），不是 not_covered
+    with pytest.raises(TruncatedAnswer):
+        finish(["结论[1]。未完成"], evidence(1), truncated=True)
 
 
 @pytest.mark.parametrize("reason", ["no_retrieval_hit", "below_similarity_threshold", "insufficient_evidence", "all_citations_invalidated"])

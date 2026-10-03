@@ -1996,12 +1996,13 @@ export interface components {
             reason: components["schemas"]["ChatLlmUnavailableReason"];
         };
         /**
-         * @description 问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期；其余首字前失败（含两路首字超时）
-         *     一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`。
+         * @description 问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期（含改写、向量、图检索与生成任一环节）；
+         *     其余首字前失败（含两路首字超时）一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`；
+         *     生成达到输出上限且未通过逐句出处校验为 `truncated`（ADR-082 决定 2，不再归 `not_covered`）。
          *
          * @enum {string}
          */
-        ChatLlmUnavailableReason: "upstream" | "stream_interrupted" | "timeout" | "auth";
+        ChatLlmUnavailableReason: "upstream" | "stream_interrupted" | "timeout" | "auth" | "truncated";
         /** @description 问答接口的 503（开流前的 P2/P4 失败，以及 JSON 模式下的 O7～O10、O12，Q2、Q7）。
          *     `details` 为闭合对象：`request_id` 在 P2 之后出现；`reason` 只属于 `LLM_UNAVAILABLE` 且取 Q5 闭集。
          *     P4 向量调用失败的 `reason` 规格未定，因此 `reason` 可缺省。
@@ -3517,7 +3518,7 @@ export interface operations {
             429: components["responses"]["RateLimited"];
             /** @description JSON 模式下未预期的服务端异常（`INTERNAL_ERROR`，Q5 O13）；`details.request_id` 带回请求 ID。 */
             500: components["responses"]["InternalError"];
-            /** @description JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth），
+            /** @description JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth / truncated），
              *     或存储不可用（`STORAGE_UNAVAILABLE`）。P2 之后发生时 `details.request_id` 带回请求 ID。
              *      */
             503: {

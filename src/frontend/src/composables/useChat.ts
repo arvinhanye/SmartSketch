@@ -22,6 +22,7 @@ function errorText(code: string, reason?: string): string {
     if (reason === 'timeout') return '回答超时，请稍后重试。'
     if (reason === 'stream_interrupted') return '连接中断，回答已撤回。'
     if (reason === 'auth') return '你的模型 API 密钥被拒绝，请到「模型 API 设置」检查配置。'
+    if (reason === 'truncated') return '回答过长被截断，无法保证每句都有出处，已撤回。请缩小问题范围或分开提问。'
     return '问答服务暂不可用，请稍后重试。'
   }
   if (code === 'MODEL_CONFIG_REQUIRED') return '尚未配置模型 API，请先到「模型 API 设置」保存配置。'
@@ -100,7 +101,8 @@ export function useChat(client: ChatStreamClient, courseId: Ref<string | null>) 
       }
     } catch (cause) {
       if (!scope.isCurrent() || active !== controller || cause instanceof AbortedError) return
-      entry.answer = cause instanceof ApiError ? errorText(cause.code)
+      entry.answer = cause instanceof ApiError
+        ? errorText(cause.code, typeof cause.details?.reason === 'string' ? cause.details.reason : undefined)
         : cause instanceof TimeoutError ? errorText('LLM_UNAVAILABLE', 'timeout')
         : cause instanceof ChatStreamInterruptedError ? errorText('LLM_UNAVAILABLE', 'stream_interrupted')
         : errorText('INTERNAL_ERROR')

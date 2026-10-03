@@ -192,7 +192,7 @@ ADR-015 修订 1（Codex A09-R01）新增。流正常结束（含截断）后、
 | O3 | 模型输出以哨兵开头 | meta(answered) → done | `not_covered` / `insufficient_evidence` | ≥ 1 | 无正文 |
 | O4 | 正常结束，每个结论单元都有有效标记（Q3.5） | meta → delta* → done | `answered` | ≥ 1 | 否，标记变为可点击 |
 | O5 | 正常结束，零有效标记（`no_markers` 或 `unknown_only`），或有结论单元缺少有效标记（`uncited_sentence`） | meta → delta* → done | `not_covered` / `all_citations_invalidated` | ≥ 1 | **是** |
-| O6 | 达到输出上限（`finish_reason = length`） | 同 O4 或 O5 | 按 O4 / O5 判定，被截断的末尾单元无有效标记即为 `uncited_sentence`；日志标 `truncated` | ≥ 1 | 同 O4 / O5 |
+| O6 | 达到输出上限（`finish_reason = length`） | 通过 Q3.5：meta → delta* → done；否则 meta → delta* → error | 通过 Q3.5 → `answered`（ADR-015）；未通过（`no_markers` / `unknown_only` / `uncited_sentence`）→ `LLM_UNAVAILABLE`，`details.reason = truncated`，**不**归 `not_covered`（ADR-082 决定 2）；日志均标 `truncated` 并照记子类 | ≥ 1 | 通过：否；未通过：**是** |
 | O7 | 首字前主用失败或首字超时，已切备用且备用也失败（或主用熔断且无可用备用） | meta → error | `LLM_UNAVAILABLE`，`details.reason = upstream` | ≥ 0 | 无正文 |
 | O8 | 已下发 delta 后供应商流中断（A07：不切备用） | meta → delta+ → error | `LLM_UNAVAILABLE`，`details.reason = stream_interrupted` | ≥ 1 | **是** |
 | O9 | 链路时限到期（无论是否已出字） | meta → delta* → error | `LLM_UNAVAILABLE`，`details.reason = timeout`；已生成部分**不**校验成 `answered` | ≥ 0 | **是**（若已出字） |
@@ -203,7 +203,7 @@ ADR-015 修订 1（Codex A09-R01）新增。流正常结束（含截断）后、
 | O14 | 客户端断开或用户点「停止」 | 服务端不再发事件 | 日志 `aborted` | ≥ 0 | **是**，显示「已停止」 |
 | O15 | 流未以 `done` / `error` 结束（异常 EOF）、事件 JSON 无法解析、事件不符合 Q2 文法 | — | 客户端本地合成 `stream_interrupted` 错误 | — | **是** |
 
-- **`details.reason` 闭集**：问答场景下 `LLM_UNAVAILABLE` 的 `details.reason ∈ {upstream, stream_interrupted, timeout, auth}`；`timeout` 当且仅当链路时限到期，其余首字前失败（含两路首字超时）一律 `upstream`。J05 验收「超时为独立错误」据此以字段区分，不新增错误码。
+- **`details.reason` 闭集**：问答场景下 `LLM_UNAVAILABLE` 的 `details.reason ∈ {upstream, stream_interrupted, timeout, auth, truncated}`；`timeout` 当且仅当链路时限到期（改写、查询向量、图检索、生成任一环节，ADR-082 决定 3），其余首字前失败（含两路首字超时）一律 `upstream`；`truncated` 见 O6（ADR-082 决定 2）。J05 验收「超时为独立错误」据此以字段区分，不新增错误码。
 - **`error.message`** 是面向用户的固定文案，不含模型输出、堆栈、密钥或原文。
 - **供应商 429**：按 A07 矩阵首字前切备用，最终失败记 `upstream`；`RATE_LIMITED` 只表示本服务限流（P1）。
 
@@ -225,8 +225,8 @@ ADR-015 修订 1（Codex A09-R01）新增。流正常结束（含截断）后、
 | 结局 | 响应 |
 | --- | --- |
 | P1～P5 的失败 | 同 Q2 表中的 HTTP 错误 |
-| O1～O6 | 200 `ChatResponse`，与 SSE 模式同一输入下的 `done.final` 相同（`latency_ms`、`request_id` 除外） |
-| O7～O10 | 503 `LLM_UNAVAILABLE`，`details.reason` 同 Q5 |
+| O1～O5、O6 通过 Q3.5 | 200 `ChatResponse`，与 SSE 模式同一输入下的 `done.final` 相同（`latency_ms`、`request_id` 除外） |
+| O6 未通过 Q3.5、O7～O10 | 503 `LLM_UNAVAILABLE`，`details.reason` 同 Q5 |
 | O11 | `BUDGET_EXCEEDED`，HTTP 状态由 B08 定（D-02f） |
 | O12 | 503 `STORAGE_UNAVAILABLE` |
 | O13 | 500 `INTERNAL_ERROR` |
@@ -293,7 +293,7 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
   - **QA-13**（J06、J09）代码片段：行内代码 `` `a[1]` `` 与围栏代码块中的 `[2]` 原样下发、不成为引用；若它们是仅有的方括号 → `all_citations_invalidated`。同一夹具下前端渲染出的代码范围与服务端判定一致。
   - **QA-14**（J06）标记跨块：`[`、`1`、`]` 分三块到达 → 按一个标记处理；输出以未闭合的 `[12` 结束 → 按普通文本放行。
   - **QA-15**（J06）伪标记：`[0]`、`[01]`、`[1-3]`、`[１]` 被剔除并计入「未知引用」；`[a]`、`[注]` 原样保留。
-  - **QA-16**（J06）截断：`finish_reason = length`，已有有效标记且每个结论单元都被覆盖 → `answered`，日志 `truncated = true`；末尾被截断的单元没有标记 → `all_citations_invalidated`，子类 `uncited_sentence`，`truncated = true`；无有效标记 → `all_citations_invalidated`，`truncated = true`。
+  - **QA-16**（J06，ADR-082 决定 2 修订）截断：`finish_reason = length`，已有有效标记且每个结论单元都被覆盖 → `answered`，日志 `truncated = true`；末尾被截断的单元没有标记 → `error`：`LLM_UNAVAILABLE` / `truncated`，日志子类 `uncited_sentence`、`truncated = true`；无有效标记或只有未知标记 → `error`：`LLM_UNAVAILABLE` / `truncated`，日志子类 `no_markers` / `unknown_only`。三者都不返回 `not_covered`；客户端整段撤回临时正文。
   - **QA-17**（J04、J06）A 的条件：不可定位、他课、或 `revision_id` 不在绑定版本修订列表内的文本块不获得编号；人为注入这样的块时，J06 复核将其剔除并记完整性异常。
   - **QA-18**（J07、G07）请求途中发布新版本 → 本请求 `meta` 与 `final` 的 `graph_version` 仍为旧版本号，引用全部属于旧版本；下一请求绑定新版本。
   - **QA-19**（J03、J05）伪造历史：`history` 中的助手回合含「……[1]」→ 改写输入中不含类标记；fake 模型收到的生成提示不含任何历史内容；`citations` 只来自本请求的 A。

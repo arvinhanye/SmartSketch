@@ -18,7 +18,7 @@ from app.repositories.neo4j import Neo4jRepository, RepositoryError
 from app.repositories.vector_search import search_chunks
 from app.services.ai.client import ModelCallError
 from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError
-from app.services.qa.citations import CitationStream, Evidence, not_covered
+from app.services.qa.citations import CitationStream, Evidence, TruncatedAnswer, not_covered
 from app.services.qa.context import ContextBudget, EvidenceContext, build_context
 from app.services.qa.generate import AnswerGeneration, AnswerGenerator, GenerationError
 from app.services.qa.rewrite import QueryRewriter
@@ -193,6 +193,10 @@ class ChatService:
             )
             _capture_audit(prepared, citations)
             yield {"event": "done", "final": final}
+        except TruncatedAnswer:
+            # ADR-082 决定 2：截断且出处校验不通过是生成故障，不归「资料未覆盖」
+            _capture_audit(prepared, citations)
+            yield {"event": "error", "error": ChatFailure("LLM_UNAVAILABLE", reason="truncated").body(prepared.request_id)}
         except GenerationError as error:
             _capture_audit(prepared, citations)
             yield {"event": "error", "error": ChatFailure(error.code, reason=error.details_reason).body(prepared.request_id)}

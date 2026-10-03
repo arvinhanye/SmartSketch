@@ -63,7 +63,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 | --- | --- | --- | --- | --- | --- |
 | N01 | P1 | DONE（待复审） | Claude | 迁移 016 配置 `revision`、`repositories/model_configs.py`、`services/qa/user_models.py`、ADR-082 决定 1 | 清除→重建（中间无提问）后下一次出站用 B；两用户互不影响；旧任务仍用创建时快照，清除仍撤销。`tests/backend/test_n01_n06.py`：red 8 failed/2 passed（出站仍为 A 地址；旧成功落到 B）→ green；连同 L04/L06/L07/L08/C 组 432 passed |
 | N06 | P2 | DONE（待复审） | Claude | `services/model_configs.py`、`repositories/model_configs.py` | 测试结果只按被测 `revision` 条件落库；保存更换、清除重建、乱序完成均不污染新配置。同上测试文件（阻塞传输 + 乱序门控）red → green |
-| D1 | P1 | TODO | Claude | `services/qa/generate.py`、`citations.py`、`chat.py`、契约与前端提示 | 截断不再判 `not_covered`；无效出处的截断回答不当成功；真实无资料仍 `not_covered` |
+| D1 | P1 | DONE（待复审） | Claude | `services/qa/citations.py`、`chat.py`、契约 `ChatLlmUnavailableReason += truncated`、`specs/grounded-qa.md` O6/QA-16、前端 `chatStream.ts`/`useChat.ts`、ADR-082 决定 2 | 截断不再判 `not_covered`；无效出处的截断回答不当成功；真实无资料仍 `not_covered`。`tests/backend/test_d1.py` red 5 failed/7 passed → green 12；`tests/frontend/d1-d3.test.ts` red 3 → green；J06 截断用例按决定 2 改断言；basic 门禁 exit 0 |
 | D3 | P1 | TODO | Claude | `services/qa/chat.py`、`services/ai/embeddings.py`、`client.py`、`compatible.py`、`outbound.py` | 同一单调截止贯穿改写/向量/检索/生成；连接、读取、多地址、重试用剩余预算；超时为 `LLM_UNAVAILABLE`/`timeout` |
 | N02 | P2 | TODO | Claude | `workers/extract_task.py` | 实体/关系首次 401/403 不重试、任务 `failed`/`LLM_UNAVAILABLE`/`auth`、不进 merging、停止派发 |
 | N03 | P2 | TODO | Claude | `App.vue`、`stores/runtime.ts`、`useModelConfig.ts` | 同角色换号、退出重登、初始读取晚于保存/清除，旧响应均不改当前账号 UI |

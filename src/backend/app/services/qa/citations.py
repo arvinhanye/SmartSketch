@@ -27,6 +27,14 @@ _TEMPLATES = {
 }
 
 
+class TruncatedAnswer(Exception):
+    """The answer hit the output limit and failed citation validation (ADR-082 decision 2).
+
+    A generation fault, not missing course material: the caller reports ``LLM_UNAVAILABLE`` /
+    ``truncated`` instead of ``not_covered``. Audit fields are already set when this is raised.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class Evidence:
     index: int
@@ -288,6 +296,8 @@ class CitationStream:
             self.uncited_units = _uncited_units(self._emitted)
             if self.uncited_units:
                 self.invalidation_subtype = "uncited_sentence"
+        if self.invalidation_subtype and truncated:
+            raise TruncatedAnswer()
         if self.invalidation_subtype:
             return not_covered("all_citations_invalidated", graph_version=self.version.graph_version,
                                request_id=self.request_id, latency_ms=latency_ms, related_kp_ids=related_kp_ids)

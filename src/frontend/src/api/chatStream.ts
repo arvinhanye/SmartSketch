@@ -95,6 +95,7 @@ const LLM_UNAVAILABLE_REASONS = [
   'stream_interrupted',
   'timeout',
   'auth',
+  'truncated',
 ] as const satisfies readonly ChatLlmUnavailableReason[]
 type MissingLlmReason = Exclude<ChatLlmUnavailableReason, (typeof LLM_UNAVAILABLE_REASONS)[number]>
 const llmReasonsComplete: [MissingLlmReason] extends [never] ? true : MissingLlmReason = true

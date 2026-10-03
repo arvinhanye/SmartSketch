@@ -209,12 +209,13 @@
     },
     "ChatLlmUnavailableReason": {
       "type": "string",
-      "description": "问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期；其余首字前失败（含两路首字超时）\n一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`。\n",
+      "description": "问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期（含改写、向量、图检索与生成任一环节）；\n其余首字前失败（含两路首字超时）一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`；\n生成达到输出上限且未通过逐句出处校验为 `truncated`（ADR-082 决定 2，不再归 `not_covered`）。\n",
       "enum": [
         "upstream",
         "stream_interrupted",
         "timeout",
-        "auth"
+        "auth",
+        "truncated"
       ]
     },
     "ChatMetaEvent": {

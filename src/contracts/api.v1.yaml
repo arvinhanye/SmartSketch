@@ -1380,7 +1380,7 @@ paths:
           description: JSON 模式下未预期的服务端异常（`INTERNAL_ERROR`，Q5 O13）；`details.request_id` 带回请求 ID。
         '503':
           description: |
-            JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth），
+            JSON 模式：主备模型或向量服务不可用（`LLM_UNAVAILABLE`，`details.reason` 同 Q5：upstream / stream_interrupted / timeout / auth / truncated），
             或存储不可用（`STORAGE_UNAVAILABLE`）。P2 之后发生时 `details.request_id` 带回请求 ID。
           content:
             application/json:
@@ -3925,9 +3925,10 @@ components:
     ChatLlmUnavailableReason:
       type: string
       description: |
-        问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期；其余首字前失败（含两路首字超时）
-        一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`。
-      enum: [upstream, stream_interrupted, timeout, auth]
+        问答 `LLM_UNAVAILABLE` 的原因闭集（Q5）：`timeout` 当且仅当链路时限到期（含改写、向量、图检索与生成任一环节）；
+        其余首字前失败（含两路首字超时）一律 `upstream`；出字后供应商流中断为 `stream_interrupted`；供应商鉴权失败为 `auth`；
+        生成达到输出上限且未通过逐句出处校验为 `truncated`（ADR-082 决定 2，不再归 `not_covered`）。
+      enum: [upstream, stream_interrupted, timeout, auth, truncated]
 
     ChatUnavailableError:
       description: |

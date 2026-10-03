@@ -1310,6 +1310,7 @@ class ChatLlmUnavailableReason(Enum):
     stream_interrupted = 'stream_interrupted'
     timeout = 'timeout'
     auth = 'auth'
+    truncated = 'truncated'
 
 
 class Code2(Enum):
