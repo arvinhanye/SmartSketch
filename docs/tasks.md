@@ -55,6 +55,31 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 
 - 2026-10-03 Claude 复核计划 A 未完成项检查（`92aa8bc`）：通过，记录 `docs/reviews/claude-deepseek-plan-a-verification-2026-10-03.md`。计划 A（L00–L10）完成。**遗留缺陷（未修，待认领）**：D1（高）答案超过 1024 输出 token 被截断后整篇撤回并误报 `not_covered`，违反「资料未覆盖与服务故障分开显示」；D2（低）发布时向量调用不写 `model_calls`；D3（中）问答查询向量调用不受 15 秒截止约束。另：抽取 141.72 秒未达 60 秒目标。
 
+## 2026-10-03 Claude 认领：计划 A 审查修复（D1–D3、N01–N08）
+
+依据：Codex 审查 `/Users/arvinhan/.codex/worktrees/e92f/SmartSketch/docs/reviews/codex-claude-plan-a-2026-10-03.md` 与修复 prompt `/Users/arvinhan/.codex/worktrees/e92f/SmartSketch/docs/handoffs/codex-claude-plan-a-fix-prompt-2026-10-03.md`（均在 Codex 检出、未合并，按绝对路径引用）。审查对象 `6ff8a8d → e86f4b9`；开工时冲刺工作区 HEAD 仍为 `e86f4b9`、工作树干净。会话工具不允许写其他工作树，本轮在工作树 `/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`（分支 `claude/smartsketch-plan-a-fixes-e70a34`，从 `e86f4b9` 快进）实施，可快进合回冲刺分支。编号沿用审查的 D1–D3、N01–N08，不覆盖旧 R 编号。交接：`docs/handoffs/claude-plan-a-review-fixes-2026-10-03.md`。
+
+| ID | 级别 | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| N01 | P1 | DONE（待复审） | Claude | 迁移 016 配置 `revision`、`repositories/model_configs.py`、`services/qa/user_models.py`、ADR-082 决定 1 | 清除→重建（中间无提问）后下一次出站用 B；两用户互不影响；旧任务仍用创建时快照，清除仍撤销。`tests/backend/test_n01_n06.py`：red 8 failed/2 passed（出站仍为 A 地址；旧成功落到 B）→ green；连同 L04/L06/L07/L08/C 组 432 passed |
+| N06 | P2 | DONE（待复审） | Claude | `services/model_configs.py`、`repositories/model_configs.py` | 测试结果只按被测 `revision` 条件落库；保存更换、清除重建、乱序完成均不污染新配置。同上测试文件（阻塞传输 + 乱序门控）red → green |
+| D1 | P1 | TODO | Claude | `services/qa/generate.py`、`citations.py`、`chat.py`、契约与前端提示 | 截断不再判 `not_covered`；无效出处的截断回答不当成功；真实无资料仍 `not_covered` |
+| D3 | P1 | TODO | Claude | `services/qa/chat.py`、`services/ai/embeddings.py`、`client.py`、`compatible.py`、`outbound.py` | 同一单调截止贯穿改写/向量/检索/生成；连接、读取、多地址、重试用剩余预算；超时为 `LLM_UNAVAILABLE`/`timeout` |
+| N02 | P2 | TODO | Claude | `workers/extract_task.py` | 实体/关系首次 401/403 不重试、任务 `failed`/`LLM_UNAVAILABLE`/`auth`、不进 merging、停止派发 |
+| N03 | P2 | TODO | Claude | `App.vue`、`stores/runtime.ts`、`useModelConfig.ts` | 同角色换号、退出重登、初始读取晚于保存/清除，旧响应均不改当前账号 UI |
+| N04 | P2 | TODO | Claude | `useModelConfig.ts`、`ModelSettingsView.vue` | 保存/测试/清除互斥（逻辑与按钮），错误后释放，卸载中止，乱序结果不回写 |
+| N05 | P2 | TODO | Claude | `useModelConfig.ts`、`ModelSettingsView.vue` | 仅地址与模型都未改且密钥留空时测试已存配置；其余要求先保存或填完整凭据，并标明测试对象 |
+| §3.7 | 既有缺口 | TODO | Claude | `ChatView.vue`、`useChat.ts` | 发送期间按钮、Enter、逻辑入口都不再提交；显式「停止」后可再发 |
+| N07 | P2 | TODO | Claude | `services/model_configs.py` | 存储未启用时 `/test` 任何分支在 DNS/传输前返回 503 `credential_store_disabled` |
+| N08 | P2 | TODO | Claude | `services/model_configs.py`、`api/model_config.py` | 空白模型名 PUT 与 /test 均 422 `VALIDATION_ERROR`（`model`），不写库不出站 |
+| D2 | P2 | TODO | Claude | `services/ai/embeddings.py`、`api/versions.py`、`api/chat.py`、`repositories/model_calls.py` | 发布与查询的每次实际向量出站先预写、再回写；缓存命中/回滚复制不记；不计入个人日预算 |
+
+- 输入：上述审查与 prompt、已签收冲刺规格与 ADR-080/081、计划 A 代码（`e86f4b9`）。输出：修复代码、仓库回归（先红后绿）、必要的规格/ADR/契约更新、交接。
+- 依赖：顺序 N01+N06 → D1+D3 → N02 → N03–N05 与 §3.7 → N07–N08 → D2。共享边界（配置身份、错误闭集、记账归属）先写 ADR-082 再写代码。
+- 风险：迁移 016 改已有库（新增可空列 + 回填，附回滚）；D1/D3 改问答终态与错误闭集，需契约、DTO、前端提示同步；D3 涉及出站传输，不可放松地址防护与 TLS 校验。
+- 验证命令：每组最小相关测试（`PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/<file> -q`、`npm run test -- --run <file>`）；最终 `./scripts/verify.sh`、`full`、`integration`（仅一次性 Neo4j）、`git diff --check`。不调用真实模型、不动真实课程库。
+- 计划 B/C（L11–L19）不在本节范围。
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |

@@ -6,6 +6,7 @@ Rows hold ciphertext only; this module never sees a plaintext key.
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from dataclasses import dataclass, field
 
 from app.repositories.sqlite import connect
@@ -13,7 +14,7 @@ from app.repositories.sqlite import connect
 _NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
 _TERMINAL = "('awaiting_review', 'completed', 'failed', 'cancelled')"
 _CONFIG_COLUMNS = ("user_id, base_url, model, key_ciphertext, key_nonce, key_hint, version, updated_at, "
-                   "last_test_at, last_test_ok, last_test_error_class")
+                   "last_test_at, last_test_ok, last_test_error_class, revision")
 
 
 class KeyRequired(Exception):
@@ -40,6 +41,8 @@ class ModelConfigRow:
     last_test_at: str | None
     last_test_ok: bool | None
     last_test_error_class: str | None
+    revision: str | None = None
+    """Never-repeating identity of this saved configuration (ADR-082 decision 1); ``version`` can repeat."""
 
 
 @dataclass(frozen=True)
@@ -59,7 +62,7 @@ def _config(row: tuple | None) -> ModelConfigRow | None:
     return ModelConfigRow(
         user_id=row[0], base_url=row[1], model=row[2], sealed=SealedKey(bytes(row[3]), bytes(row[4])),
         key_hint=row[5], version=row[6], updated_at=row[7], last_test_at=row[8],
-        last_test_ok=None if row[9] is None else bool(row[9]), last_test_error_class=row[10],
+        last_test_ok=None if row[9] is None else bool(row[9]), last_test_error_class=row[10], revision=row[11],
     )
 
 
@@ -76,7 +79,11 @@ def get_config(sqlite_url: str, user_id: str) -> ModelConfigRow | None:
 
 def save_config(sqlite_url: str, *, user_id: str, base_url: str, model: str,
                 sealed: SealedKey | None, key_hint: str | None) -> ModelConfigRow:
-    """Insert or update; ``sealed=None`` keeps the stored key and requires an unchanged ``base_url``."""
+    """Insert or update; ``sealed=None`` keeps the stored key and requires an unchanged ``base_url``.
+
+    Every save gets a fresh ``revision``, so a clear-and-recreate never looks like the old configuration.
+    """
+    revision = uuid.uuid4().hex
     with connect(sqlite_url) as database:
         database.execute("BEGIN IMMEDIATE")
         try:
@@ -85,22 +92,23 @@ def save_config(sqlite_url: str, *, user_id: str, base_url: str, model: str,
                 if current is None or current.base_url != base_url:
                     raise KeyRequired()
                 database.execute(
-                    f"UPDATE user_model_configs SET model = ?, version = version + 1, updated_at = {_NOW},"
+                    f"UPDATE user_model_configs SET model = ?, version = version + 1, revision = ?, updated_at = {_NOW},"
                     " last_test_at = NULL, last_test_ok = NULL, last_test_error_class = NULL WHERE user_id = ?",
-                    (model, user_id),
+                    (model, revision, user_id),
                 )
             else:
                 if not key_hint:
                     raise ValueError("key_hint is required with a new key")
                 database.execute(
                     "INSERT INTO user_model_configs"
-                    " (user_id, base_url, model, key_ciphertext, key_nonce, key_hint, version)"
-                    " VALUES (?, ?, ?, ?, ?, ?, 1)"
+                    " (user_id, base_url, model, key_ciphertext, key_nonce, key_hint, version, revision)"
+                    " VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
                     " ON CONFLICT(user_id) DO UPDATE SET base_url = excluded.base_url, model = excluded.model,"
                     " key_ciphertext = excluded.key_ciphertext, key_nonce = excluded.key_nonce,"
-                    f" key_hint = excluded.key_hint, version = user_model_configs.version + 1, updated_at = {_NOW},"
+                    f" key_hint = excluded.key_hint, version = user_model_configs.version + 1, revision = excluded.revision,"
+                    f" updated_at = {_NOW},"
                     " last_test_at = NULL, last_test_ok = NULL, last_test_error_class = NULL",
-                    (user_id, base_url, model, sealed.ciphertext, sealed.nonce, key_hint),
+                    (user_id, base_url, model, sealed.ciphertext, sealed.nonce, key_hint, revision),
                 )
             row = _read(database, user_id)
             database.execute("COMMIT")
@@ -132,13 +140,14 @@ def delete_config(sqlite_url: str, user_id: str) -> bool:
     return deleted == 1
 
 
-def record_test(sqlite_url: str, user_id: str, *, ok: bool, error_class: str | None) -> None:
+def record_test(sqlite_url: str, user_id: str, *, revision: str, ok: bool, error_class: str | None) -> bool:
+    """Record a test result only on the configuration that was tested; False when it was replaced meanwhile."""
     with connect(sqlite_url) as database:
-        database.execute(
+        return database.execute(
             f"UPDATE user_model_configs SET last_test_at = {_NOW}, last_test_ok = ?, last_test_error_class = ?"
-            " WHERE user_id = ?",
-            (1 if ok else 0, error_class, user_id),
-        )
+            " WHERE user_id = ? AND revision = ?",
+            (1 if ok else 0, error_class, user_id, revision),
+        ).rowcount == 1
 
 
 def bind_task(database: sqlite3.Connection, *, task_id: str, user_id: str) -> bool:

@@ -96,13 +96,15 @@ def test_save_then_update_and_key_rules(url):
 def test_record_test_and_save_clears_it(url):
     user = _user(url, "teacher1")
     cipher = CredentialCipher(ROOT_KEY)
-    repo.save_config(url, user_id=user.id, base_url="https://a.example/v1", model="m1",
-                     sealed=cipher.seal(user.id, SECRET), key_hint="abcd")
-    repo.record_test(url, user.id, ok=False, error_class="auth")
+    first = repo.save_config(url, user_id=user.id, base_url="https://a.example/v1", model="m1",
+                             sealed=cipher.seal(user.id, SECRET), key_hint="abcd")
+    assert repo.record_test(url, user.id, revision=first.revision, ok=False, error_class="auth")
     row = repo.get_config(url, user.id)
     assert (row.last_test_ok, row.last_test_error_class) == (False, "auth") and row.last_test_at
     saved = repo.save_config(url, user_id=user.id, base_url="https://a.example/v1", model="m3", sealed=None, key_hint=None)
     assert saved.last_test_at is None
+    assert not repo.record_test(url, user.id, revision=first.revision, ok=True, error_class=None)   # ADR-082 决定 1
+    assert repo.get_config(url, user.id).last_test_at is None
 
 
 def test_binding_is_an_immutable_snapshot(url):

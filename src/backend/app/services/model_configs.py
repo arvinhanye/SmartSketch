@@ -84,10 +84,12 @@ def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: s
              clock: Callable[[], float] = time.monotonic) -> TestOutcome:
     """One minimal chat call. With no values the saved configuration is tested and the result recorded."""
     saved = base_url is None
+    revision = None
     if saved:
         row = repo.get_config(settings.SQLITE_URL, user_id)
         if row is None:
             raise ModelConfigRequired()
+        revision = row.revision
         try:
             base_url, model, api_key = row.base_url, row.model, _cipher(settings).open(user_id, row.sealed)
         except CredentialError:
@@ -109,8 +111,10 @@ def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: s
             outcome = TestOutcome(True, None, max(0, int((clock() - started) * 1000)))
         except ModelCallError as error:
             outcome = TestOutcome(False, error.error_class.value, max(0, int((clock() - started) * 1000)))
-    if saved:
-        repo.record_test(settings.SQLITE_URL, user_id, ok=outcome.ok, error_class=outcome.error_class)
+    if saved and revision is not None:
+        # Conditional on the tested revision: a configuration saved or recreated meanwhile keeps its own state.
+        repo.record_test(settings.SQLITE_URL, user_id, revision=revision, ok=outcome.ok,
+                         error_class=outcome.error_class)
     return outcome
 
 
