@@ -22,6 +22,9 @@ type Course = components['schemas']['Course']
 type Role = components['schemas']['Role']
 type ErrorCode = components['schemas']['ErrorCode']
 
+/** 课程内页面的占位组件：只为让路由存在，供课程页判断入口 */
+const Stub = { template: '<div />' }
+
 function course(id: string, overrides: Partial<Course> = {}): Course {
   return {
     id,
@@ -93,6 +96,13 @@ async function mountApp({
     history: createMemoryHistory(),
     getAccountRole: () => session.role,
     coursesComponent: CoursesView,
+    // 与 main.ts 一样注册课程内页面；课程页按“路由是否存在”决定入口是否显示
+    membersComponent: Stub,
+    materialsComponent: Stub,
+    teacherGraphComponent: Stub,
+    studentGraphComponent: Stub,
+    reviewComponent: Stub,
+    chatComponent: Stub,
   })
   await router.push(path ?? (role === 'student' ? '/student' : '/teacher'))
   await router.isReady()
@@ -396,6 +406,59 @@ describe('H01 课程页视觉重构', () => {
     expect(cards[1]!.findAll('a')).toHaveLength(1)
   })
 
+  it('课程卡只有「进入课程」是链接，其它区域不可跳转', async () => {
+    const { wrapper, router } = await mountApp({
+      api: fakeApi({ list: async () => [course('c1', { name: '数据结构', my_role: 'teacher', kp_count: 3 })] }),
+    })
+    const card = wrapper.get('[data-test="course-card"]')
+
+    // 整卡只有一个链接，且就是右下角的入口
+    expect(card.findAll('a')).toHaveLength(1)
+    const entry = card.get('[data-test="course-entry"]')
+    expect(entry.attributes('href')).toBe('/courses/c1')
+    // 无障碍名称能区分课程
+    expect(entry.attributes('aria-label')).toBe('进入课程：数据结构')
+
+    // 卡片容器不是链接、不可聚焦，也没有点击跳转角色
+    const body = card.get('.course-card__body')
+    expect(body.element.tagName.toLowerCase()).toBe('div')
+    expect(body.attributes('role')).toBeUndefined()
+    expect(body.attributes('tabindex')).toBeUndefined()
+
+    // 非链接区域（标题、简介、Chip、空白）不触发导航
+    for (const selector of ['.course-card__name', '.course-card__badge', '.course-card__chip', '.course-card__body']) {
+      await card.get(selector).trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/teacher')
+    }
+
+    // 只有入口链接负责跳转
+    await entry.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/courses/c1')
+  })
+
+  it('列表与概览互斥：列表不再出现当前课程的 aria-current，侧栏课程入口标记为当前页', async () => {
+    const api = fakeApi({ list: async () => [course('c1', { name: '数据结构' }), course('c2', { name: '操作系统' })] })
+    const { wrapper, router } = await mountApp({ api, path: '/teacher' })
+    expect(wrapper.findAll('[data-test="course-entry"]').every((entry) => entry.attributes('aria-current') === undefined)).toBe(true)
+
+    await router.push('/courses/c2')
+    await flushPromises()
+    // 概览页本身表示“当前课程”，列表已不渲染，因此链接上没有 aria-current
+    expect(wrapper.find('[data-test="course-list-region"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="course-entry"]').exists()).toBe(false)
+    // 侧栏的「课程概览」仍是当前页
+    expect(wrapper.get('.app-nav__item.is-active').attributes('aria-current')).toBe('page')
+  })
+
+  it('键盘只聚焦入口链接，卡片容器不出现在 Tab 序列里', async () => {
+    const { wrapper } = await mountApp({ api: fakeApi({ list: async () => [course('c1')] }) })
+    const focusable = wrapper.get('[data-test="course-card"]').findAll('[tabindex], a, button')
+    expect(focusable).toHaveLength(1)
+    expect(focusable[0]!.attributes('data-test')).toBe('course-entry')
+  })
+
   it('顶部统计只在列表就绪时给出确定数字', async () => {
     const pending = deferred<Course[]>()
     const { wrapper } = await mountApp({ api: fakeApi({ list: () => pending.promise }) })
@@ -431,7 +494,70 @@ describe('H01 切换课程', () => {
     expect(store.courseId).toBe('c1')
     expect(api.get).toHaveBeenCalledWith('c1', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(wrapper.get('[data-test="current-course"]').text()).toContain('数据结构')
-    expect(wrapper.get('[data-test="course-card"] a').attributes('aria-current')).toBe('page')
+    // 概览不再渲染课程列表，因此这里不出现课程卡
+    expect(wrapper.find('[data-test="course-card"]').exists()).toBe(false)
+  })
+
+  it('课程首页与课程概览互斥：首页没有概览，概览没有列表与统计', async () => {
+    const api = fakeApi({
+      list: async () => [course('c1', { name: '数据结构', kp_count: 5 })],
+      get: async (cid) => course(cid, { name: '数据结构', description: '课程简介文本' }),
+    })
+
+    // 首页：有列表与统计，没有当前课程概览
+    const home = await mountApp({ api, path: '/teacher' })
+    expect(home.wrapper.find('[data-test="course-list-region"]').exists()).toBe(true)
+    expect(home.wrapper.find('[data-test="courses-stats"]').exists()).toBe(true)
+    expect(home.wrapper.find('[data-test="create-toggle"]').exists()).toBe(true)
+    expect(home.wrapper.find('[data-test="current-course"]').exists()).toBe(false)
+    expect(home.wrapper.find('[data-test="back-to-courses"]').exists()).toBe(false)
+    home.wrapper.unmount()
+
+    // 概览：只有当前课程信息与入口，没有课程列表、统计、创建入口与首页说明
+    setActivePinia((pinia = createPinia()))
+    const overview = await mountApp({ api, path: '/courses/c1' })
+    const page = overview.wrapper
+    expect(page.get('#courses-title').text()).toBe('课程概览')
+    expect(page.get('[data-test="current-course"]').text()).toContain('数据结构')
+    expect(page.get('[data-test="current-course"]').text()).toContain('课程简介文本')
+    expect(page.find('[data-test="course-list-region"]').exists()).toBe(false)
+    expect(page.find('[data-test="courses-stats"]').exists()).toBe(false)
+    expect(page.find('[data-test="courses-total"]').exists()).toBe(false)
+    expect(page.find('[data-test="create-toggle"]').exists()).toBe(false)
+    expect(page.find('form[data-test="course-create"]').exists()).toBe(false)
+    expect(page.find('.courses__lede').exists()).toBe(false)
+    // 教师保留原有课程内入口
+    expect(page.find('[data-test="teacher-graph-link"]').exists()).toBe(true)
+    expect(page.find('[data-test="materials-link"]').exists()).toBe(true)
+    expect(page.find('[data-test="review-link"]').exists()).toBe(true)
+    expect(page.find('[data-test="members-link"]').exists()).toBe(true)
+  })
+
+  it('「返回我的课程」使用角色对应的首页路由，并能回到列表', async () => {
+    const api = fakeApi({ list: async () => [course('c1')], get: async (cid) => course(cid) })
+    const { wrapper, router } = await mountApp({ api, path: '/courses/c1' })
+    const back = wrapper.get('[data-test="back-to-courses"]')
+    expect(back.attributes('href')).toBe('/teacher')
+    await back.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('teacher-home')
+    expect(wrapper.find('[data-test="course-list-region"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="current-course"]').exists()).toBe(false)
+  })
+
+  it('学生概览只保留学生入口，不出现教师操作', async () => {
+    setActivePinia((pinia = createPinia()))
+    const api = fakeApi({
+      list: async () => [course('c1', { my_role: 'student' })],
+      get: async (cid) => course(cid, { my_role: 'student', status: 'published' }),
+    })
+    const { wrapper } = await mountApp({ role: 'student', api, path: '/courses/c1' })
+    expect(wrapper.find('[data-test="teacher-graph-link"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="materials-link"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="review-link"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="members-link"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="student-graph-link"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="back-to-courses"]').attributes('href')).toBe('/student')
   })
 
   it('A→B 快速切换：A 晚到的响应不污染 B，A 的请求被取消', async () => {

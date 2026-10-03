@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
 import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, useCourses } from '../composables/useCourses'
 import {
@@ -23,6 +23,8 @@ if (api === null) throw new Error('CoursesView 需要注入 COURSES_API_KEY')
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+/** 课程卡内的「进入课程」链接用于区分无障碍名称 */
+const COURSE_ENTRY_LABEL = '进入课程'
 
 const courseId = computed(() => {
   const cid = route.params.cid
@@ -91,6 +93,17 @@ const roleLede = computed(() =>
     : '浏览课程知识图谱，规划学习路径并进行课程问答',
 )
 
+// ---------------------------------------------------------------- 首页与概览互斥
+/**
+ * 路由有有效 courseId 时进入「课程概览」，否则是「我的课程」首页。
+ * 用条件渲染区分两页，不做 CSS 隐藏；两个页面的数据读取、权限与状态处理都保持原样。
+ */
+const isOverview = computed(() => courseId.value !== null)
+const overviewTitleId = 'course-overview-title'
+const homeTo = computed<RouteLocationRaw>(() =>
+  session.role === null ? { name: ROOT_ROUTE } : { name: homeRouteFor(session.role) },
+)
+
 // ---------------------------------------------------------------- 创建面板（默认收起）
 const createOpen = ref(false)
 const createNameInput = ref<HTMLInputElement | null>(null)
@@ -112,8 +125,6 @@ function cancelCreate(): void {
 }
 
 // ---------------------------------------------------------------- 卡片展示细节
-/** 「进入课程 →」这一行不参与无障碍名称，卡片标题与状态才是 */
-const CARD_ACTION_LABEL = '进入课程'
 /** 状态徽标配色：草稿灰、已发布绿、修订中琥珀，未知状态用中性色 */
 function statusTone(label: string): string {
   if (label === '已发布') return 'is-published'
@@ -152,208 +163,223 @@ function nodeAt(index: number): { cx: number; cy: number } {
 
 <template>
   <div class="page courses" aria-labelledby="courses-title">
-    <header class="courses__head">
-      <div class="courses__intro">
-        <h2 id="courses-title">我的课程</h2>
-        <p class="courses__stats" data-test="courses-stats">{{ statsLine }}</p>
-        <p class="courses__lede">{{ roleLede }}</p>
-      </div>
-      <div v-if="canCreate" class="courses__actions">
-        <button
-          ref="createButton"
-          type="button"
-          class="courses__create"
-          :aria-expanded="createOpen"
-          aria-controls="course-create-panel"
-          :disabled="creating"
-          data-test="create-toggle"
-          @click="toggleCreate"
-        >
-          <svg class="courses__create-icon" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-            <path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
-          {{ creating ? '创建中…' : '创建课程' }}
-        </button>
-      </div>
-    </header>
-
     <p v-if="courseForbidden" data-test="course-forbidden" role="alert">
       你无权访问该课程（可能已被移出课程），已返回课程列表。
     </p>
 
-    <p v-if="createdName" class="courses__feedback" data-test="create-toast" role="status">
-      <span class="courses__feedback-ok" data-test="create-success-outside">已创建课程「{{ createdName }}」。</span>
-    </p>
-
-    <form
-      v-if="canCreate"
-      v-show="createOpen"
-      id="course-create-panel"
-      class="courses__create-panel"
-      data-test="course-create"
-      novalidate
-      :aria-busy="creating"
-      @submit.prevent="createCourse"
-    >
-      <fieldset :disabled="creating">
-        <legend class="courses__create-title">创建课程</legend>
-        <p class="courses__create-hint">填写课程名称即可创建；简介可以稍后补充。</p>
-        <label>
-          课程名称
-          <input
-            ref="createNameInput"
-            v-model="form.name"
-            name="name"
-            type="text"
-            required
-            :maxlength="COURSE_NAME_MAX"
-          />
-        </label>
-        <label>
-          课程简介（可选）
-          <textarea v-model="form.description" name="description" rows="3" :maxlength="COURSE_DESCRIPTION_MAX" />
-        </label>
-        <!-- 表单内的提示保持原语义：失败用 alert，成功用 status -->
-        <p v-if="createError" data-test="create-error" role="alert">{{ createError }}</p>
-        <p v-if="createdName" data-test="create-success" role="status">已创建课程「{{ createdName }}」。</p>
-        <div class="courses__create-actions">
-          <button type="submit" :disabled="creating">{{ creating ? '创建中…' : '创建课程' }}</button>
-          <button type="button" data-variant="secondary" :disabled="creating" data-test="create-cancel" @click="cancelCreate">
-            取消
-          </button>
+    <!-- ============================================================ 课程概览 -->
+    <!-- 进入课程路由时只渲染概览：不含全部课程列表、统计与创建入口 -->
+    <template v-if="isOverview">
+      <header class="courses__head courses__head--overview">
+        <div class="courses__intro">
+          <h2 id="courses-title">课程概览</h2>
         </div>
-      </fieldset>
-    </form>
-
-    <section
-      v-if="courseId !== null"
-      class="courses__current"
-      data-test="current-course"
-      aria-labelledby="current-course-title"
-      :aria-busy="currentStatus === 'loading'"
-    >
-      <h3 id="current-course-title">当前课程</h3>
-      <p v-if="currentStatus === 'loading'" role="status">正在加载课程…</p>
-      <p v-else-if="currentStatus === 'error'" data-test="current-course-error" role="alert">{{ currentError }}</p>
-      <template v-else-if="current">
-        <p class="courses__current-name">{{ current.name }}</p>
-        <p class="courses__current-meta">
-          课程内身份：{{ current.roleLabel }}（{{ current.myRole === 'teacher' ? '教师视图' : '学生视图' }}）
-          · 状态：{{ current.statusLabel }}
-        </p>
-        <p v-if="current.description" class="courses__current-desc">{{ current.description }}</p>
-        <ul class="courses__current-links">
-          <li v-if="hasStudentGraph && current.myRole === 'student'">
-            <RouterLink data-test="student-graph-link" :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: current.id } }">
-              浏览课程图谱
-            </RouterLink>
-          </li>
-          <li v-if="hasTeacherGraph && current.myRole === 'teacher'">
-            <RouterLink data-test="teacher-graph-link" :to="{ name: TEACHER_GRAPH_ROUTE, params: { cid: current.id } }">
-              编辑课程图谱（草稿）
-            </RouterLink>
-          </li>
-          <li v-if="hasReview && current.myRole === 'teacher'">
-            <RouterLink data-test="review-link" :to="{ name: REVIEW_ROUTE, params: { cid: current.id } }">
-              审核队列
-            </RouterLink>
-          </li>
-          <li v-if="hasMaterials && current.myRole === 'teacher'">
-            <RouterLink data-test="materials-link" :to="{ name: MATERIALS_ROUTE, params: { cid: current.id } }">
-              资料上传与处理进度
-            </RouterLink>
-          </li>
-          <li v-if="hasChat && current.myRole === 'student'">
-            <RouterLink :to="{ name: CHAT_ROUTE, params: { cid: current.id } }">课程问答</RouterLink>
-          </li>
-          <li v-if="hasMembersRoute && current.myRole === 'teacher'">
-            <RouterLink data-test="members-link" :to="{ name: COURSE_MEMBERS_ROUTE, params: { cid: current.id } }">
-              管理成员
-            </RouterLink>
-          </li>
-        </ul>
-      </template>
-    </section>
-
-    <section
-      class="courses__list"
-      data-test="course-list-region"
-      aria-labelledby="course-list-title"
-      :aria-busy="listStatus === 'loading'"
-    >
-      <header class="courses__list-head">
-        <h3 id="course-list-title">课程列表</h3>
-        <span v-if="listReady" class="courses__list-total" data-test="courses-total">共 {{ courseCount }} 门</span>
+        <RouterLink class="courses__back" data-test="back-to-courses" :to="homeTo">← 返回我的课程</RouterLink>
       </header>
 
-      <p v-if="listStatus === 'loading'" data-test="courses-loading" role="status">正在加载课程…</p>
-      <p v-else-if="listStatus === 'forbidden'" data-test="courses-forbidden" role="alert">{{ listError }}</p>
-      <div v-else-if="listStatus === 'error'" class="courses__list-error">
-        <p data-test="courses-error" role="alert">{{ listError }}</p>
-        <button type="button" data-variant="secondary" data-test="courses-retry" @click="loadCourses">重试</button>
-      </div>
-      <p v-else-if="isEmpty" class="courses__list-empty" data-test="courses-empty">
-        暂无课程。{{ canCreate ? '可以在上方展开「创建课程」创建第一门。' : '教师将你加入课程并发布图谱后，课程会出现在这里。' }}
+      <section
+        class="courses__current"
+        data-test="current-course"
+        :aria-labelledby="overviewTitleId"
+        :aria-busy="currentStatus === 'loading'"
+      >
+        <h3 :id="overviewTitleId" class="courses__current-heading">当前课程</h3>
+        <p v-if="currentStatus === 'loading'" role="status">正在加载课程…</p>
+        <p v-else-if="currentStatus === 'error'" data-test="current-course-error" role="alert">{{ currentError }}</p>
+        <template v-else-if="current">
+          <p class="courses__current-name">{{ current.name }}</p>
+          <p v-if="current.description" class="courses__current-desc">{{ current.description }}</p>
+          <p class="courses__current-meta">
+            课程内身份：{{ current.roleLabel }}（{{ current.myRole === 'teacher' ? '教师视图' : '学生视图' }}）
+            · 状态：{{ current.statusLabel }}
+          </p>
+          <ul class="courses__current-links">
+            <li v-if="hasStudentGraph && current.myRole === 'student'">
+              <RouterLink data-test="student-graph-link" :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: current.id } }">
+                浏览课程图谱
+              </RouterLink>
+            </li>
+            <li v-if="hasTeacherGraph && current.myRole === 'teacher'">
+              <RouterLink data-test="teacher-graph-link" :to="{ name: TEACHER_GRAPH_ROUTE, params: { cid: current.id } }">
+                编辑课程图谱（草稿）
+              </RouterLink>
+            </li>
+            <li v-if="hasReview && current.myRole === 'teacher'">
+              <RouterLink data-test="review-link" :to="{ name: REVIEW_ROUTE, params: { cid: current.id } }">
+                审核队列
+              </RouterLink>
+            </li>
+            <li v-if="hasMaterials && current.myRole === 'teacher'">
+              <RouterLink data-test="materials-link" :to="{ name: MATERIALS_ROUTE, params: { cid: current.id } }">
+                资料上传与处理进度
+              </RouterLink>
+            </li>
+            <li v-if="hasChat && current.myRole === 'student'">
+              <RouterLink :to="{ name: CHAT_ROUTE, params: { cid: current.id } }">课程问答</RouterLink>
+            </li>
+            <li v-if="hasMembersRoute && current.myRole === 'teacher'">
+              <RouterLink data-test="members-link" :to="{ name: COURSE_MEMBERS_ROUTE, params: { cid: current.id } }">
+                管理成员
+              </RouterLink>
+            </li>
+          </ul>
+        </template>
+      </section>
+    </template>
+
+    <!-- ============================================================ 我的课程 -->
+    <template v-else>
+      <header class="courses__head">
+        <div class="courses__intro">
+          <h2 id="courses-title">我的课程</h2>
+          <p class="courses__stats" data-test="courses-stats">{{ statsLine }}</p>
+          <p class="courses__lede">{{ roleLede }}</p>
+        </div>
+        <div v-if="canCreate" class="courses__actions">
+          <button
+            ref="createButton"
+            type="button"
+            class="courses__create"
+            :aria-expanded="createOpen"
+            aria-controls="course-create-panel"
+            :disabled="creating"
+            data-test="create-toggle"
+            @click="toggleCreate"
+          >
+            <svg class="courses__create-icon" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            {{ creating ? '创建中…' : '创建课程' }}
+          </button>
+        </div>
+      </header>
+
+      <p v-if="createdName" class="courses__feedback" data-test="create-toast" role="status">
+        <span class="courses__feedback-ok" data-test="create-success-outside">已创建课程「{{ createdName }}」。</span>
       </p>
 
-      <ul v-else class="courses__grid">
-        <li v-for="card in courses" :key="card.id" class="course-card" data-test="course-card">
-          <RouterLink
-            class="course-card__link"
-            :to="{ name: COURSE_ROUTE, params: { cid: card.id } }"
-            :aria-current="card.id === selectedId ? 'page' : undefined"
-          >
-            <svg class="course-card__decor" viewBox="0 0 190 130" aria-hidden="true" focusable="false">
-              <line
-                v-for="(link, index) in GRAPH_LINKS"
-                :key="`l-${index}`"
-                :x1="nodeAt(link[0]!).cx"
-                :y1="nodeAt(link[0]!).cy"
-                :x2="nodeAt(link[1]!).cx"
-                :y2="nodeAt(link[1]!).cy"
-              />
-              <circle
-                v-for="(node, index) in GRAPH_NODES"
-                :key="`n-${index}`"
-                :cx="node.cx"
-                :cy="node.cy"
-                :r="node.r"
-                :class="node.tone"
-              />
-            </svg>
+      <form
+        v-if="canCreate"
+        v-show="createOpen"
+        id="course-create-panel"
+        class="courses__create-panel"
+        data-test="course-create"
+        novalidate
+        :aria-busy="creating"
+        @submit.prevent="createCourse"
+      >
+        <fieldset :disabled="creating">
+          <legend class="courses__create-title">创建课程</legend>
+          <p class="courses__create-hint">填写课程名称即可创建；简介可以稍后补充。</p>
+          <label>
+            课程名称
+            <input
+              ref="createNameInput"
+              v-model="form.name"
+              name="name"
+              type="text"
+              required
+              :maxlength="COURSE_NAME_MAX"
+            />
+          </label>
+          <label>
+            课程简介（可选）
+            <textarea v-model="form.description" name="description" rows="3" :maxlength="COURSE_DESCRIPTION_MAX" />
+          </label>
+          <!-- 表单内的提示保持原语义：失败用 alert，成功用 status -->
+          <p v-if="createError" data-test="create-error" role="alert">{{ createError }}</p>
+          <p v-if="createdName" data-test="create-success" role="status">已创建课程「{{ createdName }}」。</p>
+          <div class="courses__create-actions">
+            <button type="submit" :disabled="creating">{{ creating ? '创建中…' : '创建课程' }}</button>
+            <button type="button" data-variant="secondary" :disabled="creating" data-test="create-cancel" @click="cancelCreate">
+              取消
+            </button>
+          </div>
+        </fieldset>
+      </form>
 
-            <span class="course-card__badge" :class="statusTone(card.statusLabel)">{{ card.statusLabel }}</span>
-            <h4 class="course-card__name">{{ card.name }}</h4>
-            <p v-if="card.description" class="course-card__desc">{{ card.description }}</p>
+      <section
+        class="courses__list"
+        data-test="course-list-region"
+        aria-labelledby="course-list-title"
+        :aria-busy="listStatus === 'loading'"
+      >
+        <header class="courses__list-head">
+          <h3 id="course-list-title">课程列表</h3>
+          <span v-if="listReady" class="courses__list-total" data-test="courses-total">共 {{ courseCount }} 门</span>
+        </header>
 
-            <div class="course-card__footer">
-              <ul class="course-card__chips">
-                <li class="course-card__chip">
+        <p v-if="listStatus === 'loading'" data-test="courses-loading" role="status">正在加载课程…</p>
+        <p v-else-if="listStatus === 'forbidden'" data-test="courses-forbidden" role="alert">{{ listError }}</p>
+        <div v-else-if="listStatus === 'error'" class="courses__list-error">
+          <p data-test="courses-error" role="alert">{{ listError }}</p>
+          <button type="button" data-variant="secondary" data-test="courses-retry" @click="loadCourses">重试</button>
+        </div>
+        <p v-else-if="isEmpty" class="courses__list-empty" data-test="courses-empty">
+          暂无课程。{{ canCreate ? '可以在上方展开「创建课程」创建第一门。' : '教师将你加入课程并发布图谱后，课程会出现在这里。' }}
+        </p>
+
+        <ul v-else class="courses__grid">
+          <li v-for="card in courses" :key="card.id" class="course-card" data-test="course-card">
+            <!-- 卡片本身不是链接：只有右下角的「进入课程」负责跳转 -->
+            <div class="course-card__body">
+              <svg class="course-card__decor" viewBox="0 0 190 130" aria-hidden="true" focusable="false">
+                <line
+                  v-for="(link, index) in GRAPH_LINKS"
+                  :key="`l-${index}`"
+                  :x1="nodeAt(link[0]!).cx"
+                  :y1="nodeAt(link[0]!).cy"
+                  :x2="nodeAt(link[1]!).cx"
+                  :y2="nodeAt(link[1]!).cy"
+                />
+                <circle
+                  v-for="(node, index) in GRAPH_NODES"
+                  :key="`n-${index}`"
+                  :cx="node.cx"
+                  :cy="node.cy"
+                  :r="node.r"
+                  :class="node.tone"
+                />
+              </svg>
+
+              <span class="course-card__badge" :class="statusTone(card.statusLabel)">{{ card.statusLabel }}</span>
+              <h4 class="course-card__name">{{ card.name }}</h4>
+              <p v-if="card.description" class="course-card__desc">{{ card.description }}</p>
+
+              <div class="course-card__footer">
+                <ul class="course-card__chips">
+                  <li class="course-card__chip">
+                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                      <circle cx="8" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4" />
+                      <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                    </svg>
+                    {{ card.roleLabel }}
+                  </li>
+                  <li class="course-card__chip">
+                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                      <path d="M3 3.5h4.5A2 2 0 0 1 9.5 5.5V13a2 2 0 0 0-2-2H3z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                      <path d="M13 3.5H9.5A2 2 0 0 0 7.5 5.5V13a2 2 0 0 1 2-2H13z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                    </svg>
+                    {{ card.knowledgePointCount }} 个知识点
+                  </li>
+                </ul>
+                <RouterLink
+                  class="course-card__cta"
+                  data-test="course-entry"
+                  :to="{ name: COURSE_ROUTE, params: { cid: card.id } }"
+                  :aria-label="`${COURSE_ENTRY_LABEL}：${card.name}`"
+                >
+                  {{ COURSE_ENTRY_LABEL }}
                   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-                    <circle cx="8" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4" />
-                    <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                    <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
-                  {{ card.roleLabel }}
-                </li>
-                <li class="course-card__chip">
-                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-                    <path d="M3 3.5h4.5A2 2 0 0 1 9.5 5.5V13a2 2 0 0 0-2-2H3z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-                    <path d="M13 3.5H9.5A2 2 0 0 0 7.5 5.5V13a2 2 0 0 1 2-2H13z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-                  </svg>
-                  {{ card.knowledgePointCount }} 个知识点
-                </li>
-              </ul>
-              <span class="course-card__cta">
-                {{ CARD_ACTION_LABEL }}
-                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-                  <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
+                </RouterLink>
+              </div>
             </div>
-          </RouterLink>
-        </li>
-      </ul>
-    </section>
+          </li>
+        </ul>
+      </section>
+    </template>
   </div>
 </template>
 
@@ -408,6 +434,32 @@ function nodeAt(index: number): { cx: number; cy: number } {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+/* 概览页顶部：标题与「返回我的课程」 */
+.courses__head--overview {
+  align-items: center;
+}
+
+.courses__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.courses__back:hover,
+.courses__back:focus-visible {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+  text-decoration: none;
 }
 
 .courses__create {
@@ -496,7 +548,8 @@ function nodeAt(index: number): { cx: number; cy: number } {
   box-shadow: var(--shadow-card);
 }
 
-.courses__current > h3 {
+.courses__current > h3,
+.courses__current-heading {
   margin: 0;
   font-size: 1.05rem;
 }
@@ -573,12 +626,13 @@ function nodeAt(index: number): { cx: number; cy: number } {
 }
 
 /* ---------------------------------------------------------------- 课程卡片 */
+/* 卡片本身不是链接：样式挂在容器上，只有「进入课程」可点击 */
 .course-card {
   display: flex;
   min-width: 0;
 }
 
-.course-card__link {
+.course-card__body {
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -593,21 +647,19 @@ function nodeAt(index: number): { cx: number; cy: number } {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   color: var(--color-text);
-  text-decoration: none;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
-.course-card__link:hover,
-.course-card__link:focus-visible {
+.course-card__body:hover {
   transform: translateY(-2px);
   border-color: var(--color-border-strong);
   box-shadow: 0 2px 4px rgb(35 32 28 / 6%), 0 10px 26px rgb(35 32 28 / 8%);
-  text-decoration: none;
 }
 
-.course-card__link:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+/* 键盘聚焦到卡片内的「进入课程」时，整张卡也给出可见反馈 */
+.course-card__body:focus-within {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 2px 4px rgb(35 32 28 / 6%), 0 10px 26px rgb(35 32 28 / 8%);
 }
 
 /* 右侧装饰图谱：纯装饰，不拦鼠标、不进无障碍树 */
@@ -731,15 +783,27 @@ function nodeAt(index: number): { cx: number; cy: number } {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin-left: auto;
+  /* 适度内边距方便点击，但不覆盖卡片其它内容 */
+  margin: 0.15rem -0.35rem 0.15rem auto;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
   color: var(--color-primary);
   font-size: 0.9375rem;
   font-weight: 600;
   white-space: nowrap;
+  text-decoration: none;
 }
 
-.course-card__link:hover .course-card__cta {
+.course-card__cta:hover,
+.course-card__cta:focus-visible {
+  background: var(--color-primary-soft);
   color: var(--color-primary-hover);
+  text-decoration: none;
+}
+
+.course-card__cta:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 @media (max-width: 760px) {
@@ -749,6 +813,11 @@ function nodeAt(index: number): { cx: number; cy: number } {
 
   .courses__head {
     align-items: stretch;
+  }
+
+  .courses__back {
+    margin-left: 0;
+    align-self: flex-start;
   }
 
   .courses__actions,
@@ -764,18 +833,17 @@ function nodeAt(index: number): { cx: number; cy: number } {
     grid-template-columns: 1fr;
   }
 
-  .course-card__link {
+  .course-card__body {
     min-height: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .course-card__link {
+  .course-card__body {
     transition: none;
   }
 
-  .course-card__link:hover,
-  .course-card__link:focus-visible {
+  .course-card__body:hover {
     transform: none;
   }
 }
