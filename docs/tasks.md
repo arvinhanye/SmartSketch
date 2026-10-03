@@ -20,7 +20,7 @@
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
 | L01 | DONE | Claude | 隔离环境：`.venv`（Python 3.11.9）、`npm ci`、独立 Neo4j（7688/7475）；三档门禁基线；不改业务文件 | basic exit 0；full exit 0（后端 3559 通过/27 跳过，前端 772 通过）；integration exit 1，仅因本机未装 Playwright 浏览器，改用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向 Chrome 后两条端到端通过。另发现北京地域向量服务在本机网络不可达。交接 `docs/handoffs/claude-l01.md` |
-| L02 | IN_PROGRESS（抽取已测；问答补测 V1 交给 DeepSeek harness，交接 `docs/handoffs/claude-plan-a-verification-handoff.md`） | Claude → DeepSeek harness | `evaluation/measure_web_flow.py`、基线报告 `evaluation/reports/l02-baseline-2026-10.md` | 抽取实测 141.72 秒（目标 60 秒，未达标），82 个知识点、4 种关系，计费 101054 token；问答未测：北京地域向量接口在本机网络 TCP 超时。交接 `docs/handoffs/claude-l02.md` |
+| L02 | DONE | Claude（抽取）；DeepSeek harness（2026-10-03 发布与问答补测） | `evaluation/measure_web_flow.py`、基线报告 `evaluation/reports/l02-baseline-2026-10.md` | 抽取实测 141.72 秒（目标 60 秒，未达标），82 个知识点、4 种关系，计费 101054 token。**发布与问答已补测（2026-10-03，向量网络恢复后）**：发布 HTTP 200 / 21.17 秒 / v1（82 知识点、73 关系、无排除项）；五题中 3 题 `answered`、第 5 题按预期 `not_covered`；完整耗时 p50 5.13 秒、最大 6.12 秒（≤15 秒与 ≤10 秒均达标），首字 5.88/4.70/2.07 秒（S2 的 ≤3 秒目标 3 题中 2 题未达标）；**第 3 题「栈和队列有什么区别？」被整篇撤回**（`all_citations_invalidated` / `no_markers`，输出撞 `ANSWER_MAX_OUTPUT_TOKENS=1024` 上限被截断，`truncated=1`），资料实际覆盖该问题，可确定性复现，**缺陷按本轮边界未修**；发布期向量调用未写入 `model_calls`（记账缺口）。本次计费 16101 token。交接 `docs/handoffs/claude-l02.md`、`docs/handoffs/deepseek-plan-a-verification.md` |
 | L03 | DONE | Claude | ADR-080/081、`AGENTS.md` §4/§6、`docs/`、`src/contracts/`、生成物；前端三处错误码清单同步 | 契约门禁 exit 0；前端类型检查与 772 用例通过；后端 3561 通过/27 跳过；交接 `docs/handoffs/claude-l03.md` |
 | L04 | DONE | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py`、`cryptography==50.0.2` | 11 个新用例；后端 3572 通过/27 跳过；交接 `docs/handoffs/claude-l04.md` |
 | L05 | DONE | Claude | `services/ai/outbound.py`；顺带修复 `_StdlibResponse.read` 在服务端关闭连接时误报连接错误 | 32 个新用例与既有客户端用例通过；交接 `docs/handoffs/claude-l05.md` |
@@ -28,9 +28,30 @@
 | L07 | DONE | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
 | L08 | DONE | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 9 个新用例；后端 3645 通过/27 跳过；交接 `docs/handoffs/claude-l08.md` |
 | L09 | DONE | DeepSeek harness | 在线向量联调、`local` 明确拒绝、`scripts/start.sh`；用户 2026-10-03 选向量方案第 1 种（恢复到北京地域接口的网络路径，地址不变） | 真实向量实测可用：`check-embedding.py` → `ok model=text-embedding-v4 dimensions=1024 seconds=0.66`（exit 0）。正式入口不静默切 demo：`EMBEDDING_MODE=demo`/`local` 时 `start.sh` 均 exit 1；冒烟 `GET /api/v1/me/model-config` → `{"runtime_mode":"personal","configured":false}`、`/health` ok、worker 无 `Invalid configuration`。后端+tooling 3648 通过/27 跳过/0 失败；`verify.sh` exit 0。交接 `docs/handoffs/deepseek-l09.md` |
-| L10 | IN_PROGRESS（代码与 10 个组件用例完成；真实页面走查 V2 交给 DeepSeek harness，交接 `docs/handoffs/claude-plan-a-verification-handoff.md`） | Claude → DeepSeek harness | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过；交接 `docs/handoffs/claude-l10.md` |
+| L10 | DONE | Claude（代码）；DeepSeek harness（2026-10-03 真实页面走查） | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过。**真实页面走查六步全部符合设计**（由 DeepSeek harness 用真实 Chromium 驱动，personal 模式）：侧栏「模型 API 设置」带「未配置」标记、资料页引导且上传禁用；测试连接成功（585 毫秒）、保存后显示「已配置：deepseek-flash · 密钥 ••••+末 4 位」（末 4 位见截图中脱敏显示，不写入本文档）、刷新后仍脱敏且密钥框为空；`localStorage`/`sessionStorage` 无密钥（仅登录令牌）、6 次 `GET /me/model-config` 与 `PUT` 响应均不含密钥；上传 1002 字节文件推进到待审核；学生保存配置后提问得到带引用的回答；教师清除配置后再上传被拒（HTTP 409 `MODEL_CONFIG_REQUIRED`）并显示引导。截图 `.demo/v2/`（Git 忽略）。交接 `docs/handoffs/claude-l10.md`、`docs/handoffs/deepseek-plan-a-verification.md` |
 
 - 2026-10-03 Claude 复核 L09（`ea9484c`）：通过，记录 `docs/reviews/claude-deepseek-l09-2026-10-03.md`。**未决风险**：问答准备阶段的查询向量调用不受 15 秒链路截止约束，向量服务不可达时一次提问可能挂数分钟（`services/qa/chat.py:115`）；建议在计划 B（L15）或计划 C（L16）单独认领修复。本机到北京地域向量接口的网络时通时断，L02 问答补测与 L10 走查需网络稳定后进行。
+
+### V3：业务改动后的完整门禁与端到端（2026-10-03，DeepSeek harness）
+
+**通过，退出码 0，无失败项。** 命令与证据：
+
+```bash
+PYTHON=.venv/bin/python PATH="$PWD/.venv/bin:$PATH" \
+PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  ./scripts/verify.sh integration > .demo/logs/verify-integration-planA.log 2>&1   # → exit 0
+```
+
+| 档位 | 结果 |
+| --- | --- |
+| 基础档 | 钩子回归通过；`PASS contracts`（32 路径 / 129 schema / 385 `$ref`）；B14 生成与漂移回归、25 项门禁负向测试；B08/B09/B10/B12/B13 契约回归全通过 |
+| 后端全量 | 3648 passed、27 skipped → `PASS` |
+| 前端全量 | 26 文件 782 passed → `PASS` |
+| 集成用例 | 392 passed、4 skipped → `PASS` |
+| 图库后端用例 | 44 passed → `PASS` |
+| 端到端 | 2 passed（学生主线 52.5 秒、教师主线 1.2 分钟）→ `✓ 端到端通过` |
+
+这是 PR #317 中 L03–L10 业务改动之后的首次完整门禁（此前的端到端证据只来自 L01、业务改动之前）。端到端用演示模型，**不产生费用**。log 与端到端目录：`.demo/logs/verify-integration-planA.log`、`.e2e/20261003-030121/`。两项环境前提：契约门禁硬编码 `python3` 需把 `.venv/bin` 前置到 `PATH`；`tests/tooling/test_k07.py` 的 4 个交互式用例需要更宽的沙箱权限才能分配 PTY（详见 `docs/handoffs/deepseek-l09.md`「环境与沙箱」）。
 
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
