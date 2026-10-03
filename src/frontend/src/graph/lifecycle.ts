@@ -73,6 +73,11 @@ export interface CanvasGraph {
   getZoom?(): number
   zoomTo?(zoom: number): Promise<void>
   focusElement?(id: string): Promise<void>
+  /**
+   * L14：G6 5.x 的 `render()` 每次都按 `autoFit` 重新整图适配，掌握状态、选中、路径高亮引起的数据更新
+   * 因此会把视口拉回整图。首次渲染后用它关掉 `autoFit`；之后的适配只在尺寸变化与切换布局时显式 `fitView`。
+   */
+  setOptions?(options: Partial<GraphOptions>): void
 }
 
 /**
@@ -244,6 +249,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   let chain: Promise<void> = Promise.resolve()
   /** 建图前请求的聚焦目标（知识点 ID） */
   let pendingFocus: string | null = null
+  /** 最近一次页面请求聚焦的知识点（L14）：尺寸变化重新适配后回到它，而不是入口节点 */
+  let anchor: string | null = null
 
   const alive = () => status !== 'destroyed' && status !== 'error'
 
@@ -288,7 +295,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     if (g.getZoom !== undefined && g.zoomTo !== undefined && g.getZoom() < READABLE_ZOOM) {
       await g.zoomTo(READABLE_ZOOM)
       if (!alive()) return
-      const target = pendingFocus !== null ? nodeElementId(pendingFocus) : entryNode()
+      const wanted = pendingFocus ?? anchor
+      const target = wanted !== null && drawn.has(nodeElementId(wanted)) ? nodeElementId(wanted) : entryNode()
       pendingFocus = null
       if (target !== null && drawn.has(target) && g.focusElement !== undefined) await g.focusElement(target)
     } else if (pendingFocus !== null) {
@@ -320,6 +328,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       })
       await graph.render()
       if (!alive()) return
+      // 之后的数据更新保持学生正在看的位置，不再回到整图适配（见 `CanvasGraph.setOptions`）
+      graph.setOptions?.({ autoFit: undefined })
       await ensureReadable(graph)
       if (!alive()) return
       if (pending !== null) flush()
@@ -422,6 +432,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     },
     focus(kpId) {
       if (!alive()) return
+      anchor = kpId
       if (graph === null) {
         pendingFocus = kpId
         return

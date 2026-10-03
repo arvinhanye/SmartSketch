@@ -373,3 +373,71 @@ describe('L14-3 推荐解释：先修事实优先，缺省值不冒充测量', (
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------- 数据更新不重置视口
+
+import { createGraphLifecycle, type CanvasGraphInit } from '../../src/frontend/src/graph/lifecycle'
+
+/** 模拟 G6 5.x：设置了 `autoFit` 时每次 render 都把视口重置为整图适配（缩放 0.2、原点 [0,0]） */
+class AutoFitGraph {
+  destroyed = false
+  zoom = 1
+  position: [number, number] = [0, 0]
+  focused: string[] = []
+  autoFit: unknown = 'view'
+  constructor(readonly init: CanvasGraphInit) {}
+  async render() { if (this.autoFit) { this.zoom = 0.2; this.position = [0, 0] } }
+  setOptions(options: { autoFit?: unknown }) { if ('autoFit' in options) this.autoFit = options.autoFit }
+  setData() {}
+  setSize() {}
+  async fitView() { this.zoom = 0.2; this.position = [0, 0] }
+  on() { return undefined }
+  destroy() { this.destroyed = true }
+  getZoom() { return this.zoom }
+  async zoomTo(zoom: number) { this.zoom = zoom }
+  async focusElement(id: string) { this.focused.push(id); this.position = [123, 45] }
+}
+
+describe('L14-2 数据更新保留视口', () => {
+  it('掌握状态、选中、路径高亮引起的数据更新后，缩放与位置保持不变（不回到整图适配）', async () => {
+    let graph!: AutoFitGraph
+    const el = document.createElement('div')
+    Object.defineProperty(el, 'clientWidth', { value: 800 })
+    Object.defineProperty(el, 'clientHeight', { value: 600 })
+    const data = canvasData()
+    const life = createGraphLifecycle(el, { data, factory: (init) => (graph = new AutoFitGraph(init)) as unknown as CanvasGraph })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await flushPromises()
+    life.focus('C')
+    await flushPromises()
+    expect(graph.zoom).toBe(0.7)
+    expect(graph.position).toEqual([123, 45])
+    life.update({ ...data, nodes: data.nodes.map((n) => ({ ...n, states: ['dimmed'] })) })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await flushPromises()
+    expect(graph.zoom).toBe(0.7)
+    expect(graph.position).toEqual([123, 45])
+  })
+})
+
+describe('L14-2 尺寸变化后仍聚焦最近一次请求的节点', () => {
+  it('推荐面板加载使画布变宽 → 重新适配后回到最近聚焦的节点，而不是入口节点', async () => {
+    let graph!: AutoFitGraph
+    let width = 800
+    const el = document.createElement('div')
+    Object.defineProperty(el, 'clientWidth', { get: () => width })
+    Object.defineProperty(el, 'clientHeight', { value: 600 })
+    const life = createGraphLifecycle(el, { data: canvasData(), factory: (init) => (graph = new AutoFitGraph(init)) as unknown as CanvasGraph })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await flushPromises()
+    expect(graph.focused.at(-1)).toBe(nodeElementId('A'))   // 入口节点（无前置的第一个）
+    life.focus('C')
+    await flushPromises()
+    width = 640
+    life.refreshSize()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    await flushPromises()
+    expect(graph.zoom).toBe(0.7)
+    expect(graph.focused.at(-1)).toBe(nodeElementId('C'))
+  })
+})
