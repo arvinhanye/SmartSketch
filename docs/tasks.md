@@ -30,6 +30,8 @@
 | L09 | DONE | DeepSeek harness | 在线向量联调、`local` 明确拒绝、`scripts/start.sh`；用户 2026-10-03 选向量方案第 1 种（恢复到北京地域接口的网络路径，地址不变） | 真实向量实测可用：`check-embedding.py` → `ok model=text-embedding-v4 dimensions=1024 seconds=0.66`（exit 0）。正式入口不静默切 demo：`EMBEDDING_MODE=demo`/`local` 时 `start.sh` 均 exit 1；冒烟 `GET /api/v1/me/model-config` → `{"runtime_mode":"personal","configured":false}`、`/health` ok、worker 无 `Invalid configuration`。后端+tooling 3648 通过/27 跳过/0 失败；`verify.sh` exit 0。交接 `docs/handoffs/deepseek-l09.md` |
 | L10 | IN_PROGRESS（代码与 10 个组件用例完成；真实页面走查等 L09） | Claude | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过；交接 `docs/handoffs/claude-l10.md` |
 
+- 2026-10-03 Claude 复核 L09（`ea9484c`）：通过，记录 `docs/reviews/claude-deepseek-l09-2026-10-03.md`。**未决风险**：问答准备阶段的查询向量调用不受 15 秒链路截止约束，向量服务不可达时一次提问可能挂数分钟（`services/qa/chat.py:115`）；建议在计划 B（L15）或计划 C（L16）单独认领修复。本机到北京地域向量接口的网络时通时断，L02 问答补测与 L10 走查需网络稳定后进行。
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
