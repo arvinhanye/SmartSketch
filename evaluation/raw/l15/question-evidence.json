@@ -1,0 +1,297 @@
+{
+  "round": {
+    "started_at": "2026-10-03T18:16:00Z",
+    "measurement_checkout": "codex/plan-b-takeover @ 257750e",
+    "answer_max_output_tokens": 2048,
+    "incremental_cap": 80000,
+    "generation_billed_this_round": 28951,
+    "generation_cumulative": 648168,
+    "embedding_billed_this_round": 59,
+    "embedding_cumulative": 11943,
+    "note": "answer 正文与引用定位保留；引用的 chunk 原文不在此文件（可在 datasets/contest 对应文件按 section_path 找到）。"
+  },
+  "questions": [
+    {
+      "course": "course1-ds",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "question": "什么是栈",
+      "http_status": 200,
+      "client_elapsed_seconds": 8.24,
+      "request_id": "01M41FR9CM2BT6CKQ6HY4C93YP",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 8224,
+      "first_delta_latency_ms": 7828,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-2",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        },
+        {
+          "index": 4,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.6 本章小结 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-15",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        }
+      ],
+      "answer": "栈（又称堆栈，英文 stack）是只允许在一端进行插入和删除操作的线性表 [1]  \n允许操作的一端称为栈顶，另一端称为栈底 [1]  \n不含任何元素的栈称为空栈 [1]  \n由于最后进入的元素最先被删除，栈的操作特性可以概括为后进先出（Last In First Out，LIFO）[1]  \n栈的基本操作包括初始化、判空、入栈、出栈和读栈顶元素 [1]  \n栈是操作受限的线性表，限定在栈顶操作，具有后进先出特性 [4]"
+    },
+    {
+      "course": "course1-ds",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "question": "栈和队列有什么区别",
+      "http_status": 503,
+      "client_elapsed_seconds": 10.27,
+      "request_id": null,
+      "outcome": "LLM_UNAVAILABLE",
+      "reason": "truncated",
+      "error_code": null,
+      "error_reason": null,
+      "truncated": null,
+      "invalidation_subtype": null,
+      "latency_ms": null,
+      "first_delta_latency_ms": null,
+      "graph_version": null,
+      "citations": [],
+      "answer": null
+    },
+    {
+      "course": "course1-ds",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "question": "顺序栈入栈需要检查什么",
+      "http_status": 200,
+      "client_elapsed_seconds": 9.51,
+      "request_id": "01M41FRVEWY7EMGX7RCZ5AZB63",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 9500,
+      "first_delta_latency_ms": 9287,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-3",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        }
+      ],
+      "answer": "顺序栈入栈需要检查栈中是否已有 `MaxSize` 个元素，因为此时再执行入栈就会发生上溢 [1]。上溢说明预分配的空间不足，是顺序栈的主要缺点 [1]。顺序栈入栈时先令 `top` 加 1 再写入元素 [1]。"
+    },
+    {
+      "course": "course1-ds",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "question": "循环队列如何判断空与满",
+      "http_status": 200,
+      "client_elapsed_seconds": 5.11,
+      "request_id": "01M41FS4RAPGHK1ADRT2A02P20",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 5098,
+      "first_delta_latency_ms": 4816,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-7",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        }
+      ],
+      "answer": "- 在约定 `front` 指向队头元素、`rear` 指向队尾元素的下一个位置，并牺牲一个存储单元时，队空条件是 `front == rear` [1]。\n- 队满条件是 `(rear + 1) % MaxSize == front` [1]。\n- 牺牲一个存储单元是为了区分队空和队满这两种状态 [1]。\n- 也可以改用计数变量 `size` 来区分队空和队满 [1]。"
+    },
+    {
+      "course": "course1-ds",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "question": "今天天气怎么样",
+      "http_status": 200,
+      "client_elapsed_seconds": 0.54,
+      "request_id": "01M41FS9R01P03B54QXZKJEDGV",
+      "outcome": "not_covered",
+      "reason": "below_similarity_threshold",
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 524,
+      "first_delta_latency_ms": null,
+      "graph_version": 1,
+      "citations": [],
+      "answer": "课程资料中与这个问题相关的内容不够充分，无法给出有出处的回答。"
+    },
+    {
+      "course": "course2-os",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "question": "什么是进程",
+      "http_status": 200,
+      "client_elapsed_seconds": 3.18,
+      "request_id": "01M41FSA97G121ZQZ1FHDTRXFW",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 3169,
+      "first_delta_latency_ms": 3028,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.1 进程的定义 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-2",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ],
+      "answer": "进程是程序在一个数据集合上的一次运行过程，是系统进行资源分配和调度的独立单位。[1]\n程序是静态的指令集合，进程则是动态的执行实体；同一个程序运行两次，就产生两个不同的进程。[1]\n进程具有动态性、并发性、独立性和异步性四个特征。[1]"
+    },
+    {
+      "course": "course2-os",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "question": "进程和线程有什么区别",
+      "http_status": 200,
+      "client_elapsed_seconds": 6.86,
+      "request_id": "01M41FSDCJ5KTASCXB8RY98YC4",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 6840,
+      "first_delta_latency_ms": 6537,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.4 线程 > 2.4.2 进程与线程的比较 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-11",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        },
+        {
+          "index": 2,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.4 线程 > 2.4.1 线程的定义 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-10",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        },
+        {
+          "index": 5,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.4 进程切换 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-5",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ],
+      "answer": "进程是资源分配的基本单位，线程是处理机调度的基本单位。[1]\n同一进程中的线程切换不会引起进程切换；不同进程中的线程切换则会引起进程切换。[1]\n进程之间相互独立，而同一进程的多个线程共享内存，因此线程之间通信更方便，但也更需要同步。[1]\n一个进程可以包含多个线程，这些线程共享进程的地址空间、打开的文件等资源，但各自拥有独立的程序计数器、寄存器和栈。[2]\n由于同一进程内的线程共享资源，线程切换不需要切换地址空间，因此比进程切换快得多。[2]\n进程切换需要保存当前进程现场到它的 PCB，再从下一个进程的 PCB 中恢复现场，并由中断或系统调用触发且在内核态下完成。[5]"
+    },
+    {
+      "course": "course2-os",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "question": "进程有哪些基本状态",
+      "http_status": 200,
+      "client_elapsed_seconds": 3.75,
+      "request_id": "01M41FSM2WH6CN5GTPY71J1EH9",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 3742,
+      "first_delta_latency_ms": 3460,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-4",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ],
+      "answer": "进程在生命周期中会在几种状态之间转换 [1]。  \n基本状态包括就绪态，即进程已获得除处理机以外的全部资源，只等待被调度 [1]。  \n基本状态包括运行态，即进程正在处理机上执行 [1]。  \n基本状态包括阻塞态，即进程因等待某一事件而暂停执行 [1]。  \n此外还有创建态和终止态，分别表示进程正在被创建和进程已经结束 [1]。"
+    },
+    {
+      "course": "course2-os",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "question": "PCB 保存哪些信息",
+      "http_status": 200,
+      "client_elapsed_seconds": 5.18,
+      "request_id": "01M41FSQREDSW12Y61V3AJTGB3",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 5167,
+      "first_delta_latency_ms": 5020,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.2 进程控制块 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-3",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ],
+      "answer": "PCB 中记录进程标识符、进程状态、程序计数器、寄存器内容、调度信息和打开的文件等 [1]。"
+    },
+    {
+      "course": "course2-os",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "question": "怎么制作红烧肉",
+      "http_status": 200,
+      "client_elapsed_seconds": 0.66,
+      "request_id": "01M41FSWTTSGVZ03YPBPN6GDWE",
+      "outcome": "not_covered",
+      "reason": "below_similarity_threshold",
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 646,
+      "first_delta_latency_ms": null,
+      "graph_version": 1,
+      "citations": [],
+      "answer": "课程资料中与这个问题相关的内容不够充分，无法给出有出处的回答。"
+    }
+  ],
+  "aborted_first_attempt": [
+    {
+      "request_id": "01M41FNT0S7EEYCSSGV6HQYWST",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "question": "什么是栈",
+      "outcome": "error",
+      "reason": null,
+      "error_code": "LLM_UNAVAILABLE",
+      "error_reason": "truncated",
+      "truncated": 1,
+      "invalidation_subtype": "no_markers",
+      "latency_ms": 11412,
+      "first_delta_latency_ms": null
+    }
+  ]
+}
