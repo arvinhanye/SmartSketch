@@ -41,6 +41,17 @@ function materialRow(page: Page, name: string) {
   return page.locator('[data-test=material-row]').filter({ hasText: name })
 }
 
+/** 点开详情里的第一条来源：文件名是本课资料，位置与格式相符；可收起 */
+async function expectSourceViewer(page: Page): Promise<void> {
+  await page.locator('[data-test=kd-source-locate]').first().click()
+  const viewer = page.locator('[data-test=source-viewer]')
+  await expect(viewer.locator('[data-test=sv-document]')).toHaveText(/^ch3-stack-queue\.(pdf|md)$/)
+  const name = (await viewer.locator('[data-test=sv-document]').textContent()) ?? ''
+  await expect(viewer.locator('[data-test=sv-location]')).toHaveText(name.endsWith('.pdf') ? /第 \d+ 页/ : /\S/)
+  await viewer.locator('[data-test=sv-close]').click()
+  await expect(viewer).toHaveCount(0)
+}
+
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -98,27 +109,31 @@ test.describe('个人模式（L11）', () => {
     await page.goto(`${appUrl}/courses/${courseId}/graph/edit`)
     await expect(page.locator('[data-test=tg-graph]')).toBeVisible()
     await expect(page.locator('[data-test=tg-draft]')).toBeVisible()
-    const names = await page.locator('[data-test=tg-node-picker] option:not([value=""])').allTextContents()
+    const names = (await page.locator('[data-test=tg-node-picker] option:not([value=""])').allTextContents())
+      .map((name) => name.trim())
     expect(names.length).toBeGreaterThanOrEqual(3)
-    // 只挑名称唯一的节点做修改与删除，学生端按名称核对时不会混到另一份资料抽出的同名节点
-    const trimmed = names.map((name) => name.trim())
-    const unique = trimmed.filter((name) => trimmed.indexOf(name) === trimmed.lastIndexOf(name))
-    expect(unique.length).toBeGreaterThanOrEqual(2)
-    const [edited, removed] = unique
+    // 同一章 PDF 与 Markdown 各抽取一遍，AI 节点多为同名（跨任务融合不在本期，R05）；
+    // 修改定义与「发布后改草稿」都用教师新建的节点（名称唯一），删除按同名数量减 1 断言。
+    const edited = 'L11 教师新增知识点'
+    const removed = names[names.length - 1]!
 
+    // L12：教师图谱的来源可点开，显示资料文件名与对应格式的位置（PDF 页码 / Markdown 章节）
+    await selectDraftNode(page, names[0]!)
+    await page.locator('[data-test=tg-tab-detail]').click()
+    await expectSourceViewer(page)
+
+    // 以选中节点的来源新建知识点，再修改它的定义
+    await page.locator('[data-test=tg-create-open]').click()
+    await page.locator('[data-test=tg-create-name]').fill(edited)
+    await page.locator('[data-test=tg-create-definition]').fill('教师根据资料补充的知识点。')
+    await page.locator('[data-test=tg-create-submit]').click()
+    await expect(page.locator('[data-test=tg-create-success]')).toContainText(edited)
     await selectDraftNode(page, edited)
     await page.locator('[data-test=tg-tab-edit]').click()
     await page.locator('[data-test=ne-definition]').fill('L11 教师修改后的定义')
     await page.locator('[data-test=ne-save]').click()
     await expect(page.locator('[data-test=ne-notice]')).toContainText('已保存')
 
-    await page.locator('[data-test=tg-create-open]').click()
-    await page.locator('[data-test=tg-create-name]').fill('L11 教师新增知识点')
-    await page.locator('[data-test=tg-create-definition]').fill('教师根据资料补充的知识点。')
-    await page.locator('[data-test=tg-create-submit]').click()
-    await expect(page.locator('[data-test=tg-create-success]')).toContainText('L11 教师新增知识点')
-
-    // 同一章 PDF 与 Markdown 各抽取一遍，草稿里可能有同名节点（跨任务融合不在本期，R05 如实记录）
     const sameName = page.locator('[data-test=tg-node-picker] option').filter({ hasText: new RegExp(`^${escapeRegExp(removed)}$`) })
     const before = await sameName.count()
     await selectDraftNode(page, removed)
@@ -162,13 +177,17 @@ test.describe('个人模式（L11）', () => {
 
       await student.goto(`${appUrl}/courses/${courseId}/graph`)
       await expect(student.locator('[data-test=sg-version]')).toContainText('v1')
-      await expect(await studentCards(student, 'L11 教师新增知识点')).toHaveCount(1)
+      await expect(await studentCards(student, edited)).toHaveCount(1)
       await expect(await studentCards(student, removed)).toHaveCount(before - 1)
 
       await student.goto(`${appUrl}/courses/${courseId}/chat`)
       await student.locator('textarea').fill('什么是栈？')
       await student.locator('[data-test=chat-send]').click()
       await expect(student.locator('.source-list__item').first()).toBeVisible({ timeout: 60_000 })
+      // L12：问答引用带文件名，位置与格式相符
+      for (const text of await student.locator('.source-list__item').allTextContents()) {
+        expect(text).toMatch(/ch3-stack-queue\.(pdf · 第 \d+ 页|md · \S)/)
+      }
 
       // 8. 教师发布后再改草稿：学生看到的仍是发布版的定义
       await page.goto(`${appUrl}/courses/${courseId}/graph/edit`)
@@ -181,6 +200,7 @@ test.describe('个人模式（L11）', () => {
       await student.goto(`${appUrl}/courses/${courseId}/graph`)
       await (await studentCards(student, edited)).first().click()
       await expect(student.locator('[data-test=kd-definition]')).toHaveText('L11 教师修改后的定义')
+      await expectSourceViewer(student)   // L12：学生图谱同样能查看来源
     } finally {
       await studentContext.close()
     }
