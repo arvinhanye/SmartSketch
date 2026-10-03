@@ -1,0 +1,310 @@
+================================================================================
+SmartSketch / 智绘学途 —— Windows 启动支持与可移植性修复说明
+================================================================================
+分支：jmy1.0-2026-10-02
+基线：main @ 2a67189
+日期：2026-10-02
+变更规模：23 个文件（新增 6 个），+1439 行，-19 行
+          含两个提交：
+            c320ac8  feat(tooling): Windows 一键启动脚本与前端启动器
+            3754ec5  fix(portability): 修 Windows 上开箱即坏的 5 处缺陷并补 Windows CI job
+验证环境：Windows 11 23H2（家庭中文版）+ Docker Desktop 4.93.0
+          + Neo4j 5.26.31（community，含 APOC）+ Windows PowerShell 5.1
+          + Python 3.12.10 + Node.js 24.16.0
+
+
+================================================================================
+一、这个分支解决什么问题
+================================================================================
+
+项目的 scripts/start-demo.sh 是 bash 脚本，docs/runbook.md 开头明确写着
+「macOS 与 Windows 未实测」。在 Windows 上从零跑通该项目的过程中，暴露出
+若干「只在 Windows 出现、CI 无法捕获」的缺陷——CI 的三个 job 全部运行在
+ubuntu-latest 上，因此这些缺陷不可能被发现。
+
+本分支做两件事：
+  （1）提供 Windows 上可用的一键启动方式；
+  （2）修掉实测发现的缺陷，并补一个 Windows CI job 防止它们回归。
+
+
+================================================================================
+二、新增：Windows 一键启动
+================================================================================
+
+双击 start-smartsketch.bat 即可。它会依次完成：
+
+  1/4  检查 Docker Desktop 是否运行，未运行则启动；引擎已响应则不重复启动
+       （避免争抢 %LOCALAPPDATA%\Docker\launcher.lock 弹出 launcher lock 报错）
+  2/4  轮询等待 Docker 引擎就绪（冷启动 1–2 分钟，最多等 4 分钟）
+  3/4  docker compose up -d neo4j 启动 Neo4j 容器
+  4/4  由 start-dev.ps1 在三个独立窗口启动 API、worker、前端，
+       等前端响应后自动打开浏览器 http://127.0.0.1:5173
+
+停止：关掉那三个服务窗口。Neo4j 用 docker compose stop neo4j。
+
+演示账号（首次由 seed-demo-accounts.py 预置）：
+  demo_teacher / demo_student / demo_student2
+  口令：smartsketch-demo
+
+start-dev.ps1 的可选参数：
+  -Migrate      先跑 SQLite 与 Neo4j 迁移
+  -ImportDemo   启动后导入演示课程
+  -NoWeb        只起后端，不起前端
+
+文件清单：
+  start-smartsketch.bat                  双击入口（纯 ASCII，244 行）
+  start-dev.ps1                          启动主体（157 行）
+  WINDOWS.md                             中文运行指南
+  src/frontend/dev-server-no-config.mjs  Vite 受限环境启动器（35 行）
+
+
+================================================================================
+三、Windows 上必须处理的差异（三条，缺一不可）
+================================================================================
+
+（1）worker 心跳文件路径
+    src/backend/app/workers/runner.py 的 DEFAULT_HEARTBEAT_FILE 原本硬编码为
+    Unix 路径 "/tmp/smartsketch-worker.heartbeat"。Windows 上它被解析为当前
+    盘符根下的 \tmp\...，该目录通常不存在，于是 supervise() 里的
+    beat.touch() 抛 FileNotFoundError，整个监督进程退出——worker 根本起不来，
+    上传的资料永远停在 queued 状态。
+    → 已改为按平台派生：str(Path(tempfile.gettempdir()) / "smartsketch-worker.heartbeat")
+      POSIX 上 gettempdir() 仍是 /tmp，行为不变。
+    → 也可用官方支持的 WORKER_HEARTBEAT_FILE 环境变量覆盖（脚本已设置）。
+
+（2）应用只读环境变量，不读 .env 文件
+    src/backend/app/config.py 明确「without reading a .env file」。
+    不载入 .env 会有两个后果：
+      · 缺 AUTH_JWT_SECRET（或短于 32 字节）→ API 拒绝启动；
+      · 缺 NEO4J_PASSWORD → 连 Neo4j 报 AuthError（读到的是空字符串）。
+    → start-demo.sh 用 `set -a; source .env` 解决，Windows 等价做法是逐行
+      按字面值 Set-Item "Env:<名>"，脚本已内置。
+
+（3）相对路径依赖进程 CWD
+    .env 里 SQLITE_URL=sqlite:///./storage/smartsketch.sqlite3 与
+    STORAGE_DIR=./storage 都是相对路径。原先 database_path() 与
+    FileStorage.__init__ 都用 Path(...).resolve()，即按**进程当前目录**解析。
+    于是同一份配置按启动目录解析成两个库：
+      · 从 src/backend 启动（runbook 与 start-demo.sh 的写法）
+        → src/backend/storage/smartsketch.sqlite3，有迁移、有数据；
+      · 从仓库根目录运行（scripts/import-demo.py、seed-demo-accounts.py
+        的自然用法）→ <仓库根>/storage/，是一个全新空库，随即报
+        "Database has pending migrations (001, ... 014)"。
+    → 已改为把**相对**路径锚定到后端根 src/backend；绝对路径（容器内
+      /data/... 、测试夹具的 tmp 路径）不受影响。仓库在别处早就是这个
+      范式：MIGRATIONS_DIR、DEFAULT_PROMPTS_DIR、contracts._PATH。
+
+
+================================================================================
+四、修复清单（8 项）
+================================================================================
+
+编号  缺陷                                    修改文件
+----  ------------------------------------    ------------------------------------
+  1   worker 心跳默认值写死 Unix /tmp         src/backend/app/workers/runner.py
+  2   datasets/ 未钉 eol=lf，CRLF 检出改变    .gitattributes
+      演示资料字节，sha256 与 manifest.json
+      失配并级联（实测 1268 个 error）
+  3   无 Windows CI，上述缺陷不可能被发现     .github/workflows/ci.yml
+      （新增 platform-windows job）
+  4   tests/tooling/test_k07.py 用 pty        tests/tooling/test_k07.py
+      （POSIX 专有），收集期 ModuleNotFound
+      Error 打断整个门禁
+  5   test_b07/test_k11 直接执行 .sh，         tests/tooling/conftest.py（新增）
+      Windows 报 WinError 193；写死 "bash"     tests/tooling/test_b07.py
+      又踩 System32\bash.exe（WSL 启动器）     tests/tooling/test_k11.py
+  6   check_contracts.py 按 locale 输出 ✓，    scripts/check_contracts.py
+      中文 Windows（GBK）下在**成功路径**
+      抛 UnicodeEncodeError，门禁把通过判成失败
+  7   测试 subprocess.run(text=True) 未固定    tests/backend/conftest.py
+      编码，子进程按 locale 编码 stdout/       tests/backend/test_k02.py
+      stderr，含中文或 ✓ 时崩溃
+  8   gate.py 丢弃模块级跳过的真实原因，       scripts/verify/gate.py
+      pytest 把原因放在 JUnit 元素文本里，     scripts/verify/allowed-skips.txt
+      门禁只读 message（固定串
+      "collection skipped"），合法跳过被判红
+
+
+================================================================================
+五、验证结果（全部实测，非估计）
+================================================================================
+
+后端全量（tests/backend + tests/tooling）
+    3537 passed, 34 skipped
+    基线（main）为 3496 passed —— 净增 41，其中 12 个是本分支新增的用例
+    唯一失败：tests/backend/test_e03.py::test_stdlib_transport_connection_refused
+      该用例期望回环连接被**拒绝**，而受限环境把连接变成**超时**（得到
+      ModelTimeoutError 而非 ModelConnectionError）。与被测代码无关，普通的
+      CI 环境（含 GitHub runner）上会通过。
+
+心跳修复（编号 1）
+    改前：5 failed，报错即
+          FileNotFoundError: '\\tmp\\smartsketch-worker.heartbeat'
+    改后：7 passed
+    独立复核：默认路径 D:\SmartSketch\.tmp\smartsketch-worker.heartbeat，
+          绝对路径、父目录存在且可写、touch() 成功、health() 返回 0
+
+行尾修复（编号 2）
+    git check-attr → eol: lf
+    ch3-stack-queue.md 的 sha256 = 4847e2e4b5ef... 与 manifest.json 记录一致
+    tests/backend/test_k09.py → 9 passed
+
+相对路径锚点（编号 3 的前置修复，见第三节第 3 条）
+    新增 tests/backend/test_config_path_anchor.py
+    改前 4 failed，端到端子进程用例直接打印出「同一配置解析出两个库」
+    改后 5 passed
+    真实复核：从仓库根运行 scripts/seed-demo-accounts.py 输出
+          "exists, unchanged"、退出码 0（旧实现报「待迁移」）
+
+门禁链路（复现 scripts/verify/backend.sh 的两条命令）
+    tests/tooling 从「收集即崩」变为 29 passed, 7 skipped
+    gate.py tooling full → PASS
+    未登记原因的负例仍判红（未放宽门禁）
+
+契约
+    scripts/check_contracts.py → PASS, exit 0
+    tests/contracts → 292 passed
+    另有 3 个失败与本次改动无关：本机缺 openapi-typescript 与
+    datamodel-code-generator（在 main 基线上同样失败，已对照确认）
+
+语法
+    所有改动的 Python 文件 py_compile 通过
+
+
+================================================================================
+六、已知限制与未验证项
+================================================================================
+
+（1）platform-windows CI job 未经真实 CI 运行
+    本机受限环境无法执行 Git Bash（报
+    "couldn't create signal pipe, Win32 error 5"），因此该 job 只做到
+    YAML 结构校验 + 在 Python 里逐步复现 backend.sh 的两条命令。
+    首次推送后必须核对真实 CI 结果。
+
+（2）start-smartsketch.bat 的完整流程未在本机验证
+    start-dev.ps1 已用 Windows PowerShell 5.1 端到端跑通（API 8000 与
+    前端 5173 均 HTTP 200），.bat 的静态校验通过（无 BOM、纯 ASCII、
+    30 个 goto 目标全部存在、无未转义特殊字符的 echo、无 timeout 依赖），
+    但双击整条链路需要在你的桌面会话验证。
+
+（3）其余 locale 相关调用点未逐一固定编码
+    tests/backend 还有 8 处、tests/tooling 2 处、tests/contracts 1 处
+    subprocess.run(text=True) 未指定 encoding=。当前由
+    tests/backend/conftest.py 的 PYTHONIOENCODING=utf-8 兜住；若将来有
+    子进程输出非 ASCII 且父进程断言也含非 ASCII，需按 test_k02 的做法在
+    调用点显式固定。
+
+（4）同名测试文件未改名（有意保留）
+    tests/backend 与 tests/integration 有 5 组同名文件
+    （test_f08/f12/g06/k09/relations_api.py），混跑会触发 pytest
+    import mismatch。但这是仓库**有意的约定**（docs/tasks.md 第 1459 行
+    明载「同 F08～F13 惯例，必须按目录分开跑」），语义上也正确
+    （backend = 真实 app + SQLite，integration = 真实 Neo4j），且文档有
+    26 处引用这些路径。
+    曾评估用 __init__.py 把两目录变成不同的包（实测确实消除了混跑冲突），
+    但连带需改 9 处跨测试导入（test_f12.py 导 test_f08、
+    test_g05/g06/g08* 导 test_g04 等）并引入 pythonpath 配置，
+    风险大于收益，已回退。如要彻底消除，应作为独立任务连同跨测试导入
+    一起改造。
+
+（5）Windows 上的跳过项均为「缺外部依赖」，Linux 仍必须执行
+    · test_k07.py 整模块（Windows 无 pty/termios）
+    · tooling 中调用 .sh 的用例（Windows 未配置 Git Bash 时）
+    两者都登记在 scripts/verify/allowed-skips.txt，未削弱覆盖率。
+
+
+================================================================================
+七、如何运行（Windows）
+================================================================================
+
+前置（只做一次）：
+  1) 安装 WSL 2（wsl --install --no-distribution，或装 GitHub 上的
+     wsl.<版本>.x64.msi）
+  2) 安装 Docker Desktop，安装时选 Per-user installation；
+     装完在 Settings → General 确认使用 WSL 2 后端
+  3) Settings → Docker Engine 配置国内镜像加速，否则拉 neo4j 镜像很慢：
+       { "registry-mirrors": ["https://docker.1ms.run"] }
+  4) Python 3.11/3.12：建 .venv 后装 src/backend[test] 依赖。
+     PyPI 直连慢，建议用镜像：
+       pip install -i https://pypi.tuna.tsinghua.edu.cn/simple ...
+  5) Node.js 22.22+ 或 24.15+：npm ci --prefix src/frontend
+  6) 复制 .env.example 为 .env，填写 NEO4J_PASSWORD（≥8 位）与
+     AUTH_JWT_SECRET（≥32 位随机串）
+
+日常启动：
+  双击 start-smartsketch.bat
+  或先启动 Docker Desktop，再执行
+     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+     .\start-dev.ps1
+
+手动启动（与 start-demo.sh 等价，三个窗口）：
+  每个窗口先执行公共前置：
+    cd D:\SmartSketch\SmartSketch
+    Get-Content .env | ForEach-Object {
+      if ($_ -match '^([A-Z_][A-Z0-9_]*)=(.*)$') {
+        $v = $Matches[2].Trim(); if ($v) { Set-Item "Env:$($Matches[1])" $v }
+      }
+    }
+    $env:PYTHONPATH = "$PWD\src\backend"
+    Set-Location src\backend
+
+  窗口 A（API）      : ..\..\.venv\Scripts\python.exe -m app
+  窗口 B（worker）   : ..\..\.venv\Scripts\python.exe -m app.workers
+  窗口 C（前端）     : cd ..\frontend; node dev-server-no-config.mjs 5173
+
+  注意：worker 的心跳路径已按平台派生，无需再手动设置
+  WORKER_HEARTBEAT_FILE；只有使用未包含本次修复的旧代码时才需要。
+
+
+================================================================================
+八、提交内容清单
+================================================================================
+
+修改（14 个）：
+  .gitattributes
+  .github/workflows/ci.yml
+  docs/tasks.md
+  scripts/check_contracts.py
+  scripts/verify/allowed-skips.txt
+  scripts/verify/gate.py
+  src/backend/app/repositories/sqlite.py
+  src/backend/app/services/file_storage.py
+  src/backend/app/workers/runner.py
+  tests/backend/conftest.py
+  tests/backend/test_k02.py
+  tests/tooling/test_b07.py
+  tests/tooling/test_k07.py
+  tests/tooling/test_k11.py
+
+新增（9 个）：
+  start-smartsketch.bat
+  start-dev.ps1
+  WINDOWS.md
+  CHANGES.txt（本文件）
+  src/frontend/dev-server-no-config.mjs
+  tests/backend/test_config_path_anchor.py
+  tests/backend/test_worker_heartbeat.py
+  tests/tooling/conftest.py
+  docs/handoffs/claude-win-portability.md
+
+回滚：本分支无数据库迁移、无契约变更、无依赖升级。撤销即恢复到基线；
+      .env 与 storage/ 均在 .gitignore 内，不受影响。
+
+
+================================================================================
+九、与上游约定的对照（AGENTS.md）
+================================================================================
+
+已按仓库规范完成：
+  · 未改动 src/contracts/ 真源，因此不需要重新生成契约产物
+  · 未改共享 DTO、Neo4j 模型或数据模型，无需更新架构文档或 ADR
+  · 已在 docs/tasks.md 登记 WIN-01（含范围、验收条件、待决项）
+  · 已写 docs/handoffs/claude-win-portability.md 交接
+    （交付物、验证命令与数字、风险、遗留、下一步）
+  · 新增跳过原因已登记 scripts/verify/allowed-skips.txt，门禁未放宽
+
+未做（需项目方决定）：
+  · 推送与合并
+  · ADR：相对路径锚点改变了「相对 SQLITE_URL 的解析基准」，虽属修复，
+    但若项目方认为需要记录，可补一条 ADR
+================================================================================

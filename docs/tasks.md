@@ -1534,3 +1534,17 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 验收条件：① 未登录可打开 `/register`，登录页有入口，已登录访问回本账号首页；② 只建学生账号，请求体带 `role` 422 且零写入；③ 用户名大小写不敏感重复 409 `USERNAME_TAKEN`，页面在用户名下提示；④ 本地校验不过不发请求；⑤ 每进程 60 秒内 60 次，超出 429 带 `Retry-After`；⑥ 问答页知识点显示名称（取回答所依据的发布版），读取失败退回标识；⑦ 退出登录清会话回登录页。
 - 顺带修复：`useChat` 直接改原始对象，`currentVersion` 不会更新（改为写响应式代理）。
 - 待决：G6 画布在 64 个节点时整体缩得很小、标签难读（改版前已存在，未在本任务处理）；是否需要关闭自助注册的部署开关（ADR-079 后果）。详见 `docs/handoffs/claude-frontend-redesign.md`。
+
+## 2026-10-02 Windows 可移植性修复（Claude，新增任务）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| WIN-01 | DONE（待独立审查/推送） | 修 Windows 上开箱即坏的 5 处缺陷，并补 Windows CI job 防回归 | Claude | `fix/windows-worker-and-eol` / `main@2a67189` | `tests/backend/test_worker_heartbeat.py` 先红（5 failed）后绿（7 passed）；`tests/tooling` 29 passed / 7 skipped 且 `gate.py tooling full` PASS；后端全量 3532 passed / 34 skipped（基线 3496）；详见 `docs/handoffs/claude-win-portability.md` |
+
+- 输入：Windows 11 23H2 + Docker Desktop 4.93 + Neo4j 5.26.31 实机跑通记录；`docs/runbook.md` 明载 macOS/Windows 未实测。输出：worker 心跳默认路径按平台派生、`datasets/` 钉 `eol=lf`、Windows 可移植性 CI job，以及为使该 job 可跑而必须一并修的 4 处脚本/测试缺陷。
+- 修复清单：① `runner.py` 心跳默认值由 `/tmp/...` 改为 `tempfile.gettempdir()` 派生（Windows 上 worker 原本直接崩溃）；② `.gitattributes` 补 `datasets/** text eol=lf`（CRLF 检出使演示资料哈希失配，级联 1268 个 error）；③ `tests/tooling` 增加 bash 夹具并在 Windows 跳过 pty 依赖的 K07；④ `check_contracts.py` 输出 `✓` 时切 UTF-8（GBK 控制台下 PASS 路径崩溃）；⑤ `tests/backend/conftest.py` 统一子进程 `PYTHONIOENCODING=utf-8` 并在 `test_k02` 调用点固定编码；⑥ `gate.py` 回落读取模块级跳过的真实原因。
+- 验收条件：① `python -m app.workers` 在不设 `WORKER_HEARTBEAT_FILE` 时能建立心跳且 `--health` 返回 0；② 干净检出后 `test_k09` 通过且哈希与 `manifest.json` 一致；③ `tests/tooling` 在 Windows 上不再因收集错误打断门禁，跳过项均有登记原因；④ 新增 CI job 的 YAML 合法且能表达完整后端门禁。
+- 追加修复（同批次第二项）：相对 `SQLITE_URL`/`STORAGE_DIR` 锚定到后端根 `src/backend`，不再跟随进程 CWD。旧行为下同一配置按启动目录解析成两个库——从 `src/backend` 启动指向有数据的真库，从仓库根目录运行 `scripts/import-demo.py` / `seed-demo-accounts.py` 则打开**全新空库**并报 `Database has pending migrations`。`repositories/sqlite.py` 与 `services/file_storage.py` 各新增 `BACKEND_ROOT` 并只对相对路径加锚；绝对路径（容器 `/data/...`、测试 tmp）不受影响。新增 `tests/backend/test_config_path_anchor.py`：改前 4 failed（端到端子进程用例直接打印出"同一配置解析出两个库"），改后 5 passed；从仓库根运行 seed 脚本输出 `exists, unchanged` 且退出码 0。后端全量 **3537 passed / 34 skipped**（基线 3496）。
+- 调研后决定不改：`tests/backend` 与 `tests/integration` 的 5 组同名文件（`test_f08/f12/g06/k09/relations_api.py`）混跑会触发 pytest `import mismatch`，但这是仓库**有意约定**（本文件 1459 行明载"同 F08～F13 惯例，必须按目录分开跑"），语义上正确（backend=真实 app+SQLite，integration=真实 Neo4j），且文档有 26 处引用这些路径。曾评估用 `__init__.py` 把两目录变成不同的包（实测**确实消除**了混跑冲突），但连带需改 **9 处跨测试导入**（`test_f12.py` 导 `test_f08`、`test_g05/g06/g08*` 导 `test_g04` 等）并引入 `pythonpath` 配置，风险大于收益，**已回退**；如要彻底消除应作为独立任务连同跨测试导入一起改造。
+- 待决：`platform-windows` job 未经真实 CI 运行（本机受限环境无法执行 Git Bash）；其余 11 处 `text=True` 调用点未逐一固定编码，暂由 conftest 兜底；同名测试文件与跨测试导入的改造另立任务。
+

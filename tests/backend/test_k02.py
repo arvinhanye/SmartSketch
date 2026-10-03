@@ -409,7 +409,7 @@ def test_cli_score_repeat_output_identical(tmp_path):
         out = tmp_path / f"r{k}.json"
         proc = subprocess.run(
             [sys.executable, str(SCRIPT), "score", "--gold", str(g_path), "--predictions", str(p_path), "--out", str(out)],
-            capture_output=True, text=True,
+            capture_output=True, encoding="utf-8", errors="replace",
         )
         assert proc.returncode == 0, proc.stderr
         outs.append(out.read_bytes())
@@ -461,7 +461,7 @@ def test_cli_sample_runs(tmp_path):
     p_path.write_text(json.dumps(preds(many_entities(120))), encoding="utf-8")
     proc = subprocess.run(
         [sys.executable, str(SCRIPT), "sample", "--predictions", str(p_path), "--seed", "3", "--size", "10"],
-        capture_output=True, text=True,
+        capture_output=True, encoding="utf-8", errors="replace",
     )
     assert proc.returncode == 0, proc.stderr
     data = json.loads(proc.stdout)
@@ -505,7 +505,7 @@ def test_cli_malformed_input_exits_nonzero(tmp_path):
     p_path.write_text(json.dumps(preds([p_ent("p1", "栈", "lemma")])), encoding="utf-8")
     proc = subprocess.run(
         [sys.executable, str(SCRIPT), "score", "--gold", str(g_path), "--predictions", str(p_path)],
-        capture_output=True, text=True,
+        capture_output=True, encoding="utf-8", errors="replace",
     )
     assert proc.returncode != 0
     assert "lemma" in proc.stderr
@@ -516,7 +516,7 @@ def test_cli_invalid_json_exits_nonzero(tmp_path):
     p_path = tmp_path / "p.json"
     p_path.write_text("{not json", encoding="utf-8")
     proc = subprocess.run([sys.executable, str(SCRIPT), "sample", "--predictions", str(p_path)],
-                          capture_output=True, text=True)
+                          capture_output=True, encoding="utf-8", errors="replace")
     assert proc.returncode != 0
     assert "JSON" in proc.stderr
 

@@ -43,6 +43,23 @@ def load_rules(path: Path = ALLOWLIST) -> list[Rule]:
     return rules
 
 
+def skip_reason(skipped: ET.Element) -> str:
+    """Return the human reason recorded for one ``<skipped>`` element.
+
+    pytest writes the real reason into the element text for *module-level* skips
+    (``allow_module_level=True``) and puts the fixed string ``collection skipped`` in the
+    ``message`` attribute instead. Preferring the attribute would therefore throw the
+    reason away and let the fixed string decide; the element text is used whenever the
+    attribute carries no information. Both spellings are kept, so a report that only
+    fills the attribute still works.
+    """
+    message = (skipped.get("message") or "").strip()
+    text = (skipped.text or "").strip()
+    if message and message != "collection skipped":
+        return message
+    return text or message or "(no reason)"
+
+
 def judge(label: str, mode: str, report: Path, rules: list[Rule], min_tests: int = 1) -> list[str]:
     try:
         root = ET.parse(report).getroot()
@@ -60,7 +77,7 @@ def judge(label: str, mode: str, report: Path, rules: list[Rule], min_tests: int
             problems.append(f"failed: {name}")
             executed += 1
         elif skipped is not None:
-            reason = (skipped.get("message") or skipped.text or "").strip() or "(no reason)"
+            reason = skip_reason(skipped)
             if not any(rule.mode in ("*", mode) and rule.pattern.search(reason) for rule in rules):
                 unexpected[reason] = unexpected.get(reason, 0) + 1
         else:

@@ -35,9 +35,12 @@ def run_gate(cwd: Path = ROOT, *args: str, blocked: str = "") -> subprocess.Comp
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SHIM) if blocked else ""
     env["BLOCK_MODULES"] = blocked
+    # 显式按 UTF-8 解码：脚本会打印 "✓"（U+2713），中文 Windows 的默认 locale 是 GBK，
+    # 用 text=True 会按 GBK 解码并抛错，把一次通过的校验判成失败。
+    env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run(
         [sys.executable, "scripts/check_contracts.py", *args],
-        cwd=cwd, env=env, text=True, capture_output=True, check=False,
+        cwd=cwd, env=env, encoding="utf-8", errors="replace", capture_output=True, check=False,
     )
 
 
@@ -144,13 +147,16 @@ def shell_workspace(tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize("source_rc, expected", [(0, "PASS"), (1, "FAIL")])
-def test_dispatcher_reports_aggregate_status(shell_workspace: Path, source_rc: int, expected: str):
+def test_dispatcher_reports_aggregate_status(bash: str, shell_workspace: Path, source_rc: int, expected: str):
     env = os.environ.copy()
     env["SOURCE_RC"] = str(source_rc)
     env["PATH"] = str(Path(sys.executable).parent) + os.pathsep + env.get("PATH", "")
+    # 显式交给 bash：Windows 直接执行 .sh 会报 WinError 193（本目录 conftest 的 bash 夹具负责解析
+    # 解释器，缺失时带登记原因跳过）。
     result = subprocess.run(
-        ["bash", "scripts/verify/contracts.sh"], cwd=shell_workspace,
-        env=env, text=True, capture_output=True, check=False,
+        [bash, "scripts/verify/contracts.sh"], cwd=shell_workspace,
+        env=env, encoding="utf-8", errors="replace", capture_output=True, check=False,
     )
     assert result.returncode == source_rc
-    assert expected in result.stdout + result.stderr
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert expected in combined

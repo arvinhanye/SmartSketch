@@ -4,3 +4,5 @@
 full	^isolated Neo4j fixture not configured$	F11 等图库用例需要一次性 Neo4j；integration 模式会配置它并必须执行
 integration	^no Docker daemon available$	F01 的 dev-up/compose 用例会占用开发端口 7687，门禁固定 SMARTSKETCH_SKIP_DOCKER=1；本机手动运行
 integration	^no Docker daemon \(or SMARTSKETCH_SKIP_DOCKER=1\)$	K08 镜像构建耗时长且需联网拉基础镜像；本机或发布前手动运行
+full	pty is POSIX-only; K07 drives a real TTY	K07 用 pty.openpty() 驱动真实 TTY，Windows 无 pty/termios；该模块在 Windows 上整体跳过（Linux 仍必须执行）。不加首尾锚点：模块级跳过的 JUnit 文本是 ('<路径>', <行>, 'Skipped: <原因>') 元组
+full	^bash interpreter not available$	调用 scripts/*.sh 的用例需要 bash：Windows 不会按 shebang 执行 .sh，且 Git Bash 默认不在 PATH。设 SMARTSKETCH_BASH 指向 bash.exe 即可让这些用例照常执行（CI 的 windows 运行器自带 bash，不会跳过）

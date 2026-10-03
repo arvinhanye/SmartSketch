@@ -81,6 +81,39 @@ jobs:
           PYTHON: python
         run: scripts/verify/backend.sh full
 
+  platform-windows:
+    # 可移植性门禁：后端单测在 Windows 上跑一遍。
+    # 存在的理由是两个只在 Windows 出现的缺陷曾经长期无人发现（两者都是本 job 的直接目标）：
+    #   1. worker 心跳文件的默认值是 Unix 路径 /tmp/...，Windows 上解析为 \tmp\... 而崩溃，
+    #      worker 根本起不来（tests/backend/test_worker_heartbeat.py 覆盖）；
+    #   2. datasets/ 未钉 eol=lf，core.autocrlf=true 的检出改变演示资料字节，
+    #      使其 sha256 与 manifest.json 记录不符，并级联影响修订 ID 与大量用例
+    #      （tests/backend/test_k09.py 覆盖）。
+    # 只跑后端单测：不需要 Neo4j，因此不依赖 Docker，运行时间与 ubuntu 的 backend job 相当。
+    name: Backend (Windows portability)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install locked backend dependencies
+        run: |
+          python -m pip install -e './src/backend[test]'
+          python -m pip check
+      # backend.sh 先找 .venv/bin/python（POSIX 布局），再回退 python3；Windows 上两者都不适用，
+      # 因此必须显式给出解释器，它才会走 gate.py 的报告判定而不是静默退回。
+      - name: Backend gate (Windows)
+        env:
+          PYTHON: python
+        shell: bash
+        run: scripts/verify/backend.sh full
+
   integration:
     name: Integration and E2E
     runs-on: ubuntu-latest

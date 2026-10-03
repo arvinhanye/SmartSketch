@@ -12,7 +12,8 @@ from typing import Iterator
 
 
 BUSY_TIMEOUT_MS = 5000
-MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+MIGRATIONS_DIR = BACKEND_ROOT / "migrations"
 MIGRATION_NAME = re.compile(r"^([0-9]{3})_[a-z0-9_]+\.sql$")
 
 
@@ -21,13 +22,27 @@ class MigrationError(RuntimeError):
 
 
 def database_path(sqlite_url: str) -> Path:
-    """Resolve the project SQLite URL relative to the current process directory."""
+    """Resolve the project SQLite URL.
+
+    Relative paths are anchored to the backend root (``src/backend``), never to the
+    process working directory. Anchoring to the CWD meant one configuration resolved to
+    two different databases depending on where the process was started: the runbook and
+    ``scripts/start-demo.sh`` start from ``src/backend``, while ``scripts/import-demo.py``
+    and ``scripts/seed-demo-accounts.py`` are naturally run from the repository root. The
+    second case silently created a fresh empty database and reported
+    ``Database has pending migrations``. ``sqlite.MIGRATIONS_DIR``,
+    ``ai.prompts.DEFAULT_PROMPTS_DIR`` and ``schemas.contracts._PATH`` already anchor to
+    the source tree the same way.
+    """
     if not sqlite_url.startswith("sqlite:///"):
         raise ValueError("SQLITE_URL must start with sqlite:///")
     raw = sqlite_url[len("sqlite:///") :]
     if not raw or raw == ":memory:" or "?" in raw or "#" in raw:
         raise ValueError("SQLITE_URL must name a file without query parameters")
-    return Path(raw).resolve()
+    path = Path(raw)
+    if not path.is_absolute():
+        path = BACKEND_ROOT / path
+    return path.resolve()
 
 
 @contextmanager

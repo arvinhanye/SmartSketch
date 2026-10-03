@@ -99,17 +99,20 @@ def test_repository_allowlist_is_well_formed_and_explained():
     assert not any(rule.pattern.search("anything at all") for rule in rules)
 
 
-def test_verify_rejects_unknown_mode():
-    result = subprocess.run([str(ROOT / "scripts" / "verify.sh"), "fast"], capture_output=True, text=True, cwd=ROOT)
+def test_verify_rejects_unknown_mode(bash: str):
+    # 直接执行 .sh 只在 POSIX 上成立：Windows 会报 WinError 193，所以显式交给 bash。
+    # 显式 UTF-8 解码：见 test_b07.py 的同类注释（中文 Windows 默认 locale 是 GBK）。
+    result = subprocess.run([bash, str(ROOT / "scripts" / "verify.sh"), "fast"],
+                            capture_output=True, encoding="utf-8", errors="replace", cwd=ROOT)
     assert result.returncode == 2 and "Unknown verify mode" in result.stderr
 
 
 @pytest.mark.parametrize("script", ["backend.sh", "frontend.sh", "integration.sh"])
-def test_stage_scripts_judge_their_reports(script):
+def test_stage_scripts_judge_their_reports(bash: str, script):
     text = (ROOT / "scripts" / "verify" / script).read_text(encoding="utf-8")
     assert "gate.py" in text and "--junitxml" in text or "outputFile.junit" in text
     assert "|| status=" in text and 'exit "$status"' in text
-    result = subprocess.run(["bash", "-n", str(ROOT / "scripts" / "verify" / script)], capture_output=True)
+    result = subprocess.run([bash, "-n", str(ROOT / "scripts" / "verify" / script)], capture_output=True)
     assert result.returncode == 0
 
 

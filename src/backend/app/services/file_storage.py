@@ -25,6 +25,10 @@ from typing import Any, BinaryIO, Literal, TypeVar
 
 DocumentFormat = Literal["pdf", "docx", "txt", "markdown"]
 
+# 后端根（``src/backend``）：相对 ``STORAGE_DIR`` 的锚点，取法与
+# ``repositories.sqlite.BACKEND_ROOT`` 一致（本文件位于 ``app/services/``，故为 parents[2]）。
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
 SUPPORTED_FORMATS: tuple[DocumentFormat, ...] = ("pdf", "docx", "txt", "markdown")
 DEFAULT_CHUNK_SIZE = 64 * 1024
 MAX_FILENAME_BYTES = 255
@@ -253,6 +257,11 @@ class FileStorage:
         if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
             raise ValueError("max_bytes must be a positive integer")
         path = Path(root)
+        # 相对 root 锚定到后端根（``src/backend``），不跟随进程 CWD——理由与
+        # ``repositories.sqlite.database_path`` 相同：同一份配置不应因启动目录不同而指向
+        # 两个存储目录（否则上传落在一处、读取去另一处）。绝对路径（如容器里的 /data）不变。
+        if not path.is_absolute():
+            path = BACKEND_ROOT / path
         _disk(path.mkdir, 0o700, True, True)
         self.root = _disk(path.resolve, True)
         if not self.root.is_dir():

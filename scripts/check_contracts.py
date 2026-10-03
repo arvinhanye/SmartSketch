@@ -16,6 +16,18 @@ import argparse
 import sys
 from pathlib import Path
 
+# PASS 分支会打印 "✓"（U+2713）。Windows 默认按控制台代码页编码 stdout，中文区是 GBK，
+# 该字符不在 GBK 里，脚本会在**成功路径**上抛 UnicodeEncodeError 并以非零码退出，
+# 于是门禁把一次通过的校验判成失败（tests/tooling/test_b07.py 直接复现了这一点）。
+# 这里只在当前流的编码确实无法表示它时才切到 UTF-8，POSIX 行为不变。
+for _stream in (sys.stdout, sys.stderr):
+    _encoding = getattr(_stream, "encoding", None)
+    if _encoding and "utf" not in _encoding.lower():
+        try:
+            "✓".encode(_encoding)
+        except (UnicodeEncodeError, LookupError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+
 SPEC = Path("src/contracts/api.v1.yaml")
 EVENTS = Path("src/contracts/events.v1.md")
 ARCH = Path("docs/architecture.md")

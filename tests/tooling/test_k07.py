@@ -3,13 +3,26 @@
 from __future__ import annotations
 
 import os
-import pty
 import shutil
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+
+# K07 测的是 bash 生命周期脚本在**真实 TTY** 上的交互（`--destroy` 要求逐字确认），
+# 用 `pty.openpty()` 驱动。pty/termios 是 POSIX 专有模块，Windows 上不存在，
+# 因此本模块在 Windows 上整体跳过，而不是让收集阶段抛 ModuleNotFoundError
+# 把整个门禁打断。
+#
+# 用显式 skip 而不是 pytest.importorskip：后者的 reason 不进 JUnit 报告，
+# 跳过原因会被记成 "collection skipped"，而 K11 门禁要求每条 SKIP 都有登记原因
+# （scripts/verify/allowed-skips.txt）。这里的 reason 必须与该文件中的正则逐字一致。
+if sys.platform == "win32":  # pragma: no cover - 平台分支
+    pytest.skip("pty is POSIX-only; K07 drives a real TTY", allow_module_level=True)
+
+import pty  # noqa: E402  （仅在非 Windows 上执行到）
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ("_dev-common.sh", "dev-up.sh", "check-apoc.sh")

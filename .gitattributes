@@ -1,3 +1,8 @@
 src/contracts/v1/generated/** text eol=lf
 # 迁移校验和按内容计算，检出时统一为 LF（REVIEW-C01-R01）
 src/backend/migrations/*.sql text eol=lf
+# 演示资料的内容哈希按 LF 计算：datasets/demo/manifest.json 记录了
+# ch3-stack-queue.md 的 sha256（tests/backend/test_k09.py 直接校验文件字节）。
+# 若在 core.autocrlf=true 的机器上被检出为 CRLF，指纹立刻不符；修订 ID 又由内容哈希派生，
+# 于是 K09 与依赖夹具的用例会成片失败（Windows 实测：1268 个 error）。
+datasets/** text eol=lf

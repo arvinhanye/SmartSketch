@@ -29,6 +29,7 @@ import multiprocessing
 import os
 import signal
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -55,7 +56,10 @@ HEARTBEAT_STALE_SECONDS = 60.0
 # 与 K02 评测脚本的缺省值一致（evaluation/run_live_extraction.py）
 MAX_OUTPUT_TOKENS = 4096
 HEARTBEAT_ENV = "WORKER_HEARTBEAT_FILE"
-DEFAULT_HEARTBEAT_FILE = "/tmp/smartsketch-worker.heartbeat"
+# 缺省值取当前平台的临时目录，不写死 "/tmp"：Windows 上 "/tmp" 会被解析为当前盘符根下的
+# \tmp\...（通常不存在），supervise() 的 beat.touch() 随即抛 FileNotFoundError 而整体退出。
+# POSIX 上 tempfile.gettempdir() 仍是 "/tmp"，行为不变。
+DEFAULT_HEARTBEAT_FILE = str(Path(tempfile.gettempdir()) / "smartsketch-worker.heartbeat")
 
 EXIT_CONFIG = 2
 EXIT_CHILD_DIED = 3
