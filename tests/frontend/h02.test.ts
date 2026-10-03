@@ -795,6 +795,22 @@ describe('H02 任务失败与重试', () => {
       expect(text).not.toContain('服务端原文')
     })
 
+  it('L11-5：预算用尽显示预算文案', async () => {
+    const { wrapper, events } = await uploaded()
+    events.failed('t1', 'BUDGET_EXCEEDED')
+    await flushPromises()
+    expect(row(wrapper, 'd_t1').get('[data-test="task-error"]').text()).toBe('模型调用预算已用尽。')
+  })
+
+  it('L11-5：模型超时是通用的不可用文案，不引导去检查个人配置', async () => {
+    const { wrapper, events } = await uploaded()
+    events.failed('t1', 'LLM_UNAVAILABLE', { reason: 'timeout' })
+    await flushPromises()
+    const text = row(wrapper, 'd_t1').get('[data-test="task-error"]').text()
+    expect(text).toBe('模型服务暂不可用，抽取未完成。')
+    expect(text).not.toContain('模型 API 设置')
+  })
+
   it('LLM_UNAVAILABLE 没有凭据原因时仍是通用文案', async () => {
     const { wrapper, events } = await uploaded()
     events.failed('t1', 'LLM_UNAVAILABLE')

@@ -186,6 +186,28 @@ test.describe('个人模式（L11）', () => {
     }
   })
 
+  test('处理中取消任务：转为已取消；换回正常密钥后重新选择同一文件上传成功', async ({ page, request }) => {
+    test.setTimeout(300_000)
+    const md = file(`${course1}/ch3-stack-queue.md`, 'text/markdown')
+    await login(page, teacherUsername, teacherPassword)
+    // sk-fake-slow：假供应商每次调用先等几秒，留出在处理中点「取消」的时间
+    await configureModel(page, 'sk-fake-slow', true)
+    const teacher = await apiLogin(request, teacherUsername, teacherPassword)
+    const courseId = await createCourse(teacher, `L11 取消与重传 ${Date.now()}`)
+    await uploadThroughPage(page, courseId, md)
+    const row = materialRow(page, md.name).first()
+    await expect(row.locator('[data-test=material-status]')).toHaveText(/排队中|解析中|抽取中/)
+    await row.locator('[data-test=task-cancel]').click()
+    await expect(row.locator('[data-test=material-status]')).toHaveText('已取消', { timeout: 120_000 })
+
+    await configureModel(page, 'sk-fake-good', true)
+    // 离开页面后浏览器不再持有原文件，页面提示「请重新选择文件上传」（不提供一键重传）
+    await uploadThroughPage(page, courseId, md)
+    const done = page.locator('[data-test=material-row]').filter({ hasText: md.name })
+      .filter({ has: page.locator('[data-test=material-status]', { hasText: '待审核' }) })
+    await expect(done).toHaveCount(1, { timeout: 180_000 })
+  })
+
   test('供应商拒绝密钥：任务终止并引导检查配置', async ({ page, request }) => {
     test.setTimeout(240_000)
     const md = file(`${course1}/ch3-stack-queue.md`, 'text/markdown')

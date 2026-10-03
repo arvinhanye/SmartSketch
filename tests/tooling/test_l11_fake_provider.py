@@ -39,7 +39,7 @@ def _free_port() -> int:
 @pytest.fixture
 def provider():
     port = _free_port()
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "src" / "backend")}
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "src" / "backend"), "FAKE_PROVIDER_SLOW_SECONDS": "0.4"}
     proc = subprocess.Popen([sys.executable, str(SCRIPT), "--port", str(port)], env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{port}"
@@ -102,6 +102,14 @@ def test_bad_key_is_rejected_with_401(provider):
         _post(provider, "sk-fake-bad", {"model": "fake-model", "max_tokens": 8,
                                          "messages": [{"role": "user", "content": "x"}]})
     assert caught.value.code == 401
+
+
+def test_slow_key_holds_every_response(provider):
+    """sk-fake-slow：每次调用先等待 FAKE_PROVIDER_SLOW_SECONDS，供端到端在处理中点「取消」。"""
+    started = time.monotonic()
+    _post(provider, "sk-fake-slow", {"model": "fake-model", "max_tokens": 8,
+                                      "messages": [{"role": "user", "content": "x"}]}).read()
+    assert time.monotonic() - started >= 0.4
 
 
 def test_delay_header_holds_the_response(provider):

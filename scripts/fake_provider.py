@@ -7,6 +7,7 @@
 
 测试约定：
 - ``Authorization: Bearer sk-fake-bad`` → 401（供应商拒绝密钥）；其他非空 key 一律接受；
+- ``Bearer sk-fake-slow`` → 每次调用先等待 ``FAKE_PROVIDER_SLOW_SECONDS``（缺省 3 秒），供端到端在处理中取消；
 - 请求头 ``X-Fake-Delay: <秒>`` → 先等待再响应（链路超时用例）。
 
 只监听 127.0.0.1；个人模式下须设 ``MODEL_ENDPOINT_ALLOW_PRIVATE=1`` 才能连到它（APP_ENV=production 禁止）。
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -24,6 +26,7 @@ from app.services.ai.client import Message, ModelRequest, StreamDelta, StreamDon
 from app.services.ai.demo import _KNOWN_MARK, _TABLE_MARK, DemoModelClient
 
 BAD_KEY = "sk-fake-bad"
+SLOW_KEY = "sk-fake-slow"
 MAX_BODY_BYTES = 4 * 1024 * 1024
 
 
@@ -94,6 +97,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(401, {"error": {"message": "invalid api key", "type": "authentication_error"}})
             return
         delay = float(self.headers.get("X-Fake-Delay") or 0)
+        if key == SLOW_KEY:
+            delay = max(delay, float(os.environ.get("FAKE_PROVIDER_SLOW_SECONDS") or 3))
         if delay > 0:
             time.sleep(min(delay, 120))
         try:
