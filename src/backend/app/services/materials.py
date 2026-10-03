@@ -21,7 +21,9 @@ from app.repositories.materials import (
     delete_material,
     list_materials,
 )
-from app.repositories.tasks import create_material_task
+from app.repositories.model_configs import get_config
+from app.repositories.tasks import ModelConfigMissing, create_material_task
+from app.services.credentials import ModelConfigRequired
 from app.services.file_storage import FileStorage, FileStorageError, StorageWriteError
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,7 @@ def upload_material(
     content_type: str | None,
     chunks: Iterable[bytes],
     idempotency_key: str | None = None,
+    uploaded_by: str | None = None,
 ) -> UploadResult:
     """落盘并建资料与 queued 任务；失败抛 ``FileStorageError`` 子类或原异常。
 
@@ -62,13 +65,19 @@ def upload_material(
     """
     storage = open_storage(settings)
     stored = storage.save(filename, content_type, chunks)
+    bind = settings.LLM_MODE == "personal"
     try:
         result = create_material_task(
             settings.SQLITE_URL,
             course_id=course_id,
             stored_file=stored,
             idempotency_key=idempotency_key or uuid4().hex,
+            created_by=uploaded_by,
+            bind_model_config=bind,
         )
+    except ModelConfigMissing:
+        _discard(storage, stored.storage_name)
+        raise ModelConfigRequired() from None
     except sqlite3.Error:
         _discard(storage, stored.storage_name)
         raise StorageWriteError("资料记录暂不可写") from None
@@ -78,6 +87,11 @@ def upload_material(
     if not result.created:
         _discard(storage, stored.storage_name)
     return UploadResult(task_id=result.task.id, document_id=result.material.id)
+
+
+def model_config_ready(settings: Settings, user_id: str) -> bool:
+    """personal 模式下上传前的快速检查，避免为注定被拒的请求读完整个文件体（ADR-080）。"""
+    return settings.LLM_MODE != "personal" or get_config(settings.SQLITE_URL, user_id) is not None
 
 
 def list_course_materials(settings: Settings, course_id: str) -> list[MaterialRecord]:

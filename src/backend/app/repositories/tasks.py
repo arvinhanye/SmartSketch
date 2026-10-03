@@ -12,6 +12,7 @@ from app.repositories.materials import (
     get_material_in_connection,
     insert_material,
 )
+from app.repositories.model_configs import bind_task
 from app.repositories.sqlite import connect
 
 
@@ -65,6 +66,10 @@ def _task_from_row(row: tuple[object, ...]) -> TaskRecord:
     )
 
 
+class ModelConfigMissing(Exception):
+    """``bind_model_config`` was requested but the creator has no saved model configuration (ADR-080)."""
+
+
 def _insert_task(
     database: sqlite3.Connection,
     *,
@@ -72,14 +77,27 @@ def _insert_task(
     course_id: str,
     document_id: str,
     idempotency_key: str,
+    created_by: str | None = None,
 ) -> TaskRecord:
-    """Insert the initial queued row on the caller's connection."""
-    database.execute(
-        """INSERT INTO processing_tasks
-           (id, course_id, document_id, idempotency_key)
-           VALUES (?, ?, ?, ?)""",
-        (task_id, course_id, document_id, idempotency_key),
-    )
+    """Insert the initial queued row on the caller's connection.
+
+    ``created_by`` (migration 015, ADR-080) is written only when given, so callers without a creator keep
+    working on schemas that predate the column.
+    """
+    if created_by is None:
+        database.execute(
+            """INSERT INTO processing_tasks
+               (id, course_id, document_id, idempotency_key)
+               VALUES (?, ?, ?, ?)""",
+            (task_id, course_id, document_id, idempotency_key),
+        )
+    else:
+        database.execute(
+            """INSERT INTO processing_tasks
+               (id, course_id, document_id, idempotency_key, created_by)
+               VALUES (?, ?, ?, ?, ?)""",
+            (task_id, course_id, document_id, idempotency_key, created_by),
+        )
     row = database.execute(
         f"SELECT {_TASK_COLUMNS} FROM processing_tasks WHERE id = ?", (task_id,)
     ).fetchone()
@@ -94,6 +112,8 @@ def create_material_task(
     course_id: str,
     stored_file: StoredFileMetadata,
     idempotency_key: str,
+    created_by: str | None = None,
+    bind_model_config: bool = False,
 ) -> MaterialTaskResult:
     """Create a material and its queued task atomically.
 
@@ -107,6 +127,8 @@ def create_material_task(
         raise ValueError("idempotency_key must be a non-empty string")
     if len(idempotency_key) > 255:
         raise ValueError("idempotency_key must be at most 255 characters")
+    if bind_model_config and not created_by:
+        raise ValueError("bind_model_config requires created_by")
 
     material_id = uuid4().hex
     task_id = uuid4().hex
@@ -143,7 +165,11 @@ def create_material_task(
                     course_id=course_id,
                     document_id=material.id,
                     idempotency_key=idempotency_key,
+                    created_by=created_by,
                 )
+                # ADR-080：personal 模式下与资料、任务同一事务复制所有者的密钥快照；没有配置即整体回滚
+                if bind_model_config and not bind_task(database, task_id=task.id, user_id=created_by):
+                    raise ModelConfigMissing()
                 result = MaterialTaskResult(material=material, task=task, created=True)
             database.execute("COMMIT")
         except BaseException:

@@ -77,6 +77,7 @@ from app.services.ai.policy import (
     ModelCallPolicy,
     ModelUnavailableError,
 )
+from app.services.credentials import CredentialUnavailable
 from app.services.ai.relations import (
     RelationCandidate,
     RelationExtractor,
@@ -198,6 +199,11 @@ class ExtractionToolkit:
     entities: Callable[[ModelClient], EntityExtractor]
     relations: Callable[[ModelClient], RelationExtractor]
     gleaner: Callable[[ModelClient], EntityGleaner] | None = None
+    #: personal 模式：调用归属的用户与每次尝试前的快照有效性检查（失效时抛 CredentialUnavailable，ADR-080）。
+    user_id: str | None = None
+    guard: Callable[[], None] | None = None
+    #: personal 模式下任务快照里的模型名；全局模式为 None（模型名已固化在抽取器工厂里）。
+    model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -436,6 +442,8 @@ def _attempts(
     """L2：最多 ``chunk_max_attempts`` 次；``body`` 返回结果或输出不合规的失败码。"""
     last = OUTPUT_INVALID_CODE
     for attempt in range(1, limits.chunk_max_attempts + 1):
+        if toolkit.guard is not None:
+            toolkit.guard()
         client = _AttemptClient(
             toolkit.policy,
             CallAttribution(
@@ -444,6 +452,7 @@ def _attempts(
                 chunk_id=chunk_id,
                 task_attempt=lease.attempt,
                 chunk_attempt=attempt,
+                user_id=toolkit.user_id,
             ),
         )
         try:
@@ -584,9 +593,10 @@ def _boundary(sqlite_url: str, lease: Lease, event: str) -> TaskState:
 
 
 def _fail(
-    sqlite_url: str, lease: Lease, code: str, details: Mapping[str, object] | None, counts: Mapping[str, int]
+    sqlite_url: str, lease: Lease, code: str, details: Mapping[str, object] | None, counts: Mapping[str, int],
+    *, message: str | None = None,
 ) -> ExtractOutcome:
-    message = _MESSAGES[code]
+    message = message or _MESSAGES[code]
     error = TaskError(code, message, details)
     encoded = None if details is None else json.dumps(dict(details), ensure_ascii=False, sort_keys=True)
     try:
@@ -848,6 +858,14 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
     return ExtractOutcome(ExtractStatus.ADVANCED, lease.task_id, NEXT_STAGE, "stage", **progress.counts())
 
 
+CREDENTIAL_MESSAGE = "个人模型 API 配置不可用，任务已终止；请检查「模型 API 设置」后重新上传"
+
+
+def fail_for_credential(sqlite_url: str, lease: Lease, reason: str) -> ExtractOutcome:
+    """ADR-080 决定 3：快照缺失、已撤销或不可解时终止任务，不重试、不换 key。"""
+    return _fail(sqlite_url, lease, MODEL_ERROR_CODE, {"reason": reason}, {}, message=CREDENTIAL_MESSAGE)
+
+
 def run_extract_stage(
     sqlite_url: str, lease: Lease, *, toolkit: ExtractionToolkit, limits: ExtractLimits
 ) -> ExtractOutcome:
@@ -868,6 +886,9 @@ def run_extract_stage(
         return _run(sqlite_url, lease, toolkit, limits)
     except LeaseLost:
         return _lost(lease)
+    except CredentialUnavailable as exc:
+        logger.warning("extracting task %s: credential unavailable (%s)", lease.task_id, exc.reason)
+        return fail_for_credential(sqlite_url, lease, exc.reason)
     except sqlite3.OperationalError as exc:
         logger.warning("extracting task %s: storage unavailable (%s)", lease.task_id, type(exc).__name__)
         return _release(sqlite_url, lease, "STORAGE_UNAVAILABLE", limits.max_attempts, {})

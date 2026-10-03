@@ -9,6 +9,7 @@ TASK-9、TASK-10、TASK-13、LEASE-2、LEASE-6、LEASE-11。
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -31,6 +32,7 @@ from app.services.ai.fake import BAD_JSON_TEXT, FakeModelClient
 from app.services.ai.gleaning import EntityGleaner
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
+from app.services.credentials import CredentialUnavailable
 from app.services.file_storage import FileStorage, StoredFile
 from app.workers import extract_task
 from app.workers.extract_task import (
@@ -892,3 +894,41 @@ def test_run_once_hands_back_merging_tasks(db_url, storage):
                                    owner="worker-b", storage=storage)
 
     assert result.extract is None and result.handed_back is True and script.calls == []
+
+
+# --- ADR-080：密钥快照失效 -----------------------------------------------------------------------
+def test_revoked_credential_fails_the_task_before_any_model_call(db_url, storage):
+    lease, _chunk_ids = _extracting(db_url, storage)
+
+    def guard() -> None:
+        raise CredentialUnavailable("credential_revoked")
+
+    toolkit = dataclasses.replace(_toolkit(db_url, Script()), guard=guard)
+
+    outcome = _run(db_url, lease, toolkit)
+
+    assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
+    row = _row(db_url, lease.task_id)
+    assert row["stage"] == "failed" and row["lease_token"] is None
+    assert json.loads(row["error_details"]) == {"reason": "credential_revoked"}
+    assert "模型 API" in row["error_message"]
+    assert _call_rows(db_url, lease.task_id) == []
+
+
+def test_credential_revoked_mid_stage_stops_further_chunks(db_url, storage):
+    lease, _chunk_ids = _extracting(db_url, storage)
+    script = Script()
+    allowed = {"left": 2}
+
+    def guard() -> None:
+        if allowed["left"] == 0:
+            raise CredentialUnavailable("credential_revoked")
+        allowed["left"] -= 1
+
+    toolkit = dataclasses.replace(_toolkit(db_url, script), guard=guard)
+
+    outcome = _run(db_url, lease, toolkit)
+
+    assert outcome.status is ExtractStatus.FAILED
+    assert json.loads(_row(db_url, lease.task_id)["error_details"]) == {"reason": "credential_revoked"}
+    assert len(script.calls) == 2

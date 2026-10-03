@@ -22,6 +22,8 @@ FAKE_MODEL_ID = "fake"
 
 def build_model_clients(settings: Settings) -> tuple[ModelClient, ModelClient | None]:
     """返回 ``(主用, 备用)``；只有 ``live`` 且配了备用四项时备用非空。"""
+    if settings.LLM_MODE == "personal":
+        raise RuntimeError("LLM_MODE=personal has no process-wide model client (ADR-080)")
     if settings.LLM_MODE == "live":
         from app.services.ai.compatible import CompatibleModelClient
 

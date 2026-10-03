@@ -78,6 +78,7 @@ class CallRecord:
     model_requested: str
     input_tokens_est: int
     max_output_tokens: int
+    user_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -169,15 +170,15 @@ class SqliteCallStore:
                     database.execute(
                         "INSERT INTO model_calls (call_id, status, course_id, task_id, chunk_id,"
                         " request_id, purpose, task_attempt, chunk_attempt, call_seq, provider_role,"
-                        " is_repair, model_requested, input_tokens_est, max_output_tokens)"
-                        " VALUES (?, 'sent', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                        " is_repair, model_requested, input_tokens_est, max_output_tokens, user_id)"
+                        " VALUES (?, 'sent', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                         " ON CONFLICT(call_id) DO NOTHING",
                         (
                             record.call_id, record.course_id, record.task_id, record.chunk_id,
                             record.request_id, record.purpose, record.task_attempt,
                             record.chunk_attempt, record.call_seq, record.provider_role,
                             1 if record.is_repair else 0, record.model_requested,
-                            record.input_tokens_est, record.max_output_tokens,
+                            record.input_tokens_est, record.max_output_tokens, record.user_id,
                         ),
                     )
                 database.execute("COMMIT")
