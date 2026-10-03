@@ -59,7 +59,14 @@ class ModelConfigUpdate(BaseModel):
         extra='forbid',
     )
     base_url: Annotated[str, Field(max_length=512, min_length=9)]
-    model: Annotated[str, Field(max_length=128, min_length=1)]
+    model: Annotated[
+        str,
+        Field(
+            description='服务端先去掉首尾空白；结果为空时返回 422 `VALIDATION_ERROR`，`details.fields` 指向 `model`、原因 `blank`，不保存、不发起请求（ADR-082 决定 5）。',
+            max_length=128,
+            min_length=1,
+        ),
+    ]
     api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
 
 
@@ -68,7 +75,14 @@ class ModelConfigTestRequest(BaseModel):
         extra='forbid',
     )
     base_url: Annotated[Optional[str], Field(max_length=512, min_length=9)] = None
-    model: Annotated[Optional[str], Field(max_length=128, min_length=1)] = None
+    model: Annotated[
+        Optional[str],
+        Field(
+            description='服务端先去掉首尾空白；结果为空时返回 422 `VALIDATION_ERROR`，`details.fields` 指向 `model`、原因 `blank`，不保存、不发起请求（ADR-082 决定 5）。',
+            max_length=128,
+            min_length=1,
+        ),
+    ] = None
     api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
 
 

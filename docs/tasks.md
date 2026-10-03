@@ -70,8 +70,8 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 | N04 | P2 | DONE（待复审） | Claude | `useModelConfig.ts`（单一 `busy` 互斥、卸载丢弃）、`ModelSettingsView.vue`（四个按钮按 `busy` 禁用） | 保存/测试/清除互斥（逻辑与按钮），错误后释放，卸载中止，乱序结果不回写。同上测试文件 N04 段 red → green |
 | N05 | P2 | DONE（待复审） | Claude | `useModelConfig.ts` | 仅地址与模型都未改且密钥留空时测试已存配置；其余要求先保存或填完整凭据，并标明测试对象（「已保存的配置」/「表单中的配置（尚未保存）」；测试期间改表单则结果作废）。同上测试文件 N05 段 red → green |
 | §3.7 | 既有缺口 | DONE（待复审） | Claude | `ChatView.vue`、`useChat.ts`、`specs/grounded-qa.md` Q6.5 | 发送期间按钮、Enter、逻辑入口都不再提交；显式「停止」后可再发。`tests/frontend/chat-send-lock.test.ts` red → green；前端全量 811 中 810 通过，唯一失败为 B02 嵌套 vitest 在满载下超时 5 s，单独重跑 5/5 通过；type-check exit 0 |
-| N07 | P2 | TODO | Claude | `services/model_configs.py` | 存储未启用时 `/test` 任何分支在 DNS/传输前返回 503 `credential_store_disabled` |
-| N08 | P2 | TODO | Claude | `services/model_configs.py`、`api/model_config.py` | 空白模型名 PUT 与 /test 均 422 `VALIDATION_ERROR`（`model`），不写库不出站 |
+| N07 | P2 | DONE（待复审） | Claude | `services/model_configs.py`（`run_test` 开头统一检查存储）、ADR-082 决定 5 | 存储未启用时 `/test` 任何分支在 DNS/传输前返回 503 `credential_store_disabled`。`tests/backend/test_n07_n08.py`（demo/fake × 完整/空请求体、残留配置；启用时仍可测）red → green |
+| N08 | P2 | DONE（待复审） | Claude | `services/model_configs.py`（共享 `normalize_model`）、`api/model_config.py`、契约 `model` 说明（已重生成） | 空白模型名 PUT 与 /test 均 422 `VALIDATION_ERROR`（`model`/`blank`），不写库不出站。同上测试文件（空格/制表符/换行，新建、保留密钥修改、测试三入口）red 20 failed/2 passed（含 N07）→ green 22；连同 L06 42 passed |
 | D2 | P2 | TODO | Claude | `services/ai/embeddings.py`、`api/versions.py`、`api/chat.py`、`repositories/model_calls.py` | 发布与查询的每次实际向量出站先预写、再回写；缓存命中/回滚复制不记；不计入个人日预算 |
 
 - 输入：上述审查与 prompt、已签收冲刺规格与 ADR-080/081、计划 A 代码（`e86f4b9`）。输出：修复代码、仓库回归（先红后绿）、必要的规格/ADR/契约更新、交接。

@@ -20,8 +20,10 @@ TEST_TIMEOUT_SECONDS = 15.0
 TEST_PURPOSE = "config_test"
 BLOCKED_ADDRESS = "blocked_address"
 
-__all__ = ["BLOCKED_ADDRESS", "ConfigTestLimiter", "CredentialStoreDisabled", "InvalidKey", "KeyRequired",
-           "ModelConfigView", "TestOutcome", "clear", "run_test", "save", "view"]
+__all__ = ["BLOCKED_ADDRESS", "ConfigTestLimiter", "CredentialStoreDisabled", "InvalidKey", "InvalidModel", "KeyRequired",
+           "ModelConfigView", "TestOutcome", "clear", "normalize_model", "run_test", "save", "view"]
+
+MODEL_MAX_LENGTH = 128
 
 
 class CredentialStoreDisabled(Exception):
@@ -30,6 +32,24 @@ class CredentialStoreDisabled(Exception):
 
 class InvalidKey(Exception):
     """The API key cannot go into an HTTP header (non-printable, non-ASCII or spaces)."""
+
+
+class InvalidModel(Exception):
+    """The model name is blank after trimming (N08); ``reason`` is machine-readable."""
+
+    def __init__(self, reason: str = "blank") -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def normalize_model(model: str) -> str:
+    """Shared by save and test: trim, then refuse an empty name before anything is stored or sent."""
+    value = model.strip()
+    if not value:
+        raise InvalidModel("blank")
+    if len(value) > MODEL_MAX_LENGTH:
+        raise InvalidModel("too_long")
+    return value
 
 
 @dataclass(frozen=True)
@@ -64,13 +84,14 @@ def view(settings: Settings, user_id: str) -> ModelConfigView:
 def save(settings: Settings, user_id: str, *, base_url: str, model: str, api_key: str | None,
          resolver: Resolver | None = None) -> ModelConfigView:
     cipher = _cipher(settings)
+    model = normalize_model(model)
     check_endpoint(base_url, allow_private=settings.MODEL_ENDPOINT_ALLOW_PRIVATE,
                    resolver=resolver or system_resolver)
     sealed = hint = None
     if api_key is not None:
         _check_key(api_key)
         sealed, hint = cipher.seal(user_id, api_key), api_key[-4:]
-    row = repo.save_config(settings.SQLITE_URL, user_id=user_id, base_url=base_url, model=model.strip(),
+    row = repo.save_config(settings.SQLITE_URL, user_id=user_id, base_url=base_url, model=model,
                            sealed=sealed, key_hint=hint)
     return ModelConfigView(settings.LLM_MODE, row)
 
@@ -82,7 +103,12 @@ def clear(settings: Settings, user_id: str) -> None:
 def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: str | None, api_key: str | None,
              transport: HttpTransport, resolver: Resolver | None = None,
              clock: Callable[[], float] = time.monotonic) -> TestOutcome:
-    """One minimal chat call. With no values the saved configuration is tested and the result recorded."""
+    """One minimal chat call. With no values the saved configuration is tested and the result recorded.
+
+    The credential store is checked first on every branch (N07): without a root key nothing is
+    resolved or sent, even for a complete request body.
+    """
+    cipher = _cipher(settings)
     saved = base_url is None
     revision = None
     if saved:
@@ -91,10 +117,11 @@ def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: s
             raise ModelConfigRequired()
         revision = row.revision
         try:
-            base_url, model, api_key = row.base_url, row.model, _cipher(settings).open(user_id, row.sealed)
+            base_url, model, api_key = row.base_url, row.model, cipher.open(user_id, row.sealed)
         except CredentialError:
             raise CredentialStoreDisabled() from None
     else:
+        model = normalize_model(model or "")
         _check_key(api_key or "")
     started = clock()
     try:

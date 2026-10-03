@@ -81,6 +81,8 @@ def save_model_config(payload: ModelConfigUpdate, request: Request,
         return _invalid("api_key", "required_when_endpoint_changes")
     except service.InvalidKey:
         return _invalid("api_key", "invalid_characters")
+    except service.InvalidModel as invalid:
+        return _invalid("model", invalid.reason)
     except service.CredentialStoreDisabled:
         return _disabled()
     return JSONResponse(content=_to_wire(view))
@@ -114,6 +116,8 @@ def test_model_config(request: Request, payload: ModelConfigTestRequest | None =
         return JSONResponse(status_code=409, content=body.model_dump(exclude_none=True))
     except service.InvalidKey:
         return _invalid("api_key", "invalid_characters")
+    except service.InvalidModel as invalid:
+        return _invalid("model", invalid.reason)
     except service.CredentialStoreDisabled:
         return _disabled()
     wire: dict[str, Any] = {"ok": outcome.ok, "latency_ms": outcome.latency_ms}

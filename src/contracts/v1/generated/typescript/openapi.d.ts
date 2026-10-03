@@ -878,6 +878,7 @@ export interface components {
         };
         ModelConfigUpdate: {
             base_url: string;
+            /** @description 服务端先去掉首尾空白；结果为空时返回 422 `VALIDATION_ERROR`，`details.fields` 指向 `model`、原因 `blank`，不保存、不发起请求（ADR-082 决定 5）。 */
             model: string;
             /** Format: password */
             api_key?: string;
@@ -885,6 +886,7 @@ export interface components {
         /** @description 三项都省略时测试已存配置；否则三项都必填。 */
         ModelConfigTestRequest: {
             base_url?: string;
+            /** @description 服务端先去掉首尾空白；结果为空时返回 422 `VALIDATION_ERROR`，`details.fields` 指向 `model`、原因 `blank`，不保存、不发起请求（ADR-082 决定 5）。 */
             model?: string;
             /** Format: password */
             api_key?: string;
