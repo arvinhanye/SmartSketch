@@ -155,6 +155,10 @@ class _StdlibResponse:
         return self._response.getheader(name)
 
     def read(self, amount: int, timeout: float) -> bytes:
+        # A server that closes the connection (HTTP/1.0, ``Connection: close``) makes http.client
+        # close the socket once the body is consumed; the next read is EOF, not a socket call.
+        if self._response.isclosed():
+            return b""
         if self._sock is not None:
             self._sock.settimeout(max(timeout, 0.001))
         return self._response.read1(amount)
