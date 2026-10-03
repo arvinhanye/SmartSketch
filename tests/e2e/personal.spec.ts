@@ -189,6 +189,26 @@ test.describe('个人模式（L11）', () => {
         expect(text).toMatch(/ch3-stack-queue\.(pdf · 第 \d+ 页|md · \S)/)
       }
 
+      // L13：从问答点知识点跳到图谱并选中同一节点；刷新直达仍选中
+      const chip = student.locator('[data-test=chat-kp]').first()
+      await expect(chip).not.toHaveText(/^kp_/)        // 问答页读完已发布图谱后，按钮显示知识点名称
+      const chipName = ((await chip.textContent()) ?? '').trim()
+      await chip.click()
+      await expect(student).toHaveURL(new RegExp(`/courses/${courseId}/graph\\?kp=`))
+      await expect(student.locator('[data-test=kd-title]')).toHaveText(chipName)
+      await student.reload()
+      await expect(student.locator('[data-test=kd-title]')).toHaveText(chipName)
+
+      // L13：20+ 节点时初始视口不低于可读缩放；搜索回车定位并选中
+      const canvas = student.locator('[data-test=graph-canvas]')
+      await expect(canvas).toHaveAttribute('data-zoom', /\d/)
+      expect(Number(await canvas.getAttribute('data-zoom'))).toBeGreaterThanOrEqual(0.7)
+      const label = (await student.locator('.graph-canvas__stage').getAttribute('aria-label')) ?? ''
+      expect(Number(/(\d+) 个知识点/.exec(label)?.[1] ?? 0)).toBeGreaterThanOrEqual(20)
+      await student.getByPlaceholder('搜索知识点').fill(edited)
+      await student.getByPlaceholder('搜索知识点').press('Enter')
+      await expect(student.locator('[data-test=kd-title]')).toHaveText(edited)
+
       // 8. 教师发布后再改草稿：学生看到的仍是发布版的定义
       await page.goto(`${appUrl}/courses/${courseId}/graph/edit`)
       await selectDraftNode(page, edited)
