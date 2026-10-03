@@ -415,12 +415,12 @@ describe('L11 发布阻断原因', () => {
           type: string
           minLength: 1
           maxLength: 255
-          description: "资料文件名（课程内资料的原始文件名）；资料已删除或不可读时省略，客户端显示「资料不可用」。仅来自同一课程（ADR-083）。"
+          description: "资料文件名（课程内资料的原始文件名）；资料已删除或不可读时省略，客户端显示「资料不可用」。仅来自同一课程（ADR-084）。"
 ```
 
 - Modify: `specs/grounded-qa.md` 的 Q4 `citations` 行，加入「`document_name` 由服务端按同课程资料填写」。
 - Modify: `specs/course-knowledge-graph.md`，在知识点详情来源一节写入同一规则。
-- Modify: `docs/decisions.md`，新增 ADR-083「来源文件名的可选字段与课程隔离」。
+- Modify: `docs/decisions.md`，新增 ADR-084「来源文件名的可选字段与课程隔离」。
 - Regenerate: `PATH="$PWD/.venv/bin:$PATH" ./scripts/gen-contracts.sh`
 - Test: `tests/contracts/`（既有门禁）
 

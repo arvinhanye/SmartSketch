@@ -1759,3 +1759,11 @@
   4. **供应商鉴权失败任务级终止（N02）**：抽取阶段任一块或小节的模型调用收到 401/403（`ModelAuthError`），该单元不做 L2 重试，阶段停止派发新单元，已在途单元的结果不再写检查点，任务以 `LLM_UNAVAILABLE`、`details = {"reason": "auth"}` 失败（不进入 `merging`，不切备用、不换 key；E04 本就不对鉴权失败做 L1 重试与主备切换）。与本人清除配置的 `credential_revoked` 等快照原因区分。普通的关系输出不合规仍按既有容错只记小节检查点。此规则对 `live` 的全站 key 同样成立：鉴权失败不会靠重试恢复。
   5. **凭据存储门禁先于一切、模型名共享校验（N07、N08）**：`/me/model-config/test` 的每个分支（完整请求体、空请求体、已有配置）都先确认凭据存储已启用，未启用即 503 `credential_store_disabled`，在任何域名解析与出站之前结束，与规格 §3.5「写入与测试返回 503」一致。保存与测试共用 `normalize_model`：去掉首尾空白后为空即 422 `VALIDATION_ERROR`（`field = model`，`reason = blank`），不写库、不解析、不出站；不靠前端拦截，也不把异常吞成 200。
   6. **共享向量调用记账（D2，落实 ADR-011 修订 2 决定 12）**：发布与问答共用 `build_embedding_adapter` 装配系统级向量；`EMBEDDING_MODE=online` 时适配器带 `model_calls` 存储，每次实际向量请求发出前预写一行（`purpose = embedding`、`max_output_tokens = 0`、输入按 UTF-8 字节估算，`call_id` 各自独立），预写失败则不发请求（问答为 `STORAGE_UNAVAILABLE`），返回后按 `call_id` 回写状态、usage（缺 usage 留空）与耗时，失败记错误分类。归属：问答 `course_id` + 问答 `request_id`（与 `chat_logs` 对应）；发布 `course_id` + `request_id = publish:<version_id>`（与 `graph_versions` 对应）；不填 `user_id`、`task_id`。向量费用归部署者：`embedding` 用途照既有规则不做预算检查、不计入任务或个人/全站生成模型日预算。缓存命中、内容未变的重复发布与回滚复制向量都不发请求、不新增行。E07 批大小与客户端批大小同为 `EMBEDDING_BATCH_SIZE`，一行对应一次 HTTP 请求；本层没有重试，若将来加重试须每次重试各记一行。fake/demo 不出站，不记；离线重新向量化脚本沿用自己的调用台账。
+
+## ADR-083：PDF 提取把部首形近字改回统一汉字（解析器 `pdf/2`）
+
+- **日期**：2026-10-03
+- **背景**：L11 用本机 Chrome 打印的中文文本型 PDF 首次经过解析器，发现 macOS 字体的 ToUnicode 会把部分汉字映射成康熙部首（U+2F00–U+2FD5，如「⽬」「⾃」）或部首补充区字符（U+2E80–U+2EF3，如「⻓」「⻅」）。外观与正常汉字相同，编码不同，会让检索、引用片段与模型输入出错。Mac 上导出的教师 PDF 很可能普遍如此。
+- **决定**：D05 提取行文本时调用 `normalize_ideographs`：康熙部首区按 NFKC 映射（全部有兼容分解）；部首补充区按 Unicode EquivalentUnifiedIdeograph 显式对照，只收能在正文中单独成字的简化字形，偏旁专用形态不映射。不做全量 NFKC，全角标点与全角字母数字保持原样。PDF 解析器版本 `pdf/1 → pdf/2`，修订解析器版本随之变为 `pdf/2,cleanup/1,headings/1`。
+- **后果**：同一份 PDF 重新上传会得到新的资料修订（版本号参与修订身份）；已有修订、草稿与发布版不变，不需要迁移。Markdown、DOCX、TXT 直接读 Unicode 文本，不受影响。
+- **回滚**：回退本提交，`PARSER_VERSION` 改回 `pdf/1`；之后上传的 PDF 回到旧行为。

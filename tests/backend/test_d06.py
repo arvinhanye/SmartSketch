@@ -144,7 +144,7 @@ def textbook() -> tuple[PdfLine, ...]:
 def test_parser_version_extends_d05_version_without_whitespace():
     # ADR-018 修订 1：解析器段内各步骤用 "," 连接、按处理顺序排列；"+" 只留给分块段。
     assert HEADINGS_VERSION == "headings/1"
-    assert PARSER_VERSION == "pdf/1,headings/1"
+    assert PARSER_VERSION == "pdf/2,headings/1"
     assert PARSER_VERSION == f"{pdf_mod.PARSER_VERSION},{HEADINGS_VERSION}"
     assert "+" not in PARSER_VERSION
     assert not any(ch.isspace() for ch in PARSER_VERSION)
@@ -152,7 +152,7 @@ def test_parser_version_extends_d05_version_without_whitespace():
 
 
 def test_cleaned_parser_version_lists_d05_d07_d06_in_order():
-    assert CLEANED_PARSER_VERSION == "pdf/1,cleanup/1,headings/1"
+    assert CLEANED_PARSER_VERSION == "pdf/2,cleanup/1,headings/1"
     assert CLEANED_PARSER_VERSION == f"{pdf_mod.PARSER_VERSION},{CLEANUP_VERSION},{HEADINGS_VERSION}"
     assert "+" not in CLEANED_PARSER_VERSION
 

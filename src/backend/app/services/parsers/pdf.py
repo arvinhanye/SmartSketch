@@ -22,6 +22,7 @@ D07 页眉页脚清洗共同的中间结构；另提供 `to_parsed_document` 把
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -56,7 +57,7 @@ __all__ = [
 ]
 
 #: 解析器版本，进入 `RevisionKey.parser_version`。行切分、行序或过滤规则变化时递增。
-PARSER_VERSION = "pdf/1"
+PARSER_VERSION = "pdf/2"  # pdf/2：提取行文本时把部首形近字改回统一汉字（L11）
 
 #: PDF 规范允许文件头出现在前 1024 字节内、`%%EOF` 出现在末尾 1024 字节内。
 _HEADER_WINDOW = 1024
@@ -65,6 +66,39 @@ _EOF_WINDOW = 1024
 _SUBSET_PREFIX_RE = re.compile(r"^[A-Z]{6}\+")
 _BOLD_NAME_RE = re.compile(r"bold|black|heavy|semibold|demibold|demi\b", re.IGNORECASE)
 _CID_PLACEHOLDER_RE = re.compile(r"\(cid:\d+\)")
+
+
+# 部首补充区（U+2E80–U+2EFF）大多没有兼容分解，按 Unicode EquivalentUnifiedIdeograph 显式对照。
+# 只收能在正文中单独成字的简化字形；偏旁专用形态（如 ⺅、⻖）不映射，避免误改。
+_SUPPLEMENT_IDEOGRAPHS = {
+    0x2EC4: "西", 0x2EC5: "见", 0x2EC6: "角", 0x2EC9: "贝", 0x2ECB: "车", 0x2ED3: "长", 0x2ED4: "门",
+    0x2ED7: "雨", 0x2ED8: "青", 0x2ED9: "韦", 0x2EDA: "页", 0x2EDB: "风", 0x2EDC: "飞", 0x2EDD: "食",
+    0x2EE2: "马", 0x2EE3: "骨", 0x2EE4: "鬼", 0x2EE5: "鱼", 0x2EE6: "鸟", 0x2EE8: "麦", 0x2EE9: "黄",
+    0x2EEC: "齐", 0x2EEE: "齿", 0x2EF0: "龙", 0x2EA0: "民", 0x2EAE: "竹",
+}
+
+
+def _ideograph_table() -> dict[int, str]:
+    """康熙部首（U+2F00–U+2FDF，全部有兼容分解）与部首补充区的形近字 → 统一汉字。"""
+    table: dict[int, str] = {}
+    for code in (*range(0x2E80, 0x2F00), *range(0x2F00, 0x2FE0)):
+        mapped = unicodedata.normalize("NFKC", chr(code))
+        if mapped != chr(code) and len(mapped) == 1:
+            table[code] = mapped
+    table.update({code: char for code, char in _SUPPLEMENT_IDEOGRAPHS.items()})
+    return table
+
+
+_IDEOGRAPHS = _ideograph_table()
+
+
+def normalize_ideographs(text: str) -> str:
+    """把字体 ToUnicode 映射出的部首形近字改回统一汉字（L11；macOS 字体导出的 PDF 常见）。
+
+    外观相同但编码不同的字会让检索、引用片段与模型输入出错。只处理部首区段，不做全量 NFKC：
+    全角标点、全角字母数字等保持原样。
+    """
+    return text.translate(_IDEOGRAPHS)
 
 _NO_TEXT_DETAIL = "PDF 没有可提取的文本层（可能是扫描件或纯图片）；系统未提供 OCR，请上传带文本层的 PDF"
 _NO_UNICODE_DETAIL = (
@@ -260,7 +294,7 @@ def _page_lines(layout: LTPage, number: int) -> tuple[tuple[PdfLine, ...], bool]
         for item in box:
             if not isinstance(item, LTTextLine):
                 continue
-            text = item.get_text().strip()
+            text = normalize_ideographs(item.get_text().strip())
             if not _CID_PLACEHOLDER_RE.sub("", text).strip():
                 unmapped = unmapped or bool(text)
                 continue
