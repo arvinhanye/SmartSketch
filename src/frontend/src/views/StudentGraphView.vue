@@ -156,6 +156,14 @@ const {
   onVersionStale: reload,
 })
 
+// L14：视口跟随路径焦点（首个推荐项，或学生点选的推荐项），让高亮的路径落在画面里
+watch(
+  () => learningPath.value?.focus ?? null,
+  (focus) => {
+    if (focus !== null) canvas.value?.focus(focus)
+  },
+)
+
 const masteryOptions: Array<{ value: MasteryStatus; label: string }> = [
   { value: 'unknown', label: MASTERY_LABELS.unknown },
   { value: 'learning', label: MASTERY_LABELS.learning },

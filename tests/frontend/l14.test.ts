@@ -125,7 +125,7 @@ import { PROGRESS_API_KEY, type ProgressApi, type ProgressEntry } from '../../sr
 import { RECOMMEND_API_KEY, type Recommendation, type RecommendApi } from '../../src/frontend/src/api/recommend'
 import GraphCanvas from '../../src/frontend/src/components/GraphCanvas.vue'
 import { applyLearningStates } from '../../src/frontend/src/composables/useLearning'
-import { toG6Data } from '../../src/frontend/src/graph/adapter'
+import { nodeElementId, toG6Data } from '../../src/frontend/src/graph/adapter'
 import { pathInputFromCanvas } from '../../src/frontend/src/graph/learningPath'
 import {
   buildGraphOptions,
@@ -243,14 +243,17 @@ function rec(kpId: string, extra: Partial<Recommendation['reason_facts']> = {}):
   }
 }
 
+const focused: string[] = []
 function fakeCanvas(): CanvasGraphFactory {
   return (() => ({
     destroyed: false, render: () => Promise.resolve(), setData: () => {}, setSize: () => {},
     fitView: () => Promise.resolve(), on() { return this }, destroy: () => {},
+    focusElement: (id: string) => { focused.push(id); return Promise.resolve() },
   }) as unknown as CanvasGraph) as CanvasGraphFactory
 }
 
 async function mountStudent(mastered: string[], recommended: string[]) {
+  focused.length = 0
   const pinia = createPinia()
   setActivePinia(pinia)
   const session = useSessionStore(pinia)
@@ -302,6 +305,20 @@ describe('L14-2 学生图谱页路径焦点', () => {
     expect(pageStates(wrapper).node.get('G')).not.toContain('dimmed')
     expect(pageStates(wrapper).node.get('D')).toContain('dimmed')
     wrapper.unmount()
+  })
+
+  it('画布视口跟随路径焦点：初始落在第一个推荐项，点击其他推荐项后移到它', async () => {
+    // jsdom 元素没有尺寸，画布不会建图；这里给出尺寸
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+    const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(focused.at(-1)).toBe(nodeElementId('C'))
+    await wrapper.get('[data-test="rc-select-G"]').trigger('click')
+    await flushPromises()
+    expect(focused.at(-1)).toBe(nodeElementId('G'))
+    wrapper.unmount()
+    vi.restoreAllMocks()
   })
 })
 
