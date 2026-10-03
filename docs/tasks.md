@@ -1720,3 +1720,16 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 无新接口、数据模型、迁移、依赖或业务改动。下一阶段范围沿用L16–L19，先质量/性能再美化与材料，不在收尾时增加自动出题或管理员统一模型功能。
 
 收尾验收证据（Codex本轮）：./scripts/verify.sh full 整体exit0，后端3780 passed/27白名单skip，前端901 passed，type-check/build/契约通过；D1/D2/D3/L15/PDF-reflow定向56 passed；只读关联核验十题+额外尝试/19调用通过；git diff --check通过；DeepSeek原始三文件未改。此次无新的真实调用、未重跑integration/E2E，257750e的完整integration仅作为既有代码证据。完整命令、日志、限制和后续首个动作见docs/handoffs/codex-plan-b-closeout.md。
+
+
+## 2026-10-03 Codex：第三阶段启动交接 prompt
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| C-HANDOFF-01 | DONE（prompt/范围记录/基础验证完成） | Codex（规划交接） | 基于9ca6e88/第二阶段收尾，交付Claude启动prompt；九类参赛材料从第三阶段暂缓；保留质量/性能/技术验收与预算边界，不实施业务修复 |
+
+输入：用户第三阶段范围调整、codex-plan-b-closeout.md、codex-plan-b-96f3885-closeout.md与已知待办。输出：docs/handoffs/codex-claude-plan-c-start-prompt-2026-10-03.md、ADR-088范围记录、看板状态。依赖：现有第二阶段基线和未完成验收；风险：将推送/合并/付费调用误作已授权、把材料暂缓误作取消技术证据、交接旧工作树代码。验证：引用路径/预算/排除项断言、./scripts/verify.sh basic、git diff --check。仅本工作树文档改动；Claude先提交原子计划供用户确认，真实生成/向量测试继续交DeepSeek。
+
+第三阶段范围覆盖更新（用户2026-10-03确认，ADR-088）：此前收尾清单里“美化与材料/运行材料”的材料部分现在暂缓，九类参赛材料不进入第三阶段验收。B-EVAL-01/B-QA-01/B-PDF-01/B-QUALITY-01仍OPEN；L17轻量美化以主线稳定为前置，L19保留隔离技术复测。内部技术证据/测试/人工判定/预算与交接仍须完成。启动prompt：docs/handoffs/codex-claude-plan-c-start-prompt-2026-10-03.md；Claude未被工具派发，先核9ca6e88基线、提交原子计划，获用户确认再实施。不新增模型调用、合并/推送、环境/数据同步授权。
+
+C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据引用和最新预算边界，路径/范围/预算断言通过；./scripts/verify.sh basic整体exit0，日志/private/tmp/plan-c-prompt-basic.log；git diff --check通过。仅修改本工作树交接、任务、决策文档；未运行full/integration、未修改业务代码或数据、未调用模型。此处交付供用户转交的prompt，尚未向Claude会话发送，也未启动第三阶段实施。
