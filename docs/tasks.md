@@ -53,6 +53,8 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 
 这是 PR #317 中 L03–L10 业务改动之后的首次完整门禁（此前的端到端证据只来自 L01、业务改动之前）。端到端用演示模型，**不产生费用**。log 与端到端目录：`.demo/logs/verify-integration-planA.log`、`.e2e/20261003-030121/`。两项环境前提：契约门禁硬编码 `python3` 需把 `.venv/bin` 前置到 `PATH`；`tests/tooling/test_k07.py` 的 4 个交互式用例需要更宽的沙箱权限才能分配 PTY（详见 `docs/handoffs/deepseek-l09.md`「环境与沙箱」）。
 
+- 2026-10-03 Claude 复核计划 A 未完成项检查（`92aa8bc`）：通过，记录 `docs/reviews/claude-deepseek-plan-a-verification-2026-10-03.md`。计划 A（L00–L10）完成。**遗留缺陷（未修，待认领）**：D1（高）答案超过 1024 输出 token 被截断后整篇撤回并误报 `not_covered`，违反「资料未覆盖与服务故障分开显示」；D2（低）发布时向量调用不写 `model_calls`；D3（中）问答查询向量调用不受 15 秒截止约束。另：抽取 141.72 秒未达 60 秒目标。
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
