@@ -87,8 +87,8 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| L11 | IN_PROGRESS（L11-1～L11-6 已完成；阶段门禁待跑） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
-| L12 | TODO | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-084）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
+| L11 | IN_PROGRESS（L11-1～L11-7 已完成；L11-7 真实模型复测待 DeepSeek） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
+| L12 | TODO | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
 | L13 | TODO | Claude | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
 | L14 | TODO | Claude | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
 | L15 | TODO | Claude | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15_isolation.py`；`verify.sh integration` 与 D/N 回归 |
@@ -98,6 +98,8 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - 观察（不修，R05）：同一章 PDF 与 Markdown 都上传会产生大量同名知识点（审核队列「疑似重复」60 组），跨任务融合不在本期。
 - L11-6 真实模型测量交接：`docs/handoffs/claude-l11-6-deepseek-handoff.md`（DeepSeek harness 在冲刺工作树执行；含迁移 016 首次启动核对、预算停止线累计 60 万）。
 - 2026-10-03 L11-6 完成（DeepSeek harness）：四次抽取（两门课 × MD/PDF）+ 两次发布全部成功，交接 `docs/handoffs/deepseek-l11-6.md`，报告 `evaluation/reports/l11-teacher-loop-2026-10.md`。**赛题指标**：知识点 75/71/71/74 与关系种类 4/3/4/3 均达标；**抽取耗时四份全部未达 60 秒**（83.97 / 200.37 / 75.51 / 162.54 秒）；准确率未判定（原始输出已导出到 `evaluation/raw/l11/`，待 L16）。**发布与向量记账**：两门 MD 课程 HTTP 200（11.21 / 6.58 秒），`model_calls` 出现 `purpose='embedding'`、`request_id=publish:<version_id>`、`status=ok` 各 10 行，**ADR-082 决定 6 首次真实验证通过**（上一轮的「发布期向量未记账」缺口已消失）。**ADR-083** 在真实 PDF 上核对通过（32 个块里康熙部首/部首补充区字符 0 个）。**迁移 016** 已执行，备份实际在 `src/backend/storage/backups/`（交接写的仓根 `backups/` 有误），`integrity_check=ok`。**新发现（未修）**：PDF 路径成本约为 MD 的 1.6～2.2 倍且 repair 次数达 13 次；PDF 两份都抽不出 `PREREQUISITE`、孤立节点 37/71 与 39/74；旧基线「入库 45.7 秒是头号瓶颈」的判断已不成立（本次非模型阶段仅 1.04～12.39 秒）。**用量**：本次 478987 token，累计 **619217 / 5000000**；越线经用户明确授权（详见交接）。
+- 2026-10-03 L11 阶段门禁（`fc2ad94`，`verify.sh integration`，独立端口）：后端 1 failed / 3750 passed / 27 skipped（`test_shell_multibyte_vars` 拦下本轮两处中文前未加花括号的变量，`4ee7b52` 修复后单测通过）；前端 824 passed；集成 393 passed / 4 skipped；图库 44 passed；演示端到端 2 passed、个人模式端到端 3 passed。同一次运行未整体 exit 0。
+- 2026-10-03 **L11-7（新增，用户批准在 L12 前修）**：L11-6 实测 PDF 路径成本高、无 PREREQUISITE、近半孤立节点。离线定位根因为一行一块、句子被换行切断；修复为自动换行的续行并回同一段（ADR-084，`headings/2`），比赛 PDF 38/24 块，与 Markdown 37/24 相当。`tests/backend/test_l11_pdf_reflow.py` red 5 → green 10；D06 三个用例按新行为更新期望；解析相关 1850 passed。真实模型复测交接 `docs/handoffs/claude-l11-7-deepseek-retest.md`。
 - 未决（待用户）：问答输出上限是否在 L16 前调整。
 
 ## 2026-09-28 Codex 认领：认证页动态图谱
