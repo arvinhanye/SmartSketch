@@ -25,6 +25,12 @@ export async function createCourse(api: Api, name: string): Promise<string> {
   return (await response.json()).id as string
 }
 
+/** 学生自助注册（成功即登录）：用于需要第二个学生账号的隔离证据 */
+export async function registerStudent(request: APIRequestContext, username: string, password: string): Promise<void> {
+  const response = await request.post('/api/v1/auth/register', { data: { username, password } })
+  expect(response.status(), `register ${username}`).toBe(201)
+}
+
 export async function addStudent(api: Api, courseId: string, username: string): Promise<void> {
   const response = await call(api, 'POST', `/api/v1/courses/${courseId}/members`, { username })
   expect([200, 201]).toContain(response.status())

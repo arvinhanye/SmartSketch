@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
-import { addStudent, apiLogin, createCourse } from './api'
+import { addStudent, apiLogin, createCourse, registerStudent } from './api'
 import { appUrl, expect, login, studentPassword, studentUsername, teacherPassword, teacherUsername, test } from './fixtures'
 
 // L11（计划 B）个人模式端到端：LLM_MODE=personal，教师和学生在设置页填写本机假供应商
@@ -208,6 +208,44 @@ test.describe('个人模式（L11）', () => {
       await student.getByPlaceholder('搜索知识点').fill(edited)
       await student.getByPlaceholder('搜索知识点').press('Enter')
       await expect(student.locator('[data-test=kd-title]')).toHaveText(edited)
+
+      // L14：把推荐第 1 项标为已掌握 → 推荐与路径行更新、刷新保留；另一个学生不受影响；取消后恢复
+      await student.goto(`${appUrl}/courses/${courseId}/graph`)
+      const items = student.locator('[data-test=recommendations] [data-test=rc-item]')
+      const pathLine = student.locator('[data-test=rc-path-line]')
+      await expect(pathLine).toContainText('下一步：')
+      const firstId = (await items.first().getAttribute('data-kp-id'))!
+      const firstLine = ((await pathLine.textContent()) ?? '').trim()
+      await expect(items.first().locator('[data-test=rc-order]')).toHaveText('1.')
+      await student.locator(`[data-test="rc-select-${firstId}"]`).click()
+      await student.locator('[data-test=sg-mastery-mastered]').click()
+      await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为已掌握')
+      await expect(student.locator(`[data-test="rc-select-${firstId}"]`)).toHaveCount(0)
+      await expect(pathLine).not.toHaveText(firstLine)
+      await student.reload()
+      await expect(items.first()).toBeVisible()
+      await expect(student.locator(`[data-test="rc-select-${firstId}"]`)).toHaveCount(0)
+
+      const otherName = `l14_s2_${stamp}`
+      await registerStudent(request, otherName, studentPassword)
+      await addStudent(teacher, courseId, otherName)
+      const otherContext = await browser.newContext()
+      try {
+        const other = await otherContext.newPage()
+        await login(other, otherName, studentPassword)
+        await other.goto(`${appUrl}/courses/${courseId}/graph?kp=${firstId}`)
+        await expect(other.locator('[data-test=sg-mastery-target]')).toContainText('当前：未开始')
+        await expect(other.locator('[data-test=recommendations] [data-test=rc-item]').first()).toHaveAttribute('data-kp-id', firstId)
+      } finally {
+        await otherContext.close()
+      }
+
+      await student.goto(`${appUrl}/courses/${courseId}/graph?kp=${firstId}`)
+      await expect(student.locator('[data-test=sg-mastery-target]')).toContainText('当前：已掌握')
+      await student.locator('[data-test=sg-mastery-unknown]').click()
+      await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为未开始')
+      await expect(items.first()).toHaveAttribute('data-kp-id', firstId)
+      await expect(pathLine).toHaveText(firstLine)
 
       // 8. 教师发布后再改草稿：学生看到的仍是发布版的定义
       await page.goto(`${appUrl}/courses/${courseId}/graph/edit`)
