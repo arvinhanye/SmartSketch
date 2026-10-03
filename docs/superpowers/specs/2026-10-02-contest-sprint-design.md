@@ -226,6 +226,8 @@
 
 冲刺工作区的 `.env` 已生成（未跟踪、权限 600）。端口与主检出错开：API 8001、前端 5174、Neo4j 7688/7475。`LLM_API_KEY` 与 `EMBEDDING_API_KEY` 留空，由用户本人填写。百炼兼容基址 `https://dashscope.aliyuncs.com/compatible-mode/v1` 凭记忆填写，在 L09 真实联调时核对。
 
+**2026-10-03 L09 核对结果（基址与在线向量已实测可用）**：第 4 节与第 11 节第 1 项的在线向量方案在本机跑通。`.venv/bin/python scripts/check-embedding.py` 返回 `ok model=text-embedding-v4 dimensions=1024 seconds=0.66`（exit 0），即基址 `https://dashscope.aliyuncs.com/compatible-mode/v1`、模型 `text-embedding-v4`、`EMBEDDING_DIMENSIONS=1024`、`EMBEDDING_BATCH_SIZE=10` 四项与 ADR-081 一致，维度与配置相符。此前 L01/L02 记录的「北京地域接口 TCP 超时」已由用户恢复网络路径（地址与 key 未改）。正式入口 `scripts/start.sh` 冒烟通过：API `/health` 返回 `{"status":"ok","version":"0.1.0"}`、`GET /api/v1/me/model-config` 返回 `{"runtime_mode":"personal","configured":false}`、worker 日志无 `Invalid configuration`、前端 5174 返回 200。用量登记见 `docs/handoffs/deepseek-l09.md`。
+
 ## 12. 实施计划
 
 - 计划 A（L01–L10，第 1–3 天）：`docs/superpowers/plans/2026-10-02-contest-sprint-a-personal-model-api.md`。

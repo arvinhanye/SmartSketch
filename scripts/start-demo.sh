@@ -7,9 +7,10 @@
 # 可重复执行：已装的依赖、已有的 .env、已建的账号与已导入的课程都会复用，不会重复或覆盖。
 # Ctrl+C 停止 API、worker 与前端；Neo4j 保持运行以免下次冷启动，停止用 scripts/dev-down.sh。
 #
-# 用法：scripts/start-demo.sh [--live] [--no-import] [--no-open]
-#   --live       真实大模型：须在 .env 填 LLM_API_KEY；向量沿用演示向量（.env 为 online/local 时用真实向量）。
+# 用法：scripts/start-demo.sh [--live | --personal] [--no-import] [--no-open]
+#   --live       真实大模型：须在 .env 填 LLM_API_KEY；向量沿用演示向量（.env 为 online 时用真实向量）。
 #                不导入演示课程（首次导入会付费抽取整套示例资料），教师上传资料时才调用模型
+#   --personal   正式模式：LLM_MODE=personal（个人模型 API，ADR-080）+ 在线向量；不导入演示课程
 #   --no-import  不执行演示课程导入（scripts/import-demo.py）
 #   --no-open    启动后不自动打开浏览器
 # 环境变量：SEED_DEMO_PASSWORD（首次建演示账号用的口令，缺省 smartsketch-demo）、
@@ -24,16 +25,22 @@ set -euo pipefail
 do_import=1
 open_browser=1
 live=0
+personal=0
 for arg in "$@"; do
   case "$arg" in
     --live) live=1 ;;
+    --personal) personal=1 ;;
     --no-import) do_import=0 ;;
     --no-open) open_browser=0 ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "未知选项 ${arg}。用法：$0 [--live] [--no-import] [--no-open]" ;;
+    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "未知选项 ${arg}。用法：$0 [--live | --personal] [--no-import] [--no-open]" ;;
   esac
 done
+if ((live)) && ((personal)); then
+  die "--live 与 --personal 不能同时使用"
+fi
 ((live)) && do_import=0
+((personal)) && do_import=0
 
 LOG_DIR="$REPO_ROOT/.demo/logs"
 mkdir -p "$LOG_DIR"
@@ -101,6 +108,22 @@ path.write_text(text, encoding="utf-8")
 PY
 fi
 
+# 正式模式的根密钥（ADR-080）：必须在下面对 .env 的逐行导入之前补齐，否则本次进程读不到新写入的值。
+if ((personal)) && [[ -z "$(env_setting MODEL_CREDENTIAL_KEY "")" ]]; then
+  step ".env 的 MODEL_CREDENTIAL_KEY 为空，写入随机值（更换它会使已保存的个人模型配置失效）"
+  "$PY" - <<'PY'
+import base64, re, secrets
+from pathlib import Path
+path = Path(".env")
+text = path.read_text(encoding="utf-8")
+line = "MODEL_CREDENTIAL_KEY=" + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+text, n = re.subn(r"^MODEL_CREDENTIAL_KEY=.*$", line, text, count=1, flags=re.M)
+if n == 0:
+    text = text.rstrip("\n") + "\n" + line + "\n"
+path.write_text(text, encoding="utf-8")
+PY
+fi
+
 # 把 .env 按字面值导入（与 Compose 一致，不当 shell 脚本执行）；已在 shell 里设置的变量优先。
 while IFS= read -r line || [[ -n $line ]]; do
   line="${line%$'\r'}"
@@ -109,13 +132,27 @@ while IFS= read -r line || [[ -n $line ]]; do
   value="$(env_setting "$key" "")"
   [[ -n $value ]] && export "$key=$value"
 done < .env
-if ((live)); then
+if ((personal)); then
+  # 正式模式（ADR-080/081）：生成模型用各人的个人配置，向量必须是在线向量；任一缺失都直接退出，
+  # 不静默落到演示模型或演示向量——否则教师与学生会以为在用真实模型。
+  [[ "${EMBEDDING_MODE:-}" == online ]] || die "--personal 需要在 .env 设 EMBEDDING_MODE=online 并填写 EMBEDDING_BASE_URL、EMBEDDING_API_KEY、EMBEDDING_MODEL（ADR-081）。"
+  for key in EMBEDDING_BASE_URL EMBEDDING_API_KEY EMBEDDING_MODEL MODEL_CREDENTIAL_KEY; do
+    [[ -n ${!key:-} ]] || die "--personal 需要在 .env 填写 ${key}。"
+  done
+  export LLM_MODE=personal APP_ENV=development
+  if [[ -z ${SSL_CERT_FILE:-} && $(uname -s) == Darwin ]]; then
+    (cd /tmp && "$PY" -c 'import certifi' 2>/dev/null) || "$PY" -m pip install -q certifi
+    SSL_CERT_FILE="$(cd /tmp && "$PY" -c 'import certifi; print(certifi.where())')" || die "取不到 certifi 根证书，手动 export SSL_CERT_FILE 后重试。"
+    export SSL_CERT_FILE
+  fi
+elif ((live)); then
   # 真实大模型：主用四项缺一即退出，免得 API 启动后才报 Invalid configuration
   for key in LLM_BASE_URL LLM_API_KEY LLM_EXTRACTION_MODEL LLM_CHAT_MODEL; do
     [[ -n ${!key:-} ]] || die "--live 需要在 .env 填写 ${key}（DeepSeek 的 API Key 填 LLM_API_KEY，见 docs/runbook.md 第 3 节）。"
   done
   export LLM_MODE=live APP_ENV=development
-  # 向量：.env 配了 online/local 就用；否则沿用演示向量，与演示课程同一向量空间，不必换库或重新向量化
+  # 向量：.env 配了 online 就用；否则沿用演示向量，与演示课程同一向量空间，不必换库或重新向量化
+  # （local 不在此列：它会被配置校验拒绝并指出 EMBEDDING_MODE，见 ADR-081。）
   case "${EMBEDDING_MODE:-}" in
     online|local) ;;
     *) export EMBEDDING_MODE=demo ;;
@@ -218,21 +255,34 @@ start_bg web "$LOG_DIR/web.log" env SMARTSKETCH_API_TARGET="http://127.0.0.1:$AP
 WEB_URL="http://localhost:$WEB_PORT"
 wait_http "http://127.0.0.1:$WEB_PORT/" 前端 "$LOG_DIR/web.log" 60
 
-cat <<EOF
+if ((personal)); then
+  cat <<EOF
+
+✓ 正式模式已启动：$WEB_URL
+  教师与学生登录后先在「模型 API 设置」保存自己的模型 API（ADR-080）：未保存前上传资料与提问会返回「需要配置模型」，不会回退到演示模型。
+  账号：demo_teacher（教师）、demo_student、demo_student2（学生）
+EOF
+else
+  cat <<EOF
 
 ✓ 演示环境已启动：$WEB_URL
   账号：demo_teacher（教师）、demo_student、demo_student2（学生）
 EOF
+fi
 if ((accounts_existed)); then
   echo "  口令：账号早已存在，沿用当初设置的口令（本脚本不会重置口令）"
 else
   echo "  口令：$DEMO_PASSWORD"
 fi
-if ((live)); then
+if ((personal)); then
+  echo "  模型：个人模型 API（各人自填，按各人自己的额度计费）；向量：$EMBEDDING_MODE ${EMBEDDING_MODEL} ${EMBEDDING_DIMENSIONS} 维"
+  echo "  用法：教师登录 → 课程 → 资料 → 上传 PDF，处理完成后到「审核」查看草稿图谱"
+elif ((live)); then
   echo "  模型：真实大模型 ${LLM_EXTRACTION_MODEL}（${LLM_BASE_URL}，按量计费）；向量：$EMBEDDING_MODE"
   echo "  用法：教师登录 → 课程 → 资料 → 上传 PDF，处理完成后到「审核」查看草稿图谱"
 else
   echo "  模型：演示模式（不联网、不计费）；用真实大模型：scripts/start-demo.sh --live"
+  echo "  正式模式（个人模型 API）：scripts/start.sh"
 fi
 cat <<EOF
   日志：$LOG_DIR

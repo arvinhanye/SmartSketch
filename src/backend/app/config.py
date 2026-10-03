@@ -187,8 +187,9 @@ def _check_rules(settings: Settings) -> None:
             for name in ("EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL")
             if not _has_value(getattr(settings, name))
         )
-    elif settings.EMBEDDING_MODE == "local" and not _has_value(settings.EMBEDDING_MODEL):
-        invalid.add("EMBEDDING_MODEL")
+    elif settings.EMBEDDING_MODE == "local":
+        # ADR-081：本版本未实现本地向量客户端；保留枚举值只为给出明确的拒绝，而不是在首次调用时失败。
+        invalid.add("EMBEDDING_MODE")
     if settings.EMBEDDING_MODE in ("online", "local") and settings.EMBEDDING_MODEL.strip() == DEMO_EMBEDDING_MODEL:
         invalid.add("EMBEDDING_MODEL")
     if _has_value(settings.MODEL_CREDENTIAL_KEY) or settings.LLM_MODE == "personal":
