@@ -1174,3 +1174,208 @@ describe('H02 删除资料（ADR-021）', () => {
     expect(wrapper.find('[data-test="material-row"][data-document-id="d_t1"]').exists()).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------- 拖拽与文件选择
+
+async function dropFiles(wrapper: VueWrapper, files: File[], types: string[] = ['Files']) {
+  const target = wrapper.get('[data-test="material-dropzone"]')
+  const event = new Event('drop', { bubbles: true, cancelable: true }) as Event & { dataTransfer: unknown }
+  Object.defineProperty(event, 'dataTransfer', {
+    value: { files, types, dropEffect: 'none' },
+    configurable: true,
+  })
+  target.element.dispatchEvent(event)
+  await flushPromises()
+}
+
+describe('H02 拖拽与文件选择', () => {
+  it('选择文件后不自动上传，点击上传只提交一次', async () => {
+    const materials = fakeMaterialsApi()
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('讲义.pdf'))
+    expect(materials.upload).not.toHaveBeenCalled()
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+  })
+
+  it('拖拽选择与点击选择提交同一个文件，且不自动上传', async () => {
+    const materials = fakeMaterialsApi()
+    const { wrapper } = await mountPage({ materials })
+    const dropped = file('拖拽.pdf', 32, 'application/pdf')
+    await dropFiles(wrapper, [dropped])
+    expect(materials.upload).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('拖拽.pdf')
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+    expect(materials.upload.mock.calls[0]![1]).toBe(dropped)
+  })
+
+  it('拖入多个文件时提示只能选一个，且不清空已有选择', async () => {
+    const materials = fakeMaterialsApi()
+    const { wrapper } = await mountPage({ materials })
+    const kept = file('先选的.pdf')
+    await chooseFile(wrapper, kept)
+    await dropFiles(wrapper, [file('a.pdf'), file('b.pdf')])
+    expect(wrapper.get('[data-test="drop-notice"]').text()).toContain('一次只能选择一个文件')
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('先选的.pdf')
+    // 无效拖入不触发上传，也不当成业务错误
+    expect(materials.upload).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="upload-error"]').exists()).toBe(false)
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+    expect(materials.upload.mock.calls[0]![1]).toBe(kept)
+  })
+
+  it('拖入文件夹（拿不到有效文件）时提示不支持，并保留已有选择', async () => {
+    const { wrapper } = await mountPage()
+    await chooseFile(wrapper, file('保留.pdf'))
+    await dropFiles(wrapper, [])
+    expect(wrapper.get('[data-test="drop-notice"]').text()).toContain('不支持拖入文件夹')
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('保留.pdf')
+  })
+
+  it('非文件拖拽不作为文件选择处理，也不显示拖拽提示', async () => {
+    const { wrapper } = await mountPage()
+    await dropFiles(wrapper, [], ['text/plain'])
+    expect(wrapper.find('[data-test="drop-notice"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="selected-file"]').exists()).toBe(false)
+  })
+
+  it('拖入的文件沿用原有校验：不支持格式与空文件都会提示', async () => {
+    const { wrapper } = await mountPage()
+    await dropFiles(wrapper, [file('病毒.exe')])
+    expect(wrapper.get('[data-test="upload-error"]').text()).toMatch(/仅支持/)
+    await dropFiles(wrapper, [file('空.pdf', 0)])
+    expect(wrapper.get('[data-test="upload-error"]').text()).toContain('空')
+  })
+
+  it('上传进行中不允许替换已选文件', async () => {
+    const pending = deferred<{ task_id: string; document_id: string }>()
+    const materials = fakeMaterialsApi({ upload: () => pending.promise })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('上传中.pdf'))
+    await submitUpload(wrapper)
+    expect(wrapper.get('[data-test="upload-submit"]').attributes('disabled')).toBeDefined()
+
+    await dropFiles(wrapper, [file('替换.pdf')])
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('上传中.pdf')
+    // 上传中不显示拖拽提示，也不出现取消选择
+    expect(wrapper.find('[data-test="drop-notice"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="upload-clear"]').exists()).toBe(false)
+
+    pending.resolve({ task_id: 't1', document_id: 'd1' })
+    await flushPromises()
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+  })
+
+  it('上传成功后选择区恢复为未选择状态', async () => {
+    const { wrapper } = await mountPage()
+    await chooseFile(wrapper, file('讲义.pdf', 16, 'application/pdf'))
+    expect(wrapper.find('[data-test="selected-file"]').exists()).toBe(true)
+    await submitUpload(wrapper)
+    await flushPromises()
+    expect(wrapper.find('[data-test="selected-file"]').exists()).toBe(false)
+    // 恢复后显示未选择状态的引导文案（「选择资料文件」是 label 内的静态说明）
+    expect(wrapper.get('[data-test="material-dropzone"]').text()).toContain('点击选择文件或拖拽文件到此处')
+    expect(wrapper.get('[data-test="upload-success"]').text()).toContain('讲义.pdf')
+  })
+
+  it('上传失败时保留与实际选择一致的文件信息', async () => {
+    const materials = fakeMaterialsApi({ upload: async () => Promise.reject(new NetworkError(new TypeError('offline'))) })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('失败.pdf', 2048))
+    await submitUpload(wrapper)
+    expect(wrapper.get('[data-test="upload-error"]').text()).toContain('网络')
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('失败.pdf')
+    expect(wrapper.get('[data-test="selected-file-detail"]').text()).toContain('2 KiB')
+  })
+
+  it('取消选择后回到未选择状态，且不影响业务状态', async () => {
+    const { wrapper } = await mountPage()
+    await chooseFile(wrapper, file('待取消.pdf'))
+    await wrapper.get('[data-test="upload-clear"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="selected-file"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="upload-error"]').exists()).toBe(false)
+  })
+
+  it('切换课程后不残留上一个课程的文件信息', async () => {
+    const { wrapper, router } = await mountPage()
+    await chooseFile(wrapper, file('旧课程.pdf'))
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('旧课程.pdf')
+
+    await router.push('/courses/c2/materials')
+    await flushPromises()
+    expect(wrapper.find('[data-test="selected-file"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="drop-notice"]').exists()).toBe(false)
+  })
+
+  it('选择区可用键盘操作，且文件图标不进入无障碍树', async () => {
+    const { wrapper } = await mountPage()
+    const zone = wrapper.get('[data-test="material-dropzone"]')
+    expect(zone.attributes('tabindex')).toBe('0')
+    const icon = zone.get('.dropzone__icon')
+    expect(icon.attributes('aria-hidden')).toBe('true')
+    // 选择控件仍保留原生属性
+    const input = wrapper.get('[data-test="material-file-input"]')
+    expect(input.attributes('name')).toBe('file')
+    expect(input.attributes('accept')).toContain('.pdf')
+    expect(input.attributes('aria-describedby')).toContain('material-upload-hint')
+  })
+
+  it('状态徽标按状态使用不同配色，并保留真实状态文字与进度', async () => {
+    // 先上传一份，拿到订阅后再按真实阶段推进，覆盖「一行式信息 + 进度 + 操作」的组合
+    let listed: Document[] = []
+    const materials = fakeMaterialsApi({ list: async () => listed })
+    const { wrapper, events } = await mountPage({ materials })
+    await chooseFile(wrapper, file('第一章.pdf', 2048, 'application/pdf'))
+    listed = [doc('d_t1', { filename: '第一章.pdf', parse_status: 'extracting' })]
+    await submitUpload(wrapper)
+
+    events.stage('t1', 'extracting', 0.42)
+    await flushPromises()
+    const processing = row(wrapper, 'd_t1')
+    const badge = processing.get('[data-test="material-status"]')
+    expect(badge.text()).toBe('抽取中')
+    expect(badge.classes()).toContain('badge--processing')
+    // 一行式布局顶部同时给出文件名与类型/大小
+    expect(processing.get('[data-test="material-filename"]').text()).toBe('第一章.pdf')
+    expect(processing.text()).toContain('PDF')
+    expect(processing.text()).toContain('2 KiB')
+    // 进度条仍是真实进度
+    const bar = processing.get('[data-test="material-progress"]')
+    expect(bar.attributes('value')).toBe('42')
+    expect(bar.attributes('aria-valuenow')).toBe('42')
+    // 处理中保留取消操作
+    expect(processing.find('[data-test="task-cancel"]').exists()).toBe(true)
+
+    events.stage('t1', 'awaiting_review', 0.95)
+    await flushPromises()
+    expect(row(wrapper, 'd_t1').get('[data-test="material-status"]').text()).toBe('待审核')
+    expect(row(wrapper, 'd_t1').get('[data-test="material-status"]').classes()).toContain('badge--awaiting_review')
+
+    events.cancelled('t1')
+    await flushPromises()
+    const cancelledBadge = row(wrapper, 'd_t1').get('[data-test="material-status"]')
+    expect(cancelledBadge.text()).toBe('已取消')
+    expect(cancelledBadge.classes()).toContain('badge--cancelled')
+  })
+
+  it('任务失败时徽标使用失败配色，并保留任务错误提示', async () => {
+    let listed: Document[] = []
+    const materials = fakeMaterialsApi({ list: async () => listed })
+    const { wrapper, events } = await mountPage({ materials })
+    await chooseFile(wrapper, file('第二章.pdf', 2048, 'application/pdf'))
+    listed = [doc('d_t2', { filename: '第二章.pdf', parse_status: 'failed' })]
+    await submitUpload(wrapper)
+
+    events.failed(events.last().taskId, 'DOCUMENT_UNREADABLE')
+    await flushPromises()
+    const failedRow = row(wrapper, 'd_t2')
+    const badge = failedRow.get('[data-test="material-status"]')
+    expect(badge.text()).toBe('处理失败')
+    expect(badge.classes()).toContain('badge--failed')
+    expect(failedRow.get('[data-test="task-error"]').attributes('role')).toBe('alert')
+    expect(failedRow.get('[data-test="task-error"]').text()).not.toBe('')
+  })
+})
