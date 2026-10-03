@@ -90,7 +90,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 | L11 | IN_PROGRESS（L11-1～L11-7 已完成；L11-7 真实模型复测待 DeepSeek） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
 | L12 | DONE（待复审） | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
 | L13 | DONE（待复审） | Claude | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
-| L14 | TODO | Claude | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
+| L14 | DONE（待复审） | Claude | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
 | L15 | TODO | Claude | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15_isolation.py`；`verify.sh integration` 与 D/N 回归 |
 
 - 2026-10-03 L11-1 完成：`datasets/contest/` 两门课各一章（Markdown 为源，PDF 由 `scripts/build-contest-pdfs.sh` 用 Chrome 无头打印：第 3 章 5 页、第 2 章 4 页），`tests/backend/test_l11_datasets.py` red（无清单）→ green。**发现并修复阻断**：macOS 字体 PDF 的部首形近字（⽬⾃⻓⻅），ADR-083、解析器 `pdf/2`，red 4 failed → green；解析相关 1840 passed。已知：pdfminer 对 Chrome 字体打印大量 FontBBox 告警，不影响提取。
@@ -102,6 +102,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - 2026-10-03 **L11-7（新增，用户批准在 L12 前修）**：L11-6 实测 PDF 路径成本高、无 PREREQUISITE、近半孤立节点。离线定位根因为一行一块、句子被换行切断；修复为自动换行的续行并回同一段（ADR-084，`headings/2`），比赛 PDF 38/24 块，与 Markdown 37/24 相当。`tests/backend/test_l11_pdf_reflow.py` red 5 → green 10；D06 三个用例按新行为更新期望；解析相关 1850 passed。真实模型复测交接 `docs/handoffs/claude-l11-7-deepseek-retest.md`。
 - 2026-10-03 **L12 完成**（`af671cc`、`8b79ccc` 及端到端提交）：契约 `SourceRef`/`Citation` 增加可选 `document_name`（ADR-085），后端按同课资料填写知识点来源、关系来源与问答引用（他课/已删除省略、查名失败不影响回答）；前端统一「文件名 · 第 N 页 · 章节」、缺名写「资料不可用」，知识点详情点开来源即展开查看器（教师、学生共用），问答右栏带文件名。证据：`tests/backend/test_l12.py` 8 passed（含跨课负例）、`tests/frontend/l12.test.ts` 11 passed、前端全量 835 passed；个人模式端到端教师图谱、学生图谱、问答引用三入口均断言文件名与对应格式的位置（3 passed），演示端到端 2 passed。
 - 2026-10-03 **L13 完成**（`1d50a33` `50e5389` `25470ab` `8aa5cfb` 及端到端提交）：初始视口不低于可读缩放 0.7 并聚焦入口节点（无前置的第一个节点），页面可按知识点聚焦；搜索框回车按「名称完全一致优先、包含其次、只在当前筛选可见节点中」定位并选中；类型、状态、章节筛选收进默认收起的「更多筛选」（关系图例与布局常显）；问答知识点按钮链接到 `?kp=&v=`，学生图谱选中目标，目标不在当前版本或版本不同时给出提示，不跨课找同 ID 节点。学生页右栏还承载学习路径，详情与掌握标记本就只在选中时渲染，未再收起整栏。证据：`tests/frontend/l13.test.ts` 10 passed、`l13-kp-link.test.ts` 8 passed；个人模式端到端 3 passed（`.e2e/20261003-115144`）：71+ 节点画布 `data-zoom` ≥ 0.7、问答点知识点后详情标题与按钮名称一致、刷新直达仍选中、搜索回车选中教师新建节点。
+- 2026-10-03 **L14 完成**（`3b50380` `8d6988e` `5d171e4` `aa2d7ad` `d668e0d` `09349d3` `653089e`）：学习路径纯函数（`graph/learningPath.ts`：只看未被拒的先修边，后继须全部前置满足才算解锁，推荐顺序以服务端为准只给序号）；画布推荐项标签「1. 」、缺失前置/之后解锁/淡化/路径边各有状态，焦点为点选的推荐项或第一个推荐项，视口跟随；推荐列表顶部「已掌握 → 还需先学 → 下一步 → 之后解锁」，「排序参考」中中性值 0.5 写「未标注」。**走查（真实浏览器截图）另发现并修复三处**：服务端理由句把缺失属性的 0.5 写成测量值（后端 `ranking._reason`）；G6 5.1.1 每次 render 都按 autoFit 整图适配，状态更新会把视口拉回整图（L13 的聚焦也受影响）；画布尺寸变化后重新聚焦回入口节点。证据：`tests/frontend/l14.test.ts` 21 passed、`tests/backend/test_l14_reason.py` 3 passed；个人模式端到端 3 passed（标记推荐第 1 项 → 推荐与路径行更新、刷新保留、自助注册的第二个学生看到「未开始」且推荐不变、取消后恢复）。`h05`/`i06` 的样式键清单与 0.5 展示断言按新行为更新。
 - 未决（待用户）：问答输出上限是否在 L16 前调整。
 
 ## 2026-09-28 Codex 认领：认证页动态图谱
