@@ -52,6 +52,8 @@ interface NavItem {
   label: string
   to: RouteLocationRaw
   active: boolean
+  /** 图标键：route 用页面路由名，其余用固定键 */
+  icon: string
 }
 
 const courseId = computed(() => {
@@ -79,7 +81,7 @@ const courseNav = computed<NavItem[]>(() => {
         ]
   return names
     .filter(([name]) => router.hasRoute(name))
-    .map(([name, label]) => ({ label, to: { name, params: { cid } }, active: route?.name === name }))
+    .map(([name, label]) => ({ label, to: { name, params: { cid } }, active: route?.name === name, icon: 'route' }))
 })
 
 const homeLink = computed<RouteLocationRaw | null>(() => (role.value === null ? null : { name: homeRouteFor(role.value) }))
@@ -113,10 +115,18 @@ function signOut(): void {
       </div>
       <nav class="app-nav" aria-label="主导航">
         <RouterLink v-if="homeLink" :to="homeLink" class="app-nav__item" :class="{ 'is-active': homeActive }">
-          我的课程
+          <svg class="app-nav__icon" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false">
+            <path d="M9 4.2C7.8 3.2 6.2 2.8 3.8 2.8v11c2.4 0 4 .4 5.2 1.4 1.2-1 2.8-1.4 5.2-1.4v-11c-2.4 0-4 .4-5.2 1.4Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+            <path d="M9 4.2v11" fill="none" stroke="currentColor" stroke-width="1.4" />
+          </svg>
+          <span>我的课程</span>
         </RouterLink>
         <RouterLink v-if="role === 'teacher'" to="/api-settings" class="app-nav__item" :class="{ 'is-active': route?.name === 'api-settings' }">
-          API 设置
+          <svg class="app-nav__icon" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false">
+            <circle cx="9" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4" />
+            <path d="M9 2.2v2M9 13.8v2M2.2 9h2M13.8 9h2M4.2 4.2l1.4 1.4M12.4 12.4l1.4 1.4M13.8 4.2l-1.4 1.4M5.6 12.4l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          </svg>
+          <span>API 设置</span>
         </RouterLink>
         <template v-if="courseNav.length">
           <p class="app-nav__heading">当前课程</p>
@@ -128,13 +138,32 @@ function signOut(): void {
             :class="{ 'is-active': item.active }"
             :aria-current="item.active ? 'page' : undefined"
           >
-            {{ item.label }}
+            <svg class="app-nav__icon" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false">
+              <circle cx="9" cy="6" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4" />
+              <path d="M3.4 15c0-2.6 2.4-4.2 5.6-4.2S14.6 12.4 14.6 15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <span>{{ item.label }}</span>
           </RouterLink>
         </template>
       </nav>
       <div class="app-sidebar__user">
-        <span data-test="app-user">{{ session?.user?.username }} · {{ roleLabel }}</span>
-        <button type="button" data-variant="secondary" data-test="app-sign-out" @click="signOut">退出登录</button>
+        <span class="app-sidebar__avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+            <circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M4.8 20c0-3.4 3.1-5.6 7.2-5.6s7.2 2.2 7.2 5.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="app-sidebar__identity" data-test="app-user">
+          <span class="app-sidebar__name">{{ session?.user?.username }}</span>
+          <span class="app-sidebar__role">{{ roleLabel }}</span>
+        </span>
+        <button type="button" class="app-sidebar__signout" data-variant="secondary" data-test="app-sign-out" @click="signOut">
+          <svg viewBox="0 0 18 18" width="15" height="15" aria-hidden="true" focusable="false">
+            <path d="M11 5.5V3.8A1.8 1.8 0 0 0 9.2 2H4.3A1.8 1.8 0 0 0 2.5 3.8v10.4A1.8 1.8 0 0 0 4.3 16h4.9a1.8 1.8 0 0 0 1.8-1.8v-1.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            <path d="M7.5 9h7.8M12.4 6 15.5 9l-3.1 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>退出登录</span>
+        </button>
       </div>
     </aside>
   </div>

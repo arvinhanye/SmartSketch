@@ -76,7 +76,14 @@ async function mountApp({
   role = 'teacher',
   api = fakeApi(),
   path,
-}: { role?: Role | null; api?: ReturnType<typeof fakeApi>; path?: string } = {}) {
+  attachTo,
+}: {
+  role?: Role | null
+  api?: ReturnType<typeof fakeApi>
+  path?: string
+  /** 需要断言 document.activeElement 时把组件挂到真实 DOM 上 */
+  attachTo?: HTMLElement
+} = {}) {
   // 与 main.ts 一致：守卫与课程页都从会话读账号类型
   const session = useSessionStore(pinia)
   if (role !== null) {
@@ -91,6 +98,7 @@ async function mountApp({
   await router.isReady()
   const wrapper = mount(App, {
     global: { plugins: [pinia, router], provide: { [COURSES_API_KEY as symbol]: api } },
+    ...(attachTo ? { attachTo } : {}),
   })
   await flushPromises()
   return { wrapper, router, api, store: useCourseStore(pinia) }
@@ -305,6 +313,112 @@ describe('H01 创建课程表单', () => {
     await wrapper.get('form[data-test="course-create"]').trigger('submit')
     await flushPromises()
     expect(api.create).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------- 视觉重构后的交互
+
+describe('H01 课程页视觉重构', () => {
+  it('创建面板默认收起：按钮带 aria-expanded，展开后聚焦课程名，取消后聚焦回按钮', async () => {
+    const { wrapper } = await mountApp({
+      api: fakeApi({ list: async () => [course('c1')] }),
+      // 焦点断言需要组件真的挂在 document 上
+      attachTo: document.body,
+    })
+    const toggle = wrapper.get('[data-test="create-toggle"]')
+    const panel = wrapper.get('form[data-test="course-create"]')
+
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(toggle.attributes('aria-controls')).toBe('course-create-panel')
+    expect(panel.attributes('id')).toBe('course-create-panel')
+    // 收起用 v-show：面板仍在 DOM 内，但不显示
+    expect((panel.element as HTMLElement).style.display).toBe('none')
+
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect((panel.element as HTMLElement).style.display).not.toBe('none')
+    expect(document.activeElement).toBe(wrapper.get('input[name="name"]').element)
+
+    await wrapper.get('[data-test="create-cancel"]').trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect((panel.element as HTMLElement).style.display).toBe('none')
+    expect(document.activeElement).toBe(toggle.element)
+
+    // 取消不改变业务状态：没有提交、没有错误
+    expect(wrapper.find('[data-test="create-error"]').exists()).toBe(false)
+  })
+
+  it('创建成功后列表更新且面板保持可用，成功提示在表单外仍然可见', async () => {
+    const { wrapper } = await mountApp({ api: fakeApi({ list: async () => [course('c1')] }) })
+    await wrapper.get('[data-test="create-toggle"]').trigger('click')
+    await wrapper.get('input[name="name"]').setValue('编译原理')
+    await wrapper.get('form[data-test="course-create"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-test="course-card"]')).toHaveLength(2)
+    const toast = wrapper.get('[data-test="create-success-outside"]')
+    expect(toast.text()).toContain('编译原理')
+    expect(wrapper.get('[data-test="create-toast"]').attributes('role')).toBe('status')
+    // 表单里的成功提示同样保留原有 data-test
+    expect(wrapper.get('[data-test="create-success"]').text()).toContain('编译原理')
+  })
+
+  it('列表标题右侧给出课程总数，卡片展示状态徽标、身份与知识点，并链接到课程路由', async () => {
+    const { wrapper } = await mountApp({
+      api: fakeApi({
+        list: async () => [
+          course('c1', { name: '数据结构', my_role: 'teacher', status: 'draft', kp_count: 3 }),
+          course('c2', { name: '操作系统', my_role: 'student', status: 'published', published_version: 2 }),
+        ],
+      }),
+    })
+
+    expect(wrapper.get('[data-test="courses-total"]').text()).toBe('共 2 门')
+    const cards = wrapper.findAll('[data-test="course-card"]')
+    expect(cards).toHaveLength(2)
+    // 草稿与已发布要用不同样式，不能一律显示为绿色
+    const draftBadge = cards[0]!.get('.course-card__badge')
+    const publishedBadge = cards[1]!.get('.course-card__badge')
+    expect(draftBadge.text()).toBe('草稿')
+    expect(draftBadge.classes()).toContain('is-draft')
+    expect(publishedBadge.text()).toBe('已发布')
+    expect(publishedBadge.classes()).toContain('is-published')
+    // 卡片文字包含课程内身份与知识点数量
+    expect(cards[0]!.text()).toContain('教师')
+    expect(cards[0]!.text()).toContain('3 个知识点')
+    // 装饰图谱不进入无障碍树，也不拦鼠标
+    const decor = cards[0]!.get('.course-card__decor')
+    expect(decor.attributes('aria-hidden')).toBe('true')
+    expect(decor.attributes('focusable')).toBe('false')
+    // 整张卡是一个链接，没有嵌套链接
+    const link = cards[1]!.get('a')
+    expect(link.attributes('href')).toBe('/courses/c2')
+    expect(cards[1]!.findAll('a')).toHaveLength(1)
+  })
+
+  it('顶部统计只在列表就绪时给出确定数字', async () => {
+    const pending = deferred<Course[]>()
+    const { wrapper } = await mountApp({ api: fakeApi({ list: () => pending.promise }) })
+    // 加载中不把未加载的数据说成「0 门课程」
+    expect(wrapper.get('[data-test="courses-stats"]').text()).toBe('课程列表加载中')
+    expect(wrapper.find('[data-test="courses-total"]').exists()).toBe(false)
+
+    pending.resolve([course('c1', { kp_count: 5 }), course('c2', { kp_count: 7 })])
+    await flushPromises()
+    expect(wrapper.get('[data-test="courses-stats"]').text()).toBe('2 门课程 · 12 个知识点')
+    expect(wrapper.get('[data-test="courses-total"]').text()).toBe('共 2 门')
+  })
+
+  it('学生端没有创建按钮与创建表单，说明文字按角色区分', async () => {
+    setActivePinia((pinia = createPinia()))
+    const { wrapper } = await mountApp({ role: 'student', api: fakeApi({ list: async () => [course('c1', { my_role: 'student' })] }) })
+
+    expect(wrapper.find('[data-test="create-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('form[data-test="course-create"]').exists()).toBe(false)
+    expect(wrapper.get('.courses__lede').text()).toContain('浏览课程知识图谱')
+    // 侧栏账号区显示真实用户名与账号角色（不写死 demo 账号）
+    expect(wrapper.get('[data-test="app-user"]').text()).toContain('student')
+    expect(wrapper.get('[data-test="app-user"]').text()).toContain('学生')
   })
 })
 
