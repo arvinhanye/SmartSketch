@@ -25,6 +25,7 @@ budget: 619217 / 5000000 token（本会话未调用真实模型，未增加）
 
    - 逐任务的设计取舍与验证见 `claude-l12.md`、`claude-l13.md`、`claude-l14.md`，复审重点见本文 §3。
    - 复审意见写入 `docs/handoffs/codex-<task>.md` 或 `docs/reviews/`。
+   - **先修 §2 的门禁失败**：演示端到端 `student.spec.ts`，是 L14-3 推荐序号放进按钮引起的回归，根因与建议修法见 §2。修完后完整重跑门禁。
    - 复审通过且 DeepSeek 的 L11-7 复测合并后，再快进冲刺分支。
 
 2. **需要向量模型或真实模型的测试仍交 DeepSeek harness**：凡是要调用阿里云百炼向量（发布期向量化、问答检索的真实向量）或真实生成模型的验证，Codex 都**不在本地运行**，而是写交接稿交给 DeepSeek harness。
@@ -63,7 +64,44 @@ budget: 619217 / 5000000 token（本会话未调用真实模型，未增加）
 
 - **L11 阶段门禁**（`fc2ad94`）：后端 1 failed（`test_shell_multibyte_vars`，`4ee7b52` 已修，单测通过），其余全部通过；同一次运行未整体 exit 0。
 - **L13 门禁**：开跑后为避免 L14 改动混入而中止，**未完成**。
-- **L13+L14 合并门禁**：交接时正在后台运行（`verify.sh integration`，代码 HEAD `56610d4`，独立端口），已通过契约与基础档，后端 full 尚在运行，**结果未出**。日志在 Claude 会话 scratchpad，不入库。**接手后请重新运行并以你的结果为准**：
+- **L13+L14 合并门禁（代码 HEAD `56610d4`，`verify.sh integration`，独立端口）：整体 exit 1，有 1 项端到端失败，交 Codex 修复。**
+
+  | 阶段 | 结果 |
+  | --- | --- |
+  | 契约 / 基础档 | PASS |
+  | 后端 full | PASS：3772 passed / 27 skipped（已登记） |
+  | 前端（integration） | PASS：34 文件 874 passed |
+  | 集成用例 | PASS：393 passed / 4 skipped（已登记） |
+  | 图库后端（backend-live） | PASS：44 passed |
+  | 演示端到端 | **FAIL**：`student.spec.ts` 1 failed、`teacher.spec.ts` 1 passed（证据 `.e2e/20261003-124107`） |
+  | 个人模式端到端 | PASS：3 passed（`.e2e/20261003-124333`） |
+
+  门禁日志在 Claude 会话 scratchpad，不入库；端到端证据在工作区 `.e2e/`（不提交）。
+
+- **待修失败（L14-3 引入的回归，交 Codex）**：`tests/e2e/student.spec.ts:60`
+
+  ```text
+  Locator: [data-test=sg-mastery-target]
+  Expected substring: "1."
+  Received string:    " 知识点：栈 · 当前：未开始"
+  ```
+
+  - 根因：L14-3（`5d171e4`）把序号 `<span data-test="rc-order">1.</span>` 放进了推荐按钮 `rc-select-*` 内部。演示用例读取按钮文字后取第一个空白前的词当知识点名称，结果取到「1.」。
+  - 建议修法：把序号移到按钮外（`<span data-test="rc-order" aria-hidden="true">` 放在按钮前面，`<ol>` 已提供列表语义）。这样按钮文字和可访问名都只剩知识点名称；同时在 `tests/frontend/l14.test.ts`「列表：顶部路径行、每项序号、「排序参考」」里加断言 `rc-select-C` 的文字等于「知识点C」，先确认红。
+  - Claude 已在本地验证这个修法：新增断言先红，改后 `l14` 与 `i06` 共 60 passed、type-check 通过。按用户要求已撤回，未提交，端到端未重跑。
+  - 另一种修法是改端到端：按 `data-kp-id` 找目标，或直接读 `rc-select` 的名称；但上面的修法也改善了读屏体验，更推荐。
+  - 修完重跑：
+
+    ```bash
+    E2E_API_PORT=18100 E2E_WEB_PORT=15273 E2E_NEO4J_PORT=17788 E2E_PROVIDER_PORT=18990 PYTHON=.venv/bin/python PATH="$PWD/.venv/bin:$PATH" PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" scripts/e2e.sh tests/e2e/student.spec.ts tests/e2e/teacher.spec.ts
+    ```
+
+    然后跑 `personal.spec.ts`（`E2E_LLM_MODE=personal`）。`personal.spec.ts` 用的是 `items.first().locator('[data-test=rc-order]')`，序号移到按钮外仍在同一个 `li` 内，预计不受影响。
+
+- **门禁可信度说明**：这次门禁运行期间，Claude 在工作区短暂改过 `src/backend/app/services/qa/generate.py`（上限临时改为 2048），随后已撤回，没有提交。
+  - 后端 full 的用例数 3772 = 3761 + `test_l12` 8 + `test_l14_reason` 3，说明当时新建的临时测试文件没有被收集；
+  - 但集成用例阶段是否读到了临时值无法排除。问答集成用例不依赖具体上限值，影响很小。
+  - 稳妥起见，修完上面的失败后请**完整重跑一次 `verify.sh integration`** 作为最终门禁：
 
 ```bash
 E2E_API_PORT=18100 E2E_WEB_PORT=15273 E2E_NEO4J_PORT=17788 E2E_PROVIDER_PORT=18990 VERIFY_NEO4J_PORT=17789 \
@@ -72,7 +110,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 ./scripts/verify.sh integration
 ```
 
-- 逐任务已验证（均为本工作区实测）：
+- 逐任务已验证（均为本工作区实测；全量结果以上表为准）：
   - 前端：`l12` 11、`l13` 10、`l13-kp-link` 8、`l14` 21 passed，`h04/h05/h11/i06` 回归通过，type-check exit 0。最近一次前端全量是 L12 后的 835 passed，L13/L14 之后**未跑全量**。
   - 后端：`test_l12` 8、`test_l14_reason` 3、`test_i04`+`test_i05` 154 passed。最近一次后端全量是 L11-7 后的 3761 passed / 27 skipped。
   - 个人模式端到端 3 passed（`.e2e/20261003-120719`）。视口修复（`09349d3`）之后只以加截图的运行复核过 exit 0，未单独留存纯净运行。
