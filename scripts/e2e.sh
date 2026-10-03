@@ -59,7 +59,7 @@ cleanup() {
   for pid in ${pids[@]+"${pids[@]}"}; do kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; done
   wait 2>/dev/null || true
   [[ -z $neo4j_container ]] || docker rm -f "$neo4j_container" >> "$RUN_DIR/cleanup.log" 2>&1 \
-    || echo "未能删除一次性 Neo4j 容器 $neo4j_container，请手动 docker rm -f" >&2
+    || echo "未能删除一次性 Neo4j 容器 ${neo4j_container}，请手动 docker rm -f" >&2
 }
 trap cleanup EXIT INT TERM
 

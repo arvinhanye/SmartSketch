@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 chrome="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 py="${PYTHON:-.venv/bin/python}"
-[[ -x $chrome ]] || { echo "找不到 Chrome：$chrome（用 CHROME= 指定）" >&2; exit 1; }
+[[ -x $chrome ]] || { echo "找不到 Chrome：${chrome}（用 CHROME= 指定）" >&2; exit 1; }
 work="$(mktemp -d)"
 cleanup() { rm -f -- "$work"/*.html; rmdir -- "$work" 2>/dev/null || true; }
 trap cleanup EXIT
