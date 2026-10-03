@@ -42,6 +42,8 @@ export interface SourceView extends SourceLocation {
   locationLabel: string
   /** 原文片段；已发布版本或无证据区间时没有 */
   excerpt?: string
+  /** 资料文件名（同课资料，L12/ADR-085）；资料已删除或不可读时没有 */
+  documentName?: string
 }
 
 export interface RelatedView {
@@ -95,6 +97,7 @@ export function toSourceView(source: SourceRef, index = 0): SourceView | null {
   if (page !== undefined) view.page = page
   if (sectionPath !== undefined) view.sectionPath = sectionPath
   if (nonEmpty(raw.text)) view.excerpt = raw.text
+  if (nonEmpty(raw.document_name)) view.documentName = raw.document_name
   return view
 }
 

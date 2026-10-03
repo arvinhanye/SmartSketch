@@ -470,11 +470,12 @@ describe('H06 知识点详情组件', () => {
     expect(buttons[1]!.attributes('aria-pressed')).toBe('true')
   })
 
-  it('未知资料名不伪造标题，只显示资料编号', async () => {
+  it('未知资料名不伪造标题：统一写「资料不可用」，也不拿资料编号冒充（L12，ADR-085）', async () => {
     const wrapper = mountDetail(fakeApi(), { kpId: 'k1', documentNames: {} })
     await flushPromises()
     const text = wrapper.get('[data-test="kd-source-locate"]').text()
-    expect(text).toContain('doc1')
+    expect(text).toContain('资料不可用')
+    expect(text).not.toContain('doc1')
     expect(text).not.toContain('.pdf')
   })
 

@@ -5,7 +5,7 @@ import { AbortedError, ApiError, TimeoutError } from '../api/http'
 import { useCourseStore } from '../stores/course'
 
 type ChatResponse = components['schemas']['ChatResponse']
-export type Citation = { index: number; chunk_id: string; document_id: string; section_path?: string; page?: number; text: string }
+export type Citation = { index: number; chunk_id: string; document_id: string; section_path?: string; page?: number; text: string; document_name?: string }
 
 export interface ChatEntry {
   id: number

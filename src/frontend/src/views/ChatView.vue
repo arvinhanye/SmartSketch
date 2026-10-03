@@ -5,6 +5,7 @@ import { CHAT_STREAM_CLIENT_KEY } from '../api/chatStream'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { createPublishedGraphApi, PUBLISHED_GRAPH_API_KEY } from '../api/graph'
 import ChatMarkdown from '../components/ChatMarkdown.vue'
+import { formatSourceLine } from '../composables/sourceLabel'
 import { useChat, type Citation } from '../composables/useChat'
 import { CHAT_ROUTE, COURSE_ROUTE, SETTINGS_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
 import { useCourseStore } from '../stores/course'
@@ -63,11 +64,9 @@ function openKnowledgePoint(id: string): void {
   notice.value = `知识点：${kpLabel(id)}`
 }
 
+/** 「文件名 · 第 N 页 · 章节」；缺文件名写「资料不可用」（L12，ADR-085） */
 function sourceLine(citation: Citation): string {
-  const parts: string[] = []
-  if (citation.section_path) parts.push(citation.section_path)
-  if (citation.page) parts.push(`第 ${citation.page} 页`)
-  return parts.join(' · ')
+  return formatSourceLine({ documentName: citation.document_name, page: citation.page, sectionPath: citation.section_path })
 }
 
 // 右栏按回答列出全部出处；点正文中的编号时高亮对应一条
