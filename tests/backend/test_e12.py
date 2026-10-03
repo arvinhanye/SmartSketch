@@ -979,7 +979,13 @@ def test_relation_auth_failure_ends_the_task_instead_of_advancing_to_merging(db_
 def test_auth_failure_with_concurrent_units_stops_dispatching(db_url, storage):
     lease, chunk_ids = _extracting(db_url, storage)
     script = Script()
-    script.delay = 0.05
+
+    def slow(n):                                            # 其余在途单元在鉴权失败被观察到之后才结束
+        time.sleep(0.3)
+        return None
+
+    for index in range(1, len(chunk_ids)):
+        script.hooks[_key(chunk_ids, index)] = slow
     script.hooks[_key(chunk_ids, 0)] = lambda n: ModelAuthError(MODEL)
 
     outcome = _run(db_url, lease, _toolkit(db_url, script), max_concurrency=3)
@@ -987,5 +993,5 @@ def test_auth_failure_with_concurrent_units_stops_dispatching(db_url, storage):
     assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
     assert _auth_rows(db_url, lease.task_id)[1] == {"reason": "auth"}
     assert script.count(_key(chunk_ids, 0)) == 1
-    assert len(script.calls) <= 3 + 1                     # 已在途的单元之外不再派发新块
-    assert len(script.calls) < len(chunk_ids)
+    assert len(script.calls) == 3                           # 只有最初在途的 3 个单元，之后不再派发
+    assert _checkpoints(db_url, lease.task_id) == {}         # 鉴权终止后在途结果不写检查点
