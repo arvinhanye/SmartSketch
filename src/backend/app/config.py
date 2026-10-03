@@ -1,5 +1,7 @@
 """Typed runtime settings loaded only from environment variables."""
 
+import base64
+import binascii
 import math
 import os
 from collections.abc import Mapping
@@ -44,7 +46,8 @@ class Settings(BaseModel):
     NEO4J_PASSWORD: SecretStr = SecretStr("")
 
     # demo：确定性、无网络的规则演示模型与字符 n-gram 向量（ADR-076），用于无付费模型的整链路验收
-    LLM_MODE: Literal["fake", "demo", "live"] = "fake"
+    # personal（ADR-080）：无全站大模型客户端，任务用快照、问答用本人配置；LLM_* 的地址、key、模型名不读取
+    LLM_MODE: Literal["fake", "demo", "live", "personal"] = "fake"
     EMBEDDING_MODE: Literal["fake", "demo", "online", "local"] = "fake"
     LLM_BASE_URL: str = ""
     LLM_API_KEY: SecretStr = SecretStr("")
@@ -93,6 +96,11 @@ class Settings(BaseModel):
     AUTH_JWT_SECRET: SecretStr = SecretStr("")
     AUTH_ACCESS_TOKEN_TTL_SECONDS: int = Field(default=28800, ge=1)
 
+    # 个人模型凭据（ADR-080）：根密钥为 32 字节的 URL 安全 base64；personal 模式必填。
+    MODEL_CREDENTIAL_KEY: SecretStr = SecretStr("")
+    # 仅测试：放行回环/内网模型地址（本机假供应商）；production 下为真即拒绝启动。
+    MODEL_ENDPOINT_ALLOW_PRIVATE: bool = False
+
     # 四项成组（ADR-014 修订 1 决定 6）；都不设或都为空时用 S2 缺省值，读取请用 recommend_weights
     RECOMMEND_WEIGHT_UNLOCK: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     RECOMMEND_WEIGHT_IMPORTANCE: float | None = Field(default=None, ge=0, allow_inf_nan=False)
@@ -126,6 +134,14 @@ def _valid_url(value: str, schemes: set[str]) -> bool:
             and parsed.password is None
         )
     except ValueError:
+        return False
+
+
+def _valid_credential_key(value: SecretStr) -> bool:
+    text = value.get_secret_value().strip()
+    try:
+        return len(base64.b64decode(text + "=" * (-len(text) % 4), altchars=b"-_", validate=True)) == 32
+    except (binascii.Error, ValueError):
         return False
 
 
@@ -175,7 +191,12 @@ def _check_rules(settings: Settings) -> None:
         invalid.add("EMBEDDING_MODEL")
     if settings.EMBEDDING_MODE in ("online", "local") and settings.EMBEDDING_MODEL.strip() == DEMO_EMBEDDING_MODEL:
         invalid.add("EMBEDDING_MODEL")
+    if _has_value(settings.MODEL_CREDENTIAL_KEY) or settings.LLM_MODE == "personal":
+        if not _valid_credential_key(settings.MODEL_CREDENTIAL_KEY):
+            invalid.add("MODEL_CREDENTIAL_KEY")
     if settings.APP_ENV == "production":
+        if settings.MODEL_ENDPOINT_ALLOW_PRIVATE:
+            invalid.add("MODEL_ENDPOINT_ALLOW_PRIVATE")
         if settings.LLM_MODE in ("fake", "demo"):
             invalid.add("LLM_MODE")
         if settings.EMBEDDING_MODE in ("fake", "demo"):
@@ -233,6 +254,9 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     for name in RECOMMEND_WEIGHT_NAMES:
         if name in source and not source[name].strip():
             del source[name]
+    # 布尔变量在 .env 里留空等同未设置
+    if "MODEL_ENDPOINT_ALLOW_PRIVATE" in source and not source["MODEL_ENDPOINT_ALLOW_PRIVATE"].strip():
+        del source["MODEL_ENDPOINT_ALLOW_PRIVATE"]
     try:
         settings = Settings.model_validate(source)
     except ValidationError as exc:

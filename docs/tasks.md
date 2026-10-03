@@ -22,7 +22,7 @@
 | L01 | DONE | Claude | 隔离环境：`.venv`（Python 3.11.9）、`npm ci`、独立 Neo4j（7688/7475）；三档门禁基线；不改业务文件 | basic exit 0；full exit 0（后端 3559 通过/27 跳过，前端 772 通过）；integration exit 1，仅因本机未装 Playwright 浏览器，改用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向 Chrome 后两条端到端通过。另发现北京地域向量服务在本机网络不可达。交接 `docs/handoffs/claude-l01.md` |
 | L02 | IN_PROGRESS（抽取已测；问答等向量服务可达后补测） | Claude | `evaluation/measure_web_flow.py`、基线报告 `evaluation/reports/l02-baseline-2026-10.md` | 抽取实测 141.72 秒（目标 60 秒，未达标），82 个知识点、4 种关系，计费 101054 token；问答未测：北京地域向量接口在本机网络 TCP 超时。交接 `docs/handoffs/claude-l02.md` |
 | L03 | DONE | Claude | ADR-080/081、`AGENTS.md` §4/§6、`docs/`、`src/contracts/`、生成物；前端三处错误码清单同步 | 契约门禁 exit 0；前端类型检查与 772 用例通过；后端 3561 通过/27 跳过；交接 `docs/handoffs/claude-l03.md` |
-| L04 | TODO | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py` | 加解密、关联数据、快照、回滚说明 |
+| L04 | DONE | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py`、`cryptography==50.0.2` | 11 个新用例；后端 3572 通过/27 跳过；交接 `docs/handoffs/claude-l04.md` |
 | L05 | TODO | Claude | `services/ai/outbound.py` | 内网、元数据、重定向、DNS 变化用例 |
 | L06 | TODO | Claude | `services/model_configs.py`、`api/model_config.py` | 越权、脱敏、无泄漏、限流用例 |
 | L07 | TODO | Claude | 上传绑定、`workers/`、调用归属用户 | 改/清配置、重启接管、两教师不同 key 用例 |
