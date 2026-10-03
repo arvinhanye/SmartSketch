@@ -10,6 +10,77 @@ from typing import Annotated, Any, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, RootModel, SecretStr
 
 
+class RuntimeMode(Enum):
+    personal = 'personal'
+    demo = 'demo'
+    fake = 'fake'
+    live = 'live'
+
+
+class ModelConfigTestErrorClass(Enum):
+    auth = 'auth'
+    timeout = 'timeout'
+    rate_limited = 'rate_limited'
+    connection = 'connection'
+    invalid_request = 'invalid_request'
+    server = 'server'
+    malformed_response = 'malformed_response'
+    stream_interrupted = 'stream_interrupted'
+    blocked_address = 'blocked_address'
+
+
+class ModelConfigLastTest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ok: bool
+    tested_at: datetime
+    error_class: Optional[ModelConfigTestErrorClass] = None
+
+
+class ModelConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    runtime_mode: RuntimeMode
+    configured: bool
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    key_hint: Annotated[Optional[str], Field(description='密钥末 4 位，仅供辨认')] = (
+        None
+    )
+    version: Annotated[Optional[int], Field(ge=1)] = None
+    updated_at: Optional[datetime] = None
+    last_test: Optional[ModelConfigLastTest] = None
+
+
+class ModelConfigUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    base_url: Annotated[str, Field(max_length=512, min_length=9)]
+    model: Annotated[str, Field(max_length=128, min_length=1)]
+    api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+
+
+class ModelConfigTestRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    base_url: Annotated[Optional[str], Field(max_length=512, min_length=9)] = None
+    model: Annotated[Optional[str], Field(max_length=128, min_length=1)] = None
+    api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+
+
+class ModelConfigTestResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ok: bool
+    latency_ms: Annotated[int, Field(ge=0)]
+    error_class: Optional[ModelConfigTestErrorClass] = None
+
+
 class ErrorCode(Enum):
     UNAUTHENTICATED = 'UNAUTHENTICATED'
     COURSE_FORBIDDEN = 'COURSE_FORBIDDEN'
@@ -38,6 +109,7 @@ class ErrorCode(Enum):
     DOCUMENT_NOT_DELETABLE = 'DOCUMENT_NOT_DELETABLE'
     REVISION_CONFLICT = 'REVISION_CONFLICT'
     USERNAME_TAKEN = 'USERNAME_TAKEN'
+    MODEL_CONFIG_REQUIRED = 'MODEL_CONFIG_REQUIRED'
 
 
 class CycleItem(RootModel[str]):

@@ -562,6 +562,7 @@ const ERROR_CODES = [
   'DOCUMENT_NOT_DELETABLE',
   'REVISION_CONFLICT',
   'USERNAME_TAKEN',
+  'MODEL_CONFIG_REQUIRED',
 ] as const satisfies readonly components['schemas']['ErrorCode'][]
 type MissingErrorCode = Exclude<components['schemas']['ErrorCode'], (typeof ERROR_CODES)[number]>
 const errorCodesComplete: [MissingErrorCode] extends [never] ? true : MissingErrorCode = true

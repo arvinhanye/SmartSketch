@@ -60,3 +60,10 @@ ProgressResponse = _module.ProgressResponse
 ProgressUpdate = _module.ProgressUpdate
 # I05 next-step recommendation.
 RecommendResponse = _module.RecommendResponse
+# L03 个人模型配置（ADR-080）。
+RuntimeMode = _module.RuntimeMode
+ModelConfig = _module.ModelConfig
+ModelConfigLastTest = _module.ModelConfigLastTest
+ModelConfigUpdate = _module.ModelConfigUpdate
+ModelConfigTestRequest = _module.ModelConfigTestRequest
+ModelConfigTestResult = _module.ModelConfigTestResult

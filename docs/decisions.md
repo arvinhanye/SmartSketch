@@ -1697,3 +1697,53 @@
   - 未做：部署级开关（如关闭自助注册的环境变量）；需要时另立任务。
 - **回滚**：删除 `api/auth.py` 的 `register` 路由、`schemas/auth.py` 的 `RegisterRequest`、`services/auth.py` 的 `RegistrationRateLimiter`/`register_student`、`main.py` 一行限流器、`tests/backend/test_adr079_register.py`，撤回契约与生成物、错误码副本、前端注册页和路由；已自助注册的学生账号保留，可用 `manage-accounts.py disable` 停用。
 - **签收**：待 ArvinHan 签收（方案已由用户在线程中选定）。
+
+## ADR-080：个人模型凭据与 `LLM_MODE=personal`
+
+- **日期**：2026-10-02
+- **背景**：参赛版是教师与学生共用的 Web 应用。用户要求教师、学生各自接入自己的模型 API，不由管理员统一决定模型，也不把教师密钥共享给学生（ArvinHan，2026-10-02）。现有实现里 worker 与问答服务都按进程级环境变量装配一份模型客户端（`workers/runner.py`、`api/chat.py`），`AGENTS.md` §4 规定「配置只能从环境变量读取」、§6 规定「密钥只存个人本地环境」，与该要求冲突。规格：`docs/superpowers/specs/2026-10-02-contest-sprint-design.md`。
+- **选项**（任务如何绑定凭据）：
+
+  | 选项 | 结论 | 理由 |
+  | --- | --- | --- |
+  | 任务级加密快照：建任务时复制所有者当时的地址、模型名与密文 | **采纳** | 改配置不影响已建任务；清除可逐任务作废；worker 重启后从 SQLite 读回，不依赖内存 |
+  | 追加式配置版本表，任务引用版本号 | 否决 | 语义等价，但清除要处理多版本残留，表与查询更多 |
+  | 任务只绑定配置 ID | 否决 | 改配置会让排队任务静默换模型或换 key |
+
+- **决定**：
+  1. 新增运行模式 `LLM_MODE=personal`：进程内没有任何全站大模型客户端。教师任务使用任务快照，学生问答使用本人配置；未配置时上传与提问返回 409 `MODEL_CONFIG_REQUIRED`，不回退到 `demo`、`fake` 或任何全站 key。此模式下不读取 `LLM_*` 的地址、key 与模型名变量。`demo`、`fake`、`live` 的全局装配路径不变；`APP_ENV=production` 允许 `personal` 与 `live`。
+  2. 每个用户一份配置（服务地址、模型名、密钥），同一模型名用于抽取与问答，只支持 OpenAI 兼容的 Chat Completions 协议。密钥用 AES-256-GCM 加密存入 SQLite `user_model_configs`，关联数据为所有者的 `user_id`；根密钥来自环境变量 `MODEL_CREDENTIAL_KEY`（32 字节，URL 安全 base64），`personal` 模式下缺失或非法即拒绝启动。读取接口只返回密钥末 4 位；修改服务地址时必须重新提交密钥。
+  3. 任务快照 `task_model_bindings` 与资料、任务在同一个 SQLite 事务内写入，内容是所有者当时配置的密文副本。修改配置只影响之后新建的任务。清除配置时，在同一事务里把本人未结束任务的快照密文置空（`revoked`）；这些任务在下一个块或小节的尝试开始前以 `LLM_UNAVAILABLE`、`details.reason = credential_revoked` 终止。快照缺失为 `credential_missing`，无法解密为 `credential_unreadable`。任务进入 `awaiting_review`、`completed`、`failed` 或 `cancelled` 后，worker 把快照密文置空（`terminal`），只留地址、模型名与配置版本号。任务状态机与 SSE 语义不变，不新增重试端点。
+  4. 问答按「用户 + 配置版本」缓存各自的调用策略，熔断状态互不影响。`model_calls` 增加 `user_id`，`processing_tasks` 增加 `created_by`；`personal` 模式下 `LLM_DAILY_TOKEN_BUDGET` 按用户统计，`LLM_TASK_TOKEN_BUDGET` 不变。
+  5. 用户填写的地址只接受 `https`，不得带凭据、查询串或片段；解析域名后任一地址不是公网地址即拒绝（回环、私网、链路本地含云元数据地址、CGNAT、组播、保留段、IPv6 ULA 与 IPv4 映射地址）。保存、测试与每次建连都执行；连接钉住已校验的 IP，TLS 仍校验原域名；不跟随重定向。`MODEL_ENDPOINT_ALLOW_PRIVATE` 只用于本机假供应商测试，`APP_ENV=production` 下为真即拒绝启动。
+  6. 规则调整：`AGENTS.md` §4 改为「基础设施与系统级配置只能从环境变量读取；用户个人模型凭据是唯一例外」，§6 增加同一例外。个人凭据不进响应、日志、`model_calls`、任务 payload、SSE、前端持久存储与仓库。
+  7. 新增后端依赖 `cryptography`（锁定版本）。标准库没有认证加密，不自造。
+- **后果**：
+  - 契约：新增 `/api/v1/me/model-config`（读取、保存、清除）与 `/api/v1/me/model-config/test`；`ErrorCode` 增加 `MODEL_CONFIG_REQUIRED`；上传与问答增加 409 响应；`errors.v1.md` 同步。
+  - 数据：迁移 `015_user_model_configs.sql`，两张新表与两个可空新列；历史行的新列为空。
+  - 更换 `MODEL_CREDENTIAL_KEY` 会使已保存的配置与未结束任务的快照无法解密，用户需重新填写；本轮不做根密钥轮换工具。
+  - 测试连接会向用户的服务发 1 次输出上限为 1 token 的请求，每用户每分钟至多 5 次，不计入 `model_calls`。
+  - 未做：多配置收藏、多协议、供应商自动切换、按用户的配额管理界面。
+- **回滚**：停 API 与 worker，恢复 `backups/*-before-015.sqlite`（或执行迁移文件内的 `ROLLBACK` 语句），回退相关提交，`LLM_MODE` 改回原值。新列均可空，旧代码可读新库。
+- **签收**：ArvinHan 2026-10-02 同意规则调整、任务快照方案与新增 `cryptography`（冲刺规格第 11 节）。
+
+## ADR-081：向量方案签收（D-02c）：系统级在线向量，`local` 明确不支持
+
+- **日期**：2026-10-02
+- **背景**：D-02c 一直未签收。`EMBEDDING_MODE=local` 能通过配置校验，但工厂把它与 `online` 一样交给兼容 API 客户端，后者要求在线地址与 key，实际无法运行（Codex 审查 R03，2026-10-02 隔离复现）。个人模型 API（ADR-080）让用户各自选择生成模型，向量空间必须独立于此，否则每换一个模型都要重新向量化。
+- **选项**：
+
+  | 选项 | 结论 | 理由 |
+  | --- | --- | --- |
+  | 系统级在线向量，部署者提供 key | **采纳** | 客户端已实现；用量小（每次发布向量化一次，每次提问 1 次查询）；用户换生成模型不影响向量空间 |
+  | 本地 `bge-small-zh-v1.5` | 否决（本轮） | 要新增推理依赖并下载模型；512 token 上限与约 1500 字分块冲突，需先定截断或重新分块；一周内风险高 |
+  | 演示 n-gram 向量 | 否决 | 不是语义检索，只用于演示入口 |
+
+- **决定**：
+  1. 正式运行使用 `EMBEDDING_MODE=online`：阿里云百炼 `text-embedding-v4`，`EMBEDDING_DIMENSIONS=1024`，`EMBEDDING_BATCH_SIZE=10`。向量 key 属部署者，走环境变量；共享检索成本由部署者承担。
+  2. `EMBEDDING_MODE=local` 在配置校验阶段拒绝并指出变量名，不再留到首次调用才失败。枚举值保留，只为给出明确的错误。
+  3. 向量空间与生成模型无关：用户更换个人模型不触发重新向量化。更换向量模型或维度仍按 `specs/teacher-review-publish.md` V12 重新向量化或使用新库。
+  4. 冲刺与验收使用独立的 SQLite、`STORAGE_DIR` 与 Neo4j 实例，不改写已有演示库的向量空间。
+- **后果**：`docs/integrations.md` 的 D-02c 改为已签收；运行手册删除「`local` 可用」的表述；依赖 `local` 通过校验的既有测试改为断言被拒绝。在线向量在本轮首次做真实联调；2026-10-02 本机网络到北京地域接口 TCP 超时，联调结果与实际用量记入交接。
+- **回滚**：恢复 `config.py` 中 `local` 的原校验分支与对应测试；数据不受影响。
+- **签收**：ArvinHan 2026-10-02 同意（冲刺规格第 11 节第 1 项）。

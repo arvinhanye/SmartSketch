@@ -61,6 +61,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/model-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取当前用户的个人模型配置（脱敏）
+         * @description 永不返回密钥，只返回末 4 位 `key_hint`。`runtime_mode` 为服务端当前的大模型运行模式（ADR-080）。
+         */
+        get: operations["getModelConfig"];
+        /**
+         * 保存或修改当前用户的个人模型配置
+         * @description `base_url` 只接受 https，解析后的地址必须全部为公网地址。首次保存或 `base_url` 与已存值不同时必须带 `api_key`；
+         *     只改 `model` 时可省略 `api_key` 以保留已存密钥。每次成功保存 `version` 加 1，并清空最近测试结果。
+         *     修改不影响已创建的任务（ADR-080 决定 3）。
+         *
+         */
+        put: operations["saveModelConfig"];
+        post?: never;
+        /**
+         * 清除当前用户的个人模型配置
+         * @description 同时作废本人未结束任务的密钥快照；这些任务随后以 `LLM_UNAVAILABLE`（`details.reason = credential_revoked`）终止。
+         *     未配置时也返回 204。
+         *
+         */
+        delete: operations["clearModelConfig"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/model-config/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 测试个人模型配置的连通性
+         * @description 向 `base_url` 发 1 次输出上限为 1 token 的最小对话请求。请求体三项都省略时测试已存配置；否则三项都必填，
+         *     测试这组值而不保存。每用户每分钟至多 5 次。只返回成败、错误分类与耗时，不回显供应商响应。
+         *
+         */
+        post: operations["testModelConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses": {
         parameters: {
             query?: never;
@@ -792,6 +847,53 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description 服务端大模型运行模式（ADR-080）。`personal` 才使用个人配置；其余模式下个人配置不生效。
+         * @enum {string}
+         */
+        RuntimeMode: "personal" | "demo" | "fake" | "live";
+        /**
+         * @description 测试连接的失败分类；`blocked_address` 表示地址未通过出站校验，未发出请求。
+         * @enum {string}
+         */
+        ModelConfigTestErrorClass: "auth" | "timeout" | "rate_limited" | "connection" | "invalid_request" | "server" | "malformed_response" | "stream_interrupted" | "blocked_address";
+        ModelConfigLastTest: {
+            ok: boolean;
+            /** Format: date-time */
+            tested_at: string;
+            error_class?: components["schemas"]["ModelConfigTestErrorClass"];
+        };
+        /** @description 当前用户的个人模型配置状态。永不含密钥。 */
+        ModelConfig: {
+            runtime_mode: components["schemas"]["RuntimeMode"];
+            configured: boolean;
+            base_url?: string;
+            model?: string;
+            /** @description 密钥末 4 位，仅供辨认 */
+            key_hint?: string;
+            version?: number;
+            /** Format: date-time */
+            updated_at?: string;
+            last_test?: components["schemas"]["ModelConfigLastTest"];
+        };
+        ModelConfigUpdate: {
+            base_url: string;
+            model: string;
+            /** Format: password */
+            api_key?: string;
+        };
+        /** @description 三项都省略时测试已存配置；否则三项都必填。 */
+        ModelConfigTestRequest: {
+            base_url?: string;
+            model?: string;
+            /** Format: password */
+            api_key?: string;
+        };
+        ModelConfigTestResult: {
+            ok: boolean;
+            latency_ms: number;
+            error_class?: components["schemas"]["ModelConfigTestErrorClass"];
+        };
         Error: {
             code: components["schemas"]["ErrorCode"];
             /** @description 面向用户的可读说明 */
@@ -805,7 +907,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN" | "MODEL_CONFIG_REQUIRED";
         PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
         /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
         PublishBlockedCycleReason: {
@@ -2142,6 +2244,152 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    getModelConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前配置状态；未配置时 `configured = false` 且不带其余配置字段 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelConfig"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    saveModelConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description 保存后的配置状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelConfig"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `VALIDATION_ERROR`。`details.fields[].reason` 除 schema 错误外另有：`scheme`、`credentials`、`query`、`host`、`port`、
+             *     `unresolvable`、`private_address`（字段 `base_url`）；`required_when_endpoint_changes`、`invalid_characters`（字段 `api_key`）。
+             *      */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 服务端未配置凭据根密钥（`STORAGE_UNAVAILABLE`，`details.reason = credential_store_disabled`） */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    clearModelConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已清除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    testModelConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ModelConfigTestRequest"];
+            };
+        };
+        responses: {
+            /** @description 测试结果（失败也是 200，`ok = false`） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelConfigTestResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description 未带请求体且尚未保存配置（`MODEL_CONFIG_REQUIRED`） */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR`：原因同保存接口；或请求体只给了部分字段（`reason = missing`） */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 测试过于频繁（`RATE_LIMITED`），带 `Retry-After` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 服务端未配置凭据根密钥（`STORAGE_UNAVAILABLE`，`details.reason = credential_store_disabled`） */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listCourses: {
         parameters: {
             query?: never;
@@ -2362,6 +2610,15 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            /** @description `LLM_MODE=personal` 下当前用户尚未配置个人模型 API（`MODEL_CONFIG_REQUIRED`，ADR-080） */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             413: components["responses"]["FileTooLarge"];
             415: components["responses"]["UnsupportedFormat"];
         };
@@ -3247,6 +3504,15 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             /** @description 学生成员提问从未发布的课程（`GRAPH_NOT_PUBLISHED`）。 */
             404: components["responses"]["NotFound"];
+            /** @description `LLM_MODE=personal` 下当前用户尚未配置个人模型 API（`MODEL_CONFIG_REQUIRED`，ADR-080） */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
             /** @description JSON 模式下未预期的服务端异常（`INTERNAL_ERROR`，Q5 O13）；`details.request_id` 带回请求 ID。 */

@@ -1119,6 +1119,8 @@ def _valid_credential_key(value: SecretStr) -> bool:
         del source["MODEL_ENDPOINT_ALLOW_PRIVATE"]
 ```
 
+6. `.env.example` 在 `AUTH_ACCESS_TOKEN_TTL_SECONDS=28800` 之后加入 `MODEL_CREDENTIAL_KEY=` 与 `MODEL_ENDPOINT_ALLOW_PRIVATE=` 两行及其注释（L03 执行时发现 `tests/backend/test_b06.py::test_env_example_covers_every_setting` 要求 `.env.example` 与 `Settings` 字段一一对应，所以这两行随设置字段在本任务加入，而不是 L03）。
+
 - [ ] **Step 7：写仓储**
 
 ```python
