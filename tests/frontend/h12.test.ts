@@ -1,10 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createMemoryHistory } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../../src/contracts/v1/generated/typescript/openapi'
 import App from '../../src/frontend/src/App.vue'
-import { COURSES_API_KEY, type CoursesApi } from '../../src/frontend/src/api/courses'
+import { COURSES_API_KEY, createCoursesApi, type CoursesApi } from '../../src/frontend/src/api/courses'
 import { ApiError, createHttpClient, NetworkError, type FetchLike } from '../../src/frontend/src/api/http'
 import { createMembersApi, MEMBERS_API_KEY, type MembersApi } from '../../src/frontend/src/api/members'
 import { toMemberRow } from '../../src/frontend/src/composables/useMembers'
@@ -499,5 +501,154 @@ describe('H12 移除学生成员', () => {
   it('成员页有返回课程页的链接', async () => {
     const { wrapper } = await mountApp()
     expect(wrapper.get('[data-test="members-back"]').attributes('href')).toBe('/courses/c1')
+  })
+})
+
+// ---------------------------------------------------------------- 页面结构与样式
+
+describe('H12 成员页布局', () => {
+  const countText = (wrapper: Awaited<ReturnType<typeof mountApp>>['wrapper'], kind: 'total' | 'teacher' | 'student') =>
+    wrapper.get(`[data-test="members-count-${kind}"]`).text().trim()
+
+  it('页面顺序：返回课程、标题与说明、当前课程名，再是两张卡片', async () => {
+    const { wrapper } = await mountApp()
+    const all = Array.from(wrapper.element.querySelectorAll('*'))
+    const at = (selector: string) => {
+      const el = wrapper.element.querySelector(selector)
+      return el === null ? -1 : all.indexOf(el)
+    }
+    const order = {
+      back: at('[data-test="members-back"]'),
+      title: at('#members-title'),
+      lede: at('.members__lede'),
+      course: at('[data-test="members-course"]'),
+      addCard: at('[data-test="member-add"]'),
+      listCard: at('[data-test="members-region"]'),
+    }
+    for (const [name, value] of Object.entries(order)) {
+      expect(value, `${name} 应在页面上出现`).toBeGreaterThanOrEqual(0)
+    }
+    expect(order.back).toBeLessThan(order.title)
+    expect(order.title).toBeLessThan(order.lede)
+    expect(order.lede).toBeLessThan(order.course)
+    expect(order.course).toBeLessThan(order.addCard)
+    expect(order.addCard).toBeLessThan(order.listCard)
+    // 「添加学生」卡片在「成员列表」卡片之前，两张卡片互不嵌套
+    expect(wrapper.get('[data-test="member-add"]').element.closest('[data-test="members-region"]')).toBeNull()
+  })
+
+  it('当前课程名取自课程接口，不硬编码；读不到时整行隐藏', async () => {
+    const { wrapper } = await mountApp({
+      courses: fakeCoursesApi({ get: async (cid) => course(cid, { name: '数据结构与算法' }) }),
+    })
+    expect(wrapper.get('[data-test="members-course"]').text()).toBe('当前课程：数据结构与算法')
+
+    const failing = await mountApp({
+      courses: fakeCoursesApi({ get: async () => Promise.reject(new NetworkError(new TypeError('offline'))) }),
+    })
+    // 课程名只是展示辅助：读不到不显示这一行，也不影响成员列表
+    expect(failing.wrapper.find('[data-test="members-course"]').exists()).toBe(false)
+    expect(rows(failing.wrapper)).toHaveLength(2)
+  })
+
+  it('课程名请求真的发出去（真实 HTTP 客户端）：不会被成员切课作用域连带中止', async () => {
+    // 回归：课程名请求曾与成员列表共用同一个 AbortController，被 selectCourse 的切课中止掉，
+    // 于是页面上永远没有「当前课程」这一行。这里用真实 createCoursesApi + 记录型 fetch 走完整链路。
+    const calls: Array<{ url: string; method: string; aborted: boolean }> = []
+    const fetch: FetchLike = async (url, init) => {
+      const record = { url, method: init?.method ?? 'GET', aborted: init?.signal?.aborted ?? false }
+      calls.push(record)
+      const body = url.includes('/members')
+        ? [TEACHER, ALICE]
+        : course('c1', { name: '操作系统' })
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    const { wrapper } = await mountApp({
+      courses: createCoursesApi(createHttpClient({ fetch, getAccessToken: () => 'tok' })),
+    })
+    const courseRequest = calls.find((c) => c.url === '/api/v1/courses/c1')
+    expect(courseRequest).toBeDefined()
+    expect(courseRequest!.method).toBe('GET')
+    expect(courseRequest!.aborted, '课程名请求不应在发出前就被中止').toBe(false)
+    expect(wrapper.get('[data-test="members-course"]').text()).toBe('当前课程：操作系统')
+    expect(rows(wrapper)).toHaveLength(2)
+  })
+
+  it('添加卡片：标题、说明、输入 label 与占位符、砖红按钮文案与信息提示', async () => {
+    const { wrapper } = await mountApp()
+    const card = wrapper.get('[data-test="member-add"]')
+    expect(card.text()).toContain('添加学生')
+    expect(card.text()).toContain('将已注册的学生账号加入本课程。')
+    const input = card.get('input[name="username"]')
+    expect(input.attributes('placeholder')).toBe('输入学生用户名')
+    expect(input.element.closest('label')?.textContent).toContain('学生用户名')
+    const submit = card.get('button[type="submit"]')
+    expect(submit.text().replace(/\s+/g, '')).toBe('添加学生')
+    expect(submit.attributes('disabled')).toBeUndefined()
+    expect(card.text()).toContain('学生加入后，可查看本课程已发布的内容。')
+  })
+
+  it('提交中：按钮文案变为添加中并禁用，反馈仍留在表单附近', async () => {
+    const pending = deferred<CourseMember>()
+    const { wrapper } = await mountApp({ api: fakeMembersApi({ add: () => pending.promise }) })
+    await submitAdd(wrapper, 'bob')
+    const card = wrapper.get('[data-test="member-add"]')
+    expect(card.get('button[type="submit"]').text()).toContain('添加中')
+    expect(card.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    pending.resolve(member('u_bob', 'bob'))
+    await flushPromises()
+    expect(wrapper.get('[data-test="member-add"]').text()).toContain('已添加学生「bob」')
+  })
+
+  it('成员列表卡片：人数标签由真实数据计算，标题与提示条齐备', async () => {
+    const { wrapper } = await mountApp()
+    expect(countText(wrapper, 'total')).toBe('全部 2 人')
+    expect(countText(wrapper, 'teacher')).toBe('教师 1 人')
+    expect(countText(wrapper, 'student')).toBe('学生 1 人')
+    expect(wrapper.get('[data-test="members-region"]').text()).toContain('成员列表')
+    expect(wrapper.get('[data-test="members-region"]').text()).toContain('教师成员仅可由管理员通过命令行调整。')
+    expect(wrapper.get('[data-test="members-total"]').text()).toBe('共 2 位成员。')
+
+    const empty = await mountApp({ api: fakeMembersApi({ list: async () => [TEACHER] }) })
+    expect(countText(empty.wrapper, 'total')).toBe('全部 1 人')
+    expect(countText(empty.wrapper, 'teacher')).toBe('教师 1 人')
+    expect(countText(empty.wrapper, 'student')).toBe('学生 0 人')
+    expect(empty.wrapper.get('[data-test="members-total"]').text()).toBe('共 1 位成员。')
+    // 数量由成员数据算出，不写死
+    expect(empty.wrapper.find('[data-test="members-count-student"]').text()).not.toContain('2 人')
+  })
+
+  it('表格：四列表头、身份标签按角色着色、时间用 time[datetime]，教师显示管理员维护', async () => {
+    const { wrapper } = await mountApp()
+    const table = wrapper.get('[data-test="members-table"]')
+    expect(table.findAll('th[scope="col"]').map((th) => th.text())).toEqual(['用户名', '课程内身份', '加入时间', '操作'])
+    const [teacherRow, aliceRow] = rows(wrapper)
+    expect(teacherRow!.get('.members__role').classes()).toContain('members__role--teacher')
+    expect(teacherRow!.get('.members__role').text()).toBe('教师')
+    expect(aliceRow!.get('.members__role').classes()).toContain('members__role--student')
+    expect(aliceRow!.get('.members__role').text()).toBe('学生')
+    expect(teacherRow!.get('time').attributes('datetime')).toBe(TEACHER.created_at)
+    expect(teacherRow!.get('time').text()).toBe(toMemberRow(TEACHER).joinedLabel)
+    expect(teacherRow!.get('.members__locked').text()).toContain('管理员维护')
+    // 学生行的移除按钮是砖红描边的小按钮，不带 data-variant="danger"
+    const remove = aliceRow!.get('[data-test="member-remove"]')
+    expect(remove.attributes('data-variant')).toBe('secondary')
+    expect(remove.classes()).toContain('members__remove')
+  })
+
+  it('窄屏与横向滚动样式：存在窄屏媒体查询与表格滚动容器', () => {
+    // vitest 的工作目录是前端包（src/frontend）；jsdom 下 import.meta.url 不是 file: 协议
+    const pagePath = resolve(process.cwd(), 'src/views/MembersView.vue')
+    const styles = readFileSync(pagePath, 'utf8')
+    expect(styles).toContain('@media (max-width: 760px)')
+    // 窄屏下输入框与按钮改纵向
+    expect(styles).toMatch(/@media \(max-width: 760px\)[\s\S]*\.members__field-row \{\s*flex-direction: column/)
+    // 表格在自身容器内横向滚动，窄屏不撑宽整页
+    expect(styles).toMatch(/\.members__table-wrap \{[\s\S]*overflow-x: auto/)
+    expect(styles).toMatch(/\.members__table-wrap table \{[\s\S]*min-width:/)
+    // 人数标签允许换行
+    expect(styles).toMatch(/\.members__counts \{[\s\S]*flex-wrap: wrap/)
+    // 页面宽度与教学资料页一致（居中、约 1160px）
+    expect(styles).toMatch(/\.members \{[\s\S]*max-width: 72\.5rem/)
   })
 })
