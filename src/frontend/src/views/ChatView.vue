@@ -6,8 +6,9 @@ import { HTTP_CLIENT_KEY } from '../api/client'
 import { createPublishedGraphApi, PUBLISHED_GRAPH_API_KEY } from '../api/graph'
 import ChatMarkdown from '../components/ChatMarkdown.vue'
 import { useChat, type Citation } from '../composables/useChat'
-import { CHAT_ROUTE, COURSE_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
+import { CHAT_ROUTE, COURSE_ROUTE, SETTINGS_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
 import { useCourseStore } from '../stores/course'
+import { useRuntimeStore } from '../stores/runtime'
 
 const client = inject(CHAT_STREAM_CLIENT_KEY, null)
 if (client === null) throw new Error('ChatView 需要注入 CHAT_STREAM_CLIENT_KEY')
@@ -23,6 +24,12 @@ const courseId = computed(() => {
   return route.name === CHAT_ROUTE && typeof cid === 'string' && cid !== '' ? cid : null
 })
 const { entries, question, sending, currentVersion, ask, stop } = useChat(client, courseId)
+// L10（ADR-080）：personal 模式下未配置个人模型 API 时不发起提问，引导到设置页
+const runtime = useRuntimeStore()
+function submitQuestion(): void {
+  if (runtime.needsConfig || sending.value) return
+  void ask()
+}
 const selectedCitation = ref<Citation | null>(null)
 const notice = ref('')
 watch(courseId, () => { selectedCitation.value = null; notice.value = '' })
@@ -72,7 +79,7 @@ const latestCitations = computed(() => {
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
     event.preventDefault()
-    void ask()
+    submitQuestion()
   }
 }
 </script>
@@ -117,7 +124,7 @@ function onKeydown(event: KeyboardEvent): void {
                   {{ kpLabel(id) }}
                 </button>
               </p>
-              <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" @click="ask(entry.question)">重试</button>
+              <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" :disabled="sending" @click="ask(entry.question)">重试</button>
             </div>
           </li>
         </ol>
@@ -128,7 +135,11 @@ function onKeydown(event: KeyboardEvent): void {
             :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: courseId } }"
           >在图谱中查看</RouterLink>
         </p>
-        <form class="compose" @submit.prevent="ask()">
+        <p v-if="runtime.needsConfig" class="model-required" data-test="model-config-required" role="alert">
+          提问前需要先配置你的模型 API，回答会使用你自己的模型。
+          <RouterLink :to="{ name: SETTINGS_ROUTE }" data-test="model-config-link">去设置</RouterLink>
+        </p>
+        <form class="compose" @submit.prevent="submitQuestion">
           <label for="chat-question" class="sr-only">向课程助教提问</label>
           <textarea
             id="chat-question"
@@ -139,8 +150,8 @@ function onKeydown(event: KeyboardEvent): void {
             @keydown="onKeydown"
           />
           <div class="actions">
-            <button v-if="sending" type="button" data-variant="secondary" @click="stop">停止</button>
-            <button type="submit" :disabled="!question.trim()">发送</button>
+            <button v-if="sending" type="button" data-variant="secondary" data-test="chat-stop" @click="stop">停止</button>
+            <button type="submit" data-test="chat-send" :disabled="sending || !question.trim() || runtime.needsConfig">发送</button>
           </div>
         </form>
       </div>

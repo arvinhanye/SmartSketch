@@ -9,6 +9,7 @@ TASK-9、TASK-10、TASK-13、LEASE-2、LEASE-6、LEASE-11。
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -25,12 +26,13 @@ from app.config import load_settings
 from app.repositories import task_leases, tasks
 from app.repositories.model_calls import SqliteCallStore
 from app.repositories.sqlite import MIGRATIONS_DIR, connect, migrate
-from app.services.ai.client import ModelRequest, ModelServerError
+from app.services.ai.client import ModelAuthError, ModelRequest, ModelServerError
 from app.services.ai.entities import EntityExtractor
 from app.services.ai.fake import BAD_JSON_TEXT, FakeModelClient
 from app.services.ai.gleaning import EntityGleaner
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
+from app.services.credentials import CredentialUnavailable
 from app.services.file_storage import FileStorage, StoredFile
 from app.workers import extract_task
 from app.workers.extract_task import (
@@ -892,3 +894,104 @@ def test_run_once_hands_back_merging_tasks(db_url, storage):
                                    owner="worker-b", storage=storage)
 
     assert result.extract is None and result.handed_back is True and script.calls == []
+
+
+# --- ADR-080：密钥快照失效 -----------------------------------------------------------------------
+def test_revoked_credential_fails_the_task_before_any_model_call(db_url, storage):
+    lease, _chunk_ids = _extracting(db_url, storage)
+
+    def guard() -> None:
+        raise CredentialUnavailable("credential_revoked")
+
+    toolkit = dataclasses.replace(_toolkit(db_url, Script()), guard=guard)
+
+    outcome = _run(db_url, lease, toolkit)
+
+    assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
+    row = _row(db_url, lease.task_id)
+    assert row["stage"] == "failed" and row["lease_token"] is None
+    assert json.loads(row["error_details"]) == {"reason": "credential_revoked"}
+    assert "模型 API" in row["error_message"]
+    assert _call_rows(db_url, lease.task_id) == []
+
+
+def test_credential_revoked_mid_stage_stops_further_chunks(db_url, storage):
+    lease, _chunk_ids = _extracting(db_url, storage)
+    script = Script()
+    allowed = {"left": 2}
+
+    def guard() -> None:
+        if allowed["left"] == 0:
+            raise CredentialUnavailable("credential_revoked")
+        allowed["left"] -= 1
+
+    toolkit = dataclasses.replace(_toolkit(db_url, script), guard=guard)
+
+    outcome = _run(db_url, lease, toolkit)
+
+    assert outcome.status is ExtractStatus.FAILED
+    assert json.loads(_row(db_url, lease.task_id)["error_details"]) == {"reason": "credential_revoked"}
+    assert len(script.calls) == 2
+
+
+# --- N02：供应商鉴权失败是任务级终止（ADR-082 决定 4） ----------------------------------------------
+
+
+def _auth_rows(db_url: str, task_id: str) -> tuple[dict[str, object], dict[str, object]]:
+    row = _row(db_url, task_id)
+    return row, json.loads(row["error_details"])
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_entity_auth_failure_ends_the_task_without_retry_or_further_chunks(db_url, storage, status):
+    lease, chunk_ids = _extracting(db_url, storage)
+    script = Script()
+    script.hooks[_key(chunk_ids, 0)] = lambda n: ModelAuthError(MODEL, status_code=status)
+
+    outcome = _run(db_url, lease, _toolkit(db_url, script, max_retries=2), chunk_max_attempts=3)
+
+    assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
+    assert outcome.sse_event == "error"
+    row, details = _auth_rows(db_url, lease.task_id)
+    assert row["stage"] == "failed" and row["lease_token"] is None
+    assert details == {"reason": "auth"}
+    assert "credential_revoked" not in json.dumps(details)
+    assert script.count(_key(chunk_ids, 0)) == 1          # 不做 L1/L2 重试，不换 key
+    assert len(script.calls) == 1                         # 不再派发后续块
+    assert _checkpoints(db_url, lease.task_id, "section") == {}
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_relation_auth_failure_ends_the_task_instead_of_advancing_to_merging(db_url, storage, status):
+    lease, chunk_ids = _extracting(db_url, storage)
+    script = Script()
+    script.hooks["sec:" + chunk_ids[0]] = lambda n: ModelAuthError(MODEL, status_code=status)
+
+    outcome = _run(db_url, lease, _toolkit(db_url, script), chunk_max_attempts=2)
+
+    assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
+    row, details = _auth_rows(db_url, lease.task_id)
+    assert row["stage"] == "failed" and details == {"reason": "auth"}
+    assert script.count("sec:" + chunk_ids[0]) == 1
+    assert [key for _, key in script.calls if key.startswith("sec:")] == ["sec:" + chunk_ids[0]]
+
+
+def test_auth_failure_with_concurrent_units_stops_dispatching(db_url, storage):
+    lease, chunk_ids = _extracting(db_url, storage)
+    script = Script()
+
+    def slow(n):                                            # 其余在途单元在鉴权失败被观察到之后才结束
+        time.sleep(0.3)
+        return None
+
+    for index in range(1, len(chunk_ids)):
+        script.hooks[_key(chunk_ids, index)] = slow
+    script.hooks[_key(chunk_ids, 0)] = lambda n: ModelAuthError(MODEL)
+
+    outcome = _run(db_url, lease, _toolkit(db_url, script), max_concurrency=3)
+
+    assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
+    assert _auth_rows(db_url, lease.task_id)[1] == {"reason": "auth"}
+    assert script.count(_key(chunk_ids, 0)) == 1
+    assert len(script.calls) == 3                           # 只有最初在途的 3 个单元，之后不再派发
+    assert _checkpoints(db_url, lease.task_id) == {}         # 鉴权终止后在途结果不写检查点

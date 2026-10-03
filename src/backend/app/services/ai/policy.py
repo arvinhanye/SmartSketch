@@ -313,11 +313,13 @@ class CallAttribution:
     task_attempt: int | None = None
     chunk_attempt: int | None = None
     is_repair: bool = False
+    #: ADR-080：personal 模式下调用归属的用户（任务所有者或提问者）；全局模式为 None
+    user_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.course_id, str) or not self.course_id:
             raise ValueError("CallAttribution: course_id is required")
-        for name in ("task_id", "chunk_id", "request_id"):
+        for name in ("task_id", "chunk_id", "request_id", "user_id"):
             value = getattr(self, name)
             if value is not None and (not isinstance(value, str) or not value):
                 raise ValueError(f"CallAttribution: {name} must be a non-empty str or None")
@@ -487,6 +489,7 @@ class ModelCallPolicy:
             model_requested=request.model,
             input_tokens_est=self._estimate(request),
             max_output_tokens=request.max_output_tokens,
+            user_id=attribution.user_id,
         )
         try:
             self._store.prewrite(record, task_budget=self.task_token_budget, daily_budget=self.daily_token_budget)

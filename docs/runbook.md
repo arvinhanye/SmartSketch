@@ -27,12 +27,14 @@ cp .env.example .env        # 然后编辑 .env，见下
 | --- | --- | --- |
 | `NEO4J_PASSWORD` | 本机自定，≥ 8 位 | 仅本机使用，不提交 |
 | `AUTH_JWT_SECRET` | ≥ 32 位随机串，如 `python3 -c 'import secrets;print(secrets.token_urlsafe(48))'` | 登录令牌签名 |
-| `LLM_MODE` / `EMBEDDING_MODE` | 演示用 `demo`；真实模型用 `live` / `online` | 见第 3 节 |
+| `LLM_MODE` / `EMBEDDING_MODE` | 演示用 `demo`；正式运行用 `personal` / `online`；服务端统一密钥用 `live` / `online` | 见第 3 节 |
 | `QA_SIMILARITY_THRESHOLD` | 演示模式用 `0.58`；真实向量保持 `0.7` | ADR-076 实测 |
 
 ## 2. 启动
 
-### 一键启动（推荐，演示模式）
+### 一键启动（演示入口 `scripts/start-demo.sh`，推荐试用）
+
+> `scripts/start-demo.sh` 是**演示入口**：不联网、不计费。正式运行（教师与学生各自填模型 API）用 `scripts/start.sh`，见下一节。
 
 ```bash
 git clone https://github.com/arvinhanye/SmartSketch.git && cd SmartSketch
@@ -45,7 +47,7 @@ scripts/start-demo.sh
 - 本次进程一律用演示模型（`LLM_MODE=demo`、`EMBEDDING_MODE=demo`、`QA_SIMILARITY_THRESHOLD=0.58`），不改 `.env`，不产生付费调用。已有 `.env` 只会在 `AUTH_JWT_SECRET` 为空或过短时补一行随机值。
 - 可重复执行：已装依赖、已建账号、已导入课程都复用（导入报告 `publish_unchanged: true`）。
 - `Ctrl+C` 停止 API、worker 与前端；Neo4j 保留运行，停止用 `scripts/dev-down.sh`。
-- 选项：`--live` 用真实大模型（见下），`--no-import` 跳过课程导入，`--no-open` 不开浏览器；`DEMO_WEB_PORT` 改前端端口。日志在 `.demo/logs/`。
+- 选项：`--live` 用真实大模型（见下）、`--personal` 进正式模式（等价于 `scripts/start.sh`，见下）、`--no-import` 跳过课程导入、`--no-open` 不开浏览器；`DEMO_WEB_PORT` 改前端端口。日志在 `.demo/logs/`。`--live` 与 `--personal` 互斥。
 - 与手动步骤一样，后端进程从 `src/backend` 启动，相对的 `SQLITE_URL`/`STORAGE_DIR` 落在 `src/backend/storage/`，与下文手动方式共用同一份数据。
 - 若 Neo4j 库此前用 `fake` 或真实向量建过，API 会因向量空间不一致拒绝启动（见第 3 节），此时换新库或运行 `scripts/reembed.py`。
 
@@ -57,10 +59,43 @@ scripts/start-demo.sh
 2. `scripts/start-demo.sh --live`。脚本启动前检查主用四项，缺一项就退出；本次进程用 `LLM_MODE=live`。
 3. 教师登录 → 课程 → 资料 → 上传 PDF/DOCX/TXT/Markdown；状态变为已完成后，到「审核」与「编辑图谱」查看草稿。
 
-- 向量：`.env` 的 `EMBEDDING_MODE` 为 `online`/`local` 时照用，否则沿用演示向量（D-02c 向量供应商未签收；DeepSeek 不提供向量接口）。沿用演示向量时与演示课程同一向量空间，不必换库，问答阈值仍用 0.58。
+- 向量：`.env` 的 `EMBEDDING_MODE` 为 `online` 时照用，否则沿用演示向量（`local` 已不支持，会被配置校验拒绝并指出 `EMBEDDING_MODE`，见第 3 节与 ADR-081）。沿用演示向量时与演示课程同一向量空间，不必换库，问答阈值仍用 0.58。
 - `--live` 不自动导入演示课程：首次导入会用真实模型抽取整套示例资料。已导入过的演示课程照常可用。
 - macOS 上未设置 `SSL_CERT_FILE` 时，脚本用 `.venv` 里的 certifi 根证书（缺时自动安装），免得 HTTPS 调模型报证书错误。
 - 每上传一份资料就会产生付费调用，受 `LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET` 限制。
+
+### 一键启动，正式模式（个人模型 API，`scripts/start.sh`）
+
+正式运行用 `scripts/start.sh`（等价于 `scripts/start-demo.sh --personal`）：**每个教师与学生登录后在网页里填自己的模型 API**（ADR-080），不由部署者统一配一份密钥；向量是系统级的在线向量，key 由部署者提供（ADR-081）。该脚本不导入演示课程，也不使用演示模型。
+
+```bash
+scripts/start.sh                 # 默认自动打开浏览器
+scripts/start.sh --no-open       # 不打开浏览器
+```
+
+启动前 `.env` 需要这些变量（缺任一则以中文原因退出，**不会静默落到演示模型或演示向量**）：
+
+| 变量 | 取值 | 说明 |
+| --- | --- | --- |
+| `EMBEDDING_MODE` | `online` | `demo`／`local` 都会被拒绝 |
+| `EMBEDDING_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 阿里云百炼兼容基址（2026-10-03 实测可用） |
+| `EMBEDDING_API_KEY` | 部署者的向量 key | 与用户的模型 key 无关，不共享给学生 |
+| `EMBEDDING_MODEL` | `text-embedding-v4` | 维度由 `EMBEDDING_DIMENSIONS`（`1024`）决定，建索引后不可换 |
+| `MODEL_CREDENTIAL_KEY` | 32 字节 URL 安全 base64 | 加密用户模型密钥的根密钥；**空着时脚本自动写入随机值** |
+
+- 脚本本次进程用 `LLM_MODE=personal`、`APP_ENV=development`，并**不读取** `LLM_BASE_URL`／`LLM_API_KEY`／`LLM_*_MODEL`。
+- `MODEL_CREDENTIAL_KEY` 为空时脚本自动写入一行随机值，并提示「更换它会使已保存的个人模型配置失效」：换掉它，已保存的用户配置与未结束任务的快照密文都解不开，用户要重新填写（ADR-080，本轮不做轮换工具）。
+- 未保存个人模型 API 的账号：上传资料与提问返回 409「需要配置模型」（`MODEL_CONFIG_REQUIRED`），**不回退**到演示或全站 key。教师与学生登录后先在「模型 API 设置」保存自己的 API。
+- 上线前用下面这条命令确认在线向量真的可用（只发 1 次请求，只打印模型、维度与耗时，不打印 key 与向量）：
+
+```bash
+.venv/bin/python scripts/check-embedding.py     # 期望：ok model=text-embedding-v4 dimensions=1024 seconds=…
+```
+
+  退出码：`0` 成功；`2` 配置非法或不是 `online`；`3` 调用失败（按错误分类排查：`auth` 看 key，`invalid_request` 看基址路径或 `dimensions`）。脚本自己读仓库根的 `.env`，不覆盖已在环境中的变量，也不需要先 `source .env`。
+
+- 与演示入口一样：`Ctrl+C` 停止 API、worker 与前端，Neo4j 保留运行；日志在 `.demo/logs/`。
+- 2026-10-03 在 macOS 冒烟通过：API `/health` 返回 `{"status":"ok","version":"0.1.0"}`、`GET /api/v1/me/model-config` 返回 `{"runtime_mode":"personal","configured":false}`、worker 日志无 `Invalid configuration`、前端返回 200（端口来自 `.env`：API 8001、前端 5174）。
 
 ### 方式 B：本机进程，手动（已测）
 
@@ -95,7 +130,10 @@ docker compose --profile app run --rm -e SEED_DEMO_PASSWORD='口令' api python 
 | --- | --- | --- | --- | --- |
 | 演示 | `demo` | `demo` | 无 | 本地验收、端到端测试、演示。规则抽取（中文定义句、标题层级、先修句式）与字符 n-gram 向量，结果确定（ADR-076） |
 | 假 | `fake` | `fake` | 无 | 单元测试；上传后抽取必失败，**不要用来验收** |
-| 真实 | `live` | `online` | 按量计费 | 正式抽取与问答；需 `LLM_*`、`EMBEDDING_*` 变量（见 `docs/integrations.md`），付费调用须负责人同意 |
+| 正式（个人模型 API） | `personal` | `online` | 用户各自的模型额度 + 部署者的向量用量 | 教师与学生各自填自己的模型 API（ADR-080）。进程内没有全站模型客户端，未配置的账号被 409 拒绝 |
+| 真实（服务端统一密钥） | `live` | `online` | 按量计费 | 部署者统一配一份 `LLM_*` 抽取与问答；需 `LLM_*`、`EMBEDDING_*` 变量（见 `docs/integrations.md`），付费调用须负责人同意 |
+
+`EMBEDDING_MODE=local` **不可用**：枚举值保留只为给出明确的拒绝，配置校验阶段即失败并指出变量名，不再留到首次调用才报错（ADR-081：本轮不实现本地向量客户端）。
 
 演示向量与假向量、真实向量属于不同向量空间：**同一个 Neo4j 库不能直接换模式**，启动时会被拒绝。换模式时用新库，或按 F14 运行 `scripts/reembed.py`。
 
@@ -151,6 +189,10 @@ scripts/restore-demo.sh --from backups/k10/<备份目录> \
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
 | 上传后状态「处理失败：抽取失败的片段过多」 | `LLM_MODE=fake` | 改 `demo` 或 `live` 后重新上传 |
+| 启动或 `scripts/start.sh` 报 `Invalid configuration: EMBEDDING_MODE`（或提示「`--personal` 需要在 .env 设 `EMBEDDING_MODE=online`」） | `.env` 写了 `EMBEDDING_MODE=local` | `local` 本轮不实现，改成 `online` 并填 `EMBEDDING_BASE_URL`／`EMBEDDING_API_KEY`／`EMBEDDING_MODEL`（ADR-081） |
+| 上传资料或提问返回 409「需要配置模型」 | `LLM_MODE=personal` 下该账号还没保存自己的模型 API | 登录后在「模型 API 设置」保存服务地址与密钥；这是设计行为，不会回退到演示模型（ADR-080） |
+| `scripts/check-embedding.py` 退出码 3，`auth` | 向量 key 无效或过期 | 换 `EMBEDDING_API_KEY`；key 属部署者，不共享给学生 |
+| `scripts/check-embedding.py` 退出码 3，`connection`／`timeout` | 本机到向量供应商的网络不通 | 确认基址可达（如 `nc -z -G 8 dashscope.aliyuncs.com 443`）；不要改地址或换供应商来绕过，先修网络路径 |
 | API 启动报向量空间不一致 | 换了 `EMBEDDING_MODE`/模型但沿用旧库 | 用新 Neo4j 库，或 `scripts/reembed.py` |
 | 资料一直「排队中」 | worker 没在运行 | 启动 `python -m app.workers`；已排队任务会被领取 |
 | 问答总是「资料未覆盖」 | 阈值与向量模式不匹配，或课程未发布 | 演示模式设 `QA_SIMILARITY_THRESHOLD=0.58`；先发布 |

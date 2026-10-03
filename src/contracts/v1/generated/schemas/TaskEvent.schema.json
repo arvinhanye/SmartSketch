@@ -55,7 +55,8 @@
         "BUDGET_EXCEEDED",
         "DOCUMENT_NOT_DELETABLE",
         "REVISION_CONFLICT",
-        "USERNAME_TAKEN"
+        "USERNAME_TAKEN",
+        "MODEL_CONFIG_REQUIRED"
       ]
     },
     "FixedStageProgress": {

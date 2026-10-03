@@ -45,8 +45,8 @@
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `LLM_MODE` | 枚举 `fake` \| `demo` \| `live` | `fake` | `fake` 不联网、按输入确定性输出、可注入故障并上报模拟 usage；`demo` 不联网，按规则从资料原文产出能被真实解析器接受的抽取/问答输出（演示与端到端验收用，模型 ID 固定为 `smartsketch-demo-rules-v1`，不读 `LLM_*_MODEL`，ADR-076）；`live` 调用主用/备用供应商 | A07 定形；`demo` 见 ADR-076 |
-| `EMBEDDING_MODE` | 枚举 `fake` \| `demo` \| `online` \| `local` | `fake` | `fake` 按输入确定性生成 `EMBEDDING_DIMENSIONS` 维向量（与语义无关）；`demo` 不联网，字符 1-gram + 2-gram 哈希词袋向量，字面重叠的问题与文本块相似度明显更高，空间为保留模型 ID `smartsketch-demo-ngram-v1`（ADR-076）；`online` 调用兼容 API；`local` 在本机 CPU 运行 | A07 定形；生产用 `online` 还是 `local` 待 D-02c；`demo` 见 ADR-076 |
+| `LLM_MODE` | 枚举 `fake` \| `demo` \| `live` \| `personal` | `fake` | `fake` 不联网、按输入确定性输出、可注入故障并上报模拟 usage；`demo` 不联网，按规则从资料原文产出能被真实解析器接受的抽取/问答输出（演示与端到端验收用，模型 ID 固定为 `smartsketch-demo-rules-v1`，不读 `LLM_*_MODEL`，ADR-076）；`live` 调用主用/备用供应商；`personal` 无全站大模型客户端，教师任务用建任务时的密钥快照、学生问答用本人配置，未配置即拒绝（`MODEL_CONFIG_REQUIRED`），不读 `LLM_*` 的地址、key 与模型名 | A07 定形；`demo` 见 ADR-076；`personal` 见 ADR-080 |
+| `EMBEDDING_MODE` | 枚举 `fake` \| `demo` \| `online` \| `local` | `fake` | `fake` 按输入确定性生成 `EMBEDDING_DIMENSIONS` 维向量（与语义无关）；`demo` 不联网，字符 1-gram + 2-gram 哈希词袋向量，字面重叠的问题与文本块相似度明显更高，空间为保留模型 ID `smartsketch-demo-ngram-v1`（ADR-076）；`online` 调用兼容 API；`local` 本版本未实现，配置校验即拒绝 | 已签收（ADR-081：正式运行用 `online`）；`demo` 见 ADR-076 |
 
 ### 主用与备用大模型（OpenAI 兼容）
 
@@ -84,15 +84,15 @@
 
 ### 向量模型
 
-与对话模型独立选型：向量维度建索引后就固定，不能跟着对话模型一起换。
+与对话模型独立选型：向量维度建索引后就固定，不能跟着对话模型一起换。`EMBEDDING_MODE=local` 不可用：枚举值保留，但配置校验阶段即拒绝并指出 `EMBEDDING_MODE`，不再留到首次调用才失败（ADR-081）。
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `EMBEDDING_BASE_URL` | URL；`EMBEDDING_MODE=online` 时必填 | 空 | 向量供应商 API 基址，可与 `LLM_BASE_URL` 不同 | 占位（D-02c） |
-| `EMBEDDING_API_KEY` | 密钥；同上 | 空 | 向量供应商密钥 | 本机填写 |
-| `EMBEDDING_MODEL` | 字符串；`online` / `local` 时必填 | 空 | `online` 为模型 ID；`local` 为模型 ID 或本机路径 | 占位（D-02c） |
-| `EMBEDDING_DIMENSIONS` | 整数 ≥ 1 | `1024` | 向量维度；`online` 调用时作为 `dimensions` 参数发送；与返回长度或 Neo4j 索引不一致即报错 | 占位（D-02c） |
-| `EMBEDDING_BATCH_SIZE` | 整数 ≥ 1 | `10` | 单次向量请求的文本条数上限，不得超过供应商限制 | 占位（D-02c） |
+| `EMBEDDING_BASE_URL` | URL；`EMBEDDING_MODE=online` 时必填 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 向量供应商 API 基址，可与 `LLM_BASE_URL` 不同 | 已签收（ADR-081）；2026-10-03 L09 实测可用 |
+| `EMBEDDING_API_KEY` | 密钥；同上 | 空 | 向量供应商密钥 | 本机填写（部署者提供） |
+| `EMBEDDING_MODEL` | 字符串；`online` 时必填 | `text-embedding-v4` | 向量模型 ID（`local` 已不支持，见上） | 已签收（ADR-081） |
+| `EMBEDDING_DIMENSIONS` | 整数 ≥ 1 | `1024` | 向量维度；`online` 调用时作为 `dimensions` 参数发送；与返回长度或 Neo4j 索引不一致即报错 | 已签收（ADR-081） |
+| `EMBEDDING_BATCH_SIZE` | 整数 ≥ 1 | `10` | 单次向量请求的文本条数上限，不得超过供应商限制 | 已签收（ADR-081） |
 
 ### 任务处理（只登记，不改语义）
 
@@ -129,6 +129,8 @@
 | --- | --- | --- | --- | --- |
 | `AUTH_JWT_SECRET` | 密钥；UTF-8 编码后 ≥ 32 字节，不得全为空白 | 空 | 访问令牌 HS256 签名密钥。缺失或过短时 API 拒绝启动，不回退默认密钥；错误信息只含变量名。本机用 `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` 生成 | 本机填写 |
 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 整数 ≥ 1 | `28800` | 访问令牌有效期（秒），即 `LoginResponse.expires_in` 与 `exp - iat`；无刷新令牌 | 已签收（ADR-013） |
+| `MODEL_CREDENTIAL_KEY` | 密钥；32 字节的 URL 安全 base64（可省略填充） | 空 | 个人模型凭据的 AES-256-GCM 根密钥；`LLM_MODE=personal` 时必填，缺失或非法拒绝启动；更换会使已保存的个人配置与未结束任务的快照无法解密 | 已签收（ADR-080） |
+| `MODEL_ENDPOINT_ALLOW_PRIVATE` | 布尔；空串等同未设置 | 不设 | 仅测试：放行回环/内网的个人模型地址与 `http`，供本机假供应商端到端测试；`APP_ENV=production` 下为真即拒绝启动 | 已签收（ADR-080） |
 | `SEED_DEMO_PASSWORD` | 密钥；仅种子脚本读取 | 不设（`.env.example` 中为注释行） | 演示账号口令；未设置时种子脚本非 0 退出，不回退仓库内默认口令。由 C14 的 `scripts/seed-demo-accounts.py` 读取；不是 API 设置，因此不进 `Settings` | 本机填写 |
 
 ### 文档解析依赖（D02～D05）
@@ -234,8 +236,8 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 ### 启动校验（B06）
 
 - 类型或范围不合法时拒绝启动并指出变量名，不静默回落默认值（与 `specs/task-processing.md` §8.8 一致）。
-- 条件必填：`LLM_MODE=live` 时主用四项必填；备用四项全空或全填；`EMBEDDING_MODE=online` 时 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 必填，`local` 时 `EMBEDDING_MODEL` 必填。
-- `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake` 或 `demo`（ADR-076）。
+- 条件必填：`LLM_MODE=live` 时主用四项必填；备用四项全空或全填；`EMBEDDING_MODE=online` 时 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 必填；`EMBEDDING_MODE=local` 一律拒绝（ADR-081）；`LLM_MODE=personal` 或已设置 `MODEL_CREDENTIAL_KEY` 时，它必须是 32 字节的 URL 安全 base64（ADR-080）。
+- `APP_ENV=production` 时 `LLM_MODE`、`EMBEDDING_MODE` 均不得为 `fake` 或 `demo`（ADR-076），`MODEL_ENDPOINT_ALLOW_PRIVATE` 不得为真（ADR-080）。
 - 演示模式（`demo`）的相似度阈值：`QA_SIMILARITY_THRESHOLD` 缺省值 0.7 针对真实向量，演示向量的余弦分布不同，建议演示时设为 `0.58`（ADR-076 实测：覆盖问题 0.63～0.67，无关问题 ≤ 0.54）；这是环境变量取值建议，代码不按模式改阈值、不绕过闸门。
 - `STORAGE_DIR` 不得为空或全空白；启动校验不创建目录也不检查可写，目录由 `FileStorage` 首次构造时创建（C05）。
 - `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 必须小于 `LLM_CHAT_TIMEOUT_SECONDS`。
@@ -251,7 +253,7 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 | --- | --- | --- | --- | --- |
 | D-02a | 主用供应商与 `LLM_EXTRACTION_MODEL`、`LLM_CHAT_MODEL`；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：DeepSeek 为主。ArvinHan 2026-09-26 定为 DeepSeek V4.1 Flash。模型 ID `deepseek-flash`、基址 `https://api.deepseek.com` 取自第三方资料（2026-09-26 检索；官方文档站在本环境被网络策略拦截，未直接核对）；资料称 `deepseek-flash` 随版本更新指向最新 Flash，旧 ID `deepseek-v4-flash` 暂时兼容转到 V4.1 | `https://api.deepseek.com`、`deepseek-flash` | **已签收（ADR-027）**；2026-09-26 本机 `GET /models` 返回 `deepseek-flash`、`deepseek-v4-pro`，模型 ID 已确认；usage（含流式）待首次抽取运行确认。E03 补注（ADR-017 决定 3）：输出上限字段默认 `max_tokens`，可切换为 `max_completion_tokens`（`CompatibleModelClient` 构造参数 `max_tokens_field`）；流式 usage、`finish_reason` 超出 `stop`/`length` 的取值、缺 `[DONE]` 的处理，待拿到密钥后用手工冒烟脚本（不进 CI）对主用候选测普通与流式请求各一次，结果填在此处（实测：待填）；缺 usage 按 ADR-011 修订 3 回退估算 |
 | D-02b | 备用供应商与模型；注明响应（含流式）是否返回 usage（ADR-011 修订 3） | S2 §6.1：通义千问备用。模型 ID 未核对 | 空 | 未签收。E03 补注（ADR-017 决定 3）：输出上限字段默认 `max_tokens`，可切换为 `max_completion_tokens`（`CompatibleModelClient` 构造参数 `max_tokens_field`）；流式 usage、`finish_reason` 超出 `stop`/`length` 的取值、缺 `[DONE]` 的处理，待拿到密钥后用手工冒烟脚本（不进 CI）对备用候选测普通与流式请求各一次，结果填在此处（实测：待填）；缺 usage 按 ADR-011 修订 3 回退估算 |
-| D-02c | 向量方案（`online` / `local`）、模型、维度、批量 | 在线 `text-embedding-v4`：维度可选 2048 / 1536 / 1024（默认）/ 768 / 512 / 256 / 128 / 64，每请求至多 10 条、每条至多 8192 token，OpenAI 兼容接口支持 `dimensions`（阿里云百炼向量化文档，2026-09-23 核对）。本地 `bge-small-zh-v1.5`：512 维、最大序列 512 token（模型 `config.json`，2026-09-23 核对），**S2 的约 1500 字分块会超长被截断**，选本地方案须先定截断或另行分块 | `fake`、`1024`、`10` | 未签收 |
+| D-02c | 向量方案（`online` / `local`）、模型、维度、批量 | 在线 `text-embedding-v4`：维度可选 2048 / 1536 / 1024（默认）/ 768 / 512 / 256 / 128 / 64，每请求至多 10 条、每条至多 8192 token，OpenAI 兼容接口支持 `dimensions`（阿里云百炼向量化文档，2026-09-23 核对）。本地 `bge-small-zh-v1.5`：512 维、最大序列 512 token（模型 `config.json`，2026-09-23 核对），**S2 的约 1500 字分块会超长被截断**，选本地方案须先定截断或另行分块 | `fake`、`1024`、`10` | 已签收（ADR-081）：`online`、`text-embedding-v4`、`1024`、`10`；`local` 不支持。**2026-10-03 L09 实测联调通过**：基址 `https://dashscope.aliyuncs.com/compatible-mode/v1`，`scripts/check-embedding.py` → `ok model=text-embedding-v4 dimensions=1024 seconds=0.66`（exit 0） |
 | D-02d | `LLM_TASK_TOKEN_BUDGET`、`LLM_DAILY_TOKEN_BUDGET` | S2 表 5.2（估算，以实测为准）：单章约 0.35 元、单门课约 4.2 元、千人一学期问答约 2080 元（约 19 元/天）；价格未在本任务核对 | `500000`（按输出单价上限约 4 元/任务）、`5000000` | **已签收（ADR-028，ArvinHan 2026-09-26，按占位值）**；抽取评测（K02）与抽取消融（K13，ADR-045）的付费调用已确认 |
 | D-02e | 超时、并发、重试、熔断取值 | S2 表 6.7：单章 14 块并发 8 路约 20～25 秒；表 3.1：问答首字 ≤ 3 秒、完整 ≤ 10 秒（目标值）、赛题 ≤ 15 秒。样例下单次调用上界约 6 分钟，远大于正常耗时 | 见「调用约束」 | 未签收 |
 | D-02f | 新错误码 `BUDGET_EXCEEDED` | — | 已纳入 `ErrorCode`；同步请求 HTTP 429 | B08 已完成 |

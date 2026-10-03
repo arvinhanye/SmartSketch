@@ -1,5 +1,100 @@
 # 任务看板
 
+## 2026-10-02 Claude 认领：A10 一周参赛冲刺设计
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| L00 | DONE（规格与计划 A 已获用户确认，2026-10-02；本会话内逐任务执行） | Claude（协调） | `docs/superpowers/specs/2026-10-02-contest-sprint-design.md`、本节、`docs/handoffs/claude-l00-sprint-design.md` | 精简设计规格覆盖两条闭环、个人模型凭据与任务绑定、问答隔离、向量方案、性能测量、原子任务候选 L01–L19 与待用户决定事项；用户批准后再写实施计划 |
+
+- 输入：Codex 交接 prompt 与两份审查（仅在 Codex 工作区 `/Users/arvinhan/.codex/worktrees/e92f/SmartSketch`，未提交，按绝对路径引用，不复制）；用户确认只做学生提问与 AI 回答、不做自动出题。输出：设计规格与交接。
+- 依赖：基线 `6ff8a8d`；现有规格、契约与源码只读核验。风险：赛题 DOCX 原文未独立复核；Codex 对本文件有未提交改动，后续合并时两段都保留；规格中的接口、迁移、规则调整均未签收。
+- 验证命令：`./scripts/verify.sh`、`git status --short`、`git diff --check`。无模型调用、依赖安装、数据写入、契约或迁移变更。
+- 验收证据：`./scripts/verify.sh` exit 0（基础档，系统 Python）；`full` / `integration` 未跑。交接 `docs/handoffs/claude-l00-sprint-design.md`。
+- 已决（ArvinHan，2026-10-02）：在线向量 `text-embedding-v4`；DeepSeek `deepseek-flash`，预算 30 元（累计计费 token ≤ 500 万）；两门课自编；同意规则调整与新增 `cryptography`。工作区 `.env` 已生成（未跟踪），两个供应商 key 待用户填写。
+- 计划 A：`docs/superpowers/plans/2026-10-02-contest-sprint-a-personal-model-api.md`，用户确认在本会话内逐任务执行；L01–L10 的认领见下一节。
+
+## 2026-10-02 Claude 认领：冲刺计划 A（个人模型 API 与真实运行路径）
+
+计划：`docs/superpowers/plans/2026-10-02-contest-sprint-a-personal-model-api.md`；规格：`docs/superpowers/specs/2026-10-02-contest-sprint-design.md`。每项的输入、输出、风险与验证命令见计划对应 Task；验收证据写入 `docs/handoffs/claude-l<nn>.md`。
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| L01 | DONE | Claude | 隔离环境：`.venv`（Python 3.11.9）、`npm ci`、独立 Neo4j（7688/7475）；三档门禁基线；不改业务文件 | basic exit 0；full exit 0（后端 3559 通过/27 跳过，前端 772 通过）；integration exit 1，仅因本机未装 Playwright 浏览器，改用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向 Chrome 后两条端到端通过。另发现北京地域向量服务在本机网络不可达。交接 `docs/handoffs/claude-l01.md` |
+| L02 | DONE | Claude（抽取）；DeepSeek harness（2026-10-03 发布与问答补测） | `evaluation/measure_web_flow.py`、基线报告 `evaluation/reports/l02-baseline-2026-10.md` | 抽取实测 141.72 秒（目标 60 秒，未达标），82 个知识点、4 种关系，计费 101054 token。**发布与问答已补测（2026-10-03，向量网络恢复后）**：发布 HTTP 200 / 21.17 秒 / v1（82 知识点、73 关系、无排除项）；五题中 3 题 `answered`、第 5 题按预期 `not_covered`；完整耗时 p50 5.13 秒、最大 6.12 秒（≤15 秒与 ≤10 秒均达标），首字 5.88/4.70/2.07 秒（S2 的 ≤3 秒目标 3 题中 2 题未达标）；**第 3 题「栈和队列有什么区别？」被整篇撤回**（`all_citations_invalidated` / `no_markers`，输出撞 `ANSWER_MAX_OUTPUT_TOKENS=1024` 上限被截断，`truncated=1`），资料实际覆盖该问题，可确定性复现，**缺陷按本轮边界未修**；发布期向量调用未写入 `model_calls`（记账缺口）。本次计费 16101 token。交接 `docs/handoffs/claude-l02.md`、`docs/handoffs/deepseek-plan-a-verification.md` |
+| L03 | DONE | Claude | ADR-080/081、`AGENTS.md` §4/§6、`docs/`、`src/contracts/`、生成物；前端三处错误码清单同步 | 契约门禁 exit 0；前端类型检查与 772 用例通过；后端 3561 通过/27 跳过；交接 `docs/handoffs/claude-l03.md` |
+| L04 | DONE | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py`、`cryptography==50.0.2` | 11 个新用例；后端 3572 通过/27 跳过；交接 `docs/handoffs/claude-l04.md` |
+| L05 | DONE | Claude | `services/ai/outbound.py`；顺带修复 `_StdlibResponse.read` 在服务端关闭连接时误报连接错误 | 32 个新用例与既有客户端用例通过；交接 `docs/handoffs/claude-l05.md` |
+| L06 | DONE | Claude | `services/model_configs.py`、`api/model_config.py`、`main.py` | 20 个新用例；后端 3623 通过/27 跳过；真实 DeepSeek 测试连接成功、无效密钥识别为 auth；交接 `docs/handoffs/claude-l06.md` |
+| L07 | DONE | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
+| L08 | DONE | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 9 个新用例；后端 3645 通过/27 跳过；交接 `docs/handoffs/claude-l08.md` |
+| L09 | DONE | DeepSeek harness | 在线向量联调、`local` 明确拒绝、`scripts/start.sh`；用户 2026-10-03 选向量方案第 1 种（恢复到北京地域接口的网络路径，地址不变） | 真实向量实测可用：`check-embedding.py` → `ok model=text-embedding-v4 dimensions=1024 seconds=0.66`（exit 0）。正式入口不静默切 demo：`EMBEDDING_MODE=demo`/`local` 时 `start.sh` 均 exit 1；冒烟 `GET /api/v1/me/model-config` → `{"runtime_mode":"personal","configured":false}`、`/health` ok、worker 无 `Invalid configuration`。后端+tooling 3648 通过/27 跳过/0 失败；`verify.sh` exit 0。交接 `docs/handoffs/deepseek-l09.md` |
+| L10 | DONE | Claude（代码）；DeepSeek harness（2026-10-03 真实页面走查） | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过。**真实页面走查六步全部符合设计**（由 DeepSeek harness 用真实 Chromium 驱动，personal 模式）：侧栏「模型 API 设置」带「未配置」标记、资料页引导且上传禁用；测试连接成功（585 毫秒）、保存后显示「已配置：deepseek-flash · 密钥 ••••+末 4 位」（末 4 位见截图中脱敏显示，不写入本文档）、刷新后仍脱敏且密钥框为空；`localStorage`/`sessionStorage` 无密钥（仅登录令牌）、6 次 `GET /me/model-config` 与 `PUT` 响应均不含密钥；上传 1002 字节文件推进到待审核；学生保存配置后提问得到带引用的回答；教师清除配置后再上传被拒（HTTP 409 `MODEL_CONFIG_REQUIRED`）并显示引导。截图 `.demo/v2/`（Git 忽略）。交接 `docs/handoffs/claude-l10.md`、`docs/handoffs/deepseek-plan-a-verification.md` |
+
+- 2026-10-03 Claude 复核 L09（`ea9484c`）：通过，记录 `docs/reviews/claude-deepseek-l09-2026-10-03.md`。**未决风险**：问答准备阶段的查询向量调用不受 15 秒链路截止约束，向量服务不可达时一次提问可能挂数分钟（`services/qa/chat.py:115`）；建议在计划 B（L15）或计划 C（L16）单独认领修复。本机到北京地域向量接口的网络时通时断，L02 问答补测与 L10 走查需网络稳定后进行。
+
+### V3：业务改动后的完整门禁与端到端（2026-10-03，DeepSeek harness）
+
+**通过，退出码 0，无失败项。** 命令与证据：
+
+```bash
+PYTHON=.venv/bin/python PATH="$PWD/.venv/bin:$PATH" \
+PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  ./scripts/verify.sh integration > .demo/logs/verify-integration-planA.log 2>&1   # → exit 0
+```
+
+| 档位 | 结果 |
+| --- | --- |
+| 基础档 | 钩子回归通过；`PASS contracts`（32 路径 / 129 schema / 385 `$ref`）；B14 生成与漂移回归、25 项门禁负向测试；B08/B09/B10/B12/B13 契约回归全通过 |
+| 后端全量 | 3648 passed、27 skipped → `PASS` |
+| 前端全量 | 26 文件 782 passed → `PASS` |
+| 集成用例 | 392 passed、4 skipped → `PASS` |
+| 图库后端用例 | 44 passed → `PASS` |
+| 端到端 | 2 passed（学生主线 52.5 秒、教师主线 1.2 分钟）→ `✓ 端到端通过` |
+
+这是 PR #317 中 L03–L10 业务改动之后的首次完整门禁（此前的端到端证据只来自 L01、业务改动之前）。端到端用演示模型，**不产生费用**。log 与端到端目录：`.demo/logs/verify-integration-planA.log`、`.e2e/20261003-030121/`。两项环境前提：契约门禁硬编码 `python3` 需把 `.venv/bin` 前置到 `PATH`；`tests/tooling/test_k07.py` 的 4 个交互式用例需要更宽的沙箱权限才能分配 PTY（详见 `docs/handoffs/deepseek-l09.md`「环境与沙箱」）。
+
+- 2026-10-03 Claude 复核计划 A 未完成项检查（`92aa8bc`）：通过，记录 `docs/reviews/claude-deepseek-plan-a-verification-2026-10-03.md`。计划 A（L00–L10）完成。**遗留缺陷（未修，待认领）**：D1（高）答案超过 1024 输出 token 被截断后整篇撤回并误报 `not_covered`，违反「资料未覆盖与服务故障分开显示」；D2（低）发布时向量调用不写 `model_calls`；D3（中）问答查询向量调用不受 15 秒截止约束。另：抽取 141.72 秒未达 60 秒目标。
+
+## 2026-10-03 Claude 认领：计划 A 审查修复（D1–D3、N01–N08）
+
+依据：Codex 审查 `/Users/arvinhan/.codex/worktrees/e92f/SmartSketch/docs/reviews/codex-claude-plan-a-2026-10-03.md` 与修复 prompt `/Users/arvinhan/.codex/worktrees/e92f/SmartSketch/docs/handoffs/codex-claude-plan-a-fix-prompt-2026-10-03.md`（均在 Codex 检出、未合并，按绝对路径引用）。审查对象 `6ff8a8d → e86f4b9`；开工时冲刺工作区 HEAD 仍为 `e86f4b9`、工作树干净。会话工具不允许写其他工作树，本轮在工作树 `/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`（分支 `claude/smartsketch-plan-a-fixes-e70a34`，从 `e86f4b9` 快进）实施，可快进合回冲刺分支。编号沿用审查的 D1–D3、N01–N08，不覆盖旧 R 编号。交接：`docs/handoffs/claude-plan-a-review-fixes-2026-10-03.md`。
+
+| ID | 级别 | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| N01 | P1 | DONE（待复审） | Claude | 迁移 016 配置 `revision`、`repositories/model_configs.py`、`services/qa/user_models.py`、ADR-082 决定 1 | 清除→重建（中间无提问）后下一次出站用 B；两用户互不影响；旧任务仍用创建时快照，清除仍撤销。`tests/backend/test_n01_n06.py`：red 8 failed/2 passed（出站仍为 A 地址；旧成功落到 B）→ green；连同 L04/L06/L07/L08/C 组 432 passed |
+| N06 | P2 | DONE（待复审） | Claude | `services/model_configs.py`、`repositories/model_configs.py` | 测试结果只按被测 `revision` 条件落库；保存更换、清除重建、乱序完成均不污染新配置。同上测试文件（阻塞传输 + 乱序门控）red → green |
+| D1 | P1 | DONE（待复审） | Claude | `services/qa/citations.py`、`chat.py`、契约 `ChatLlmUnavailableReason += truncated`、`specs/grounded-qa.md` O6/QA-16、前端 `chatStream.ts`/`useChat.ts`、ADR-082 决定 2 | 截断不再判 `not_covered`；无效出处的截断回答不当成功；真实无资料仍 `not_covered`。`tests/backend/test_d1.py` red 5 failed/7 passed → green 12；`tests/frontend/d1-d3.test.ts` red 3 → green；J06 截断用例按决定 2 改断言；basic 门禁 exit 0 |
+| D3 | P1 | DONE（待复审） | Claude | `services/qa/chat.py`、`services/ai/embeddings.py`、`client.py`（`EmbeddingRequest.timeout_seconds`）、`compatible.py`（`exchange` 总预算 + 看门狗）、`outbound.py`、`repositories/neo4j.py`（`read_deadline`）、ADR-082 决定 3 | 同一单调截止贯穿改写/向量/检索/生成；连接、读取、多地址、重试用剩余预算；超时为 `LLM_UNAVAILABLE`/`timeout`。`tests/backend/test_d3.py`（假解析/假连接/回环桩：解析挂起、多地址累计、静默与慢速逐字节响应头、向量批次共用预算、缓存命中、改写耗尽、两种传输与日志）：red 14 failed/4 passed（接口先行后）→ green 18；连同 L05/E03 传输用例通过 |
+| N02 | P2 | DONE（待复审） | Claude | `workers/extract_task.py`、前端 `useMaterials.ts` 任务失败按凭据原因提示、ADR-082 决定 4 | 实体/关系首次 401/403 不重试、任务 `failed`/`LLM_UNAVAILABLE`/`auth`、不进 merging、停止派发。`tests/backend/test_e12.py` N02 段 red 5 failed（任务进入 merging、chunks_failed=1）→ green（E12+L07 55 passed）；`tests/frontend/h02.test.ts` 凭据原因提示 red 4 → green 85 |
+| N03 | P2 | DONE（待复审） | Claude | `App.vue`（按会话令牌监听、中止旧读取）、`stores/runtime.ts`（owner + 代际：`commitRead`/`commitWrite`）、`useModelConfig.ts` | 同角色换号、退出重登、初始读取晚于保存/清除，旧响应均不改当前账号 UI。`tests/frontend/n03-n05.test.ts` N03 段 red → green |
+| N04 | P2 | DONE（待复审） | Claude | `useModelConfig.ts`（单一 `busy` 互斥、卸载丢弃）、`ModelSettingsView.vue`（四个按钮按 `busy` 禁用） | 保存/测试/清除互斥（逻辑与按钮），错误后释放，卸载中止，乱序结果不回写。同上测试文件 N04 段 red → green |
+| N05 | P2 | DONE（待复审） | Claude | `useModelConfig.ts` | 仅地址与模型都未改且密钥留空时测试已存配置；其余要求先保存或填完整凭据，并标明测试对象（「已保存的配置」/「表单中的配置（尚未保存）」；测试期间改表单则结果作废）。同上测试文件 N05 段 red → green |
+| §3.7 | 既有缺口 | DONE（待复审） | Claude | `ChatView.vue`、`useChat.ts`、`specs/grounded-qa.md` Q6.5 | 发送期间按钮、Enter、逻辑入口都不再提交；显式「停止」后可再发。`tests/frontend/chat-send-lock.test.ts` red → green；前端全量 811 中 810 通过，唯一失败为 B02 嵌套 vitest 在满载下超时 5 s，单独重跑 5/5 通过；type-check exit 0 |
+| N07 | P2 | DONE（待复审） | Claude | `services/model_configs.py`（`run_test` 开头统一检查存储）、ADR-082 决定 5 | 存储未启用时 `/test` 任何分支在 DNS/传输前返回 503 `credential_store_disabled`。`tests/backend/test_n07_n08.py`（demo/fake × 完整/空请求体、残留配置；启用时仍可测）red → green |
+| N08 | P2 | DONE（待复审） | Claude | `services/model_configs.py`（共享 `normalize_model`）、`api/model_config.py`、契约 `model` 说明（已重生成） | 空白模型名 PUT 与 /test 均 422 `VALIDATION_ERROR`（`model`/`blank`），不写库不出站。同上测试文件（空格/制表符/换行，新建、保留密钥修改、测试三入口）red 20 failed/2 passed（含 N07）→ green 22；连同 L06 42 passed |
+| D2 | P2 | DONE（待复审） | Claude | `services/ai/embeddings.py`（可选调用存储 + `embedding_calls` 归属）、`services/ai/factory.py`（`build_embedding_adapter`，仅 online 记账）、`api/versions.py`、`api/chat.py`、`services/versions/publish.py`、`services/qa/chat.py`、ADR-082 决定 6 | 发布与查询的每次实际向量出站先预写、再回写；缓存命中/回滚复制不记；不计入个人日预算。`tests/backend/test_d2.py` red 9 failed/1 passed（接口先行后）→ green 10；`tests/integration/test_d2_publish.py`（发布、未变重复发布、回滚）在 integration 档通过 |
+
+- 输入：上述审查与 prompt、已签收冲刺规格与 ADR-080/081、计划 A 代码（`e86f4b9`）。输出：修复代码、仓库回归（先红后绿）、必要的规格/ADR/契约更新、交接。
+- 依赖：顺序 N01+N06 → D1+D3 → N02 → N03–N05 与 §3.7 → N07–N08 → D2。共享边界（配置身份、错误闭集、记账归属）先写 ADR-082 再写代码。
+- 风险：迁移 016 改已有库（新增可空列 + 回填，附回滚）；D1/D3 改问答终态与错误闭集，需契约、DTO、前端提示同步；D3 涉及出站传输，不可放松地址防护与 TLS 校验。
+- 验证命令：每组最小相关测试（`PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/<file> -q`、`npm run test -- --run <file>`）；最终 `./scripts/verify.sh`、`full`、`integration`（仅一次性 Neo4j）、`git diff --check`。不调用真实模型、不动真实课程库。
+- 2026-10-03 全部 11 项及 §3.7 已修并提交（`0745ea6` `cc26d4c` `8e539a8` `a787b0b` `45dd86e` `f580b74` `29a10f6` `959331e`），ready_for_review。**门禁（代码 HEAD `959331e`）**：`./scripts/verify.sh integration` 中基础档 PASS；后端 full 3725 passed / 27 skipped（已登记）PASS；前端 full 29 文件 811 passed、type-check 与 build 通过；集成用例 393 passed / 4 skipped（已登记）PASS；图库后端用例 44 passed PASS；端到端首次因本工作树缺根目录 `@playwright/test` 失败（环境原因），补齐依赖后单独运行 `scripts/e2e.sh` 2 passed（演示模型，无费用）。同一次 `verify.sh integration` 未整体 exit 0，端到端为补跑。`git diff --check e86f4b9 HEAD` exit 0。未决：D1 的输出上限是否提高或增加有限重试，需人工按 15 秒与费用实测决定。详见交接。
+- 计划 B/C（L11–L19）不在本节范围。
+
+## 2026-10-03 Claude 规划：冲刺计划 B（L11–L15 功能闭环）——规划待确认
+
+计划：`docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md`；交接 `docs/handoffs/claude-plan-b-planning.md`。基线 `d766f40`（计划 A 审查修复版本，代码 HEAD `959331e`）。用户确认前不实施。
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| L11 | 规划待确认 | Claude | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量（需预算确认） | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告分列 |
+| L12 | 规划待确认 | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-083）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
+| L13 | 规划待确认 | Claude | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
+| L14 | 规划待确认 | Claude | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
+| L15 | 规划待确认 | Claude | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15_isolation.py`；`verify.sh integration` 与 D/N 回归 |
+
+- 未决（待用户）：是否批准执行；是否批准约 30～53 万 token 的真实调用；问答输出上限是否在 L16 前调整；第二门课主题（默认「操作系统 第 2 章 进程与线程」）。
+
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
 | ID | 状态 | 负责人 | 范围 | 验收 |

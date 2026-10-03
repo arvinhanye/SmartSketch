@@ -21,11 +21,13 @@ from app.api.dependencies import course_teacher
 from app.schemas.errors import Error
 from app.schemas.materials import Document, DocumentNotDeletableDetails, UploadAccepted, UploadPolicy
 from app.services.access import CourseAccess, not_found
+from app.services.credentials import ModelConfigRequired
 from app.services.file_storage import FileStorageError, FileTooLargeError, iter_file
 from app.services.materials import (
     MaterialNotDeletable,
     delete_course_material,
     list_course_materials,
+    model_config_ready,
     upload_material,
 )
 
@@ -122,6 +124,7 @@ def list_documents(
     responses={
         **_ACCESS_RESPONSES,
         413: {"model": Error, "description": "文件超出上限（`FILE_TOO_LARGE`）"},
+        409: {"model": Error, "description": "未配置个人模型 API（`MODEL_CONFIG_REQUIRED`，ADR-080）"},
         415: {"model": Error, "description": "不支持的资料格式（`UNSUPPORTED_FORMAT`）"},
         422: {"model": Error, "description": "请求体校验失败（`VALIDATION_ERROR`）"},
         503: {"model": Error, "description": "资料存储暂不可用（`STORAGE_UNAVAILABLE`）"},
@@ -132,6 +135,8 @@ async def upload_document(
     access: CourseAccess = Depends(course_teacher),
 ) -> UploadAccepted | JSONResponse:
     settings = request.app.state.settings
+    if not await run_in_threadpool(model_config_ready, settings, access.user.id):
+        return _model_config_required()
     try:
         form = await _read_bounded_form(request, settings.UPLOAD_MAX_BYTES)
     except _BodyTooLarge:
@@ -147,7 +152,10 @@ async def upload_document(
             filename=file.filename,
             content_type=file.content_type,
             chunks=iter_file(file.file),
+            uploaded_by=access.user.id,
         )
+    except ModelConfigRequired:
+        return _model_config_required()
     except FileStorageError as error:
         return _storage_error(error)
     finally:
@@ -188,6 +196,11 @@ def delete_document(
 
 class _BodyTooLarge(Exception):
     """请求体超过 ``UPLOAD_MAX_BYTES`` + 表单开销；路由转为 413 ``FILE_TOO_LARGE``。"""
+
+
+def _model_config_required() -> JSONResponse:
+    body = Error(code="MODEL_CONFIG_REQUIRED", message="请先在「模型 API 设置」中保存你的模型 API 配置")
+    return JSONResponse(status_code=409, content=body.model_dump(exclude_none=True))
 
 
 def _invalid_body(field: str, reason: str) -> RequestValidationError:

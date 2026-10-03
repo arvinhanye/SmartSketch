@@ -86,7 +86,8 @@ def test_invalid_ranges_name_the_variable(name, value):
         ({"LLM_MODE": "live"}, "LLM_BASE_URL"),
         ({"LLM_FALLBACK_API_KEY": "backup-key"}, "LLM_FALLBACK_BASE_URL"),
         ({"EMBEDDING_MODE": "online"}, "EMBEDDING_API_KEY"),
-        ({"EMBEDDING_MODE": "local"}, "EMBEDDING_MODEL"),
+        # ADR-081：local 枚举值保留，但配置校验阶段即拒绝，并指出 EMBEDDING_MODE（而不是等首次调用才失败）
+        ({"EMBEDDING_MODE": "local"}, "EMBEDDING_MODE"),
         ({"APP_ENV": "production"}, "LLM_MODE"),
         ({"LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS": "15"}, "LLM_CHAT_TIMEOUT_SECONDS"),
         ({"WEB_ORIGIN": "not-a-url"}, "WEB_ORIGIN"),
@@ -128,20 +129,22 @@ def test_complete_live_configuration_is_typed_and_redacted():
     assert "private-embedding-key" not in repr(settings)
 
 
-def test_complete_fallback_and_local_embedding_are_accepted():
+def test_complete_fallback_and_online_embedding_are_accepted():
     settings = load_settings(
         {
             "LLM_FALLBACK_BASE_URL": "https://backup.example/v1",
             "LLM_FALLBACK_API_KEY": "backup-key",
             "LLM_FALLBACK_EXTRACTION_MODEL": "backup-extract",
             "LLM_FALLBACK_CHAT_MODEL": "backup-chat",
-            "EMBEDDING_MODE": "local",
-            "EMBEDDING_MODEL": "local-embedding-v1",
+            "EMBEDDING_MODE": "online",
+            "EMBEDDING_BASE_URL": "https://embedding.example/v1",
+            "EMBEDDING_API_KEY": "embedding-key",
+            "EMBEDDING_MODEL": "embedding-v1",
         }
     )
 
     assert settings.LLM_FALLBACK_API_KEY.get_secret_value() == "backup-key"
-    assert settings.EMBEDDING_MODE == "local"
+    assert settings.EMBEDDING_MODE == "online"
 
 
 def test_errors_and_logs_never_include_secret_values(caplog):
@@ -228,15 +231,18 @@ def test_listener_uses_configured_host_and_port(monkeypatch):
 def test_worker_can_reuse_space_gate_and_model_changes_fail(tmp_path):
     sqlite_url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
     migrate(sqlite_url)   # REVIEW-C01-R03：建表归迁移
+    # 空间标识与向量模式无关（`online`/`local` 同为 `(模型, 维度, 0)`），换 `online` 不改本用例语义
     validate_embedding_space(
         load_settings(
-            {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "local", "EMBEDDING_MODEL": "model-a"}
+            {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "online", "EMBEDDING_MODEL": "model-a",
+             "EMBEDDING_BASE_URL": "https://embedding.example/v1", "EMBEDDING_API_KEY": "embedding-key"}
         )
     )
     with pytest.raises(SettingsError, match="model-a.*model-b.*重新向量化"):
         validate_embedding_space(
             load_settings(
-                {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "local", "EMBEDDING_MODEL": "model-b"}
+                {"SQLITE_URL": sqlite_url, "EMBEDDING_MODE": "online", "EMBEDDING_MODEL": "model-b",
+                 "EMBEDDING_BASE_URL": "https://embedding.example/v1", "EMBEDDING_API_KEY": "embedding-key"}
             )
         )
 

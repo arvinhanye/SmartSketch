@@ -4,7 +4,11 @@ import { RouterLink, useRoute } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
 import { MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from '../api/materials'
 import { MATERIAL_ACCEPT, SUPPORTED_FORMATS_TEXT, useMaterials } from '../composables/useMaterials'
-import { COURSE_ROUTE, MATERIALS_ROUTE } from '../router'
+import { COURSE_ROUTE, MATERIALS_ROUTE, SETTINGS_ROUTE } from '../router'
+import { useRuntimeStore } from '../stores/runtime'
+
+// L10（ADR-080）：personal 模式下未配置个人模型 API 时引导到设置页并禁用上传
+const runtime = useRuntimeStore()
 
 const materialsApi = inject(MATERIALS_API_KEY, null)
 if (materialsApi === null) throw new Error('MaterialsView 需要注入 MATERIALS_API_KEY')
@@ -68,6 +72,10 @@ function onFileChange(event: Event): void {
     </div>
 
     <template v-else>
+      <p v-if="runtime.needsConfig" class="model-required" data-test="model-config-required" role="alert">
+        上传前需要先配置你的模型 API，图谱生成会使用你自己的模型。
+        <RouterLink :to="{ name: SETTINGS_ROUTE }" data-test="model-config-link">去设置</RouterLink>
+      </p>
       <form
         class="upload"
         data-test="material-upload-form"
@@ -100,7 +108,7 @@ function onFileChange(event: Event): void {
             </p>
           </div>
           <div class="actions">
-            <button type="submit" data-test="upload-submit" :disabled="uploading">
+            <button type="submit" data-test="upload-submit" :disabled="uploading || runtime.needsConfig">
               {{ uploading ? '上传中…' : selectedName ? `上传「${selectedName}」` : '上传' }}
             </button>
             <button v-if="canRetryUpload" type="button" data-test="upload-retry" @click="retryUpload">重试上传</button>

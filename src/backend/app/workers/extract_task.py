@@ -14,7 +14,9 @@ E04/E05/E06/E11 交接的调用约定）。
    - 其余模型调用错误（L1 已在 E04 内做完）→ 同上，失败码 ``LLM_UNAVAILABLE``；
    - ``BudgetExceededError`` → 块立即失败 ``BUDGET_EXCEEDED``，不再重试（预算不会自己恢复）；
    - ``ModelUnavailableError``（熔断打开）→ 当前块**不记失败**，停止派发，阶段级临时故障主动释放（LEASE-6）；
-   - ``CallRecordError`` → 存储不可用，同样主动释放。
+   - ``CallRecordError`` → 存储不可用，同样主动释放；
+   - ``ModelAuthError``（供应商 401/403）→ 不重试，停止派发，任务 ``LLM_UNAVAILABLE`` + ``reason = auth``
+     终止（块与小节阶段相同，ADR-082 决定 4）。
 3. **检查点**：每块结束在一个 C09 ``leased_transaction`` 内先读取消标志——为真则不写该块结果（在途调用的
    结果被丢弃，§4「生效时延」），随后 T8；否则写 ``task_chunk_checkpoints`` 并上报阶段内进度。
    失败块一旦使 ``失败块数 / 总块数`` 超过阈值（精确十进制比较）即提前判定 T9，不再为剩余块花钱，
@@ -67,7 +69,7 @@ from app.repositories.task_leases import (
     release_on_shutdown,
 )
 from app.repositories.tasks import read_leased_task
-from app.services.ai.client import ModelClient, ModelError, ModelRequest, ModelResult, StreamEvent
+from app.services.ai.client import ModelAuthError, ModelClient, ModelError, ModelRequest, ModelResult, StreamEvent
 from app.services.ai.entities import REPAIR_PURPOSE, EntityCandidate, EntityExtractor, EntitySource
 from app.services.ai.gleaning import EntityGleaner, entity_name_key
 from app.services.ai.policy import (
@@ -77,6 +79,7 @@ from app.services.ai.policy import (
     ModelCallPolicy,
     ModelUnavailableError,
 )
+from app.services.credentials import CredentialUnavailable
 from app.services.ai.relations import (
     RelationCandidate,
     RelationExtractor,
@@ -198,6 +201,11 @@ class ExtractionToolkit:
     entities: Callable[[ModelClient], EntityExtractor]
     relations: Callable[[ModelClient], RelationExtractor]
     gleaner: Callable[[ModelClient], EntityGleaner] | None = None
+    #: personal 模式：调用归属的用户与每次尝试前的快照有效性检查（失效时抛 CredentialUnavailable，ADR-080）。
+    user_id: str | None = None
+    guard: Callable[[], None] | None = None
+    #: personal 模式下任务快照里的模型名；全局模式为 None（模型名已固化在抽取器工厂里）。
+    model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -414,7 +422,8 @@ class _AttemptClient:
 
 
 class _Halt(Exception):
-    """阶段级临时故障：``circuit``（熔断打开）或 ``storage``（调用记录写不进）。"""
+    """阶段级停止：``circuit``（熔断打开）、``storage``（调用记录写不进）——临时故障，释放租约；
+    ``auth``（供应商拒绝密钥，401/403）——任务级终止，不重试、不换 key（ADR-082 决定 4）。"""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
@@ -436,6 +445,8 @@ def _attempts(
     """L2：最多 ``chunk_max_attempts`` 次；``body`` 返回结果或输出不合规的失败码。"""
     last = OUTPUT_INVALID_CODE
     for attempt in range(1, limits.chunk_max_attempts + 1):
+        if toolkit.guard is not None:
+            toolkit.guard()
         client = _AttemptClient(
             toolkit.policy,
             CallAttribution(
@@ -444,6 +455,7 @@ def _attempts(
                 chunk_id=chunk_id,
                 task_attempt=lease.attempt,
                 chunk_attempt=attempt,
+                user_id=toolkit.user_id,
             ),
         )
         try:
@@ -454,6 +466,8 @@ def _attempts(
             raise _Halt("circuit") from exc
         except CallRecordError as exc:
             raise _Halt("storage") from exc
+        except ModelAuthError as exc:
+            raise _Halt("auth") from exc
         except ModelError:
             last = MODEL_ERROR_CODE
             continue
@@ -584,9 +598,10 @@ def _boundary(sqlite_url: str, lease: Lease, event: str) -> TaskState:
 
 
 def _fail(
-    sqlite_url: str, lease: Lease, code: str, details: Mapping[str, object] | None, counts: Mapping[str, int]
+    sqlite_url: str, lease: Lease, code: str, details: Mapping[str, object] | None, counts: Mapping[str, int],
+    *, message: str | None = None,
 ) -> ExtractOutcome:
-    message = _MESSAGES[code]
+    message = message or _MESSAGES[code]
     error = TaskError(code, message, details)
     encoded = None if details is None else json.dumps(dict(details), ensure_ascii=False, sort_keys=True)
     try:
@@ -634,8 +649,9 @@ class _Dispatcher(Generic[_U]):
     """在线程池里处理单元，主线程按完成顺序在块边界写检查点；在途上限 ``limit``。
 
     ``halt`` 取值：``cancel``（边界读到取消标志）、``lost``、``threshold``（``after_write`` 判定）、
-    ``circuit``/``storage``（阶段级临时故障）。出现后不再派发；``cancel``/``lost``/``threshold`` 之后
-    完成的单元不写检查点，``circuit``/``storage`` 之后正常完成的单元照常写入（结果有效）。
+    ``auth``（鉴权失败，任务终止）、``circuit``/``storage``（阶段级临时故障）。出现后不再派发；
+    ``cancel``/``lost``/``threshold``/``auth`` 之后完成的单元不写检查点，``circuit``/``storage`` 之后
+    正常完成的单元照常写入（结果有效）。
     """
 
     def __init__(
@@ -681,7 +697,7 @@ class _Dispatcher(Generic[_U]):
         except _Halt as halt:
             self.halt = self.halt or halt.reason
             return
-        if self.halt in ("cancel", "lost", "threshold"):
+        if self.halt in ("cancel", "lost", "threshold", "auth"):
             return
         try:
             if not self._write(unit, result):
@@ -745,6 +761,9 @@ def _halted(
         return ExtractOutcome(ExtractStatus.CANCELLED, lease.task_id, "cancelled", "cancelled", **counts)
     if halt == "threshold":
         return _threshold_failure(sqlite_url, lease, limits, progress)
+    if halt == "auth":
+        logger.warning("extracting task %s: provider rejected the API key, failing the task", lease.task_id)
+        return _fail(sqlite_url, lease, MODEL_ERROR_CODE, {"reason": "auth"}, counts, message=AUTH_MESSAGE)
     code = MODEL_ERROR_CODE if halt == "circuit" else "STORAGE_UNAVAILABLE"
     logger.warning("extracting task %s: stage-level fault (%s), releasing", lease.task_id, halt)
     return _release(sqlite_url, lease, code, limits.max_attempts, counts)
@@ -848,6 +867,15 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
     return ExtractOutcome(ExtractStatus.ADVANCED, lease.task_id, NEXT_STAGE, "stage", **progress.counts())
 
 
+CREDENTIAL_MESSAGE = "个人模型 API 配置不可用，任务已终止；请检查「模型 API 设置」后重新上传"
+AUTH_MESSAGE = "模型服务拒绝了 API 密钥，任务已终止；请检查「模型 API 设置」后重新上传"
+
+
+def fail_for_credential(sqlite_url: str, lease: Lease, reason: str) -> ExtractOutcome:
+    """ADR-080 决定 3：快照缺失、已撤销或不可解时终止任务，不重试、不换 key。"""
+    return _fail(sqlite_url, lease, MODEL_ERROR_CODE, {"reason": reason}, {}, message=CREDENTIAL_MESSAGE)
+
+
 def run_extract_stage(
     sqlite_url: str, lease: Lease, *, toolkit: ExtractionToolkit, limits: ExtractLimits
 ) -> ExtractOutcome:
@@ -868,6 +896,9 @@ def run_extract_stage(
         return _run(sqlite_url, lease, toolkit, limits)
     except LeaseLost:
         return _lost(lease)
+    except CredentialUnavailable as exc:
+        logger.warning("extracting task %s: credential unavailable (%s)", lease.task_id, exc.reason)
+        return fail_for_credential(sqlite_url, lease, exc.reason)
     except sqlite3.OperationalError as exc:
         logger.warning("extracting task %s: storage unavailable (%s)", lease.task_id, type(exc).__name__)
         return _release(sqlite_url, lease, "STORAGE_UNAVAILABLE", limits.max_attempts, {})

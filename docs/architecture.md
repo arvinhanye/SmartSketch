@@ -118,7 +118,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 
 | schema | 取值 | 大小写 | 用于 | 740adb 核对 / 备注 |
 | --- | --- | --- | --- | --- |
-| `ErrorCode` | `UNAUTHENTICATED`、`COURSE_FORBIDDEN`、`ROLE_FORBIDDEN`、`NOT_FOUND`、`GRAPH_NOT_PUBLISHED`、`UNSUPPORTED_FORMAT`、`FILE_TOO_LARGE`、`VALIDATION_ERROR`、`CYCLE_DETECTED`、`DANGLING_ENDPOINT`、`DUPLICATE_RELATION`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`PUBLISH_BLOCKED`、`RATE_LIMITED`、`LLM_UNAVAILABLE`、`DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`TASK_ATTEMPTS_EXHAUSTED`、`PUBLISH_IN_PROGRESS`、`COURSE_BUSY`、`BUDGET_EXCEEDED`、`DOCUMENT_NOT_DELETABLE`、`REVISION_CONFLICT`、`USERNAME_TAKEN` | UPPER | `Error.code` | 一致。**不含** `NOT_COVERED`、`TASK_FAILED`：它们是领域状态，不是错误码 |
+| `ErrorCode` | `UNAUTHENTICATED`、`COURSE_FORBIDDEN`、`ROLE_FORBIDDEN`、`NOT_FOUND`、`GRAPH_NOT_PUBLISHED`、`UNSUPPORTED_FORMAT`、`FILE_TOO_LARGE`、`VALIDATION_ERROR`、`CYCLE_DETECTED`、`DANGLING_ENDPOINT`、`DUPLICATE_RELATION`、`NODE_LOCKED`、`TASK_NOT_CANCELLABLE`、`PUBLISH_BLOCKED`、`RATE_LIMITED`、`LLM_UNAVAILABLE`、`DOCUMENT_UNREADABLE`、`EXTRACTION_INCOMPLETE`、`STORAGE_UNAVAILABLE`、`INTERNAL_ERROR`、`TASK_ATTEMPTS_EXHAUSTED`、`PUBLISH_IN_PROGRESS`、`COURSE_BUSY`、`BUDGET_EXCEEDED`、`DOCUMENT_NOT_DELETABLE`、`REVISION_CONFLICT`、`USERNAME_TAKEN`、`MODEL_CONFIG_REQUIRED` | UPPER | `Error.code` | 一致。**不含** `NOT_COVERED`、`TASK_FAILED`：它们是领域状态，不是错误码 |
 | `RelationType` | `CONTAINS`、`PREREQUISITE`、`RELATED_TO`、`EXAMPLE_OF` | UPPER | `Relation.type` | 一致。闭集；S2 图 6.3 的 `RELATED`、`APPLIES_TO` 不得使用（ADR-008） |
 | `TaskStage` | `queued`、`parsing`、`extracting`、`merging`、`persisting`、`awaiting_review`、`completed`、`failed`、`cancelled` | lower | `Task.stage`、`TaskEvent.stage`、`Document.parse_status` | 一致。终态为 `completed`、`failed`、`cancelled`；转换、触发者与取消语义见 `specs/task-processing.md`（ADR-010） |
 | `CourseStatus` | `draft`、`published`、`revising` | lower | `Course.status` | 一致 |
@@ -209,7 +209,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## 关键质量边界
 
 - API 响应、任务事件、图谱导入/导出格式先在 `src/contracts/` 版本化。
-- LLM 是可替换适配器，基础 URL、模型和密钥均来自环境变量。
+- LLM 是可替换适配器。`live`/`demo`/`fake` 模式下基础 URL、模型和密钥来自环境变量；`personal` 模式（ADR-080）下来自用户本人加密保存的配置：教师任务使用建任务时的密钥快照，学生问答按「用户 + 配置版本」隔离调用策略，用户填写的地址经出站校验并钉住已校验的 IP。向量为系统级在线服务（ADR-081），与用户所选生成模型无关。
 - 每次教师修改与发布都保留版本号和审计信息；破坏性迁移需提供回滚说明。教师图编辑审计（F12，ADR-061）在 SQLite `graph_edit_logs`：与 `draft_revision + 1` 同一事务写入 `pending`，Neo4j 写入后置 `committed`/`aborted`，遗留行由下一次同课程教师写入持锁对账；摘要白名单并脱敏。
 
 ## 持续集成
