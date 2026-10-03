@@ -78,6 +78,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - 依赖：顺序 N01+N06 → D1+D3 → N02 → N03–N05 与 §3.7 → N07–N08 → D2。共享边界（配置身份、错误闭集、记账归属）先写 ADR-082 再写代码。
 - 风险：迁移 016 改已有库（新增可空列 + 回填，附回滚）；D1/D3 改问答终态与错误闭集，需契约、DTO、前端提示同步；D3 涉及出站传输，不可放松地址防护与 TLS 校验。
 - 验证命令：每组最小相关测试（`PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/<file> -q`、`npm run test -- --run <file>`）；最终 `./scripts/verify.sh`、`full`、`integration`（仅一次性 Neo4j）、`git diff --check`。不调用真实模型、不动真实课程库。
+- 2026-10-03 中途停止（用量上限）：N01/N06/D1/D3/N02 已提交；N03–N05 与 §3.7 红测已写未提交；N07/N08/D2 未开始。详见交接。
 - 计划 B/C（L11–L19）不在本节范围。
 
 ## 2026-09-28 Codex 认领：认证页动态图谱
