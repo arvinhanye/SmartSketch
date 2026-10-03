@@ -169,11 +169,16 @@ StreamEvent = StreamDelta | StreamDone
 
 @dataclass(frozen=True)
 class EmbeddingRequest:
-    """One vector call. ``dimensions`` is sent to the provider (``EMBEDDING_DIMENSIONS``)."""
+    """One vector call. ``dimensions`` is sent to the provider (``EMBEDDING_DIMENSIONS``).
+
+    ``timeout_seconds`` is the budget for the whole request (all its HTTP batches), set from a
+    QA chain deadline; ``None`` keeps the adapter's own per-call timeout (publish, offline).
+    """
 
     model: str
     texts: tuple[str, ...] = field(repr=False)
     dimensions: int
+    timeout_seconds: float | None = None
 
     def __post_init__(self) -> None:
         _check_model_id(self.model, "EmbeddingRequest")
@@ -183,6 +188,11 @@ class EmbeddingRequest:
         object.__setattr__(self, "texts", texts)
         if not _is_int(self.dimensions) or self.dimensions < 1:
             raise ValueError("EmbeddingRequest: dimensions must be an int >= 1")
+        if self.timeout_seconds is not None and (
+            isinstance(self.timeout_seconds, bool) or not isinstance(self.timeout_seconds, int | float)
+            or not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0
+        ):
+            raise ValueError("EmbeddingRequest: timeout_seconds must be a finite number > 0 or None")
 
 
 @dataclass(frozen=True)

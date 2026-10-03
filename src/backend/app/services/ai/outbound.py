@@ -1,15 +1,15 @@
 """Outbound guard for user-supplied model endpoints (ADR-080 决定 5).
 
 A user controls ``base_url``, so every connection is made only after the host has been
-resolved and every resolved address is public; the socket then connects to that checked
-address (TLS still verifies the original host name), so a DNS answer that changes between
+resolved and every resolved address is public; the socket then connects to those checked
+addresses (TLS still verifies the original host name), so a DNS answer that changes between
 check and connect has no effect. Redirects are never followed (``compatible.py`` treats a
-3xx as a malformed response).
+3xx as a malformed response). ``timeout`` is the hard budget of the whole exchange,
+resolution included (``compatible.exchange``, ADR-082 决定 3).
 """
 
 from __future__ import annotations
 
-import http.client
 import ipaddress
 import socket
 import ssl
@@ -17,7 +17,7 @@ from collections.abc import Callable, Mapping
 from urllib.parse import SplitResult, urlsplit
 
 from app.config import Settings
-from app.services.ai.compatible import HttpResponse, _StdlibResponse
+from app.services.ai.compatible import Connector, ExchangeDeadline, HttpResponse, exchange, resolve_within
 
 Resolver = Callable[[str, int], list[str]]
 
@@ -75,6 +75,8 @@ def resolve_endpoint(host: str, port: int, *, allow_private: bool = False,
                      resolver: Resolver = system_resolver) -> list[str]:
     try:
         addresses = resolver(host, port)
+    except TimeoutError:
+        raise                               # the exchange deadline, not an unresolvable host
     except OSError:
         raise EndpointBlocked("unresolvable") from None
     if not addresses:
@@ -89,53 +91,32 @@ def check_endpoint(url: str, *, allow_private: bool = False, resolver: Resolver 
     resolve_endpoint(parts.hostname or "", _default_port(parts), allow_private=allow_private, resolver=resolver)
 
 
-class _PinnedHTTPConnection(http.client.HTTPConnection):
-    def __init__(self, host: str, port: int, *, ip: str, timeout: float) -> None:
-        super().__init__(host, port, timeout=timeout)
-        self._pinned_ip = ip
-
-    def connect(self) -> None:
-        self.sock = socket.create_connection((self._pinned_ip, self.port), self.timeout)
-
-
-class _PinnedHTTPSConnection(http.client.HTTPSConnection):
-    def __init__(self, host: str, port: int, *, ip: str, timeout: float, context: ssl.SSLContext) -> None:
-        super().__init__(host, port, timeout=timeout, context=context)
-        self._pinned_ip = ip
-        self._pinned_context = context
-
-    def connect(self) -> None:
-        sock = socket.create_connection((self._pinned_ip, self.port), self.timeout)
-        self.sock = self._pinned_context.wrap_socket(sock, server_hostname=self.host)
+def _pinned_connect(address: tuple[str, int], timeout: float) -> socket.socket:
+    return socket.create_connection(address, timeout)
 
 
 class GuardedTransport:
     """``HttpTransport`` that resolves, checks and pins on every ``open``."""
 
     def __init__(self, *, allow_private: bool = False, resolver: Resolver = system_resolver,
-                 ssl_context: ssl.SSLContext | None = None) -> None:
+                 ssl_context: ssl.SSLContext | None = None, connector: Connector | None = None) -> None:
         self._allow_private = allow_private
         self._resolver = resolver
         self._ssl_context = ssl_context
+        self._connector = connector or _pinned_connect
 
     def open(self, url: str, body: bytes, headers: Mapping[str, str], timeout: float) -> HttpResponse:
         parts = check_endpoint_url(url, allow_private=self._allow_private)
         host, port = parts.hostname or "", _default_port(parts)
-        ip = resolve_endpoint(host, port, allow_private=self._allow_private, resolver=self._resolver)[0]
-        connection: http.client.HTTPConnection
-        if parts.scheme == "https":
-            context = self._ssl_context or ssl.create_default_context()
-            connection = _PinnedHTTPSConnection(host, port, ip=ip, timeout=timeout, context=context)
-        else:
-            connection = _PinnedHTTPConnection(host, port, ip=ip, timeout=timeout)
-        try:
-            connection.request("POST", parts.path or "/", body=body, headers=dict(headers))
-            sock = connection.sock
-            response = connection.getresponse()
-        except BaseException:
-            connection.close()
-            raise
-        return _StdlibResponse(connection, sock, response)
+
+        def checked(limit: ExchangeDeadline) -> list[str]:
+            return resolve_endpoint(host, port, allow_private=self._allow_private,
+                                    resolver=lambda h, p: resolve_within(self._resolver, h, p, limit))
+
+        # Only checked addresses are ever connected to; TLS verifies ``host``, not the IP.
+        return exchange(scheme=parts.scheme, host=host, port=port, path=parts.path, body=body, headers=headers,
+                        timeout=timeout, addresses=checked, connector=self._connector,
+                        ssl_context=self._ssl_context)
 
 
 def build_transport(settings: Settings) -> GuardedTransport:

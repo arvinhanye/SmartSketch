@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -34,6 +35,10 @@ class EmbeddingBatchError(RuntimeError):
             f"embedding batch {batch_index} failed ({reason}); "
             f"{completed_count} vectors completed"
         )
+
+
+class EmbeddingDeadlineExceeded(EmbeddingBatchError):
+    """The caller's deadline left no time for (another) embedding request."""
 
 
 class EmbeddingCache:
@@ -93,7 +98,11 @@ class EmbeddingAdapter:
             f"fake/{self._dimensions}" if is_fake else f"real/{self._model}/{self._dimensions}"
         )
 
-    def embed(self, texts: Sequence[str]) -> tuple[EmbeddedVector, ...]:
+    def embed(self, texts: Sequence[str], *, deadline: float | None = None) -> tuple[EmbeddedVector, ...]:
+        """``deadline`` (``time.monotonic()`` axis) bounds QA query embedding (ADR-082 决定 3): each request
+        carries the remaining time and none is sent once it has passed. Publish/offline callers pass
+        nothing and keep the client's per-request timeout. Cache hits never send a request.
+        """
         if isinstance(texts, str) or not isinstance(texts, Sequence) or not all(
             isinstance(text, str) for text in texts
         ):
@@ -120,15 +129,21 @@ class EmbeddingAdapter:
         for batch_index, start in enumerate(range(0, len(pending), self._batch_size)):
             batch = pending[start : start + self._batch_size]
             completed = sum(vector is not None for vector in found)
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise EmbeddingDeadlineExceeded("deadline reached", batch_index, completed)
             try:
                 response = self._client.embed(
                     EmbeddingRequest(
                         model=self._model,
                         texts=tuple(text for _, text in batch),
                         dimensions=self._dimensions,
+                        timeout_seconds=remaining,
                     )
                 )
             except Exception as exc:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise EmbeddingDeadlineExceeded("deadline reached", batch_index, completed) from exc
                 raise EmbeddingBatchError("client call", batch_index, completed) from exc
 
             if response.model_requested != self._model or response.model_responded not in (None, self._model):
@@ -153,4 +168,4 @@ class EmbeddingAdapter:
         return tuple(vector for vector in found if vector is not None)
 
 
-__all__ = ["EmbeddedVector", "EmbeddingAdapter", "EmbeddingBatchError", "EmbeddingCache"]
+__all__ = ["EmbeddedVector", "EmbeddingAdapter", "EmbeddingBatchError", "EmbeddingCache", "EmbeddingDeadlineExceeded"]

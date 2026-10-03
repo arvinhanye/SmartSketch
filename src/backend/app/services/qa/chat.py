@@ -14,10 +14,10 @@ from app.config import Settings
 from app.repositories.chunks import ChunkStoreError, get_chunks
 from app.repositories.graph_migrations import VectorSpaceError, sqlite_current_space
 from app.repositories.graph_search import search_subgraph
-from app.repositories.neo4j import Neo4jRepository, RepositoryError
+from app.repositories.neo4j import Neo4jRepository, RepositoryError, read_deadline
 from app.repositories.vector_search import search_chunks
 from app.services.ai.client import ModelCallError
-from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError
+from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError, EmbeddingDeadlineExceeded
 from app.services.qa.citations import CitationStream, Evidence, TruncatedAnswer, not_covered
 from app.services.qa.context import ContextBudget, EvidenceContext, build_context
 from app.services.qa.generate import AnswerGeneration, AnswerGenerator, GenerationError
@@ -107,34 +107,51 @@ class ChatService:
 
     def prepare(self, *, version: PublishedVersion, request_id: str, started: float,
                 question: str, history: list[object] | None, kp_id: str | None) -> PreparedChat:
+        """One deadline (``started`` + ``LLM_CHAT_TIMEOUT_SECONDS``) bounds rewrite, query embedding,
+        graph retrieval and, later, generation (ADR-082 决定 3). Each step is checked before it starts,
+        so nothing goes out once the deadline has passed; a failure after it is reported as ``timeout``.
+        """
         deadline = started + self.settings.LLM_CHAT_TIMEOUT_SECONDS
+
+        def check() -> None:
+            if time.monotonic() >= deadline:
+                raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
+
         rewritten = self.rewriter.rewrite(question, history, course_id=version.course_id,
                                           request_id=request_id, deadline=deadline)
         query = rewritten.query
+        check()
         try:
-            [vector] = self.embedding.embed((query,))
-            space = self.current_space()
-            scope = version.graph_scope()
-            hits = search_chunks(self.repo, scope, version.revision_ids, vector, space=space,
-                                 limit=self.settings.QA_VECTOR_LIMIT)
-            graph = search_subgraph(self.repo, scope, version.revision_ids, (query,),
-                                    seed_kp_ids=(kp_id,) if kp_id else ())
-            context = build_context(
-                course_id=version.course_id, revision_ids=version.revision_ids,
-                vector_hits=hits, subgraph=graph,
-                load_chunks=lambda ids: get_chunks(self.settings.SQLITE_URL, course_id=version.course_id,
-                                                   chunk_ids=ids),
-                threshold=self.settings.QA_SIMILARITY_THRESHOLD,
-                budget=ContextBudget(self.settings.QA_CONTEXT_CHUNK_TOKENS,
-                                     self.settings.QA_CONTEXT_GRAPH_TOKENS,
-                                     self.settings.QA_CONTEXT_MAX_CHUNKS),
-            )
+            with read_deadline(deadline):
+                [vector] = self.embedding.embed((query,), deadline=deadline)
+                check()
+                space = self.current_space()
+                scope = version.graph_scope()
+                hits = search_chunks(self.repo, scope, version.revision_ids, vector, space=space,
+                                     limit=self.settings.QA_VECTOR_LIMIT)
+                check()
+                graph = search_subgraph(self.repo, scope, version.revision_ids, (query,),
+                                        seed_kp_ids=(kp_id,) if kp_id else ())
+                check()
+                context = build_context(
+                    course_id=version.course_id, revision_ids=version.revision_ids,
+                    vector_hits=hits, subgraph=graph,
+                    load_chunks=lambda ids: get_chunks(self.settings.SQLITE_URL, course_id=version.course_id,
+                                                       chunk_ids=ids),
+                    threshold=self.settings.QA_SIMILARITY_THRESHOLD,
+                    budget=ContextBudget(self.settings.QA_CONTEXT_CHUNK_TOKENS,
+                                         self.settings.QA_CONTEXT_GRAPH_TOKENS,
+                                         self.settings.QA_CONTEXT_MAX_CHUNKS),
+                )
+        except EmbeddingDeadlineExceeded as error:
+            raise ChatFailure("LLM_UNAVAILABLE", reason="timeout") from error
         except (EmbeddingBatchError, ModelCallError) as error:
+            check()
             raise ChatFailure("LLM_UNAVAILABLE") from error
         except (RepositoryError, VectorSpaceError, ChunkStoreError, sqlite3.Error) as error:
+            check()
             raise ChatFailure("STORAGE_UNAVAILABLE") from error
-        if time.monotonic() >= deadline:
-            raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
+        check()
         return PreparedChat(version, request_id, started, deadline, query, context)
 
     def events(self, prepared: PreparedChat, stop: Event | None = None) -> Iterator[dict[str, Any]]:
