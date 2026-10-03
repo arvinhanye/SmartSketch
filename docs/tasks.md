@@ -20,7 +20,7 @@
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
 | L01 | DONE | Claude | 隔离环境：`.venv`（Python 3.11.9）、`npm ci`、独立 Neo4j（7688/7475）；三档门禁基线；不改业务文件 | basic exit 0；full exit 0（后端 3559 通过/27 跳过，前端 772 通过）；integration exit 1，仅因本机未装 Playwright 浏览器，改用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向 Chrome 后两条端到端通过。另发现北京地域向量服务在本机网络不可达。交接 `docs/handoffs/claude-l01.md` |
-| L02 | IN_PROGRESS（抽取已测；问答等向量服务可达后补测） | Claude | `evaluation/measure_web_flow.py`、基线报告 `evaluation/reports/l02-baseline-2026-10.md` | 抽取实测 141.72 秒（目标 60 秒，未达标），82 个知识点、4 种关系，计费 101054 token；问答未测：北京地域向量接口在本机网络 TCP 超时。交接 `docs/handoffs/claude-l02.md` |
+| L02 | IN_PROGRESS（抽取已测；问答补测 V1 交给 DeepSeek harness，交接 `docs/handoffs/claude-plan-a-verification-handoff.md`） | Claude → DeepSeek harness | `evaluation/measure_web_flow.py`、基线报告 `evaluation/reports/l02-baseline-2026-10.md` | 抽取实测 141.72 秒（目标 60 秒，未达标），82 个知识点、4 种关系，计费 101054 token；问答未测：北京地域向量接口在本机网络 TCP 超时。交接 `docs/handoffs/claude-l02.md` |
 | L03 | DONE | Claude | ADR-080/081、`AGENTS.md` §4/§6、`docs/`、`src/contracts/`、生成物；前端三处错误码清单同步 | 契约门禁 exit 0；前端类型检查与 772 用例通过；后端 3561 通过/27 跳过；交接 `docs/handoffs/claude-l03.md` |
 | L04 | DONE | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py`、`cryptography==50.0.2` | 11 个新用例；后端 3572 通过/27 跳过；交接 `docs/handoffs/claude-l04.md` |
 | L05 | DONE | Claude | `services/ai/outbound.py`；顺带修复 `_StdlibResponse.read` 在服务端关闭连接时误报连接错误 | 32 个新用例与既有客户端用例通过；交接 `docs/handoffs/claude-l05.md` |
@@ -28,7 +28,7 @@
 | L07 | DONE | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
 | L08 | DONE | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 9 个新用例；后端 3645 通过/27 跳过；交接 `docs/handoffs/claude-l08.md` |
 | L09 | DONE | DeepSeek harness | 在线向量联调、`local` 明确拒绝、`scripts/start.sh`；用户 2026-10-03 选向量方案第 1 种（恢复到北京地域接口的网络路径，地址不变） | 真实向量实测可用：`check-embedding.py` → `ok model=text-embedding-v4 dimensions=1024 seconds=0.66`（exit 0）。正式入口不静默切 demo：`EMBEDDING_MODE=demo`/`local` 时 `start.sh` 均 exit 1；冒烟 `GET /api/v1/me/model-config` → `{"runtime_mode":"personal","configured":false}`、`/health` ok、worker 无 `Invalid configuration`。后端+tooling 3648 通过/27 跳过/0 失败；`verify.sh` exit 0。交接 `docs/handoffs/deepseek-l09.md` |
-| L10 | IN_PROGRESS（代码与 10 个组件用例完成；真实页面走查等 L09） | Claude | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过；交接 `docs/handoffs/claude-l10.md` |
+| L10 | IN_PROGRESS（代码与 10 个组件用例完成；真实页面走查 V2 交给 DeepSeek harness，交接 `docs/handoffs/claude-plan-a-verification-handoff.md`） | Claude → DeepSeek harness | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过；交接 `docs/handoffs/claude-l10.md` |
 
 - 2026-10-03 Claude 复核 L09（`ea9484c`）：通过，记录 `docs/reviews/claude-deepseek-l09-2026-10-03.md`。**未决风险**：问答准备阶段的查询向量调用不受 15 秒链路截止约束，向量服务不可达时一次提问可能挂数分钟（`services/qa/chat.py:115`）；建议在计划 B（L15）或计划 C（L16）单独认领修复。本机到北京地域向量接口的网络时通时断，L02 问答补测与 L10 走查需网络稳定后进行。
 
