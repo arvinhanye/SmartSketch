@@ -26,7 +26,7 @@
 | L05 | DONE | Claude | `services/ai/outbound.py`；顺带修复 `_StdlibResponse.read` 在服务端关闭连接时误报连接错误 | 32 个新用例与既有客户端用例通过；交接 `docs/handoffs/claude-l05.md` |
 | L06 | DONE | Claude | `services/model_configs.py`、`api/model_config.py`、`main.py` | 20 个新用例；后端 3623 通过/27 跳过；真实 DeepSeek 测试连接成功、无效密钥识别为 auth；交接 `docs/handoffs/claude-l06.md` |
 | L07 | DONE（集成测试待 Docker 恢复后补跑） | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
-| L08 | TODO | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 两用户隔离、一人坏 key 不影响另一人 |
+| L08 | DONE | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 9 个新用例；后端 3645 通过/27 跳过；交接 `docs/handoffs/claude-l08.md` |
 | L09 | TODO | Claude | 在线向量联调、`local` 明确拒绝、`scripts/start.sh` | 真实检索可用；正式入口不静默切 demo |
 | L10 | TODO | Claude | 前端设置页、未配置引导、模式标识 | 组件测试 + 真实页面走查 |
 

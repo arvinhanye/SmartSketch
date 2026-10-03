@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import sqlite3
 import time
 from collections.abc import Iterator
@@ -29,6 +30,7 @@ _MESSAGES = {
     "STORAGE_UNAVAILABLE": "课程资料暂不可用，请稍后重试",
     "BUDGET_EXCEEDED": "当前模型调用额度不足，请稍后重试",
     "INTERNAL_ERROR": "问答暂时失败，请稍后重试",
+    "MODEL_CONFIG_REQUIRED": "请先在「模型 API 设置」中保存你的模型 API 配置",
 }
 
 
@@ -40,7 +42,7 @@ class ChatFailure(Exception):
 
     @property
     def status_code(self) -> int:
-        return {"BUDGET_EXCEEDED": 429, "INTERNAL_ERROR": 500}.get(self.code, 503)
+        return {"BUDGET_EXCEEDED": 429, "INTERNAL_ERROR": 500, "MODEL_CONFIG_REQUIRED": 409}.get(self.code, 503)
 
     def body(self, request_id: str | None = None) -> dict[str, Any]:
         details: dict[str, str] = {}
@@ -89,13 +91,19 @@ def _capture_audit(prepared: PreparedChat, citations: CitationStream | None) -> 
 
 class ChatService:
     def __init__(self, settings: Settings, repo: Neo4jRepository, embedding: EmbeddingAdapter,
-                 rewriter: QueryRewriter, generator: AnswerGenerator) -> None:
+                 rewriter: QueryRewriter | None, generator: AnswerGenerator | None) -> None:
         self.settings = settings
         self.repo = repo
         self.embedding = embedding
         self.rewriter = rewriter
         self.generator = generator
         self.current_space = sqlite_current_space(settings.SQLITE_URL)
+
+    def with_models(self, rewriter: QueryRewriter, generator: AnswerGenerator) -> ChatService:
+        """personal 模式：同一份检索依赖，换上当前用户的改写器与生成器（ADR-080 决定 4）。"""
+        bound = copy.copy(self)
+        bound.rewriter, bound.generator = rewriter, generator
+        return bound
 
     def prepare(self, *, version: PublishedVersion, request_id: str, started: float,
                 question: str, history: list[object] | None, kp_id: str | None) -> PreparedChat:

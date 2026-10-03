@@ -306,6 +306,7 @@ class QueryRewriter:
         policy: ModelCallPolicy,
         *,
         model: str,
+        user_id: str | None = None,
         prompts: PromptLibrary | None = None,
         clock: Callable[[], float] = time.monotonic,
         timeout_seconds: float = REWRITE_TIMEOUT_SECONDS,
@@ -324,6 +325,8 @@ class QueryRewriter:
             raise ValueError("reserve_seconds must be a finite number >= 0")
         self._policy = policy
         self._model = model
+        #: personal 模式：本实例只服务这一个用户，调用记录与日预算归属于他（ADR-080）
+        self._user_id = user_id
         self._clock = clock
         self._timeout_seconds = float(timeout_seconds)
         self._reserve_seconds = float(reserve_seconds)
@@ -375,7 +378,8 @@ class QueryRewriter:
             response_format="text",
             timeout_seconds=seconds,
         )
-        client = self._policy.bind(CallAttribution(course_id=course_id, request_id=request_id),
+        client = self._policy.bind(CallAttribution(course_id=course_id, request_id=request_id,
+                                                         user_id=self._user_id),
                                    deadline=deadline - self._reserve_seconds)
         try:
             result = client.complete(request)

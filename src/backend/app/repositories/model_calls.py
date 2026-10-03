@@ -108,11 +108,15 @@ def _task_billed(database: sqlite3.Connection, task_id: str) -> int:
     return _billed_where(database, "task_id = ?", (task_id,))
 
 
-def _day_billed(database: sqlite3.Connection, day: str | None) -> int:
+def _day_billed(database: sqlite3.Connection, day: str | None, user_id: str | None = None) -> int:
+    """One Beijing day's billed tokens; with ``user_id`` (personal mode, ADR-080) only that user's."""
     day_sql = _TODAY if day is None else "?"
     params: tuple[Any, ...] = () if day is None else (day, day)
     where = (f"created_at >= {_DAY_START.format(day=day_sql)}"
              f" AND created_at < {_DAY_END.format(day=day_sql)}")
+    if user_id is not None:
+        where += " AND user_id = ?"
+        params += (user_id,)
     return _billed_where(database, where, params)
 
 
@@ -164,7 +168,7 @@ class SqliteCallStore:
                             used = _task_billed(database, record.task_id)
                             if used >= task_budget:
                                 raise BudgetRejected("task", used, task_budget)
-                        used = _day_billed(database, None)
+                        used = _day_billed(database, None, record.user_id)
                         if used >= daily_budget:
                             raise BudgetRejected("daily", used, daily_budget)
                     database.execute(

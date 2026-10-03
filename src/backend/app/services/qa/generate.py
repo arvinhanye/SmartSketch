@@ -311,6 +311,7 @@ class AnswerGenerator:
         policy: ModelCallPolicy,
         *,
         model: str,
+        user_id: str | None = None,
         prompts: PromptLibrary | None = None,
         clock: Callable[[], float] = time.monotonic,
         max_output_tokens: int = ANSWER_MAX_OUTPUT_TOKENS,
@@ -323,6 +324,8 @@ class AnswerGenerator:
             raise ValueError("max_output_tokens must be an int >= 1")
         self._policy = policy
         self._model = model
+        #: personal 模式：本实例只服务这一个用户，调用记录与日预算归属于他（ADR-080）
+        self._user_id = user_id
         self._clock = clock
         self._max_output_tokens = max_output_tokens
         # 装配时就取模板：缺文件或版本不符应在启动时暴露。
@@ -370,5 +373,6 @@ class AnswerGenerator:
             max_output_tokens=self._max_output_tokens,
             response_format="text",
         )
-        client = self._policy.bind(CallAttribution(course_id=course_id, request_id=request_id), deadline=deadline)
+        client = self._policy.bind(CallAttribution(course_id=course_id, request_id=request_id,
+                                                         user_id=self._user_id), deadline=deadline)
         return AnswerGeneration(lambda: client.stream(request), lambda: deadline - self._clock())

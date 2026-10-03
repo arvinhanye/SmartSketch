@@ -45,7 +45,7 @@ changed_files:
 | `pytest tests/backend/test_e12.py` | 39 passed（含新增 2 例） |
 | 后端全量（第一次） | exit 1：38 个失败，均在 `test_d10`（35）与 `test_c09`（3），`table processing_tasks has no column named created_by` |
 | 修复后 `pytest test_d10.py test_c09.py test_l07.py test_l04.py` | 111 passed |
-| 后端全量（修复后） | 与 L08 一起运行，结果记在 `claude-l08.md` |
+| 后端全量（修复后） | 与 L08 一起运行：exit 0，3645 通过、27 跳过 |
 | 集成（不含端到端） | 未运行成功：Docker 守护进程未运行，无法启动一次性 Neo4j |
 | `./scripts/verify.sh` | exit 0（基础档） |
 
