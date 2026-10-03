@@ -56,6 +56,11 @@ function kpLabel(id: string): string {
   return kpNames.value.get(id) ?? id
 }
 
+const graphLinkAvailable = router.hasRoute(STUDENT_GRAPH_ROUTE)
+function kpQuery(id: string, graphVersion: number | undefined): Record<string, string> {
+  return graphVersion === undefined ? { kp: id } : { kp: id, v: String(graphVersion) }
+}
+
 function openKnowledgePoint(id: string): void {
   if (course.graph && course.graph.graph_version === currentVersion.value && !course.graph.nodes.some((node) => node.id === id)) {
     notice.value = '当前版本已无此知识点'
@@ -112,16 +117,20 @@ function onKeydown(event: KeyboardEvent): void {
               <p v-if="entry.status === 'error'" class="state" role="alert">本次回答未完成</p>
               <p v-if="entry.relatedKpIds.length && (entry.status === 'answered' || entry.status === 'not_covered')" class="kps">
                 <span class="kps__label">涉及的知识点：</span>
-                <button
-                  v-for="id in entry.relatedKpIds"
-                  :key="id"
-                  type="button"
-                  class="kps__chip"
-                  data-test="chat-kp"
-                  @click="openKnowledgePoint(id)"
-                >
-                  {{ kpLabel(id) }}
-                </button>
+                <template v-for="id in entry.relatedKpIds" :key="id">
+                  <!-- L13-4：跳到本课程图谱并选中该知识点；带上回答所依据的图谱版本，图谱页据此提示版本差异 -->
+                  <RouterLink
+                    v-if="graphLinkAvailable && courseId"
+                    class="kps__chip"
+                    data-test="chat-kp"
+                    :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: courseId }, query: kpQuery(id, entry.graphVersion) }"
+                  >
+                    {{ kpLabel(id) }}
+                  </RouterLink>
+                  <button v-else type="button" class="kps__chip" data-test="chat-kp" @click="openKnowledgePoint(id)">
+                    {{ kpLabel(id) }}
+                  </button>
+                </template>
               </p>
               <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" :disabled="sending" @click="ask(entry.question)">重试</button>
             </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, type InjectionKey } from 'vue'
+import { computed, inject, ref, watch, type InjectionKey } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
@@ -14,6 +14,7 @@ import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import Recommendations from '../components/Recommendations.vue'
 import { chapterOptions, useGraphFilters } from '../composables/useGraphFilters'
 import { MASTERY_LABELS, useLearning } from '../composables/useLearning'
+import { kpLinkOutcome } from '../composables/kpLink'
 import { toKnowledgeCards, useStudentGraph } from '../composables/useStudentGraph'
 import { COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
@@ -72,8 +73,35 @@ const { status, error, retryable, courseName, graphVersion, graph, chapters, rel
 const filters = useGraphFilters(graph)
 const { selected, visible, summary, isDefault, selectedHidden } = filters
 
-// L13-2：搜索框回车定位并选中，画布聚焦到该节点；未找到时提示
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
+
+// L13-4：问答知识点链接 ?kp=&v=：当前课程的图加载完后选中并聚焦；目标不在或版本不同时提示。
+// 同一链接只处理一次（之后用户可自由选择）；切课时组合式重置图谱，旧课程的 kp 不会落到新课程。
+const linkNotice = ref<string | null>(null)
+let handledLink: string | null = null
+watch(
+  [() => route.query.kp, () => route.query.v, courseId, status, graphVersion] as const,
+  ([kp, v, cid, current]) => {
+    if (current !== 'ready' || graph.value === null || cid === null) return
+    const key = `${cid}|${String(kp)}|${String(v)}|${graphVersion.value}`
+    if (key === handledLink) return
+    const outcome = kpLinkOutcome({ kp, v }, cid, {
+      course_id: cid,
+      graph_version: graphVersion.value,
+      nodes: graph.value.nodes.map((node) => ({ id: node.data.kpId })),
+    })
+    if (outcome === null) return
+    handledLink = key
+    linkNotice.value = outcome.notice
+    if (outcome.select !== null) {
+      filters.select(outcome.select)
+      canvas.value?.focus(outcome.select)
+    }
+  },
+  { immediate: true },
+)
+
+// L13-2：搜索框回车定位并选中，画布聚焦到该节点；未找到时提示
 const searchNotice = ref<string | null>(null)
 function onLocate(query: string): void {
   const kpId = filters.locate(query)
@@ -199,6 +227,7 @@ const selectedName = computed(() => {
         @locate="onLocate"
       />
       <p v-if="searchNotice" data-test="sg-search-notice" role="status">{{ searchNotice }}</p>
+      <p v-if="linkNotice" data-test="sg-link-notice" role="status">{{ linkNotice }}</p>
 
       <div class="student-graph__body">
         <div v-if="mode === 'graph'" class="student-graph__canvas" data-test="sg-graph">
