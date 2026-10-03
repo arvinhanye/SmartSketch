@@ -14,6 +14,41 @@ plan: docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md
 budget: 619217 / 5000000 token（本会话未调用真实模型，未增加）
 ```
 
+## 0. 交给 Codex 的三件事（用户 2026-10-03 指定）
+
+1. **复审 L12～L14 的 16 个提交**：范围 `5a34fec..56610d4`（`5a34fec` 是 L11-7，冲刺分支当前停在这里）。
+
+   ```bash
+   git log --oneline 5a34fec..56610d4
+   git diff 5a34fec 56610d4
+   ```
+
+   - 逐任务的设计取舍与验证见 `claude-l12.md`、`claude-l13.md`、`claude-l14.md`，复审重点见本文 §3。
+   - 复审意见写入 `docs/handoffs/codex-<task>.md` 或 `docs/reviews/`。
+   - 复审通过且 DeepSeek 的 L11-7 复测合并后，再快进冲刺分支。
+
+2. **需要向量模型或真实模型的测试仍交 DeepSeek harness**：凡是要调用阿里云百炼向量（发布期向量化、问答检索的真实向量）或真实生成模型的验证，Codex 都**不在本地运行**，而是写交接稿交给 DeepSeek harness。
+   - 交接稿写清：命令、预算停止线、需要记录的指标。
+   - 写法参照 `claude-l11-6-deepseek-handoff.md`、`claude-l11-7-deepseek-retest.md`。
+   - 本地只用演示模型、本机假供应商（`scripts/fake_provider.py`）和一次性 Neo4j。
+   - 目前在途或待交的有三项：
+     - L11-7 PDF 续行修复的真实模型复测（已交，结果未到）；
+     - L15-6 Step 4 两门课问答抽样；
+     - 下面第 3 项调高上限后的实测。
+
+3. **调高问答输出上限（用户已决定调高）**：`ANSWER_MAX_OUTPUT_TOKENS`（`src/backend/app/services/qa/generate.py:116`）当前为 1024。这一项关闭 ADR-068 待决 1，并取代计划 A 交接里「上限不变、待人工决定」的状态。
+   - 已有数据（L02 真实模型，`evaluation/reports/l02-baseline-2026-10.md` §4.4、`deepseek-plan-a-verification.md`）：
+     - 比较类问题「栈和队列有什么区别？」的输出正好撞上 1024 被截断，可确定性复现；
+     - 同批未截断回答输出 246～858 token；
+     - 五题完整耗时最大 6.12 秒（含截断那题），赛题时限 15 秒。
+   - 建议做法（Claude 起草、未实施，由 Codex 定稿）：
+     - 先在 `docs/decisions.md` 新增 ADR-086（背景、决定、后果、回滚），并同步 `specs/grounded-qa.md`「生成输出上限」一行，以及 ADR-068 决定 5、ADR-082 决定 2 中「1024 不变」的表述。
+     - 再按 TDD 改常量：先写断言新值的失败测试，再改 `generate.py`。
+     - 建议值 2048：按上面的耗时推算，仍在 15 秒内；ADR-082 决定 3 的统一截止时刻兜底超时；截断仍按 ADR-082 决定 2 判为 `LLM_UNAVAILABLE`/`truncated`，不放松出处校验、不加重试。
+     - 后果：单题输出费用上限约翻倍，长回答的完整耗时上升。
+   - 相关测试：`tests/backend/test_j05.py:261` 用常量比较，会自动跟随；`tests/backend/test_demo_mode.py:386` 与 `scripts/fake_provider.py:56` 里有字面量 1024，需逐一核对是否应跟随。
+   - 改完后的真实模型实测（15 秒内是否稳定完成、比较类问题是否不再截断、费用）按第 2 项交 DeepSeek harness，不在本地跑。
+
 ## 1. 进度总览
 
 | 任务 | 状态 | 交接 | 说明 |
@@ -112,7 +147,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - `personal.spec.ts` 新增「两门课互不串课」。第二门课资料是 `datasets/contest/course2-os-ch2/`。
 - 第二个学生用 `tests/e2e/api.ts` 的 `registerStudent`（L14-4 已加）。
 - Step 3：列出计划 A 的 D/N 回归逐项结果。
-- Step 4：真实模型问答抽样需要预算确认，并交 DeepSeek harness。本项目约定：需要阿里云百炼模型的测试写交接稿交 DeepSeek，不在本地调用。
+- Step 4：真实模型问答抽样需要预算确认，并交 DeepSeek harness（见 §0 第 2 项）。
 
 ### 测试草稿
 
@@ -123,7 +158,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - **DeepSeek L11-7 复测**：等待提交。
   - 到达后：合并到本分支，再快进冲刺分支。
   - 复测可能仍在运行时，不要快进冲刺分支。
-- **问答输出上限**：`ANSWER_MAX_OUTPUT_TOKENS = 1024` 是否在 L16 前调整，待用户决定。
+- **问答输出上限**：用户已决定调高，交 Codex 实施（见 §0 第 3 项），实测交 DeepSeek。
 - **观察到但未修**：
   - 同章 PDF 与 Markdown 同时上传会产生大量同名知识点，推荐列表出现同名项（R05，跨任务融合不在本期）。
   - 抽取耗时四份都未达 60 秒（L16）。
