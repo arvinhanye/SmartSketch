@@ -25,9 +25,9 @@
 | L04 | DONE | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py`、`cryptography==50.0.2` | 11 个新用例；后端 3572 通过/27 跳过；交接 `docs/handoffs/claude-l04.md` |
 | L05 | DONE | Claude | `services/ai/outbound.py`；顺带修复 `_StdlibResponse.read` 在服务端关闭连接时误报连接错误 | 32 个新用例与既有客户端用例通过；交接 `docs/handoffs/claude-l05.md` |
 | L06 | DONE | Claude | `services/model_configs.py`、`api/model_config.py`、`main.py` | 20 个新用例；后端 3623 通过/27 跳过；真实 DeepSeek 测试连接成功、无效密钥识别为 auth；交接 `docs/handoffs/claude-l06.md` |
-| L07 | DONE（集成测试待 Docker 恢复后补跑） | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
+| L07 | DONE | Claude | 上传绑定、`workers/`、调用归属用户 | 13 个新用例；修复旧表结构下写 `created_by` 的回归；交接 `docs/handoffs/claude-l07.md` |
 | L08 | DONE | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 9 个新用例；后端 3645 通过/27 跳过；交接 `docs/handoffs/claude-l08.md` |
-| L09 | TODO | Claude | 在线向量联调、`local` 明确拒绝、`scripts/start.sh` | 真实检索可用；正式入口不静默切 demo |
+| L09 | TODO（交给 DeepSeek harness；交接 `docs/handoffs/claude-l09-handoff.md`） | DeepSeek harness（待认领） | 在线向量联调、`local` 明确拒绝、`scripts/start.sh`；用户 2026-10-03 选向量方案第 1 种（恢复到北京地域接口的网络路径，地址不变） | 真实检索可用；正式入口不静默切 demo |
 | L10 | IN_PROGRESS（代码与 10 个组件用例完成；真实页面走查等 L09） | Claude | 前端设置页、未配置引导、模式标识 | 前端 782 用例通过、类型检查与构建通过；交接 `docs/handoffs/claude-l10.md` |
 
 ## 2026-09-28 Codex 认领：认证页动态图谱

@@ -222,6 +222,8 @@
 3. **课程资料**：同意自编。课程一沿用「数据结构 第 3 章 栈与队列」，课程二另自编一章，各出文本型 PDF 与 Markdown。
 4. **规则与依赖**：同意 3.9 的两条规则改写与新增 `cryptography` 依赖，在 L03 写入 ADR-080 并同步上位文档。
 
+2026-10-03 补充：本机网络到北京地域向量接口 TCP 超时（`claude-l01.md` 发现 3），用户选择恢复该网络路径（地址与 key 不变）；L09 的代码交给 DeepSeek harness 编写（交接 `docs/handoffs/claude-l09-handoff.md`）。
+
 冲刺工作区的 `.env` 已生成（未跟踪、权限 600）。端口与主检出错开：API 8001、前端 5174、Neo4j 7688/7475。`LLM_API_KEY` 与 `EMBEDDING_API_KEY` 留空，由用户本人填写。百炼兼容基址 `https://dashscope.aliyuncs.com/compatible-mode/v1` 凭记忆填写，在 L09 真实联调时核对。
 
 ## 12. 实施计划

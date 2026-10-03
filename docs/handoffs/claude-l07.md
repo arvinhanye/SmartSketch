@@ -46,7 +46,7 @@ changed_files:
 | 后端全量（第一次） | exit 1：38 个失败，均在 `test_d10`（35）与 `test_c09`（3），`table processing_tasks has no column named created_by` |
 | 修复后 `pytest test_d10.py test_c09.py test_l07.py test_l04.py` | 111 passed |
 | 后端全量（修复后） | 与 L08 一起运行：exit 0，3645 通过、27 跳过 |
-| 集成（不含端到端） | 未运行成功：Docker 守护进程未运行，无法启动一次性 Neo4j |
+| 集成（不含端到端） | 首次因 Docker 未运行未执行；Docker 恢复后与 L08 一起运行：exit 0，392 通过、4 跳过，图库后端用例 44 通过 |
 | `./scripts/verify.sh` | exit 0（基础档） |
 
 ## 执行中发现并修复的问题
@@ -59,7 +59,6 @@ changed_files:
 
 - personal 模式下真实网页上传到 `awaiting_review`：在 L10 走查中验证。
 - 运行中的 worker 进程级维护钩子：只在单元层面验证了 `BindingScrub`。
-- 集成测试（真实 Neo4j 上的流水线）：本轮因 Docker 未运行未执行；Docker 恢复后补跑。
 
 ## api_and_data_changes
 
