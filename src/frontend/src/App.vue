@@ -95,21 +95,28 @@ const roleLabel = computed(() => (role.value === 'teacher' ? '教师' : '学生'
 
 // L10（ADR-080）：登录后读取一次运行模式与本人配置状态，供侧栏提示与上传/问答页的引导；
 // 读取失败不阻断外壳（设置页自有错误态）。未注入接口或未装 Pinia 时（单独挂载外壳的测试）跳过。
+// N03：按会话身份（登录令牌）而不是账号类型监听——同角色换号、退出重登都会立即重置；
+// 旧读取被中止，即便晚到也因会话或代际不符而被丢弃。
 const modelConfigApi = inject(MODEL_CONFIG_API_KEY, null)
 const runtime = getActivePinia() ? useRuntimeStore() : null
+let runtimeRead: AbortController | null = null
 watch(
-  role,
-  async (value) => {
+  () => session?.accessToken ?? null,
+  async (key) => {
     if (runtime === null) return
-    if (value === null) {
-      runtime.reset()
-      return
-    }
-    if (modelConfigApi === null) return
+    runtimeRead?.abort()
+    runtimeRead = null
+    runtime.startSession(key)
+    if (key === null || modelConfigApi === null) return
+    const controller = new AbortController()
+    runtimeRead = controller
+    const ticket = runtime.claim()
     try {
-      runtime.apply(await modelConfigApi.get())
+      runtime.commitRead(ticket, await modelConfigApi.get({ signal: controller.signal }))
     } catch {
       // 忽略：设置页会显示加载错误
+    } finally {
+      if (runtimeRead === controller) runtimeRead = null
     }
   },
   { immediate: true },

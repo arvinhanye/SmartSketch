@@ -1,12 +1,13 @@
 import { computed, onScopeDispose, reactive, ref } from 'vue'
 import { AbortedError, ApiError, NetworkError, TimeoutError } from '../api/http'
 import type { ModelConfig, ModelConfigApi, ModelConfigTestResult } from '../api/modelConfig'
-import { useRuntimeStore } from '../stores/runtime'
+import { useRuntimeStore, type RuntimeTicket } from '../stores/runtime'
 
 /**
  * 模型 API 设置页的状态（L10）。
  * - 密钥只存在于表单的 `apiKey` 里，保存或测试成功后立即清空；不写入任何存储。
  * - 错误只按错误码与 `details.fields[].reason` 给固定文案，不回显服务端 message。
+ * - N03/N04/N05：操作互斥、结果按会话与卸载校验、测试结果注明测试的是哪份配置。
  */
 
 const URL_REASON: Record<string, string> = {
@@ -55,17 +56,25 @@ function failureText(cause: unknown, fallback: string): string {
   return fallback
 }
 
+type Busy = 'loading' | 'saving' | 'testing' | 'clearing'
+
 export function useModelConfig({ api }: { api: ModelConfigApi }) {
   const runtime = useRuntimeStore()
   const controller = new AbortController()
-  onScopeDispose(() => controller.abort())
+  let disposed = false
+  onScopeDispose(() => {
+    disposed = true
+    controller.abort()
+  })
 
   const status = ref<'loading' | 'ready' | 'error'>('loading')
   const saved = ref<ModelConfig | null>(null)
   const form = reactive({ baseUrl: '', model: '', apiKey: '' })
-  const saving = ref(false)
-  const testing = ref(false)
-  const clearing = ref(false)
+  /** N04：加载、保存、测试、清除互斥；按钮与逻辑入口都据此拒绝第二个操作 */
+  const busy = ref<Busy | null>(null)
+  const saving = computed(() => busy.value === 'saving')
+  const testing = computed(() => busy.value === 'testing')
+  const clearing = computed(() => busy.value === 'clearing')
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
   const testResult = ref<{ ok: boolean; text: string } | null>(null)
@@ -76,26 +85,38 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
 
   function adopt(config: ModelConfig): void {
     saved.value = config
-    runtime.apply(config)
     form.baseUrl = config.base_url ?? ''
     form.model = config.model ?? ''
     form.apiKey = ''
   }
 
+  /** 结果是否仍属于本页面与发起时的会话（卸载或换号后一律丢弃，N03/N04） */
+  function current(ticket: RuntimeTicket): boolean {
+    return !disposed && ticket.owner === runtime.owner
+  }
+
   async function load(): Promise<void> {
+    if (busy.value !== null) return
+    busy.value = 'loading'
     status.value = 'loading'
+    const ticket = runtime.claim()
     try {
-      adopt(await api.get({ signal: controller.signal }))
+      const config = await api.get({ signal: controller.signal })
+      if (!current(ticket)) return
+      runtime.commitRead(ticket, config)
+      adopt(config)
       status.value = 'ready'
     } catch (cause) {
-      if (cause instanceof AbortedError) return
+      if (cause instanceof AbortedError || !current(ticket)) return
       error.value = failureText(cause, '配置加载失败，请稍后重试。')
       status.value = 'error'
+    } finally {
+      if (busy.value === 'loading') busy.value = null
     }
   }
 
   async function save(): Promise<void> {
-    if (saving.value) return
+    if (busy.value !== null) return
     error.value = notice.value = null
     const baseUrl = form.baseUrl.trim()
     const model = form.model.trim()
@@ -107,61 +128,85 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
       error.value = configured.value ? '修改地址时需要重新填写密钥。' : '请填写密钥。'
       return
     }
-    saving.value = true
+    busy.value = 'saving'
+    const ticket = runtime.claim()
     try {
       const body = form.apiKey === '' ? { base_url: baseUrl, model } : { base_url: baseUrl, model, api_key: form.apiKey }
-      adopt(await api.save(body, { signal: controller.signal }))
+      const config = await api.save(body, { signal: controller.signal })
+      if (!current(ticket) || !runtime.commitWrite(ticket, config)) return
+      adopt(config)
       testResult.value = null
       notice.value = '已保存。已创建的任务仍使用保存前的配置。'
     } catch (cause) {
-      if (cause instanceof AbortedError) return
+      if (cause instanceof AbortedError || !current(ticket)) return
       error.value = failureText(cause, '保存失败，请稍后重试。')
     } finally {
-      saving.value = false
+      if (busy.value === 'saving') busy.value = null
     }
   }
 
   async function test(): Promise<void> {
-    if (testing.value) return
+    if (busy.value !== null) return
     error.value = null
     testResult.value = null
-    const usesForm = form.apiKey !== ''
-    if (!usesForm && !configured.value) {
-      error.value = '请先填写密钥，或保存配置后再测试。'
-      return
+    const tested = { baseUrl: form.baseUrl.trim(), model: form.model.trim(), apiKey: form.apiKey }
+    // N05：只有地址与模型都与已存值一致且密钥留空时，测试的才是「已保存的配置」；
+    // 其余情况测试表单里这组完整的值，或要求先保存——不能让旧配置的结果冒充编辑中的新值。
+    const usesForm = tested.apiKey !== ''
+    if (!usesForm) {
+      if (!configured.value) {
+        error.value = '请先填写密钥，或保存配置后再测试。'
+        return
+      }
+      if (tested.baseUrl !== saved.value?.base_url || tested.model !== saved.value?.model) {
+        error.value = '地址或模型已修改：请先保存，或填写密钥后测试这组新值。'
+        return
+      }
     }
-    testing.value = true
+    const label = usesForm ? '表单中的配置（尚未保存）' : '已保存的配置'
+    busy.value = 'testing'
+    const ticket = runtime.claim()
     try {
-      const body = usesForm ? { base_url: form.baseUrl.trim(), model: form.model.trim(), api_key: form.apiKey } : undefined
+      const body = usesForm ? { base_url: tested.baseUrl, model: tested.model, api_key: tested.apiKey } : undefined
       const result: ModelConfigTestResult = await api.test(body, { signal: controller.signal, timeoutMs: 30_000 })
+      if (!current(ticket)) return
+      const edited = usesForm
+        && (form.baseUrl.trim() !== tested.baseUrl || form.model.trim() !== tested.model || form.apiKey !== tested.apiKey)
+      if (edited) {
+        testResult.value = { ok: false, text: '测试期间表单已修改，本次结果已作废，请重新测试。' }
+        return
+      }
       testResult.value = result.ok
-        ? { ok: true, text: `连接成功（${result.latency_ms} 毫秒）。` }
-        : { ok: false, text: TEST_TEXT[result.error_class ?? ''] ?? '连接失败。' }
+        ? { ok: true, text: `${label}：连接成功（${result.latency_ms} 毫秒）。` }
+        : { ok: false, text: `${label}：${TEST_TEXT[result.error_class ?? ''] ?? '连接失败。'}` }
     } catch (cause) {
-      if (cause instanceof AbortedError) return
+      if (cause instanceof AbortedError || !current(ticket)) return
       error.value = failureText(cause, '测试失败，请稍后重试。')
     } finally {
-      testing.value = false
+      if (busy.value === 'testing') busy.value = null
     }
   }
 
   async function clear(): Promise<void> {
-    if (clearing.value) return
+    if (busy.value !== null) return
     error.value = notice.value = null
-    clearing.value = true
+    busy.value = 'clearing'
+    const ticket = runtime.claim()
     try {
       await api.clear({ signal: controller.signal })
-      adopt({ runtime_mode: saved.value?.runtime_mode ?? 'personal', configured: false })
+      const cleared: ModelConfig = { runtime_mode: saved.value?.runtime_mode ?? 'personal', configured: false }
+      if (!current(ticket) || !runtime.commitWrite(ticket, cleared)) return
+      adopt(cleared)
       testResult.value = null
       notice.value = '已清除。尚未结束的任务会终止，需要重新上传。'
     } catch (cause) {
-      if (cause instanceof AbortedError) return
+      if (cause instanceof AbortedError || !current(ticket)) return
       error.value = failureText(cause, '清除失败，请稍后重试。')
     } finally {
-      clearing.value = false
+      if (busy.value === 'clearing') busy.value = null
     }
   }
 
   void load()
-  return { status, saved, form, configured, keyRequired, saving, testing, clearing, error, notice, testResult, load, save, test, clear }
+  return { status, saved, form, configured, keyRequired, busy, saving, testing, clearing, error, notice, testResult, load, save, test, clear }
 }

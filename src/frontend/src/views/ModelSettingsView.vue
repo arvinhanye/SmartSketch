@@ -8,7 +8,7 @@ const api = inject(MODEL_CONFIG_API_KEY, null)
 if (api === null) throw new Error('ModelSettingsView 需要注入 MODEL_CONFIG_API_KEY')
 
 const runtime = useRuntimeStore()
-const { status, saved, form, configured, keyRequired, saving, testing, clearing, error, notice, testResult, load, save, test, clear } =
+const { status, saved, form, configured, keyRequired, busy, saving, testing, error, notice, testResult, load, save, test, clear } =
   useModelConfig({ api })
 const confirmingClear = ref(false)
 
@@ -64,18 +64,18 @@ async function confirmClear(): Promise<void> {
         </p>
 
         <div class="model-settings__actions">
-          <button type="submit" data-test="mc-save" :disabled="saving">{{ saving ? '正在保存…' : '保存' }}</button>
-          <button type="button" data-test="mc-test" :disabled="testing" @click="test">
+          <button type="submit" data-test="mc-save" :disabled="busy !== null">{{ saving ? '正在保存…' : '保存' }}</button>
+          <button type="button" data-test="mc-test" :disabled="busy !== null" @click="test">
             {{ testing ? '正在测试…' : '测试连接' }}
           </button>
-          <button v-if="configured && !confirmingClear" type="button" data-test="mc-clear" :disabled="clearing"
+          <button v-if="configured && !confirmingClear" type="button" data-test="mc-clear" :disabled="busy !== null"
                   @click="confirmingClear = true">清除配置</button>
         </div>
         <p class="model-settings__hint">测试连接会向你的服务发送一次极小的请求（输出 1 个 token），费用可忽略。</p>
 
         <div v-if="confirmingClear" class="model-settings__confirm" role="alertdialog" aria-labelledby="mc-clear-title">
           <p id="mc-clear-title">清除后，你尚未结束的图谱生成任务会终止，需要重新上传。确定清除？</p>
-          <button type="button" data-test="mc-clear-confirm" @click="confirmClear">确定清除</button>
+          <button type="button" data-test="mc-clear-confirm" :disabled="busy !== null" @click="confirmClear">确定清除</button>
           <button type="button" data-test="mc-clear-cancel" @click="confirmingClear = false">取消</button>
         </div>
       </form>

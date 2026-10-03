@@ -63,8 +63,8 @@ export function useChat(client: ChatStreamClient, courseId: Ref<string | null>) 
 
   async function ask(text = question.value): Promise<void> {
     const trimmed = text.trim()
-    if (!trimmed || !courseId.value) return
-    stop()
+    // 冲刺设计 §3.7：在途时普通提交一律拒绝，不再隐式停止上一问再计费一次；要换问题先点「停止」
+    if (!trimmed || !courseId.value || sending.value) return
     const controller = new AbortController()
     active = controller
     const scope = course.beginRequest()

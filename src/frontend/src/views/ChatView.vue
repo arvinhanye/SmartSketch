@@ -27,7 +27,7 @@ const { entries, question, sending, currentVersion, ask, stop } = useChat(client
 // L10（ADR-080）：personal 模式下未配置个人模型 API 时不发起提问，引导到设置页
 const runtime = useRuntimeStore()
 function submitQuestion(): void {
-  if (runtime.needsConfig) return
+  if (runtime.needsConfig || sending.value) return
   void ask()
 }
 const selectedCitation = ref<Citation | null>(null)
@@ -124,7 +124,7 @@ function onKeydown(event: KeyboardEvent): void {
                   {{ kpLabel(id) }}
                 </button>
               </p>
-              <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" @click="ask(entry.question)">重试</button>
+              <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" :disabled="sending" @click="ask(entry.question)">重试</button>
             </div>
           </li>
         </ol>
@@ -150,8 +150,8 @@ function onKeydown(event: KeyboardEvent): void {
             @keydown="onKeydown"
           />
           <div class="actions">
-            <button v-if="sending" type="button" data-variant="secondary" @click="stop">停止</button>
-            <button type="submit" data-test="chat-send" :disabled="!question.trim() || runtime.needsConfig">发送</button>
+            <button v-if="sending" type="button" data-variant="secondary" data-test="chat-stop" @click="stop">停止</button>
+            <button type="submit" data-test="chat-send" :disabled="sending || !question.trim() || runtime.needsConfig">发送</button>
           </div>
         </form>
       </div>
