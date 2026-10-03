@@ -2,6 +2,7 @@
 import { computed, inject } from 'vue'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
+import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createVersionsApi, VERSIONS_API_KEY } from '../api/versions'
 import { useVersions } from '../composables/useVersions'
 
@@ -13,7 +14,16 @@ if (coursesApi === null) throw new Error('VersionPanel 需要注入 COURSES_API_
 const client = inject(HTTP_CLIENT_KEY, null)
 const api = inject(VERSIONS_API_KEY, null) ?? (client === null ? null : createVersionsApi(client))
 if (api === null) throw new Error('VersionPanel 需要注入 VERSIONS_API_KEY 或 HTTP_CLIENT_KEY')
-const state = useVersions({ courseId: computed(() => props.courseId), coursesApi, versionsApi: api, onCourseForbidden: () => emit('forbidden') })
+// L11-4：发布被拦时按需读一次草稿图，把阻断原因中的知识点 ID 写成名称；读不到时按 ID 列出
+const draftApi = inject(DRAFT_GRAPH_API_KEY, null) ?? (client === null ? null : createDraftGraphApi(client))
+async function nodeNames(cid: string): Promise<ReadonlyMap<string, string>> {
+  if (draftApi === null) return new Map()
+  const draft = await draftApi.getDraft(cid)
+  return new Map(draft.nodes.map((node) => [node.id, node.name] as const))
+}
+const state = useVersions({
+  courseId: computed(() => props.courseId), coursesApi, versionsApi: api, onCourseForbidden: () => emit('forbidden'), nodeNames,
+})
 </script>
 
 <template>
@@ -31,6 +41,9 @@ const state = useVersions({ courseId: computed(() => props.courseId), coursesApi
       </p>
       <p v-if="state.notice.value" data-test="vp-notice" role="status">{{ state.notice.value }}</p>
       <p v-if="state.error.value" data-test="vp-error" role="alert">{{ state.error.value }}</p>
+      <ul v-if="state.blockedReasons.value.length" data-test="publish-blocked-reasons">
+        <li v-for="line in state.blockedReasons.value" :key="line">{{ line }}</li>
+      </ul>
       <p v-if="state.refreshing.value" role="status">正在核对发布状态…</p>
       <div class="version-panel__actions">
         <button type="button" data-test="vp-publish" :disabled="state.busy.value !== null || state.stale.value" @click="state.publish">

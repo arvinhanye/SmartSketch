@@ -137,3 +137,55 @@ describe('L11 以选中知识点的来源新建知识点（ADR-035）', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------- L11-4 发布阻断原因可见
+
+import { effectScope } from 'vue'
+import { flushPromises } from '@vue/test-utils'
+import type { CoursesApi } from '../../src/frontend/src/api/courses'
+import type { VersionsApi } from '../../src/frontend/src/api/versions'
+import { blockedReasonLines, useVersions } from '../../src/frontend/src/composables/useVersions'
+
+describe('L11-4 发布阻断原因', () => {
+  const names = new Map([['a', '栈'], ['b', '队列']])
+
+  it('成环按知识点名称列出环路', () => {
+    expect(blockedReasonLines([{ kind: 'cycle', cycle: ['a', 'b', 'a'] }], names))
+      .toEqual(['先修关系成环：栈 → 队列 → 栈'])
+  })
+
+  it('悬空关系、来源失效、空图、谱系异常各有固定文案；未知名称退回 ID', () => {
+    expect(blockedReasonLines([
+      { kind: 'dangling_endpoint', relation_id: 'r1' }, { kind: 'invalid_source_ref', kp_id: 'x' },
+      { kind: 'empty_graph' }, { kind: 'invalid_lineage', kp_id: 'a' },
+    ], names)).toEqual([
+      '关系 r1 的端点已不存在', '知识点 x 的来源无法定位', '图谱为空，没有可发布的知识点', '知识点 栈 的合并谱系异常',
+    ])
+  })
+
+  it('结构不符时返回空数组，不抛错', () => {
+    expect(blockedReasonLines('oops', names)).toEqual([])
+    expect(blockedReasonLines([{ kind: 'unknown_kind' }, null], names)).toEqual([])
+  })
+
+  it('发布 409 PUBLISH_BLOCKED：除通用文案外给出逐条原因，不回显服务端 message', async () => {
+    const course = { id: 'c1', name: '课', status: 'draft', my_role: 'teacher', published_version: null, created_at: 'x' }
+    const coursesApi = { get: vi.fn(async () => course) } as unknown as Pick<CoursesApi, 'get'>
+    const versionsApi: VersionsApi = {
+      list: vi.fn(async () => []),
+      publish: vi.fn(async () => {
+        throw new ApiError(409, { code: 'PUBLISH_BLOCKED', message: '服务端原文',
+          details: { reasons: [{ kind: 'cycle', cycle: ['a', 'b', 'a'] }, { kind: 'empty_graph' }] } })
+      }),
+      rollback: vi.fn(),
+    }
+    const scope = effectScope()
+    const state = scope.run(() => useVersions({ courseId: ref('c1'), coursesApi, versionsApi, nodeNames: () => names }))!
+    await flushPromises()
+    await state.publish()
+    expect(state.error.value).toContain('发布校验未通过')
+    expect(state.error.value).not.toContain('服务端原文')
+    expect(state.blockedReasons.value).toEqual(['先修关系成环：栈 → 队列 → 栈', '图谱为空，没有可发布的知识点'])
+    scope.stop()
+  })
+})
