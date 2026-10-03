@@ -50,7 +50,8 @@ describe('B02 前端测试配置', () => {
     })
   })
 
-  describe('npm test 的退出码', () => {
+  // 两个用例各启动一次嵌套的 vitest，满载时需 5～8 秒；用例超时与子进程的 30 秒保持一致，断言不变
+  describe('npm test 的退出码', { timeout: 30_000 }, () => {
     it('断言失败时命令非 0，且失败原因是断言而不是模块解析', () => {
       const { status, output } = runVitestOn({
         'probe.test.ts': "import { expect, it } from 'vitest'\nit('probe', () => { expect(1).toBe(2) })\n",
