@@ -95,7 +95,6 @@ watch(
     linkNotice.value = outcome.notice
     if (outcome.select !== null) {
       filters.select(outcome.select)
-      canvas.value?.focus(outcome.select)
     }
   },
   { immediate: true },
@@ -158,10 +157,13 @@ const {
 
 // L14：视口跟随路径焦点（首个推荐项，或学生点选的推荐项），让高亮的路径落在画面里
 watch(
-  () => learningPath.value?.focus ?? null,
-  (focus) => {
-    if (focus !== null) canvas.value?.focus(focus)
+  [canvas, selected, () => learningPath.value?.focus ?? null, status],
+  () => {
+    if (status.value !== 'ready') return
+    const target = selected.value ?? learningPath.value?.focus ?? null
+    if (target !== null) canvas.value?.focus(target)
   },
+  { flush: 'post', immediate: true },
 )
 
 const masteryOptions: Array<{ value: MasteryStatus; label: string }> = [

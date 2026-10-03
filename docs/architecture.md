@@ -219,3 +219,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
   - **Frontend**（CI-02）：Node 24 下 `npm ci`（锁文件）、`type-check`、`test -- --run`（收集 `tests/frontend`，零用例即失败）、`build`。
   - **Backend**（CI-02）：Python 3.12 下可编辑安装 `src/backend[test]`、`pip check`、`pytest tests/backend`。
 - CI 通过表示上述单元/组件测试与构建通过，不代表 E2E、真实模型或数据库集成通过。K11 在 E2E（K05/K06）就绪后扩展同一门禁；新增检查必须失败即退出，不能以静默跳过冒充通过。
+
+
+### 计划 B 接手补充（2026-10-03，ADR-086/087）
+推荐结构化事实增加可选 importance_defaulted/difficulty_defaulted；服务层识别原始属性缺失，客户端不根据 0.5 猜测。课程作用域保存 myRole，外壳与概览共享同代在途读取但不缓存角色；切课/换号清空，建课返回也带会话代次保护。问答生成输出上限 2048、统一 15 秒截止与逐句出处校验不变。无表结构迁移，无新增外部服务。

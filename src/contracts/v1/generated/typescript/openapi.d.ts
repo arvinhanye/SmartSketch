@@ -1683,6 +1683,10 @@ export interface components {
              * @description 参与计算的重要度属性；缺失时为中性值 0.5
              */
             importance: number;
+            /** @description 原重要度缺失时为 true；可选，省略时客户端不猜测缺失 */
+            importance_defaulted?: boolean;
+            /** @description 原难度缺失时为 true；显式 0.5 为 false */
+            difficulty_defaulted?: boolean;
             /**
              * Format: double
              * @description (in_degree + out_degree) / (N−1)；N ≤ 1 时为 0

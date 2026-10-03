@@ -1531,14 +1531,14 @@
   2. **J05 只产出原始正文**：引用归一化、暂扣、哨兵判定、逐句覆盖与终态构造全部归 J06。`AnswerGeneration` 逐个产出非空片段，`close()` 关闭供应商流（J06 识别哨兵后、J07 客户端断开时调用）；正常结束后 `result` 给出拼接正文与 `finish_reason`（`length` 即 O6 截断）。
   3. 提示 `answer_with_context` 升到 v2（草稿），变量 `graph_context`、`context`、`question`，单条 user 消息。资料以 `<<资料 n>>（定位）` 为块头编号，n 与 J04 编号相同；知识点结构无编号且写明不能被引用；三部分各有 `<<…>>`/`<<…结束>>` 分段，结尾重申「只当作数据」。不用 J04 的 `[n]（定位）` 渲染，是为了让块号只出现在块头里：资料原文中的 `[3]`、代码 `a[1]` 保持原样，不会被当成块号。
   4. **原文注入按资料处理**：资料原文、结构上下文与问题中能伪造分段、块头或哨兵的开头（`<<`/`＜＜` 后接 `资料`、`课程资料`、`知识点结构`、`学生问题`、`INSUFFICIENT_EVIDENCE`）把 `<<` 换成 `«`，长度不增加；其余字符（含 `cout << x`）不动。注入文本不删除，仍作为数据留在资料段内。J06 的引用原文取自文本块数据，不受替换影响。
-  5. 请求 `purpose = answer_with_context`、`response_format = text`、输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 1024`（暂定）；不设单次超时，由 E04 按链路剩余时间补上。经 `bind(CallAttribution(course_id, request_id), deadline=...)` 调用，首字前切备用、出字后不切由 E04 保证。
+  5. 请求 `purpose = answer_with_context`、`response_format = text`、输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 2048`（2026-10-03 ADR-086 修订，按已批准的调高方向定稿）；不设单次超时，由 E04 按链路剩余时间补上。经 `bind(CallAttribution(course_id, request_id), deadline=...)` 调用，首字前切备用、出字后不切由 E04 保证。
   6. **故障分类**（`GenerationErrorKind` 闭集，`code` 与 `details_reason` 直接对应契约）：E04 截止时间、读取中链路到期、无状态码且剩余时间 ≤ 0.25 秒的供应商超时 → `timeout`；401/403 → `auth`；首字前其他供应商故障（含 408、熔断、主备都失败）→ `upstream`；出字后 → `stream_interrupted`；预算拒绝 → `BUDGET_EXCEEDED`；预写失败 → `STORAGE_UNAVAILABLE`；400/404/422 与意外异常 → `INTERNAL_ERROR`。`delivered` 标明故障前是否已出字，供 J07/J09 撤回。**超时是独立错误**：与 `upstream` 同为 `LLM_UNAVAILABLE`，以 `details.reason` 区分，不新增错误码（Q5 说明）。
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。J04 预算按 J04 的 `render_evidence()`（`[n]（定位）` 块头、每块以 `\n\n` 结尾）估算，实际提示的块头是 `<<资料 n>>（定位）` 且只有末块少一个 `\n\n`，故每块差 8 字节、末块再多 2 字节，上界为 `max_chunks × 8 + 2` 字节（独立审查按字节实测，已由 `test_prompt_blocks_are_no_larger_than_the_budgeted_rendering` 断言）。资料原文里的 `<<` 被换成 `«`（每个发生替换的 `<<` 少 1 字节），只会缩小该差值。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
-- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限已由 ADR-086 确认为 2048；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。块头比 J04 估算用的 `[n]` 多约 9 字节/块，J04 预算按 J04 渲染估算，实际提示略大，差值有上界（`max_chunks × 9` 字节），可接受。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
-- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限已由 ADR-086 确认为 2048；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
 
 ## ADR-069：I05 推荐查询从绑定版本的已提交快照读图，一次解析、全量排序后截断
 
@@ -1754,7 +1754,7 @@
 - **背景**：Codex 审查（`/Users/arvinhan/.codex/worktrees/e92f/SmartSketch/docs/reviews/codex-claude-plan-a-2026-10-03.md`，对象 `6ff8a8d → e86f4b9`）确认 D1–D3、N01–N08 共 11 项缺陷。ADR-080/081 的方案不变；本 ADR 只补齐实现它们时缺失的身份、分类与记账语义。修复任务见 `docs/tasks.md`「计划 A 审查修复」。
 - **决定**：
   1. **配置身份 `revision`（N01、N06）**：`user_model_configs` 新增 `revision`，每次保存（新建、换 key、只改模型）都生成新的 128 位随机值，清除后重建也不会与旧值相同。`version` 保留为面向用户的保存计数（契约不变，删除重建后仍可能从 1 开始），不再用于判断「是不是同一份配置」。问答的「用户 + 配置」缓存按 `revision` 比较；每次取模型都读库，因此另一进程的保存/清除同样生效，不依赖进程内清缓存。测试已存配置时记下读取时的 `revision`，结果只在该 `revision` 仍是当前值时落库（条件更新），否则丢弃、不污染新配置；测试本身的结果照实返回给调用方。`revision` 是服务端内部身份，不进 API 响应。任务快照语义不变（仍复制创建时的地址、模型与密文）。迁移 `016_model_config_revision.sql` 加可空列并为已有行回填随机值；回滚见迁移文件头。
-  2. **截断是生成故障（D1；部分修订 ADR-015 决定表「输出达到上限按正常结束判定」）**：`finish_reason = length` 且逐句出处校验（Q3.5）不通过——没有有效标记、只有未知标记、或有结论单元缺标记——时，终态是 `error`：`LLM_UNAVAILABLE`，`details.reason = truncated`，整段撤回临时正文；不再返回 `not_covered` / `all_citations_invalidated`（那是检索资料不足的语义）。截断但每个结论单元都有有效出处时仍按 ADR-015 为 `answered`（不浪费已付费生成，正文全部有出处）。没有截断的校验失败、哨兵、真实无检索命中保持原终态。不放松出处校验，不把无出处的截断正文当回答，不新增重试：本轮不做「缩短回答再生成」，输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 1024` 不变（调整上限属 ADR-068 待决 1，需要按 15 秒时限与费用另行实测决定）。`ChatLlmUnavailableReason` 增加 `truncated`，JSON 503 与 SSE `error` 同值，`chat_logs` 记 `error_code = LLM_UNAVAILABLE`、`error_reason = truncated`、`truncated = 1` 及子类；前端按原因提示「回答过长被截断，已撤回，请缩小问题范围或分开提问」。
+  2. **截断是生成故障（D1；部分修订 ADR-015 决定表「输出达到上限按正常结束判定」）**：`finish_reason = length` 且逐句出处校验（Q3.5）不通过——没有有效标记、只有未知标记、或有结论单元缺标记——时，终态是 `error`：`LLM_UNAVAILABLE`，`details.reason = truncated`，整段撤回临时正文；不再返回 `not_covered` / `all_citations_invalidated`（那是检索资料不足的语义）。截断但每个结论单元都有有效出处时仍按 ADR-015 为 `answered`（不浪费已付费生成，正文全部有出处）。没有截断的校验失败、哨兵、真实无检索命中保持原终态。不放松出处校验，不把无出处的截断正文当回答，不新增重试：本轮不做「缩短回答再生成」，输出上限按 ADR-086 修订为 `ANSWER_MAX_OUTPUT_TOKENS = 2048`（用户确认；15 秒时限与费用实测交 DeepSeek）。`ChatLlmUnavailableReason` 增加 `truncated`，JSON 503 与 SSE `error` 同值，`chat_logs` 记 `error_code = LLM_UNAVAILABLE`、`error_reason = truncated`、`truncated = 1` 及子类；前端按原因提示「回答过长被截断，已撤回，请缩小问题范围或分开提问」。
   3. **问答链路一个截止时刻（D3）**：截止时刻 = 进入问答路由时的 `time.monotonic()` + `LLM_CHAT_TIMEOUT_SECONDS`，由同一时钟贯穿改写、查询向量、图检索与生成；每一步开始前检查，到期即不再出站。查询向量的 `EmbeddingRequest.timeout_seconds` 取剩余时间，多批共用；图库读取在问答准备期间带 `neo4j.Query(timeout=剩余时间)`（服务端终止事务），剩余为零时不发查询；生成沿用 E04 按剩余时间截断的既有行为。HTTP 传输（系统级 `StdlibTransport` 与个人配置的 `GuardedTransport`）把 `timeout` 当作**整次交换的总预算**：域名解析放在有界等待中（超时即放弃结果、不再连接，解析线程只可能在系统解析器内自行结束，不会再发出供应商请求），多个地址依次连接、共用剩余预算，TLS 握手、发送、等待响应头都设剩余时间，另有看门狗在截止时刻关闭套接字，所以挂起或慢速逐字节的响应会在截止时刻真正断开，而不是外层先返回、请求在后台继续。准备阶段任一环节到期或在到期后失败，统一为 `LLM_UNAVAILABLE` + `details.reason = timeout`（开流前，两种传输都是 503 JSON；`chat_logs.error_reason = timeout`），不归资料未覆盖。地址校验、钉 IP 与 TLS 主机名校验不变。发布与离线重新向量化不带截止时刻，仍按 `LLM_REQUEST_TIMEOUT_SECONDS` 约束每次请求；worker 抽取的单次请求时限同样变为严格的总时限（原先读取阶段已按总时限，连接与解析阶段此前不受约束）。已知边界：Neo4j 驱动建立连接/取连接池的等待由驱动配置约束（本机实例，非本轮改动）。
   4. **供应商鉴权失败任务级终止（N02）**：抽取阶段任一块或小节的模型调用收到 401/403（`ModelAuthError`），该单元不做 L2 重试，阶段停止派发新单元，已在途单元的结果不再写检查点，任务以 `LLM_UNAVAILABLE`、`details = {"reason": "auth"}` 失败（不进入 `merging`，不切备用、不换 key；E04 本就不对鉴权失败做 L1 重试与主备切换）。与本人清除配置的 `credential_revoked` 等快照原因区分。普通的关系输出不合规仍按既有容错只记小节检查点。此规则对 `live` 的全站 key 同样成立：鉴权失败不会靠重试恢复。
   5. **凭据存储门禁先于一切、模型名共享校验（N07、N08）**：`/me/model-config/test` 的每个分支（完整请求体、空请求体、已有配置）都先确认凭据存储已启用，未启用即 503 `credential_store_disabled`，在任何域名解析与出站之前结束，与规格 §3.5「写入与测试返回 503」一致。保存与测试共用 `normalize_model`：去掉首尾空白后为空即 422 `VALIDATION_ERROR`（`field = model`，`reason = blank`），不写库、不解析、不出站；不靠前端拦截，也不把异常吞成 200。
@@ -1783,3 +1783,16 @@
 - **决定**：`SourceRef` 与 `Citation` 增加可选字段 `document_name`（1～255 字符），由服务端按**同一课程**的 `materials.filename` 填写：知识点详情、关系来源（图谱读取、关系编辑、审核队列）与问答引用都带上；他课或已删除的资料省略该字段，来源本身照常返回；问答查名失败只记 WARNING 并省略，不影响回答。不新增读取整份资料的接口，查看器只显示随来源返回的片段。前端统一以「文件名 · 第 N 页 · 章节」显示，缺文件名时写「资料不可用」，不再拿资料编号冒充文件名（H06 原「显示资料编号」的约定随之修订）；片段与文件名按纯文本渲染，超长片段先折叠。
 - **后果**：契约新增可选字段，旧客户端可忽略；DTO 已重新生成。每次读取多一次按课程过滤的资料查询（主键 + 课程条件）。
 - **回滚**：回退 L12 提交并重新生成 DTO；不涉及数据迁移。
+
+
+## ADR-086：问答输出上限 2048（2026-10-03）
+
+背景：1024 上限易截断带出处的课程回答，用户在 Claude 交接中已批准提高上限，交接建议 2048 并交 Codex 定稿。
+决定：ANSWER_MAX_OUTPUT_TOKENS=2048；改写仍 300；D1 逐句出处和 finish_reason=length 分类、15 秒链路时限、无额外重试均不变。替代 ADR-068 决定 5 和 ADR-082 决定 2 的 1024 保持条款。
+后果：本地仅测试接线和边界；真实成功率、延迟、费用交 DeepSeek 对照实测。回滚：恢复常量 1024、同步规格并重跑测试，不涉及数据迁移。用户已确认调高方向，Codex 按交接建议定稿 2048；真实测量待办。
+
+## ADR-087：计划 B 复审及课程闭环补齐（2026-10-03）
+
+背景：教师编辑支持 importance/difficulty 显式 0.5，前端把数字等于 0.5 猜成未标注；课程导航却按账号类型而非课程角色。
+决定：推荐 reason_facts 增加可选 importance_defaulted/difficulty_defaulted 布尔字段，由服务端根据原属性为 None 决定；前端只有 true 才展示未标注，旧响应省略字段时显示数值。不改变排序分数。课程 store 保存当前 myRole，按会话和课程作用域读取，未知角色只显示课程概览。下一步根据课程状态、发布版、资料数和个人 API 配置；不把发布版 kp_count 当草稿或资料计数。
+后果：新增字段向后兼容，无数据库迁移；教师账号可以是他课学生。已掌握后继不再算解锁；用户点选/问答目标优先于自动推荐聚焦；来源预览最多 600 字，只有主动展开才显示全文。回滚：撤销本提交并重生成契约，旧接口可继续消费。

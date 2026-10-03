@@ -5144,6 +5144,14 @@
             "maximum": 1,
             "description": "参与计算的重要度属性；缺失时为中性值 0.5"
           },
+          "importance_defaulted": {
+            "type": "boolean",
+            "description": "原重要度缺失时为 true；可选，省略时客户端不猜测缺失"
+          },
+          "difficulty_defaulted": {
+            "type": "boolean",
+            "description": "原难度缺失时为 true；显式 0.5 为 false"
+          },
           "centrality": {
             "type": "number",
             "format": "double",

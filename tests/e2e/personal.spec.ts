@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
-import { addStudent, apiLogin, createCourse, registerStudent } from './api'
+import { addStudent, apiLogin, call, createCourse, draftNodes, publish, registerStudent, uploadAndWait } from './api'
 import { appUrl, expect, login, studentPassword, studentUsername, teacherPassword, teacherUsername, test } from './fixtures'
 
 // L11（计划 B）个人模式端到端：LLM_MODE=personal，教师和学生在设置页填写本机假供应商
@@ -299,4 +299,62 @@ test.describe('个人模式（L11）', () => {
     await expect(row.locator('[data-test=task-error]')).toContainText('模型 API 设置')
     await configureModel(page, 'sk-fake-good', true)   // 复原，避免影响后续用例
   })
+  test('L15 两门课：成员权限、图谱、进度、推荐和问答出处互不串课', async ({page, browser, request}) => {
+    test.setTimeout(480_000)
+    await login(page, teacherUsername, teacherPassword)
+    await configureModel(page, 'sk-fake-good', true)
+    const teacher = await apiLogin(request, teacherUsername, teacherPassword)
+    const first = await createCourse(teacher, `L15 数据结构 ${Date.now()}`)
+    const second = await createCourse(teacher, `L15 操作系统 ${Date.now()}`)
+    for (const [cid, relative] of [[first, `${course1}/ch3-stack-queue.md`], [second, 'datasets/contest/course2-os-ch2/ch2-process-thread.md']]) {
+      const upload = file(relative, 'text/markdown')
+      await uploadAndWait(teacher, cid, upload.name, upload.mimeType, upload.buffer)
+      await publish(teacher, cid)
+    }
+    const username = `l15_student_${Date.now()}`
+    await registerStudent(request, username, studentPassword)
+    await addStudent(teacher, first, username)
+    const studentApi = await apiLogin(request, username, studentPassword)
+    const firstNode = (await draftNodes(teacher, first))[0]!
+    for (const suffix of ['/graph', '/progress', '/recommend', `/kp/${firstNode.id}`]) {
+      const forbidden = await call(studentApi, 'GET', `/api/v1/courses/${second}${suffix}`)
+      expect(forbidden.status()).toBe(403)
+      expect(await forbidden.text()).not.toContain('ch2-process-thread')
+    }
+    await addStudent(teacher, second, username)
+    const context = await browser.newContext()
+    try {
+      const student = await context.newPage()
+      await login(student, username, studentPassword)
+      await configureModel(student, 'sk-fake-good', true)
+      await student.goto(`${appUrl}/courses/${first}/graph`)
+      const masteredId = (await student.locator('[data-test=recommendations] [data-test=rc-item]').first().getAttribute('data-kp-id'))!
+      await student.locator(`[data-test="rc-select-${masteredId}"]`).click()
+      await student.locator('[data-test=sg-mastery-mastered]').click()
+      await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为已掌握')
+      for (const [cid, question, filename] of [[first, '什么是栈？', 'ch3-stack-queue.md'], [second, '什么是进程？', 'ch2-process-thread.md']]) {
+        await student.goto(`${appUrl}/courses/${cid}/graph`)
+        await expect(student.locator('[data-test=sg-version]')).toContainText('v1')
+        const graph = await (await call(studentApi, 'GET', `/api/v1/courses/${cid}/graph`)).json()
+        expect(graph.course_id).toBe(cid)
+        const ids = new Set(graph.nodes.map((n: {id: string}) => n.id))
+        const recommendations = await (await call(studentApi, 'GET', `/api/v1/courses/${cid}/recommend`)).json()
+        for (const item of recommendations.recommendations) expect(ids.has(item.kp_id)).toBe(true)
+        const progress = await (await call(studentApi, 'GET', `/api/v1/courses/${cid}/progress`)).json()
+        expect(progress.entries.every((entry: {kp_id: string}) => ids.has(entry.kp_id))).toBe(true)
+        if (cid === second) expect(progress.entries.every((entry: {status: string}) => entry.status === 'unknown')).toBe(true)
+        await student.goto(`${appUrl}/courses/${cid}/chat`)
+        expect(await student.locator('.conversation .exchange').count()).toBe(0)
+        await student.locator('textarea').fill(question)
+        await student.locator('[data-test=chat-send]').click()
+        await expect(student.locator('.source-list__item').first()).toBeVisible({timeout: 60_000})
+        for (const text of await student.locator('.source-list__item').allTextContents()) expect(text).toContain(filename)
+        const foreign = cid === first ? 'ch2-process-thread.md' : 'ch3-stack-queue.md'
+        expect(await student.locator('.source-list').textContent()).not.toContain(foreign)
+      }
+      const persisted = await (await call(studentApi, 'GET', `/api/v1/courses/${first}/progress`)).json()
+      expect(persisted.entries.find((e: {kp_id: string}) => e.kp_id === masteredId).status).toBe('mastered')
+    } finally { await context.close() }
+  })
+
 })

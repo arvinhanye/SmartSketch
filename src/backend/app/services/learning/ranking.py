@@ -162,6 +162,8 @@ class ReasonFacts:
     importance: float
     centrality: float
     difficulty: float
+    importance_defaulted: bool = False
+    difficulty_defaulted: bool = False
 
 
 @dataclass(frozen=True)
@@ -257,6 +259,8 @@ def rank_candidates(
             importance=importance,
             centrality=centrality,
             difficulty=difficulty,
+            importance_defaulted=attr.importance is None,
+            difficulty_defaulted=attr.difficulty is None,
         )
         ranked.append(
             RankedCandidate(

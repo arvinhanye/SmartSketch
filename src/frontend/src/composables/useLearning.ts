@@ -130,12 +130,12 @@ export function formatFactor(value: number): string {
   return Number.isFinite(value) ? value.toFixed(4) : String(value)
 }
 
-/** 抽取与教师编辑目前都不填重要度、难度；缺失时服务端按中性值 0.5 参与排序（`specs/learning-path.md` §3） */
+/** 缺失属性标志取自服务端，不根据数值 0.5 猜测缺失（ADR-087）。 */
 export const NEUTRAL_ATTRIBUTE = 0.5
 const UNLABELLED_TEXT = '未标注（按中性值 0.5 排序）'
 
-function attributeRow(key: string, label: string, value: number): ReasonFactRow {
-  const labelledDefault = value === NEUTRAL_ATTRIBUTE
+function attributeRow(key: string, label: string, value: number, defaulted?: boolean): ReasonFactRow {
+  const labelledDefault = defaulted === true
   return { key, label, value: labelledDefault ? UNLABELLED_TEXT : formatFactor(value), labelledDefault }
 }
 
@@ -144,9 +144,9 @@ export function reasonFactRows(item: Recommendation): ReasonFactRow[] {
   const facts = item.reason_facts
   return [
     { key: 'unlock_count', label: '可立即解锁', value: `${item.unlock_count} 个` },
-    attributeRow('importance', '重要度', facts.importance),
+    attributeRow('importance', '重要度', facts.importance, facts.importance_defaulted),
     { key: 'centrality', label: '中心度', value: formatFactor(facts.centrality) },
-    attributeRow('difficulty', '难度', facts.difficulty),
+    attributeRow('difficulty', '难度', facts.difficulty, facts.difficulty_defaulted),
     { key: 'chapter', label: '章节', value: facts.chapter_name === null ? '未分章' : `${facts.chapter_name}（秩 ${facts.chapter_rank}）` },
     { key: 'primary_factor', label: '主要理由', value: PRIMARY_FACTOR_LABELS[facts.primary_factor] },
   ]

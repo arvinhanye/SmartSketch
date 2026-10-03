@@ -264,7 +264,8 @@ def test_item_shape_score_rebuilds_bitwise_and_version_is_repeated(env):
     assert a["name"] == "点a"
     assert a["reason_facts"] | {"primary_factor": None} == {
         "primary_factor": None, "chapter_id": "c1", "chapter_name": "第一章", "chapter_rank": 0,
-        "importance": 0.8, "centrality": 0.5, "difficulty": 0.3}
+        "importance": 0.8, "centrality": 0.5, "difficulty": 0.3,
+        "importance_defaulted": False, "difficulty_defaulted": False}
     assert a["factors"] == {"unlock": 1.0, "importance": 0.65, "chapter_order": 1.0, "ease": 0.7}
     c = next(r for r in body["recommendations"] if r["kp_id"] == "c")
     assert c["reason_facts"]["centrality"] == 0.0  # RELATED_TO 不参与

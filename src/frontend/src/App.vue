@@ -16,6 +16,9 @@ import {
   STUDENT_GRAPH_ROUTE,
   TEACHER_GRAPH_ROUTE,
 } from './router'
+import { readCourseDetail } from './composables/courseDetailRequest'
+import { COURSES_API_KEY } from './api/courses'
+import { useCourseStore } from './stores/course'
 import { MODEL_CONFIG_API_KEY } from './api/modelConfig'
 import { useRuntimeStore } from './stores/runtime'
 import { useSessionStore } from './stores/session'
@@ -66,12 +69,26 @@ const courseId = computed(() => {
   return typeof cid === 'string' && cid !== '' ? cid : null
 })
 
-// 课程内导航按账号类型给入口；课程内实际权限由各页面按 `Course.my_role` 与后端判定
+// L15：课程权限与账号类型分离；读取失败/未知时不猜测权限。
+const courseApi = inject(COURSES_API_KEY, null)
+const courseStore = getActivePinia() ? useCourseStore() : null
+watch([courseId, () => session?.accessToken ?? null], async ([cid, token]) => {
+  if (courseStore === null) return
+  courseStore.selectCourse(token === null ? null : cid)
+  if (cid === null || token === null || courseApi === null) return
+  const scope = courseStore.beginRequest()
+  try {
+    const detail = await readCourseDetail(courseApi, cid, scope.signal)
+    if (session?.accessToken === token && detail.id === cid) courseStore.setRole(scope, detail.my_role)
+  } catch { /* 未知角色只提供概览，页面负责错误提示。 */ }
+}, { immediate: true, flush: 'sync' })
 const courseNav = computed<NavItem[]>(() => {
   const cid = courseId.value
   if (cid === null || router === null || role.value === null) return []
   const names =
-    role.value === 'teacher'
+    courseStore?.myRole === null || courseStore === null
+      ? [[COURSE_ROUTE, '课程概览']]
+      : courseStore.myRole === 'teacher'
       ? [
           [COURSE_ROUTE, '课程概览'],
           [MATERIALS_ROUTE, '教学资料'],

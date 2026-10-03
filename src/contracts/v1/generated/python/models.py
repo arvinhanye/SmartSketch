@@ -1041,6 +1041,13 @@ class RecommendReasonFacts(BaseModel):
         float,
         Field(description='参与计算的重要度属性；缺失时为中性值 0.5', ge=0.0, le=1.0),
     ]
+    importance_defaulted: Annotated[
+        Optional[bool],
+        Field(description='原重要度缺失时为 true；可选，省略时客户端不猜测缺失'),
+    ] = None
+    difficulty_defaulted: Annotated[
+        Optional[bool], Field(description='原难度缺失时为 true；显式 0.5 为 false')
+    ] = None
     centrality: Annotated[
         float,
         Field(

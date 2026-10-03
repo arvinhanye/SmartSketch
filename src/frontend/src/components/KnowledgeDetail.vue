@@ -8,7 +8,7 @@ import {
   type SourceLocation,
   type SourceView,
 } from '../composables/useKnowledgeDetail'
-import { documentLabel as documentName } from '../composables/sourceLabel'
+import { EXCERPT_FOLD_CHARS, documentLabel as documentName } from '../composables/sourceLabel'
 import SourceViewer from './SourceViewer.vue'
 
 /**
@@ -154,8 +154,8 @@ watch(detail, async (next) => {
               <span>{{ documentLabel(source) }}</span>
               <span>：{{ source.locationLabel }}</span>
             </button>
-            <blockquote v-if="source.excerpt" data-test="kd-source-excerpt"
-              ><template v-for="(segment, i) in highlightSegments(source.excerpt, detail.highlightTerms)" :key="i"
+            <blockquote v-if="source.excerpt && activeSourceKey !== source.key" data-test="kd-source-excerpt"
+              ><template v-for="(segment, i) in highlightSegments(source.excerpt.length > EXCERPT_FOLD_CHARS ? source.excerpt.slice(0, EXCERPT_FOLD_CHARS) + '…' : source.excerpt, detail.highlightTerms)" :key="i"
                 ><mark v-if="segment.mark">{{ segment.text }}</mark
                 ><template v-else>{{ segment.text }}</template></template
               ></blockquote

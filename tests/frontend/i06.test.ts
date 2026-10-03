@@ -127,6 +127,8 @@ function recommendation(kpId: string, overrides: Partial<Recommendation> = {}): 
       importance: 1,
       centrality: 1,
       difficulty: 0.5,
+      importance_defaulted: false,
+      difficulty_defaulted: true,
     },
     ...overrides,
   }

@@ -88,10 +88,10 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
 | L11 | IN_PROGRESS（L11-1～L11-7 已完成；L11-7 真实模型复测待 DeepSeek） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
-| L12 | DONE（待复审） | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
-| L13 | DONE（待复审） | Claude | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
-| L14 | IN_PROGRESS（演示端到端回归待 Codex 修复，见交接 §2） | Claude → Codex | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
-| L15 | TODO（移交 Codex，待认领；见 `docs/handoffs/claude-plan-b-handoff-to-codex.md`） | Codex（待认领） | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15_isolation.py`；`verify.sh integration` 与 D/N 回归 |
+| L12 | REVIEWED / 本地门禁通过（Codex 复审修复） | Claude → Codex | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
+| L13 | REVIEWED / 本地门禁通过（Codex 复审修复） | Claude → Codex | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
+| L14 | DONE（Codex 已修回归；完整本地门禁通过） | Claude → Codex | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
+| L15 | DONE（本地闭环；真实 QA 抽样已交 DeepSeek 待执行） | Codex | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15.py`、`l15-creation-scope.test.ts`；`verify.sh integration` 与 D/N 回归 |
 
 - 2026-10-03 L11-1 完成：`datasets/contest/` 两门课各一章（Markdown 为源，PDF 由 `scripts/build-contest-pdfs.sh` 用 Chrome 无头打印：第 3 章 5 页、第 2 章 4 页），`tests/backend/test_l11_datasets.py` red（无清单）→ green。**发现并修复阻断**：macOS 字体 PDF 的部首形近字（⽬⾃⻓⻅），ADR-083、解析器 `pdf/2`，red 4 failed → green；解析相关 1840 passed。已知：pdfminer 对 Chrome 字体打印大量 FontBBox 告警，不影响提取。
 - 2026-10-03 L11-2～L11-5 完成：本机 OpenAI 兼容假供应商（`scripts/fake_provider.py`，`tests/tooling/test_l11_fake_provider.py` 13 passed）；个人模式端到端 `tests/e2e/personal.spec.ts` 3 passed（教师 PDF+MD 闭环、处理中取消后重传、供应商拒绝密钥）。走查发现并修复两个前端阻断：教师图谱页没有画布外的选节点方式、没有新建知识点入口（`tests/frontend/l11.test.ts`）；发布被拦时逐条列出原因（L11-4）。`e2e.sh` 修复 bash 3.2 下清理报错导致的容器残留；B02 嵌套 vitest 用例超时与子进程对齐。前端全量 818 passed。
@@ -1682,3 +1682,17 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 起因：用户在 macOS（Intel，Docker Desktop 29.8）运行 `scripts/start-demo.sh`，只得到「Neo4j 健康检查失败」。实际原因两个：另一个目录里的 SmartSketch 副本的 Neo4j 容器（`smartsketch-neo4j-1`）一直占着 7474/7687；本目录的 Neo4j 数据/日志在反复崩溃后留下坏状态，以退出码 3、无 ERROR 反复重启。停掉另一份、换全新数据卷后启动成功（2026-10-01 用户确认）。
 - 验收条件：① 容器未运行且端口被占时不启动容器、给出 `lsof` 命令；② 容器停在 created/exited 或重启次数增加时立即失败，打印 Docker 报错、退出码与最近 40 行日志；③ 认证被拒时立即失败并说明口令只在首次初始化生效，输出不含口令；④ `unhealthy` 不立即失败，截止时打印最后一次连接输出；⑤ 正常启动行为不变。
 - 已排除：「桌面」目录挂载（改用 Docker 卷后照旧退出）；镜像、APOC、内存设置（原版镜像三组对照在该 Mac 上都正常）。坏状态的具体文件未定位，数据已随旧卷删除。
+
+
+## 2026-10-03 Codex 接手计划 B（c85ee53）
+
+| ID | 状态 | 负责人 | 范围及验收 |
+| --- | --- | --- | --- |
+| B-TAKEOVER | DONE（本地修复与完整门禁；真实测量已交接） | Codex | 复审 5a34fec..56610d4、修复推荐按钮及确认缺陷、L15、QA 2048；最终稳定代码 integration 门禁；真实模型只交 DeepSeek |
+| L15 | DONE（本地闭环；真实测量待 DeepSeek） | Codex | 课程内角色导航、阶段下一步、入课空态、课程隔离/恶意文本、个人模式双课程 E2E |
+
+输入：claude-plan-b-handoff-to-codex.md 与 c85ee53 文档提交。输出：修复、测试、Codex 审查和 DeepSeek 交接。依赖：现有接口/本地演示与假供应商；风险：切课/换号迟到响应、1024->2048 延迟费用待实测。验证：最小前后端回归、type-check/build、./scripts/verify.sh integration、git diff --check。文件所有权：本轮 Codex 顺序修改相关前后端、契约和文档；不写 Claude 工作树，不推送不合并。旧 Codex 工作树基线较早且有文档改动，保留；新托管 worktree codex/plan-b-takeover 基于 c85ee53。
+
+验收证据（Codex，最终稳定代码）：./scripts/verify.sh integration 整体 exit 0；后端3780 passed/27白名单skip，前端901 passed，集成393 passed/4白名单skip，图库44 passed，演示E2E2 passed、个人假供应商E2E4 passed（包含两课程隔离）；type-check/build与契约门禁均通过，git diff --check exit0。独立 D/N 后端116与前端107均通过。报告 docs/reviews/codex-plan-b-c85ee53.md；接手交接 docs/handoffs/codex-plan-b-takeover.md；真实模型交接 docs/handoffs/codex-plan-b-deepseek-qa.md。
+
+未决归属：DeepSeek L11-7 PDF 复测报告未到；L15-6 Step4 两课各5题/2048完整耗时、首字、出处质量、在线向量费用待真实测量与预算核对。计划 B 本地功能验收完成，不宣称赛题质量和时限全部达标，不推送不合并不快进冲刺分支。

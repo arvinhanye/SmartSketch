@@ -103,6 +103,8 @@ def _item(candidate: RankedCandidate, graph_version: int) -> dict[str, Any]:
             "importance": facts.importance,
             "centrality": facts.centrality,
             "difficulty": facts.difficulty,
+            "importance_defaulted": facts.importance_defaulted,
+            "difficulty_defaulted": facts.difficulty_defaulted,
         },
     }
 

@@ -71,7 +71,7 @@ export function buildLearningPath(
   }
   for (const out of prereqs.filter((edge) => edge.from_id === f)) {
     const target: string = out.to_id
-    if (roles.get(target) === 'unlocks' || target === f) continue
+    if (roles.get(target) === 'unlocks' || target === f || mastered(target)) continue
     const into: PathEdge[] = incoming(target)
     if (!into.every((edge) => edge.from_id === f || mastered(edge.from_id))) continue
     roles.set(target, 'unlocks')

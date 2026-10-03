@@ -71,8 +71,8 @@ function highlighted(kpId: string): string {
           :data-primary-factor="item.reason_facts.primary_factor"
           :data-highlighted="highlighted(item.kp_id)"
         >
-          <button type="button" class="recommendations__select" :data-test="`rc-select-${item.kp_id}`" @click="$emit('select', item.kp_id)">
-            <span class="recommendations__order" data-test="rc-order">{{ index + 1 }}.</span>
+              <span class="recommendations__order" data-test="rc-order" aria-hidden="true">{{ index + 1 }}.</span>
+        <button type="button" class="recommendations__select" :data-test="`rc-select-${item.kp_id}`" @click="$emit('select', item.kp_id)">
             {{ item.name }}
           </button>
           <p class="recommendations__reason" data-test="rc-reason">{{ item.reason }}</p>

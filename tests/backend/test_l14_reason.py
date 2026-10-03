@@ -24,3 +24,20 @@ def test_importance_primary_with_missing_importance_says_unlabelled():
 def test_explicit_neutral_value_is_still_a_number():
     (a,) = rank(["A"], [], set(), attrs=[kp("A", difficulty=0.5)], weights=RecommendWeights(0, 0, 0, 1))
     assert a.reason == "该点的主要推荐依据是易学度（难度 0.5000，易学度 0.5000）"
+
+
+def test_wire_marks_missing_attributes_without_guessing_neutral_values():
+    from app.services.learning.recommend import _item
+    (missing,) = rank(["A"], [], set(), attrs=[kp("A")], weights=RecommendWeights(0, 0, 0, 1))
+    (explicit,) = rank(["A"], [], set(), attrs=[kp("A", importance=0.5, difficulty=0.5)], weights=RecommendWeights(0, 0, 0, 1))
+    assert _item(missing, 1)["reason_facts"]["importance_defaulted"] is True
+    assert _item(missing, 1)["reason_facts"]["difficulty_defaulted"] is True
+    assert _item(explicit, 1)["reason_facts"]["importance_defaulted"] is False
+    assert _item(explicit, 1)["reason_facts"]["difficulty_defaulted"] is False
+
+
+def test_qa_output_cap_is_2048_without_changing_rewrite_cap():
+    from app.services.qa.generate import ANSWER_MAX_OUTPUT_TOKENS
+    from app.services.qa.rewrite import REWRITE_MAX_OUTPUT_TOKENS
+    assert ANSWER_MAX_OUTPUT_TOKENS == 2048
+    assert REWRITE_MAX_OUTPUT_TOKENS == 300

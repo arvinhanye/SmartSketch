@@ -29,6 +29,12 @@ function role(path: ReturnType<typeof buildLearningPath>, id: string) {
 }
 
 describe('L14-1 学习路径纯函数', () => {
+  it('已掌握的后继不重复计为之后解锁', () => {
+    const path = buildLearningPath(NODES, EDGES, mastery('A', 'B', 'D'), recs('C'), 'C')
+    expect(path.narrative.unlocks).toEqual(['知识点E'])
+    expect(path.edges.has('cd')).toBe(false)
+    expect(role(path, 'D')).not.toBe('unlocks')
+  })
   it('无前置：焦点 A 是下一步；C 还需要 B，不算解锁', () => {
     const path = buildLearningPath(NODES, EDGES, mastery(), recs('A', 'B', 'G'), null)
     expect(path.focus).toBe('A')
@@ -239,7 +245,7 @@ function rec(kpId: string, extra: Partial<Recommendation['reason_facts']> = {}):
     weighted: { unlock: 0.175, importance: 0.125, chapter_order: 0.2, ease: 0.1 },
     unlock_count: 1, reason: `完成 ${kpId} 可解锁后继`,
     reason_facts: { primary_factor: 'unlock', chapter_id: 'ch1', chapter_name: '第一章', chapter_rank: 0,
-      importance: 0.5, centrality: 0.3, difficulty: 0.5, ...extra },
+      importance: 0.5, centrality: 0.3, difficulty: 0.5, importance_defaulted: extra.importance === undefined, difficulty_defaulted: extra.difficulty === undefined, ...extra },
   }
 }
 
@@ -354,6 +360,7 @@ describe('L14-3 推荐解释：先修事实优先，缺省值不冒充测量', (
       },
     })
     expect(wrapper.get('[data-test="rc-path-line"]').text()).toBe('已掌握：知识点A → 下一步：知识点C → 之后解锁：知识点D')
+    expect(wrapper.get('[data-test="rc-select-C"]').text()).toBe('知识点C')
     expect(wrapper.findAll('[data-test="rc-order"]').map((el) => el.text())).toEqual(['1.', '2.'])
     expect(wrapper.get('.recommendations__details summary').text()).toBe('排序参考')
     expect(wrapper.find('[data-fact="importance"]').text()).toContain('未标注')

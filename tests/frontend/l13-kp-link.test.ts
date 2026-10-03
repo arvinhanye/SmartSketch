@@ -7,6 +7,8 @@ import type { components } from '../../src/contracts/v1/generated/typescript/ope
 import { CHAT_STREAM_CLIENT_KEY, type ChatStreamClient } from '../../src/frontend/src/api/chatStream'
 import { COURSES_API_KEY } from '../../src/frontend/src/api/courses'
 import { PUBLISHED_GRAPH_API_KEY, type PublishedGraphApi } from '../../src/frontend/src/api/graph'
+import { PROGRESS_API_KEY } from '../../src/frontend/src/api/progress'
+import { RECOMMEND_API_KEY } from '../../src/frontend/src/api/recommend'
 import { KNOWLEDGE_DETAIL_API_KEY } from '../../src/frontend/src/api/knowledgeDetail'
 import { kpLinkOutcome } from '../../src/frontend/src/composables/kpLink'
 import { GRAPH_FACTORY_KEY, type CanvasGraph, type CanvasGraphFactory } from '../../src/frontend/src/graph/lifecycle'
@@ -75,7 +77,9 @@ beforeEach(() => {
   setActivePinia(pinia)
 })
 
-async function mountGraph(path: string, version = 3) {
+const captured: string[] = []
+async function mountGraph(path: string, version = 3, learning = false) {
+  captured.length = 0
   const session = useSessionStore(pinia)
   session.signIn({ access_token: 't', token_type: 'bearer', expires_in: 3600, user: { id: 'u_s', username: 's', role: 'student' } })
   const router = createAppRouter({ history: createMemoryHistory(), getAccountRole: () => session.role,
@@ -92,7 +96,11 @@ async function mountGraph(path: string, version = 3) {
         [COURSES_API_KEY as symbol]: { list: async () => [], create: vi.fn(), get: async () => course },
         [PUBLISHED_GRAPH_API_KEY as symbol]: graph,
         [KNOWLEDGE_DETAIL_API_KEY as symbol]: { get: async (_cid: string, kid: string) => ({ ...kp(kid), source_refs: [{ chunk_id: 'k', document_id: 'd', page: 1 }], prerequisites: [], successors: [], related: [] }) },
-        [GRAPH_FACTORY_KEY as symbol]: canvasFactory([]),
+        [GRAPH_FACTORY_KEY as symbol]: canvasFactory(captured),
+        ...(learning ? {
+          [PROGRESS_API_KEY as symbol]: { get: async () => ({graph_version:version, entries:['a','b'].map(kp_id=>({kp_id,status:'unknown',own_status:'unknown',inherited_from:[],updated_at:null}))}) },
+          [RECOMMEND_API_KEY as symbol]: { get: async () => ({graph_version:version,state:'recommendations',total_eligible:1,recommendations:[{kp_id:'a',name:'知识点 a',graph_version:version,score:0.6,unlock_count:0,reason:'fixture',factors:{unlock:0,importance:0.5,chapter_order:1,ease:0.5},weighted:{unlock:0,importance:0.125,chapter_order:0.2,ease:0.1},reason_facts:{primary_factor:'chapter_order',chapter_id:'ch1',chapter_name:'章',chapter_rank:0,importance:0.5,centrality:0,difficulty:0.5}}]}) }
+        } : {}),
       },
     },
   })
@@ -154,5 +162,26 @@ describe('L13-4 问答知识点按钮链接到图谱', () => {
     expect(chip.element.tagName).toBe('A')
     expect(chip.attributes('href')).toBe('/courses/c1/graph?kp=a&v=3')
     wrapper.unmount()
+  })
+})
+
+describe('offline QA viewport probes', () => {
+  it('QA direct link without learning preserves requested focus b', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+    const {wrapper}=await mountGraph('/courses/c1/graph?kp=b&v=3')
+    await flushPromises()
+    expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点 b')
+    expect(captured.at(-1)).toBe('kp:b')
+    wrapper.unmount(); vi.restoreAllMocks()
+  })
+  it('QA direct link with learning preserves requested focus b', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+    const {wrapper}=await mountGraph('/courses/c1/graph?kp=b&v=3',3,true)
+    await flushPromises()
+    expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点 b')
+    expect(captured.at(-1)).toBe('kp:b')
+    wrapper.unmount(); vi.restoreAllMocks()
   })
 })
