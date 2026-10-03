@@ -34,7 +34,7 @@ changed_files:
 | `pytest tests/backend/test_l05.py` | 先收集失败；实现后 2 例失败（同一根因）；修复后通过 |
 | `pytest tests/backend/test_l05.py tests/backend/test_e03.py tests/backend/test_e04.py` | 全部通过 |
 | `./scripts/verify.sh` | exit 0（基础档） |
-| 后端全量 | 与 L06 一起运行，结果记在 `claude-l06.md` |
+| 后端全量 | 与 L06 一起运行：exit 0，3623 通过、27 跳过（见 `claude-l06.md`） |
 
 ## unverified
 

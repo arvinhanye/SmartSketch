@@ -24,7 +24,7 @@
 | L03 | DONE | Claude | ADR-080/081、`AGENTS.md` §4/§6、`docs/`、`src/contracts/`、生成物；前端三处错误码清单同步 | 契约门禁 exit 0；前端类型检查与 772 用例通过；后端 3561 通过/27 跳过；交接 `docs/handoffs/claude-l03.md` |
 | L04 | DONE | Claude | 迁移 015、`services/credentials.py`、`repositories/model_configs.py`、`config.py`、`cryptography==50.0.2` | 11 个新用例；后端 3572 通过/27 跳过；交接 `docs/handoffs/claude-l04.md` |
 | L05 | DONE | Claude | `services/ai/outbound.py`；顺带修复 `_StdlibResponse.read` 在服务端关闭连接时误报连接错误 | 32 个新用例与既有客户端用例通过；交接 `docs/handoffs/claude-l05.md` |
-| L06 | TODO | Claude | `services/model_configs.py`、`api/model_config.py` | 越权、脱敏、无泄漏、限流用例 |
+| L06 | DONE | Claude | `services/model_configs.py`、`api/model_config.py`、`main.py` | 20 个新用例；后端 3623 通过/27 跳过；真实 DeepSeek 测试连接成功、无效密钥识别为 auth；交接 `docs/handoffs/claude-l06.md` |
 | L07 | TODO | Claude | 上传绑定、`workers/`、调用归属用户 | 改/清配置、重启接管、两教师不同 key 用例 |
 | L08 | TODO | Claude | `api/chat.py`、`services/qa/`、按用户日预算 | 两用户隔离、一人坏 key 不影响另一人 |
 | L09 | TODO | Claude | 在线向量联调、`local` 明确拒绝、`scripts/start.sh` | 真实检索可用；正式入口不静默切 demo |
