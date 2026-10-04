@@ -223,41 +223,31 @@ function failWith(error: Error): AuthApi['login'] {
 }
 
 describe('H13 登录页', () => {
-  it('品牌区展示多组不同结构的装饰知识图谱并对读屏隐藏', async () => {
+  it('品牌区展示来源的装饰知识图谱并对读屏隐藏', async () => {
     const { wrapper } = await mountApp()
     const artwork = wrapper.get('.auth-layout__art')
-    const graphs = artwork.findAll('[data-test="auth-graph"]')
 
+    // 来源是单张固定示意图（不再是多组运动图谱），但对读屏仍完全隐藏
     expect(artwork.attributes('aria-hidden')).toBe('true')
-    expect(graphs.length).toBeGreaterThanOrEqual(8)
-    expect(artwork.findAll('line').length).toBeGreaterThan(30)
-    expect(new Set(graphs.map((graph) => `${graph.findAll('rect').length}:${graph.findAll('circle').length}`)).size)
-      .toBeGreaterThanOrEqual(3)
-
-    const second = await mountApp()
-    expect(second.wrapper.get('[data-test="auth-graph"]').attributes('transform'))
-      .not.toBe(graphs[0].attributes('transform'))
+    expect(wrapper.findAll('[data-test="auth-graph"]')).toHaveLength(1)
+    expect(artwork.findAll('circle').length).toBe(11) // 2 条轨道 + 1 处光晕 + 8 个节点
+    expect(artwork.findAll('path').length).toBe(9) // 9 条关系连线
+    expect(artwork.findAll('text').map((node) => node.text())).toContain('课程知识')
   })
 
-  it('品牌区图谱在动画帧中改变位置', async () => {
-    let nextFrame: FrameRequestCallback | undefined
-    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-      nextFrame = callback
-      return 1
-    }))
+  it('品牌区是静态示意图：节点不随渲染帧移动', async () => {
+    const nextFrame = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', nextFrame)
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
     const { wrapper } = await mountApp()
+
     const graph = wrapper.get('[data-test="auth-graph"]')
-    const before = graph.attributes('transform')
-
-    expect(nextFrame).toBeDefined()
-    nextFrame?.(1000)
-    nextFrame?.(2000)
-
-    expect(graph.attributes('transform')).not.toBe(before)
+    // 来源模板不在示意图上写 transform，也就不会随时间位移
+    expect(graph.attributes('transform')).toBeUndefined()
+    expect(nextFrame).not.toHaveBeenCalled()
   })
 
-  it('用户启用减少动态效果时不启动品牌区动画', async () => {
+  it('用户启用减少动态效果时认证页照常渲染且不注册动画帧', async () => {
     const requestFrame = vi.fn()
     vi.stubGlobal('requestAnimationFrame', requestFrame)
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
@@ -268,7 +258,7 @@ describe('H13 登录页', () => {
 
     const { wrapper } = await mountApp()
 
-    expect(wrapper.findAll('[data-test="auth-graph"]')).toHaveLength(8)
+    expect(wrapper.findAll('[data-test="auth-graph"]')).toHaveLength(1)
     expect(requestFrame).not.toHaveBeenCalled()
   })
 
@@ -284,53 +274,73 @@ describe('H13 登录页', () => {
 
   it('未登录提示可关闭，关闭后登录表单仍可使用', async () => {
     const { wrapper } = await mountApp({ path: '/teacher' })
-    const close = wrapper.get('button[aria-label="关闭提示"]')
-    expect(wrapper.get('[role="alert"]').text()).toContain('未登录')
+    const notice = wrapper.get('.auth-layout__notice')
+    expect(notice.attributes('role')).toBe('alert')
+    expect(notice.text()).toContain('未登录')
 
-    await close.trigger('click')
+    await notice.get('button[aria-label="关闭提示"]').trigger('click')
 
-    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('.auth-layout__notice').exists()).toBe(false)
     expect(wrapper.find('input[name="username"]').exists()).toBe(true)
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
   })
 
-  it('认证页不隐藏跳转提示：提示是带关闭按钮的可关闭提示条', async () => {
-    // 回归（审查 R2）：来源的样式曾用 .app--auth .app-main > [role="alert"] { display: none }
-    // 假定认证组件自己渲染同一条提示；目标的 AuthLayout 没有该逻辑，隐藏后用户看不到跳转原因。
+  it('认证页的未登录提示只显示一条：外壳那一份被标记为认证页承载并隐藏', async () => {
+    // 回归（本轮 U1）：来源在表单卡上方渲染这条提示，外壳若不做处理就会同时出现两条。
     const { wrapper } = await mountApp({ path: '/teacher' })
-    const notice = wrapper.get('[role="alert"]')
-    expect(notice.classes()).toContain('app-notice')
-    expect(notice.text()).toContain('未登录：请先登录，再进入教师或学生首页。')
-    // 提示条与登录表单同时存在（不是被隐藏后只留 DOM）
-    expect(wrapper.find('.auth-layout').exists()).toBe(true)
-    expect(notice.element.closest('.app-main')).not.toBeNull()
+    const shellNotice = wrapper.get('.app-notice')
+    const authNotice = wrapper.get('.auth-layout__notice')
+    expect(shellNotice.classes()).toContain('is-auth-owned')
+    expect(shellNotice.element.closest('.app-main')).not.toBeNull()
+    expect(authNotice.text()).toContain('未登录：请先登录，再进入教师或学生首页。')
+    expect(authNotice.find('button[aria-label="关闭提示"]').exists()).toBe(true)
+    expect(authNotice.element.closest('.auth-layout')).not.toBeNull()
+
+    // 隐藏规则只命中「认证页承载 + 本页确实渲染了 AuthLayout」的那一条，不波及整类 role=alert
+    const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+    expect(css).toContain('.app--auth .app-main:has(> .auth-layout) > .app-notice.is-auth-owned')
   })
 
-  it('样式表里没有任何隐藏外壳提示的规则', () => {
+  it('未注入认证页的外壳仍显示未登录提示（B03 旧路由外壳不回退）', () => {
+    // 隐藏规则依赖 :has(> .auth-layout)：没有 AuthLayout 时外壳提示必须保持可见。
     const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
-    // 逐条检查规则体：不允许出现「把 .app-notice 或 role=alert 关掉」的声明
+    const rule = css
+      .split('}')
+      .find((block) => (block.split('{')[0] ?? '').includes('.app-notice.is-auth-owned'))
+    expect(rule).toBeDefined()
+    expect(rule!).toContain(':has(> .auth-layout)')
+  })
+
+  it('样式表里没有任何粗粒度隐藏外壳提示的规则', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+    // 允许的只有一条精确规则：必须是「本页确实渲染了 AuthLayout」且「该提示标记为认证页承载」；
+    // 其余任何把 .app-notice / role=alert 关掉的规则都不允许（会把角色不符等提示一起藏掉）。
     const hidingRules = css
       .split('}')
       .filter((block) => /app-notice|\[role=["']?alert/.test(block.split('{')[0] ?? ''))
       .filter((block) => /display:\s*none|visibility:\s*hidden/.test(block))
-    expect(hidingRules, `发现隐藏提示的规则：${hidingRules.join(' | ')}`).toEqual([])
+    for (const rule of hidingRules) {
+      const selector = rule.split('{')[0] ?? ''
+      expect(selector).toContain(':has(> .auth-layout)')
+      expect(selector).toContain('is-auth-owned')
+      expect(selector).not.toContain('[role')
+    }
     // 认证页不再走「隐藏重复提示」的旧语义
     expect(css).not.toContain('.app--auth .app-main:has(> .auth-layout) > [role="alert"]')
   })
 
-  it('卡片兜底只作用于未迁移页面：排除透明页面外层与卡片自身', () => {
-    // 回归（审查 R3）：删掉 .app-main > section 的卡片外观后，未迁移页面丢失卡片与留白；
-    // 恢复时必须排除 .page（迁移后的透明外层）与 .surface-card（自带外观），否则双重卡片。
+  it('页面根容器不再叠加卡片外观：只约束不溢出', () => {
+    // 回归（本轮 U2）：`.app-main > section:not(.page)` 上的 padding/背景/边框/阴影
+    // 会把审核页的 `section.version-panel` 套进一张多余的大白卡。
     const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
     const fallback = css.split('}').find((block) => block.includes('.app-main > section'))
     expect(fallback).toBeDefined()
-    expect(fallback!).toContain(':not(.page)')
-    expect(fallback!).toContain(':not(.surface-card)')
-    expect(fallback!).toMatch(/background:\s*var\(--color-surface\)/)
-    expect(fallback!).toMatch(/border:\s*1px solid var\(--color-border\)/)
-    expect(fallback!).toMatch(/border-radius:/)
-    expect(fallback!).toMatch(/box-shadow:\s*var\(--shadow-card\)/)
-    expect(fallback!).toMatch(/padding:/)
+    expect(fallback!).toMatch(/min-width:\s*0/)
+    expect(fallback!).not.toContain(':not(.page)')
+    expect(fallback!).not.toMatch(/background:/)
+    expect(fallback!).not.toMatch(/border:/)
+    expect(fallback!).not.toMatch(/box-shadow:/)
+    expect(fallback!).not.toMatch(/padding:/)
   })
 
   it.each([

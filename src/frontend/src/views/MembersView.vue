@@ -633,10 +633,8 @@ const counts = computed(() => ({
   .members__counts {
     width: 100%;
   }
-}
 
-/* 窄屏：输入框与按钮改纵向排列，按钮铺满整行 */
-@media (max-width: 480px) {
+  /* 来源断点：760px 以下输入框与按钮改纵向排列，按钮铺满整行 */
   .members__field-row {
     flex-direction: column;
     align-items: stretch;

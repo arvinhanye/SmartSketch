@@ -294,6 +294,7 @@ watch(
           ref="deleteButton"
           type="button"
           class="node-editor__danger"
+          data-variant="secondary"
           data-test="ne-delete"
           :disabled="saving"
           @click="openDeleteConfirm"
@@ -316,7 +317,7 @@ watch(
         <p :id="id('confirm')">
           确定删除「{{ original.name }}」？与它相连的全部关系会一并删除<span v-if="dirty">，未保存的修改也会丢失</span>。
         </p>
-        <button type="button" class="node-editor__danger" data-test="ne-delete-yes" :disabled="saving" @click="onConfirmDelete">
+        <button type="button" class="node-editor__danger" data-variant="secondary" data-test="ne-delete-yes" :disabled="saving" @click="onConfirmDelete">
           确认删除
         </button>
         <button type="button" data-test="ne-delete-no" :disabled="saving" @click="closeDeleteConfirm">取消</button>

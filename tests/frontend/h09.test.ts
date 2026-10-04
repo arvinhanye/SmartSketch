@@ -292,6 +292,13 @@ describe('审核队列页：加载与三类空态', () => {
     const { wrapper } = await mountPage(f)
     // 三类数量都取服务端 totals，不用已加载数组长度代替
     expect(headingCounts(wrapper)).toEqual(['低置信度关系（2）', '疑似重复知识点（1）', '孤立知识点（2）'])
+    // 用户实际看到的数字与可访问名称也必须是服务端 totals（不能只靠隐藏的 data-heading）
+    expect(wrapper.get('[data-test="rv-count-low_confidence_relation"]').text()).toBe('2')
+    expect(wrapper.get('[data-test="rv-total-low_confidence_relation"]').attributes('aria-label'))
+      .toBe('低置信度关系，共 2 项')
+    expect(wrapper.get('[data-test="rv-count-isolated_node"]').text()).toBe('2')
+    expect(wrapper.get('[data-test="rv-total-isolated_node"]').attributes('aria-label'))
+      .toBe('孤立知识点，共 2 项')
     // 首次加载自动落在第一个有待处理项的分类上
     expect(wrapper.find('[data-test="rv-relation"]').exists()).toBe(true)
     expect(rows(wrapper, 'rv-relation')).toEqual(['r1', 'r2'])
@@ -349,6 +356,22 @@ describe('审核队列页：加载与三类空态', () => {
     await click(wrapper, '[data-test="rv-approve"]')
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(true)
+  })
+
+  it.each([
+    ['PREREQUISITE', true],
+    ['CONTAINS', false],
+    ['EXAMPLE_OF', false],
+    ['RELATED_TO', false],
+  ] as const)('%s 关系只在确实表示前置时显示「前置 → 后继」', async (type, hasPrerequisiteLabel) => {
+    // 有向关系不止前置：CONTAINS / EXAMPLE_OF 也有方向，把它们标成「前置 → 后继」是错的
+    const relation = { ...rel('r1', 'k1', 'k2'), type }
+    const { wrapper } = await mountPage(fakes({ relations: [relation], duplicates: [], isolated: [] }))
+    const text = wrapper.get('[data-test="rv-relation"]').text()
+    expect(text.includes('前置 → 后继')).toBe(hasPrerequisiteLabel)
+    // 箭头与关系类型标签始终保留
+    expect(text).toContain('线性表')
+    expect(text).toContain('栈')
   })
 
   it('草稿名称读取失败不影响审核，关系两端退回显示 ID', async () => {

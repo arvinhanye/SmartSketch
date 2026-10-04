@@ -357,50 +357,30 @@ tr:last-child td {
   align-content: start;
 }
 
-/* 未登录时登录、注册页铺满顶栏以下 */
+/* 未登录时登录、注册页铺满顶栏以下；认证页外壳只做定位，滚动交给右侧表单栏，
+ * 外层不叠加任何卡片外观（来源的 AuthLayout 自带分栏与滚动） */
 .app:not(.app--workbench) .app-main:has(> .auth-layout) {
   max-width: none;
   padding: 0;
 }
-/* 认证页（登录、注册）：全屏左右分栏，表单栏在窄而矮的窗口里内部滚动，避免提交按钮被挤出视口。
- * 目标的 AuthLayout 依赖这套全屏布局，因此把目标原先挂在 `.app--login` 上的规则迁到 `.app--auth`。 */
-.app.app--auth .app-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  max-width: none;
-  min-height: 0;
-  padding: 0;
+.app--auth .app-main {
+  display: block;
+  position: relative;
 }
-.app.app--auth .auth-layout {
-  flex: 1;
-  min-height: 0;
+/* 认证页的未登录提示由 AuthLayout 在表单卡上方渲染；外壳里的同一个提示标记为 is-auth-owned。
+ * 只在本页确实渲染了 AuthLayout 时隐藏外壳那一份，因此未注入认证页的外壳仍会显示跳转原因。
+ * 注意不要把这些规则扩展到整类 role=alert：角色不符等其他提示必须保持可见。 */
+.app--auth .app-main:has(> .auth-layout) > .app-notice.is-auth-owned {
+  display: none;
 }
-.app.app--auth .auth-layout__brand {
-  min-height: 0;
-  overflow: hidden;
-}
-.app.app--auth .auth-layout__form {
-  min-height: 0;
-  overflow-y: auto;
-}
-/* 这里不隐藏 role="alert"：认证页的跳转提示（未登录、角色不符）必须对用户可见，
- * 目标的 AuthLayout 没有在表单内渲染同一条提示，隐藏就会让人看不到被跳转的原因。 */
 
-/* 直接落在 .app-main 网格里的 <section>/<form>：尚未迁移的页面靠这条兜底保持卡片外观与留白。
- * 排除两类已经自带外观的容器，避免双重卡片：
- *   `.page`        迁移后的透明页面外层（标题落在背景上，内层卡片各自承担外观）
- *   `.surface-card` 已经是卡片，不需要再叠一层背景与内边距 */
-.app-main > section:not(.page):not(.surface-card),
-.app-main > form:not(.page):not(.surface-card) {
-  display: grid;
-  gap: 0.75rem;
+/* 直接落在 .app-main 网格里的 <section>/<form>：只保证不溢出。
+ * 页面外观一律由 `.page`（透明外层）、`.surface-card`（卡片自身）或组件 scoped 样式承担；
+ * 这里再叠一层 padding/background/border/shadow 会让审核页的 `section.version-panel`
+ * 等页面根容器被套进一张多余的大白卡（审查 U2）。 */
+.app-main > section,
+.app-main > form {
   min-width: 0;
-  padding: 1.25rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
 }
 
 /* ---------------------------------------------------------------- 页面骨架与卡片（API 设置页是视觉基准）

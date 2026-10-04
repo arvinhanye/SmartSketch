@@ -183,6 +183,66 @@ describe('L10 模型 API 设置页', () => {
     expect(api.test).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="mc-error"]').text()).toContain('请先保存')
   })
+
+  it('重看连接结果不重复发送测试请求', async () => {
+    const api = fakeApi(SAVED)
+    const wrapper = await mountView(api)
+    const dialog = wrapper.get('[data-test="mc-test-dialog"]').element as HTMLDialogElement
+    dialog.showModal = () => { dialog.open = true }
+    dialog.close = () => { dialog.open = false }
+
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(api.test).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-test="mc-dialog-close"]').trigger('click')
+    expect(dialog.open).toBe(false)
+
+    // 「查看测试结果」是纯展示操作：重新打开弹窗但不再发请求
+    await wrapper.get('[data-test="mc-view-result"]').trigger('click')
+    expect(dialog.open).toBe(true)
+    expect(api.test).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="mc-dialog-result"]').text()).toContain('321')
+    wrapper.unmount()
+  })
+
+  it('测试完成后清除配置不残留表单已修改提示', async () => {
+    const api = fakeApi(SAVED)
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="mc-dialog-close"]').trigger('click')
+
+    await wrapper.get('[data-test="mc-clear"]').trigger('click')
+    await wrapper.get('[data-test="mc-clear-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(api.clear).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="mc-status"]').text()).toContain('尚未配置')
+    // 清除会清空表单，但不能把「表单已修改，请重新测试」这条旧提示留在页面上
+    expect(wrapper.find('[data-test="mc-test-stale"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('测试完成后保存不残留表单已修改提示', async () => {
+    const api = fakeApi(EMPTY)
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-base-url"]').setValue('https://api.example.com/v1')
+    await wrapper.get('[data-test="mc-model"]').setValue('m1')
+    await wrapper.get('[data-test="mc-api-key"]').setValue(KEY)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="mc-dialog-close"]').trigger('click')
+
+    await wrapper.get('[data-test="mc-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(api.save).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-test="mc-test-stale"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="mc-notice"]').text()).toContain('已保存')
+    wrapper.unmount()
+  })
 })
 
 // ---------------------------------------------------------------- 上传页与问答页的未配置引导

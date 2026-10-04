@@ -94,5 +94,23 @@ const blocks = computed<Block[]>(() => {
 <style scoped>
 pre { overflow-x: auto; padding: .75rem; background: var(--color-surface-muted); }
 code { background: var(--color-surface-muted); }
-.citation { color: var(--color-primary); border: 0; background: none; cursor: pointer; text-decoration: underline; }
+/* 引用按钮：来源只写了普通态，悬停会被全局主按钮 hover 覆盖成砖红底 + 砖红字，编号难辨认。
+ * 这里把普通/悬停/焦点三态都显式写清，局部选择器优先级足以覆盖全局 button:hover。 */
+.chat-markdown button.citation {
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+  color: var(--color-primary);
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.chat-markdown button.citation:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
+}
+.chat-markdown button.citation:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 </style>

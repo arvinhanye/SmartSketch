@@ -349,7 +349,8 @@ function otherName(pair: SuspectedDuplicate): string {
                     </p>
                     <p class="item__meta">
                       置信度 {{ percent(relation.confidence) }}
-                      <span v-if="relationDirected(relation)"> · 前置 → 后继</span>
+                      <!-- 「前置 → 后继」只对 PREREQUISITE 成立：CONTAINS / EXAMPLE_OF 同样有方向，但不是前置关系 -->
+                      <span v-if="relation.type === 'PREREQUISITE'"> · 前置 → 后继</span>
                     </p>
                     <p v-if="canExpand(relation)" class="item__link-row">
                       <button

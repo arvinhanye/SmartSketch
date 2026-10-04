@@ -55,6 +55,13 @@ const notice = computed(() => {
   return null
 })
 
+// 来源认证页在表单卡上方自行渲染这条未登录提示：外壳的同一提示标记为「认证页承载」，
+// 由 styles.css 的精确规则隐藏（只在本页确实渲染了 AuthLayout 时命中），
+// 不删除外壳提示本身，未注入认证页的旧路由外壳（B03）仍照常显示跳转原因。
+const authHandlesNotice = computed(
+  () => route?.name === ROOT_ROUTE && route.query.notice === NOTICE_UNAUTHENTICATED,
+)
+
 const role = computed(() => session?.role ?? null)
 // 工作台保留侧栏；登录与注册页使用独立的全屏认证外壳。
 const withSidebar = computed(() => route !== null && role.value !== null)
@@ -151,7 +158,12 @@ function signOut(): void {
       </div>
     </header>
     <main class="app-main">
-      <div v-if="notice" class="app-notice" role="alert">
+      <div
+        v-if="notice"
+        class="app-notice"
+        :class="{ 'is-auth-owned': authHandlesNotice }"
+        role="alert"
+      >
         <span>{{ notice }}</span>
         <button type="button" class="app-notice__close" aria-label="关闭提示" @click="dismissedNotice = true">×</button>
       </div>
@@ -171,6 +183,23 @@ function signOut(): void {
           </svg>
           <span>我的课程</span>
         </RouterLink>
+        <!-- 来源把 API 设置放在「我的课程」之后、课程导航之前；
+             这里保留目标分支的个人设置路由与任一已登录角色可见规则 -->
+        <RouterLink
+          v-if="settingsLink"
+          :to="settingsLink"
+          class="app-nav__item"
+          :class="{ 'is-active': settingsActive }"
+          :aria-current="settingsActive ? 'page' : undefined"
+          data-test="nav-model-settings"
+        >
+          <svg class="app-nav__icon" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false">
+            <circle cx="9" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4" />
+            <path d="M9 2.2v2M9 13.8v2M2.2 9h2M13.8 9h2M4.2 4.2l1.4 1.4M12.4 12.4l1.4 1.4M13.8 4.2l-1.4 1.4M5.6 12.4l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          </svg>
+          <span>API 设置</span>
+          <span v-if="runtime?.needsConfig" class="app-nav__badge" data-test="nav-model-settings-pending">未配置</span>
+        </RouterLink>
         <template v-if="courseNav.length">
           <p class="app-nav__heading">当前课程</p>
           <RouterLink
@@ -188,21 +217,6 @@ function signOut(): void {
             <span>{{ item.label }}</span>
           </RouterLink>
         </template>
-        <RouterLink
-          v-if="settingsLink"
-          :to="settingsLink"
-          class="app-nav__item"
-          :class="{ 'is-active': settingsActive }"
-          :aria-current="settingsActive ? 'page' : undefined"
-          data-test="nav-model-settings"
-        >
-          <svg class="app-nav__icon" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false">
-            <circle cx="9" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4" />
-            <path d="M9 2.2v2M9 13.8v2M2.2 9h2M13.8 9h2M4.2 4.2l1.4 1.4M12.4 12.4l1.4 1.4M13.8 4.2l-1.4 1.4M5.6 12.4l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-          </svg>
-          <span>模型 API 设置</span>
-          <span v-if="runtime?.needsConfig" class="app-nav__badge" data-test="nav-model-settings-pending">未配置</span>
-        </RouterLink>
       </nav>
       <p v-if="runtime?.isDemo" class="app-mode" data-test="mode-demo" role="status">
         演示模式 · 使用内置演示模型，不调用个人 API

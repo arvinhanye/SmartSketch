@@ -132,6 +132,7 @@ function onKeydown(event: KeyboardEvent, index: number): void {
           <button
             type="button"
             class="knowledge-cards__card"
+            data-variant="secondary"
             data-test="kc-card"
             :data-kp-id="card.kpId"
             :aria-pressed="card.kpId === selectedId ? 'true' : 'false'"
