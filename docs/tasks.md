@@ -1,6 +1,6 @@
 # 任务看板
 
-> **当前状态（2026-10-04，Codex 验收修复轮）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；当前依据以末节与 `docs/handoffs/codex-plan-c-acceptance-fixes.md` 为准。
+> **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
 
 
 ## 2026-10-02 Claude 认领：A10 一周参赛冲刺设计
@@ -1882,9 +1882,14 @@ C-ACC-FIX-54 验收：签收新增回归 RED23failed/16passed、计时 RED4faile
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| C-INTEGRATE-20261004 | IN_PROGRESS | Codex | 整合当前验收四项修复、复审/交接/启动指南及已撤销设计记录；本机凭据与业务库不入库；干净无.env隔离门禁后提交推送修复PR，按依赖顺序合并相关合格PR至main；不执行技术冻结 |
+| C-INTEGRATE-20261004 | DONE（#317/#319/#318已合并；未冻结） | Codex | 整合当前验收四项修复、复审/交接/启动指南及已撤销设计记录；本机凭据与业务库不入库；干净无.env隔离门禁后提交推送修复PR，按依赖顺序合并相关合格PR至main；不执行技术冻结 |
 
 输入：用户本轮明确授权提交GitHub、开PR和合并可合并PR；现有#317（计划A，base main）、#318（计划B/C与验收，base #317分支、草稿）、本地codex/plan-c-acceptance-fixes最新修复。输出：可追溯提交/PR、独立本地门禁与远程CI结果、本Agent集成交接。依赖：GitHub与Docker可用；风险：叠加PR基线错位、把旧REQUEST_CHANGES直接合并、凭据从说明文档泄露、测试误连用户库、将合并误作冻结。验证：指定四文件回归、无.env干净工作副本./scripts/verify.sh integration、只读签收重算、敏感值扫描、git diff --check、PR头提交与CI状态匹配。只改自己的工作区；不移动/清空用户运行环境，不合并测量分支88f9f6f，不发真实生成或向量请求。此次发布授权覆盖先前历史任务的“不推送合并”约束，但不授权技术冻结：stage_c_status OPEN，technical_freeze NOT_PERFORMED。
 
 
 C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整次integration exit0，backend+tooling3921passed/27登记skip、frontend934+type-check/build、integration393/4登记skip、backend-live44、演示2、个人假供应商4；定向61passed与只读核验通过。对561个待推送历史blob和可发布文件的本机敏感值匹配0；启动指南真实值已恢复占位，私人备档保留在忽略目录，用户.env未改。结果与代码SHA见evaluation/raw/codex-c-acc-fixes/publication-verification.json；远程PR/CI和main合并待执行，不将本地通过记为已合并。
+
+
+C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCESS，merge commit 3d696158；#319（头d03b5e7，本轮修复）全部8检查SUCCESS，先合入claude/plan-c-acceptance，merge commit bbc8fbea；#318基线改为main、纳入修复后头bbc8fbea全部8检查SUCCESS，merge commit 0436ff34，已进入main。merge commit保留作者/历史，不force-push、不删除分支；没有合并测量分支88f9f6f。验证origin/main包含d03b5e7且完整代码树与已验修复提交一致。仓库当时开放PR列表为空；发布交接与启动说明的文档同步另由后续PR承载，不冒充新的业务修复或冻结。
+
+上述PR状态、头/合并提交与CI链接存evaluation/raw/codex-c-acc-fixes/publication-verification.json。当前代码入口scripts/start.sh已在GitHub main；本地主目录代码未自动pull/切换，本机.env/业务库未改。说明文档不存真实Key，向量仍.env全局online、生成API仍个人网页配置；网页向量配置计划保持CANCELLED_BY_USER。真实测量与人工签收口径不变，三项不补测仍未测，历史慢段根因OPEN；stage_c_status OPEN、technical_freeze NOT_PERFORMED。用户手工检查与冻结决定仍等待用户，不因GitHub合并自动签收。

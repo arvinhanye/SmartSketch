@@ -69,5 +69,206 @@
   },
   "stage_c_status": "OPEN",
   "technical_freeze": "NOT_PERFORMED",
-  "github": "pending current-head CI and dependency merges"
+  "github": {
+    "code_integrated_main": "0436ff34f1c0637c48d9dc093c983798bee183bd",
+    "method": "merge commit; exact-head guards; no admin bypass/force push/branch deletion",
+    "pull_requests": [
+      {
+        "number": 317,
+        "url": "https://github.com/arvinhanye/SmartSketch/pull/317",
+        "state": "MERGED",
+        "merged_at": "2026-10-04T14:29:46Z",
+        "merge_commit": "3d696158e98b069b1bb63a4019e7409de23cb2dc",
+        "reviewed_head": "68762e8ab9efdfc20552a94668d7e26deb2e34c5",
+        "all_checks_success_before_merge": true,
+        "checks": [
+          {
+            "name": "Repository scaffold",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121912130/job/111199531778"
+          },
+          {
+            "name": "Repository scaffold",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121910091/job/111199525480"
+          },
+          {
+            "name": "Frontend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121912130/job/111199531897"
+          },
+          {
+            "name": "Frontend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121910091/job/111199525533"
+          },
+          {
+            "name": "Backend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121912130/job/111199531913"
+          },
+          {
+            "name": "Backend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121910091/job/111199525508"
+          },
+          {
+            "name": "Integration and E2E",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121912130/job/111199531899"
+          },
+          {
+            "name": "Integration and E2E",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37121910091/job/111199525406"
+          }
+        ]
+      },
+      {
+        "number": 319,
+        "url": "https://github.com/arvinhanye/SmartSketch/pull/319",
+        "state": "MERGED",
+        "merged_at": "2026-10-04T14:42:01Z",
+        "merge_commit": "bbc8fbea8789305f0e1bec07fa0da9d9e2cfbe3b",
+        "reviewed_head": "d03b5e7207944f7c4c7f37070bdae9e903d8b32e",
+        "all_checks_success_before_merge": true,
+        "checks": [
+          {
+            "name": "Repository scaffold",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209707297/job/111458202512"
+          },
+          {
+            "name": "Repository scaffold",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209700358/job/111458182309"
+          },
+          {
+            "name": "Frontend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209707297/job/111458202301"
+          },
+          {
+            "name": "Frontend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209700358/job/111458182355"
+          },
+          {
+            "name": "Backend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209707297/job/111458202549"
+          },
+          {
+            "name": "Backend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209700358/job/111458182209"
+          },
+          {
+            "name": "Integration and E2E",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209707297/job/111458202436"
+          },
+          {
+            "name": "Integration and E2E",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37209700358/job/111458182330"
+          }
+        ]
+      },
+      {
+        "number": 318,
+        "url": "https://github.com/arvinhanye/SmartSketch/pull/318",
+        "state": "MERGED",
+        "merged_at": "2026-10-04T14:51:53Z",
+        "merge_commit": "0436ff34f1c0637c48d9dc093c983798bee183bd",
+        "reviewed_head": "bbc8fbea8789305f0e1bec07fa0da9d9e2cfbe3b",
+        "all_checks_success_before_merge": true,
+        "checks": [
+          {
+            "name": "Repository scaffold",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210232633/job/111459744466"
+          },
+          {
+            "name": "Repository scaffold",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210230027/job/111459737491"
+          },
+          {
+            "name": "Frontend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210232633/job/111459744398"
+          },
+          {
+            "name": "Frontend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210230027/job/111459737442"
+          },
+          {
+            "name": "Backend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210232633/job/111459744486"
+          },
+          {
+            "name": "Backend",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210230027/job/111459737504"
+          },
+          {
+            "name": "Integration and E2E",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210232633/job/111459744473"
+          },
+          {
+            "name": "Integration and E2E",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210230027/job/111459737348"
+          }
+        ]
+      }
+    ],
+    "main_contains_repair_commit": true,
+    "main_tree_equal_to_repair_commit": true,
+    "local_primary_main_not_pulled": true,
+    "integrated_code_main_push_ci": {
+      "conclusion": "success",
+      "databaseId": 37210838745,
+      "headSha": "0436ff34f1c0637c48d9dc093c983798bee183bd",
+      "status": "completed",
+      "url": "https://github.com/arvinhanye/SmartSketch/actions/runs/37210838745"
+    }
+  },
+  "pre_publication_basic": {
+    "exit_code": 0,
+    "log": "/private/tmp/codex-publish-basic.log"
+  },
+  "final_document_basic": {
+    "exit_code": 0,
+    "log": "/private/tmp/codex-publish-closeout-basic.log",
+    "sha256": "5cfd7cbaea4d5c34ccc1052f53f7788e9d8a353945eb6871e861cb12012e340b"
+  }
 }
