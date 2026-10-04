@@ -219,4 +219,5 @@ def test_migration_017_adds_nullable_reasoning_columns(tmp_path):
         files = [row[0] for row in db.execute("SELECT filename FROM schema_migrations ORDER BY version")]
     for name in ("usage_reasoning", "reasoning_chars", "first_reasoning_ms", "first_content_ms"):
         assert name in columns and columns[name][3] == 0          # 可空
-    assert files[-1].startswith("017_")
+    assert files.count("017_model_call_reasoning.sql") == 1
+    assert migrate(url) == []  # 后续迁移不影响 017 的一次性应用与可空语义

@@ -12,7 +12,7 @@ from app.config import Settings
 from app.repositories import model_configs as repo
 from app.repositories.model_configs import KeyRequired, ModelConfigRow
 from app.services.ai.client import Message, ModelCallError, ModelRequest
-from app.services.ai.compatible import CompatibleModelClient, HttpTransport
+from app.services.ai.compatible import CompatibleModelClient, HttpTransport, thinking_body
 from app.services.ai.outbound import EndpointBlocked, Resolver, check_endpoint, system_resolver
 from app.services.credentials import CredentialCipher, CredentialError, ModelConfigRequired
 
@@ -82,7 +82,7 @@ def view(settings: Settings, user_id: str) -> ModelConfigView:
 
 
 def save(settings: Settings, user_id: str, *, base_url: str, model: str, api_key: str | None,
-         resolver: Resolver | None = None) -> ModelConfigView:
+         resolver: Resolver | None = None, disable_thinking: bool | None = None) -> ModelConfigView:
     cipher = _cipher(settings)
     model = normalize_model(model)
     check_endpoint(base_url, allow_private=settings.MODEL_ENDPOINT_ALLOW_PRIVATE,
@@ -92,7 +92,7 @@ def save(settings: Settings, user_id: str, *, base_url: str, model: str, api_key
         _check_key(api_key)
         sealed, hint = cipher.seal(user_id, api_key), api_key[-4:]
     row = repo.save_config(settings.SQLITE_URL, user_id=user_id, base_url=base_url, model=model,
-                           sealed=sealed, key_hint=hint)
+                           sealed=sealed, key_hint=hint, disable_thinking=disable_thinking)
     return ModelConfigView(settings.LLM_MODE, row)
 
 
@@ -102,11 +102,12 @@ def clear(settings: Settings, user_id: str) -> None:
 
 def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: str | None, api_key: str | None,
              transport: HttpTransport, resolver: Resolver | None = None,
-             clock: Callable[[], float] = time.monotonic) -> TestOutcome:
+             clock: Callable[[], float] = time.monotonic, disable_thinking: bool = False) -> TestOutcome:
     """One minimal chat call. With no values the saved configuration is tested and the result recorded.
 
     The credential store is checked first on every branch (N07): without a root key nothing is
-    resolved or sent, even for a complete request body.
+    resolved or sent, even for a complete request body. The request carries the same thinking switch
+    that would be used after saving: the form value, or the saved value when testing the saved row (ADR-090).
     """
     cipher = _cipher(settings)
     saved = base_url is None
@@ -116,6 +117,7 @@ def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: s
         if row is None:
             raise ModelConfigRequired()
         revision = row.revision
+        disable_thinking = row.disable_thinking
         try:
             base_url, model, api_key = row.base_url, row.model, cipher.open(user_id, row.sealed)
         except CredentialError:
@@ -132,7 +134,8 @@ def run_test(settings: Settings, user_id: str, *, base_url: str | None, model: s
     else:
         try:
             client = CompatibleModelClient(base_url or "", api_key or "", transport=transport,
-                                           default_timeout_seconds=TEST_TIMEOUT_SECONDS)
+                                           default_timeout_seconds=TEST_TIMEOUT_SECONDS,
+                                           extra_body=thinking_body(disable_thinking))
             client.complete(ModelRequest(purpose=TEST_PURPOSE, model=model or "",
                                          messages=(Message("user", "ping"),), max_output_tokens=1))
             outcome = TestOutcome(True, None, max(0, int((clock() - started) * 1000)))

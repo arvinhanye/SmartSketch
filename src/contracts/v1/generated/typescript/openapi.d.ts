@@ -875,6 +875,8 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
             last_test?: components["schemas"]["ModelConfigLastTest"];
+            /** @description 开启时，该用户的全部生成调用请求体追加 `thinking: {type: disabled}`（DeepSeek 等兼容接口；ADR-090）。 */
+            disable_thinking?: boolean;
         };
         ModelConfigUpdate: {
             base_url: string;
@@ -882,14 +884,18 @@ export interface components {
             model: string;
             /** Format: password */
             api_key?: string;
+            /** @description 关闭模型思考（ADR-090）。省略时保留已存值；新建配置默认 false。 */
+            disable_thinking?: boolean;
         };
-        /** @description 三项都省略时测试已存配置；否则三项都必填。 */
+        /** @description 三项都省略时测试已存配置（含已存的 `disable_thinking`）；否则三项都必填。 */
         ModelConfigTestRequest: {
             base_url?: string;
             /** @description 服务端先去掉首尾空白；结果为空时返回 422 `VALIDATION_ERROR`，`details.fields` 指向 `model`、原因 `blank`，不保存、不发起请求（ADR-082 决定 5）。 */
             model?: string;
             /** Format: password */
             api_key?: string;
+            /** @description 测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。 */
+            disable_thinking?: boolean;
         };
         ModelConfigTestResult: {
             ok: boolean;

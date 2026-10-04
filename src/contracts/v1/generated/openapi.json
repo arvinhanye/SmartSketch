@@ -2282,6 +2282,10 @@
           },
           "last_test": {
             "$ref": "#/components/schemas/ModelConfigLastTest"
+          },
+          "disable_thinking": {
+            "type": "boolean",
+            "description": "开启时，该用户的全部生成调用请求体追加 `thinking: {type: disabled}`（DeepSeek 等兼容接口；ADR-090）。"
           }
         }
       },
@@ -2309,12 +2313,16 @@
             "format": "password",
             "minLength": 1,
             "maxLength": 512
+          },
+          "disable_thinking": {
+            "type": "boolean",
+            "description": "关闭模型思考（ADR-090）。省略时保留已存值；新建配置默认 false。"
           }
         }
       },
       "ModelConfigTestRequest": {
         "type": "object",
-        "description": "三项都省略时测试已存配置；否则三项都必填。",
+        "description": "三项都省略时测试已存配置（含已存的 `disable_thinking`）；否则三项都必填。",
         "additionalProperties": false,
         "properties": {
           "base_url": {
@@ -2333,6 +2341,10 @@
             "format": "password",
             "minLength": 1,
             "maxLength": 512
+          },
+          "disable_thinking": {
+            "type": "boolean",
+            "description": "测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。"
           }
         }
       },

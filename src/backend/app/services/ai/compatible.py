@@ -69,6 +69,7 @@ import ssl
 import threading
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final, Literal, Protocol
 from urllib.parse import urlsplit
 
@@ -374,6 +375,27 @@ def _parse_usage(value: object) -> Usage | None:
     return Usage(prompt, completion, reasoning_tokens=reasoning if _is_count(reasoning) else None)
 
 
+#: ADR-090: request fields an ``extra_body`` may never replace
+CORE_PAYLOAD_FIELDS: Final = frozenset({"model", "messages", "stream", "stream_options", "response_format"}) | MAX_TOKENS_FIELDS
+
+
+def _plain_copy(value: Any) -> Any:
+    """Deep copy into plain JSON types (mappings → dict, sequences → list)."""
+    if isinstance(value, Mapping):
+        return {str(key): _plain_copy(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_copy(item) for item in value]
+    return value
+
+
+#: ADR-090: the only thinking switch verified on a real provider (C02b probe, DeepSeek)
+THINKING_DISABLED: Final = MappingProxyType({"thinking": MappingProxyType({"type": "disabled"})})
+
+def thinking_body(disable_thinking: bool) -> Mapping[str, Any] | None:
+    """ADR-090: the ``extra_body`` for a user's switch; ``None`` (nothing added) when it is off."""
+    return THINKING_DISABLED if disable_thinking else None
+
+
 #: ADR-089: fields providers use for (non-answer) reasoning text; only their length is kept
 REASONING_FIELDS: Final = ("reasoning_content", "reasoning")
 
@@ -621,6 +643,7 @@ class CompatibleModelClient(_CompatibleHttpClient):
         max_tokens_field: Literal["max_tokens", "max_completion_tokens"] = "max_tokens",
         max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
         clock: Callable[[], float] = time.monotonic,
+        extra_body: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             base_url,
@@ -633,6 +656,11 @@ class CompatibleModelClient(_CompatibleHttpClient):
         if max_tokens_field not in MAX_TOKENS_FIELDS:
             raise ValueError(f"CompatibleModelClient: max_tokens_field must be one of {sorted(MAX_TOKENS_FIELDS)}")
         self._max_tokens_field = max_tokens_field
+        # ADR-090: extra request fields fixed at construction (a deep, plain copy); never override core fields
+        self._extra_body = _plain_copy(extra_body or {})
+        clash = sorted(set(self._extra_body) & CORE_PAYLOAD_FIELDS)
+        if clash:
+            raise ValueError(f"CompatibleModelClient: extra_body must not override {clash}")
 
     @classmethod
     def from_settings(
@@ -670,6 +698,7 @@ class CompatibleModelClient(_CompatibleHttpClient):
             payload["response_format"] = {"type": "json_object"}
         if stream:
             payload["stream_options"] = {"include_usage": True}
+        payload.update(_plain_copy(self._extra_body))
         return payload
 
     def _open(self, request: ModelRequest, *, stream: bool) -> tuple[HttpResponse, float]:

@@ -52,6 +52,12 @@ class ModelConfig(BaseModel):
     version: Annotated[Optional[int], Field(ge=1)] = None
     updated_at: Optional[datetime] = None
     last_test: Optional[ModelConfigLastTest] = None
+    disable_thinking: Annotated[
+        Optional[bool],
+        Field(
+            description='开启时，该用户的全部生成调用请求体追加 `thinking: {type: disabled}`（DeepSeek 等兼容接口；ADR-090）。'
+        ),
+    ] = None
 
 
 class ModelConfigUpdate(BaseModel):
@@ -68,6 +74,12 @@ class ModelConfigUpdate(BaseModel):
         ),
     ]
     api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+    disable_thinking: Annotated[
+        Optional[bool],
+        Field(
+            description='关闭模型思考（ADR-090）。省略时保留已存值；新建配置默认 false。'
+        ),
+    ] = None
 
 
 class ModelConfigTestRequest(BaseModel):
@@ -84,6 +96,12 @@ class ModelConfigTestRequest(BaseModel):
         ),
     ] = None
     api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+    disable_thinking: Annotated[
+        Optional[bool],
+        Field(
+            description='测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。'
+        ),
+    ] = None
 
 
 class ModelConfigTestResult(BaseModel):
