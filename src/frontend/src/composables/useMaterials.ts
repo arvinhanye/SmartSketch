@@ -60,6 +60,28 @@ function formatOf(name: string): DocumentFormat | null {
   return (FORMAT_BY_EXTENSION as Record<string, DocumentFormat | undefined>)[ext] ?? null
 }
 
+/** 扩展名归一：.markdown 与 .md 视为同一格式 */
+function splitName(filename: string): { stem: string; format: string } | null {
+  const lower = filename.trim().toLowerCase()
+  const dot = lower.lastIndexOf('.')
+  if (dot <= 0 || dot === lower.length - 1) return null
+  const format = lower.slice(dot + 1)
+  return { stem: lower.slice(0, dot), format: format === 'markdown' ? 'md' : format }
+}
+
+/**
+ * C05-4：已上传资料里与 ``filename`` 同名、但格式不同的那份（如已有 ch3.md 再传 ch3.pdf）；没有为 null。
+ * 同一章两种格式都上传会抽出大量同名知识点，跨资料融合不在本期（R05），只提示、不阻止。
+ */
+export function sameChapterOtherFormat(filename: string, existing: readonly string[]): string | null {
+  const target = splitName(filename)
+  if (target === null) return null
+  return existing.find((name) => {
+    const other = splitName(name)
+    return other !== null && other.stem === target.stem && other.format !== target.format
+  }) ?? null
+}
+
 export function formatBytes(bytes: number): string {
   const mib = bytes / (1024 * 1024)
   if (mib >= 1) return `${Number.isInteger(mib) ? mib : mib.toFixed(1)} MiB`
@@ -784,6 +806,10 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
   const limitText = computed(() => (maxBytes.value === null ? null : formatBytes(maxBytes.value)))
 
   const isEmpty = computed(() => pageStatus.value === 'ready' && rows.value.length === 0)
+  /** C05-4：选中文件与已上传资料同章不同格式时的提示（不阻止上传） */
+  const duplicateOf = computed(() =>
+    selectedName.value === null ? null : sameChapterOtherFormat(selectedName.value, rows.value.map((row) => row.filename)),
+  )
 
   watch(courseId, open, { immediate: true })
   onScopeDispose(dispose)
@@ -793,6 +819,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     pageError,
     courseName,
     rows,
+    duplicateOf,
     isEmpty,
     limitText,
     reload,

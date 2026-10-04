@@ -29,6 +29,7 @@ const {
   pageError,
   courseName,
   rows,
+  duplicateOf,
   isEmpty,
   limitText,
   reload,
@@ -103,6 +104,9 @@ function onFileChange(event: Event): void {
           </p>
           <div id="material-upload-feedback">
             <p v-if="uploadError" data-test="upload-error" role="alert">{{ uploadError }}</p>
+            <p v-if="duplicateOf" data-test="upload-duplicate-hint" role="status" class="hint">
+              已上传同一章的另一种格式「{{ duplicateOf }}」。两种格式都处理会抽出大量同名知识点（跨资料去重不在本期），建议只保留一种格式；仍可继续上传。
+            </p>
             <p v-if="uploadSuccess" data-test="upload-success" role="status">
               已上传「{{ uploadSuccess }}」，正在处理。
             </p>
