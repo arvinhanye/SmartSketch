@@ -1,0 +1,100 @@
+{
+  "task": {
+    "id": "ee55f36cf0ca46fb84f99ed5c9839941",
+    "stage": "awaiting_review",
+    "created_at": "2026-10-04T02:57:39.012Z",
+    "updated_at": "2026-10-04T02:59:10.241Z",
+    "error_code": null
+  },
+  "chunks": 16,
+  "calls": 33,
+  "repair_calls": 2,
+  "by_purpose": {
+    "extract_entities": {
+      "calls": 16,
+      "usage_input": 8653,
+      "usage_output": 21572,
+      "tokens": 30225,
+      "unknown_usage_calls": 0,
+      "tokens_complete": true,
+      "repair_calls": 0,
+      "span_seconds": 24.909,
+      "latency_ms_avg": 5385,
+      "latency_ms_max": 13829
+    },
+    "extract_relations": {
+      "calls": 15,
+      "usage_input": 14302,
+      "usage_output": 30098,
+      "tokens": 44400,
+      "unknown_usage_calls": 0,
+      "tokens_complete": true,
+      "repair_calls": 0,
+      "span_seconds": 39.243,
+      "latency_ms_avg": 8211,
+      "latency_ms_max": 18859
+    },
+    "repair": {
+      "calls": 2,
+      "usage_input": 1671,
+      "usage_output": 7226,
+      "tokens": 8897,
+      "unknown_usage_calls": 0,
+      "tokens_complete": true,
+      "repair_calls": 2,
+      "span_seconds": 28.626,
+      "latency_ms_avg": 15580,
+      "latency_ms_max": 15720
+    }
+  },
+  "non_ok_calls": {},
+  "model_span_seconds": 72.598,
+  "client_elapsed_seconds": 91.34,
+  "non_model_seconds": 18.742,
+  "ledger": {
+    "generation": {
+      "calls": 33,
+      "usage_input": 24626,
+      "usage_output": 58896,
+      "tokens": 83522,
+      "unknown_usage_calls": 0,
+      "tokens_complete": true,
+      "reasoning_tokens": 47055,
+      "reasoning_unknown_calls": 0
+    },
+    "embedding": {
+      "calls": 0,
+      "usage_input": 0,
+      "usage_output": 0,
+      "tokens": 0,
+      "unknown_usage_calls": 0,
+      "tokens_complete": true
+    },
+    "by_purpose": {
+      "extract_entities": {
+        "calls": 16,
+        "usage_input": 8653,
+        "usage_output": 21572,
+        "tokens": 30225,
+        "unknown_usage_calls": 0,
+        "tokens_complete": true
+      },
+      "extract_relations": {
+        "calls": 15,
+        "usage_input": 14302,
+        "usage_output": 30098,
+        "tokens": 44400,
+        "unknown_usage_calls": 0,
+        "tokens_complete": true
+      },
+      "repair": {
+        "calls": 2,
+        "usage_input": 1671,
+        "usage_output": 7226,
+        "tokens": 8897,
+        "unknown_usage_calls": 0,
+        "tokens_complete": true
+      }
+    }
+  }
+}
