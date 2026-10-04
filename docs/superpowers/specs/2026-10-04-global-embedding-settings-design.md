@@ -1,7 +1,9 @@
-# 全站向量服务网页配置：设计提案
+# 全站向量服务网页配置：已撤销的设计备档
+
+> 用户已撤销本计划。以下内容仅作历史记录，不是待执行任务；维持现有向量环境配置与个人生成模型网页配置。原验收修复保留，技术冻结未执行。
 
 - 日期：2026-10-04；负责人：Codex；任务：C-EMBED-SETTINGS-DESIGN。
-- 状态：DRAFT / WAITING_USER_DESIGN_REVIEW。用户已确认「全站共用一份向量配置」，未将本文件的权限、初始化与接口细节视为已批准。
+- 状态：CANCELLED_BY_USER（2026-10-04）。用户要求暂不改动并撤销计划；未开始实现，不再等待设计/计划审批。
 - 代码基线：Codex 自有工作区 codex/plan-c-acceptance-fixes，保留已通过门禁但尚未提交的验收修复；不覆盖、不回退。Claude 54a7c67、测量88f9f6f只读。
 - stage_c_status: OPEN；technical_freeze: NOT_PERFORMED。本轮仅设计，不实现、不发真实调用、不修改课程数据。
 
