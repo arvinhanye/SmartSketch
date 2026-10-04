@@ -129,6 +129,17 @@ node node_modules/vite/bin/vite.js build --outDir ../../../.review-artifacts/fro
 
 逐页冒烟（合成数据，非真实后端验收）：资料页、成员页（2 行成员）、审核页（发布栏「学生当前看到 v2」+ 徽标「草稿修订中」+ 三个 tab「低置信度关系/疑似重复知识点/孤立知识点，各 1 项」+ 单列条目含证据「第 3 页」+ 版本历史默认折叠）、教师图谱页、个人设置页（13 个地址预设、脱敏 `••••1234`）均正常渲染且无横向溢出、无控制台错误。
 
+实际请求端点（仓库外脚本 `.review-artifacts/ui-net.mjs` 记录）：
+
+| 页面/操作 | 实际请求 |
+| --- | --- |
+| `/settings/model` 打开 | `GET /api/v1/me/model-config` ×2（外壳 `App.vue` 读一次用于侧栏「未配置」徽标，设置页自身读一次） |
+| 点「测试连接」 | `POST /api/v1/me/model-config/test` |
+| 改模型名后保存 | `PUT /api/v1/me/model-config` |
+| `/courses/c1/materials` 打开 | `GET /api/v1/me/model-config`、`GET /api/v1/courses/c1`、`GET /api/v1/courses/c1/upload-policy`、`GET /api/v1/courses/c1/documents` |
+
+**没有**出现在 `/api/v1/api-settings`、模型发现（`/models`）或 embedding 相关的任何请求。
+
 截图：`final-materials.jpg`、`final-members-desktop.jpg`、`final-review.jpg`、`final-teacher-graph.jpg`、`final-model-settings.jpg`、`final-model-dialog-390x320.jpg`（均在 `.review-artifacts/`）。
 
 分组实测（均为 `--reporter=dot --testTimeout=30000 --maxWorkers=2`）：
