@@ -134,6 +134,55 @@ describe('L10 模型 API 设置页', () => {
     expect(useRuntimeStore().isDemo).toBe(true)
     expect(useRuntimeStore().needsConfig).toBe(false)
   })
+
+  it('连接结果弹窗复用个人测试结果，编辑表单后结果过期并不再展示', async () => {
+    const api = fakeApi(SAVED)
+    const wrapper = await mountView(api)
+    const dialog = wrapper.get('[data-test="mc-test-dialog"]').element as HTMLDialogElement
+    // jsdom 不实现原生 dialog 的开关行为，这里只给该元素装替身；真实焦点与 Esc 行为在浏览器复核
+    dialog.showModal = () => { dialog.open = true }
+    dialog.close = () => { dialog.open = false }
+
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(api.test).toHaveBeenCalledTimes(1)
+    expect(dialog.open).toBe(true)
+    expect(wrapper.get('[data-test="mc-dialog-result"]').text()).toContain('321')
+    // 弹窗不展示密钥、原始请求或服务端原文
+    expect(wrapper.html()).not.toContain(KEY)
+
+    await wrapper.get('[data-test="mc-model"]').setValue('m2')
+    expect(dialog.open).toBe(false)
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="mc-test-stale"]').text()).toContain('请重新测试当前配置')
+  })
+
+  it('已填密钥时切换服务商预设：地址被替换且未提交密钥被清空，保存要求重填', async () => {
+    const api = fakeApi(EMPTY)
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-base-url"]').setValue('https://custom.example.com/v1')
+    await wrapper.get('[data-test="mc-model"]').setValue('m1')
+    await wrapper.get('[data-test="mc-api-key"]').setValue(KEY)
+    // 换成服务商预设：地址被替换，未提交的密钥随之作废
+    await wrapper.get('[data-test="mc-provider"]').setValue('deepseek')
+    expect((wrapper.get('[data-test="mc-base-url"]').element as HTMLInputElement).value).toBe('https://api.deepseek.com/v1')
+    expect((wrapper.get('[data-test="mc-api-key"]').element as HTMLInputElement).value).toBe('')
+    await wrapper.get('[data-test="mc-form"]').trigger('submit')
+    await flushPromises()
+    expect(api.save).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="mc-error"]').text()).toContain('请填写密钥')
+  })
+
+  it('未填密钥测试已保存配置：不打开弹窗的编造结果，仍给出明确提示', async () => {
+    // 地址与模型都改过、密钥留空：不能拿旧配置的结果冒充新值
+    const api = fakeApi(SAVED)
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-base-url"]').setValue('https://other.example.com/v1')
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(api.test).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="mc-error"]').text()).toContain('请先保存')
+  })
 })
 
 // ---------------------------------------------------------------- 上传页与问答页的未配置引导
