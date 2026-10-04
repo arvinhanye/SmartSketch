@@ -178,7 +178,55 @@ describe('L12 问答引用显示文件名', () => {
     expect(items[0]!.text()).toContain('ch3-stack-queue.pdf · 第 2 页')
     expect(items[1]!.text()).toContain('资料不可用 · 第3章 > 3.3 队列')
     await items[0]!.trigger('click')
-    expect(wrapper.get('.source__where').text()).toContain('ch3-stack-queue.pdf')
+    // C05-2：展开的原文改由 SourceViewer 显示文件名
+    expect(wrapper.get('[data-test="sv-document"]').text()).toBe('ch3-stack-queue.pdf')
+    wrapper.unmount()
+  })
+})
+
+describe('C05-2 问答长来源与来源查看器同一折叠规则', () => {
+  it('点开出处用 SourceViewer：超过 600 字先折叠，可展开，可收起；文件名与位置仍在', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useRuntimeStore().apply({ runtime_mode: 'personal', configured: true })
+    const long = '栈是只允许在一端插入和删除的线性表。'.repeat(100)
+    const client: ChatStreamClient = {
+      async send() {
+        return {
+          kind: 'done',
+          final: {
+            status: 'answered', answer: '栈后进先出[1]。', graph_version: 1, request_id: 'r',
+            citations: [{ index: 1, chunk_id: 'k1', document_id: 'm1', page: 2, text: long, document_name: 'ch3.pdf' }],
+          },
+        } as never
+      },
+    }
+    const stub = { render: () => null }
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/courses/:cid', name: COURSE_ROUTE, component: stub },
+        { path: '/courses/:cid/chat', name: CHAT_ROUTE, component: ChatView },
+        { path: '/settings/model', name: SETTINGS_ROUTE, component: stub },
+      ],
+    })
+    await router.push('/courses/c1/chat')
+    await router.isReady()
+    const wrapper = mount(ChatView, { global: { plugins: [pinia, router], provide: { [CHAT_STREAM_CLIENT_KEY as symbol]: client } } })
+    await wrapper.get('textarea').setValue('什么是栈？')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper.findAll('.source-list__item')[0]!.trigger('click')
+    const viewer = wrapper.get('[data-test="source-viewer"]')
+    expect(wrapper.get('.source').text()).toContain('出处 [1]')
+    expect(viewer.get('[data-test="sv-document"]').text()).toBe('ch3.pdf')
+    expect(viewer.get('[data-test="sv-location"]').text()).toBe('第 2 页')
+    expect(viewer.get('[data-test="sv-excerpt"]').text().length).toBeLessThan(long.length)
+    expect(wrapper.text()).not.toContain(long)                 // 不再直接铺开全文
+    await viewer.get('[data-test="sv-expand"]').trigger('click')
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(long)
+    await wrapper.get('[data-test="sv-close"]').trigger('click')
+    expect(wrapper.find('[data-test="source-viewer"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })

@@ -5,6 +5,7 @@ import { CHAT_STREAM_CLIENT_KEY } from '../api/chatStream'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { createPublishedGraphApi, PUBLISHED_GRAPH_API_KEY } from '../api/graph'
 import ChatMarkdown from '../components/ChatMarkdown.vue'
+import SourceViewer from '../components/SourceViewer.vue'
 import { formatSourceLine } from '../composables/sourceLabel'
 import { useChat, type Citation } from '../composables/useChat'
 import { CHAT_ROUTE, COURSE_ROUTE, SETTINGS_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
@@ -70,6 +71,15 @@ function openKnowledgePoint(id: string): void {
 }
 
 /** 「文件名 · 第 N 页 · 章节」；缺文件名写「资料不可用」（L12，ADR-085） */
+function citationSource(citation: Citation): { documentName?: string; page?: number; sectionPath?: string; excerpt?: string } {
+  return {
+    documentName: citation.document_name ?? undefined,
+    page: citation.page ?? undefined,
+    sectionPath: citation.section_path ?? undefined,
+    excerpt: citation.text,
+  }
+}
+
 function sourceLine(citation: Citation): string {
   return formatSourceLine({ documentName: citation.document_name, page: citation.page, sectionPath: citation.section_path })
 }
@@ -181,10 +191,10 @@ function onKeydown(event: KeyboardEvent): void {
             </button>
           </li>
         </ul>
+        <!-- C05-2：与图谱来源同一个查看器（600 字折叠、文件名与位置、纯文本渲染） -->
         <article v-if="selectedCitation" class="source">
-          <p class="source__where"><b>出处 [{{ selectedCitation.index }}]</b> {{ sourceLine(selectedCitation) }}</p>
-          <blockquote>{{ selectedCitation.text }}</blockquote>
-          <button type="button" data-variant="secondary" @click="selectedCitation = null">收起原文</button>
+          <p class="source__where"><b>出处 [{{ selectedCitation.index }}]</b></p>
+          <SourceViewer :source="citationSource(selectedCitation)" @close="selectedCitation = null" />
         </article>
       </aside>
     </div>
