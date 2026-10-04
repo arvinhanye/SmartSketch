@@ -1687,4 +1687,3 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 未迁入来源且有意保留目标实现：`api/apiSettings.ts`、`components/ModelSelect.vue`、`views/ApiSettings.vue`、`components/ConnectionResultDialog.vue`（改为 `ModelSettingsView` 内原生 `dialog`）、`api/chatStream.ts`、`api/http.ts`、`api/taskEvents.ts`、`composables/useChat.ts`、`useMaterials.ts`、`stores/runtime.ts`、`api/modelConfig.ts`、`composables/useModelConfig.ts`、`main.ts`、`router/index.ts`——这些是目标分支的个人模型配置与请求保护能力，来源版本反而更少。
 - 验收状态：见 `docs/handoffs/deepseek-frontend-migration.md` §7；原 R1「完整迁移未完成」的界面部分已闭合，**系统门禁（`scripts/verify.sh`）因本机无 Bash 未运行**，不得记为完整验收通过。
 - 真实浏览器（无头 Chrome + CDP，合成数据）7 项判定全部通过：F2 焦点轮廓、F4 桌面同行与 420px 无溢出、G6 画布暖纸底色 `rgb(255,253,250)`、结果弹窗 390×320 不越界；截图见 `.review-artifacts/final-*.jpg`。
-
