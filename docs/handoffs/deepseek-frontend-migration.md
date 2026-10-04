@@ -197,7 +197,7 @@ node ../../../.review-artifacts/ui-replica-compare.mjs   # 同数据同视窗与
 
 ## 8. 提交序列
 
-最终 HEAD：**`fd17d50`**（`fix(frontend): restore frontend-ui-revision visual fidelity`），分支 `frontend-backend-refactor`，**未推送、未合并、未部署**。本文件随后另有一个只改文档的 `docs:` 提交用于记录该哈希；产品代码止于 `fd17d50`。
+最终 HEAD：**`0d1b170`**（`fix(frontend): isolate the connection-test snapshot from save and clear errors`，复审 R1–R5 修正），分支 `frontend-backend-refactor`，**未推送、未合并、未部署**。本文件随后另有一个只改文档的 `docs:` 提交用于记录该哈希；产品代码止于 `0d1b170`。
 
 上一轮的 13 个提交：
 
@@ -217,15 +217,24 @@ f723801 fix(frontend): keep the full course grid on the course home             
 055d914 docs(handoffs): record the frontend migration progress and the remaining batches   ← 起始基线
 ```
 
-本轮（U1–U7 视觉复刻）在其之上再提交一个：
+本轮（U1–U7 视觉复刻）在其之上再提交两个：
 
 ```
-fix(frontend): restore frontend-ui-revision visual fidelity
+0d1b170 fix(frontend): isolate the connection-test snapshot from save and clear errors   ← 复审 R1–R5（产品代码止于此）
+   ModelSettingsView.vue / tests/frontend/l10.test.ts / 本交接
+  （随后一个只改本文件的 docs: 提交用于记录上面这个哈希）
+```
+
+上一轮视觉复刻的提交（`fd17d50`）：
+
+```
+fd17d50 fix(frontend): restore frontend-ui-revision visual fidelity                     ← U1–U7
   AuthLayout.vue / App.vue / styles.css / ModelSettingsView.vue / MembersView.vue
   KnowledgeCards.vue / ChatMarkdown.vue / NodeEditor.vue / ReviewView.vue
   tests/frontend/h09.test.ts / tests/frontend/l10.test.ts / tests/frontend/h13.test.ts
   docs/handoffs/deepseek-frontend-migration.md
   docs/superpowers/plans/2026-10-04-frontend-ui-exact-replica.md
+1b2bd3c docs: record the visual replica results and the exact head
 ```
 
 每个批次/修正独立可撤回：需要回退时用对应提交的 `git revert` 生成新提交，先核对后续批次的依赖；本轮没有数据迁移，不需要数据库或向量空间回退；**禁止硬重置**。
