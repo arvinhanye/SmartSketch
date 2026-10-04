@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -469,6 +470,23 @@ class PipelineResult:
 ToolkitSource = ExtractionToolkit | Callable[[Lease], ExtractionToolkit]
 
 
+class _StageTimer:
+    """C03-2 续：每个阶段一行 INFO（任务编号、阶段、结果、毫秒数），用于归因抽取末段的非模型时间。"""
+
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+        self._started = time.monotonic()
+
+    def start(self) -> None:
+        self._started = time.monotonic()
+
+    def done(self, stage: str, status: str) -> tuple[str, str]:
+        duration = max(0, round((time.monotonic() - self._started) * 1000))
+        logger.info("task stage done task_id=%s stage=%s status=%s duration_ms=%s",
+                    self.task_id, stage, status, duration)
+        return stage, status
+
+
 def run_pipeline_once(
     settings: Settings,
     *,
@@ -494,13 +512,16 @@ def run_pipeline_once(
     if lease is None:
         return PipelineResult(reclaimed, cleaned, None, ())
     stages: list[tuple[str, str]] = []
+    timer = _StageTimer(lease.task_id)
     with LeaseHeartbeat(url, lease, lease_seconds=settings.TASK_LEASE_SECONDS):
         stage = lease.stage
         if stage == "parsing":
+            timer.start()
             parsed = run_parse_stage(url, lease, storage=store, max_attempts=settings.TASK_MAX_ATTEMPTS)
-            stages.append(("parsing", parsed.status.value))
+            stages.append(timer.done("parsing", parsed.status.value))
             stage = "extracting" if parsed.status is ParseStatus.ADVANCED else ""
         if stage == "extracting":
+            timer.start()
             leased = replace(lease, stage=stage)
             try:
                 resolved = toolkit if isinstance(toolkit, ExtractionToolkit) else toolkit(leased)
@@ -509,16 +530,18 @@ def run_pipeline_once(
             else:
                 extracted = run_extract_stage(url, leased, toolkit=resolved,
                                               limits=ExtractLimits.from_settings(settings))
-            stages.append(("extracting", extracted.status.value))
+            stages.append(timer.done("extracting", extracted.status.value))
             stage = MERGE_STAGE if extracted.status is ExtractStatus.ADVANCED else ""
         if stage == MERGE_STAGE:
+            timer.start()
             merged = run_merge_stage(url, replace(lease, stage=stage))
-            stages.append((MERGE_STAGE, merged.status.value))
+            stages.append(timer.done(MERGE_STAGE, merged.status.value))
             stage = STAGE if merged.status is PersistStatus.ADVANCED else ""
         if stage == STAGE:
+            timer.start()
             persisted = run_persist_stage(url, replace(lease, stage=stage), repo=repo,
                                           max_attempts=settings.TASK_MAX_ATTEMPTS, holder=holder, **lock)
-            stages.append((STAGE, persisted.status.value))
+            stages.append(timer.done(STAGE, persisted.status.value))
     if not stages:  # 领到了本入口不处理的阶段（不应出现）
         release_on_shutdown(url, lease.task_id, lease.token)
     return PipelineResult(reclaimed, cleaned, lease, tuple(stages))

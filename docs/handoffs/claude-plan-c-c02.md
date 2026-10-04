@@ -53,3 +53,16 @@ decision: 用户 2026-10-03 选择方案 A（推理埋点）+ C（提示词 v3�
 
 - DeepSeek 执行 C02-4（`claude-plan-c-c02-4-deepseek-qa-retest.md`），报告到达后据推理数据决定是否进入方案 B（思考控制，需用户决定）。
 - C03-1 交接已备（`claude-plan-c-c03-1-deepseek-pdf-retest.md`）。
+
+## 续：DeepSeek 首轮之后的离线修补（2026-10-04）
+
+依据复核 `docs/reviews/claude-deepseek-c02-4-c03-1.md`。
+
+| 提交 | 内容 |
+| --- | --- |
+| `312cccb` | 测量工具止损改用系统计费口径：未知 usage 按「输入估算 + 输出上限」计、生成前被拒计 0，不再整轮停止；缺估算列时仍停止。真实库只读核对：C02-4 12116、C03-1 83522 |
+| 本提交 | 阶段耗时日志（只写 INFO，无迁移、不改行为）：问答 `chat prepare phases`（`since_request_ms`、rewrite / embed / space / vector / subgraph / context 与 total，失败时写已完成的步骤）；worker `task stage done`（parsing / extracting / merging / persisting 各阶段毫秒数）。用于归因冷启动首问 8.15 秒与抽取末段 15.6 秒 |
+| `8f0fc14`、`bae1948` | 方案 B 前置：思考控制参数探测工具与 DeepSeek 交接（上限 5000） |
+
+方案 B 的设计等探测结果：哪个字段被接受、是否真的降低推理。当前倾向是在个人模型配置里让用户显式选择「关闭思考的方式」（默认不发送，与现状一致），不做自动探测，避免额外调用与猜测。
+
