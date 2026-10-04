@@ -24,12 +24,13 @@ from app.repositories.neo4j import Neo4jRepository
 from app.schemas.contracts import ChatRequest, ChatResponse
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
-from app.services.ai.embeddings import EmbeddingAdapter
-from app.services.ai.factory import build_embedding_client, build_model_clients, model_id
+from app.services.ai.factory import build_embedding_adapter, build_model_clients, model_id
 from app.services.ai.policy import ModelCallPolicy, new_call_id
+from app.services.credentials import CredentialUnavailable, ModelConfigRequired
 from app.services.qa.chat import ChatAudit, ChatFailure, ChatService
 from app.services.qa.generate import AnswerGenerator
 from app.services.qa.rewrite import QueryRewriter
+from app.services.qa.user_models import UserChatModels
 from app.services.versions.resolver import VersionIntegrityError, resolve_published
 
 
@@ -54,16 +55,41 @@ def chat_service(request: Request) -> ChatService:
     if service is not None:
         return service
     settings = request.app.state.settings
-    primary, fallback = build_model_clients(settings)
-    policy = ModelCallPolicy.from_settings(
-        settings, primary=primary, fallback=fallback, store=SqliteCallStore(settings.SQLITE_URL),
-    )
-    embedding = EmbeddingAdapter(settings, build_embedding_client(settings))
-    model = model_id(settings, "chat")
-    service = ChatService(settings, Neo4jRepository.from_settings(settings), embedding,
-                          QueryRewriter(policy, model=model), AnswerGenerator(policy, model=model))
+    embedding = build_embedding_adapter(settings)
+    repo = Neo4jRepository.from_settings(settings)
+    if settings.LLM_MODE == "personal":
+        # ADR-080：没有全站模型；每个请求由 user_chat_service 换上提问者自己的改写器与生成器
+        service = ChatService(settings, repo, embedding, None, None)
+    else:
+        primary, fallback = build_model_clients(settings)
+        policy = ModelCallPolicy.from_settings(
+            settings, primary=primary, fallback=fallback, store=SqliteCallStore(settings.SQLITE_URL),
+        )
+        model = model_id(settings, "chat")
+        service = ChatService(settings, repo, embedding,
+                              QueryRewriter(policy, model=model), AnswerGenerator(policy, model=model))
     request.app.state.chat_service = service
     return service
+
+
+def user_chat_service(request: Request, user_id: str) -> ChatService:
+    """当前用户可用的问答服务；personal 模式下换上本人的模型（ADR-080 决定 4）。"""
+    base = chat_service(request)
+    settings = request.app.state.settings
+    # 既有测试用只带 SQLITE_URL 的替身设置并替换 chat_service（test_j10）：缺属性按非 personal 处理。
+    if getattr(settings, "LLM_MODE", "") != "personal":
+        return base
+    models = getattr(request.app.state, "user_chat_models", None)
+    if models is None:
+        models = UserChatModels(settings, transport=getattr(request.app.state, "model_transport", None))
+        request.app.state.user_chat_models = models
+    try:
+        rewriter, generator = models.for_user(user_id)
+    except ModelConfigRequired:
+        raise ChatFailure("MODEL_CONFIG_REQUIRED") from None
+    except CredentialUnavailable:
+        raise ChatFailure("LLM_UNAVAILABLE", reason="auth") from None
+    return base.with_models(rewriter, generator)
 
 
 def _sse(event: dict[str, Any]) -> str:
@@ -158,7 +184,7 @@ async def _stream(
 
 @router.post(
     "/chat", operation_id="chat", response_model=ChatResponse,
-    responses={401: {"model": Error}, 403: {"model": Error}, 404: {"model": Error},
+    responses={401: {"model": Error}, 403: {"model": Error}, 404: {"model": Error}, 409: {"model": Error},
                422: {"model": Error}, 429: {"model": Error}, 500: {"model": Error},
                503: {"model": Error}},
 )
@@ -192,7 +218,7 @@ def chat(
         return JSONResponse(status_code=failure.status_code, content=body)
 
     try:
-        service = chat_service(request)
+        service = user_chat_service(request, access.user.id)
         prepared = service.prepare(
             version=version, request_id=request_id, started=started,
             question=payload.question, history=payload.history, kp_id=payload.kp_id,

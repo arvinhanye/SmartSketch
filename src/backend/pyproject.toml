@@ -9,6 +9,7 @@ description = "SmartSketch course knowledge graph API"
 requires-python = ">=3.11"
 dependencies = [
   "argon2-cffi==25.1.0",
+  "cryptography==50.0.2",
   "fastapi==0.141.1",
   "markdown-it-py==4.2.0",
   "neo4j==5.28.2",

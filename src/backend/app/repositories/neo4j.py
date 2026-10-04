@@ -7,11 +7,14 @@ predicates, including relationship endpoints and evidence visibility (§8.4).
 """
 
 import re
-from collections.abc import Callable, Mapping, Sequence
+import time
+from contextlib import contextmanager
+from contextvars import ContextVar
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeVar
 
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, Query
 from neo4j.exceptions import AuthError, DriverError, Neo4jError, ServiceUnavailable, SessionExpired
 
 from app.config import Settings
@@ -134,6 +137,29 @@ def _parameters(
     return params
 
 
+class RepositoryDeadlineExceeded(RepositoryError):
+    """The caller's deadline had passed; no query was sent."""
+
+    code = "NEO4J_DEADLINE_EXCEEDED"
+
+
+_READ_DEADLINE: ContextVar[float | None] = ContextVar("graph_read_deadline", default=None)
+
+
+@contextmanager
+def read_deadline(deadline: float) -> Iterator[None]:
+    """Bound every graph query in this context by ``deadline`` (``time.monotonic()`` axis).
+
+    QA preparation uses it (ADR-082 决定 3): each query carries the remaining time as the
+    server-side transaction timeout, and none is sent once the deadline has passed.
+    """
+    token = _READ_DEADLINE.set(deadline)
+    try:
+        yield
+    finally:
+        _READ_DEADLINE.reset(token)
+
+
 class Neo4jRepository:
     """Own a synchronous driver and return eager plain-dict records.
 
@@ -216,9 +242,16 @@ class Neo4jRepository:
         routing: str,
     ) -> list[dict[str, Any]]:
         bound = _parameters(query, scope, parameters)
+        statement: str | Query = query
+        deadline = _READ_DEADLINE.get()
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RepositoryDeadlineExceeded()
+            statement = Query(query, timeout=remaining)
         try:
             result = self._driver.execute_query(
-                query, parameters_=bound, routing_=routing, database_="neo4j"
+                statement, parameters_=bound, routing_=routing, database_="neo4j"
             )
             return [dict(record) for record in result.records]
         except _CONNECTION_ERRORS:

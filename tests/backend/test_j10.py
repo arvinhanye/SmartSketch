@@ -26,7 +26,7 @@ from app.services.versions.resolver import PublishedVersion
 @pytest.fixture
 def chat_env(tmp_path):
     url = f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}"
-    assert migrate(url)[-1] == "014"
+    assert migrate(url)[-1] == "016"
     user_id = "u" * 32
     course_id = "c" * 32
     version_id = "v" * 26

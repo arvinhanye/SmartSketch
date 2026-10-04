@@ -37,6 +37,7 @@ from app.repositories.neo4j import GraphScope, Neo4jRepository
 from app.repositories.versions import CommitRejected, PublishInProgress
 from app.services.graph.read import _relation_chunk_ids
 from app.services.versions.chunk_vectors import index_chunks, verify_chunks
+from app.services.ai.embeddings import embedding_calls
 from app.services.versions.materialize import Embedder, embed_snapshot_nodes, materialize, verify
 from app.services.versions.reconcile import compensate, reclaim_expired
 from app.services.versions.snapshot import (
@@ -258,8 +259,10 @@ def publish(ctx: PublishContext, course_id: str, *, created_by: str | None) -> P
             step = "P8"
             chunk_scope = GraphScope(course_id, version_id)
             revision_ids = [r["revision_id"] for r in snapshot.data["revisions"]]
-            index_chunks(url, ctx.repo, ctx.embedder, chunk_scope, revision_ids, space)  # G08，共享、可重复
-            vectors = embed_snapshot_nodes(ctx.embedder, snapshot)
+            # ADR-082 决定 6：本次发布的每次实际向量请求记入 model_calls，归属课程与 publish:<version_id>
+            with embedding_calls(course_id=course_id, request_id=f"publish:{version_id}"):
+                index_chunks(url, ctx.repo, ctx.embedder, chunk_scope, revision_ids, space)  # G08，共享、可重复
+                vectors = embed_snapshot_nodes(ctx.embedder, snapshot)
             touched_graph = True
             materialize(ctx.repo, snapshot, version_id, vectors, lambda: space)
             step = "P9"

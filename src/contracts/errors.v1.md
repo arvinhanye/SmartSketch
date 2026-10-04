@@ -157,7 +157,8 @@
 | 码 | HTTP | 触发条件 | 前端处理 |
 | --- | --- | --- | --- |
 | `RATE_LIMITED` | 429 | 触发本服务限流（如登录失败限流）。供应商返回的 429 不外露：按 A07 矩阵首字前切备用，最终失败为 `LLM_UNAVAILABLE`（问答 `details.reason = upstream`） | 读 `Retry-After`，指数退避后重试 |
-| `LLM_UNAVAILABLE` | 503 | 主模型与备用模型均不可用 | 提示稍后重试；构图场景下任务转 `failed` 并保留已完成的块 |
+| `LLM_UNAVAILABLE` | 503 | 主模型与备用模型均不可用。问答另有 `details.reason = truncated`：回答达到输出上限且未通过逐句出处校验，整段撤回（ADR-082 决定 2）；链路时限到期（任一环节）为 `timeout`（ADR-082 决定 3）。`LLM_MODE=personal` 下 `details.reason` 另有 `auth`（供应商拒绝本人密钥），任务失败另有 `credential_revoked`、`credential_missing`、`credential_unreadable`（ADR-080） | 提示稍后重试；构图场景下任务转 `failed` 并保留已完成的块；`personal` 模式的上述原因提示检查「模型 API 设置」 |
+| `MODEL_CONFIG_REQUIRED` | 409 | `LLM_MODE=personal` 下当前用户未配置个人模型 API 即上传资料、提问，或无请求体测试已存配置（ADR-080） | 显示「先配置模型 API」并链接到设置页；不重试 |
 | `BUDGET_EXCEEDED` | 429 | 调用前发现任务或当日 token 预算已耗尽；不再发模型请求 | 提示额度耗尽；问答返回错误，抽取按失败块规则处理，不自动重试 |
 | `STORAGE_UNAVAILABLE` | 503 | 同步请求的存储依赖不可用 | 提示稍后重试；异步任务按上表返回 200 快照 |
 | `INTERNAL_ERROR` | 500 | 同步请求遇到未预期错误；学习进度与推荐接口遇到已提交版完整性故障（含 V=∅）也用此码（`LearningIntegrityError`，不新增专用码，ADR-017 决定 4） | 显示通用失败提示，服务端日志保留诊断信息；进度与推荐接口的 `details` 为闭合对象，只含 `request_id`（与问答 `details.request_id` 同名同型，用于日志关联），不含节点 ID 或环路 |

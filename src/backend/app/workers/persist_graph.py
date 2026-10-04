@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Final
@@ -64,6 +64,7 @@ from app.repositories.task_leases import (
 )
 from app.repositories.tasks import read_effective_task_ids, read_leased_task
 from app.services.ai.relations import RelationCandidate
+from app.services.credentials import CredentialUnavailable
 from app.services.file_storage import FileStorage
 from app.services.graph.downgrade import Downgrade, UnresolvableCycleError, plan_downgrades
 from app.services.graph.relations import RelationWriteError, RelationWriteResult, apply_relations
@@ -74,6 +75,7 @@ from app.workers.extract_task import (
     ExtractLimits,
     ExtractStatus,
     TaskEntity,
+    fail_for_credential,
     load_candidates,
     run_extract_stage,
 )
@@ -463,10 +465,14 @@ class PipelineResult:
     stages: tuple[tuple[str, str], ...]
 
 
+#: 全局模式一份共用工具包；personal 模式按租约取各任务自己的工具包（ADR-080）。
+ToolkitSource = ExtractionToolkit | Callable[[Lease], ExtractionToolkit]
+
+
 def run_pipeline_once(
     settings: Settings,
     *,
-    toolkit: ExtractionToolkit,
+    toolkit: ToolkitSource,
     repo: Neo4jRepository,
     owner: str | None = None,
     storage: FileStorage | None = None,
@@ -495,8 +501,14 @@ def run_pipeline_once(
             stages.append(("parsing", parsed.status.value))
             stage = "extracting" if parsed.status is ParseStatus.ADVANCED else ""
         if stage == "extracting":
-            extracted = run_extract_stage(url, replace(lease, stage=stage), toolkit=toolkit,
-                                          limits=ExtractLimits.from_settings(settings))
+            leased = replace(lease, stage=stage)
+            try:
+                resolved = toolkit if isinstance(toolkit, ExtractionToolkit) else toolkit(leased)
+            except CredentialUnavailable as exc:
+                extracted = fail_for_credential(url, leased, exc.reason)
+            else:
+                extracted = run_extract_stage(url, leased, toolkit=resolved,
+                                              limits=ExtractLimits.from_settings(settings))
             stages.append(("extracting", extracted.status.value))
             stage = MERGE_STAGE if extracted.status is ExtractStatus.ADVANCED else ""
         if stage == MERGE_STAGE:

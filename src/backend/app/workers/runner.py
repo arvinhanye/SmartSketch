@@ -28,6 +28,7 @@ import logging
 import multiprocessing
 import os
 import signal
+import sqlite3
 import sys
 import threading
 import time
@@ -37,6 +38,7 @@ from types import FrameType
 
 from app.config import Settings, SettingsError, load_settings
 from app.repositories.model_calls import SqliteCallStore
+from app.repositories.model_configs import scrub_terminal_bindings
 from app.repositories.neo4j import Neo4jRepository
 from app.services.ai.entities import EntityExtractor
 from app.services.ai.factory import build_model_clients, model_id
@@ -45,15 +47,14 @@ from app.services.ai.relations import RelationExtractor
 from app.services.startup import validate_embedding_space, validate_schema_current
 from app.services.versions.reconcile import SweepReport, sweep
 from app.workers.extract_task import ExtractionToolkit
-from app.workers.persist_graph import run_pipeline_once
+from app.workers.persist_graph import ToolkitSource, run_pipeline_once
+from app.workers.toolkits import MAX_OUTPUT_TOKENS, TaskToolkits
 
 LOG = logging.getLogger("app.workers")
 
 IDLE_SECONDS = 2.0
 HEARTBEAT_SECONDS = 10.0
 HEARTBEAT_STALE_SECONDS = 60.0
-# 与 K02 评测脚本的缺省值一致（evaluation/run_live_extraction.py）
-MAX_OUTPUT_TOKENS = 4096
 HEARTBEAT_ENV = "WORKER_HEARTBEAT_FILE"
 DEFAULT_HEARTBEAT_FILE = "/tmp/smartsketch-worker.heartbeat"
 
@@ -65,9 +66,11 @@ def heartbeat_path() -> Path:
     return Path(os.environ.get(HEARTBEAT_ENV) or DEFAULT_HEARTBEAT_FILE)
 
 
-def build_toolkit(settings: Settings) -> ExtractionToolkit:
-    """按 ``LLM_MODE`` 建模型客户端（live / demo / fake，见 ``app.services.ai.factory``），外包 E04 策略
-    （调用记录写应用 SQLite 的 ``model_calls``）。"""
+def build_toolkit(settings: Settings) -> ToolkitSource:
+    """``personal``：按任务快照逐个构建（ADR-080）；其余模式按 ``LLM_MODE`` 建一份进程内共用的客户端
+    （live / demo / fake，见 ``app.services.ai.factory``），外包 E04 策略（调用记录写应用 SQLite 的 ``model_calls``）。"""
+    if settings.LLM_MODE == "personal":
+        return TaskToolkits(settings).for_lease
     primary, fallback = build_model_clients(settings)
     model = model_id(settings, "extraction")
     policy = ModelCallPolicy.from_settings(
@@ -120,12 +123,32 @@ class PublishSweep:
                      sum(len(r.dropped) for r in reports))
 
 
+class BindingScrub:
+    """每轮把已结束任务的密钥快照置空（ADR-080 决定 3）；故障只记日志，不打断主循环。"""
+
+    def __init__(self, sqlite_url: str) -> None:
+        self._sqlite_url = sqlite_url
+
+    def __call__(self) -> None:
+        try:
+            scrubbed = scrub_terminal_bindings(self._sqlite_url)
+        except sqlite3.Error:
+            LOG.exception("binding scrub failed; will retry next round")
+            return
+        if scrubbed:
+            LOG.info("scrubbed %s finished task key snapshots", scrubbed)
+
+
 def build_maintenance(settings: Settings, repo: Neo4jRepository) -> tuple[Callable[[], object], ...]:
-    """常驻 worker 的周期维护步骤（``run_loop`` 每轮之后执行）；间隔为 0 时不启用。"""
+    """常驻 worker 的周期维护步骤（``run_loop`` 每轮之后执行）：personal 模式的快照清理，以及间隔非 0 时的发布清扫。"""
+    hooks: list[Callable[[], object]] = []
+    if settings.LLM_MODE == "personal":
+        hooks.append(BindingScrub(settings.SQLITE_URL))
     if settings.PUBLISH_SWEEP_INTERVAL_SECONDS <= 0:
         LOG.info("publish sweep disabled (PUBLISH_SWEEP_INTERVAL_SECONDS=0)")
-        return ()
-    return (PublishSweep(settings.SQLITE_URL, repo, settings.PUBLISH_SWEEP_INTERVAL_SECONDS),)
+    else:
+        hooks.append(PublishSweep(settings.SQLITE_URL, repo, settings.PUBLISH_SWEEP_INTERVAL_SECONDS))
+    return tuple(hooks)
 
 
 def run_loop(

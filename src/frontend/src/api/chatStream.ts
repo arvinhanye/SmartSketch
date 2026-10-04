@@ -95,6 +95,7 @@ const LLM_UNAVAILABLE_REASONS = [
   'stream_interrupted',
   'timeout',
   'auth',
+  'truncated',
 ] as const satisfies readonly ChatLlmUnavailableReason[]
 type MissingLlmReason = Exclude<ChatLlmUnavailableReason, (typeof LLM_UNAVAILABLE_REASONS)[number]>
 const llmReasonsComplete: [MissingLlmReason] extends [never] ? true : MissingLlmReason = true
@@ -562,6 +563,7 @@ const ERROR_CODES = [
   'DOCUMENT_NOT_DELETABLE',
   'REVISION_CONFLICT',
   'USERNAME_TAKEN',
+  'MODEL_CONFIG_REQUIRED',
 ] as const satisfies readonly components['schemas']['ErrorCode'][]
 type MissingErrorCode = Exclude<components['schemas']['ErrorCode'], (typeof ERROR_CODES)[number]>
 const errorCodesComplete: [MissingErrorCode] extends [never] ? true : MissingErrorCode = true

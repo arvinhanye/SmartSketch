@@ -26,8 +26,7 @@ from app.repositories.versions import PublishInProgress, VersionNotFound
 from app.schemas.contracts import GraphVersion, PublishResult
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
-from app.services.ai.embeddings import EmbeddingAdapter
-from app.services.ai.factory import build_embedding_client
+from app.services.ai.factory import build_embedding_adapter
 from app.services.versions.publish import CourseBusy, PublishContext, PublishFailed, PublishOutcome, publish
 from app.services.versions.rollback import rollback
 from app.services.versions.snapshot import SnapshotBlocked
@@ -48,11 +47,10 @@ def publish_context(request: Request) -> PublishContext:
     ctx = getattr(request.app.state, "publish_context", None)
     if ctx is None:
         settings = request.app.state.settings
-        client = build_embedding_client(settings)
         ctx = PublishContext(
             settings.SQLITE_URL,
             Neo4jRepository.from_settings(settings),
-            EmbeddingAdapter(settings, client),
+            build_embedding_adapter(settings),
             sqlite_current_space(settings.SQLITE_URL),
             lease_seconds=settings.PUBLISH_LEASE_SECONDS,
             lock_wait_seconds=settings.COURSE_LOCK_WAIT_SECONDS,

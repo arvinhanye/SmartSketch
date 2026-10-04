@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import sqlite3
 import time
 from collections.abc import Iterator
@@ -13,11 +14,13 @@ from app.config import Settings
 from app.repositories.chunks import ChunkStoreError, get_chunks
 from app.repositories.graph_migrations import VectorSpaceError, sqlite_current_space
 from app.repositories.graph_search import search_subgraph
-from app.repositories.neo4j import Neo4jRepository, RepositoryError
+from app.repositories.neo4j import Neo4jRepository, RepositoryError, read_deadline
 from app.repositories.vector_search import search_chunks
 from app.services.ai.client import ModelCallError
-from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError
-from app.services.qa.citations import CitationStream, Evidence, not_covered
+from app.services.ai.embeddings import (
+    EmbeddingAdapter, EmbeddingBatchError, EmbeddingDeadlineExceeded, EmbeddingRecordError, embedding_calls,
+)
+from app.services.qa.citations import CitationStream, Evidence, TruncatedAnswer, not_covered
 from app.services.qa.context import ContextBudget, EvidenceContext, build_context
 from app.services.qa.generate import AnswerGeneration, AnswerGenerator, GenerationError
 from app.services.qa.rewrite import QueryRewriter
@@ -29,6 +32,7 @@ _MESSAGES = {
     "STORAGE_UNAVAILABLE": "课程资料暂不可用，请稍后重试",
     "BUDGET_EXCEEDED": "当前模型调用额度不足，请稍后重试",
     "INTERNAL_ERROR": "问答暂时失败，请稍后重试",
+    "MODEL_CONFIG_REQUIRED": "请先在「模型 API 设置」中保存你的模型 API 配置",
 }
 
 
@@ -40,7 +44,7 @@ class ChatFailure(Exception):
 
     @property
     def status_code(self) -> int:
-        return {"BUDGET_EXCEEDED": 429, "INTERNAL_ERROR": 500}.get(self.code, 503)
+        return {"BUDGET_EXCEEDED": 429, "INTERNAL_ERROR": 500, "MODEL_CONFIG_REQUIRED": 409}.get(self.code, 503)
 
     def body(self, request_id: str | None = None) -> dict[str, Any]:
         details: dict[str, str] = {}
@@ -89,7 +93,7 @@ def _capture_audit(prepared: PreparedChat, citations: CitationStream | None) -> 
 
 class ChatService:
     def __init__(self, settings: Settings, repo: Neo4jRepository, embedding: EmbeddingAdapter,
-                 rewriter: QueryRewriter, generator: AnswerGenerator) -> None:
+                 rewriter: QueryRewriter | None, generator: AnswerGenerator | None) -> None:
         self.settings = settings
         self.repo = repo
         self.embedding = embedding
@@ -97,36 +101,62 @@ class ChatService:
         self.generator = generator
         self.current_space = sqlite_current_space(settings.SQLITE_URL)
 
+    def with_models(self, rewriter: QueryRewriter, generator: AnswerGenerator) -> ChatService:
+        """personal 模式：同一份检索依赖，换上当前用户的改写器与生成器（ADR-080 决定 4）。"""
+        bound = copy.copy(self)
+        bound.rewriter, bound.generator = rewriter, generator
+        return bound
+
     def prepare(self, *, version: PublishedVersion, request_id: str, started: float,
                 question: str, history: list[object] | None, kp_id: str | None) -> PreparedChat:
+        """One deadline (``started`` + ``LLM_CHAT_TIMEOUT_SECONDS``) bounds rewrite, query embedding,
+        graph retrieval and, later, generation (ADR-082 决定 3). Each step is checked before it starts,
+        so nothing goes out once the deadline has passed; a failure after it is reported as ``timeout``.
+        """
         deadline = started + self.settings.LLM_CHAT_TIMEOUT_SECONDS
+
+        def check() -> None:
+            if time.monotonic() >= deadline:
+                raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
+
         rewritten = self.rewriter.rewrite(question, history, course_id=version.course_id,
                                           request_id=request_id, deadline=deadline)
         query = rewritten.query
+        check()
         try:
-            [vector] = self.embedding.embed((query,))
-            space = self.current_space()
-            scope = version.graph_scope()
-            hits = search_chunks(self.repo, scope, version.revision_ids, vector, space=space,
-                                 limit=self.settings.QA_VECTOR_LIMIT)
-            graph = search_subgraph(self.repo, scope, version.revision_ids, (query,),
-                                    seed_kp_ids=(kp_id,) if kp_id else ())
-            context = build_context(
-                course_id=version.course_id, revision_ids=version.revision_ids,
-                vector_hits=hits, subgraph=graph,
-                load_chunks=lambda ids: get_chunks(self.settings.SQLITE_URL, course_id=version.course_id,
-                                                   chunk_ids=ids),
-                threshold=self.settings.QA_SIMILARITY_THRESHOLD,
-                budget=ContextBudget(self.settings.QA_CONTEXT_CHUNK_TOKENS,
-                                     self.settings.QA_CONTEXT_GRAPH_TOKENS,
-                                     self.settings.QA_CONTEXT_MAX_CHUNKS),
-            )
+            with read_deadline(deadline), embedding_calls(course_id=version.course_id, request_id=request_id):
+                [vector] = self.embedding.embed((query,), deadline=deadline)
+                check()
+                space = self.current_space()
+                scope = version.graph_scope()
+                hits = search_chunks(self.repo, scope, version.revision_ids, vector, space=space,
+                                     limit=self.settings.QA_VECTOR_LIMIT)
+                check()
+                graph = search_subgraph(self.repo, scope, version.revision_ids, (query,),
+                                        seed_kp_ids=(kp_id,) if kp_id else ())
+                check()
+                context = build_context(
+                    course_id=version.course_id, revision_ids=version.revision_ids,
+                    vector_hits=hits, subgraph=graph,
+                    load_chunks=lambda ids: get_chunks(self.settings.SQLITE_URL, course_id=version.course_id,
+                                                       chunk_ids=ids),
+                    threshold=self.settings.QA_SIMILARITY_THRESHOLD,
+                    budget=ContextBudget(self.settings.QA_CONTEXT_CHUNK_TOKENS,
+                                         self.settings.QA_CONTEXT_GRAPH_TOKENS,
+                                         self.settings.QA_CONTEXT_MAX_CHUNKS),
+                )
+        except EmbeddingDeadlineExceeded as error:
+            raise ChatFailure("LLM_UNAVAILABLE", reason="timeout") from error
+        except EmbeddingRecordError as error:      # model_calls 预写失败：请求未发出（ADR-082 决定 6）
+            check()
+            raise ChatFailure("STORAGE_UNAVAILABLE") from error
         except (EmbeddingBatchError, ModelCallError) as error:
+            check()
             raise ChatFailure("LLM_UNAVAILABLE") from error
         except (RepositoryError, VectorSpaceError, ChunkStoreError, sqlite3.Error) as error:
+            check()
             raise ChatFailure("STORAGE_UNAVAILABLE") from error
-        if time.monotonic() >= deadline:
-            raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
+        check()
         return PreparedChat(version, request_id, started, deadline, query, context)
 
     def events(self, prepared: PreparedChat, stop: Event | None = None) -> Iterator[dict[str, Any]]:
@@ -185,6 +215,10 @@ class ChatService:
             )
             _capture_audit(prepared, citations)
             yield {"event": "done", "final": final}
+        except TruncatedAnswer:
+            # ADR-082 决定 2：截断且出处校验不通过是生成故障，不归「资料未覆盖」
+            _capture_audit(prepared, citations)
+            yield {"event": "error", "error": ChatFailure("LLM_UNAVAILABLE", reason="truncated").body(prepared.request_id)}
         except GenerationError as error:
             _capture_audit(prepared, citations)
             yield {"event": "error", "error": ChatFailure(error.code, reason=error.details_reason).body(prepared.request_id)}
