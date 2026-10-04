@@ -1743,7 +1743,7 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | C01（B-EVAL-01） | DONE（待复审） | Claude | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
 | C02（B-QA-01） | IN_PROGRESS（C02-1/2/3 完成待复审；C02-4 已交 DeepSeek，待测量环境） | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
 | C03（B-PDF-01 / L16） | TODO | DeepSeek（C03-1/4）；Claude（C03-2/3） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
-| C04（B-QUALITY-01） | TODO | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
+| C04（B-QUALITY-01） | IN_PROGRESS（C04-1 工作表已备，待判定） | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
 | C05 | DONE（待复审；视觉美化移出本阶段） | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
 | C06 | TODO | Claude | 最终门禁、隔离从零复测、交接 Codex | 整次 integration 实际 exit 0 |
 
@@ -1758,3 +1758,4 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
   - 累计：记录口径 731690，系统计费口径 743806（含 1 次未知调用估算 12116），均在批准上限 803168 内；向量 11946 另计。
 - 2026-10-04 用户决定：进入方案 B（思考控制），批准探测预算 5000；course1 PDF 等 B 完成后再测。探测工具 `evaluation/probe_thinking.py`（`8f0fc14`，`tests/tooling/test_c02b_probe.py` 7 例先红后绿）；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02b-deepseek-thinking-probe.md`（5 个变体，最坏 4110 token，直连不进 `model_calls`，需手工记账）。
 - 2026-10-04 离线推进（等待方案 B 探测期间）：测量工具止损改用系统计费口径（`312cccb`）；问答准备与 worker 阶段耗时日志（`f8c549f`，后端全量 3838 passed / 27 skipped）；**C05 完成**：C05-1 `ce378bc`、C05-2 `1a8da3f`、C05-3 `c7f15e4`、C05-4 `3101b54`，前端全量 911 passed、type-check 与 build 通过。交接 `docs/handoffs/claude-plan-c-c05.md`。
+- 2026-10-04 **C04-1 工具与工作表**：`evaluation/draft_to_predictions.py`（草稿 → K01 predictions + 判定工作表）与 `evaluate_extraction.py judge-report`（无金标只按人工判定算硬指标；`claude-assist` 判定标为非人工验收），`tests/tooling/test_c04_accuracy.py` 7 例（先红）。三份当前版本草稿（course1 MD 75/66、course2 MD 71/55、course2 PDF headings/2 74/59）均 ≤100，按 README §6.2 **全量检查**，工作表在 `evaluation/raw/c04/`。修复前的两份 PDF 草稿已被 headings/2 取代，不再判定。**人工判定待用户**；Claude 辅助判定可按需先做（标 `claude-assist`）。

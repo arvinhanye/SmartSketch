@@ -8,6 +8,9 @@
         计算实体（名称级 / 有类型）与关系的 tp/fp/fn/P/R/F1，按类型分组，统计错误类型，
         并判定赛题两项硬指标（specs/course-knowledge-graph.md 验收 7）。
     sample --predictions P [--seed N] [--size N]
+    judge-report --predictions P --judgments J [--out report.json]
+        C04：没有金标的资料（如比赛自编章节）只按人工判定计算赛题硬指标；判定人以 ``claude-assist`` 开头时
+        标为 Claude 辅助判定、非人工验收。
         固定种子抽样 ``source == "ai"`` 的实体与关系，输出供人工判定的条目与 judgments 模板。
 
 口径要点：
@@ -427,6 +430,37 @@ def score(gold: dict, predictions: dict, judgments: dict | None = None) -> dict:
     }
 
 
+ASSIST_JUDGE_PREFIX = "claude-assist"
+
+
+def judge_report(predictions: dict, judgments: dict) -> dict:
+    """C04：只按人工判定计算硬指标（不需要金标）。Claude 辅助判定一律标为非人工验收。"""
+    validate_predictions(predictions)
+    validate_judgments(judgments, predictions)
+    judge = str(judgments.get("judge") or "")
+    human = bool(judge) and not judge.startswith(ASSIST_JUDGE_PREFIX)
+    ai_ents = sum(1 for e in predictions["entities"] if e["source"] == "ai")
+    ai_rels = sum(1 for r in predictions["relations"] if r["source"] == "ai")
+    note = ("人工判定" if human else
+            "Claude 辅助判定（非人工验收）：只作参考，结论须由用户逐条复核签收后才成立" if judge else
+            "判定人为空：不能作为验收结论")
+    return {
+        "schema_version": 1,
+        "dataset_id": predictions["dataset_id"],
+        "run_id": predictions["run_id"],
+        "model": predictions["model"],
+        "prompt_versions": predictions.get("prompt_versions", {}),
+        "judge": judge or None,
+        "is_human_judgment": human,
+        "note": note,
+        "counts": {"ai_entities": ai_ents, "ai_relations": ai_rels,
+                   "non_ai_entities": len(predictions["entities"]) - ai_ents,
+                   "non_ai_relations": len(predictions["relations"]) - ai_rels},
+        "notes": judgments.get("notes", {}),
+        "hard_indicators": _hard_indicators(predictions, judgments),
+    }
+
+
 def sample(predictions: dict, seed: int = DEFAULT_SEED, size: int = DEFAULT_SAMPLE_SIZE) -> dict:
     """固定种子抽样 source == "ai" 的实体与关系；总体 ≤ size 时全量检查。"""
     validate_predictions(predictions)
@@ -499,6 +533,10 @@ def main(argv: list[str] | None = None) -> int:
     p_sample.add_argument("--predictions", required=True)
     p_sample.add_argument("--seed", type=int, default=DEFAULT_SEED)
     p_sample.add_argument("--size", type=int, default=DEFAULT_SAMPLE_SIZE)
+    p_judge = sub.add_parser("judge-report", help="无金标：只按人工判定计算硬指标（C04）")
+    p_judge.add_argument("--predictions", required=True)
+    p_judge.add_argument("--judgments", required=True)
+    p_judge.add_argument("--out", help="输出 JSON 路径；缺省写到标准输出")
     args = parser.parse_args(argv)
 
     try:
@@ -507,6 +545,13 @@ def main(argv: list[str] | None = None) -> int:
             preds = _load(args.predictions, "预测")
             judg = _load(args.judgments, "判定") if args.judgments else None
             text = dumps(score(gold, preds, judg))
+            if args.out:
+                with open(args.out, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(text)
+            else:
+                sys.stdout.write(text)
+        elif args.command == "judge-report":
+            text = dumps(judge_report(_load(args.predictions, "预测"), _load(args.judgments, "判定")))
             if args.out:
                 with open(args.out, "w", encoding="utf-8", newline="\n") as fh:
                     fh.write(text)

@@ -1,0 +1,1303 @@
+{
+  "run_id": "contest-course2-os-ch2-pdf-headings2-75d68b435781",
+  "dataset_id": "contest-course2-os-ch2-pdf-headings2",
+  "model": {
+    "id": "deepseek-flash",
+    "is_fake": false
+  },
+  "prompt_versions": {
+    "extract_entities": 2,
+    "extract_entities_gleaning": 2,
+    "extract_relations": 2
+  },
+  "source_draft_course_id": "0e402d4483bf42dfa5a3f01f156db605",
+  "entities": [
+    {
+      "id": "kp_03f55147c309017ccf5409220e376b57",
+      "name": "多级反馈队列调度算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "设置多个优先级不同的就绪队列，新进程先进入最高优先级队列，用完时间片仍未结束就降到下一级队列，兼顾短作业响应速度和长作业公平性。"
+    },
+    {
+      "id": "kp_04489364e787977ea082798c5b19212e",
+      "name": "状态与进程调度的关系",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "学习进程调度之前需要先掌握进程的状态，因为调度只在就绪态的进程之间选择。"
+    },
+    {
+      "id": "kp_073bc7c6164bbf0fa83be0c58788528a",
+      "name": "中断与进程切换的关系",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "进程切换依赖中断把控制权交还给操作系统。"
+    },
+    {
+      "id": "kp_08f45824ea0834d21380093161406271",
+      "name": "进程控制块的内容",
+      "type": "concept",
+      "source": "ai",
+      "definition": "PCB 中记录进程标识符、进程状态、程序计数器、寄存器内容、调度信息和打开的文件等。"
+    },
+    {
+      "id": "kp_0c0b1fdfd81d2e770ebac14ad1f298e6",
+      "name": "共享存储",
+      "type": "concept",
+      "source": "ai",
+      "definition": "在通信的进程之间开辟一块双方都能访问的存储区，进程通过读写这块区域交换数据。"
+    },
+    {
+      "id": "kp_115ab906d7e034a505209fa4a11477c9",
+      "name": "进程切换的本质",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "进程切换的本质就是保存和恢复 PCB 中的现场信息。"
+    },
+    {
+      "id": "kp_1331ba6b633c66e2687b5944dcf5f5c0",
+      "name": "进程切换的触发与开销",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "进程切换由中断或系统调用触发，需要在内核态下完成，因此切换本身会消耗处理机时间。"
+    },
+    {
+      "id": "kp_14442936086fc7d9fc7e31be5ffa8d33",
+      "name": "P 操作",
+      "type": "method",
+      "source": "ai",
+      "definition": "将信号量减 1，若结果小于 0 则调用进程阻塞。"
+    },
+    {
+      "id": "kp_154cf5eabbc3cd1181601c2178cd52db",
+      "name": "线程通信与同步的特点",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "由于同一进程的多个线程共享内存，线程之间通信更方便，但也更需要同步。"
+    },
+    {
+      "id": "kp_1756f0f520ddd4b29844b7c675ecc819",
+      "name": "短作业优先调度算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "优先选择估计运行时间最短的进程投入运行的调度算法，其平均等待时间最短，但可能使长作业长期得不到调度。"
+    },
+    {
+      "id": "kp_209069fe5e955da8b78649aed1304892",
+      "name": "V 操作",
+      "type": "method",
+      "source": "ai",
+      "definition": "将信号量加 1，若结果小于或等于 0 则唤醒一个等待的进程。"
+    },
+    {
+      "id": "kp_255e69eb25905a8a65795260f88b3f4f",
+      "name": "处理机调度",
+      "type": "concept",
+      "source": "ai",
+      "definition": "按照某种算法从就绪队列中选择一个进程，把处理机分配给它。"
+    },
+    {
+      "id": "kp_28ee90b0a4e41b88b835b8860de7c0a8",
+      "name": "进程控制原语",
+      "type": "method",
+      "source": "ai",
+      "definition": "操作系统用来实现进程控制的原语，包括创建原语、撤销原语、阻塞原语和唤醒原语。"
+    },
+    {
+      "id": "kp_2f44410111e247f8a1ea5c9d70c4e8bf",
+      "name": "进程状态及其转换",
+      "type": "concept",
+      "source": "ai",
+      "definition": "描述进程在不同运行状态之间变化的知识点，是本章进程部分的组成内容。"
+    },
+    {
+      "id": "kp_3324638eb1984404b0feb41ce3882500",
+      "name": "时间片长度对调度的影响",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "时间片轮转调度中时间片长度决定算法性能：时间片过长会退化为先来先服务，过短则使进程切换开销过大。"
+    },
+    {
+      "id": "kp_340abdd6d8dc3cb87c56776dc66d6d6b",
+      "name": "线程切换开销小于进程切换",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "由于同一进程内的线程共享资源，线程切换不需要切换地址空间，因此比进程切换快得多。"
+    },
+    {
+      "id": "kp_39645e3a15af50eb3dcbf0fd6e8cba41",
+      "name": "父子进程",
+      "type": "concept",
+      "source": "ai",
+      "definition": "由一个进程创建的进程称为子进程，创建者称为父进程。"
+    },
+    {
+      "id": "kp_3b9cb536beb4979072dfc7e0b1304d37",
+      "name": "线程",
+      "type": "concept",
+      "source": "ai",
+      "definition": "线程是进程中的一个执行单元，是处理机调度的基本单位。"
+    },
+    {
+      "id": "kp_3f78af5d20c41f2f9cde25f2007c1a12",
+      "name": "管道",
+      "type": "concept",
+      "source": "ai",
+      "definition": "连接一个读进程和一个写进程的共享文件，数据按先进先出的顺序流动。"
+    },
+    {
+      "id": "kp_429f0e4b0f905134f3c9a582f1c6071e",
+      "name": "进程的定义",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程是程序在一个数据集合上的一次运行过程，是系统进行资源分配和调度的独立单位。"
+    },
+    {
+      "id": "kp_43b9a49ce90db68a26f40d8dabc19145",
+      "name": "进程切换的现场保存与恢复步骤",
+      "type": "method",
+      "source": "ai",
+      "definition": "进程切换时，操作系统先把当前进程的现场保存到它的 PCB 中，再从下一个进程的 PCB 中恢复现场。"
+    },
+    {
+      "id": "kp_4890eb265660c36d843fc2f6015cde62",
+      "name": "就绪态",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程已获得除处理机以外的全部资源，只等待被调度的状态。"
+    },
+    {
+      "id": "kp_528dc2890d6cf7064a6d78dd9f94b5be",
+      "name": "时间片轮转调度算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "把处理机时间划分为固定长度的时间片，就绪进程按队列顺序轮流运行一个时间片，时间片用完而未结束的进程回到队尾的调度算法。"
+    },
+    {
+      "id": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "name": "进程",
+      "type": "concept",
+      "source": "ai",
+      "definition": "本章的起点概念，指操作系统中程序的一次执行过程，围绕其定义展开进程控制块、状态转换与切换等内容的讨论。"
+    },
+    {
+      "id": "kp_595e35d220920c098a0f4fe0eb1d61a4",
+      "name": "中级调度",
+      "type": "concept",
+      "source": "ai",
+      "definition": "决定把哪些暂时不能运行的进程换出到外存的调度。"
+    },
+    {
+      "id": "kp_5a493cf94e4f61c7985ce32fd2f58340",
+      "name": "进程通信方式",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程通信的常见方式有共享存储、消息传递和管道。"
+    },
+    {
+      "id": "kp_5f292bd67ac81701d6aec2e72c0d5887",
+      "name": "进程创建",
+      "type": "method",
+      "source": "ai",
+      "definition": "创建一个进程时，操作系统为它分配唯一的进程标识符和 PCB，分配所需的内存等资源，初始化 PCB，并把新进程插入就绪队列。"
+    },
+    {
+      "id": "kp_6054c561a1df2afaa9f357c3d9a1d34f",
+      "name": "原语",
+      "type": "concept",
+      "source": "ai",
+      "definition": "由若干条指令组成、执行期间不可被中断的程序段，具有不可分割性。"
+    },
+    {
+      "id": "kp_6f0214de936338d3d56364fc8f03a4c4",
+      "name": "进程的特征",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "进程具有动态性、并发性、独立性和异步性四个特征。"
+    },
+    {
+      "id": "kp_6f1e3c319d7b798194345b23904a049e",
+      "name": "一对一模型",
+      "type": "concept",
+      "source": "ai",
+      "definition": "多线程模型的一种，为每个用户级线程创建一个对应的内核级线程，并发性好，但创建线程的开销较大。"
+    },
+    {
+      "id": "kp_700e665f4e3b9129a60a00cb47f9d882",
+      "name": "线程的实现方式",
+      "type": "concept",
+      "source": "ai",
+      "definition": "线程的实现分为用户级线程和内核级线程。"
+    },
+    {
+      "id": "kp_7c1cdd585f7d1802156ad4148b1c2fc6",
+      "name": "内核级线程",
+      "type": "concept",
+      "source": "ai",
+      "definition": "由操作系统内核管理的线程；一个线程阻塞时内核可以调度同一进程的其他线程，代价是线程切换需要进入内核态。"
+    },
+    {
+      "id": "kp_7ce9d79a208079da10a7809a162bd008",
+      "name": "进程切换",
+      "type": "concept",
+      "source": "ai",
+      "definition": "处理机从一个进程转去运行另一个进程的过程，由中断或系统调用触发，需要在内核态下完成。"
+    },
+    {
+      "id": "kp_7f8d79827a1f936c12acd1fa8228f5c1",
+      "name": "进程独立与同进程线程共享内存",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "进程之间相互独立，而同一进程的多个线程共享内存。"
+    },
+    {
+      "id": "kp_807334ecf720932e49b0fa91d6bfb571",
+      "name": "进程与程序的区别",
+      "type": "concept",
+      "source": "ai",
+      "definition": "程序是静态的指令集合，进程是动态的执行实体；同一个程序运行两次会产生两个不同的进程。"
+    },
+    {
+      "id": "kp_835aa6df9d332e5598b5aba961a5481d",
+      "name": "临界区",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程中访问临界资源的那段代码。"
+    },
+    {
+      "id": "kp_8833b385f8c49e9c9b464710a8b9005d",
+      "name": "优先级调度算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "为每个进程设置优先级，总是选择优先级最高的就绪进程投入运行的调度算法。"
+    },
+    {
+      "id": "kp_8bd429c3fe0b58b8f166c27aff8b845a",
+      "name": "高级调度",
+      "type": "concept",
+      "source": "ai",
+      "definition": "决定把哪些作业调入内存的调度。"
+    },
+    {
+      "id": "kp_97b094b600d97d41718d791be290c69e",
+      "name": "进程通信",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程之间交换信息。由于进程拥有各自独立的地址空间，一个进程不能直接访问另一个进程的内存，因此需要操作系统提供通信机制。"
+    },
+    {
+      "id": "kp_9a7221596e027d0f81260e868f9318d5",
+      "name": "运行态",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程正在处理机上执行的状态。"
+    },
+    {
+      "id": "kp_9a74192b7ca09e7141cec2e1d9eac710",
+      "name": "原语不可分割性的作用",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "原语的不可分割性保证进程状态和 PCB 的修改不会被并发操作破坏。"
+    },
+    {
+      "id": "kp_9f1c0949050b4b45d6f83976b23f3804",
+      "name": "周转时间",
+      "type": "concept",
+      "source": "ai",
+      "definition": "作业从提交到完成所经历的时间。"
+    },
+    {
+      "id": "kp_a4b0fe9b1445c83751893ad70bd7eb82",
+      "name": "命令行管道示例",
+      "type": "example",
+      "source": "ai",
+      "definition": "命令行中的“ls | grep txt”用管道把前一个命令的输出交给后一个命令。"
+    },
+    {
+      "id": "kp_a85bc3f1089e8f920c4e6480614c4124",
+      "name": "进程撤销",
+      "type": "method",
+      "source": "ai",
+      "definition": "撤销进程时，操作系统回收它占有的全部资源，并把它的 PCB 从所在队列中移除。"
+    },
+    {
+      "id": "kp_a9d3ecc66b4d831f14c0aaa7f59c1a79",
+      "name": "创建态",
+      "type": "concept",
+      "source": "ai",
+      "definition": "表示进程正在被创建的状态。"
+    },
+    {
+      "id": "kp_ac6e65d78b6600ce2e7ed206822a6e6b",
+      "name": "消息传递",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程通过发送原语和接收原语交换格式化的消息，消息可以直接发给对方，也可以经过称为信箱的中间实体。"
+    },
+    {
+      "id": "kp_b156fc92795305897253c653e831cf55",
+      "name": "调度算法衡量指标",
+      "type": "concept",
+      "source": "ai",
+      "definition": "衡量调度算法的指标，包括处理机利用率、系统吞吐量、周转时间、等待时间和响应时间。"
+    },
+    {
+      "id": "kp_b3785d9fb6891422bd1597d4e2bd0acc",
+      "name": "进程的创建与撤销",
+      "type": "method",
+      "source": "ai",
+      "definition": "对进程进行创建和撤销的操作，是本章进程管理部分讨论的内容。"
+    },
+    {
+      "id": "kp_b740b6dcd44610734c1fe0560ddeb33d",
+      "name": "引入线程的目的",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "引入线程的目的是减小程序并发执行时的时空开销。"
+    },
+    {
+      "id": "kp_b790979d3853bb154a6694887a38385a",
+      "name": "进程控制块",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程控制块（PCB）是操作系统为每个进程维护的数据结构，是进程存在的唯一标志。"
+    },
+    {
+      "id": "kp_bb0640b6c1332cacbe728fddbf869c13",
+      "name": "进程状态转换规则",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "就绪态被调度后进入运行态；运行态时间片用完后回到就绪态；运行态请求输入输出时进入阻塞态；等待事件发生后阻塞态回到就绪态。"
+    },
+    {
+      "id": "kp_bb89982129823f255bda134cdc9589f6",
+      "name": "进程状态",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程在生命周期中会在几种状态之间转换，主要包括就绪态、运行态、阻塞态，以及创建态和终止态。"
+    },
+    {
+      "id": "kp_bbf300cf0443e9fe3ca9e854f5d470eb",
+      "name": "常见调度算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "处理机调度中用于选择作业或进程运行的算法，是本章处理机调度部分介绍的内容。"
+    },
+    {
+      "id": "kp_bec347135aa08ad4a0a77f4ac1d34b56",
+      "name": "进程是资源分配的基本单位",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程是资源分配的基本单位，即系统以进程为单位分配资源。"
+    },
+    {
+      "id": "kp_c0d1218640997fe906446c870f14ce80",
+      "name": "进程树",
+      "type": "concept",
+      "source": "ai",
+      "definition": "父子进程关系构成进程树。"
+    },
+    {
+      "id": "kp_c201712c2cb12be9f2e03a49466e6399",
+      "name": "进程与线程",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程与线程是操作系统实现并发的核心概念。"
+    },
+    {
+      "id": "kp_c568b02832a70692e90ceecca761caf8",
+      "name": "等待时间",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程在就绪队列中等待的时间总和。"
+    },
+    {
+      "id": "kp_ca5699a727da213e7631aa07ca3ae297",
+      "name": "先来先服务调度算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "按进程进入就绪队列的先后次序分配处理机的调度算法，实现简单，但对短作业不利。"
+    },
+    {
+      "id": "kp_cb1c2a1a17988302af0905657da3bc71",
+      "name": "用信号量实现互斥",
+      "type": "example",
+      "source": "ai",
+      "definition": "把初值为 1 的信号量用作互斥锁，进入临界区前执行 P 操作，离开时执行 V 操作，就能保证同一时刻只有一个进程在临界区内。"
+    },
+    {
+      "id": "kp_cc4910a502fd3b6472ebaedcaff14a4d",
+      "name": "饥饿",
+      "type": "concept",
+      "source": "ai",
+      "definition": "在调度中长作业因始终得不到处理机而被长期拖延、无法运行的现象。"
+    },
+    {
+      "id": "kp_cea76f5ff017e2a886b3dfe4f3d2e665",
+      "name": "用户级线程",
+      "type": "concept",
+      "source": "ai",
+      "definition": "由应用程序中的线程库管理的线程，内核不知道其存在；线程切换不需要进入内核态，速度快，但一个线程阻塞会导致整个进程阻塞。"
+    },
+    {
+      "id": "kp_d0609bf0093c6c57dd64693961f4ff6d",
+      "name": "线程的资源共享与私有资源",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "一个进程可包含多个线程，这些线程共享进程的地址空间、打开的文件等资源，但各自拥有独立的程序计数器、寄存器和栈。"
+    },
+    {
+      "id": "kp_db046261bb053a9dab7319526d071a8f",
+      "name": "信号量",
+      "type": "concept",
+      "source": "ai",
+      "definition": "一种用于同步和互斥的整型变量，只能通过 P 操作和 V 操作访问。"
+    },
+    {
+      "id": "kp_dc0d2415f6d405d8711495d3fd7d1c2c",
+      "name": "阻塞态不能直接进入运行态",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "阻塞态的进程必须先回到就绪态，不能直接进入运行态。"
+    },
+    {
+      "id": "kp_dc74d3c9f9d99cc86b0fbd1feef4fdf2",
+      "name": "信箱",
+      "type": "concept",
+      "source": "ai",
+      "definition": "消息传递中消息可以经过的中间实体，称为信箱。"
+    },
+    {
+      "id": "kp_de781981793f45e2d38e46d2fd15e860",
+      "name": "进程互斥",
+      "type": "concept",
+      "source": "ai",
+      "definition": "当一个进程访问某种资源时，其他进程不能同时访问。"
+    },
+    {
+      "id": "kp_e00aadfc0336c96224e1a9dbf249dfaf",
+      "name": "低级调度",
+      "type": "concept",
+      "source": "ai",
+      "definition": "决定把处理机分配给哪个就绪进程的调度。"
+    },
+    {
+      "id": "kp_e0fcbad25517fb6377f5ab895ed9fd2a",
+      "name": "多线程模型",
+      "type": "concept",
+      "source": "ai",
+      "definition": "把用户级线程映射到内核级线程的方式，包括多对一模型、一对一模型和多对多模型。"
+    },
+    {
+      "id": "kp_e67bedc236742603a923ce72f82884fc",
+      "name": "线程是处理机调度的基本单位",
+      "type": "concept",
+      "source": "ai",
+      "definition": "线程是处理机调度的基本单位，即处理机的调度以线程为单位。"
+    },
+    {
+      "id": "kp_ea1c440ca9d0933083c8563de4b26bc8",
+      "name": "临界资源",
+      "type": "concept",
+      "source": "ai",
+      "definition": "一次只允许一个进程使用的资源。"
+    },
+    {
+      "id": "kp_ea72a650d89f68eb999e704ff550bbf8",
+      "name": "线程切换与进程切换的关系",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "同一进程中的线程切换不会引起进程切换；不同进程中的线程切换则会引起进程切换。"
+    },
+    {
+      "id": "kp_f437b08ce29385b20648640f52aa7d76",
+      "name": "终止态",
+      "type": "concept",
+      "source": "ai",
+      "definition": "表示进程已经结束的状态。"
+    },
+    {
+      "id": "kp_f440e3b0c6cfd46826fa92aa37c96444",
+      "name": "阻塞态",
+      "type": "concept",
+      "source": "ai",
+      "definition": "进程因等待某一事件（例如等待输入输出完成）而暂停执行的状态。"
+    },
+    {
+      "id": "kp_f852e6411195f30c03d6a8c421289561",
+      "name": "进程同步",
+      "type": "concept",
+      "source": "ai",
+      "definition": "多个相互合作的进程按照一定的先后次序执行。"
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_03e2c0a3fe71268e5673cb67cbe25aad",
+      "type": "CONTAINS",
+      "from": "kp_255e69eb25905a8a65795260f88b3f4f",
+      "to": "kp_8bd429c3fe0b58b8f166c27aff8b845a",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.1 调度的概念"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_0e282bb838a8941b77adf77e7ca4f51e",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_97b094b600d97d41718d791be290c69e",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_28fc6510c20e5a817d8d58e121491857",
+      "type": "PREREQUISITE",
+      "from": "kp_de781981793f45e2d38e46d2fd15e860",
+      "to": "kp_db046261bb053a9dab7319526d071a8f",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.4 进程同步与互斥"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_2c2e60cc27d2fc9e32abafd099726779",
+      "type": "CONTAINS",
+      "from": "kp_6054c561a1df2afaa9f357c3d9a1d34f",
+      "to": "kp_9a74192b7ca09e7141cec2e1d9eac710",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.1 原语"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_2fea649755efcb12b85a87ea25577bf4",
+      "type": "EXAMPLE_OF",
+      "from": "kp_a4b0fe9b1445c83751893ad70bd7eb82",
+      "to": "kp_3f78af5d20c41f2f9cde25f2007c1a12",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.3 进程通信"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_31cc63fb034cbc8e6e9018a29a4da5bb",
+      "type": "RELATED_TO",
+      "from": "kp_5f292bd67ac81701d6aec2e72c0d5887",
+      "to": "kp_39645e3a15af50eb3dcbf0fd6e8cba41",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.2 进程的创建与撤销"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_327d8bc18344601835ab9c7128949a24",
+      "type": "CONTAINS",
+      "from": "kp_bb89982129823f255bda134cdc9589f6",
+      "to": "kp_9a7221596e027d0f81260e868f9318d5",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_34e9526599916fa1899664a1ca601d09",
+      "type": "CONTAINS",
+      "from": "kp_255e69eb25905a8a65795260f88b3f4f",
+      "to": "kp_e00aadfc0336c96224e1a9dbf249dfaf",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.1 调度的概念"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_3cf630d336490c43c66bc760c6896af0",
+      "type": "CONTAINS",
+      "from": "kp_3b9cb536beb4979072dfc7e0b1304d37",
+      "to": "kp_7c1cdd585f7d1802156ad4148b1c2fc6",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_3f29940e002c5473435f87e4db366700",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_6054c561a1df2afaa9f357c3d9a1d34f",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_4025381bb166340b5709aa3ecda197b7",
+      "type": "CONTAINS",
+      "from": "kp_ac6e65d78b6600ce2e7ed206822a6e6b",
+      "to": "kp_dc74d3c9f9d99cc86b0fbd1feef4fdf2",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.3 进程通信"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_44d4bc2ef2b9b08e15eb0a4ca067235c",
+      "type": "RELATED_TO",
+      "from": "kp_3324638eb1984404b0feb41ce3882500",
+      "to": "kp_ca5699a727da213e7631aa07ca3ae297",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.2 常见调度算法"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_4b6c0a875b7419cd02b6250634fbe7fe",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_7ce9d79a208079da10a7809a162bd008",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_4beda0e57fcef2883459ec1a49eb1a33",
+      "type": "RELATED_TO",
+      "from": "kp_4890eb265660c36d843fc2f6015cde62",
+      "to": "kp_04489364e787977ea082798c5b19212e",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_4cdc76ee83ec24228ed5d322039c29f0",
+      "type": "RELATED_TO",
+      "from": "kp_7f8d79827a1f936c12acd1fa8228f5c1",
+      "to": "kp_154cf5eabbc3cd1181601c2178cd52db",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.2 进程与线程的比较"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_4d39e4124a7fda5d92d8aa21f25df64a",
+      "type": "CONTAINS",
+      "from": "kp_bb89982129823f255bda134cdc9589f6",
+      "to": "kp_f437b08ce29385b20648640f52aa7d76",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_5446b102d0a239bae91a3b38a3cc7cc1",
+      "type": "PREREQUISITE",
+      "from": "kp_073bc7c6164bbf0fa83be0c58788528a",
+      "to": "kp_c201712c2cb12be9f2e03a49466e6399",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.1 本章导读"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_5ba5e11b1280db073a5dac663daaa454",
+      "type": "CONTAINS",
+      "from": "kp_b790979d3853bb154a6694887a38385a",
+      "to": "kp_08f45824ea0834d21380093161406271",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.2 进程控制块"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_644dd9774c447dfa3eefd594cdbf1497",
+      "type": "RELATED_TO",
+      "from": "kp_bec347135aa08ad4a0a77f4ac1d34b56",
+      "to": "kp_e67bedc236742603a923ce72f82884fc",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.2 进程与线程的比较"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_65a3293a875f7a85b8fff7d780d8b78a",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_2f44410111e247f8a1ea5c9d70c4e8bf",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_74033588d1a3f0ef9770c7933bf66c65",
+      "type": "RELATED_TO",
+      "from": "kp_ea1c440ca9d0933083c8563de4b26bc8",
+      "to": "kp_835aa6df9d332e5598b5aba961a5481d",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.4 进程同步与互斥"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_785239833cd5bbb243a63953cce2e5c3",
+      "type": "CONTAINS",
+      "from": "kp_b156fc92795305897253c653e831cf55",
+      "to": "kp_c568b02832a70692e90ceecca761caf8",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.1 调度的概念"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_797a3ca428eb2b24ff04692d2be371f9",
+      "type": "CONTAINS",
+      "from": "kp_7ce9d79a208079da10a7809a162bd008",
+      "to": "kp_1331ba6b633c66e2687b5944dcf5f5c0",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.4 进程切换"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_7c2f9301a2a393ed3d7fb309972f7e50",
+      "type": "RELATED_TO",
+      "from": "kp_429f0e4b0f905134f3c9a582f1c6071e",
+      "to": "kp_6f0214de936338d3d56364fc8f03a4c4",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.1 进程的定义"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_7dfeb8878cd98c5893e6677dcbb4f48d",
+      "type": "PREREQUISITE",
+      "from": "kp_f852e6411195f30c03d6a8c421289561",
+      "to": "kp_db046261bb053a9dab7319526d071a8f",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.4 进程同步与互斥"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_7edfdff33dffcacc13ce48a286ea29e3",
+      "type": "CONTAINS",
+      "from": "kp_bb89982129823f255bda134cdc9589f6",
+      "to": "kp_4890eb265660c36d843fc2f6015cde62",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_8ffad794381f4457d0e50546249b4fc3",
+      "type": "RELATED_TO",
+      "from": "kp_8833b385f8c49e9c9b464710a8b9005d",
+      "to": "kp_03f55147c309017ccf5409220e376b57",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.2 常见调度算法"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_9625764e908ced1fac4d05151d0ff9f8",
+      "type": "PREREQUISITE",
+      "from": "kp_bb89982129823f255bda134cdc9589f6",
+      "to": "kp_04489364e787977ea082798c5b19212e",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_99da55f54e6a898ea7d82636cdeb3fbf",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_b3785d9fb6891422bd1597d4e2bd0acc",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_9d73f7391225743fe1cc9af0ed49f82c",
+      "type": "RELATED_TO",
+      "from": "kp_f440e3b0c6cfd46826fa92aa37c96444",
+      "to": "kp_9a7221596e027d0f81260e868f9318d5",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_9f462df91c89627bf6a7910f7feaf126",
+      "type": "RELATED_TO",
+      "from": "kp_429f0e4b0f905134f3c9a582f1c6071e",
+      "to": "kp_807334ecf720932e49b0fa91d6bfb571",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.1 进程的定义"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_a5a6af7bfcfdd031244efc40e0a7df62",
+      "type": "RELATED_TO",
+      "from": "kp_1756f0f520ddd4b29844b7c675ecc819",
+      "to": "kp_cc4910a502fd3b6472ebaedcaff14a4d",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.2 常见调度算法"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_aaa1f080360e2bab7f97ccbaa61abb8c",
+      "type": "PREREQUISITE",
+      "from": "kp_b790979d3853bb154a6694887a38385a",
+      "to": "kp_115ab906d7e034a505209fa4a11477c9",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.2 进程控制块"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_ab5941d9c958f8ca6f4099e2af1490c2",
+      "type": "RELATED_TO",
+      "from": "kp_d0609bf0093c6c57dd64693961f4ff6d",
+      "to": "kp_340abdd6d8dc3cb87c56776dc66d6d6b",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.1 线程的定义"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_acdecdfcc9a12442be09467870cd6b37",
+      "type": "CONTAINS",
+      "from": "kp_6054c561a1df2afaa9f357c3d9a1d34f",
+      "to": "kp_28ee90b0a4e41b88b835b8860de7c0a8",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.1 原语"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_ad93498ededcf0208ad66acadb2ec8da",
+      "type": "CONTAINS",
+      "from": "kp_b156fc92795305897253c653e831cf55",
+      "to": "kp_9f1c0949050b4b45d6f83976b23f3804",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.1 调度的概念"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_ae3087b99f29016edcd322d1df941923",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_b790979d3853bb154a6694887a38385a",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_b69360441cb32e0db2a743d475e54d6a",
+      "type": "EXAMPLE_OF",
+      "from": "kp_cb1c2a1a17988302af0905657da3bc71",
+      "to": "kp_db046261bb053a9dab7319526d071a8f",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.4 进程同步与互斥"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_b92abfb13ef04b980c8581f8c9b819be",
+      "type": "RELATED_TO",
+      "from": "kp_39645e3a15af50eb3dcbf0fd6e8cba41",
+      "to": "kp_c0d1218640997fe906446c870f14ce80",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.2 进程的创建与撤销"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_be0bb8f3aab4f065c5a78c99020ef08d",
+      "type": "CONTAINS",
+      "from": "kp_e0fcbad25517fb6377f5ab895ed9fd2a",
+      "to": "kp_6f1e3c319d7b798194345b23904a049e",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.3 线程的实现方式"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_c0e94f419d7cd50cff8239a61d5980e1",
+      "type": "RELATED_TO",
+      "from": "kp_b740b6dcd44610734c1fe0560ddeb33d",
+      "to": "kp_340abdd6d8dc3cb87c56776dc66d6d6b",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.1 线程的定义"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_c0f67d417612cd61d56765bdc613e2db",
+      "type": "CONTAINS",
+      "from": "kp_db046261bb053a9dab7319526d071a8f",
+      "to": "kp_209069fe5e955da8b78649aed1304892",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.4 进程同步与互斥"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_c4d5cf738aa0cabc422fc705fea65937",
+      "type": "CONTAINS",
+      "from": "kp_bb0640b6c1332cacbe728fddbf869c13",
+      "to": "kp_dc0d2415f6d405d8711495d3fd7d1c2c",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_c55a7d3d1b210f01a85653ddbe093801",
+      "type": "CONTAINS",
+      "from": "kp_bb89982129823f255bda134cdc9589f6",
+      "to": "kp_f440e3b0c6cfd46826fa92aa37c96444",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_d449dc01b40891e858ab1b88db244508",
+      "type": "CONTAINS",
+      "from": "kp_255e69eb25905a8a65795260f88b3f4f",
+      "to": "kp_bbf300cf0443e9fe3ca9e854f5d470eb",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_d6347b29c3ae629d71926012fc96885c",
+      "type": "CONTAINS",
+      "from": "kp_700e665f4e3b9129a60a00cb47f9d882",
+      "to": "kp_7c1cdd585f7d1802156ad4148b1c2fc6",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.3 线程的实现方式"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_d7f90f757726699f4f9e10d1b8292cbb",
+      "type": "CONTAINS",
+      "from": "kp_97b094b600d97d41718d791be290c69e",
+      "to": "kp_ac6e65d78b6600ce2e7ed206822a6e6b",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.3 进程通信"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_daffeaa48fc49feb48a348cf79f992d4",
+      "type": "CONTAINS",
+      "from": "kp_3b9cb536beb4979072dfc7e0b1304d37",
+      "to": "kp_cea76f5ff017e2a886b3dfe4f3d2e665",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_dd6b7908a949ec8aa7b9281b4f123940",
+      "type": "CONTAINS",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_db046261bb053a9dab7319526d071a8f",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_dd910543504ee17e5e089eb0124694e8",
+      "type": "CONTAINS",
+      "from": "kp_97b094b600d97d41718d791be290c69e",
+      "to": "kp_0c0b1fdfd81d2e770ebac14ad1f298e6",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.3 进程通信"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_dfdabcf9e245ed14bfedf744aa8f95c1",
+      "type": "CONTAINS",
+      "from": "kp_db046261bb053a9dab7319526d071a8f",
+      "to": "kp_14442936086fc7d9fc7e31be5ffa8d33",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.4 进程同步与互斥"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_e3b1cbc24d48e5c2f4622b6a2d8f7685",
+      "type": "CONTAINS",
+      "from": "kp_97b094b600d97d41718d791be290c69e",
+      "to": "kp_3f78af5d20c41f2f9cde25f2007c1a12",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.3 进程控制与通信 > 2.3.3 进程通信"
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "rel_e7bdd2a45ba08d29c67fa3b756698bdc",
+      "type": "CONTAINS",
+      "from": "kp_700e665f4e3b9129a60a00cb47f9d882",
+      "to": "kp_cea76f5ff017e2a886b3dfe4f3d2e665",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.3 线程的实现方式"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_f0f0a85fdbc9c02b9e82f96b6907ab74",
+      "type": "RELATED_TO",
+      "from": "kp_528dc2890d6cf7064a6d78dd9f94b5be",
+      "to": "kp_3324638eb1984404b0feb41ce3882500",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.2 常见调度算法"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_f2243f0ffa867c5f3a448333b102889f",
+      "type": "CONTAINS",
+      "from": "kp_255e69eb25905a8a65795260f88b3f4f",
+      "to": "kp_595e35d220920c098a0f4fe0eb1d61a4",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.5 处理机调度 > 2.5.1 调度的概念"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_f9c24be7947d6edec8ae35b9915f922c",
+      "type": "CONTAINS",
+      "from": "kp_bb89982129823f255bda134cdc9589f6",
+      "to": "kp_a9d3ecc66b4d831f14c0aaa7f59c1a79",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态"
+      ],
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "rel_faa375adecd16b981408333ff121ca7b",
+      "type": "RELATED_TO",
+      "from": "kp_cea76f5ff017e2a886b3dfe4f3d2e665",
+      "to": "kp_7c1cdd585f7d1802156ad4148b1c2fc6",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.4 线程 > 2.4.3 线程的实现方式"
+      ],
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "rel_fdcd06b2b0d35f3f42b98f14b8f467db",
+      "type": "RELATED_TO",
+      "from": "kp_54bd2ad096668d84c2fe538d2837bd13",
+      "to": "kp_3b9cb536beb4979072dfc7e0b1304d37",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.6 本章小结"
+      ],
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "rel_fe0800828a836fb91b052af0373ce653",
+      "type": "CONTAINS",
+      "from": "kp_7ce9d79a208079da10a7809a162bd008",
+      "to": "kp_43b9a49ce90db68a26f40d8dabc19145",
+      "source": "ai",
+      "section_paths": [
+        "第2章 进程与线程 > 2.2 进程 > 2.2.4 进程切换"
+      ],
+      "pages": [
+        2
+      ]
+    }
+  ]
+}
