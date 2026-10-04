@@ -1744,7 +1744,7 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | C02（B-QA-01） | IN_PROGRESS（C02-1/2/3 完成待复审；C02-4 已交 DeepSeek，待测量环境） | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
 | C03（B-PDF-01 / L16） | TODO | DeepSeek（C03-1/4）；Claude（C03-2/3） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
 | C04（B-QUALITY-01） | TODO | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
-| C05 | TODO | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
+| C05 | DONE（待复审；视觉美化移出本阶段） | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
 | C06 | TODO | Claude | 最终门禁、隔离从零复测、交接 Codex | 整次 integration 实际 exit 0 |
 
 - 2026-10-03 C00 基线：`git switch -c claude/plan-c-reliability ec1291a`（用户确认的方式；旧分支保留在 `c85ee53`）。`./scripts/verify.sh basic` exit 0（`env -u LLM_MODE -u EMBEDDING_MODE`）。
@@ -1757,3 +1757,4 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
   - C02-4：只测 1 题（冷启动首问超时；8.15 秒无调用记录的空档未归因），因 usage 未知止损规则过严提前停止（工具问题，Claude 负责）。
   - 累计：记录口径 731690，系统计费口径 743806（含 1 次未知调用估算 12116），均在批准上限 803168 内；向量 11946 另计。
 - 2026-10-04 用户决定：进入方案 B（思考控制），批准探测预算 5000；course1 PDF 等 B 完成后再测。探测工具 `evaluation/probe_thinking.py`（`8f0fc14`，`tests/tooling/test_c02b_probe.py` 7 例先红后绿）；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02b-deepseek-thinking-probe.md`（5 个变体，最坏 4110 token，直连不进 `model_calls`，需手工记账）。
+- 2026-10-04 离线推进（等待方案 B 探测期间）：测量工具止损改用系统计费口径（`312cccb`）；问答准备与 worker 阶段耗时日志（`f8c549f`，后端全量 3838 passed / 27 skipped）；**C05 完成**：C05-1 `ce378bc`、C05-2 `1a8da3f`、C05-3 `c7f15e4`、C05-4 `3101b54`，前端全量 911 passed、type-check 与 build 通过。交接 `docs/handoffs/claude-plan-c-c05.md`。
