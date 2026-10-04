@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { documentLabel, EXCERPT_FOLD_CHARS, locationLabel } from '../composables/sourceLabel'
 
 /**
@@ -12,6 +12,13 @@ const props = defineProps<{
 defineEmits<{ close: [] }>()
 
 const expanded = ref(false)
+// A parent may recreate an equal source object; reset only when its display identity changes.
+watch([
+  () => props.source.documentName,
+  () => props.source.page,
+  () => props.source.sectionPath,
+  () => props.source.excerpt,
+], () => { expanded.value = false })
 const excerpt = computed(() => props.source.excerpt ?? '')
 const folded = computed(() => !expanded.value && excerpt.value.length > EXCERPT_FOLD_CHARS)
 const shown = computed(() => (folded.value ? `${excerpt.value.slice(0, EXCERPT_FOLD_CHARS)}…` : excerpt.value))

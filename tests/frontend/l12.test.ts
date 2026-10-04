@@ -68,6 +68,28 @@ describe('L12 来源查看器', () => {
     expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(long)
   })
 
+  it.each([
+    { documentName: 'b.pdf' },
+    { page: 2 },
+    { sectionPath: '第二章' },
+    { excerpt: '队列'.repeat(EXCERPT_FOLD_CHARS) },
+  ])('同来源新对象保持展开，切换显示字段 %j 后重新折叠', async (change) => {
+    const source = { documentName: 'a.pdf', page: 1, sectionPath: '第一章', excerpt: '栈'.repeat(EXCERPT_FOLD_CHARS + 50) }
+    const wrapper = viewer(source)
+    await wrapper.get('[data-test="sv-expand"]').trigger('click')
+    await wrapper.setProps({ source: { ...source } })
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(source.excerpt)
+    expect(wrapper.find('[data-test="sv-expand"]').exists()).toBe(false)
+    const next = { ...source, ...change }
+    await wrapper.setProps({ source: next })
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(next.excerpt.slice(0, EXCERPT_FOLD_CHARS) + '…')
+    expect(wrapper.get('[data-test="sv-document"]').text()).toBe(next.documentName)
+    expect(wrapper.get('[data-test="sv-location"]').text()).toContain(`第 ${next.page} 页`)
+    expect(wrapper.get('[data-test="sv-location"]').text()).toContain(next.sectionPath)
+    expect(wrapper.find('[data-test="sv-expand"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('片段与文件名里的标签按纯文本显示，不生成可执行节点', () => {
     const wrapper = viewer({ documentName: '<img src=x onerror=alert(1)>.pdf', page: 1, excerpt: '<script>alert(1)</script>[1]' })
     expect(wrapper.find('img').exists()).toBe(false)
@@ -190,13 +212,17 @@ describe('C05-2 问答长来源与来源查看器同一折叠规则', () => {
     setActivePinia(pinia)
     useRuntimeStore().apply({ runtime_mode: 'personal', configured: true })
     const long = '栈是只允许在一端插入和删除的线性表。'.repeat(100)
+    const longQueue = '队列是先进先出的线性表。'.repeat(100)
     const client: ChatStreamClient = {
       async send() {
         return {
           kind: 'done',
           final: {
             status: 'answered', answer: '栈后进先出[1]。', graph_version: 1, request_id: 'r',
-            citations: [{ index: 1, chunk_id: 'k1', document_id: 'm1', page: 2, text: long, document_name: 'ch3.pdf' }],
+            citations: [
+              { index: 1, chunk_id: 'k1', document_id: 'm1', page: 2, text: long, document_name: 'ch3.pdf' },
+              { index: 2, chunk_id: 'k2', document_id: 'm2', page: 3, text: longQueue, document_name: 'queue.pdf' },
+            ],
           },
         } as never
       },
@@ -225,6 +251,15 @@ describe('C05-2 问答长来源与来源查看器同一折叠规则', () => {
     expect(wrapper.text()).not.toContain(long)                 // 不再直接铺开全文
     await viewer.get('[data-test="sv-expand"]').trigger('click')
     expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(long)
+    await wrapper.findAll('.source-list__item')[1]!.trigger('click')
+    expect(wrapper.get('.source').text()).toContain('出处 [2]')
+    expect(wrapper.get('[data-test="sv-document"]').text()).toBe('queue.pdf')
+    expect(wrapper.get('[data-test="sv-location"]').text()).toBe('第 3 页')
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(longQueue.slice(0, EXCERPT_FOLD_CHARS) + '…')
+    await wrapper.get('[data-test="sv-expand"]').trigger('click')
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(longQueue)
+    await wrapper.findAll('.source-list__item')[0]!.trigger('click')
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(long.slice(0, EXCERPT_FOLD_CHARS) + '…')
     await wrapper.get('[data-test="sv-close"]').trigger('click')
     expect(wrapper.find('[data-test="source-viewer"]').exists()).toBe(false)
     wrapper.unmount()
