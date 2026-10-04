@@ -317,7 +317,28 @@ describe('H01 切换课程', () => {
     expect(store.courseId).toBe('c1')
     expect(api.get).toHaveBeenCalledWith('c1', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(wrapper.get('[data-test="current-course"]').text()).toContain('数据结构')
-    expect(wrapper.get('[data-test="course-card"] a').attributes('aria-current')).toBe('page')
+    // 概览不再重复首页的整份课程卡片；当前课程区域用 aria-labelledby 指向「当前课程」标题
+    const currentRegion = wrapper.get('[data-test="current-course"]')
+    const headingId = currentRegion.attributes('aria-labelledby')
+    expect(headingId).toBeTruthy()
+    expect(wrapper.get(`#${headingId}`).text()).toBe('当前课程')
+  })
+
+  it('概览只显示当前课程，返回首页后才显示完整课程列表', async () => {
+    const api = fakeApi({
+      list: async () => [course('c1', { name: '当前课程甲' }), course('c2', { name: '其他课程乙' })],
+      get: async (cid) => course(cid, { name: '当前课程甲' }),
+    })
+    const { wrapper } = await mountApp({ path: '/courses/c1', api })
+    expect(wrapper.get('[data-test="current-course"]').text()).toContain('当前课程甲')
+    expect(wrapper.findAll('[data-test="course-card"]')).toHaveLength(0)
+    expect(wrapper.find('[data-test="course-overview-list"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('其他课程乙')
+
+    await wrapper.get('[data-test="back-to-courses"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-test="course-card"]')).toHaveLength(2)
+    expect(wrapper.get('[data-test="course-list-region"]').text()).toContain('其他课程乙')
   })
 
   it('A→B 快速切换：A 晚到的响应不污染 B，A 的请求被取消', async () => {

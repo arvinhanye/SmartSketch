@@ -168,7 +168,7 @@ function nodeAt(index: number): { cx: number; cy: number } {
     </p>
 
     <!-- ============================================================ 课程概览 -->
-    <!-- 进入课程路由渲染概览：当前课程详情 + 当前课程卡片（标记 aria-current，用于在列表里定位本课） -->
+    <!-- 进入课程路由渲染概览：只展示当前课程详情与功能入口；整份课程列表属于「我的课程」首页 -->
     <template v-if="isOverview">
       <header class="courses__head courses__head--overview">
         <div class="courses__intro">
@@ -224,40 +224,6 @@ function nodeAt(index: number): { cx: number; cy: number } {
             </li>
           </ul>
         </template>
-      </section>
-
-      <!-- 当前课程卡片：与首页列表同款卡片，保持课程列表在概览态也能定位到本课（aria-current） -->
-      <section
-        v-if="listStatus === 'ready' && !isEmpty"
-        class="courses__list"
-        data-test="course-overview-list"
-        aria-labelledby="course-overview-list-title"
-      >
-        <h3 id="course-overview-list-title" class="courses__list-title">我的课程</h3>
-        <ul class="courses__grid">
-          <li v-for="card in courses" :key="card.id" class="course-card" data-test="course-card">
-            <div class="course-card__body">
-              <span class="course-card__badge" :class="statusTone(card.statusLabel)">{{ card.statusLabel }}</span>
-              <h4 class="course-card__name">{{ card.name }}</h4>
-              <p v-if="card.description" class="course-card__desc">{{ card.description }}</p>
-              <div class="course-card__footer">
-                <ul class="course-card__chips">
-                  <li class="course-card__chip">{{ card.roleLabel }}</li>
-                  <li class="course-card__chip">{{ card.knowledgePointCount }} 个知识点</li>
-                </ul>
-                <RouterLink
-                  class="course-card__cta"
-                  data-test="course-entry"
-                  :to="{ name: COURSE_ROUTE, params: { cid: card.id } }"
-                  :aria-current="card.id === selectedId ? 'page' : undefined"
-                  :aria-label="`${COURSE_ENTRY_LABEL}：${card.name}`"
-                >
-                  {{ COURSE_ENTRY_LABEL }}
-                </RouterLink>
-              </div>
-            </div>
-          </li>
-        </ul>
       </section>
     </template>
 
