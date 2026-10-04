@@ -7,6 +7,9 @@
 执行方案：[`docs/superpowers/plans/2026-10-04-frontend-ui-exact-replica.md`](../superpowers/plans/2026-10-04-frontend-ui-exact-replica.md)
 
 > **接手入口**：新的接手者请先读 [`NEXT-frontend-ui-replica.md`](NEXT-frontend-ui-replica.md)（状态、边界、环境恢复步骤、剩余任务与踩坑清单）。本文件保留逐批的完整历史与证据细节。
+>
+> **推送状态**：分支 `frontend-backend-refactor` 已推送到 `origin`（`github.com/arvinhanye/SmartSketch`），
+> 远端 HEAD 与本地一致；**未合并到 main、未部署**。本文件下文出现的「未推送」表述均已过时。
 
 > **本文件的定位**：主人要求「前端完全复刻 `frontend-ui-revision`，重点检查 UI 效果」。
 > 因此第 1 节之后先记录**视觉复刻**结果（U1–U7），再记录此前功能迁移的批次状态。

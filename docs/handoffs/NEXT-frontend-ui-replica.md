@@ -11,7 +11,9 @@
 - 产品代码最后提交：`0d1b170`（其后为文档提交 `217f67a`）
 - 目标基线：`68762e8ab9efdfc20552a94668d7e26deb2e34c5`
 - 界面唯一来源：`frontend-ui-revision@27bff16a67fa4e9b96416d3529069832b05e88ac`
-- **未推送、未合并、未部署**（截至本文件写入）
+- **已推送到 GitHub**：`origin/frontend-backend-refactor`（`https://github.com/arvinhanye/SmartSketch`），
+  远端 HEAD 与本地一致；**未合并到 main、未部署**。
+  可直接开 PR：<https://github.com/arvinhanye/SmartSketch/pull/new/frontend-backend-refactor>
 
 ## 2. 绝对边界（不得越界）
 
