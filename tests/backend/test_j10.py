@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -26,7 +27,9 @@ from app.services.versions.resolver import PublishedVersion
 @pytest.fixture
 def chat_env(tmp_path):
     url = f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}"
-    assert migrate(url)[-1] == "016"
+    # 全部迁移都已执行（以迁移目录里编号最大的文件为准，新增迁移不必改这里）
+    latest = max(path.name[:3] for path in (Path(__file__).resolve().parents[2] / "src/backend/migrations").glob("[0-9][0-9][0-9]_*.sql"))
+    assert migrate(url)[-1] == latest
     user_id = "u" * 32
     course_id = "c" * 32
     version_id = "v" * 26

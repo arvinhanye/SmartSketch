@@ -93,6 +93,11 @@ class CallOutcome:
     latency_ms: int | None
     error_class: str | None
     rejected_before_generation: bool
+    # ADR-089 (migration 017): reasoning measurement only; None = not reported (never zero-filled)
+    usage_reasoning: int | None = None
+    reasoning_chars: int | None = None
+    first_reasoning_ms: int | None = None
+    first_content_ms: int | None = None
 
 
 def _billed_where(database: sqlite3.Connection, where: str, params: tuple[Any, ...]) -> int:
@@ -202,12 +207,16 @@ class SqliteCallStore:
             database.execute(
                 "UPDATE model_calls SET status = ?, model_responded = ?, usage_input = ?,"
                 " usage_output = ?, latency_ms = ?, error_class = ?,"
+                " usage_reasoning = ?, reasoning_chars = ?, first_reasoning_ms = ?, first_content_ms = ?,"
                 " finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
                 " WHERE call_id = ?",
                 (
                     outcome.status, outcome.model_responded,
                     outcome.usage_input, outcome.usage_output,
-                    outcome.latency_ms, error_class, outcome.call_id,
+                    outcome.latency_ms, error_class,
+                    outcome.usage_reasoning, outcome.reasoning_chars,
+                    outcome.first_reasoning_ms, outcome.first_content_ms,
+                    outcome.call_id,
                 ),
             )
 

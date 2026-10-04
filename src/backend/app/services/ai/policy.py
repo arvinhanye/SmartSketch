@@ -75,6 +75,7 @@ from .client import (
     ModelStreamInterruptedError,
     StreamDelta,
     StreamDone,
+    StreamReasoning,
     StreamEvent,
 )
 from .compatible import estimate_input_tokens
@@ -302,6 +303,15 @@ class CallStore(Protocol):
     def finish(self, outcome: CallOutcome) -> None: ...
 
 
+@dataclass
+class _StreamTiming:
+    """ADR-089：一次流式调用内首次推理与首次可见内容的时刻（相对调用开始，毫秒）及推理字数。"""
+
+    first_reasoning_ms: int | None = None
+    first_content_ms: int | None = None
+    reasoning_chars: int = 0
+
+
 @dataclass(frozen=True)
 class CallAttribution:
     """Who a call belongs to (「调用记录」归属字段). QA calls: ``request_id`` and no ``task_id``."""
@@ -527,16 +537,22 @@ class ModelCallPolicy:
     def _latency_ms(self, started: float) -> int:
         return max(0, round((self._clock() - started) * 1000))
 
-    def _finish_ok(self, call_id: str, result: ModelResult, started: float) -> None:
+    def _finish_ok(self, call_id: str, result: ModelResult, started: float,
+                   timing: _StreamTiming | None = None) -> None:
         usage = result.usage
         self._finish(call_id, CallOutcome(
             call_id=call_id, status="ok", model_responded=result.model_responded,
             usage_input=usage.input_tokens if usage is not None else None,
             usage_output=usage.output_tokens if usage is not None else None,
             latency_ms=self._latency_ms(started), error_class=None, rejected_before_generation=False,
+            usage_reasoning=usage.reasoning_tokens if usage is not None else None,
+            reasoning_chars=result.reasoning_chars,
+            first_reasoning_ms=timing.first_reasoning_ms if timing is not None else None,
+            first_content_ms=timing.first_content_ms if timing is not None else None,
         ))
 
-    def _finish_error(self, call_id: str, error: BaseException, started: float) -> None:
+    def _finish_error(self, call_id: str, error: BaseException, started: float,
+                      timing: _StreamTiming | None = None) -> None:
         if isinstance(error, ModelCallError):
             usage = error.usage
             error_class = error.error_class.value
@@ -549,6 +565,9 @@ class ModelCallPolicy:
             usage_output=usage.output_tokens if usage is not None else None,
             latency_ms=self._latency_ms(started), error_class=error_class,
             rejected_before_generation=rejected,
+            reasoning_chars=timing.reasoning_chars or None if timing is not None else None,
+            first_reasoning_ms=timing.first_reasoning_ms if timing is not None else None,
+            first_content_ms=timing.first_content_ms if timing is not None else None,
         ))
 
     def _log_failure(self, call_id: str, provider: _Provider, model: str, error: BaseException) -> None:
@@ -635,16 +654,25 @@ class ModelCallPolicy:
                 raise
             started = self._clock()
             shown = False
+            timing = _StreamTiming()
             inner = provider.client.stream(call_request)
             try:
                 for event in inner:
                     if isinstance(event, StreamDone):
                         provider.breaker.record_success()
-                        self._finish_ok(call_id, event.result, started)
+                        self._finish_ok(call_id, event.result, started, timing)
                         yield event
                         return
+                    if isinstance(event, StreamReasoning):
+                        # ADR-089: measured here, never forwarded (callers only see the answer)
+                        if timing.first_reasoning_ms is None:
+                            timing.first_reasoning_ms = self._latency_ms(started)
+                        timing.reasoning_chars += event.chars
+                        continue
                     if isinstance(event, StreamDelta) and event.text:
                         shown = True
+                        if timing.first_content_ms is None:
+                            timing.first_content_ms = self._latency_ms(started)
                     yield event
                 # A stream that ends without StreamDone broke off (E02: StreamDone is last).
                 raise ModelStreamInterruptedError(call_request.model)
@@ -653,7 +681,7 @@ class ModelCallPolicy:
                 provider.breaker.release()
                 raise
             except ModelCallError as error:
-                self._finish_error(call_id, error, started)
+                self._finish_error(call_id, error, started, timing)
                 self._log_failure(call_id, provider, model, error)
                 if error.error_class in _STREAM_COUNTED:
                     provider.breaker.record_failure()
@@ -663,7 +691,7 @@ class ModelCallPolicy:
                     raise
                 last = error
             except BaseException as error:
-                self._finish_error(call_id, error, started)
+                self._finish_error(call_id, error, started, timing)
                 self._log_failure(call_id, provider, model, error)
                 provider.breaker.release()
                 raise
