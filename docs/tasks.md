@@ -1743,7 +1743,7 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | C01（B-EVAL-01） | DONE（已复审；Codex修复续跑预检） | Claude/Codex | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
 | C02（B-QA-01） | IN_PROGRESS（13题真实终态/服务端与SSE达标；浏览器首字/完整v3开启基线待用户决定） | Codex（本地接手）；DeepSeek（真实轮） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
 | C03（B-PDF-01 / L16） | IN_PROGRESS（新两份PDF20.90/28.08秒已核；慢段根因与MD补测决策仍OPEN） | DeepSeek（真实轮）；Codex（本地复审） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
-| C04（B-QUALITY-01） | IN_PROGRESS（C04-1 工作表已备，待判定） | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
+| C04（B-QUALITY-01） | DONE（2026-10-04 用户签收新两份 PDF：两课实体、关系均 ≥70%；复核后采纳辅助判定，见 C-ACC 证据） | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
 | C05 | DONE（待复审；视觉美化移出本阶段） | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
 | C06 | IN_PROGRESS（本地完整门禁已通过；真实冻结待指标/人工签收） | Codex | 最终门禁、隔离从零复测、交接 | 整次 integration 实际 exit 0 |
 
@@ -1777,7 +1777,7 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | C-MINOR-01 | DONE（本轮RED→GREEN，72f7430） | Codex | 已收到usage后失败/中断仍保存usage_reasoning；增加回归，保持总计费不变 |
 | C-MINOR-02 | DONE（本轮RED→GREEN，a6b19b7） | Codex | 长出处A展开后切B重置折叠，保留纯文本/正确引用与文件名 |
 | C-REAL-B | DONE（88f9f6f实测已接手；准确率另项） | DeepSeek实测/Codex只读复核 | 两份PDF20.90/28.08秒、13题11answered/2not_covered；系统746357→844451/累计900000，向量12005另计；不要重复花钱 |
-| C04-SIGNOFF | WAITING_USER（整阶段OPEN） | 用户人工判定 | 新两份PDF工作表全量：course1实体76/关系61，course2实体68/关系58；各≥70%；辅助仅claude-assist，旧快照另存 |
+| C04-SIGNOFF | DONE（用户 arvin 签收，复核后采纳 claude-assist 263/263；整阶段仍 OPEN） | 用户人工判定 | 新两份PDF工作表全量：course1实体76/关系61，course2实体68/关系58；各≥70%；辅助仅claude-assist，旧快照另存 |
 | C-LEGACY-CREDENTIALS | OPEN（仅交接提示，未读取内容） | 原数据持有人 | 收紧旧测量口令文件权限、按需轮换，停止沿用硬编码口令/未知usage记0的旧脚本；不复制进新工区 |
 
 已修C-R1：同轮达到cap后续跑不再先发一次付费问答，新增两例RED→GREEN；仍需保守留足单题/并发在途余量，不能将题前题后检查宣传为严格预留的全局硬上限。旧报告中reasoning_tokens=null必须保留“未返回”语义。当前真实生成/在线向量调用0，新旧实测原始文件保留。
@@ -1827,7 +1827,7 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 | --- | --- | --- | --- | --- | --- |
 | C-ACC-A 持久化出处只读核验 | DONE（`a094714`） | 两门课（course1 PDF 76 点、course2 PDF 68 点）草稿持久化后的 `source_refs`：数量、同课文档与 chunk、页码或章节、悬空 / 跨课 / 空出处；区分 `source="ai"` 与 `source_refs` | 共享 Neo4j（只读会话，连接变量按用户授权从测量区 `.env` 载入进程、不打印不写盘）+ 测量区 SQLite（`mode=ro`）→ 脱敏报告与证据（只含编号、计数、哈希） | 误写共享库：只读会话 + 只读 SQLite 双重防护；凭据泄露：不打印、不落盘 | 脚本退出码、计数断言、可复跑 |
 | C-ACC-B 入库子步骤计时 | DONE（`4304fec`） | `run_persist_stage` 子步骤脱敏计时（候选读取、构建、来源读取、锁等待、Neo4j 事务、SQLite 收尾、释放） | 代码 + 回归 → 本地提交 | 改变锁 / 事务语义：只加计时、不改控制流 | 先红后绿；相关回归；完整门禁（隔离端口、临时库、本机假供应商） |
-| C-ACC-C 人工签收入口 | DONE（`452d446`）；**用户签收 OPEN** | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
+| C-ACC-C 人工签收入口 | DONE（`452d446`）；用户已签收（见下方证据） | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
 | C-ACC-D 补测决策表 | DONE（提案）；**是否执行待用户决定** | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
 
 **C-ACC 验收证据**（本轮真实生成 0、在线向量 0；台账仍 844451 / 900000，向量 12005 另计）：
@@ -1838,4 +1838,5 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 - **D**：`evaluation/reports/c-acc-d-retest-decisions.md`：浏览器可见首字（先免费测前端附加时延，再选 3 题真实，52016 落在现剩 55549 之内）、关闭思考的 MD 抽取（course1 一份，建议 95000 / 940000，不发布、向量 0）、v3 + 思考开启（沿用 Codex 185000 / 1030000，A/B 352000 / 1200000）。均未执行。
 - **门禁**：`4304fec` 代码树在无 `.env` 的临时工作树、隔离端口、一次性 Neo4j、临时库、本机假供应商下整次 `./scripts/verify.sh integration` **exit 0**：backend+tooling 3878 passed / 27 登记 skip；frontend 38 文件 934 passed；integration 393 passed / 4 登记 skip；backend-live 44 passed；演示 E2E 2 passed；个人本机假供应商 E2E 4 passed；basic 契约、type-check、build 通过。相对 `043c274` 多 8 例（A 5 + B 3），无新增 skip、删用例或放宽断言。最终树 `./scripts/verify.sh`（basic）exit 0。交接 `docs/handoffs/claude-plan-c-acceptance-closeout.md`。**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
 - **C 补充（签收填写工具）**：用户要求「在工作表里填 ✓ ✗」。新增 `evaluation/c04_signoff.py`（`init` 生成 `*-worksheet-user.md` 副本，`convert` 校验后写 `*-judgments-user.json` 与 `*-report-user.json`）；原工作表与 predictions 不动。未填、非法标记、判 ✗ 无依据、判定人为空或以 `claude-assist` 开头、改动其他列一律拒绝且不写文件。`tests/tooling/test_c04_signoff_sheet.py` 12 例：先以占位模块 RED（2 failed / 10 errors，均为 NotImplementedError）→ GREEN 12 passed（连同 `test_c04_accuracy.py` 共 19 passed）。真实两课副本用辅助判定在临时目录试填，转换结果与辅助数逐条一致（263 行全部解析），试填产物不入库。
+- **C04 人工准确率签收结果**：用户 `arvin` 于 2026-10-04 在本机签收网页逐条复核两课全部 263 条（course1 76 实体 + 61 关系，course2 68 实体 + 58 关系），**采纳 Claude 辅助判定**：263/263 判定一致；35 条 ✗ 的依据中 30 条沿用辅助原文，5 条仅删去【请复核】标记。按用户确认如实记为「复核后采纳辅助判定」，不是独立盲判。course1 实体 64/76（84.21%）、关系 58/61（95.08%）；course2 实体 61/68（89.71%）、关系 45/58（77.59%）；实体数 76 / 68 均 ≥20；`judge-report` 结论两课均为「达标」，`is_human_judgment: true`。证据 `evaluation/raw/c04-signoff/*-worksheet-user.md`、`*-judgments-user.json`、`*-report-user.json`；Claude 复核：判定 JSON 与工作表逐条一致、报告可由判定重算得到、原 predictions / 工作表 / 辅助文件未改。**风险**：course2 关系离 70% 仅 5 条余量，删去【请复核】的 5 条正是两可项，改判可能使结论翻转。签收完成不等于技术冻结：**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
 

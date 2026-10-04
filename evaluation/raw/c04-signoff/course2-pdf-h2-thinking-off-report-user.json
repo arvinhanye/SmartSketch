@@ -1,0 +1,80 @@
+{
+  "counts": {
+    "ai_entities": 68,
+    "ai_relations": 58,
+    "non_ai_entities": 0,
+    "non_ai_relations": 0
+  },
+  "dataset_id": "contest-course2-os-ch2-pdf-headings2-thinking-off",
+  "hard_indicators": {
+    "entity_accuracy": {
+      "correct": 61,
+      "gap": 0.0,
+      "judged": 68,
+      "missing": 0,
+      "passed": true,
+      "sampled": 68,
+      "status": "judged",
+      "threshold": 0.7,
+      "threshold_fraction": "7/10",
+      "value": 0.8971
+    },
+    "entity_count": {
+      "gap": 0,
+      "passed": true,
+      "threshold": 20,
+      "value": 68
+    },
+    "is_fake_model": false,
+    "passed": true,
+    "relation_accuracy": {
+      "correct": 45,
+      "gap": 0.0,
+      "judged": 58,
+      "missing": 0,
+      "passed": true,
+      "sampled": 58,
+      "status": "judged",
+      "threshold": 0.7,
+      "threshold_fraction": "7/10",
+      "value": 0.7759
+    },
+    "verdict": "达标"
+  },
+  "is_human_judgment": true,
+  "judge": "arvin",
+  "model": {
+    "id": "deepseek-flash",
+    "is_fake": false
+  },
+  "note": "人工判定",
+  "notes": {
+    "kp_00482e93532208b324e6fa00276aa53d": "E2：小结中的条目，把「进程状态」与「状态转换」拼成一条；二者已由 #41、#23 分别覆盖",
+    "kp_36e19b9f4e3390976d353b019a891125": "E2/E4：名称「进程定义」不是知识点名，定义是小结的元描述（「本章讨论的起点概念」），不是进程的定义；真实定义见 #45",
+    "kp_4fdf24de48b411ca6f79a47814164496": "E1：即节标题「常见调度算法」，定义为元描述，不是被讲授的单个知识点",
+    "kp_a29e2198d0c74561249743f300fe2033": "E2/E4：即节标题，把创建与撤销两个操作拼成一条，定义为元描述；两者已由 #27、#2 覆盖",
+    "kp_d28896d9e31ed6bfdaf90dcc15a03a20": "E5：与 #28「调度算法衡量指标」为同一知识点，ID 序在后；定义亦为元描述",
+    "kp_df6594288dea6aa86934d022f3728054": "E2：把创建态、终止态两个独立状态拼成一条",
+    "kp_ee42731afd946cc9854e12fd1058b4b2": "E1/E2：把「学习进程调度前需先掌握进程状态」这句先修依赖当成知识点，应为关系而非实体【请复核】",
+    "rel_033599a9b65d0107b2390c9f8dabaa03": "R5：原文撤销进程只讲回收资源、移除 PCB，未涉及进程标识符",
+    "rel_1073efcf5265b10bfbe7f144e124f7fb": "R5：原文「饥饿」只针对短作业优先；先来先服务只说对短作业不利，未说导致饥饿",
+    "rel_1e5c1bd495038847c2a7eb13fefebdcf": "R1/R2/R5：端点「进程定义」不满足 E2；小结「从进程的定义出发……介绍了进程切换」是叙述顺序，不是包含",
+    "rel_451bd2445b8fe88c6f0aa35d06b2df09": "R2/R5：小结中「层次、评价指标和常见调度算法」是并列列举，不是包含",
+    "rel_4f9e83d7621f389dcd9ae545a88349f7": "R1/R2/R5：端点「进程定义」不满足 E2；小结叙述顺序不是包含",
+    "rel_5c7f1900416337f2a2f3a3b232e94a8e": "R2：原文明确「学习信号量之前需要先掌握进程同步与互斥」，应为 PREREQUISITE 而非 CONTAINS",
+    "rel_5dde885581320d110151a2075bb07606": "R1/R2/R5：端点「进程的创建与撤销」不满足 E2；小结中二者是并列列举，不是包含",
+    "rel_6c76e5a7c8d75a52e9d3e085f013e686": "R1/R5：端点「常见调度算法」不满足 E1；小结并列列举，不是包含",
+    "rel_8b78f05c89dfe93724778db3ee61518b": "R1：端点「创建态与终止态」不满足 E2",
+    "rel_8f32a047027ed28b042cacff1abbbf0e": "R1/R2/R5：端点「进程定义」不满足 E2；小结叙述顺序不是包含",
+    "rel_90248b983ab45b733c050b9204540b65": "R1/R2/R5：端点「进程定义」不满足 E2；小结叙述顺序不是包含",
+    "rel_9d36451f073dde132199d5229905bc94": "R1/R2/R5：端点「进程定义」「进程状态及其转换」均不满足 E2；叙述顺序不是包含",
+    "rel_bc896d379b8d641dcc1e745c4971116b": "R1：端点「进程状态对进程调度的意义」不满足 E1/E2；真实依赖应为 进程的状态 → 处理机调度"
+  },
+  "prompt_versions": {
+    "extract_entities": 2,
+    "extract_entities_gleaning": 2,
+    "extract_relations": 2
+  },
+  "run_id": "contest-course2-os-ch2-pdf-headings2-thinking-off-9c6b8ce343b1",
+  "schema_version": 1
+}

@@ -1,0 +1,75 @@
+{
+  "counts": {
+    "ai_entities": 76,
+    "ai_relations": 61,
+    "non_ai_entities": 0,
+    "non_ai_relations": 0
+  },
+  "dataset_id": "contest-course1-ds-ch3-pdf-headings2-thinking-off",
+  "hard_indicators": {
+    "entity_accuracy": {
+      "correct": 64,
+      "gap": 0.0,
+      "judged": 76,
+      "missing": 0,
+      "passed": true,
+      "sampled": 76,
+      "status": "judged",
+      "threshold": 0.7,
+      "threshold_fraction": "7/10",
+      "value": 0.8421
+    },
+    "entity_count": {
+      "gap": 0,
+      "passed": true,
+      "threshold": 20,
+      "value": 76
+    },
+    "is_fake_model": false,
+    "passed": true,
+    "relation_accuracy": {
+      "correct": 58,
+      "gap": 0.0,
+      "judged": 61,
+      "missing": 0,
+      "passed": true,
+      "sampled": 61,
+      "status": "judged",
+      "threshold": 0.7,
+      "threshold_fraction": "7/10",
+      "value": 0.9508
+    },
+    "verdict": "达标"
+  },
+  "is_human_judgment": true,
+  "judge": "arvin",
+  "model": {
+    "id": "deepseek-flash",
+    "is_fake": false
+  },
+  "note": "人工判定",
+  "notes": {
+    "kp_0e0e587d3430e3927664618f0e58bb7f": "E3：§3.1 明确把「后进先出」列为 concept 示例，此处为 theorem",
+    "kp_1a9c0b5e3db108d3083077725bb19283": "E3：与「后进先出」同类，按 §3.1 应为 concept，此处为 theorem",
+    "kp_5fbe631c7d314cbb9a54fac46e938d3b": "E5：与 #26「队列的典型应用场景」为同一知识点（队列的应用），ID 序在后",
+    "kp_704847c8105455f03fb8adf30c18f23f": "E5：与 #25「栈与队列的存储结构」为同一知识点（都可顺序或链式实现），ID 序在后",
+    "kp_7cc6867c2d7f73d1707494dfe2983321": "E3：「常数时间完成」是可陈述的性质，§3.1 归 theorem，不是可直接计算的 formula",
+    "kp_8836dd5eebce1db365c74d805d8c3319": "E3：「时间复杂度都是 O(1)」是性质，§3.1 归 theorem，不是 formula",
+    "kp_89826f28fe54454f790f652e8bd2c41d": "E1/E2：取自导读的章节概述，把栈与队列两类应用拼成一条",
+    "kp_9af5475c5c52bc4bc81483af66ccbde3": "E1/E2：即章标题「栈与队列」，把两个知识点拼成一条",
+    "kp_d7d170ae4850cac4842f4ffa2f892666": "E5：与 #26「队列的典型应用场景」为同一知识点（队列的应用），ID 序在后",
+    "kp_d7d28db660af4c9950542b72c39db637": "E5：与 #63「栈的典型应用场景」为同一知识点（栈的应用），ID 序在后",
+    "kp_d8e5e75c830e3437a67bb91e037cc343": "E1/E3：「密切相关」是泛泛结论句，不是可陈述可证明的性质；实质内容已由 #5、#50 覆盖",
+    "kp_daaf3c6f3e1b627df3f9bcd075892314": "E1：只是例 3-6 中的一次计算结果，资料未把「平均等待时间」作为知识点讲授或给出公式",
+    "rel_22f522a4cb04be25bcca138897ddb926": "R1：端点「平均等待时间」不满足 E1",
+    "rel_68b0904020b2a326cb9d355150005c2e": "R1/R3：端点「双端队列与栈和队列的关系」不满足 E1；「关系」包含「双端队列」方向与语义都不成立",
+    "rel_e6e62014a97af866aeb663ebfc05d72c": "R3/R4：原文只说中缀转后缀算法需要先理解运算符优先级，没有说该算法是学习后缀表达式的先修；如有依赖也应为 后缀表达式 → 中缀转后缀算法"
+  },
+  "prompt_versions": {
+    "extract_entities": 2,
+    "extract_entities_gleaning": 2,
+    "extract_relations": 2
+  },
+  "run_id": "contest-course1-ds-ch3-pdf-headings2-thinking-off-2db2aff95ca2",
+  "schema_version": 1
+}

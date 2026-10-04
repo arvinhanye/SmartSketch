@@ -1,6 +1,6 @@
 # C04 人工准确率签收入口（C-ACC-C，2026-10-04）
 
-> **状态：待用户签收。** 本目录里的 `claude-assist` 判定是 Claude 的辅助参考，**不是人工验收，不能据此宣布准确率达标**。赛题硬指标以用户本人逐条判定为准（`evaluation/README.md` §6）。
+> **状态：用户已签收（2026-10-04，判定人 `arvin`），见第 5 节。** 本目录里的 `claude-assist` 判定是 Claude 的辅助参考，**不是人工验收，不能据此宣布准确率达标**。赛题硬指标以用户本人逐条判定为准（`evaluation/README.md` §6）。
 
 ## 1. 签收对象
 
@@ -113,3 +113,16 @@ PYTHONPATH=src/backend .venv/bin/python evaluation/evaluate_extraction.py judge-
   --predictions $D/course2-pdf-h2-thinking-off-predictions.json \
   --judgments $D/course2-pdf-h2-thinking-off-judgments-claude-assist.json
 ```
+
+## 5. 签收结果（2026-10-04）
+
+用户 `arvin` 于 2026-10-04 在本机签收网页逐条复核两课全部 263 条（course1 76 实体 + 61 关系，course2 68 实体 + 58 关系），**采纳 Claude 辅助判定**：263/263 判定一致；35 条 ✗ 的依据中 30 条沿用辅助原文，5 条仅删去【请复核】标记。按用户确认如实记为「复核后采纳辅助判定」，不是独立盲判。
+
+| 课程 | 实体 | 关系 | 实体数 | 结论 |
+| --- | --- | --- | ---: | --- |
+| course1 | 64 / 76（84.21%） | 58 / 61（95.08%） | 76 | 达标 |
+| course2 | 61 / 68（89.71%） | 45 / 58（77.59%） | 68 | 达标 |
+
+- 文件：`*-worksheet-user.md`（判定原件）、`*-judgments-user.json`、`*-report-user.json`（`is_human_judgment: true`）。
+- 核对：判定 JSON 与工作表逐条一致；报告可由判定重算得到；原 predictions、工作表与辅助文件未改。
+- 风险：course2 关系只比 70% 多 5 条；删去【请复核】的 5 条正是两可项（course1 #37、#42、#68、#70，course2 关系 #20），若评审改判，结论可能翻转。
