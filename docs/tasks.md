@@ -1818,3 +1818,14 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 第二次完整门禁仍exit1：全部运行用例通过，但测试替身headers联合类型引出5处TS2345。单独type-check REDexit2→测试替身显式字典声明`043c274`→完整frontend类型/38文件934测试/build exit0；无any/type断言、删检查或改运行逻辑。第三次整次integration最终exit0见下方验收；前两次exit1保留，不合并部分通过为整次成功。
 
 **C-REAL-CLOSEOUT 本轮验收**：043c274稳定代码树整次`./scripts/verify.sh integration` **exit0**；backend+tooling3870passed/27登记skip，frontend38文件934passed，integration393passed/4登记skip，backend-live44passed，演示E2E2passed，个人本机假供应商E2E4passed；basic/type-check/build通过。无新增skip、删用例、放宽断言或依赖升级。新上下文只读审查Critical0/Important0，1项文档误标已校正；后发现测试夹具问题一次修复通路含类型校验修正，RED→GREEN与最终完整门禁给证据。只读审计exit0，源88f9f6f证据/分支未改，付费生成/在线向量均0；本地提交72f7430、a6b19b7、3742a4e、043c274，不推送不合并。台账仍844451/批准900000、向量12005另计；准确率/基线/浏览器/MD/来源详情/慢段根因边界分别保留OPEN。**stage_c_status: OPEN；未技术冻结**。
+
+## 2026-10-04 Claude 认领：计划 C 验收收尾（stage_c_status: OPEN，technical_freeze: NOT_PERFORMED）
+
+执行工作区 `/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`，分支 `claude/plan-c-acceptance`（用户确认自 Codex `4a6308b` 新建，含完整门禁提交 `043c274`）。上轮未提交的方案 B 文件已由 Codex 原样采纳，备份为 `claude/plan-c-b-wip-backup@2692648`，不合并。测量区 `smartsketch-c03b-measure@88f9f6f` 严格只读。本轮不发真实生成或在线向量调用。
+
+| ID | 状态 | 范围 | 输入 → 输出 | 风险 | 验证 |
+| --- | --- | --- | --- | --- | --- |
+| C-ACC-A 持久化出处只读核验 | IN_PROGRESS | 两门课（course1 PDF 76 点、course2 PDF 68 点）草稿持久化后的 `source_refs`：数量、同课文档与 chunk、页码或章节、悬空 / 跨课 / 空出处；区分 `source="ai"` 与 `source_refs` | 共享 Neo4j（只读会话，连接变量按用户授权从测量区 `.env` 载入进程、不打印不写盘）+ 测量区 SQLite（`mode=ro`）→ 脱敏报告与证据（只含编号、计数、哈希） | 误写共享库：只读会话 + 只读 SQLite 双重防护；凭据泄露：不打印、不落盘 | 脚本退出码、计数断言、可复跑 |
+| C-ACC-B 入库子步骤计时 | TODO | `run_persist_stage` 子步骤脱敏计时（候选读取、构建、来源读取、锁等待、Neo4j 事务、SQLite 收尾、释放） | 代码 + 回归 → 本地提交 | 改变锁 / 事务语义：只加计时、不改控制流 | 先红后绿；相关回归；完整门禁（隔离端口、临时库、本机假供应商） |
+| C-ACC-C 人工签收入口 | TODO | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
+| C-ACC-D 补测决策表 | TODO | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
