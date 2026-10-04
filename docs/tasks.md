@@ -1756,3 +1756,4 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
   - C03-1：PDF 修复生效（关系 25→59、`PREREQUISITE` 0→5、孤立 39→3），83522 token、91.34 秒，仍超 60 秒。抽取输出 80% 是推理，两次关系调用推理用满 4096 导致 2 次 repair；末段 15.6 秒非模型时间未归因。
   - C02-4：只测 1 题（冷启动首问超时；8.15 秒无调用记录的空档未归因），因 usage 未知止损规则过严提前停止（工具问题，Claude 负责）。
   - 累计：记录口径 731690，系统计费口径 743806（含 1 次未知调用估算 12116），均在批准上限 803168 内；向量 11946 另计。
+- 2026-10-04 用户决定：进入方案 B（思考控制），批准探测预算 5000；course1 PDF 等 B 完成后再测。探测工具 `evaluation/probe_thinking.py`（`8f0fc14`，`tests/tooling/test_c02b_probe.py` 7 例先红后绿）；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02b-deepseek-thinking-probe.md`（5 个变体，最坏 4110 token，直连不进 `model_calls`，需手工记账）。
