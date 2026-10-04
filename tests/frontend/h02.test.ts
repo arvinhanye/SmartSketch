@@ -621,6 +621,125 @@ describe('H02 上传上限取自服务端 UPLOAD_MAX_BYTES（ADR-022）', () => 
     await flushPromises()
   })
 
+  it('上传中再次拖入文件：取消默认动作且不发起第二次上传', async () => {
+    const pending = deferred<{ task_id: string; document_id: string }>()
+    const materials = fakeMaterialsApi({ upload: () => pending.promise })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('first.txt'))
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+
+    const zone = wrapper.get('[data-test="material-dropzone"]').element
+    const events = ['dragover', 'drop'].map((name) => {
+      const event = new Event(name, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { types: ['Files'], files: [file('second.txt')], dropEffect: 'copy' },
+      })
+      zone.dispatchEvent(event)
+      return event
+    })
+
+    expect(events.map((event) => event.defaultPrevented)).toEqual([true, true])
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('first.txt')
+
+    pending.resolve({ task_id: 't_drag', document_id: 'd_drag' })
+    await flushPromises()
+  })
+
+  it('上传中拖入文件：提示不可放置（dropEffect=none）', async () => {
+    const pending = deferred<{ task_id: string; document_id: string }>()
+    const materials = fakeMaterialsApi({ upload: () => pending.promise })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('first.txt'))
+    await submitUpload(wrapper)
+
+    const zone = wrapper.get('[data-test="material-dropzone"]').element
+    const transfer = { types: ['Files'], files: [file('second.txt')], dropEffect: 'copy' }
+    const over = new Event('dragover', { bubbles: true, cancelable: true })
+    Object.defineProperty(over, 'dataTransfer', { value: transfer })
+    zone.dispatchEvent(over)
+    expect(over.defaultPrevented).toBe(true)
+    expect(transfer.dropEffect).toBe('none')
+
+    pending.resolve({ task_id: 't_drag', document_id: 'd_drag' })
+    await flushPromises()
+  })
+
+  it('非文件拖拽不取消默认动作，也不改变已选文件', async () => {
+    const { wrapper, materials } = await mountPage()
+    await chooseFile(wrapper, file('first.txt'))
+    const zone = wrapper.get('[data-test="material-dropzone"]').element
+    const event = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: { types: ['text/plain'], files: [] } })
+    zone.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(wrapper.get('[data-test="selected-file-name"]').text()).toBe('first.txt')
+    expect(materials.upload).not.toHaveBeenCalled()
+  })
+
+  it('焦点落在隐藏的文件 input 上时，可见选择区仍带焦点轮廓样式', async () => {
+    const { wrapper } = await mountPage()
+    const zone = wrapper.get('[data-test="material-dropzone"]')
+    const input = wrapper.get('[data-test="material-file-input"]')
+    expect(zone.classes()).not.toContain('is-focused')
+
+    // jsdom 的 focus() 不派发冒泡的 focusin，这里显式派发与浏览器一致的事件
+    input.element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    await flushPromises()
+    expect(zone.classes()).toContain('is-focused')
+
+    // 焦点回到可见选择区自身后仍然保留轮廓样式
+    zone.element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    await flushPromises()
+    expect(zone.classes()).toContain('is-focused')
+  })
+
+  it('取消选择后焦点交给可见选择区，而不是停留在隐藏 input', async () => {
+    const { wrapper } = await mountPage()
+    await chooseFile(wrapper, file('first.txt'))
+    const zone = wrapper.get('[data-test="material-dropzone"]')
+    const input = wrapper.get('[data-test="material-file-input"]').element as HTMLInputElement
+    input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    await flushPromises()
+    expect(zone.classes()).toContain('is-focused')
+
+    // jsdom 不实现 label 的焦点委托，这里记录 focus() 是否落在可见选择区上
+    const focusSpy = vi.spyOn(zone.element as HTMLElement, 'focus')
+    await wrapper.get('[data-test="upload-clear"]').trigger('click')
+    await flushPromises()
+    expect(focusSpy).toHaveBeenCalled()
+    expect(wrapper.find('[data-test="selected-file-name"]').exists()).toBe(false)
+  })
+
+  it('选择区可用 Enter/Space 打开文件选择器', async () => {
+    const { wrapper } = await mountPage()
+    const input = wrapper.get('[data-test="material-file-input"]').element as HTMLInputElement
+    const click = vi.fn()
+    input.click = click
+    const zone = wrapper.get('[data-test="material-dropzone"]')
+    await zone.trigger('keydown', { key: 'Enter' })
+    await zone.trigger('keydown', { key: ' ' })
+    expect(click).toHaveBeenCalledTimes(2)
+  })
+
+  it('上传中选择区不能再次打开文件选择器', async () => {
+    const pending = deferred<{ task_id: string; document_id: string }>()
+    const materials = fakeMaterialsApi({ upload: () => pending.promise })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('first.txt'))
+    await submitUpload(wrapper)
+
+    const input = wrapper.get('[data-test="material-file-input"]').element as HTMLInputElement
+    const click = vi.fn()
+    input.click = click
+    await wrapper.get('[data-test="material-dropzone"]').trigger('keydown', { key: 'Enter' })
+    expect(click).not.toHaveBeenCalled()
+
+    pending.resolve({ task_id: 't_lock', document_id: 'd_lock' })
+    await flushPromises()
+  })
+
   it('上传成功：刷新列表，按 task_id 与当前课程作用域订阅，阶段事件更新进度条', async () => {
     let listed: Document[] = []
     const materials = fakeMaterialsApi({ list: async () => listed })

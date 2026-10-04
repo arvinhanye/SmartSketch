@@ -67,6 +67,23 @@ const dropNotice = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const dropzone = ref<HTMLElement | null>(null)
 
+// 键盘焦点可能落在隐藏的原生 input 上（它只有 1px 且透明），
+// 因此把「焦点在可见选择区内」显式同步成类名，保证轮廓可见且可复核
+const focusWithin = ref(false)
+
+function onDropzoneFocusIn(): void {
+  focusWithin.value = true
+}
+
+function onDropzoneFocusOut(): void {
+  // 焦点在同一选择区内部（label ↔ input）之间移动时不应闪烁
+  queueMicrotask(() => {
+    const zone = dropzone.value
+    if (zone === null) return
+    focusWithin.value = zone.contains(document.activeElement)
+  })
+}
+
 const fileInputValue = computed(() => `${selectionVersion.value}-${selectedName.value ?? ''}`)
 
 /** 是否已经选好一个待上传的文件 */
@@ -118,10 +135,13 @@ function onDragEnter(event: DragEvent): void {
 }
 
 function onDragOver(event: DragEvent): void {
-  if (uploading.value || !isFileDrag(event)) return
-  // 必须阻止默认行为，否则浏览器会直接打开被拖入的文件
+  // 先识别文件拖拽并阻止默认行为，否则浏览器会直接打开被拖入的文件；
+  // 上传中同样必须取消默认动作，只把提示光标改成不可放置
+  if (!isFileDrag(event)) return
   event.preventDefault()
-  if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
+  if (event.dataTransfer !== null) {
+    event.dataTransfer.dropEffect = uploading.value ? 'none' : 'copy'
+  }
 }
 
 function onDragLeave(event: DragEvent): void {
@@ -138,11 +158,12 @@ function resetDrag(): void {
 function onDrop(event: DragEvent): void {
   // 非文件拖拽（文本、链接等）不作为文件选择处理
   if (!isFileDrag(event)) return
+  // 先取消默认动作再判断上传状态：上传中也不允许浏览器打开拖入的文件
+  event.preventDefault()
   if (uploading.value) {
     resetDrag()
     return
   }
-  event.preventDefault()
   const transfer = event.dataTransfer
   resetDrag()
   if (transfer === null) return
@@ -164,7 +185,8 @@ function onDrop(event: DragEvent): void {
 function clearSelection(): void {
   applySelection(null)
   dropNotice.value = null
-  fileInput.value?.focus()
+  // 焦点回到可见的选择区：隐藏的原生 input 没有可见反馈，不能把焦点留在那里
+  dropzone.value?.focus()
 }
 
 // 上传成功后 composable 会递增 selectionVersion，这里同步清掉展示信息
@@ -173,6 +195,7 @@ watch(selectionVersion, () => { selectedInfo.value = null })
 watch(courseId, () => {
   selectedInfo.value = null
   dropNotice.value = null
+  focusWithin.value = false
   resetDrag()
 })
 
@@ -228,13 +251,15 @@ function badgeIcon(kind: TaskStatusKind): 'failed' | 'completed' | 'waiting' | '
             <label
               ref="dropzone"
               class="dropzone"
-              :class="{ 'is-dragging': dragging, 'is-invalid': fileInvalid, 'is-disabled': uploading }"
+              :class="{ 'is-dragging': dragging, 'is-invalid': fileInvalid, 'is-disabled': uploading, 'is-focused': focusWithin }"
               data-test="material-dropzone"
               for="material-file"
               tabindex="0"
               aria-describedby="material-upload-hint"
               @keydown.enter.prevent="openPicker"
               @keydown.space.prevent="openPicker"
+              @focusin="onDropzoneFocusIn"
+              @focusout="onDropzoneFocusOut"
               @dragenter="onDragEnter"
               @dragover="onDragOver"
               @dragleave="onDragLeave"
@@ -589,7 +614,10 @@ function badgeIcon(kind: TaskStatusKind): 'failed' | 'completed' | 'waiting' | '
   background: var(--color-primary-soft);
 }
 
-.dropzone:focus-visible {
+/* 键盘焦点提示：选择区自身或内部隐藏的原生 input 获得焦点时都要显示同一轮廓。
+   :focus-visible 覆盖自身焦点，.is-focused 覆盖焦点落在内部隐藏 input 的情况 */
+.dropzone:focus-visible,
+.dropzone.is-focused {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
