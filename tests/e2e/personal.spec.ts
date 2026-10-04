@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { testLocalConnection } from './configTestRetry'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { addStudent, apiLogin, call, createCourse, draftNodes, publish, registerStudent, uploadAndWait } from './api'
@@ -24,7 +25,13 @@ async function configureModel(page: Page, key: string, expectOk: boolean, disabl
   await page.locator('[data-test=mc-model]').fill('fake-model')
   await page.locator('[data-test=mc-api-key]').fill(key)
   await page.locator('[data-test=mc-disable-thinking]').setChecked(disableThinking)
-  await page.locator('[data-test=mc-test]').click()
+  const response = await testLocalConnection(providerUrl, async () => {
+    const pending = page.waitForResponse((response) =>
+      response.url().endsWith('/api/v1/me/model-config/test') && response.request().method() === 'POST')
+    await page.locator('[data-test=mc-test]').click()
+    return pending
+  }, (milliseconds) => page.waitForTimeout(milliseconds))
+  expect(response.status()).toBe(200)
   await expect(page.locator('[data-test=mc-test-result]')).toContainText(expectOk ? '连接成功' : '密钥被拒绝')
   await page.locator('[data-test=mc-save]').click()
   await expect(page.locator('[data-test=mc-status]')).toContainText('已配置')
