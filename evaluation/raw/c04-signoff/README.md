@@ -19,6 +19,7 @@
 | --- | --- |
 | `*-predictions.json`、`*-worksheet.md` | 原始预测与工作表，从测量区 `smartsketch-c03b-measure`（`88f9f6f`）的 `evaluation/raw/c04/` 原样复制，**未改动** |
 | `*-judgments-user.json` | **用户签收文件**：`judge` 为空，每条判定为 `null`，由用户独立填写 |
+| `*-worksheet-user.md` | **推荐的填写处**：工作表副本，填 ✓ / ✗ 后由 `evaluation/c04_signoff.py convert` 转成 `*-judgments-user.json` 与 `*-report-user.json` |
 | `*-judgments-claude-assist.json` | Claude 辅助判定：`judge` 以 `claude-assist` 开头，`is_human_judgment: false`；每条都有依据（`notes`，判错写明 E/R 编号），存疑项列在 `needs_review` |
 
 原始文件 SHA-256（与测量区逐字节一致）：
@@ -31,6 +32,29 @@
 | `course2-pdf-h2-thinking-off-worksheet.md` | `f11ebc136d8f22fd` |
 
 ## 3. 用户怎么签收
+
+### 推荐：在工作表副本里填 ✓ / ✗
+
+副本 `course1-pdf-h2-thinking-off-worksheet-user.md`、`course2-pdf-h2-thinking-off-worksheet-user.md` 已生成，与原工作表逐行相同，只多「填法」「判定人」两行。原工作表不动，作为证据。
+
+1. 在副本的 `- 判定人：` 后填你的名字（不能以 `claude-assist` 开头）。
+2. 对照章节原文，按 `evaluation/README.md` §6.3 逐行填最后两列：
+   - 「判定」填 `✓`（对）或 `✗`（错），也认 `√ ✔` 与 `× ✘`；
+   - 判 `✗` 时「依据」必须写理由，最好带编号，如 `E3：应为 concept`、`R5：证据不支持`；
+   - 只改这两列，单元格里不要用 `|`。
+3. 转换并计算（可以随时运行，用来看还剩哪些没填）：
+
+   ```bash
+   .venv/bin/python evaluation/c04_signoff.py convert
+   ```
+
+   - 有没填、标记不认识、判 ✗ 没写依据、判定人不合格，或改动了其他列，都会逐条列出并拒绝，**不写任何文件**；
+   - 全部合格时写 `*-judgments-user.json`（覆盖空白模板）和 `*-report-user.json`，并打印两课的实体、关系准确率与结论；
+   - 只转一门：加 `--course course1` 或 `--course course2`。
+
+副本被误删时可用 `.venv/bin/python evaluation/c04_signoff.py init` 重新生成；已存在的副本不会被覆盖。
+
+### 也可以直接编辑 JSON
 
 1. 对照章节原文和工作表，按 `evaluation/README.md` §6.3（实体 E1～E5、关系 R1～R6）逐条判定，填进 `*-judgments-user.json`：
    - `judge` 填本人姓名，**不得**以 `claude-assist` 开头；

@@ -20,7 +20,8 @@
   | `a094714` | A：持久化出处只读核验工具、测试、报告与证据 |
   | `4304fec` | B：入库阶段子步骤脱敏计时 + 3 例回归 |
   | `452d446` | C：C04 签收入口、用户签收文件、claude-assist 辅助判定 |
-  | 本交接所在提交 | D 决策表、`docs/tasks.md` 状态与证据、本交接 |
+  | `03af1b9` | D 决策表、`docs/tasks.md` 状态与证据、本交接 |
+  | 本次追加提交 | 签收填写工具 `evaluation/c04_signoff.py`、两课工作表副本、12 例测试 |
 
 ## 2. 四件事分开报告
 
@@ -123,7 +124,7 @@
 
 ## 6. 未完成、未验证与 OPEN
 
-- **C04 人工准确率签收**：需要用户本人填写 `*-judgments-user.json` 并跑 `judge-report`。这是技术冻结前唯一的必需项。
+- **C04 人工准确率签收**：需要用户本人在 `*-worksheet-user.md` 填 ✓ / ✗ 后运行 `evaluation/c04_signoff.py convert`（或直接填 JSON 后跑 `judge-report`）。这是技术冻结前唯一的必需项。
 - 浏览器可见首字、关闭思考的 MD 抽取、v3 + 思考开启基线：均未测，是否补测由用户按决策表决定。
 - course1 6471 ms 与旧 15.643 秒的根因：仍 OPEN；B 的日志只对以后的运行有效。
 - 已发布版本副本中的出处没有核验（两门课都未发布）。
@@ -139,6 +140,15 @@
 
 ## 8. 用户只需确认
 
-1. **准确率签收**：两课各填一份 `evaluation/raw/c04-signoff/*-judgments-user.json`（`judge` 填本人，不以 `claude-assist` 开头），跑 README 中的 `judge-report`；实体、关系各 ≥70% 才算达标。
+1. **准确率签收**：在 `evaluation/raw/c04-signoff/` 两份 `*-worksheet-user.md` 里填判定人和每行 ✓ / ✗（判 ✗ 写依据），运行 `.venv/bin/python evaluation/c04_signoff.py convert`；实体、关系各 ≥70% 才算达标。
 2. **补测**：D1 / D2 / D3 各选「做 / 不做」。要做的项须确认增量停止线、累计上限和向量上限。
 3. **冻结**：签收与补测决定之后，再决定是否执行技术冻结。在此之前保持 `stage_c_status: OPEN`、`technical_freeze: NOT_PERFORMED`。
+
+## 9. 追加：签收填写工具（用户要求「在工作表里填 ✓ ✗」）
+
+- `evaluation/c04_signoff.py`：`init` 从原工作表生成 `*-worksheet-user.md`（多「填法」「判定人」两行，已存在不覆盖）；`convert` 校验副本后写 `*-judgments-user.json`、`*-report-user.json` 并打印准确率。
+- 拒绝条件（拒绝时不写任何文件）：有行未填；标记不是 ✓ / ✗（也认 √ ✔ × ✘）；判 ✗ 没写依据；判定人为空或以 `claude-assist` 开头；改动「判定」「依据」以外的列或增删行。判 ✗ 依据里没有 E/R 编号只提示，不拒绝。
+- 测试 `tests/tooling/test_c04_signoff_sheet.py` 12 例：先用占位模块得到行为层 RED（2 failed / 10 errors，均为 `NotImplementedError`），实现后 GREEN 12 passed；连同 `test_c04_accuracy.py` 共 19 passed。
+- 真实数据试运行：在会话临时目录用辅助判定试填两课副本，`convert` 结果与辅助数逐条一致（course1 64/76、58/61；course2 61/68、45/58），263 行含转义 `\|` 的名称全部正确解析。试填产物只在临时目录，不入库，不是签收。
+- 仓库内两份副本为空白待填；对它们运行 `convert` 时已实测拒绝并列出未填条数（137 / 126），没有写文件。
+- 回滚：`git revert` 该提交；签收仍可走直接编辑 JSON 的路径。
