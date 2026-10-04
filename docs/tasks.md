@@ -1741,12 +1741,14 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
 | C01（B-EVAL-01） | DONE（待复审） | Claude | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
-| C02（B-QA-01） | TODO | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
+| C02（B-QA-01） | IN_PROGRESS（C02-1/2/3 完成待复审；C02-4 已交 DeepSeek，待测量环境） | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
 | C03（B-PDF-01 / L16） | TODO | DeepSeek（C03-1/4）；Claude（C03-2/3） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
 | C04（B-QUALITY-01） | TODO | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
 | C05 | TODO | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
 | C06 | TODO | Claude | 最终门禁、隔离从零复测、交接 Codex | 整次 integration 实际 exit 0 |
 
 - 2026-10-03 C00 基线：`git switch -c claude/plan-c-reliability ec1291a`（用户确认的方式；旧分支保留在 `c85ee53`）。`./scripts/verify.sh basic` exit 0（`env -u LLM_MODE -u EMBEDDING_MODE`）。
-- 2026-10-03 **C01 完成**：`measure_web_flow.py` 新增 `audit` 子命令、`ask --stream/--out/--audit-db/--cap`。错误编号兼容 `details.request_id`；按 UTC 时刻的 `[since, until)` 窗口或固定请求 ID 关联；生成与向量分账；未知 usage 不当 0，止损遇未知即停；最近秩分位并注明分母；首字三列口径。离线重算 L15：11 请求、19 调用 = 9+10、生成 28951、向量 59。`tests/tooling/test_c01_measure.py` 22 passed（17 例先红），`tests/tooling` 97 passed，`verify.sh basic` exit 0。交接 `docs/handoffs/claude-c01.md`。
+- 2026-10-03 **C01 完成**：`measure_web_flow.py` 新增 `audit` 子命令、`ask --stream/--out/--audit-db/--cap`。错误编号兼容 `details.request_id`；按 UTC 时刻的 `[since, until)` 窗口或固定请求 ID 关联；生成与向量分账；未知 usage 不当 0，止损遇未知即停；最近秩分位并注明分母；首字三列口径。离线重算 L15：11 请求、19 调用 = 9+10、生成 28951、向量 59。`tests/tooling/test_c01_measure.py` 22 passed（17 例先红），`tests/tooling` 97 passed，`verify.sh basic` exit 0。交接 `docs/handoffs/claude-plan-c-c01.md`。
 - 2026-10-03 **C02-1 诊断完成**（`evaluation/reports/c02-qa-diagnosis.md`，离线、零调用）：可见回答每字 2.9～17 个输出 token，首个 delta ≈ 生成耗时。推断为模型的不可见推理吃掉 2048 预算并推迟可见内容；兼容客户端只读 `delta.content`。输入侧不是主因（平均输入约 2085 token）。修法 A（推理埋点）/B（思考控制）/C（提示词 v3）/D（思考提示）**待用户决定**。**C02-3 完成**：`audit` 逐请求给出查询向量 / 生成 / 其余三段耗时（现有字段，无迁移），`test_c01_measure.py` 新增 2 例先红后绿，共 24 passed。
+- 2026-10-03 **C02-2 完成**（用户选 A+C）：ADR-089（`0469bad`）。A：迁移 017 + 推理字数 / 推理 token / 首次推理与首次可见内容时刻，只计量不存正文，回答与 SSE 不变（`33177c0`）。C：提示词 v3（`088a601`）。测量工具读推理列、`--round-started-at`、`audit-task`（`e709ccb`）。后端全量 3825 passed / 27 skipped。交接 `docs/handoffs/claude-plan-c-c02.md`；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02-4-deepseek-qa-retest.md`（止损 45000）、`docs/handoffs/claude-plan-c-c03-1-deepseek-pdf-retest.md`（course2 PDF，止损 110000），**需用户安排带本分支代码与测量数据的环境后执行**。
+- 2026-10-03 更正：第三阶段交接文件统一用 `claude-plan-c-` 前缀（`claude-c02.md` 等旧名属于原子清单同号任务；本轮写交接时曾误覆盖 `claude-c02.md` 的工作区副本，未提交，已原样恢复）。`claude-c01.md` 改名为 `claude-plan-c-c01.md`。
