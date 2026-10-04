@@ -1670,3 +1670,21 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 起因：用户在 macOS（Intel，Docker Desktop 29.8）运行 `scripts/start-demo.sh`，只得到「Neo4j 健康检查失败」。实际原因两个：另一个目录里的 SmartSketch 副本的 Neo4j 容器（`smartsketch-neo4j-1`）一直占着 7474/7687；本目录的 Neo4j 数据/日志在反复崩溃后留下坏状态，以退出码 3、无 ERROR 反复重启。停掉另一份、换全新数据卷后启动成功（2026-10-01 用户确认）。
 - 验收条件：① 容器未运行且端口被占时不启动容器、给出 `lsof` 命令；② 容器停在 created/exited 或重启次数增加时立即失败，打印 Docker 报错、退出码与最近 40 行日志；③ 认证被拒时立即失败并说明口令只在首次初始化生效，输出不含口令；④ `unhealthy` 不立即失败，截止时打印最后一次连接输出；⑤ 正常启动行为不变。
 - 已排除：「桌面」目录挂载（改用 Docker 卷后照旧退出）；镜像、APOC、内存设置（原版镜像三组对照在该 Mac 上都正常）。坏状态的具体文件未定位，数据已随旧卷删除。
+
+## 2026-10-04 前端设计迁移收尾：F1–F4 修复与第 4–7 批（DeepSeek，新增任务）
+
+| ID | 状态 | 任务 | 负责人 | 分支 / 基线 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| FE-MIG-F1F2 | DONE（界面完成，系统门禁待环境） | 资料页：上传中拖入文件取消默认动作（F1）、隐藏文件 input 获得焦点时可见选择区显示轮廓（F2） | DeepSeek | `frontend-backend-refactor` / `68762e8` | `25d785f`；`tests/frontend/h02.test.ts` 新增 4 项，未修复时 4 项失败；仓库外独立探针 `055d914-probe.test.ts` 的 F1 用例通过 |
+| FE-MIG-F3 | DONE（界面完成，系统门禁待环境） | 课程概览恢复与首页分离：概览只留当前课程详情与功能入口（F3） | DeepSeek | 同上 | `f723801`；`tests/frontend/h01.test.ts` 新增 c1/c2 用例，aria-current 结构断言改为当前课程区域 `aria-labelledby` 语义；独立探针 F3 用例通过 |
+| FE-MIG-F4 | DONE（界面完成，系统门禁待环境） | 成员页桌面输入框与添加按钮同行（F4） | DeepSeek | 同上 | `257aa6d`；`tests/frontend/h12.test.ts` 原标签与成员操作断言保留通过 |
+| FE-MIG-B4 | DONE（界面完成，系统门禁待环境） | 第 4 批：审核队列与版本面板迁移（紧凑发布栏、三类 tab、单列审核、默认折叠历史、`review-header`/`review-content` 插槽、空态互斥、tab 键盘） | DeepSeek | 同上 | `103a322`；`h09` 38 项、`h10` 18 项、`h14` 通过；纯布局断言改为按分类 tab 复核，API/处理/合并/分页/权限/迟到响应断言保留 |
+| FE-MIG-B5 | DONE（界面完成，系统门禁待环境） | 第 5 批：图谱页、子组件与画布主题（`graph/theme.ts` 恢复，theme → GraphCanvas → lifecycle 贯通，adapter 关系色与设计令牌对齐） | DeepSeek | 同上 | `10981d4`；`h03–h08/h11/h14/i06` 367 项通过；`h04` 新增主题用例，`i06` 状态色断言改取主题常量 |
+| FE-MIG-B6 | DONE（界面完成，系统门禁待环境） | 第 6 批：问答页与 Markdown 展示迁移（只迁视觉，保留发送锁与个人模型引导） | DeepSeek | 同上 | `b27bdb3`；`redesign-chat`、`chat-send-lock`、`j08`、`j09`、`l10`、`d1-d3` 95 项通过 |
+| FE-MIG-B7 | DONE（界面完成，系统门禁待环境） | 第 7 批：个人模型设置卡片、服务商地址预设与连接结果弹窗（继续用 `/api/v1/me/model-config`） | DeepSeek | 同上 | `700d743`；`l10`/`n03-n05`/`d1-d3` 33 项通过；新增弹窗复用与结果过期、服务商预设清密钥用例 |
+
+- 范围边界：只改 `src/frontend/src/**` 与 `tests/frontend/**`；`git diff 68762e8 HEAD -- src/backend src/contracts scripts .env.example src/frontend/src/{api,composables,stores,router,main.ts}` 为空。
+- 未迁入来源且有意保留目标实现：`api/apiSettings.ts`、`components/ModelSelect.vue`、`views/ApiSettings.vue`、`components/ConnectionResultDialog.vue`（改为 `ModelSettingsView` 内原生 `dialog`）、`api/chatStream.ts`、`api/http.ts`、`api/taskEvents.ts`、`composables/useChat.ts`、`useMaterials.ts`、`stores/runtime.ts`、`api/modelConfig.ts`、`composables/useModelConfig.ts`、`main.ts`、`router/index.ts`——这些是目标分支的个人模型配置与请求保护能力，来源版本反而更少。
+- 验收状态：见 `docs/handoffs/deepseek-frontend-migration.md` §7；原 R1「完整迁移未完成」的界面部分已闭合，**系统门禁（`scripts/verify.sh`）因本机无 Bash 未运行**，不得记为完整验收通过。
+- 真实浏览器（无头 Chrome + CDP，合成数据）7 项判定全部通过：F2 焦点轮廓、F4 桌面同行与 420px 无溢出、G6 画布暖纸底色 `rgb(255,253,250)`、结果弹窗 390×320 不越界；截图见 `.review-artifacts/final-*.jpg`。
+
