@@ -9,7 +9,7 @@ import { useSessionStore } from '../../src/frontend/src/stores/session'
 import ReviewView from '../../src/frontend/src/views/ReviewView.vue'
 import type { components } from '../../src/contracts/v1/generated/typescript/openapi'
 import { COURSES_API_KEY, type CoursesApi } from '../../src/frontend/src/api/courses'
-import { ApiError, createHttpClient, TimeoutError, type FetchLike } from '../../src/frontend/src/api/http'
+import { ApiError, createHttpClient, NetworkError, TimeoutError, type FetchLike } from '../../src/frontend/src/api/http'
 import { createVersionsApi, VERSIONS_API_KEY, type VersionsApi } from '../../src/frontend/src/api/versions'
 import VersionPanel from '../../src/frontend/src/components/VersionPanel.vue'
 
@@ -70,7 +70,11 @@ describe('H10 version panel', () => {
     const { wrapper } = fixture({ list: async () => [published(1), published(2)] })
     await flushPromises()
     expect(wrapper.get('[data-test="vp-current"]').text()).toContain('v2')
-    expect(wrapper.get('[data-test="vp-revising"]').text()).toContain('学生仍看到 v2')
+    // 改版把「学生仍看到 v2」拆成发布栏的徽标与说明两句，整体区域语义不变
+    const pub = wrapper.get('.pub')
+    expect(pub.get('[data-test="vp-revising"]').text()).toContain('草稿修订中')
+    expect(pub.text()).toContain('学生仍看到 v2')
+    expect(pub.text()).toContain('学生当前看到 v2')
     expect(wrapper.findAll('[data-test="vp-version"]').map((item) => item.text())).toEqual([
       expect.stringContaining('v2'), expect.stringContaining('v1'),
     ])
@@ -206,6 +210,32 @@ describe('H10 version panel', () => {
     await flushPromises()
     expect(wrapper.get('[data-test="vp-current"]').text()).toContain('v5')
     expect(wrapper.get('[data-test="vp-current"]').text()).not.toContain('v2')
+  })
+
+  it('课程与版本都读不到时仍保留标题与审核区插槽', async () => {
+    const wrapper = mount(VersionPanel, {
+      props: { courseId: 'c1' },
+      slots: {
+        'review-header': () => h('h2', { 'data-test': 'slot-header' }, '审核队列'),
+        'review-content': () => h('div', { 'data-test': 'slot-review' }, '待处理事项'),
+      },
+      global: {
+        provide: {
+          // 版本区进入错误态，但两个插槽与审核标题仍独立显示
+          [COURSES_API_KEY as symbol]: {
+            get: vi.fn(async () => Promise.reject(new NetworkError('offline'))),
+            list: vi.fn(),
+            create: vi.fn(),
+          },
+          [VERSIONS_API_KEY as symbol]: { list: vi.fn(async () => []), publish: vi.fn(), rollback: vi.fn() },
+        },
+      },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-test="vp-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="vp-current"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="slot-header"]').text()).toBe('审核队列')
+    expect(wrapper.get('[data-test="slot-review"]').text()).toBe('待处理事项')
   })
 })
 

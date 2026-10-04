@@ -220,12 +220,22 @@ async function mountPage(f: Fakes, path = '/courses/c1/review', accountRole: 'st
   return { wrapper, router }
 }
 
+/**
+ * 改版后三栏改为分类 tab：同一时刻只渲染当前分类。
+ * 「名称（数量）」留在 tab 的 data-heading 上（可见文本把数量拆进 aria-hidden 徽标），
+ * 既有数量断言与新布局都能复核；切换分类用 selectKind。
+ */
 function totalText(wrapper: VueWrapper, kind: Kind): string {
-  return wrapper.find(`[data-test="rv-total-${kind}"]`).text()
+  return wrapper.find(`[data-test="rv-total-${kind}"]`).attributes('data-heading') ?? ''
 }
 
 function headingCounts(wrapper: VueWrapper): string[] {
   return (['low_confidence_relation', 'suspected_duplicate', 'isolated_node'] as const).map((k) => totalText(wrapper, k))
+}
+
+/** 切到指定分类 tab（改版后只有当前分类的条目会渲染） */
+async function selectKind(wrapper: VueWrapper, kind: Kind): Promise<void> {
+  await click(wrapper, `[data-test="rv-total-${kind}"]`)
 }
 
 function rows(wrapper: VueWrapper, test: 'rv-relation' | 'rv-duplicate' | 'rv-isolated'): string[] {
@@ -277,27 +287,35 @@ describe('审核队列 API', () => {
 // ---------------------------------------------------------------- 页面
 
 describe('审核队列页：加载与三类空态', () => {
-  it('三栏显示条目与服务端完整条数，关系两端显示名称', async () => {
+  it('分类 tab 显示服务端完整条数，当前分类的条目与关系两端名称可见', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)
+    // 三类数量都取服务端 totals，不用已加载数组长度代替
     expect(headingCounts(wrapper)).toEqual(['低置信度关系（2）', '疑似重复知识点（1）', '孤立知识点（2）'])
+    // 首次加载自动落在第一个有待处理项的分类上
+    expect(wrapper.find('[data-test="rv-relation"]').exists()).toBe(true)
     expect(rows(wrapper, 'rv-relation')).toEqual(['r1', 'r2'])
     expect(wrapper.find('[data-test="rv-relation"]').text()).toContain('线性表')
     expect(wrapper.find('[data-test="rv-relation"]').text()).toContain('栈')
     expect(wrapper.find('[data-test="rv-relation"]').text()).toContain('置信度 30%')
     expect(wrapper.find('[data-test="rv-relation"]').text()).toContain('第 3 页')
-    expect(rows(wrapper, 'rv-isolated')).toEqual(['k5', 'k6'])
     expect(f.review.getQueue).toHaveBeenCalledWith('c1', { limit: 50 }, expect.anything())
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
+
+    await selectKind(wrapper, 'isolated_node')
+    expect(rows(wrapper, 'rv-isolated')).toEqual(['k5', 'k6'])
+    expect(wrapper.find('[data-test="rv-relation"]').exists()).toBe(false)
   })
 
-  it('三栏全空：每栏各自的空态 + 「可以直接发布」', async () => {
+  it('三栏全空：只显示一条总空态，不再逐栏显示分类空态', async () => {
     const f = fakes({ relations: [], duplicates: [], isolated: [] })
     const { wrapper } = await mountPage(f)
-    expect(wrapper.find('[data-test="rv-all-empty"]').text()).toContain('可以直接发布')
+    expect(wrapper.get('[data-test="rv-all-empty"]').text()).toContain('可以直接发布')
     for (const kind of ['low_confidence_relation', 'suspected_duplicate', 'isolated_node']) {
-      expect(wrapper.find(`[data-test="rv-empty-${kind}"]`).exists()).toBe(true)
+      expect(wrapper.find(`[data-test="rv-empty-${kind}"]`).exists()).toBe(false)
     }
+    // 分类 tab 仍然存在，数量为 0
+    expect(headingCounts(wrapper)).toEqual(['低置信度关系（0）', '疑似重复知识点（0）', '孤立知识点（0）'])
   })
 
   it.each<[Kind, Parameters<typeof fakes>[0]]>([
@@ -306,6 +324,7 @@ describe('审核队列页：加载与三类空态', () => {
     ['isolated_node', { isolated: [] }],
   ])('只有「%s」为空时只显示该栏空态', async (kind, opts) => {
     const { wrapper } = await mountPage(fakes(opts))
+    await selectKind(wrapper, kind)
     const shown = ['low_confidence_relation', 'suspected_duplicate', 'isolated_node'].filter((k) =>
       wrapper.find(`[data-test="rv-empty-${k}"]`).exists(),
     )
@@ -313,12 +332,23 @@ describe('审核队列页：加载与三类空态', () => {
     expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
   })
 
-  it('处理完最后一条后栏目进入空态；三栏都处理完显示「可以直接发布」', async () => {
+  it('处理完最后一条后栏目进入空态；三栏都处理完只显示「可以直接发布」', async () => {
+    // 三类里只有关系有待处理项：处理掉它之后 totals 全为零
     const f = fakes({ relations: [rel('r1', 'k1', 'k2')], duplicates: [], isolated: [] })
     const { wrapper } = await mountPage(f)
+    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
     await click(wrapper, '[data-test="rv-approve"]')
+    // 处理完最后一条后三类都为空：只留总空态，不再显示分类空态（空态互斥）
+    expect(wrapper.find('[data-test="rv-all-empty"]').text()).toContain('可以直接发布')
+    expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(false)
+  })
+
+  it('选中分类被处理空、其他分类仍有条目时显示该分类空态', async () => {
+    const f = fakes({ relations: [rel('r1', 'k1', 'k2')] })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-approve"]')
+    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="rv-empty-low_confidence_relation"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="rv-all-empty"]').exists()).toBe(true)
   })
 
   it('草稿名称读取失败不影响审核，关系两端退回显示 ID', async () => {
@@ -354,12 +384,18 @@ describe('审核队列页：加载与三类空态', () => {
   })
 
   it('三栏空态文案各不相同，不是共用一句', async () => {
-    const { wrapper } = await mountPage(fakes({ relations: [], duplicates: [], isolated: [] }))
-    const texts = (['low_confidence_relation', 'suspected_duplicate', 'isolated_node'] as const).map((kind) =>
-      wrapper.find(`[data-test="rv-empty-${kind}"]`).text().trim(),
-    )
-    expect(texts.every((text) => text.length > 0)).toBe(true)
-    expect(new Set(texts).size).toBe(3)
+    // 改版后同一时刻只渲染当前分类：分类空态只在切到该分类、且它确实为空时显示。
+    // 因此逐个分类用「只有该类为空」的夹具复核文案互不相同。
+    const singles: string[] = []
+    for (const kind of ['low_confidence_relation', 'suspected_duplicate', 'isolated_node'] as const) {
+      const only: Parameters<typeof fakes>[0] =
+        kind === 'low_confidence_relation' ? { relations: [] } : kind === 'suspected_duplicate' ? { duplicates: [] } : { isolated: [] }
+      const { wrapper } = await mountPage(fakes(only))
+      await selectKind(wrapper, kind)
+      singles.push(wrapper.get(`[data-test="rv-empty-${kind}"]`).text().trim())
+    }
+    expect(singles.every((text) => text.length > 0)).toBe(true)
+    expect(new Set(singles).size).toBe(3)
   })
 
   it('COURSE_FORBIDDEN：回课程列表并带提示', async () => {
@@ -422,10 +458,13 @@ describe('审核队列页：单项处理与重复操作', () => {
     const button = wrapper.find('[data-test="rv-relation"][data-id="r1"] [data-test="rv-approve"]')
     await button.trigger('click')
     await button.trigger('click')
-    await wrapper.find('[data-test="rv-isolated"] [data-test="rv-keep"]').trigger('click')
     expect(f.review.resolve).toHaveBeenCalledTimes(1)
     expect(wrapper.findAll('button[data-test^="rv-"]').filter((b) => ['rv-approve', 'rv-reject', 'rv-keep', 'rv-merge'].includes(b.attributes('data-test')!)).every((b) => b.attributes('disabled') !== undefined)).toBe(true)
     expect(wrapper.find('[data-test="rv-relation"][data-id="r1"]').attributes('aria-busy')).toBe('true')
+    // 在途写请求期间切到另一分类：该类别的处理按钮同样处于禁用状态
+    await selectKind(wrapper, 'isolated_node')
+    expect(wrapper.find('[data-test="rv-isolated"] [data-test="rv-keep"]').attributes('disabled')).toBeDefined()
+    await selectKind(wrapper, 'low_confidence_relation')
     pending.resolve({ item: 'low_confidence_relation', action: 'approve', changed: true, totals: { low_confidence_relations: 1, suspected_duplicates: 1, isolated_nodes: 2 } })
     await flushPromises()
     expect(rows(wrapper, 'rv-relation')).toEqual(['r2'])
@@ -471,6 +510,7 @@ describe('审核队列页：单项处理与重复操作', () => {
       }
     })
     await click(wrapper, '[data-test="rv-relation"][data-id="r2"] [data-test="rv-reject"]')
+    await selectKind(wrapper, 'isolated_node')
     expect(rows(wrapper, 'rv-isolated')).toEqual(['k5', 'k6', 'k3'])
     expect(totalText(wrapper, 'isolated_node')).toBe('孤立知识点（3）')
   })
@@ -478,6 +518,7 @@ describe('审核队列页：单项处理与重复操作', () => {
   it('孤立知识点确认保留 / 拒绝', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     await click(wrapper, '[data-test="rv-isolated"][data-id="k6"] [data-test="rv-keep"]')
     expect(f.review.resolve).toHaveBeenLastCalledWith('c1', { item: 'isolated_node', kp_id: 'k6', action: 'approve' }, expect.anything())
     await click(wrapper, '[data-test="rv-isolated"][data-id="k5"] [data-test="rv-reject-node"]')
@@ -504,6 +545,7 @@ describe('审核队列页：疑似重复与合并', () => {
   it('不是重复：提交 reject，这一对移出队列', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'suspected_duplicate')
     await click(wrapper, '[data-test="rv-not-duplicate"]')
     expect(f.review.resolve).toHaveBeenCalledWith('c1', { item: 'suspected_duplicate', kp_ids: ['k4', 'k5'], action: 'reject' }, expect.anything())
     expect(wrapper.find('[data-test="rv-empty-suspected_duplicate"]').exists()).toBe(true)
@@ -512,6 +554,7 @@ describe('审核队列页：疑似重复与合并', () => {
   it('合并需先选主知识点再确认；合并后重新读取，引用被合并节点的条目随之消失', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'suspected_duplicate')
     await click(wrapper, '[data-test="rv-merge"]')
     expect(f.review.resolve).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="rv-merge-summary"]').text()).toContain('「堆栈」将并入「栈」')
@@ -534,6 +577,7 @@ describe('审核队列页：疑似重复与合并', () => {
   it('取消合并不发请求', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'suspected_duplicate')
     await click(wrapper, '[data-test="rv-merge"]')
     await click(wrapper, '[data-test="rv-merge-cancel"]')
     expect(wrapper.find('[data-test="rv-merge-panel"]').exists()).toBe(false)
@@ -544,6 +588,7 @@ describe('审核队列页：疑似重复与合并', () => {
     const f = fakes()
     f.review.resolve.mockRejectedValueOnce(apiError(409, 'CYCLE_DETECTED', { cycle: ['k1', 'k2', 'k3', 'k1'] }))
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'suspected_duplicate')
     await click(wrapper, '[data-test="rv-merge"]')
     await click(wrapper, '[data-test="rv-merge-confirm"]')
     const error = wrapper.find('[data-test="rv-duplicate"] [data-test="rv-item-error"]')
@@ -562,6 +607,7 @@ describe('审核队列页：疑似重复与合并', () => {
     const f = fakes()
     f.review.resolve.mockRejectedValueOnce(apiError(409, 'COURSE_BUSY'))
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'suspected_duplicate')
     await click(wrapper, '[data-test="rv-merge"]')
     await click(wrapper, '[data-test="rv-merge-confirm"]')
     expect(wrapper.find('[data-test="rv-item-error"]').text()).toContain('稍后重试')
@@ -578,6 +624,7 @@ describe('审核队列页：疑似重复与合并', () => {
     const f = fakes()
     f.review.resolve.mockRejectedValueOnce(apiError(409, 'CYCLE_DETECTED', { cycle: ['k1', 'k9', 'k1'] }))
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'suspected_duplicate')
     await click(wrapper, '[data-test="rv-merge"]')
     await click(wrapper, '[data-test="rv-merge-confirm"]')
     expect(wrapper.find('[data-test="rv-merge-panel"]').exists()).toBe(true)
@@ -599,6 +646,7 @@ describe('审核队列页：分页', () => {
   it('加载更多追加下一页，数量始终是完整条数', async () => {
     const f = fakes({ isolated: [...many] })
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     expect(rows(wrapper, 'rv-isolated')).toHaveLength(50)
     expect(totalText(wrapper, 'isolated_node')).toBe('孤立知识点（60）')
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
@@ -616,6 +664,7 @@ describe('审核队列页：分页', () => {
       return page
     })
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     expect(totalText(wrapper, 'isolated_node')).toBe('孤立知识点（60）')
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
     expect(totalText(wrapper, 'isolated_node')).toBe('孤立知识点（70）')
@@ -625,6 +674,7 @@ describe('审核队列页：分页', () => {
   it('处理后重新读取时条数不少于已加载的', async () => {
     const f = fakes({ isolated: [...many] })
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
     await click(wrapper, '[data-test="rv-isolated"][data-id="n00"] [data-test="rv-reject-node"]')
     expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { limit: 59 }, expect.anything())
@@ -635,6 +685,7 @@ describe('审核队列页：分页', () => {
   it('游标失效（422）时从第一页重新读取', async () => {
     const f = fakes({ isolated: [...many] })
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     f.review.getQueue.mockRejectedValueOnce(apiError(422, 'VALIDATION_ERROR'))
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
     expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { limit: 50 }, expect.anything())
@@ -644,17 +695,23 @@ describe('审核队列页：分页', () => {
   it('两栏都有下一页时各用各的游标，互不串栏', async () => {
     const f = fakes({ relations: Array.from({ length: 60 }, (_, i) => rel(`r${String(i).padStart(2, '0')}`, 'k1', 'k2')), isolated: [...many] })
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
     expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { kind: 'isolated_node', cursor: 'isolated_node:50', limit: 50 }, expect.anything())
+    await selectKind(wrapper, 'low_confidence_relation')
     await click(wrapper, '[data-test="rv-more-low_confidence_relation"]')
     expect(f.review.getQueue).toHaveBeenLastCalledWith('c1', { kind: 'low_confidence_relation', cursor: 'low_confidence_relation:50', limit: 50 }, expect.anything())
+    // 切回孤立栏：该栏已加载的 60 条仍在，说明两栏游标互不串栏
+    await selectKind(wrapper, 'isolated_node')
     expect(rows(wrapper, 'rv-isolated')).toHaveLength(60)
+    await selectKind(wrapper, 'low_confidence_relation')
     expect(rows(wrapper, 'rv-relation')).toHaveLength(60)
   })
 
   it('加载更多失败给出提示，列表不变', async () => {
     const f = fakes({ isolated: [...many] })
     const { wrapper } = await mountPage(f)
+    await selectKind(wrapper, 'isolated_node')
     f.review.getQueue.mockRejectedValueOnce(new NetworkError('offline'))
     await click(wrapper, '[data-test="rv-more-isolated_node"]')
     expect(wrapper.find('[data-test="rv-more-error-isolated_node"]').exists()).toBe(true)
