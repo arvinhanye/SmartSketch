@@ -242,7 +242,7 @@ evaluation/
 只用标准库；口令从 `--password-env` 指定的环境变量读取；数据库只读打开（`mode=ro` + `PRAGMA query_only`）。
 
 ```bash
-# 问答：逐题写 JSONL；每题后按生成 token 检查本轮增量止损（默认 45000），usage 未知也停
+# 问答：逐题写 JSONL；每题发出前及完成后按生成 token 检查本轮增量止损（默认 45000），usage 未知也停
 python evaluation/measure_web_flow.py ask --base-url http://127.0.0.1:<port> --username <学生> \
     --password-env MEASURE_PASSWORD --course-id <cid> --questions q.txt \
     --out run.jsonl --audit-db <只读 SQLite 路径> --cap 45000 [--stream]

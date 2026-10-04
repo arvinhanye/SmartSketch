@@ -1740,12 +1740,12 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| C01（B-EVAL-01） | DONE（待复审） | Claude | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
-| C02（B-QA-01） | IN_PROGRESS（C02-1/2/3 完成待复审；C02-4 已交 DeepSeek，待测量环境） | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
-| C03（B-PDF-01 / L16） | TODO | DeepSeek（C03-1/4）；Claude（C03-2/3） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
+| C01（B-EVAL-01） | DONE（已复审；Codex修复续跑预检） | Claude/Codex | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
+| C02（B-QA-01） | IN_PROGRESS（A/C/方案B本地接手；旧C02-4仅1题，新真实轮待预算） | Codex（本地接手）；DeepSeek（真实轮） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
+| C03（B-PDF-01 / L16） | IN_PROGRESS（course2旧轮91.34秒未达标；方案B两份PDF待预算） | DeepSeek（真实轮）；Codex（本地复审） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
 | C04（B-QUALITY-01） | IN_PROGRESS（C04-1 工作表已备，待判定） | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
 | C05 | DONE（待复审；视觉美化移出本阶段） | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
-| C06 | TODO | Claude | 最终门禁、隔离从零复测、交接 Codex | 整次 integration 实际 exit 0 |
+| C06 | IN_PROGRESS（本地完整门禁已通过；真实冻结待指标/人工签收） | Codex | 最终门禁、隔离从零复测、交接 | 整次 integration 实际 exit 0 |
 
 - 2026-10-03 C00 基线：`git switch -c claude/plan-c-reliability ec1291a`（用户确认的方式；旧分支保留在 `c85ee53`）。`./scripts/verify.sh basic` exit 0（`env -u LLM_MODE -u EMBEDDING_MODE`）。
 - 2026-10-03 **C01 完成**：`measure_web_flow.py` 新增 `audit` 子命令、`ask --stream/--out/--audit-db/--cap`。错误编号兼容 `details.request_id`；按 UTC 时刻的 `[since, until)` 窗口或固定请求 ID 关联；生成与向量分账；未知 usage 不当 0，止损遇未知即停；最近秩分位并注明分母；首字三列口径。离线重算 L15：11 请求、19 调用 = 9+10、生成 28951、向量 59。`tests/tooling/test_c01_measure.py` 22 passed（17 例先红），`tests/tooling` 97 passed，`verify.sh basic` exit 0。交接 `docs/handoffs/claude-plan-c-c01.md`。
@@ -1760,3 +1760,29 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 - 2026-10-04 离线推进（等待方案 B 探测期间）：测量工具止损改用系统计费口径（`312cccb`）；问答准备与 worker 阶段耗时日志（`f8c549f`，后端全量 3838 passed / 27 skipped）；**C05 完成**：C05-1 `ce378bc`、C05-2 `1a8da3f`、C05-3 `c7f15e4`、C05-4 `3101b54`，前端全量 911 passed、type-check 与 build 通过。交接 `docs/handoffs/claude-plan-c-c05.md`。
 - 2026-10-04 **C04-1 工具与工作表**：`evaluation/draft_to_predictions.py`（草稿 → K01 predictions + 判定工作表）与 `evaluate_extraction.py judge-report`（无金标只按人工判定算硬指标；`claude-assist` 判定标为非人工验收），`tests/tooling/test_c04_accuracy.py` 7 例（先红）。三份当前版本草稿（course1 MD 75/66、course2 MD 71/55、course2 PDF headings/2 74/59）均 ≤100，按 README §6.2 **全量检查**，工作表在 `evaluation/raw/c04/`。修复前的两份 PDF 草稿已被 headings/2 取代，不再判定。**人工判定待用户**；Claude 辅助判定可按需先做（标 `claude-assist`）。
 - 2026-10-04 **计划 C 移交 Codex**：交接 `docs/handoffs/claude-plan-c-handoff-to-codex.md`。已完成 C00/C01/C02-1～3/C05 与 C04-1 工具；DeepSeek 已完成 C02-4（只测 1 题）、C03-1、C02b 探测。**方案 B（ADR-090）已实现但未提交**：后端全量 1 failed / 4153 passed / 27 skipped，失败为 `test_c02_reasoning.py` 写死「最后迁移为 017」的断言；前端全量与整次 integration 未跑。未完成：方案 B 收尾与真实验证（需新预算）、C02-4 重跑、C03 两段未归因时间与 60 秒、C04 人工判定、C06 门禁与冻结。预算（系统计费口径）746357 / 5000000，批准上限 803168 余约 56800。
+
+## 2026-10-04 Codex 认领：计划 C 接手复审
+
+| ID | 状态 | 负责人 | 范围及验收 |
+| --- | --- | --- | --- |
+| C-TAKEOVER | DONE（本地接手/修复/完整门禁；整阶段仍OPEN） | Codex | 082323a 基线与 Claude 16 个未提交文件的 SHA-256 一致副本；复现迁移断言失败、复审 ADR-090 全调用链、修复确认缺陷、隔离完整门禁、审查与下一轮真实测量交接 |
+
+输入：claude-plan-c-handoff-to-codex.md、计划 C、ADR-089/090、DeepSeek 三轮脱敏结果。输出：本地修复、回归、Codex 报告/交接。依赖：现有 Python/Node 依赖与本地假供应商、一次性 Neo4j。风险：旧迁移升级、开关快照/缓存/连接测试不一致、真实性能结论越界、误写实测数据。验证：test_c02_reasoning/test_c02b_disable_thinking、相关前端回归、contracts、./scripts/verify.sh integration、git diff --check。文件所有权：Codex 顺序编辑独立 codex/plan-c-takeover；源工作区/旧 Codex 工作区保留。未复制 .env、数据库或真实凭据；本轮不发真实生成/在线向量请求，不推送不合并。当前系统计费累计 746357，旧批准上限 803168（剩56811），新实测先确认预算。
+
+
+### Codex接手后的显式待办（2026-10-04）
+
+| ID | 状态 | 负责人/下一步 | 验收 |
+| --- | --- | --- | --- |
+| C-MINOR-01 | OPEN（轻微） | 后端后续任务 | 已收到usage后失败/中断仍保存usage_reasoning；增加回归，保持总计费不变 |
+| C-MINOR-02 | OPEN（轻微） | 前端后续任务 | 长出处A展开后切B重置折叠，保留纯文本/正确引用与文件名 |
+| C-REAL-B | WAITING_USER_BUDGET | 用户确认预算与测量环境后DeepSeek | course2 PDF先测，再定course1；十题+比较题3次；系统计费起点746357、旧上限803168，不能自动调额 |
+| C04-SIGNOFF | WAITING_USER | 用户人工判定 | 当前三份与新方案B快照分开，实体/关系各≥70%；辅助judgment不冒充人工 |
+| C-LEGACY-CREDENTIALS | OPEN（仅交接提示，未读取内容） | 原数据持有人 | 收紧旧测量口令文件权限、按需轮换，停止沿用硬编码口令/未知usage记0的旧脚本；不复制进新工区 |
+
+已修C-R1：同轮达到cap后续跑不再先发一次付费问答，新增两例RED→GREEN；仍需保守留足单题/并发在途余量，不能将题前题后检查宣传为严格预留的全局硬上限。旧报告中reasoning_tokens=null必须保留“未返回”语义。当前真实生成/在线向量调用0，新旧实测原始文件保留。
+
+2026-10-04 用户明确选择：本地收尾后再确认真实测量预算。本轮继续仅本地修复/验证，不执行DeepSeek真实轮，不使用旧余额自动开跑。
+
+
+C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0，backend+tooling3862 passed/27登记skip；frontend37文件913 passed；integration393 passed/4登记skip；backend-live44 passed；演示E2E2 passed；个人假供应商E2E4 passed（教师/学生开关保存刷新、抽取问答、取消/鉴权终止、两课隔离）；type-check/build/basic契约通过。定向推理/开关22 passed、测量54 passed、契约全量296 passed；git diff --check通过。报告 `docs/reviews/codex-plan-c-takeover.md`；接手 `docs/handoffs/codex-plan-c-takeover.md`；下一轮准备 `docs/handoffs/codex-plan-c-deepseek-next-round.md`。不把注册SKIP当PASS；无新增skip/删测试/依赖升级；真实调用0，源Claude工作区和旧实测数据保留。用户明确本地收尾后再确认预算，阶段C保持OPEN。
