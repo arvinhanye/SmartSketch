@@ -21,6 +21,7 @@ import {
   type GraphCanvasData,
   type LifecycleStatus,
 } from '../../src/frontend/src/graph/lifecycle'
+import { FALLBACK_GRAPH_THEME, readGraphTheme, toGraphTheme } from '../../src/frontend/src/graph/theme'
 
 // ---------- 测试替身 ----------
 
@@ -265,6 +266,21 @@ describe('H04 挂载', () => {
     life.destroy()
   })
 
+  it('建图时把主题原样交给工厂：未传时 theme 为 undefined，传入时是同一对象', async () => {
+    const plain = fakeFactory()
+    const first = createGraphLifecycle(container(), { data: sample(), factory: plain.factory })
+    await settle()
+    expect(plain.graphs[0]!.init.theme).toBeUndefined()
+    first.destroy()
+
+    const themed = fakeFactory()
+    const theme = { ...FALLBACK_GRAPH_THEME, canvas: '#abcdef' }
+    const second = createGraphLifecycle(container(), { data: sample(), factory: themed.factory, theme })
+    await settle()
+    expect(themed.graphs[0]!.init.theme).toBe(theme)
+    second.destroy()
+  })
+
   it('交给 G6 的是副本：G6 改写数据（如布局写坐标）不影响调用方', async () => {
     const f = fakeFactory()
     const input = sample()
@@ -329,6 +345,46 @@ describe('H04 挂载', () => {
     expect(options.transforms).toEqual(['process-parallel-edges'])
     const labelText = (options.node?.style as unknown as { labelText: (d: G6Node) => string }).labelText
     expect(labelText(node('stack', '栈'))).toBe('栈')
+  })
+
+  it('未传主题时使用暖纸兜底色，传入主题时使用该主题', () => {
+    const base = { container: container(), width: 640, height: 480, data: { nodes: [], edges: [] } }
+    expect(buildGraphOptions(base)).toMatchObject({
+      background: FALLBACK_GRAPH_THEME.canvas,
+      node: { style: { fill: FALLBACK_GRAPH_THEME.node.fill, stroke: FALLBACK_GRAPH_THEME.node.stroke, labelFill: FALLBACK_GRAPH_THEME.node.label } },
+      edge: { style: { labelFill: FALLBACK_GRAPH_THEME.node.label } },
+    })
+    const theme = {
+      ...FALLBACK_GRAPH_THEME,
+      canvas: '#102030',
+      node: { ...FALLBACK_GRAPH_THEME.node, fill: '#203040' },
+      state: { ...FALLBACK_GRAPH_THEME.state, selectedStroke: '#405060' },
+    }
+    const options = buildGraphOptions({ ...base, theme })
+    expect(options).toMatchObject({
+      background: '#102030',
+      node: { style: { fill: '#203040' } },
+    })
+    expect((options.node?.state as unknown as { selected: { stroke: string } }).selected.stroke).toBe('#405060')
+  })
+
+  it('主题变量缺失时退回兜底色，读取到的变量覆盖兜底色', () => {
+    expect(toGraphTheme(new Map())).toEqual(FALLBACK_GRAPH_THEME)
+    const values = new Map<string, string>([
+      ['--color-surface', '#010203'],
+      ['--graph-edge-prerequisite', '#040506'],
+      ['--graph-state-selected', '  #070809  '],
+    ])
+    const theme = toGraphTheme(values)
+    expect(theme.canvas).toBe('#010203')
+    expect(theme.relation.PREREQUISITE).toBe('#040506')
+    expect(theme.state.selectedStroke).toBe('#070809')
+    // 未提供的变量继续使用兜底色
+    expect(theme.relation.CONTAINS).toBe(FALLBACK_GRAPH_THEME.relation.CONTAINS)
+  })
+
+  it('未挂载的元素读取主题时返回兜底主题', () => {
+    expect(readGraphTheme(null)).toEqual(FALLBACK_GRAPH_THEME)
   })
 })
 

@@ -31,12 +31,12 @@ function style(value: RelationStyle): RelationStyle {
   return Object.freeze(value)
 }
 
-/** 四类关系的边样式，图例（H 组）与画布共用此表 */
+/** 四类关系的边样式，图例（H 组）与画布共用此表；颜色与 `styles.css` 的 `--graph-edge-*` 一致 */
 export const RELATION_STYLES: Readonly<Record<RelationType, RelationStyle>> = Object.freeze({
-  CONTAINS: style({ label: '包含', stroke: '#8c8c8c', lineWidth: 1.5, lineDash: [], directed: true }),
-  PREREQUISITE: style({ label: '前置', stroke: '#1677ff', lineWidth: 2, lineDash: [], directed: true }),
-  RELATED_TO: style({ label: '相关', stroke: '#52c41a', lineWidth: 1, lineDash: [6, 4], directed: false }),
-  EXAMPLE_OF: style({ label: '应用实例', stroke: '#fa8c16', lineWidth: 1, lineDash: [2, 3], directed: true }),
+  CONTAINS: style({ label: '包含', stroke: '#8a8175', lineWidth: 1.5, lineDash: [], directed: true }),
+  PREREQUISITE: style({ label: '前置', stroke: '#9c4a34', lineWidth: 2, lineDash: [], directed: true }),
+  RELATED_TO: style({ label: '相关', stroke: '#3f6157', lineWidth: 1, lineDash: [6, 4], directed: false }),
+  EXAMPLE_OF: style({ label: '应用实例', stroke: '#b1791f', lineWidth: 1, lineDash: [2, 3], directed: true }),
 })
 
 export interface G6NodeData {

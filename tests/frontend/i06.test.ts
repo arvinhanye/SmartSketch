@@ -23,6 +23,7 @@ import {
 } from '../../src/frontend/src/composables/useLearning'
 import { toG6Data } from '../../src/frontend/src/graph/adapter'
 import { buildGraphOptions, GRAPH_FACTORY_KEY, type CanvasGraph, type CanvasGraphFactory, type GraphCanvasData } from '../../src/frontend/src/graph/lifecycle'
+import { FALLBACK_GRAPH_THEME } from '../../src/frontend/src/graph/theme'
 import { createAppRouter } from '../../src/frontend/src/router/index.ts'
 import { useCourseStore } from '../../src/frontend/src/stores/course'
 import { useSessionStore } from '../../src/frontend/src/stores/session'
@@ -377,7 +378,18 @@ describe('I06 掌握状态到节点视觉属性（纯函数）', () => {
     const options = buildGraphOptions({ container: document.createElement('div'), width: 100, height: 100, data: graph })
     const nodeState = (options.node as { state: Record<string, unknown> }).state
     expect(Object.keys(nodeState).sort()).toEqual(['learning', 'lowConfidence', 'mastered', 'notStarted', 'recommended', 'rejected', 'selected'])
-    expect(nodeState.mastered).toMatchObject({ stroke: '#52c41a' })
+    // 状态色取自建图主题：未传时是暖纸兜底色，传入自定义主题时跟随主题
+    expect(nodeState.mastered).toMatchObject({ stroke: FALLBACK_GRAPH_THEME.state.masteredStroke })
+    expect(nodeState.learning).toMatchObject({ stroke: FALLBACK_GRAPH_THEME.state.learningStroke })
+
+    const themed = buildGraphOptions({
+      container: document.createElement('div'),
+      width: 100,
+      height: 100,
+      data: graph,
+      theme: { ...FALLBACK_GRAPH_THEME, state: { ...FALLBACK_GRAPH_THEME.state, masteredStroke: '#123456' } },
+    })
+    expect((themed.node as { state: Record<string, { stroke: string }> }).state.mastered!.stroke).toBe('#123456')
   })
 })
 

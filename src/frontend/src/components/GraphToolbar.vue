@@ -238,15 +238,15 @@ const summaryText = computed(() => {
   gap: 4px 12px;
   margin: 0;
   padding: 4px 10px;
-  border: 1px solid var(--color-border, #d9d9d9);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm, 4px);
-  background: var(--color-surface, #fff);
+  background: var(--color-surface);
 }
 
 .graph-toolbar__group legend {
   padding: 0 4px;
   font-size: 12px;
-  color: var(--color-text-muted, #595959);
+  color: var(--color-text-muted);
 }
 
 .graph-toolbar__group label,
@@ -312,18 +312,18 @@ const summaryText = computed(() => {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 1.5px solid #1677ff;
+  border: 1.5px solid var(--color-border-strong);
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .graph-toolbar__node-swatch--low_confidence {
-  border-color: #fa8c16;
+  border-color: var(--color-warning-text);
   border-style: dashed;
 }
 
 .graph-toolbar__node-swatch--rejected {
-  border-color: #bfbfbf;
+  border-color: var(--color-border-strong);
   border-style: dashed;
   opacity: 0.4;
 }

@@ -144,13 +144,13 @@ function onTypeChange(relationId: string, event: Event): void {
 
 .relation-editor__conflict,
 .relation-editor__error {
-  color: #a8071a;
-  border: 1px solid #ff4d4f;
+  color: var(--color-danger-text);
+  border: 1px solid var(--color-danger-border);
   padding: 8px;
 }
 
 .relation-editor__list li.is-highlighted {
-  outline: 2px solid #ff4d4f;
+  outline: 2px solid var(--color-danger-text);
 }
 
 .relation-editor__list li.is-pending {
