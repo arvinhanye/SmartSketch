@@ -1733,3 +1733,18 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 第三阶段范围覆盖更新（用户2026-10-03确认，ADR-088）：此前收尾清单里“美化与材料/运行材料”的材料部分现在暂缓，九类参赛材料不进入第三阶段验收。B-EVAL-01/B-QA-01/B-PDF-01/B-QUALITY-01仍OPEN；L17轻量美化以主线稳定为前置，L19保留隔离技术复测。内部技术证据/测试/人工判定/预算与交接仍须完成。启动prompt：docs/handoffs/codex-claude-plan-c-start-prompt-2026-10-03.md；Claude未被工具派发，先核9ca6e88基线、提交原子计划，获用户确认再实施。不新增模型调用、合并/推送、环境/数据同步授权。
 
 C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据引用和最新预算边界，路径/范围/预算断言通过；./scripts/verify.sh basic整体exit0，日志/private/tmp/plan-c-prompt-basic.log；git diff --check通过。仅修改本工作树交接、任务、决策文档；未运行full/integration、未修改业务代码或数据、未调用模型。此处交付供用户转交的prompt，尚未向Claude会话发送，也未启动第三阶段实施。
+
+## 2026-10-03 Claude 认领：冲刺计划 C（第三阶段：可靠性、性能与技术冻结）——用户已确认
+
+计划：`docs/superpowers/plans/2026-10-03-contest-sprint-c-reliability-performance.md`。工作区 `/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`，分支 `claude/plan-c-reliability`（用户确认自 `ec1291a` 新建，包含 `9ca6e88`）。九类参赛材料暂缓（ADR-088）；美化轻量化，技术达标后由用户另开前端设计任务。本会话不发真实生成或在线向量请求，付费测量交 DeepSeek 并先确认预算（生成累计 648168 / 5000000，向量 11943 另计）。
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| C01（B-EVAL-01） | IN_PROGRESS | Claude | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
+| C02（B-QA-01） | TODO | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
+| C03（B-PDF-01 / L16） | TODO | DeepSeek（C03-1/4）；Claude（C03-2/3） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
+| C04（B-QUALITY-01） | TODO | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
+| C05 | TODO | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
+| C06 | TODO | Claude | 最终门禁、隔离从零复测、交接 Codex | 整次 integration 实际 exit 0 |
+
+- 2026-10-03 C00 基线：`git switch -c claude/plan-c-reliability ec1291a`（用户确认的方式；旧分支保留在 `c85ee53`）。`./scripts/verify.sh basic` exit 0（`env -u LLM_MODE -u EMBEDDING_MODE`）。
