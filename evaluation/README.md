@@ -24,6 +24,7 @@ evaluation/
 ├── evaluate_extraction.py       # K02：离线评测脚本
 ├── run_live_extraction.py       # K02：本机真实模型抽取
 ├── ablation.py                  # K13：抽取消融（单阶段 / 两阶段 / 两阶段 + 补漏）
+├── measure_web_flow.py          # L02 / C01：经 HTTP 测抽取与问答耗时；只读核对调用账本（§9）
 ├── prompts/extract_joint.yaml   # K13：单阶段对照组专用提示词（不进生产）
 └── reports/
     ├── extraction-accuracy.md   # K02：抽取准确率测试报告（参赛材料）
@@ -235,3 +236,29 @@ evaluation/
 
   由此报告 `NOT_COVERED` 的精确率、召回率与臆答率（臆答数 / 资料未覆盖问题数），空分母同样给 `null`。
 - 问答阈值同样不在测试集上调，判定对象同样只算真实模型。
+
+## 9. 真实测量与预算核对（`measure_web_flow.py`，C01）
+
+只用标准库；口令从 `--password-env` 指定的环境变量读取；数据库只读打开（`mode=ro` + `PRAGMA query_only`）。
+
+```bash
+# 问答：逐题写 JSONL；每题后按生成 token 检查本轮增量止损（默认 45000），usage 未知也停
+python evaluation/measure_web_flow.py ask --base-url http://127.0.0.1:<port> --username <学生> \
+    --password-env MEASURE_PASSWORD --course-id <cid> --questions q.txt \
+    --out run.jsonl --audit-db <只读 SQLite 路径> --cap 45000 [--stream]
+
+# 事后核对：按 JSONL 中的请求 ID 关联；或给固定 ID；或给 [since, until) 窗口（必须带结束边界）
+python evaluation/measure_web_flow.py audit --db <只读 SQLite 路径> --records run.jsonl
+```
+
+口径：
+
+- **结局**：`answered` / `not_covered` / `error` / `no_response` 分开计数，`total` 为分母。HTTP 错误对象的请求编号取 `details.request_id`；`outcome`、`error_code`、`error_reason` 分列。`ask` 退出码 0 只表示测量跑完，看 `all_answered` 判断是否全部答成功；提前停止退出码为 3。
+- **时间边界**：所有时刻按 UTC 时刻比较，不做字符串比较；窗口为 `[since, until)`。缺时区的时间直接拒绝。
+- **分账**：`purpose = embedding` 为向量，其余为生成（计入生成预算）；另列 `by_purpose`。缓存命中不产生调用；中断（`status = sent`）与失败的调用照样计数；usage 缺失计入 `unknown_usage_calls`，`tokens` 只累加已知部分，并标 `tokens_complete = false`，不当作 0。窗口内没有对应 `chat_logs` 的调用单列 `unmatched_calls`。
+- **耗时**：分位数用最近秩法（排序后取第 ⌈q·n⌉ 个），每项注明分母。首字分三列，不能互相替代：
+  - 服务端首个 delta：`chat_logs.first_delta_latency_ms`，只统计已回答题；
+  - 客户端 SSE 首个 delta：`ask --stream` 收到第一条 `delta` 事件的时刻；
+  - 浏览器可见首字：本工具不测，写「未测」。
+  - 另有客户端完整响应 `client_elapsed_seconds` 与服务端 `latency_ms`。
+- 第二阶段 L15 十题可用 `evaluation/raw/l15/codex-closeout-audit.json` 离线重算：11 个请求、19 次调用 = 9 生成 + 10 向量，生成 28951、向量 59（`tests/tooling/test_c01_measure.py`）。

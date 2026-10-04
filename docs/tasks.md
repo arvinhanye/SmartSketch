@@ -1740,7 +1740,7 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| C01（B-EVAL-01） | IN_PROGRESS | Claude | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
+| C01（B-EVAL-01） | DONE（待复审） | Claude | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
 | C02（B-QA-01） | TODO | Claude；DeepSeek（C02-4） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
 | C03（B-PDF-01 / L16） | TODO | DeepSeek（C03-1/4）；Claude（C03-2/3） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
 | C04（B-QUALITY-01） | TODO | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
@@ -1748,3 +1748,4 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | C06 | TODO | Claude | 最终门禁、隔离从零复测、交接 Codex | 整次 integration 实际 exit 0 |
 
 - 2026-10-03 C00 基线：`git switch -c claude/plan-c-reliability ec1291a`（用户确认的方式；旧分支保留在 `c85ee53`）。`./scripts/verify.sh basic` exit 0（`env -u LLM_MODE -u EMBEDDING_MODE`）。
+- 2026-10-03 **C01 完成**：`measure_web_flow.py` 新增 `audit` 子命令、`ask --stream/--out/--audit-db/--cap`。错误编号兼容 `details.request_id`；按 UTC 时刻的 `[since, until)` 窗口或固定请求 ID 关联；生成与向量分账；未知 usage 不当 0，止损遇未知即停；最近秩分位并注明分母；首字三列口径。离线重算 L15：11 请求、19 调用 = 9+10、生成 28951、向量 59。`tests/tooling/test_c01_measure.py` 22 passed（17 例先红），`tests/tooling` 97 passed，`verify.sh basic` exit 0。交接 `docs/handoffs/claude-c01.md`。
