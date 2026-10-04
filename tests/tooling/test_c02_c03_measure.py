@@ -273,3 +273,29 @@ def test_audit_task_reports_billed_tokens_with_estimates(tmp_path):
     con.close()
     generation = measure.audit_task(db, task_id="t1")["ledger"]["generation"]
     assert generation["tokens"] == 1500 and generation["billed_tokens"] == 1500 + 800 + 2048
+
+
+@pytest.mark.parametrize("unknown_usage", [False, True])
+def test_ask_resumed_round_stops_before_sending_if_cap_or_unestimable_usage(tmp_path, monkeypatch, capsys, unknown_usage):
+    """A resumed round must never add a paid request after its ledger already requires a stop."""
+    import argparse
+    calls = [{"request_id": "prior", "purpose": "answer_with_context", "status": "error" if unknown_usage else "ok",
+              "usage_input": None if unknown_usage else 44900, "usage_output": None if unknown_usage else 100,
+              "created_at": "2026-10-03T20:01:00.000Z"}]
+    db = _db(tmp_path, CALLS_V17, calls)
+    questions = tmp_path / "questions.txt"
+    questions.write_text("什么是栈\n", encoding="utf-8")
+    monkeypatch.setattr(measure, "login", lambda *args: "fixture-token")
+    monkeypatch.setattr(measure, "utc_now_iso", lambda: T1)
+
+    def unexpected_call(*args, **kwargs):
+        pytest.fail("budget-exhausted/unestimable round issued a new question")
+
+    monkeypatch.setattr(measure, "_ask_once", unexpected_call)
+    args = argparse.Namespace(base_url="http://fixture.invalid", username="fixture", password_env="FIXTURE_PASSWORD",
+                              questions=str(questions), course_id="c1", stream=True, out=None,
+                              round_started_at=T0, audit_db=str(db), cap=45000)
+    assert measure.cmd_ask(args) == 3
+    result = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert result["round"]["stopped"]
+    assert result["summary"]["counts"]["total"] == 0

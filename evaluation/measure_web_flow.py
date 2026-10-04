@@ -511,6 +511,14 @@ def cmd_ask(args: argparse.Namespace) -> int:
     records: list[dict[str, Any]] = []
     stopped: str | None = None
     for question in questions:
+        # A resumed round (or other calls in the same window) may already require a stop.
+        # Check before issuing a paid request as well as after each completed question.
+        if args.audit_db:
+            report = audit(args.audit_db, started_at=started_at, ended_at=utc_now_iso())
+            stop, why = budget_stop(report["ledger"]["generation"], cap=args.cap)
+            if stop:
+                stopped = why
+                break
         record = {**_ask_once(args.base_url, token, args.course_id, question, stream=args.stream),
                   "round_started_at": started_at}
         records.append(record)
