@@ -183,7 +183,7 @@ node ../../../.review-artifacts/ui-replica-compare.mjs   # 同数据同视窗与
 
 ## 8. 提交序列
 
-最终 HEAD：**`（见 git log -1，本文件最后一次 docs 提交）`**（分支 `frontend-backend-refactor`，**未推送、未合并、未部署**）。
+最终 HEAD：**`fd17d50`**（`fix(frontend): restore frontend-ui-revision visual fidelity`），分支 `frontend-backend-refactor`，**未推送、未合并、未部署**。本文件随后另有一个只改文档的 `docs:` 提交用于记录该哈希；产品代码止于 `fd17d50`。
 
 上一轮的 13 个提交：
 
