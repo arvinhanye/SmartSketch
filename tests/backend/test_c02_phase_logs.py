@@ -175,7 +175,8 @@ class _Repo:
 SENTINEL_NAME = "绝不应出现在日志里的知识点名"
 
 
-def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None, released=None):
+def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None, released=None,
+             held_context=None):
     caplog.set_level(logging.INFO, logger=persist_graph.logger.name)
     written = SimpleNamespace(nodes=None, relations=None, downgraded=())
     monkeypatch.setattr(persist_graph, "load_candidates", _Sleep(20, SimpleNamespace(name=SENTINEL_NAME)))
@@ -189,7 +190,7 @@ def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None,
         yield lock
         time.sleep(0.015)                                 # 退出时释放锁
 
-    monkeypatch.setattr(persist_graph.course_locks, "held", held)
+    monkeypatch.setattr(persist_graph.course_locks, "held", held_context or held)
     monkeypatch.setattr(persist_graph, "_check_lease", lease_check or _Sleep(2))
     monkeypatch.setattr(persist_graph, "_effective", _Sleep(2, ("t1",)))
     monkeypatch.setattr(persist_graph, "_write_draft", _Sleep(40, written))
@@ -231,3 +232,44 @@ def test_persist_logs_neo4j_failure_and_lost_lease(monkeypatch, caplog):
     result, f = _persist(monkeypatch, caplog, lease_check=_Sleep(1, exc=LeaseLost("lost")))
     assert result.status is persist_graph.PersistStatus.LOST
     assert f["outcome"] == "lost" and "neo4j_ms" not in f
+
+
+@pytest.mark.parametrize("failure", ["neo4j", "lease", "unlock", "uncaught"])
+def test_unlock_is_timed_on_failures_without_changing_cleanup_or_propagation(monkeypatch, caplog, failure):
+    import sqlite3
+
+    events = []
+
+    @contextmanager
+    def held(*args, **kwargs):
+        try:
+            yield
+        finally:
+            events.append("unlock-start")
+            time.sleep(0.020)
+            events.append("unlock-end")
+            if failure == "unlock":
+                raise sqlite3.OperationalError("unlock failed")
+
+    def release(*args, **kwargs):
+        events.append("task-release")
+        return SimpleNamespace(status=persist_graph.PersistStatus.RELEASED)
+
+    exc = RepositoryError() if failure == "neo4j" else KeyError("uncaught") if failure == "uncaught" else None
+    kwargs = dict(repo=_Repo(exc=exc), held_context=held, released=release,
+                  lease_check=_Sleep(1, exc=LeaseLost("lost")) if failure == "lease" else None)
+    if failure == "uncaught":
+        with pytest.raises(KeyError, match="uncaught"):
+            _persist(monkeypatch, caplog, **kwargs)
+        [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("persist steps")]
+        f = _fields(line)
+        assert f["outcome"] == "KeyError"
+    else:
+        result, f = _persist(monkeypatch, caplog, **kwargs)
+        expected = persist_graph.PersistStatus.LOST if failure == "lease" else persist_graph.PersistStatus.RELEASED
+        assert result.status is expected
+    assert events == ["unlock-start", "unlock-end"] + (["task-release"] if failure in ("neo4j", "unlock") else [])
+    assert int(f["lock_release_ms"]) >= 20
+    assert ("t6_ms" in f) == (failure == "unlock")
+    assert ("neo4j_ms" in f) == (failure != "lease")
+    assert f.get("neo4j_attempts") == (None if failure == "lease" else "1")

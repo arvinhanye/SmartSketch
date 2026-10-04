@@ -18,7 +18,7 @@
 | 文件 | 说明 |
 | --- | --- |
 | `*-predictions.json`、`*-worksheet.md` | 原始预测与工作表，从测量区 `smartsketch-c03b-measure`（`88f9f6f`）的 `evaluation/raw/c04/` 原样复制，**未改动** |
-| `*-judgments-user.json` | **用户签收文件**：`judge` 为空，每条判定为 `null`，由用户独立填写 |
+| `*-judgments-user.json` | **已完成的用户签收记录**：`judge=arvin`，263 条判定已填；逐条复核后采纳辅助判定，非独立盲判（见 §5） |
 | `*-worksheet-user.md` | **推荐的填写处**：工作表副本，填 ✓ / ✗ 后由 `evaluation/c04_signoff.py convert` 转成 `*-judgments-user.json` 与 `*-report-user.json` |
 | `*-judgments-claude-assist.json` | Claude 辅助判定：`judge` 以 `claude-assist` 开头，`is_human_judgment: false`；每条都有依据（`notes`，判错写明 E/R 编号），存疑项列在 `needs_review` |
 
@@ -35,7 +35,7 @@
 
 ### 推荐：在工作表副本里填 ✓ / ✗
 
-副本 `course1-pdf-h2-thinking-off-worksheet-user.md`、`course2-pdf-h2-thinking-off-worksheet-user.md` 已生成，与原工作表逐行相同，只多「填法」「判定人」两行。原工作表不动，作为证据。
+副本 `course1-pdf-h2-thinking-off-worksheet-user.md`、`course2-pdf-h2-thinking-off-worksheet-user.md` 已由用户填完。除「判定人」元信息、最后两列与新增说明外，数据列与原工作表相同。原工作表不动，作为证据。以下是填写流程说明，不是要求重做现有签收。
 
 1. 在副本的 `- 判定人：` 后填你的名字（不能以 `claude-assist` 开头）。
 2. 对照章节原文，按 `evaluation/README.md` §6.3 逐行填最后两列：
@@ -48,9 +48,11 @@
    .venv/bin/python evaluation/c04_signoff.py convert
    ```
 
-   - 有没填、标记不认识、判 ✗ 没写依据、判定人不合格，或改动了其他列，都会逐条列出并拒绝，**不写任何文件**；
-   - 全部合格时写 `*-judgments-user.json`（覆盖空白模板）和 `*-report-user.json`，并打印两课的实体、关系准确率与结论；
+   - 有没填、标记不认识、判 ✗ 没写依据、判定人不合格，或改动了其他列，以及重复行号 / ID、非七列数据行都会拒绝；**所选课程全部预检通过前，不写任何结果文件**；
+   - 全部合格时写 `*-judgments-user.json`（覆盖该课程既有判定结果；请先备份）和 `*-report-user.json`，并打印两课的实体、关系准确率与结论；
    - 只转一门：加 `--course course1` 或 `--course course2`。
+
+预检零写入只覆盖校验失败；通过校验后的磁盘写入并非跨文件事务，I/O 故障可能留下部分输出。已签收证据不应随意重转或覆盖。当前修复说明与最新阶段状态见 `docs/handoffs/codex-plan-c-acceptance-fixes.md`；Claude 交接 §3C / §6 的初始待签收措辞保留为历史，不作当前状态。
 
 副本被误删时可用 `.venv/bin/python evaluation/c04_signoff.py init` 重新生成；已存在的副本不会被覆盖。
 

@@ -67,16 +67,27 @@ def _cells(line: str) -> list[str]:
 
 
 def _rows(sheet: str) -> dict[str, dict[int, tuple[str, list[str]]]]:
-    """{kind: {行号: (ID, 全部单元格)}}。"""
+    """解析七列表格；在折叠为字典前拒绝重复行号/ID 与畸形数据行。"""
     rows: dict[str, dict[int, tuple[str, list[str]]]] = {"entities": {}, "relations": {}}
+    seen_ids: set[str] = set()
     kind = None
     for line in sheet.splitlines():
         if line.startswith("## "):
             kind = SECTIONS.get(line.strip())
             continue
+        if not kind or not line.lstrip().startswith("|"):
+            continue
+        cells = _cells(line)
+        if cells and (cells[0] == "#" or all(re.fullmatch(r":?-+:?", c) for c in cells)):
+            continue  # 表头和分隔行不是判定对象
         match = ROW.match(line)
-        if kind and match:
-            rows[kind][int(match.group(1))] = (match.group(2), _cells(line))
+        if not match or len(cells) != 7:
+            raise SignoffError(f"{LABELS[kind]}表格数据行格式错误：须保留原七列、行号与 ID")
+        number, item_id = int(match.group(1)), match.group(2)
+        if number in rows[kind] or item_id in seen_ids:
+            raise SignoffError(f"{LABELS[kind]} #{number}：重复行号或 ID {item_id}")
+        seen_ids.add(item_id)
+        rows[kind][number] = (item_id, cells)
     return rows
 
 
@@ -189,19 +200,24 @@ def _init(paths: dict[str, Path]) -> None:
     print(f"已生成：{target}")
 
 
-def _convert(paths: dict[str, Path], course: str) -> bool:
+def _prepare_conversion(paths: dict[str, Path], course: str) -> tuple[Result, dict[str, Any]] | None:
+    """只读预检与计算；所有课程通过后才允许写结果。"""
     sheet = paths["worksheet-user.md"]
     if not sheet.exists():
         print(f"{course}：没有副本 {sheet.name}，先运行 init", file=sys.stderr)
-        return False
-    predictions = json.loads(paths["predictions.json"].read_text(encoding="utf-8"))
+        return None
     try:
+        predictions = json.loads(paths["predictions.json"].read_text(encoding="utf-8"))
         result = to_judgments(sheet.read_text(encoding="utf-8"),
                               paths["worksheet.md"].read_text(encoding="utf-8"), predictions)
-    except SignoffError as error:
-        print(f"{course}：不能转换，未写任何文件。\n{error}", file=sys.stderr)
-        return False
-    report = evaluate.judge_report(predictions, result.judgments)
+        report = evaluate.judge_report(predictions, result.judgments)
+    except (SignoffError, OSError, ValueError, KeyError) as error:
+        print(f"{course}：校验失败，未写任何文件。\n{error}", file=sys.stderr)
+        return None
+    return result, report
+
+
+def _write_conversion(paths: dict[str, Path], course: str, result: Result, report: dict[str, Any]) -> None:
     paths["judgments-user.json"].write_text(evaluate.dumps(result.judgments), encoding="utf-8")
     paths["report-user.json"].write_text(evaluate.dumps(report), encoding="utf-8")
     hard = report["hard_indicators"]
@@ -212,7 +228,6 @@ def _convert(paths: dict[str, Path], course: str) -> bool:
           f"实体 {ent['correct']}/{ent['judged']}（{ent['value']:.2%}），关系 {rel['correct']}/{rel['judged']}"
           f"（{rel['value']:.2%}），阈值 70%；结论：{hard['verdict']}")
     print(f"  已写 {paths['judgments-user.json'].name}、{paths['report-user.json'].name}")
-    return True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -223,14 +238,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dir", default=str(DEFAULT_DIR), help="签收目录（缺省 evaluation/raw/c04-signoff）")
     args = parser.parse_args(argv)
     directory = Path(args.dir)
-    ok = True
-    for course in args.course or sorted(COURSES):
+    courses = args.course or sorted(COURSES)
+    if args.command == "init":
+        for course in courses:
+            _init(_paths(directory, COURSES[course]))
+        return 0
+    prepared = []
+    for course in courses:
         paths = _paths(directory, COURSES[course])
-        if args.command == "init":
-            _init(paths)
-        else:
-            ok = _convert(paths, course) and ok
-    return 0 if ok else 1
+        conversion = _prepare_conversion(paths, course)
+        if conversion is None:
+            return 1
+        prepared.append((paths, course, *conversion))
+    for paths, course, result, report in prepared:
+        _write_conversion(paths, course, result, report)
+    return 0
 
 
 if __name__ == "__main__":
