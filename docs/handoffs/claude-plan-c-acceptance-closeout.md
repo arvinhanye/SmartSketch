@@ -1,10 +1,59 @@
 # Claude 交接：计划 C 验收收尾（C-ACC-A～D）
 
 - 日期：2026-10-04
-- task_id：C-ACC-A / C-ACC-B / C-ACC-C / C-ACC-D
+- task_id：C-ACC-A / C-ACC-B / C-ACC-C / C-ACC-D（含 C04 签收工具与签收登记）
 - **stage_c_status: OPEN**
 - **technical_freeze: NOT_PERFORMED**
 - review_status: ready_for_review
+- worktree：`/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`（分支 `claude/plan-c-acceptance`）
+- base_commit：`4a6308b`（Codex `codex/plan-c-takeover`）
+- head_commit：本交接所在提交（代码与数据截至 `bf81d20`，之后只改本文件）；工作区干净，仅未跟踪的本机 `.claude/launch.json`，不属于交付
+- next_action：请 Codex 复审 `4a6308b..head` 全部提交；修复另开一轮。标记就绪后 Claude 不再改这批文件。
+
+## 0. 复审请求（给 Codex）
+
+### 范围
+
+`git diff 4a6308b..HEAD`，共 24 个文件：
+
+| 类别 | 文件 |
+| --- | --- |
+| 业务代码（唯一一处） | `src/backend/app/workers/persist_graph.py` |
+| 评测工具 | `evaluation/audit_persisted_sources.py`、`evaluation/c04_signoff.py` |
+| 测试 | `tests/backend/test_c02_phase_logs.py`、`tests/tooling/test_c_acc_sources.py`、`tests/tooling/test_c04_signoff_sheet.py` |
+| 证据与签收数据 | `evaluation/raw/c-acc-a/sources.json`、`evaluation/raw/c04-signoff/`（14 个文件） |
+| 报告与文档 | `evaluation/reports/c-acc-a-persisted-sources.md`、`evaluation/reports/c-acc-d-retest-decisions.md`、`docs/tasks.md`、本交接 |
+
+无 API / DTO / 契约 / 迁移 / 依赖变化。
+
+### 建议重点
+
+1. **`persist_graph.py` 语义不变**：`run_persist_stage` 改为外层计时 + 内部 `_persist_stage`。请核对锁获取 / 释放顺序、租约检查、`repo.write_transaction` 重跑时的 `neo4j_attempts` 计数、`_release` / `_after_failure` 的调用路径与异常传播都与 `4a6308b` 等价；日志只含任务编号、结果、毫秒数与次数。
+2. **A 的只读保证**：`audit_persisted_sources.py` 临时替换四个模块的 `connect`（`mode=ro&immutable=1` + `query_only`），退出时恢复；Neo4j 只经读路由。请确认不存在写路径遗漏，及 `immutable=1` 的前提（测量服务已停、WAL 为空）在报告中已写明。
+3. **C04 签收工具**：`c04_signoff.py` 的拒绝条件（未填、非法标记、✗ 无依据、判定人为空或 `claude-assist`、改动其他列）与 `apply_marks` 回写只改最后两列；表格转义 `\|` 的切分。
+4. **签收记录的措辞**：用户判定与 `claude-assist` 263/263 一致，已按用户确认记为「复核后采纳辅助判定」，不是独立盲判。请审查 `docs/tasks.md`、`evaluation/raw/c04-signoff/README.md` §5 与本交接第 10 节是否有夸大。
+5. **补测决定**：用户决定三项补测均不做；`c-acc-d-retest-decisions.md` §5 与 `docs/tasks.md` 的「未测」写法是否足以防止误用（尤其 MD 抽取 ≤60 秒与浏览器首字）。
+
+### 验证（实际结果）
+
+| 命令 | 结果 |
+| --- | --- |
+| 完整门禁 `./scripts/verify.sh integration`，`bf81d20`，干净临时工作树 | **第 2 次 exit 0**：backend+tooling 3893 passed / 27 登记 skip；frontend 38 文件 934 passed；integration 393 passed / 4 登记 skip；backend-live 44 passed；演示 E2E 2 passed；个人本机假供应商 E2E 4 passed（日志 `scratchpad/logs/c-acc-gate-bf81d20-r2.log`，23356 字节，SHA-256 前 16 位 `0769aeb27f1d9dbb`）。第 1 次 exit 1：backend 3893 / 27 skip、frontend 934 均通过，integration 层因本 shell 的 PATH 缺 `~/.docker/bin` 找不到 docker 命令、未能启动一次性 Neo4j（Docker Desktop 在运行）；第 2 次只把 `~/.docker/bin` 加进 PATH，其余命令、工作树与代码相同（日志 `c-acc-gate-bf81d20.log`，18670 字节，`677970d7dc15994f`）。相对 `4304fec` 多 15 例（签收工具 12 + 3），无新增 skip、删用例或放宽断言 |
+| 完整门禁 `./scripts/verify.sh integration`，`4304fec`（前一次） | exit 0；backend+tooling 3878 / 27 skip，frontend 934，integration 393 / 4 skip，backend-live 44，演示 E2E 2，个人 E2E 4 |
+| `tests/tooling/test_c04_signoff_sheet.py` | 先以占位模块 RED（2 failed / 10 errors）→ 12 passed；追加 `apply_marks` 3 例 RED 3 failed → 15 passed |
+| `tests/backend/test_c02_phase_logs.py` 新增 3 例 | RED 3 failed / 3 passed → 6 passed |
+| `tests/tooling/test_c_acc_sources.py` | 5 passed（RED 仅为文件不存在，非行为层红灯，照实记录） |
+
+### open_questions
+
+- 是否执行技术冻结：用户尚未决定；在此之前保持 `stage_c_status: OPEN`。
+- course1 6471 ms 与旧 15.643 秒入库慢段的根因：仍 OPEN（B 的日志只对以后的运行有效）。
+
+### unverified
+
+- 三项补测（浏览器可见首字、关闭思考的 MD 抽取、v3 + 思考开启基线）：用户决定不做，未测。
+- 已发布版本副本中的出处：两门课均未发布，未核验。
+- 本机临时签收网页（会话临时目录，不入库）只经手工浏览器走查，无自动化测试；它的写入经 `apply_marks`，转换经 `to_judgments`，两者有单测。
 
 ## 1. 工作区、基线与提交
 
@@ -21,13 +70,17 @@
   | `4304fec` | B：入库阶段子步骤脱敏计时 + 3 例回归 |
   | `452d446` | C：C04 签收入口、用户签收文件、claude-assist 辅助判定 |
   | `03af1b9` | D 决策表、`docs/tasks.md` 状态与证据、本交接 |
-  | 本次追加提交 | 签收填写工具 `evaluation/c04_signoff.py`、两课工作表副本、12 例测试 |
+  | `b3c91b6` | 签收填写工具 `evaluation/c04_signoff.py`、两课工作表副本、12 例测试 |
+  | `4c6b56d` | `apply_marks` / `read_marks`（临时网页回写用）+ 3 例测试 |
+  | `7956b72` | 登记 C04 人工准确率签收 |
+  | `bf81d20` | 登记用户决定三项补测均不做 |
+  | 本交接所在提交 | 复审请求与最终门禁结果 |
 
 ## 2. 四件事分开报告
 
 | 项 | 结论 |
 | --- | --- |
-| 工程门禁通过 | **是**：`4304fec` 代码树完整 `./scripts/verify.sh integration` 实际 exit 0（第 4 节）；之后两个提交只加数据与文档，最终树另跑 `./scripts/verify.sh`（basic）exit 0 |
+| 工程门禁通过 | **是**：最终代码树 `bf81d20` 完整 `./scripts/verify.sh integration` 见第 0 节；此前 `4304fec` 同样 exit 0（第 4 节） |
 | 真实测量已完成 | 是，由 DeepSeek 在 `88f9f6f` 完成，Codex 已复核；本轮没有新增真实测量 |
 | 人工准确率已签收 | **是**（2026-10-04，判定人 `arvin`）：两课实体、关系均 ≥70%；记为「逐条复核后采纳 Claude 辅助判定」（263/263 一致），不是独立盲判（第 10 节） |
 | 技术冻结已执行 | **否** |
@@ -125,7 +178,7 @@
 ## 6. 未完成、未验证与 OPEN
 
 - **C04 人工准确率签收**：需要用户本人在 `*-worksheet-user.md` 填 ✓ / ✗ 后运行 `evaluation/c04_signoff.py convert`（或直接填 JSON 后跑 `judge-report`）。这是技术冻结前唯一的必需项。
-- 浏览器可见首字、关闭思考的 MD 抽取、v3 + 思考开启基线：均未测，是否补测由用户按决策表决定。
+- 浏览器可见首字、关闭思考的 MD 抽取、v3 + 思考开启基线：均未测；用户 2026-10-04 决定不补测。
 - course1 6471 ms 与旧 15.643 秒的根因：仍 OPEN；B 的日志只对以后的运行有效。
 - 已发布版本副本中的出处没有核验（两门课都未发布）。
 
@@ -140,9 +193,9 @@
 
 ## 8. 用户只需确认
 
-1. **准确率签收**：在 `evaluation/raw/c04-signoff/` 两份 `*-worksheet-user.md` 里填判定人和每行 ✓ / ✗（判 ✗ 写依据），运行 `.venv/bin/python evaluation/c04_signoff.py convert`；实体、关系各 ≥70% 才算达标。
-2. **补测**：D1 / D2 / D3 各选「做 / 不做」。要做的项须确认增量停止线、累计上限和向量上限。
-3. **冻结**：签收与补测决定之后，再决定是否执行技术冻结。在此之前保持 `stage_c_status: OPEN`、`technical_freeze: NOT_PERFORMED`。
+1. ~~**准确率签收**~~：已完成（第 10 节）。
+2. ~~**补测**~~：用户决定三项均不做。
+3. **冻结**：唯一待用户决定的事项；建议在 Codex 复审本轮后再定。在此之前保持 `stage_c_status: OPEN`、`technical_freeze: NOT_PERFORMED`。
 
 ## 9. 追加：签收填写工具（用户要求「在工作表里填 ✓ ✗」）
 
@@ -162,4 +215,4 @@
 - 核对命令：对两课重新运行 `to_judgments`（与写出的 JSON 相同）与 `judge_report`（与写出的报告相同）；原 predictions、工作表、辅助文件 `git diff` 为空。
 - 风险：course2 关系余量 5 条；删去【请复核】的 5 条（course1 #37、#42、#68、#70，course2 关系 #20）是两可项。
 - 网页保存曾把工作表权限改成 0600：已恢复 644，并修正临时服务保留原权限。
-- 仍 OPEN、待用户决定：三项补测（决策表 D1～D3）是否执行；之后是否技术冻结。**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
+- 三项补测：用户决定均不做（`bf81d20`），冻结说明照实写「未测」。仍待用户决定：是否技术冻结。**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
