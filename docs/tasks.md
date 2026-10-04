@@ -1752,3 +1752,7 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 - 2026-10-03 **C02-1 诊断完成**（`evaluation/reports/c02-qa-diagnosis.md`，离线、零调用）：可见回答每字 2.9～17 个输出 token，首个 delta ≈ 生成耗时。推断为模型的不可见推理吃掉 2048 预算并推迟可见内容；兼容客户端只读 `delta.content`。输入侧不是主因（平均输入约 2085 token）。修法 A（推理埋点）/B（思考控制）/C（提示词 v3）/D（思考提示）**待用户决定**。**C02-3 完成**：`audit` 逐请求给出查询向量 / 生成 / 其余三段耗时（现有字段，无迁移），`test_c01_measure.py` 新增 2 例先红后绿，共 24 passed。
 - 2026-10-03 **C02-2 完成**（用户选 A+C）：ADR-089（`0469bad`）。A：迁移 017 + 推理字数 / 推理 token / 首次推理与首次可见内容时刻，只计量不存正文，回答与 SSE 不变（`33177c0`）。C：提示词 v3（`088a601`）。测量工具读推理列、`--round-started-at`、`audit-task`（`e709ccb`）。后端全量 3825 passed / 27 skipped。交接 `docs/handoffs/claude-plan-c-c02.md`；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02-4-deepseek-qa-retest.md`（止损 45000）、`docs/handoffs/claude-plan-c-c03-1-deepseek-pdf-retest.md`（course2 PDF，止损 110000），**需用户安排带本分支代码与测量数据的环境后执行**。
 - 2026-10-03 更正：第三阶段交接文件统一用 `claude-plan-c-` 前缀（`claude-c02.md` 等旧名属于原子清单同号任务；本轮写交接时曾误覆盖 `claude-c02.md` 的工作区副本，未提交，已原样恢复）。`claude-c01.md` 改名为 `claude-plan-c-c01.md`。
+- 2026-10-04 **DeepSeek C02-4（`16d9ebd`）与 C03-1（`72fed5e`）完成，Claude 复核** `docs/reviews/claude-deepseek-c02-4-c03-1.md`：
+  - C03-1：PDF 修复生效（关系 25→59、`PREREQUISITE` 0→5、孤立 39→3），83522 token、91.34 秒，仍超 60 秒。抽取输出 80% 是推理，两次关系调用推理用满 4096 导致 2 次 repair；末段 15.6 秒非模型时间未归因。
+  - C02-4：只测 1 题（冷启动首问超时；8.15 秒无调用记录的空档未归因），因 usage 未知止损规则过严提前停止（工具问题，Claude 负责）。
+  - 累计：记录口径 731690，系统计费口径 743806（含 1 次未知调用估算 12116），均在批准上限 803168 内；向量 11946 另计。
