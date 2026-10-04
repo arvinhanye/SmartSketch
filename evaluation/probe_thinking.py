@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -61,6 +62,18 @@ def charge(used: int, row: dict[str, Any], *, input_estimate: int, max_tokens: i
     return used + input_estimate + max_tokens
 
 
+def tls_context() -> ssl.SSLContext:
+    """系统信任库在部分 python.org 构建上不可用（C02b 首次运行全部证书失败）：未显式设置 SSL_CERT_FILE 时优先用 certifi。"""
+    if not os.environ.get("SSL_CERT_FILE"):
+        try:
+            import certifi
+        except ImportError:
+            pass
+        else:
+            return ssl.create_default_context(cafile=certifi.where())
+    return ssl.create_default_context()
+
+
 def _reasoning_chars(message: dict[str, Any]) -> int:
     return sum(len(text) for name in ("reasoning_content", "reasoning")
                if isinstance(text := message.get(name), str))
@@ -77,17 +90,20 @@ def call_variant(base_url: str, key: str, model: str, variant: str, *, max_token
                                      data=json.dumps(body, ensure_ascii=False).encode("utf-8"), method="POST")
     request.add_header("Content-Type", "application/json")
     request.add_header("Authorization", f"Bearer {key}")
-    row: dict[str, Any] = {"variant": variant, "fields": VARIANTS[variant], "http_status": None, "accepted": False,
+    # outcome：answered（有响应）/ rejected（HTTP 错误，字段可能不被接受）/ no_response（连不上，结果不说明字段）
+    row: dict[str, Any] = {"variant": variant, "fields": VARIANTS[variant], "outcome": "no_response",
+                           "http_status": None, "accepted": None,
                            "error_code": None, "error_type": None, "usage_input": None, "usage_output": None,
                            "reasoning_tokens": None, "reasoning_chars": None, "content_chars": None,
                            "finish_reason": None, "latency_ms": None}
     started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        context = tls_context() if base_url.startswith("https://") else None
+        with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
             payload = json.loads(response.read() or b"{}")
             row["http_status"] = response.status
     except urllib.error.HTTPError as error:
-        row["http_status"] = error.code
+        row.update(http_status=error.code, outcome="rejected", accepted=False)
         try:
             detail = (json.loads(error.read() or b"{}").get("error") or {})
         except ValueError:
@@ -108,7 +124,7 @@ def call_variant(base_url: str, key: str, model: str, variant: str, *, max_token
     first = choices[0] if choices and isinstance(choices[0], dict) else {}
     message = first.get("message") if isinstance(first.get("message"), dict) else {}
     content = message.get("content")
-    row.update(accepted=True, usage_input=_count(usage.get("prompt_tokens")), usage_output=_count(usage.get("completion_tokens")),
+    row.update(outcome="answered", accepted=True, usage_input=_count(usage.get("prompt_tokens")), usage_output=_count(usage.get("completion_tokens")),
                reasoning_tokens=_count(details.get("reasoning_tokens")), reasoning_chars=_reasoning_chars(message),
                content_chars=len(content) if isinstance(content, str) else None, finish_reason=first.get("finish_reason"))
     return row
@@ -138,16 +154,22 @@ def main(argv: list[str] | None = None) -> int:
 
     estimate = input_estimate()
     used, stopped = 0, None
+    outcomes: dict[str, int] = {"answered": 0, "rejected": 0, "no_response": 0}
     for variant in variants:
         if used + estimate + args.max_tokens > args.cap:
             stopped = f"预算：已用 {used}，再发一次最坏 {estimate + args.max_tokens}，将超过上限 {args.cap}"
             break
         row = call_variant(args.base_url, key, args.model, variant, max_tokens=args.max_tokens, timeout=args.timeout)
         used = charge(used, row, input_estimate=estimate, max_tokens=args.max_tokens)
+        outcomes[row["outcome"]] += 1
         print(json.dumps(row, ensure_ascii=False))
     print(json.dumps({"summary": {"model": args.model, "tokens_used": used, "cap": args.cap, "stopped": stopped,
+                                  **outcomes,
                                   "note": "直连供应商，未计入 model_calls；请手工计入预算台账"}}, ensure_ascii=False))
-    return 3 if stopped else 0
+    if stopped:
+        return 3
+    # 全部连不上：结果不能用来判断任何字段（退出码 4，提醒先排查网络或证书）
+    return 4 if outcomes["no_response"] and not (outcomes["answered"] or outcomes["rejected"]) else 0
 
 
 if __name__ == "__main__":

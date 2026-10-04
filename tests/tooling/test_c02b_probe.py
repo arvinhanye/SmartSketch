@@ -134,3 +134,31 @@ def test_unknown_variant_is_rejected(provider):
     with pytest.raises(SystemExit):
         probe.main(["--base-url", provider.base, "--model", "m1", "--key-env", "PROBE_KEY", "--allow-http",
                     "--variants", "nope"])
+
+
+def test_connection_failure_is_its_own_outcome_not_a_rejected_field(monkeypatch, capsys):
+    """DeepSeek 复测发现：证书失败时 5 行都是 accepted:false，被误读成「字段都不被接受」。"""
+    monkeypatch.setenv("PROBE_KEY", KEY)
+    code = probe.main(["--base-url", "http://127.0.0.1:9/v1", "--model", "m1", "--key-env", "PROBE_KEY",
+                       "--allow-http", "--variants", "baseline", "--timeout", "2"])
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
+    row = lines[0]
+    assert row["outcome"] == "no_response" and row["accepted"] is None
+    assert lines[-1]["summary"]["no_response"] == 1
+    assert code == 4                                       # 全部拿不到响应：结果不可用于判断字段
+
+
+def test_outcomes_for_answered_and_rejected(provider, capsys):
+    _, lines, _ = _run(provider, capsys, "--variants", "baseline,reasoning_effort_low")
+    rows = {row["variant"]: row for row in lines if "variant" in row}
+    assert rows["baseline"]["outcome"] == "answered" and rows["reasoning_effort_low"]["outcome"] == "rejected"
+
+
+def test_tls_context_prefers_certifi_when_available(monkeypatch):
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    fake = type("certifi", (), {"where": staticmethod(lambda: "/tmp/certifi.pem")})
+    monkeypatch.setitem(__import__("sys").modules, "certifi", fake)
+    calls = []
+    monkeypatch.setattr(probe.ssl, "create_default_context", lambda cafile=None: calls.append(cafile) or object())
+    probe.tls_context()
+    assert calls == ["/tmp/certifi.pem"]
