@@ -103,8 +103,8 @@ function onLocate(query: string): void {
   const kpId = full === null ? null : locateNode(full, filters.state.value, query)
   searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
   if (kpId === null) return
-  guard.request(kpId)
-  canvas.value?.focus(kpId)
+  // C05-1：有未保存修改时先确认；画布只在选中真正切换后才聚焦，取消则画布与详情都留在原节点
+  guard.request(kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
 }
 
 // L11：画布之外的可访问选择方式（键盘与自动化可用），选择同样经过「未保存修改」守卫

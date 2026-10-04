@@ -242,34 +242,51 @@ export interface UseSelectionGuardOptions {
  * 切换选中前的未保存确认（H14）：面板有未保存修改时，换节点或关闭面板先挂起为待确认，
  * 教师确认放弃后才切换；取消则保留当前节点与修改。选中被外部改变（删除、换课）时撤销待确认。
  */
+export interface SelectionRequestOptions {
+  /** C05-1：选中真正生效后才执行（如画布聚焦）；取消、或选中被外部改变（删除、换课）时丢弃 */
+  then?: (kpId: string | null) => void
+}
+
 export function useSelectionGuard({ selected, apply, isDirty }: UseSelectionGuardOptions) {
   const pending = shallowRef<{ kpId: string | null } | null>(null)
+  let after: SelectionRequestOptions['then'] | null = null
 
-  function request(kpId: string | null): void {
+  function request(kpId: string | null, options: SelectionRequestOptions = {}): void {
     if (kpId === selected.value) {
       pending.value = null
+      after = null
+      options.then?.(kpId)
       return
     }
     if (selected.value !== null && isDirty()) {
       pending.value = { kpId }
+      after = options.then ?? null
       return
     }
     pending.value = null
+    after = null
     apply(kpId)
+    options.then?.(kpId)
   }
 
   function confirm(): void {
     const target = pending.value
+    const then = after
     pending.value = null
-    if (target !== null) apply(target.kpId)
+    after = null
+    if (target === null) return
+    apply(target.kpId)
+    then?.(target.kpId)
   }
 
   function cancel(): void {
     pending.value = null
+    after = null
   }
 
   watch(selected, () => {
     pending.value = null
+    after = null
   })
 
   return { pending: pending as Readonly<Ref<{ kpId: string | null } | null>>, request, confirm, cancel }
