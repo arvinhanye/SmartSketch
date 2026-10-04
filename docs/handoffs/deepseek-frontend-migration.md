@@ -164,17 +164,38 @@ node node_modules/vite/bin/vite.js build --outDir ../../../.review-artifacts/fro
 4. **来源的服务商地址预设**是 27bff16 的静态值，本轮没有逐家联网验证可用性；页面文案已声明「地址预设只填写服务地址，不校验服务商当前可用性」。
 5. **个人设置测试弹窗的键盘细节**（Tab 焦点限制、Esc 关闭、关闭后焦点回测试按钮）本轮只在 jsdom 与 CDP 截图层面核对，未做完整的键盘路径回放。
 
-## 8. 提交序列（HEAD 之前 7 个本地提交）
+## 8. 提交序列
+
+最终 HEAD：`1a7dc88ef5d622d0ec46fce1ffc1f06c77e49e60`（分支 `frontend-backend-refactor`，工作区干净，**未推送、未合并、未部署**）。
 
 ```
-700d743 feat(frontend): adapt personal model settings cards and test dialog
-b27bdb3 feat(frontend): adapt chat presentation without changing request guards
-10981d4 feat(frontend): migrate graph presentation and canvas theme
-103a322 feat(frontend): migrate the review workspace and version presentation
-257aa6d fix(frontend): align the member form controls on desktop
-f723801 fix(frontend): keep the full course grid on the course home
-25d785f fix(frontend): preserve file-drop cancellation and visible upload focus
+1a7dc88 docs: record the browser acceptance results and the requested endpoints
+14b9b76 docs: drop the trailing blank line in the task table
+db57409 docs: record the complete frontend migration verification
+700d743 feat(frontend): adapt personal model settings cards and test dialog          ← 第 7 批
+b27bdb3 feat(frontend): adapt chat presentation without changing request guards      ← 第 6 批
+10981d4 feat(frontend): migrate graph presentation and canvas theme                  ← 第 5 批
+103a322 feat(frontend): migrate the review workspace and version presentation        ← 第 4 批
+257aa6d fix(frontend): align the member form controls on desktop                     ← F4
+f723801 fix(frontend): keep the full course grid on the course home                  ← F3
+25d785f fix(frontend): preserve file-drop cancellation and visible upload focus      ← F1/F2
 055d914 docs(handoffs): record the frontend migration progress and the remaining batches   ← 起始基线
 ```
 
+本轮共 10 个本地提交（F1–F4 修复 3 个、第 4–7 批 4 个、文档与收尾 3 个），涉及 `src/frontend/**`、`tests/frontend/**` 与 `docs/**`，共 38 个文件。
+
 每批独立可撤回：需要回退某一批时用对应提交的 `git revert` 生成新提交，先核对后续批次的依赖；本轮没有数据迁移，不需要数据库或向量空间回退；**禁止硬重置**。
+
+## 9. 原 R1 关闭条件逐条对照
+
+| 条件 | 状态 |
+| --- | --- |
+| 第 4–7 批全部实现，并核对与 27bff16 的设计覆盖 | 已实现；覆盖表见 §3（含有意不迁入项与理由） |
+| F1/F2/F3/F4 有修复和对应验证证据 | 已完成；单元/探针/浏览器三类证据见 §4 与 §5 |
+| 前端全量检查与旧独立探针在最终提交通过 | 已完成：两套 `vue-tsc` 0 错误、29 文件 831 项通过、仓库外探针 2 项通过、构建成功 |
+| 浏览器的布局、焦点与主要交互验收通过 | 部分完成：合成数据下 7 项判定通过（含真实 G6 画布配色与弹窗尺寸）；**真实后端数据下的写操作链路未验** |
+| 后端与业务保护边界保持 | 已完成：边界 diff 为空；个人模型配置、发送锁、会话隔离、晚到结果保护保留 |
+| 所需系统门禁/隔离链路完成 | **未完成**：本机无 Bash，`scripts/verify.sh` 未运行 |
+| 任务文档、交接、本地提交完成 | 已完成：`docs/tasks.md` 新增 FE-MIG 任务行、本交接与执行方案均已提交 |
+
+结论：**界面迁移与前端验收已完成，系统门禁与真实后端链路验收仍受阻**，原 R1 现在可以记为「界面部分已闭合，系统部分待环境」，不能记为完整验收通过。
