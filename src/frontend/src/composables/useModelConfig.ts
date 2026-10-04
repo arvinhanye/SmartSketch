@@ -69,7 +69,8 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
 
   const status = ref<'loading' | 'ready' | 'error'>('loading')
   const saved = ref<ModelConfig | null>(null)
-  const form = reactive({ baseUrl: '', model: '', apiKey: '' })
+  // ADR-090：disableThinking 是「关闭模型思考」开关，与地址、模型一起保存
+  const form = reactive({ baseUrl: '', model: '', apiKey: '', disableThinking: false })
   /** N04：加载、保存、测试、清除互斥；按钮与逻辑入口都据此拒绝第二个操作 */
   const busy = ref<Busy | null>(null)
   const saving = computed(() => busy.value === 'saving')
@@ -88,6 +89,12 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
     form.baseUrl = config.base_url ?? ''
     form.model = config.model ?? ''
     form.apiKey = ''
+    form.disableThinking = config.disable_thinking ?? false
+  }
+
+  /** 开关与已存值不同才发送（省略即保留已存值；新建配置的已存值视为关闭） */
+  function thinkingChange(): { disable_thinking?: boolean } {
+    return form.disableThinking !== (saved.value?.disable_thinking ?? false) ? { disable_thinking: form.disableThinking } : {}
   }
 
   /** 结果是否仍属于本页面与发起时的会话（卸载或换号后一律丢弃，N03/N04） */
@@ -131,7 +138,9 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
     busy.value = 'saving'
     const ticket = runtime.claim()
     try {
-      const body = form.apiKey === '' ? { base_url: baseUrl, model } : { base_url: baseUrl, model, api_key: form.apiKey }
+      const body = form.apiKey === ''
+        ? { base_url: baseUrl, model, ...thinkingChange() }
+        : { base_url: baseUrl, model, api_key: form.apiKey, ...thinkingChange() }
       const config = await api.save(body, { signal: controller.signal })
       if (!current(ticket) || !runtime.commitWrite(ticket, config)) return
       adopt(config)
@@ -149,7 +158,8 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
     if (busy.value !== null) return
     error.value = null
     testResult.value = null
-    const tested = { baseUrl: form.baseUrl.trim(), model: form.model.trim(), apiKey: form.apiKey }
+    const tested = { baseUrl: form.baseUrl.trim(), model: form.model.trim(), apiKey: form.apiKey,
+      disableThinking: form.disableThinking }
     // N05：只有地址与模型都与已存值一致且密钥留空时，测试的才是「已保存的配置」；
     // 其余情况测试表单里这组完整的值，或要求先保存——不能让旧配置的结果冒充编辑中的新值。
     const usesForm = tested.apiKey !== ''
@@ -162,16 +172,24 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
         error.value = '地址或模型已修改：请先保存，或填写密钥后测试这组新值。'
         return
       }
+      if (tested.disableThinking !== (saved.value?.disable_thinking ?? false)) {
+        error.value = '「关闭模型思考」开关已修改：请先保存，或填写密钥后测试这组新值。'
+        return
+      }
     }
     const label = usesForm ? '表单中的配置（尚未保存）' : '已保存的配置'
     busy.value = 'testing'
     const ticket = runtime.claim()
     try {
-      const body = usesForm ? { base_url: tested.baseUrl, model: tested.model, api_key: tested.apiKey } : undefined
+      const body = usesForm
+        ? { base_url: tested.baseUrl, model: tested.model, api_key: tested.apiKey,
+            ...(tested.disableThinking ? { disable_thinking: true } : {}) }
+        : undefined
       const result: ModelConfigTestResult = await api.test(body, { signal: controller.signal, timeoutMs: 30_000 })
       if (!current(ticket)) return
       const edited = usesForm
-        && (form.baseUrl.trim() !== tested.baseUrl || form.model.trim() !== tested.model || form.apiKey !== tested.apiKey)
+        && (form.baseUrl.trim() !== tested.baseUrl || form.model.trim() !== tested.model || form.apiKey !== tested.apiKey
+          || form.disableThinking !== tested.disableThinking)
       if (edited) {
         testResult.value = { ok: false, text: '测试期间表单已修改，本次结果已作废，请重新测试。' }
         return
