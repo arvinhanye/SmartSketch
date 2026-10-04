@@ -1,0 +1,87 @@
+{
+  "final_code_commit": "043c274",
+  "stage_c_status": "OPEN",
+  "paid_generation_calls": 0,
+  "paid_embedding_calls": 0,
+  "gates": {
+    "backend_tooling": {
+      "passed": 3870,
+      "registered_skip": 27
+    },
+    "frontend": {
+      "files": 38,
+      "passed": 934
+    },
+    "integration": {
+      "passed": 393,
+      "registered_skip": 4
+    },
+    "backend_live": {
+      "passed": 44
+    },
+    "demo_e2e": {
+      "passed": 2
+    },
+    "personal_fake_e2e": {
+      "passed": 4
+    }
+  },
+  "full_gate_runs": [
+    {
+      "path": "/private/tmp/plan-c-real-closeout-integration.log",
+      "exit": 1,
+      "result": "personal E2E shared-account application RATE_LIMITED; Retry-After3",
+      "bytes": 26659,
+      "sha256": "cc2afcaf8411535caca4de74e566ed4c1b16147db287211ed5cee46124dfd7e9"
+    },
+    {
+      "path": "/private/tmp/plan-c-real-closeout-integration-final.log",
+      "exit": 1,
+      "result": "test mock headers TS2345; runtime layers passed",
+      "bytes": 28057,
+      "sha256": "30838f35021858f645d2b8d57844ad0cd7f5a7d02a4eaa74289f07fa03443841"
+    },
+    {
+      "path": "/private/tmp/plan-c-real-closeout-integration-confirmed.log",
+      "exit": 0,
+      "result": "all stages passed",
+      "bytes": 22179,
+      "sha256": "f3ce8db3bfc7df41ebc0fb30fc4717de6988dae3db4cc39b95930d125e530252"
+    }
+  ],
+  "fresh_review": {
+    "code_range": "95e0797..a6b19b7",
+    "critical": 0,
+    "important": 0,
+    "minor": 1,
+    "minor_disposition": "premature documentation checkbox corrected",
+    "after_review_test_fixture_fix": "3742a4e,043c274; RED/GREEN + final full gate, no second review"
+  },
+  "regressions": {
+    "minor01": {
+      "red_failed": 4,
+      "red_passed": 4,
+      "green_file_passed": 18
+    },
+    "minor02": {
+      "red_failed": 5,
+      "red_passed": 11,
+      "green_file_passed": 16
+    },
+    "local_test_fixture": {
+      "red_behavior_failed": 13,
+      "red_behavior_passed": 4,
+      "green_passed": 17,
+      "type_check_red_exit": 2,
+      "frontend_layer_green_exit": 0
+    }
+  },
+  "backup_verification": {
+    "path": "measurement:src/backend/storage/backups/20261004T045530158146Z-before-018.sqlite",
+    "bytes": 1695744,
+    "read_only_integrity_check": "ok",
+    "migrations": 17,
+    "has_018": false,
+    "current_017_018_sql_checksums_match": true
+  }
+}

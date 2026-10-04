@@ -1,5 +1,7 @@
 # Codex 计划 C 接手交接
 
+> **2026-10-04 最新状态覆盖（88f9f6f接手）**：原“下一轮测量”已经完成，不按本文旧步骤重跑。详见 `docs/handoffs/codex-plan-c-real-closeout.md` 与 `docs/reviews/codex-plan-c-88f9f6f-closeout.md`；最新生成844451/批准900000、余55549，向量12005另计。本轮两项Minor已修（72f7430、a6b19b7）。stage_c_status仍OPEN（准确率未签收），浏览器首字/v3开启完整基线/MD补测与冻结交用户。以下保留的是上一轮历史记录；旧预算与OPEN Minor状态不再代表当前，不能据其再发付费请求。
+
 ```text
 date: 2026-10-04
 task: C-TAKEOVER / ADR-090 本地收尾 / C06 本地技术门禁
@@ -10,7 +12,7 @@ source_head: 082323a5647abda22d013faeee6e4de4731babec
 base_of_plan_c: ec1291a
 paid_generation_calls: 0
 paid_embedding_calls: 0
-stage_c_status: OPEN（真实测量与人工准确率未完成）
+stage_c_status: OPEN（新真实测量已接手；人工准确率未签收）
 ```
 
 ## 已接手与交付
@@ -68,7 +70,7 @@ env -u VERIFY_NEO4J_URI -u VERIFY_NEO4J_USER -u VERIFY_NEO4J_PASSWORD \
 
 各代码提交可独立revert。回退018前代码先停指定API/worker，按018注释删除两列及迁移记录或恢复before-018备份；不要只删除迁移记录。备份恢复会丢后续写入，先保存当前库并经人工决定。不在真实测量库实施本轮迁移/回滚。仅关闭开关不追溯改旧任务快照，等结束或走原取消流程。
 
-## 未完成项及首个动作
+## 上一轮未完成项及首个动作（历史；当前见文首新交接）
 
 1. 用户已选择**本地收尾后再确认真实测量预算**；本轮不自动花旧余量。下一轮先确认预算/环境/最新台账，再按 `codex-plan-c-deepseek-next-round.md` 测course2 PDF，决定course1和13题问答。
 2. 真PDF91.34秒仍>60，QA旧新轮仅首题冷启动超时、未完成13题；旧8.15秒/15.6秒两段空档未归因。下轮阶段日志需解释，不凭猜测并发重构。
