@@ -1826,3 +1826,28 @@
   - 提示词：`ANSWER_PROMPT_VERSION` 改回 2 并恢复清单摘要，v3 文件内容回退。
   - 埋点：回退代码提交；迁移 017 按文件内 `ROLLBACK` 注释停机删列并删除 `schema_migrations` 记录，或用迁移前自动备份恢复。
 - **签收依据**：ArvinHan 本会话 2026-10-03「按推荐 A+C 执行，两轮预算同意」。
+
+## ADR-090：个人模型配置增加「关闭模型思考」开关（方案 B，2026-10-04）
+
+- **背景**：
+  - C03-1 实测：抽取输出 80% 是推理，两次关系调用的 4096 输出全部是推理，导致截断与 repair，91 秒中模型跨度 72.6 秒。
+  - C02b 探测（`evaluation/reports/c02b-thinking-probe.md`）在 DeepSeek `deepseek-flash` 上确认：只有 `thinking: {"type": "disabled"}` 有效，推理 1121 字 → 0、输出 512（撞顶）→ 49、耗时 2895 → 513 ms；`enable_thinking`、`chat_template_kwargs.enable_thinking`、`reasoning_effort` 返回 200 但被静默忽略。
+  - 用户 2026-10-04 决定进入方案 B。
+- **决定**：
+  1. 个人模型配置增加布尔项 `disable_thinking`（默认 `false`）。开启时，该用户的**全部生成调用**（问答改写、答案生成、抽取、repair、连接测试）请求体追加且只追加 `{"thinking": {"type": "disabled"}}`。关闭时请求体与现状逐字节相同。向量调用不受影响。
+  2. 只提供经真实探测验证的这一种写法，不猜其他供应商的字段。界面注明「DeepSeek 等兼容 `thinking` 字段的接口」。供应商不认识该字段时，可能报错或静默忽略：报错会在「测试连接」暴露；静默忽略由推理埋点（ADR-089）发现。
+  3. 契约：
+     - `ModelConfig` 增加可选 `disable_thinking`；
+     - `ModelConfigUpdate` 增加可选 `disable_thinking`，省略时保留已存值，新建配置默认 `false`；
+     - `ModelConfigTestRequest` 增加可选 `disable_thinking`：测试未保存的表单时按表单值；测试已存配置时用已存值。保证测的就是将要用的请求形状。
+  4. 数据：迁移 018 给 `user_model_configs` 与 `task_model_bindings` 各加 `disable_thinking INTEGER NOT NULL DEFAULT 0`（取值 0/1）。任务创建时与地址、模型一起快照，抽取中途改开关不影响进行中的任务。改开关属于一次保存，`revision` 随之更新，问答模型缓存失效（ADR-082 决定 1）。
+  5. 兼容客户端增加只读的 `extra_body`（构造时固定），合并进请求体；不得覆盖 `model`、`messages`、输出上限、`stream`、`stream_options`、`response_format`，冲突时构造即报错。
+  6. 输出上限、15 秒截止、出处校验、截断判定、重试策略全部不变。
+- **后果**：
+  - 预期抽取与问答的输出 token 和耗时大幅下降，截断与 repair 减少。真实效果、抽取准确率与回答质量的变化必须由 DeepSeek 实测与人工判定确认，不以探测的单次短请求代替。
+  - 关闭思考可能降低复杂问题的回答质量，因此作为用户可选项，默认不开。
+- **回滚**：
+  - 代码：回退对应提交（关闭时行为与现状相同，可先让用户全部关闭再回退）。
+  - 数据：迁移 018 按文件内 `ROLLBACK` 注释停机删列并删除 `schema_migrations` 记录，或用迁移前自动备份恢复。
+  - 契约：字段可选，旧客户端可忽略。
+- **签收依据**：ArvinHan 2026-10-04「按推荐进入方案 B」；探测结果 DeepSeek `3d38015`。
