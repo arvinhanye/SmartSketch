@@ -25,6 +25,8 @@ export interface LearningPath {
   edges: ReadonlySet<string>
   /** 「已掌握 →（还需先学）→ 下一步 → 之后解锁」的名称列表，按节点在图中的顺序 */
   narrative: { mastered: string[]; missing: string[]; next: string[]; unlocks: string[] }
+  /** 与 ``narrative`` 同序的知识点编号（C05-3：路径行里的名称可点击定位） */
+  narrativeIds: { mastered: string[]; missing: string[]; next: string[]; unlocks: string[] }
 }
 
 export interface PathNode {
@@ -56,7 +58,7 @@ export function buildLearningPath(
   const highlighted = new Set<string>()
   const first: string | undefined = order.keys().next().value
   const f: string | null = focus !== null && order.has(focus) ? focus : (first ?? null)
-  if (f === null) return { focus: null, order, roles, edges: highlighted, narrative: narrate(nodes, roles) }
+  if (f === null) return { focus: null, order, roles, edges: highlighted, ...narrate(nodes, roles) }
 
   const prereqs: PathEdge[] = edges.filter(
     (edge) => edge.type === 'PREREQUISITE' && edge.status !== 'rejected' && known.has(edge.from_id) && known.has(edge.to_id),
@@ -80,12 +82,20 @@ export function buildLearningPath(
       if (edge.from_id !== f && roles.get(edge.from_id) === 'dimmed') roles.set(edge.from_id, 'mastered')
     })
   }
-  return { focus: f, order, roles, edges: highlighted, narrative: narrate(nodes, roles) }
+  return { focus: f, order, roles, edges: highlighted, ...narrate(nodes, roles) }
 }
 
-function narrate(nodes: ReadonlyArray<PathNode>, roles: ReadonlyMap<string, PathRole>): LearningPath['narrative'] {
-  const named = (role: PathRole) => nodes.filter((node) => roles.get(node.id) === role).map((node) => node.name)
-  return { mastered: named('mastered'), missing: named('prereqMissing'), next: named('next'), unlocks: named('unlocks') }
+function narrate(
+  nodes: ReadonlyArray<PathNode>,
+  roles: ReadonlyMap<string, PathRole>,
+): Pick<LearningPath, 'narrative' | 'narrativeIds'> {
+  const of = (role: PathRole) => nodes.filter((node) => roles.get(node.id) === role)
+  const names = (role: PathRole) => of(role).map((node) => node.name)
+  const ids = (role: PathRole) => of(role).map((node) => node.id)
+  return {
+    narrative: { mastered: names('mastered'), missing: names('prereqMissing'), next: names('next'), unlocks: names('unlocks') },
+    narrativeIds: { mastered: ids('mastered'), missing: ids('prereqMissing'), next: ids('next'), unlocks: ids('unlocks') },
+  }
 }
 
 /** 画布数据（适配层输出）→ 路径输入：节点用 kpId、边用 relation id 与两端 kpId */

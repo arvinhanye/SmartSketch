@@ -166,6 +166,12 @@ watch(
   { flush: 'post', immediate: true },
 )
 
+// C05-3：路径行里点「之后解锁」的名称：选中该节点并把画布移过去（解锁节点可能在视口外）
+function onUnlockLocate(kpId: string): void {
+  filters.select(kpId)
+  canvas.value?.focus(kpId)
+}
+
 const masteryOptions: Array<{ value: MasteryStatus; label: string }> = [
   { value: 'unknown', label: MASTERY_LABELS.unknown },
   { value: 'learning', label: MASTERY_LABELS.learning },
@@ -285,7 +291,9 @@ const selectedName = computed(() => {
             :error="recommendError"
             :selected-id="selected"
             :narrative="learningPath?.narrative ?? null"
+            :narrative-ids="learningPath?.narrativeIds ?? null"
             @select="filters.select"
+            @locate="onUnlockLocate"
             @retry="refreshRecommend"
           />
 

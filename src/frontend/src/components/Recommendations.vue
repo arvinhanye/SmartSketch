@@ -25,13 +25,24 @@ const props = withDefaults(
     error?: string | null
     selectedId?: string | null
     narrative?: LearningPath['narrative'] | null
+    /** C05-3：与 narrative 同序的编号；给出时「之后解锁」的名称可点击定位 */
+    narrativeIds?: LearningPath['narrativeIds'] | null
   }>(),
-  { version: null, loading: false, error: null, selectedId: null, narrative: null },
+  { version: null, loading: false, error: null, selectedId: null, narrative: null, narrativeIds: null },
 )
 
 const line = computed(() => (props.narrative === null ? '' : pathLine(props.narrative)))
+/** 「之后解锁」之前的部分（与 pathLine 同一写法），解锁名称另渲染为按钮 */
+const lead = computed(() => (props.narrative === null ? '' : pathLine({ ...props.narrative, unlocks: [] })))
+const unlockLinks = computed(() => {
+  const names = props.narrative?.unlocks ?? []
+  const ids = props.narrativeIds?.unlocks ?? []
+  return line.value !== '' && names.length > 0 && names.length === ids.length
+    ? names.map((name, i) => ({ id: ids[i]!, name }))
+    : []
+})
 
-defineEmits<{ select: [kpId: string]; retry: [] }>()
+defineEmits<{ select: [kpId: string]; retry: []; locate: [kpId: string] }>()
 
 function highlighted(kpId: string): string {
   return props.selectedId === kpId ? 'true' : 'false'
@@ -57,7 +68,7 @@ function highlighted(kpId: string): string {
     <p v-else-if="items.length === 0" data-test="rc-empty" role="status">当前没有可学的知识点。</p>
 
     <template v-else>
-      <p v-if="line !== ''" class="recommendations__path" data-test="rc-path-line">{{ line }}</p>
+      <p v-if="line !== ''" class="recommendations__path" data-test="rc-path-line"><template v-if="unlockLinks.length > 0">{{ lead }} → 之后解锁：<template v-for="(item, index) in unlockLinks" :key="item.id"><span v-if="index > 0">、</span><button type="button" class="recommendations__unlock" :data-test="`rc-unlock-${item.id}`" :aria-label="`在图中定位：${item.name}`" @click="$emit('locate', item.id)">{{ item.name }}</button></template></template><template v-else>{{ line }}</template></p>
       <p class="recommendations__total" data-test="rc-total">
         共 {{ totalEligible }} 个可学知识点，显示前 {{ items.length }} 个。
       </p>
@@ -150,6 +161,15 @@ function highlighted(kpId: string): string {
   color: var(--color-text-muted, #595959);
   font-weight: 500;
   margin-right: 0.25rem;
+}
+.recommendations__unlock {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-primary, #1c6e8c);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
 }
 .recommendations__path {
   margin: 0 0 0.4rem;

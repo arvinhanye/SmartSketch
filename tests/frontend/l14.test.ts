@@ -448,3 +448,40 @@ describe('L14-2 尺寸变化后仍聚焦最近一次请求的节点', () => {
     expect(graph.focused.at(-1)).toBe(nodeElementId('C'))
   })
 })
+
+// ---------------------------------------------------------------- C05-3 视口外的解锁节点可点击定位
+
+describe('C05-3 路径行里的「之后解锁」可点击定位', () => {
+  it('路径给出与名称同序的编号', () => {
+    const path = buildLearningPath(NODES, EDGES, mastery('A', 'B'), recs('C', 'G'), null)
+    expect(path.narrativeIds).toEqual({ mastered: ['A', 'B'], missing: [], next: ['C'], unlocks: ['D', 'E'] })
+  })
+
+  it('解锁名称渲染为按钮，路径行文字不变，点击发出 locate', async () => {
+    const wrapper = mount(Recommendations, {
+      props: {
+        state: 'recommendations', items: [rec('C')], totalEligible: 1,
+        narrative: { mastered: ['知识点A'], missing: [], next: ['知识点C'], unlocks: ['知识点D', '知识点E'] },
+        narrativeIds: { mastered: ['A'], missing: [], next: ['C'], unlocks: ['D', 'E'] },
+      },
+    })
+    const line = wrapper.get('[data-test="rc-path-line"]')
+    expect(line.text()).toBe('已掌握：知识点A → 下一步：知识点C → 之后解锁：知识点D、知识点E')
+    await line.get('[data-test="rc-unlock-E"]').trigger('click')
+    expect(wrapper.emitted('locate')).toEqual([['E']])
+  })
+
+  it('学生图谱页：点解锁名称选中该节点并把画布移过去', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+    const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    await wrapper.get('[data-test="rc-unlock-D"]').trigger('click')
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点D')
+    expect(focused.at(-1)).toBe(nodeElementId('D'))
+    wrapper.unmount()
+    vi.restoreAllMocks()
+  })
+})
