@@ -29,10 +29,11 @@ import json
 import logging
 import sqlite3
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from typing import Final
+from typing import Any, Final
 
 from app.config import Settings
 from app.repositories import course_locks
@@ -408,6 +409,42 @@ def _release(sqlite_url: str, repo: Neo4jRepository, lease: Lease, *, max_attemp
     return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
 
 
+class _PersistSteps:
+    """C-ACC-B：入库阶段子步骤耗时，结束时写一行 INFO（只有任务编号、结果、毫秒数与次数）。
+
+    只计时、不改控制流：锁、事务、重试、预算与业务语义不变。每个已开始的步骤都计时（含抛错的那一步），
+    没走到的步骤不出现；``neo4j_attempts`` 是驱动执行写事务工作函数的次数（瞬态故障重跑时大于 1）。
+    """
+
+    def __init__(self, task_id: str) -> None:
+        self.task_id = task_id
+        self.started = time.monotonic()
+        self.done: dict[str, int] = {}
+        self.neo4j_attempts = 0
+        self._open: dict[str, float] = {}
+
+    def start(self, name: str) -> None:
+        self._open[name] = time.monotonic()
+
+    def stop(self, name: str) -> None:
+        self.done[name] = max(0, round((time.monotonic() - self._open.pop(name)) * 1000))
+
+    @contextmanager
+    def step(self, name: str) -> Iterator[None]:
+        self.start(name)
+        try:
+            yield
+        finally:
+            self.stop(name)
+
+    def log(self, outcome: str) -> None:
+        parts = [f"{name}_ms={ms}" for name, ms in self.done.items()]
+        if self.neo4j_attempts:
+            parts.append(f"neo4j_attempts={self.neo4j_attempts}")
+        total = max(0, round((time.monotonic() - self.started) * 1000))
+        logger.info("persist steps task_id=%s outcome=%s %s total_ms=%s", self.task_id, outcome, " ".join(parts), total)
+
+
 def run_persist_stage(
     sqlite_url: str,
     lease: Lease,
@@ -421,36 +458,83 @@ def run_persist_stage(
     """见模块说明。``lease.stage`` 须为 ``persisting``。"""
     if lease.stage != STAGE:
         raise ValueError(f"lease is on stage {lease.stage}, not {STAGE}")
+    steps = _PersistSteps(lease.task_id)
+    outcome = "error"
+    try:
+        result = _persist_stage(sqlite_url, lease, repo=repo, max_attempts=max_attempts, lock_seconds=lock_seconds,
+                                lock_wait_seconds=lock_wait_seconds, holder=holder, steps=steps)
+        outcome = result.status.value
+        return result
+    except BaseException as error:
+        outcome = type(error).__name__
+        raise
+    finally:
+        steps.log(outcome)
+
+
+def _persist_stage(
+    sqlite_url: str,
+    lease: Lease,
+    *,
+    repo: Neo4jRepository,
+    max_attempts: int,
+    lock_seconds: int,
+    lock_wait_seconds: float,
+    holder: str | None,
+    steps: _PersistSteps,
+) -> PersistOutcome:
     owner = holder or lease.owner
     common = dict(holder=owner, lock_seconds=lock_seconds, lock_wait_seconds=lock_wait_seconds)
-    try:
-        candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id)
-        plan = build_plan(lease.course_id, lease.task_id, candidates)
-        chunks = get_chunks(sqlite_url, course_id=lease.course_id, chunk_ids=_source_chunk_ids(plan))
-    except sqlite3.Error:
-        return _release(sqlite_url, repo, lease, max_attempts=max_attempts, **common)
 
-    lock = course_locks.acquire(sqlite_url, lease.course_id, holder=owner, lease_seconds=lock_seconds,
-                                wait_seconds=lock_wait_seconds)
+    def release() -> PersistOutcome:
+        with steps.step("task_release"):
+            return _release(sqlite_url, repo, lease, max_attempts=max_attempts, **common)
+
+    def after_failure(**kwargs: Any) -> PersistOutcome:
+        with steps.step("task_release"):
+            return _after_failure(sqlite_url, repo, lease, **kwargs, **common)
+
+    try:
+        with steps.step("candidates"):
+            candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id)
+        with steps.step("plan"):
+            plan = build_plan(lease.course_id, lease.task_id, candidates)
+        with steps.step("chunks"):
+            chunks = get_chunks(sqlite_url, course_id=lease.course_id, chunk_ids=_source_chunk_ids(plan))
+    except sqlite3.Error:
+        return release()
+
+    with steps.step("lock_wait"):
+        lock = course_locks.acquire(sqlite_url, lease.course_id, holder=owner, lease_seconds=lock_seconds,
+                                    wait_seconds=lock_wait_seconds)
     if lock is None:  # 发布或教师编辑持锁：退避后重试
-        return _release(sqlite_url, repo, lease, max_attempts=max_attempts, **common)
+        return release()
+
+    def work(tx: ScopedTransaction) -> _Written:
+        steps.neo4j_attempts += 1
+        return _write_draft(tx, lease.task_id, plan, chunks)
+
     try:
         with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds):
-            _check_lease(sqlite_url, lease)  # 租约已丢则不写 Neo4j
-            scope = GraphScope(lease.course_id, DRAFT_VERSION,
-                               effective_task_ids=_effective(sqlite_url, lease.course_id))
-            written = repo.write_transaction(scope, lambda tx: _write_draft(tx, lease.task_id, plan, chunks))
-            _t6(sqlite_url, lease)
+            with steps.step("lease_check"):
+                _check_lease(sqlite_url, lease)  # 租约已丢则不写 Neo4j
+                scope = GraphScope(lease.course_id, DRAFT_VERSION,
+                                   effective_task_ids=_effective(sqlite_url, lease.course_id))
+            with steps.step("neo4j"):
+                written = repo.write_transaction(scope, work)
+            with steps.step("t6"):
+                _t6(sqlite_url, lease)
+            steps.start("lock_release")
+        steps.stop("lock_release")
     except LeaseLost:
         return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
     except UnresolvableCycleError as exc:
-        return _after_failure(sqlite_url, repo, lease, code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)},
-                              **common)
+        return after_failure(code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)})
     except (RepositoryError, sqlite3.Error):
-        return _release(sqlite_url, repo, lease, max_attempts=max_attempts, **common)
+        return release()
     except (RelationWriteError, RuntimeError, ValueError) as exc:
         logger.exception("persisting task %s failed (%s)", lease.task_id, type(exc).__name__)
-        return _after_failure(sqlite_url, repo, lease, code="INTERNAL_ERROR", details=None, **common)
+        return after_failure(code="INTERNAL_ERROR", details=None)
     return PersistOutcome(PersistStatus.ADVANCED, lease.task_id, "awaiting_review", nodes=written.nodes,
                           relations=written.relations, downgraded=written.downgraded)
 
