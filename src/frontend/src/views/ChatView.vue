@@ -85,7 +85,7 @@ function onKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <section class="chat" aria-labelledby="chat-title">
+  <section class="page surface-card chat" aria-labelledby="chat-title">
     <header class="chat__header">
       <h2 id="chat-title">课程问答</h2>
       <span class="chat__badge">仅依据已发布资料回答</span>
