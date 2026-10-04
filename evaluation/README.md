@@ -261,5 +261,8 @@ python evaluation/measure_web_flow.py audit --db <只读 SQLite 路径> --record
   - 客户端 SSE 首个 delta：`ask --stream` 收到第一条 `delta` 事件的时刻；
   - 浏览器可见首字：本工具不测，写「未测」。
   - 另有客户端完整响应 `client_elapsed_seconds` 与服务端 `latency_ms`。
+- **一轮多次调用**：同一轮分几次调用 `ask` 时传同一个 `--round-started-at`，止损按整轮累计。
+- **推理（ADR-089，迁移 017）**：`audit` 逐请求给出最后一次生成调用的 `generation_reasoning_tokens`、`generation_reasoning_chars`、`generation_first_reasoning_ms`、`generation_first_content_ms`；账本给出 `reasoning_tokens`（已报告部分之和，属于输出 token，不另计费）与 `reasoning_unknown_calls`。迁移 017 之前的库 `reasoning_columns = false`，推理一律为未知。
+- **抽取任务拆解（C03-2）**：`audit-task --db <库> --task-id <tid> [--client-elapsed-seconds <extract 的 elapsed_seconds>]` 给出各用途调用数、repair 数、usage、首条创建 → 末条完成的跨度、非 ok 调用、块数、模型调用总跨度，以及派生的 `non_model_seconds`（客户端总耗时 − 模型跨度：排队、解析、分块、融合、入库）。有调用未完成时跨度为未知。赛题「解析 + 知识抽取」以客户端总耗时为准，不剔除模型时间。
 - **分段（C02-3）**：`audit` 逐请求给出 `embedding_ms`（查询向量）、`generation_ms`（生成）与 `other_ms` = `chat_logs.latency_ms` − 两者（检索、组装、校验等）；任一调用缺耗时即为未知。诊断见 `reports/c02-qa-diagnosis.md`。
 - 第二阶段 L15 十题可用 `evaluation/raw/l15/codex-closeout-audit.json` 离线重算：11 个请求、19 次调用 = 9 生成 + 10 向量，生成 28951、向量 59（`tests/tooling/test_c01_measure.py`）。

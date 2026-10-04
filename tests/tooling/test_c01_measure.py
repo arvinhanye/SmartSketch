@@ -361,8 +361,9 @@ def test_cli_ask_exit_zero_does_not_mean_all_answered(chat_env, capsys):
     summary = lines[-1]["summary"]
     assert summary["counts"]["answered"] == 2 and summary["counts"]["error"] == 1
     assert summary["all_answered"] is False
-    assert summary["ledger"]["generation"] == {"calls": 3, "usage_input": 300, "usage_output": 0, "tokens": 300,
-                                               "unknown_usage_calls": 0, "tokens_complete": True}
+    assert summary["ledger"]["generation"].items() >= {"calls": 3, "usage_input": 300, "usage_output": 0,
+                                                       "tokens": 300, "unknown_usage_calls": 0,
+                                                       "tokens_complete": True}.items()
     assert len(out.read_text(encoding="utf-8").splitlines()) == 3
 
 

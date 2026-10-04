@@ -148,6 +148,12 @@ def open_readonly(path: str | Path) -> Iterator[sqlite3.Connection]:
 
 CALL_COLUMNS = ("request_id", "purpose", "status", "max_output_tokens", "usage_input", "usage_output",
                 "created_at", "latency_ms")
+#: ADR-089（迁移 017）推理列；旧库没有时一律视为未知
+REASONING_COLUMNS = ("usage_reasoning", "reasoning_chars", "first_reasoning_ms", "first_content_ms")
+
+
+def _columns(con: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
 LOG_COLUMNS = ("request_id", "course_id", "question", "outcome", "reason", "error_code", "error_reason",
                "invalidation_subtype", "truncated", "latency_ms", "first_delta_latency_ms", "created_at")
 
@@ -161,14 +167,21 @@ def _select(con: sqlite3.Connection, table: str, columns: Sequence[str],
     return [dict(row) for row in con.execute(f"{sql} WHERE request_id IN ({marks})", tuple(request_ids))]
 
 
-def _group(calls: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+def _group(calls: Iterable[Mapping[str, Any]], *, reasoning: bool = False) -> dict[str, Any]:
     rows = list(calls)
     known = [r for r in rows if r["usage_input"] is not None and r["usage_output"] is not None]
     usage_input = sum(r["usage_input"] for r in known)
     usage_output = sum(r["usage_output"] for r in known)
     unknown = len(rows) - len(known)
-    return {"calls": len(rows), "usage_input": usage_input, "usage_output": usage_output,
-            "tokens": usage_input + usage_output, "unknown_usage_calls": unknown, "tokens_complete": unknown == 0}
+    group: dict[str, Any] = {"calls": len(rows), "usage_input": usage_input, "usage_output": usage_output,
+                             "tokens": usage_input + usage_output, "unknown_usage_calls": unknown,
+                             "tokens_complete": unknown == 0}
+    if reasoning:
+        # 推理 token 是 usage_output 的一部分，只用于诊断，不另计费
+        reported = [r["usage_reasoning"] for r in rows if r.get("usage_reasoning") is not None]
+        group["reasoning_tokens"] = sum(reported) if reported or not rows else None
+        group["reasoning_unknown_calls"] = len(rows) - len(reported)
+    return group
 
 
 def _latency(calls: Iterable[Mapping[str, Any]]) -> int | None:
@@ -182,11 +195,14 @@ def _is_embedding(call: Mapping[str, Any]) -> bool:
     return call["purpose"] == "embedding"
 
 
-def ledger(calls: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def ledger(calls: Sequence[Mapping[str, Any]], *, reasoning: bool = True) -> dict[str, Any]:
     """生成（``purpose != embedding``，计入生成预算）与向量分开计；另列各用途明细。"""
     purposes = sorted({c["purpose"] for c in calls})
+    generation = _group((c for c in calls if not _is_embedding(c)), reasoning=reasoning)
+    if not reasoning:
+        generation.update(reasoning_tokens=None, reasoning_unknown_calls=generation["calls"])
     return {
-        "generation": _group(c for c in calls if not _is_embedding(c)),
+        "generation": generation,
         "embedding": _group(c for c in calls if _is_embedding(c)),
         "by_purpose": {p: _group(c for c in calls if c["purpose"] == p) for p in purposes},
     }
@@ -199,7 +215,9 @@ def audit(db_path: str | Path, *, started_at: str | None = None, ended_at: str |
         raise ValueError("audit 需要 request_ids，或同时给 started_at 与 ended_at")
     ids = None if request_ids is None else list(dict.fromkeys(request_ids))
     with open_readonly(db_path) as con:
-        calls = _select(con, "model_calls", CALL_COLUMNS, ids)
+        has_reasoning = set(REASONING_COLUMNS) <= _columns(con, "model_calls")
+        columns = CALL_COLUMNS + (REASONING_COLUMNS if has_reasoning else ())
+        calls = _select(con, "model_calls", columns, ids)
         logs = _select(con, "chat_logs", LOG_COLUMNS, ids)
     if ids is None:
         calls = [c for c in calls if in_window(c["created_at"], started_at, ended_at)]
@@ -218,7 +236,13 @@ def audit(db_path: str | Path, *, started_at: str | None = None, ended_at: str |
         generation_ms = _latency(c for c in own if not _is_embedding(c))
         other_ms = (None if embedding_ms is None or generation_ms is None
                     else log["latency_ms"] - embedding_ms - generation_ms)
+        final = [c for c in own if not _is_embedding(c)][-1:]      # 给出结局的那次生成（含主备切换后的最后一次）
+        last = final[0] if final else {}
         per_request.append({**log, "generation_calls": generation["calls"], "embedding_calls": embedding["calls"],
+                            "generation_reasoning_tokens": last.get("usage_reasoning"),
+                            "generation_reasoning_chars": last.get("reasoning_chars"),
+                            "generation_first_reasoning_ms": last.get("first_reasoning_ms"),
+                            "generation_first_content_ms": last.get("first_content_ms"),
                             "generation_tokens": generation["tokens"] if generation["tokens_complete"] else None,
                             "embedding_tokens": embedding["tokens"] if embedding["tokens_complete"] else None,
                             # C02-3 分段：总耗时 − 查询向量 − 生成 = 其余（检索、组装、校验等）；任一调用缺耗时即未知
@@ -228,9 +252,73 @@ def audit(db_path: str | Path, *, started_at: str | None = None, ended_at: str |
         "window": {"started_at": started_at, "ended_at": ended_at, "request_ids": ids},
         "requests": len(logs),
         "per_request": per_request,
-        "ledger": ledger(calls),
+        "reasoning_columns": has_reasoning,
+        "ledger": ledger(calls, reasoning=has_reasoning),
         # 窗口内没有对应 chat_logs 的调用（如同期抽取任务、未落日志的中断）照样计费，单列以便核对
         "unmatched_calls": sum(1 for c in calls if c["request_id"] not in logged),
+    }
+
+
+TASK_CALL_COLUMNS = ("purpose", "status", "is_repair", "usage_input", "usage_output", "created_at", "finished_at",
+                     "latency_ms", "error_class")
+
+
+def _span_seconds(rows: Sequence[Mapping[str, Any]]) -> float | None:
+    """首条创建 → 末条完成；有任一调用未完成（无 finished_at）即未知。"""
+    if not rows or any(r["finished_at"] is None for r in rows):
+        return None
+    start = min(parse_utc(r["created_at"]) for r in rows)
+    end = max(parse_utc(r["finished_at"]) for r in rows)
+    return round((end - start).total_seconds(), 3)
+
+
+def audit_task(db_path: str | Path, *, task_id: str, client_elapsed_seconds: float | None = None) -> dict[str, Any]:
+    """C03-2：一次抽取任务的调用拆解（只读）。
+
+    各用途：调用数、repair 数、usage（缺失为未知）、首条创建 → 末条完成的跨度、平均 / 最大耗时；
+    非 ok 调用按「用途:状态」计数。``non_model_seconds`` = 客户端测得的上传 → 待审核 − 模型调用总跨度，
+    是排队、解析、分块、融合、入库的**派生**值；赛题「解析 + 知识抽取」口径仍以客户端总耗时为准，不剔除模型时间。
+    """
+    with open_readonly(db_path) as con:
+        task = con.execute("SELECT id, stage, created_at, updated_at, error_code FROM processing_tasks WHERE id = ?",
+                           (task_id,)).fetchone()
+        if task is None:
+            raise ValueError(f"任务不存在：{task_id}")
+        has_reasoning = set(REASONING_COLUMNS) <= _columns(con, "model_calls")
+        columns = TASK_CALL_COLUMNS + (("usage_reasoning",) if has_reasoning else ())
+        calls = [dict(r) for r in con.execute(
+            f"SELECT {', '.join(columns)} FROM model_calls WHERE task_id = ?", (task_id,))]
+        chunks = con.execute("SELECT count(*) FROM chunks c JOIN task_revisions t ON c.revision_id = t.revision_id"
+                             " WHERE t.task_id = ?", (task_id,)).fetchone()[0]
+    calls.sort(key=lambda c: parse_utc(c["created_at"]))
+    by_purpose: dict[str, Any] = {}
+    for purpose in sorted({c["purpose"] for c in calls}):
+        rows = [c for c in calls if c["purpose"] == purpose]
+        latencies = [r["latency_ms"] for r in rows if r["latency_ms"] is not None]
+        by_purpose[purpose] = {
+            **_group(rows), "repair_calls": sum(1 for r in rows if r["is_repair"]),
+            "span_seconds": _span_seconds(rows),
+            "latency_ms_avg": round(sum(latencies) / len(latencies)) if latencies else None,
+            "latency_ms_max": max(latencies, default=None),
+        }
+    non_ok: dict[str, int] = {}
+    for call in calls:
+        if call["status"] != "ok":
+            key = f"{call['purpose']}:{call['error_class'] or call['status']}"
+            non_ok[key] = non_ok.get(key, 0) + 1
+    span = _span_seconds(calls)
+    return {
+        "task": dict(task),
+        "chunks": chunks,
+        "calls": len(calls),
+        "repair_calls": sum(1 for c in calls if c["is_repair"]),
+        "by_purpose": by_purpose,
+        "non_ok_calls": non_ok,
+        "model_span_seconds": span,
+        "client_elapsed_seconds": client_elapsed_seconds,
+        "non_model_seconds": (None if span is None or client_elapsed_seconds is None
+                              else round(client_elapsed_seconds - span, 3)),
+        "ledger": ledger(calls, reasoning=has_reasoning),
     }
 
 
@@ -389,7 +477,9 @@ def _ask_once(base: str, token: str, course_id: str, question: str, *, stream: b
 def cmd_ask(args: argparse.Namespace) -> int:
     token = login(args.base_url, args.username, args.password_env)
     questions = [line.strip() for line in Path(args.questions).read_text(encoding="utf-8").splitlines() if line.strip()]
-    started_at = utc_now_iso()
+    # 一轮分多次调用时传同一个起点，止损按整轮累计
+    started_at = args.round_started_at or utc_now_iso()
+    parse_utc(started_at)
     out = Path(args.out) if args.out else None
     records: list[dict[str, Any]] = []
     stopped: str | None = None
@@ -455,15 +545,24 @@ def main(argv: list[str] | None = None) -> int:
     ask.add_argument("--out", help="逐题结果追加写入的 JSONL")
     ask.add_argument("--audit-db", help="只读 SQLite：每题后按生成 token 检查增量止损")
     ask.add_argument("--cap", type=int, default=45_000, help="本轮生成 token 增量止损（只计生成，不含向量）")
+    ask.add_argument("--round-started-at", help="整轮起点（ISO 8601，带时区）；一轮分多次调用 ask 时共用")
     audit_cmd = sub.add_parser("audit")
     audit_cmd.add_argument("--db", required=True)
     audit_cmd.add_argument("--records", help="ask 写出的 JSONL；未给时间窗口时按其中的请求 ID 关联")
     audit_cmd.add_argument("--request-ids", help="逗号分隔的固定请求 ID")
     audit_cmd.add_argument("--since", help="窗口起点（含），ISO 8601 且带时区")
     audit_cmd.add_argument("--until", help="窗口终点（不含），ISO 8601 且带时区")
+    task_cmd = sub.add_parser("audit-task")
+    task_cmd.add_argument("--db", required=True)
+    task_cmd.add_argument("--task-id", required=True)
+    task_cmd.add_argument("--client-elapsed-seconds", type=float, help="extract 输出的 elapsed_seconds")
     args = parser.parse_args(argv)
     if args.command == "extract":
         return cmd_extract(args)
+    if args.command == "audit-task":
+        print(json.dumps(audit_task(args.db, task_id=args.task_id, client_elapsed_seconds=args.client_elapsed_seconds),
+                         ensure_ascii=False, indent=2))
+        return 0
     return cmd_ask(args) if args.command == "ask" else cmd_audit(args)
 
 if __name__ == "__main__":
