@@ -17,16 +17,20 @@ function file(relative: string, mimeType: string) {
   return { name: relative.split('/').at(-1)!, mimeType, buffer: readFileSync(path) }
 }
 
-async function configureModel(page: Page, key: string, expectOk: boolean): Promise<void> {
+async function configureModel(page: Page, key: string, expectOk: boolean, disableThinking = false): Promise<void> {
   await page.goto(`${appUrl}/settings/model`)
   await expect(page.locator('[data-test=mc-form]')).toBeVisible()
   await page.locator('[data-test=mc-base-url]').fill(providerUrl)
   await page.locator('[data-test=mc-model]').fill('fake-model')
   await page.locator('[data-test=mc-api-key]').fill(key)
+  await page.locator('[data-test=mc-disable-thinking]').setChecked(disableThinking)
   await page.locator('[data-test=mc-test]').click()
   await expect(page.locator('[data-test=mc-test-result]')).toContainText(expectOk ? '连接成功' : '密钥被拒绝')
   await page.locator('[data-test=mc-save]').click()
   await expect(page.locator('[data-test=mc-status]')).toContainText('已配置')
+  await page.reload()
+  await expect(page.locator('[data-test=mc-form]')).toBeVisible()
+  await expect(page.locator('[data-test=mc-disable-thinking]')).toBeChecked({ checked: disableThinking })
 }
 
 async function uploadThroughPage(page: Page, courseId: string, upload: ReturnType<typeof file>): Promise<void> {
@@ -87,7 +91,7 @@ test.describe('个人模式（L11）', () => {
 
     // 1. 教师配置个人 API（测试连接后保存）
     await login(page, teacherUsername, teacherPassword)
-    await configureModel(page, 'sk-fake-good', true)
+    await configureModel(page, 'sk-fake-good', true, true)
 
     // 2. 建课、加入学生
     const teacher = await apiLogin(request, teacherUsername, teacherPassword)
@@ -173,7 +177,7 @@ test.describe('个人模式（L11）', () => {
       await student.goto(`${appUrl}/courses/${courseId}/chat`)
       const required = student.locator('[data-test=model-config-required]')
       if (await required.isVisible()) await expect(student.locator('[data-test=chat-send]')).toBeDisabled()
-      await configureModel(student, 'sk-fake-good', true)
+      await configureModel(student, 'sk-fake-good', true, true)
 
       await student.goto(`${appUrl}/courses/${courseId}/graph`)
       await expect(student.locator('[data-test=sg-version]')).toContainText('v1')
@@ -278,7 +282,7 @@ test.describe('个人模式（L11）', () => {
     await row.locator('[data-test=task-cancel]').click()
     await expect(row.locator('[data-test=material-status]')).toHaveText('已取消', { timeout: 120_000 })
 
-    await configureModel(page, 'sk-fake-good', true)
+    await configureModel(page, 'sk-fake-good', true, true)
     // 离开页面后浏览器不再持有原文件，页面提示「请重新选择文件上传」（不提供一键重传）
     await uploadThroughPage(page, courseId, md)
     const done = page.locator('[data-test=material-row]').filter({ hasText: md.name })
@@ -297,12 +301,12 @@ test.describe('个人模式（L11）', () => {
     const row = materialRow(page, md.name)
     await expect(row.locator('[data-test=material-status]')).toHaveText('处理失败', { timeout: 120_000 })
     await expect(row.locator('[data-test=task-error]')).toContainText('模型 API 设置')
-    await configureModel(page, 'sk-fake-good', true)   // 复原，避免影响后续用例
+    await configureModel(page, 'sk-fake-good', true, true)   // 复原，避免影响后续用例
   })
   test('L15 两门课：成员权限、图谱、进度、推荐和问答出处互不串课', async ({page, browser, request}) => {
     test.setTimeout(480_000)
     await login(page, teacherUsername, teacherPassword)
-    await configureModel(page, 'sk-fake-good', true)
+    await configureModel(page, 'sk-fake-good', true, true)
     const teacher = await apiLogin(request, teacherUsername, teacherPassword)
     const first = await createCourse(teacher, `L15 数据结构 ${Date.now()}`)
     const second = await createCourse(teacher, `L15 操作系统 ${Date.now()}`)
@@ -326,7 +330,7 @@ test.describe('个人模式（L11）', () => {
     try {
       const student = await context.newPage()
       await login(student, username, studentPassword)
-      await configureModel(student, 'sk-fake-good', true)
+      await configureModel(student, 'sk-fake-good', true, true)
       await student.goto(`${appUrl}/courses/${first}/graph`)
       const masteredId = (await student.locator('[data-test=recommendations] [data-test=rc-item]').first().getAttribute('data-kp-id'))!
       await student.locator(`[data-test="rc-select-${masteredId}"]`).click()
