@@ -223,3 +223,53 @@ def test_round_started_at_makes_the_budget_window_span_the_whole_round(tmp_path,
     lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
     assert code == 3 and len(lines) == 2                   # 第 1 题后整轮 45050 ≥ 45000，停止
     assert lines[-1]["round"]["started_at"] == round_start
+
+
+# ---------------------------------------------------------------- 未知 usage 按系统计费规则估算（复核 §4）
+
+CALLS_EST = CALLS_V17.replace("max_output_tokens INTEGER NOT NULL,",
+                              "max_output_tokens INTEGER NOT NULL, input_tokens_est INTEGER,")
+
+
+def test_unknown_usage_is_billed_at_estimate_like_the_system_rule(tmp_path):
+    db = _db(tmp_path, CALLS_EST, [
+        _qa_call("r1", "2026-10-03T20:01:00.000Z"),                                         # 已知 2900
+        {"request_id": "r2", "purpose": "answer_with_context", "status": "error", "error_class": "timeout",
+         "usage_input": None, "usage_output": None, "input_tokens_est": 10068, "created_at": "2026-10-03T20:02:00.000Z"},
+        {"request_id": "r3", "purpose": "answer_with_context", "status": "error",
+         "error_class": "auth:rejected_before_generation", "usage_input": None, "usage_output": None,
+         "input_tokens_est": 9000, "created_at": "2026-10-03T20:03:00.000Z"},              # 生成前被拒：0
+    ])
+    generation = measure.audit(db, started_at=T0, ended_at=T1)["ledger"]["generation"]
+    assert generation["tokens"] == 2900 and generation["unknown_usage_calls"] == 2
+    assert generation["billed_tokens"] == 2900 + 10068 + 2048
+    assert generation["billed_complete"] is True
+    assert measure.budget_stop(generation, cap=45_000) == (False, None)
+    stop, why = measure.budget_stop(generation, cap=15_000)
+    assert stop and "15000" in why and "估算" in why
+
+
+def test_without_the_estimate_column_unknown_usage_still_stops(tmp_path):
+    db = _db(tmp_path, CALLS_V17, [{"request_id": "r2", "purpose": "answer_with_context", "status": "error",
+                                    "usage_input": None, "usage_output": None,
+                                    "created_at": "2026-10-03T20:02:00.000Z"}])
+    generation = measure.audit(db, started_at=T0, ended_at=T1)["ledger"]["generation"]
+    assert generation["billed_tokens"] is None and generation["billed_complete"] is False
+    stop, why = measure.budget_stop(generation, cap=45_000)
+    assert stop and "未知" in why
+
+
+def test_audit_task_reports_billed_tokens_with_estimates(tmp_path):
+    db = _db(tmp_path, CALLS_EST, [
+        {**_task_call("extract_relations", "2026-10-03T20:00:41.000Z", "2026-10-03T20:01:10.000Z"), "input_tokens_est": 900},
+        {**_task_call("extract_relations", "2026-10-03T20:00:42.000Z", None, usage=None, status="sent"),
+         "input_tokens_est": 800},
+    ])
+    con = sqlite3.connect(db)
+    con.executescript(TASKS)
+    con.execute("INSERT INTO processing_tasks VALUES ('t1', 'c1', 'failed', '2026-10-03T20:00:00.000Z',"
+                " '2026-10-03T20:01:20.000Z', 'EXTRACTION_INCOMPLETE')")
+    con.commit()
+    con.close()
+    generation = measure.audit_task(db, task_id="t1")["ledger"]["generation"]
+    assert generation["tokens"] == 1500 and generation["billed_tokens"] == 1500 + 800 + 2048

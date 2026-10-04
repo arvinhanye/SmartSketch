@@ -148,6 +148,9 @@ def open_readonly(path: str | Path) -> Iterator[sqlite3.Connection]:
 
 CALL_COLUMNS = ("request_id", "purpose", "status", "max_output_tokens", "usage_input", "usage_output",
                 "created_at", "latency_ms")
+#: 系统计费口径（``BILLED_TOKENS_SQL``）需要的列；夹具或旧库缺少时，未知 usage 无法估算
+BILLING_COLUMNS = ("input_tokens_est", "error_class")
+REJECTED_SUFFIX = ":rejected_before_generation"
 #: ADR-089（迁移 017）推理列；旧库没有时一律视为未知
 REASONING_COLUMNS = ("usage_reasoning", "reasoning_chars", "first_reasoning_ms", "first_content_ms")
 
@@ -173,9 +176,13 @@ def _group(calls: Iterable[Mapping[str, Any]], *, reasoning: bool = False) -> di
     usage_input = sum(r["usage_input"] for r in known)
     usage_output = sum(r["usage_output"] for r in known)
     unknown = len(rows) - len(known)
+    billed = [_billed(r) for r in rows]
     group: dict[str, Any] = {"calls": len(rows), "usage_input": usage_input, "usage_output": usage_output,
                              "tokens": usage_input + usage_output, "unknown_usage_calls": unknown,
-                             "tokens_complete": unknown == 0}
+                             "tokens_complete": unknown == 0,
+                             # 系统计费口径：未知 usage 按「输入估算 + 输出上限」计、生成前被拒计 0；缺估算列时为未知
+                             "billed_tokens": None if None in billed else sum(billed),
+                             "billed_complete": None not in billed}
     if reasoning:
         # 推理 token 是 usage_output 的一部分，只用于诊断，不另计费
         reported = [r["usage_reasoning"] for r in rows if r.get("usage_reasoning") is not None]
@@ -189,6 +196,17 @@ def _latency(calls: Iterable[Mapping[str, Any]]) -> int | None:
     if any(r["latency_ms"] is None for r in rows):
         return None
     return sum(r["latency_ms"] for r in rows)
+
+
+def _billed(call: Mapping[str, Any]) -> int | None:
+    """与 ``app.repositories.model_calls.BILLED_TOKENS_SQL`` 同一规则（只允许高估）。"""
+    if call["usage_input"] is not None and call["usage_output"] is not None:
+        return call["usage_input"] + call["usage_output"]
+    if call.get("status") == "error" and str(call.get("error_class") or "").endswith(REJECTED_SUFFIX):
+        return 0
+    if call.get("input_tokens_est") is None:
+        return None
+    return call["input_tokens_est"] + call["max_output_tokens"]
 
 
 def _is_embedding(call: Mapping[str, Any]) -> bool:
@@ -215,8 +233,10 @@ def audit(db_path: str | Path, *, started_at: str | None = None, ended_at: str |
         raise ValueError("audit 需要 request_ids，或同时给 started_at 与 ended_at")
     ids = None if request_ids is None else list(dict.fromkeys(request_ids))
     with open_readonly(db_path) as con:
-        has_reasoning = set(REASONING_COLUMNS) <= _columns(con, "model_calls")
-        columns = CALL_COLUMNS + (REASONING_COLUMNS if has_reasoning else ())
+        present = _columns(con, "model_calls")
+        has_reasoning = set(REASONING_COLUMNS) <= present
+        columns = (CALL_COLUMNS + tuple(c for c in BILLING_COLUMNS if c in present)
+                   + (REASONING_COLUMNS if has_reasoning else ()))
         calls = _select(con, "model_calls", columns, ids)
         logs = _select(con, "chat_logs", LOG_COLUMNS, ids)
     if ids is None:
@@ -259,8 +279,8 @@ def audit(db_path: str | Path, *, started_at: str | None = None, ended_at: str |
     }
 
 
-TASK_CALL_COLUMNS = ("purpose", "status", "is_repair", "usage_input", "usage_output", "created_at", "finished_at",
-                     "latency_ms", "error_class")
+TASK_CALL_COLUMNS = ("purpose", "status", "is_repair", "max_output_tokens", "usage_input", "usage_output",
+                     "created_at", "finished_at", "latency_ms", "error_class")
 
 
 def _span_seconds(rows: Sequence[Mapping[str, Any]]) -> float | None:
@@ -284,8 +304,10 @@ def audit_task(db_path: str | Path, *, task_id: str, client_elapsed_seconds: flo
                            (task_id,)).fetchone()
         if task is None:
             raise ValueError(f"任务不存在：{task_id}")
-        has_reasoning = set(REASONING_COLUMNS) <= _columns(con, "model_calls")
-        columns = TASK_CALL_COLUMNS + (("usage_reasoning",) if has_reasoning else ())
+        present = _columns(con, "model_calls")
+        has_reasoning = set(REASONING_COLUMNS) <= present
+        columns = (TASK_CALL_COLUMNS + tuple(c for c in BILLING_COLUMNS if c in present and c not in TASK_CALL_COLUMNS)
+                   + (("usage_reasoning",) if has_reasoning else ()))
         calls = [dict(r) for r in con.execute(
             f"SELECT {', '.join(columns)} FROM model_calls WHERE task_id = ?", (task_id,))]
         chunks = con.execute("SELECT count(*) FROM chunks c JOIN task_revisions t ON c.revision_id = t.revision_id"
@@ -323,11 +345,16 @@ def audit_task(db_path: str | Path, *, task_id: str, client_elapsed_seconds: flo
 
 
 def budget_stop(generation: Mapping[str, Any], *, cap: int) -> tuple[bool, str | None]:
-    """硬止损只按生成 token；存在 usage 未知的调用时无法确认剩余额度，同样停止。"""
-    if generation.get("unknown_usage_calls", 0) > 0:
-        return True, f"存在 {generation['unknown_usage_calls']} 次 usage 未知的生成调用，无法确认额度，停止"
-    if generation["tokens"] >= cap:
-        return True, f"生成 token {generation['tokens']} 达到增量止损 {cap}"
+    """硬止损只按生成 token。usage 未知的调用按系统计费规则计为估算值（输入估算 + 输出上限，只会高估）；
+    缺少估算列、无法估算时才停止（复核 ``docs/reviews/claude-deepseek-c02-4-c03-1.md`` §4）。"""
+    unknown = generation.get("unknown_usage_calls", 0)
+    billed = generation.get("billed_tokens")
+    if unknown > 0 and billed is None:
+        return True, f"存在 {unknown} 次 usage 未知且无法估算的生成调用，无法确认额度，停止"
+    spent = billed if billed is not None else generation["tokens"]
+    if spent >= cap:
+        detail = f"（含 {unknown} 次未知 usage 的估算）" if unknown else ""
+        return True, f"生成 token {spent}{detail} 达到增量止损 {cap}"
     return False, None
 
 

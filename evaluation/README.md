@@ -255,7 +255,7 @@ python evaluation/measure_web_flow.py audit --db <只读 SQLite 路径> --record
 
 - **结局**：`answered` / `not_covered` / `error` / `no_response` 分开计数，`total` 为分母。HTTP 错误对象的请求编号取 `details.request_id`；`outcome`、`error_code`、`error_reason` 分列。`ask` 退出码 0 只表示测量跑完，看 `all_answered` 判断是否全部答成功；提前停止退出码为 3。
 - **时间边界**：所有时刻按 UTC 时刻比较，不做字符串比较；窗口为 `[since, until)`。缺时区的时间直接拒绝。
-- **分账**：`purpose = embedding` 为向量，其余为生成（计入生成预算）；另列 `by_purpose`。缓存命中不产生调用；中断（`status = sent`）与失败的调用照样计数；usage 缺失计入 `unknown_usage_calls`，`tokens` 只累加已知部分，并标 `tokens_complete = false`，不当作 0。窗口内没有对应 `chat_logs` 的调用单列 `unmatched_calls`。
+- **分账**：`purpose = embedding` 为向量，其余为生成（计入生成预算）；另列 `by_purpose`。缓存命中不产生调用；中断（`status = sent`）与失败的调用照样计数；usage 缺失计入 `unknown_usage_calls`，`tokens` 只累加已知部分，并标 `tokens_complete = false`，不当作 0；`billed_tokens` 按系统计费规则（`BILLED_TOKENS_SQL`）把未知 usage 计为「输入估算 + 输出上限」、生成前被拒计 0，**止损按 `billed_tokens` 判断**，库里缺估算列时才因未知 usage 停止（复核 `docs/reviews/claude-deepseek-c02-4-c03-1.md` §4）。窗口内没有对应 `chat_logs` 的调用单列 `unmatched_calls`。
 - **耗时**：分位数用最近秩法（排序后取第 ⌈q·n⌉ 个），每项注明分母。首字分三列，不能互相替代：
   - 服务端首个 delta：`chat_logs.first_delta_latency_ms`，只统计已回答题；
   - 客户端 SSE 首个 delta：`ask --stream` 收到第一条 `delta` 事件的时刻；
