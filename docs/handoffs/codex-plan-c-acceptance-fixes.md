@@ -1,5 +1,7 @@
 # Codex 交接：计划 C 验收复审四项修复
 
+> 本文件记录本地修复轮。后续用户已授权发布，四项修复已随#319/#318进入GitHub main；最新发布/启动依据见codex-plan-c-github-integration.md。下文“不推送合并”是当时边界，不是当前集成状态。
+
 - 日期：2026-10-04；task_id：C-ACC-FIX-54。
 - 状态：DONE（本轮四项修复与独立门禁）；用户手工检查待执行，整阶段仍 OPEN。
 - 基线：54a7c67；分支：codex/plan-c-acceptance-fixes。

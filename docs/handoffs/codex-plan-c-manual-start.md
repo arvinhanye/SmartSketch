@@ -2,7 +2,7 @@
 
 ## 1. 使用哪份代码
 
-仅使用 Codex 的修复工作区：
+**最新状态**：计划A/B/C及本轮验收修复已通过#317/#319/#318合入GitHub `main`，业务集成提交0436ff34。技术冻结尚未执行。推荐继续使用已经配置好的独立检查目录：
 
 ```bash
 cd /Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch
@@ -10,7 +10,7 @@ export PATH="$HOME/.docker/bin:$PATH"
 git branch --show-current
 ```
 
-应显示 `codex/plan-c-acceptance-fixes`。不要在 Claude 工作区、测量 worktree 或 `/Users/arvinhan/SmartSketch` 主目录启动这次修复版本。修复尚未推送/合并；GitHub 和那些旧工作区不包含本轮修复。
+本独立目录分支为 `codex/plan-c-acceptance-fixes`；代码已发布。不要在 Claude 工作区或只读测量 worktree 启动。主目录 `/Users/arvinhan/SmartSketch` 没有被自动更新：若需要使用主目录，先停止该目录旧服务、确认在main且无待提交变更，再执行 `git pull --ff-only`。这只同步代码，不会同步本独立目录的 `.env`、数据库或资料；新环境另按下节配置，已有业务库先备份并按迁移指引处理，不直接覆盖旧配置或更换已激活向量空间。
 
 本目录已有本机依赖；先启动 Docker Desktop，等它就绪。依赖软链指向已有安装，暂时保留那些目录；应用启动时从本工作区的 `src/backend` 加载修复代码，不需要重新安装。
 
