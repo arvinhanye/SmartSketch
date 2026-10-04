@@ -166,14 +166,15 @@ node node_modules/vite/bin/vite.js build --outDir ../../../.review-artifacts/fro
 
 ## 8. 提交序列
 
-最终 HEAD：`8c89afa1e92c570b1797c91ee86c879a4da0a908`（分支 `frontend-backend-refactor`，工作区干净，**未推送、未合并、未部署**；其后的 `docs:` 提交只更新本文件，不改变产品代码）。
+最终 HEAD：**`95b2a35c426cd4aec2a894a9242099b63004d3c8`**（分支 `frontend-backend-refactor`，工作区干净，**未推送、未合并、未部署**）。产品代码在 `700d743` 之后未再改动：`8c89afa` 及之后的提交只更新本文件。
 
 ```
+95b2a35 docs: record the definitive head hash in the handoff
 8c89afa docs: record the final head and the R1 closure checklist
 1a7dc88 docs: record the browser acceptance results and the requested endpoints
 14b9b76 docs: drop the trailing blank line in the task table
 db57409 docs: record the complete frontend migration verification
-700d743 feat(frontend): adapt personal model settings cards and test dialog          ← 第 7 批
+700d743 feat(frontend): adapt personal model settings cards and test dialog          ← 第 7 批（产品代码最后一次改动）
 b27bdb3 feat(frontend): adapt chat presentation without changing request guards      ← 第 6 批
 10981d4 feat(frontend): migrate graph presentation and canvas theme                  ← 第 5 批
 103a322 feat(frontend): migrate the review workspace and version presentation        ← 第 4 批
@@ -183,9 +184,9 @@ f723801 fix(frontend): keep the full course grid on the course home             
 055d914 docs(handoffs): record the frontend migration progress and the remaining batches   ← 起始基线
 ```
 
-本轮共 11 个本地提交（F1–F4 修复 3 个、第 4–7 批 4 个、文档与收尾 4 个），涉及 `src/frontend/**`、`tests/frontend/**` 与 `docs/**`，共 38 个文件。
+本轮共 13 个本地提交（F1–F4 修复 3 个、第 4–7 批 4 个、文档与收尾 5 个，最后一个只写本文件的 HEAD 哈希），涉及 `src/frontend/**`、`tests/frontend/**` 与 `docs/**`，共 38 个文件。
 
-产品代码最后一次改动在 `700d743`（第 7 批）；其后所有提交均为文档。因此 §5 的类型检查、全量测试、仓库外探针与 §5 的浏览器验收结果都适用于当前产品代码状态。
+产品代码最后一次改动在 `700d743`（第 7 批）；其后所有提交均为文档。因此 §5 的类型检查、全量测试、仓库外探针与浏览器验收结果都适用于当前产品代码状态。
 
 每批独立可撤回：需要回退某一批时用对应提交的 `git revert` 生成新提交，先核对后续批次的依赖；本轮没有数据迁移，不需要数据库或向量空间回退；**禁止硬重置**。
 
