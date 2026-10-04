@@ -171,6 +171,13 @@ def _group(calls: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             "tokens": usage_input + usage_output, "unknown_usage_calls": unknown, "tokens_complete": unknown == 0}
 
 
+def _latency(calls: Iterable[Mapping[str, Any]]) -> int | None:
+    rows = list(calls)
+    if any(r["latency_ms"] is None for r in rows):
+        return None
+    return sum(r["latency_ms"] for r in rows)
+
+
 def _is_embedding(call: Mapping[str, Any]) -> bool:
     return call["purpose"] == "embedding"
 
@@ -207,9 +214,15 @@ def audit(db_path: str | Path, *, started_at: str | None = None, ended_at: str |
         own = by_request.get(log["request_id"], [])
         generation = _group(c for c in own if not _is_embedding(c))
         embedding = _group(c for c in own if _is_embedding(c))
+        embedding_ms = _latency(c for c in own if _is_embedding(c))
+        generation_ms = _latency(c for c in own if not _is_embedding(c))
+        other_ms = (None if embedding_ms is None or generation_ms is None
+                    else log["latency_ms"] - embedding_ms - generation_ms)
         per_request.append({**log, "generation_calls": generation["calls"], "embedding_calls": embedding["calls"],
                             "generation_tokens": generation["tokens"] if generation["tokens_complete"] else None,
-                            "embedding_tokens": embedding["tokens"] if embedding["tokens_complete"] else None})
+                            "embedding_tokens": embedding["tokens"] if embedding["tokens_complete"] else None,
+                            # C02-3 分段：总耗时 − 查询向量 − 生成 = 其余（检索、组装、校验等）；任一调用缺耗时即未知
+                            "embedding_ms": embedding_ms, "generation_ms": generation_ms, "other_ms": other_ms})
     logged = {g["request_id"] for g in logs}
     return {
         "window": {"started_at": started_at, "ended_at": ended_at, "request_ids": ids},

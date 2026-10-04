@@ -401,3 +401,24 @@ def test_cli_audit_joins_records_by_request_id(tmp_path, capsys):
     assert payload["audit"]["requests"] == 10                     # 只按十题的编号关联，不含额外尝试
     assert payload["audit"]["ledger"]["generation"]["tokens"] == 28951 - 4606
     assert payload["summary"]["counts"]["total"] == 10
+
+
+# ---------------------------------------------------------------- C02-3 分段耗时（现有字段）
+
+
+def test_per_request_segments_split_embedding_generation_and_other(tmp_path):
+    report = measure.audit(_db(tmp_path), started_at=STARTED, ended_at=ENDED)
+    rows = {r["request_id"]: r for r in report["per_request"]}
+    failed = rows[FAILED_ID]
+    assert (failed["embedding_ms"], failed["generation_ms"], failed["other_ms"]) == (589, 9297, 369)
+    uncovered = next(r for r in report["per_request"] if r["question"] == "今天天气怎么样")
+    assert (uncovered["embedding_ms"], uncovered["generation_ms"], uncovered["other_ms"]) == (431, 0, 93)
+
+
+def test_segment_is_unknown_when_a_call_latency_is_missing(tmp_path):
+    pending = {"request_id": FAILED_ID, "purpose": "embedding", "status": "sent", "max_output_tokens": 0,
+               "usage_input": None, "usage_output": None, "created_at": "2026-10-03T18:20:00.000Z"}
+    report = measure.audit(_db(tmp_path, extra_calls=[pending]), request_ids=[FAILED_ID])
+    row = report["per_request"][0]
+    assert row["embedding_ms"] is None and row["other_ms"] is None
+    assert row["generation_ms"] == 9297

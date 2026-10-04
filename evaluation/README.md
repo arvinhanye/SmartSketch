@@ -261,4 +261,5 @@ python evaluation/measure_web_flow.py audit --db <只读 SQLite 路径> --record
   - 客户端 SSE 首个 delta：`ask --stream` 收到第一条 `delta` 事件的时刻；
   - 浏览器可见首字：本工具不测，写「未测」。
   - 另有客户端完整响应 `client_elapsed_seconds` 与服务端 `latency_ms`。
+- **分段（C02-3）**：`audit` 逐请求给出 `embedding_ms`（查询向量）、`generation_ms`（生成）与 `other_ms` = `chat_logs.latency_ms` − 两者（检索、组装、校验等）；任一调用缺耗时即为未知。诊断见 `reports/c02-qa-diagnosis.md`。
 - 第二阶段 L15 十题可用 `evaluation/raw/l15/codex-closeout-audit.json` 离线重算：11 个请求、19 次调用 = 9 生成 + 10 向量，生成 28951、向量 59（`tests/tooling/test_c01_measure.py`）。
