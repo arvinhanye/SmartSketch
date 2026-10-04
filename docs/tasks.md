@@ -1741,8 +1741,8 @@ C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据�
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
 | C01（B-EVAL-01） | DONE（已复审；Codex修复续跑预检） | Claude/Codex | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
-| C02（B-QA-01） | IN_PROGRESS（13题真实终态/服务端与SSE达标；浏览器首字/完整v3开启基线待用户决定） | Codex（本地接手）；DeepSeek（真实轮） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
-| C03（B-PDF-01 / L16） | IN_PROGRESS（新两份PDF20.90/28.08秒已核；慢段根因与MD补测决策仍OPEN） | DeepSeek（真实轮）；Codex（本地复审） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
+| C02（B-QA-01） | IN_PROGRESS（13题真实终态/服务端与SSE达标；浏览器可见首字、v3+思考开启基线：2026-10-04 用户决定三项补测均不做，保持「未测」） | Codex（本地接手）；DeepSeek（真实轮） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
+| C03（B-PDF-01 / L16） | IN_PROGRESS（新两份PDF20.90/28.08秒已核；关闭思考MD抽取：2026-10-04 用户决定三项补测均不做，保持「未测」；慢段根因仍OPEN） | DeepSeek（真实轮）；Codex（本地复审） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
 | C04（B-QUALITY-01） | DONE（2026-10-04 用户签收新两份 PDF：两课实体、关系均 ≥70%；复核后采纳辅助判定，见 C-ACC 证据） | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
 | C05 | DONE（待复审；视觉美化移出本阶段） | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
 | C06 | IN_PROGRESS（本地完整门禁已通过；真实冻结待指标/人工签收） | Codex | 最终门禁、隔离从零复测、交接 | 整次 integration 实际 exit 0 |
@@ -1805,7 +1805,7 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 | ID | 当前状态 | 下一步/判定边界 |
 | --- | --- | --- |
 | C-PERSIST-TRACE | OPEN（证据不足） | 6471ms只能定位run_persist_stage范围；现存日志缺阶段行；旧C03-1末段15.643秒根因仍未判定，未在本轮同幅重现不是已修 |
-| C-QA-V3-BASELINE | WAITING_USER_BUDGET / OPEN | 最小同13题v3思考开启未测；保守11调用118052，13调用+余量182056；建议增量185000/累计1030000仅提案，无授权不执行 |
+| C-QA-V3-BASELINE | NOT_EXECUTED（2026-10-04 用户决定三项补测均不做；结论只写「未测」，不能声称关闭思考带来的改善幅度） | 最小同13题v3思考开启未测；保守11调用118052，13调用+余量182056；建议增量185000/累计1030000仅提案，无授权不执行 |
 | C-MD-THINKING-OFF | WAITING_USER / OPEN | 是否补关闭思考的新Markdown抽取；本轮QA已有MD课程不是新MD抽取证据 |
 | C-BROWSER-FIRST-TOKEN | WAITING_USER / OPEN | 浏览器可见首字未采集；SSE783～2927ms不替代渲染首字 |
 | C-PERSISTED-SOURCES | OPEN（本轮未独立验证） | 检查点来源已按实体/节点ID核对同课chunk；导出节点source=ai非source_refs，Neo4j详情来源未读 |
@@ -1828,7 +1828,7 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 | C-ACC-A 持久化出处只读核验 | DONE（`a094714`） | 两门课（course1 PDF 76 点、course2 PDF 68 点）草稿持久化后的 `source_refs`：数量、同课文档与 chunk、页码或章节、悬空 / 跨课 / 空出处；区分 `source="ai"` 与 `source_refs` | 共享 Neo4j（只读会话，连接变量按用户授权从测量区 `.env` 载入进程、不打印不写盘）+ 测量区 SQLite（`mode=ro`）→ 脱敏报告与证据（只含编号、计数、哈希） | 误写共享库：只读会话 + 只读 SQLite 双重防护；凭据泄露：不打印、不落盘 | 脚本退出码、计数断言、可复跑 |
 | C-ACC-B 入库子步骤计时 | DONE（`4304fec`） | `run_persist_stage` 子步骤脱敏计时（候选读取、构建、来源读取、锁等待、Neo4j 事务、SQLite 收尾、释放） | 代码 + 回归 → 本地提交 | 改变锁 / 事务语义：只加计时、不改控制流 | 先红后绿；相关回归；完整门禁（隔离端口、临时库、本机假供应商） |
 | C-ACC-C 人工签收入口 | DONE（`452d446`）；用户已签收（见下方证据） | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
-| C-ACC-D 补测决策表 | DONE（提案）；**是否执行待用户决定** | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
+| C-ACC-D 补测决策表 | DONE（提案）；2026-10-04 用户决定三项补测均不做 | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
 
 **C-ACC 验收证据**（本轮真实生成 0、在线向量 0；台账仍 844451 / 900000，向量 12005 另计）：
 
@@ -1839,4 +1839,5 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 - **门禁**：`4304fec` 代码树在无 `.env` 的临时工作树、隔离端口、一次性 Neo4j、临时库、本机假供应商下整次 `./scripts/verify.sh integration` **exit 0**：backend+tooling 3878 passed / 27 登记 skip；frontend 38 文件 934 passed；integration 393 passed / 4 登记 skip；backend-live 44 passed；演示 E2E 2 passed；个人本机假供应商 E2E 4 passed；basic 契约、type-check、build 通过。相对 `043c274` 多 8 例（A 5 + B 3），无新增 skip、删用例或放宽断言。最终树 `./scripts/verify.sh`（basic）exit 0。交接 `docs/handoffs/claude-plan-c-acceptance-closeout.md`。**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
 - **C 补充（签收填写工具）**：用户要求「在工作表里填 ✓ ✗」。新增 `evaluation/c04_signoff.py`（`init` 生成 `*-worksheet-user.md` 副本，`convert` 校验后写 `*-judgments-user.json` 与 `*-report-user.json`）；原工作表与 predictions 不动。未填、非法标记、判 ✗ 无依据、判定人为空或以 `claude-assist` 开头、改动其他列一律拒绝且不写文件。`tests/tooling/test_c04_signoff_sheet.py` 12 例：先以占位模块 RED（2 failed / 10 errors，均为 NotImplementedError）→ GREEN 12 passed（连同 `test_c04_accuracy.py` 共 19 passed）。真实两课副本用辅助判定在临时目录试填，转换结果与辅助数逐条一致（263 行全部解析），试填产物不入库。
 - **C04 人工准确率签收结果**：用户 `arvin` 于 2026-10-04 在本机签收网页逐条复核两课全部 263 条（course1 76 实体 + 61 关系，course2 68 实体 + 58 关系），**采纳 Claude 辅助判定**：263/263 判定一致；35 条 ✗ 的依据中 30 条沿用辅助原文，5 条仅删去【请复核】标记。按用户确认如实记为「复核后采纳辅助判定」，不是独立盲判。course1 实体 64/76（84.21%）、关系 58/61（95.08%）；course2 实体 61/68（89.71%）、关系 45/58（77.59%）；实体数 76 / 68 均 ≥20；`judge-report` 结论两课均为「达标」，`is_human_judgment: true`。证据 `evaluation/raw/c04-signoff/*-worksheet-user.md`、`*-judgments-user.json`、`*-report-user.json`；Claude 复核：判定 JSON 与工作表逐条一致、报告可由判定重算得到、原 predictions / 工作表 / 辅助文件未改。**风险**：course2 关系离 70% 仅 5 条余量，删去【请复核】的 5 条正是两可项，改判可能使结论翻转。签收完成不等于技术冻结：**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
+- **补测决定**：2026-10-04 用户决定三项补测均不做（浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线）。无付费调用，台账仍 844451 / 900000，向量 12005 另计。冻结说明须如实写这三项「未测」：首字只有服务端首 delta 与客户端 SSE 首 delta；MD 抽取的 ≤60 秒只有思考开启时的旧数据（83.97 / 75.51 秒，未达标）；关闭思考的问答改善幅度无法与 v3 提示词分离。整轮交 Codex 复审：`docs/handoffs/claude-plan-c-acceptance-closeout.md`（review_status: ready_for_review）。
 
