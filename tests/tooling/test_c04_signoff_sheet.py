@@ -167,3 +167,36 @@ def test_cli_convert_fails_and_writes_nothing_when_incomplete(tmp_path):
     assert signoff.main(["convert", "--dir", str(tmp_path), "--course", "course1"]) == 1
     assert not (tmp_path / f"{stem}-judgments-user.json").exists()
     assert not (tmp_path / f"{stem}-report-user.json").exists()
+
+
+# ---------------------------------------------------------------- 网页回写：apply_marks
+
+
+def test_apply_marks_round_trips_through_convert(setup):
+    predictions, original, sheet = setup
+    marks = {"kp_a": ("✓", ""), "kp_b": ("✓", "定义完整"), "kp_c": ("✗", "E2：名称含 | 号"), "rel_1": ("✓", "")}
+    written = signoff.apply_marks(sheet, "李四", marks)
+    judgments = signoff.to_judgments(written, original, predictions).judgments
+    assert judgments["judge"] == "李四"
+    assert judgments["entities"] == {"kp_a": "correct", "kp_b": "correct", "kp_c": "incorrect"}
+    assert judgments["notes"] == {"kp_b": "定义完整", "kp_c": "E2：名称含 ／ 号"}    # | 换成全角，不破坏表格
+
+
+def test_apply_marks_keeps_other_columns_and_can_clear_a_mark(setup):
+    predictions, original, sheet = setup
+    filled = signoff.apply_marks(sheet, "李四", dict(ALL_OK))
+    cleared = signoff.apply_marks(filled, "李四", {"kp_b": ("", "")})
+    assert signoff.read_marks(cleared)[1]["kp_b"] == ("", "")
+    assert signoff.read_marks(cleared)[1]["kp_a"] == ("✓", "")
+    rows = [line for line in original.splitlines() if line.startswith("| ") and "`kp_b`" in line]
+    assert rows[0] in cleared.splitlines()                          # 清空后与原行逐字节相同
+    with pytest.raises(signoff.SignoffError, match="未填 1 条"):
+        signoff.to_judgments(cleared, original, predictions)
+
+
+def test_apply_marks_rejects_unknown_ids_and_marks(setup):
+    _, _, sheet = setup
+    with pytest.raises(signoff.SignoffError, match="kp_zzz"):
+        signoff.apply_marks(sheet, "李四", {"kp_zzz": ("✓", "")})
+    with pytest.raises(signoff.SignoffError, match="标记"):
+        signoff.apply_marks(sheet, "李四", {"kp_a": ("对", "")})

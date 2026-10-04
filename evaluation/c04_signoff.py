@@ -87,6 +87,44 @@ def _judge(sheet: str) -> str:
     return ""
 
 
+def read_marks(sheet: str) -> tuple[str, dict[str, tuple[str, str]]]:
+    """副本当前的（判定人, {ID: (判定, 依据)}）；未填为空串。"""
+    marks = {}
+    for kind_rows in _rows(sheet).values():
+        for item_id, cells in kind_rows.values():
+            mark, note = (cells[5:7] + ["", ""])[:2]
+            marks[item_id] = (mark, note)
+    return _judge(sheet), marks
+
+
+def _clean(text: str) -> str:
+    """单元格内容：去换行，| 换成全角，避免破坏表格。"""
+    return " ".join(text.split()).replace("|", "／")
+
+
+def apply_marks(sheet: str, judge: str, marks: dict[str, tuple[str, str]]) -> str:
+    """把（判定, 依据）写回副本的最后两列，其余列逐字节保留；判定与依据都为空即清空该行。"""
+    known = {item_id for kind_rows in _rows(sheet).values() for item_id, _ in kind_rows.values()}
+    unknown = sorted(set(marks) - known)
+    if unknown:
+        raise SignoffError(f"工作表中没有这些 ID：{', '.join(unknown)}")
+    bad = sorted(i for i, (mark, _) in marks.items() if mark and mark not in MARKS)
+    if bad:
+        raise SignoffError(f"标记只能是 ✓ 或 ✗：{', '.join(bad)}")
+    out = []
+    for line in sheet.splitlines():
+        if line.startswith(JUDGE_PREFIX):
+            line = JUDGE_PREFIX + _clean(judge)
+        match = ROW.match(line)
+        if match and match.group(2) in marks:
+            mark, note = marks[match.group(2)]
+            parts = re.split(r"(?<!\\)\|", line)
+            parts[6], parts[7] = (f" {mark} " if mark else "  "), (f" {_clean(note)} " if note.strip() else "  ")
+            line = "|".join(parts)
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
 def to_judgments(sheet: str, original: str, predictions: dict[str, Any],
                  seed: int = evaluate.DEFAULT_SEED) -> Result:
     errors: list[str] = []
