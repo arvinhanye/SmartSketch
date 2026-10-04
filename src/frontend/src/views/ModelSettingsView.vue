@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { MODEL_CONFIG_API_KEY } from '../api/modelConfig'
 import { useModelConfig } from '../composables/useModelConfig'
 import { useRuntimeStore } from '../stores/runtime'
@@ -57,19 +57,99 @@ function chooseProvider(event: Event): void {
 
 /** 弹窗展示本次测试用到的配置：只保存真实值，不编造服务端字段 */
 type TestDisplayContext = { baseUrl: string; model: string; providerLabel: string }
-const testDisplayContext = ref<TestDisplayContext | null>(null)
+/**
+ * 连接测试的展示快照：只描述「这一次测试」，与保存/清除共用的 `error` 完全分离。
+ *
+ * 这样做的原因（复审 R1/R2/R3）：
+ * - 保存或清除失败会写入通用 `error`；若弹窗读它，会把「保存失败」显示成「连接失败」；
+ * - 测试失败（429、超时、网络错误）时 composable 不会产出 testResult，必须靠快照保留
+ *   本次测试的地址、模型与错误文本，否则弹窗会退回「等待测试」；
+ * - 快照绑定发起时的 `runtime.owner`：换号后旧账号的结论不能重新生效。
+ */
+type TestSnapshotStatus = 'pending' | 'success' | 'failure'
+interface TestSnapshot {
+  owner: string | null
+  baseUrl: string
+  model: string
+  providerLabel: string
+  status: TestSnapshotStatus
+  /** 成功/失败的健康文本，直接来自 composable 的真实现有字段 */
+  text: string | null
+  /** 测试本身抛错时的固定文案；保存/清除的错误不会进这里 */
+  error: string | null
+}
+
+const testSnapshot = ref<TestSnapshot | null>(null)
 const testDialog = ref<HTMLDialogElement | null>(null)
-/** 表单已改动：当前显示的结果不再代表这次配置 */
-const resultObsolete = ref(false)
+const testButton = ref<HTMLButtonElement | null>(null)
+const viewResultButton = ref<HTMLButtonElement | null>(null)
+/** 关闭弹窗是否由用户发起（Esc / ×）；只有这种关闭才把焦点还给触发按钮 */
+let userInitiatedClose = false
+/** 快照是否已被「表单改动」作废（保留快照本身，用于显示『请重新测试』并挡住重看入口） */
+const snapshotStale = ref(false)
+/** 正在进行的操作是否为测试：test() 失败时 busy 也会回到 null，据此区分「测试结束」与「保存/清除结束」 */
+const testingInFlight = ref(false)
+
+/** 快照不再代表当前配置：表单被改动，或已换号 */
+const resultObsolete = computed(
+  () => testSnapshot.value !== null && (snapshotStale.value || testSnapshot.value.owner !== runtime.owner),
+)
+/** 有可展示的、未失效的测试结论（含失败），用于重看入口与页面内提示 */
+const snapshotAvailable = computed(
+  () => testSnapshot.value !== null && !resultObsolete.value,
+)
 
 function providerLabelFor(url: string): string {
   return providerPresets.find((preset) => preset.url === url.trim())?.label ?? '自定义地址'
+}
+
+function dropTestSnapshot(): void {
+  testSnapshot.value = null
+  snapshotStale.value = false
 }
 
 function closeTestDialog(): void {
   const dialog = testDialog.value
   // 结果展示只是展示层：环境不支持原生 dialog 时不因此中断测试请求
   if (dialog !== null && dialog.open && typeof dialog.close === 'function') dialog.close()
+}
+
+/**
+ * 用户用 Esc 关闭原生 dialog：cancel 早于 close 触发，在这里记下「这次是用户关闭」，
+ * 随后的 close 事件据此把焦点还给可用的触发按钮（复审 R4）。
+ */
+function onDialogCancel(): void {
+  userInitiatedClose = true
+}
+
+/** 用户点 × 关闭：closeTestDialog 之后原生 close 事件仍会触发，这里只需标记来源 */
+function onDialogCloseButton(): void {
+  userInitiatedClose = true
+  closeTestDialog()
+}
+
+/**
+ * 用户关闭弹窗（Esc 或 ×）后把焦点还给可用的触发按钮：
+ * 测试结束后测试按钮恢复可用；进行中则用已出现的「查看测试结果」。
+ * 编辑表单、换号、卸载等自动关闭不调用这里，因此不会抢新页面的焦点。
+ */
+function restoreDialogTriggerFocus(): void {
+  void nextTick(() => {
+    if (typeof document === 'undefined') return
+    const candidates: Array<HTMLButtonElement | null> = [viewResultButton.value, testButton.value]
+    const target = candidates.find(
+      (element): element is HTMLButtonElement =>
+        element !== null && !element.disabled && document.contains(element),
+    )
+    if (target !== undefined) target.focus()
+  })
+}
+
+/** 原生 dialog 的 close 事件：Esc 与 × 都会触发，这里只处理用户发起的关闭 */
+function onDialogClose(): void {
+  if (!userInitiatedClose) return
+  userInitiatedClose = false
+  restoreDialogTriggerFocus()
 }
 
 /** 只负责把已有结果重新展示出来，不发起任何请求 */
@@ -80,48 +160,73 @@ function showTestResult(): void {
 
 async function runConnectionTest(): Promise<void> {
   if (busy.value !== null) return
-  resultObsolete.value = false
   // 先记录这次测试针对的配置，再发起请求：晚到的响应不会与编辑中的值混淆
   const baseUrl = form.baseUrl.trim()
-  testDisplayContext.value = { baseUrl, model: form.model.trim(), providerLabel: providerLabelFor(baseUrl) }
+  snapshotStale.value = false
+  testSnapshot.value = {
+    owner: runtime.owner,
+    baseUrl,
+    model: form.model.trim(),
+    providerLabel: providerLabelFor(baseUrl),
+    status: 'pending',
+    text: null,
+    error: null,
+  }
   showTestResult()
-  await test()
+  testingInFlight.value = true
+  try {
+    await test()
+  } finally {
+    testingInFlight.value = false
+  }
+  const snapshot = testSnapshot.value
+  // 测试期间换号或快照已清理：不把这次结果写到新会话上
+  if (snapshot === null || snapshot.owner !== runtime.owner) return
+  if (error.value !== null) {
+    // 测试阶段的 error 只可能来自 test() 本身（保存/清除的 error 不会进快照）
+    testSnapshot.value = { ...snapshot, status: 'failure', text: null, error: error.value }
+    return
+  }
+  const result = testResult.value
+  testSnapshot.value = result === null
+    ? { ...snapshot, status: 'failure', text: null, error: '测试未返回结果，请重试。' }
+    : { ...snapshot, status: result.ok ? 'success' : 'failure', text: result.text, error: null }
 }
 
-/** 表单改动立即作废旧结果并收起弹窗；关闭弹窗不等于取消后台测试请求 */
+/** 表单改动：把已有快照标记为作废（保留用于提示）并收起弹窗；关闭弹窗不等于取消后台测试请求 */
 watch(
   [() => form.baseUrl, () => form.model, () => form.apiKey],
   () => {
-    if (testing.value || testResult.value !== null) resultObsolete.value = true
+    // 测试进行中的改动只收起弹窗，不清也是不废：本次测试的地址与模型仍要显示在弹窗里
+    if (!testing.value && testSnapshot.value !== null) snapshotStale.value = true
     closeTestDialog()
   },
   { flush: 'sync' },
 )
 
-// 保存或清除成功会清空 testResult：此时本地展示状态一并复位，避免残留“表单已修改”提示。
-// 只在结果被清空且没有正在进行的测试时复位，因此不会让已被用户作废的旧结果复活。
+/**
+ * 保存或清除成功会清空 testResult，此时才复位本地展示（避免残留『表单已修改』提示）。
+ * 测试失败（test() 抛错）同样让 busy 回到 null，但它不是「配置已变更」，必须把失败快照留下，
+ * 因此这里按 testingInFlight 区分两种结束，而不是只看 testResult 是否为空（复审 R3）。
+ */
 watch(
-  [testResult, busy],
-  ([result, operation]) => {
-    if (result === null && operation !== 'testing') {
-      resultObsolete.value = false
-      testDisplayContext.value = null
-    }
+  busy,
+  (operation) => {
+    if (operation === null && !testingInFlight.value && testResult.value === null) dropTestSnapshot()
   },
   { flush: 'post' },
 )
 
-// 换号后旧会话的结果不再展示，也不重开弹窗；焦点不因自动关闭而被抢走
+// 换号后清掉展示快照（旧账号的结论与作废标记都不再展示），并自动收起弹窗；不抢焦点
 watch(
   () => runtime.owner,
   () => {
     closeTestDialog()
-    resultObsolete.value = false
-    testDisplayContext.value = null
+    dropTestSnapshot()
   },
   { flush: 'sync' },
 )
-onBeforeUnmount(closeTestDialog)
+onBeforeUnmount(() => closeTestDialog())
 
 async function confirmClear(): Promise<void> {
   confirmingClear.value = false
@@ -197,15 +302,17 @@ async function confirmClear(): Promise<void> {
 
               <p v-if="error" class="notice error" data-test="mc-error" role="alert">{{ error }}</p>
               <p v-if="notice" class="notice" data-test="mc-notice" role="status">{{ notice }}</p>
+              <!-- 页面内只展示「本次测试」的结论：保存/清除的失败留在上面的 mc-error，不冒充测试结果 -->
               <p v-if="resultObsolete" class="api-settings__note" data-test="mc-test-stale" role="status">
                 表单已修改，请重新测试当前配置
               </p>
-              <p v-else-if="testResult" class="notice" data-test="mc-test-result" :class="{ error: !testResult.ok }" role="status">
-                {{ testResult.text }}
+              <p v-else-if="snapshotAvailable" class="notice" data-test="mc-test-result"
+                 :class="{ error: testSnapshot?.status === 'failure' }" role="status">
+                {{ testSnapshot?.error ?? testSnapshot?.text }}
               </p>
 
               <div class="test-actions">
-                <button type="button" class="primary" data-test="mc-test" :disabled="busy !== null" @click="runConnectionTest">
+                <button ref="testButton" type="button" class="primary" data-test="mc-test" :disabled="busy !== null" @click="runConnectionTest">
                   {{ testing ? '测试中…' : '测试连接' }}
                 </button>
               </div>
@@ -217,7 +324,7 @@ async function confirmClear(): Promise<void> {
           <button type="submit" class="primary" data-test="mc-save" :disabled="busy !== null">
             {{ saving ? '正在保存…' : '保存设置' }}
           </button>
-          <button v-if="testing || (testResult !== null && !resultObsolete)" type="button" class="secondary"
+          <button v-if="testing || snapshotAvailable" ref="viewResultButton" type="button" class="secondary"
                   data-test="mc-view-result" @click="showTestResult">
             查看测试结果
           </button>
@@ -237,34 +344,44 @@ async function confirmClear(): Promise<void> {
       </form>
     </template>
 
-    <!-- 连接结果弹窗：原生 dialog；Esc 与关闭按钮只收起展示，后台测试请求不受影响 -->
-    <dialog ref="testDialog" class="result-dialog" data-test="mc-test-dialog" aria-labelledby="mc-dialog-title">
+    <!-- 连接结果弹窗：原生 dialog；Esc 与关闭按钮只收起展示，后台测试请求不受影响。
+         弹窗内容只读本次测试的展示快照，因此保存/清除的失败不会串进来（复审 R1）。 -->
+    <dialog
+      ref="testDialog"
+      class="result-dialog"
+      data-test="mc-test-dialog"
+      aria-labelledby="mc-dialog-title"
+      @cancel="onDialogCancel"
+      @close="onDialogClose"
+    >
       <header class="result-dialog__head">
         <h3 id="mc-dialog-title" class="result-dialog__title">
-          {{ testDisplayContext?.providerLabel ?? '模型接口' }}测试结果
+          {{ testSnapshot?.providerLabel ?? '模型接口' }}测试结果
         </h3>
-        <button type="button" class="result-dialog__close" aria-label="关闭测试结果" data-test="mc-dialog-close" @click="closeTestDialog">×</button>
+        <button type="button" class="result-dialog__close" aria-label="关闭测试结果" data-test="mc-dialog-close"
+                @click="onDialogCloseButton">×</button>
       </header>
 
-      <p v-if="testing" class="result-dialog__status" role="status">测试中…</p>
-      <p v-else-if="error" class="result-dialog__state result-dialog__state--failure" role="alert">连接失败</p>
-      <p v-else-if="testResult && !resultObsolete" class="result-dialog__state"
-         :class="testResult.ok ? 'result-dialog__state--success' : 'result-dialog__state--failure'" role="status">
-        {{ testResult.ok ? '连接成功' : '连接失败' }}
-      </p>
-      <p v-else class="result-dialog__status" role="status">表单已修改，请重新测试当前配置</p>
-
-      <dl class="result-dialog__facts">
-        <dt>接口地址</dt>
-        <dd>{{ testDisplayContext?.baseUrl ?? '等待测试' }}</dd>
-        <dt>使用模型</dt>
-        <dd>{{ testDisplayContext?.model || '待确认' }}</dd>
-      </dl>
-
-      <p v-if="error" class="notice error" role="alert">{{ error }}</p>
-      <p v-else-if="testResult && !resultObsolete" class="result-dialog__detail" data-test="mc-dialog-result" role="status">
-        {{ testResult.text }}
-      </p>
+      <p v-if="testing || testSnapshot?.status === 'pending'" class="result-dialog__status" role="status">测试中…</p>
+      <p v-else-if="resultObsolete" class="result-dialog__status" role="status">表单已修改，请重新测试当前配置</p>
+      <template v-else-if="testSnapshot !== null">
+        <p class="result-dialog__state"
+           :class="testSnapshot.status === 'success' ? 'result-dialog__state--success' : 'result-dialog__state--failure'"
+           role="status">
+          {{ testSnapshot.status === 'success' ? '连接成功' : '连接失败' }}
+        </p>
+        <dl class="result-dialog__facts">
+          <dt>接口地址</dt>
+          <dd>{{ testSnapshot.baseUrl || '未填写' }}</dd>
+          <dt>使用模型</dt>
+          <dd>{{ testSnapshot.model || '未填写' }}</dd>
+        </dl>
+        <p v-if="testSnapshot.error" class="notice error" role="alert">{{ testSnapshot.error }}</p>
+        <p v-else-if="testSnapshot.text" class="result-dialog__detail" data-test="mc-dialog-result" role="status">
+          {{ testSnapshot.text }}
+        </p>
+      </template>
+      <p v-else class="result-dialog__status" role="status">尚未发起连接测试。</p>
 
       <small class="result-dialog__footnote">测试只发送一次最小请求；这里不展示密钥与原始请求内容。</small>
     </dialog>
@@ -471,13 +588,14 @@ async function confirmClear(): Promise<void> {
 }
 
 /* ---------------------------------------------------------------- 结果弹窗 */
+/* 尺寸与圆角按来源 ConnectionResultDialog：22rem / 8px（复审 R5） */
 .result-dialog {
-  width: min(100%, 24rem);
+  width: min(100%, 22rem);
   max-height: 90vh;
   overflow: auto;
   padding: 20px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -498,7 +616,9 @@ async function confirmClear(): Promise<void> {
   font-size: 1.0625rem;
 }
 
-.result-dialog__close {
+/* 顶部 ×：来源是 32px 高、3px 10px 内边距的小按钮。
+ * 用 .api-settings .result-dialog__close 提高优先级，避免被上面的通用按钮规则覆盖（复审 R5）。 */
+.api-settings .result-dialog__close {
   flex: none;
   min-height: 32px;
   padding: 3px 10px;

@@ -243,6 +243,112 @@ describe('L10 模型 API 设置页', () => {
     expect(wrapper.get('[data-test="mc-notice"]').text()).toContain('已保存')
     wrapper.unmount()
   })
+
+  // ------------------------------------------------ 复审 R1–R3：测试快照独立于保存/清除错误
+
+  it('保存失败不会把测试弹窗改写为连接失败（R1）', async () => {
+    const api = fakeApi(SAVED, {
+      save: async () => { throw new ApiError(503, { code: 'STORAGE_UNAVAILABLE', message: '服务端原文' }) },
+    })
+    const wrapper = await mountView(api)
+    const dialog = wrapper.get('[data-test="mc-test-dialog"]').element as HTMLDialogElement
+    dialog.showModal = () => { dialog.open = true }
+    dialog.close = () => { dialog.open = false }
+
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="mc-dialog-close"]').trigger('click')
+
+    // 重看：仍是上次测试的结论（这条路径未被保存错误污染）
+    await wrapper.get('[data-test="mc-view-result"]').trigger('click')
+    await flushPromises()
+    expect(api.test).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="mc-test-dialog"]').text()).toContain('连接成功')
+    expect(wrapper.get('[data-test="mc-dialog-result"]').text()).toContain('321')
+    await wrapper.get('[data-test="mc-dialog-close"]').trigger('click')
+
+    // 改模型名触发保存（不改地址，因此不需要重填密钥），保存失败
+    await wrapper.get('[data-test="mc-model"]').setValue('m2')
+    await wrapper.get('[data-test="mc-form"]').trigger('submit')
+    await flushPromises()
+    expect(api.save).toHaveBeenCalledTimes(1)
+    // 页面显示保存错误；测试结论按 R1 的约定转为「请重新测试」，绝不显示成「连接失败」
+    expect(wrapper.get('[data-test="mc-error"]').text()).toContain('凭据存储')
+    expect(wrapper.find('[data-test="mc-test-stale"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('测试失败仍保留本次地址与模型，并可重看（R3）', async () => {
+    const api = fakeApi(SAVED, {
+      test: async () => { throw new ApiError(429, { code: 'RATE_LIMITED', message: '服务端原文' }) },
+    })
+    const wrapper = await mountView(api)
+    const dialog = wrapper.get('[data-test="mc-test-dialog"]').element as HTMLDialogElement
+    dialog.showModal = () => { dialog.open = true }
+    dialog.close = () => { dialog.open = false }
+
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    const text = wrapper.get('[data-test="mc-test-dialog"]').text()
+    expect(text).toContain('连接失败')
+    // 本次测试的地址与模型必须留在弹窗里，不能退回「等待测试 / 待确认」
+    expect(text).toContain('https://api.example.com/v1')
+    expect(text).toContain('m1')
+    expect(text).not.toContain('等待测试')
+    expect(text).not.toContain('待确认')
+
+    await wrapper.get('[data-test="mc-dialog-close"]').trigger('click')
+    // 关闭后仍可重看这次失败，且不重复发请求
+    await wrapper.get('[data-test="mc-view-result"]').trigger('click')
+    await flushPromises()
+    expect(api.test).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="mc-test-dialog"]').text()).toContain('连接失败')
+    wrapper.unmount()
+  })
+
+  it('换号后不复活旧账号的测试结果（R2）', async () => {
+    const api = fakeApi(SAVED)
+    const wrapper = await mountView(api)
+    const dialog = wrapper.get('[data-test="mc-test-dialog"]').element as HTMLDialogElement
+    dialog.showModal = () => { dialog.open = true }
+    dialog.close = () => { dialog.open = false }
+
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(true)
+
+    // 修改表单作废旧结果
+    await wrapper.get('[data-test="mc-model"]').setValue('m2')
+    await flushPromises()
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(false)
+
+    // 换号：不得让上一账号的成功结论重新生效
+    const runtime = useRuntimeStore()
+    runtime.startSession('another-owner')
+    await flushPromises()
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mc-view-result"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('保存失败不改写页面内已有的测试结论（R1 的页面侧）', async () => {
+    const api = fakeApi(SAVED, {
+      save: async () => { throw new ApiError(503, { code: 'STORAGE_UNAVAILABLE', message: '服务端原文' }) },
+    })
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="mc-test-result"]').text()).toContain('连接成功')
+
+    await wrapper.get('[data-test="mc-model"]').setValue('m2')
+    await wrapper.get('[data-test="mc-form"]').trigger('submit')
+    await flushPromises()
+    // 保存失败的文案与测试结论分开呈现，测试结论不变成「连接失败」
+    expect(wrapper.get('[data-test="mc-error"]').text()).toContain('凭据存储')
+    expect(wrapper.find('[data-test="mc-test-stale"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
 })
 
 // ---------------------------------------------------------------- 上传页与问答页的未配置引导
