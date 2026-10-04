@@ -1825,7 +1825,16 @@ C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0
 
 | ID | 状态 | 范围 | 输入 → 输出 | 风险 | 验证 |
 | --- | --- | --- | --- | --- | --- |
-| C-ACC-A 持久化出处只读核验 | IN_PROGRESS | 两门课（course1 PDF 76 点、course2 PDF 68 点）草稿持久化后的 `source_refs`：数量、同课文档与 chunk、页码或章节、悬空 / 跨课 / 空出处；区分 `source="ai"` 与 `source_refs` | 共享 Neo4j（只读会话，连接变量按用户授权从测量区 `.env` 载入进程、不打印不写盘）+ 测量区 SQLite（`mode=ro`）→ 脱敏报告与证据（只含编号、计数、哈希） | 误写共享库：只读会话 + 只读 SQLite 双重防护；凭据泄露：不打印、不落盘 | 脚本退出码、计数断言、可复跑 |
-| C-ACC-B 入库子步骤计时 | TODO | `run_persist_stage` 子步骤脱敏计时（候选读取、构建、来源读取、锁等待、Neo4j 事务、SQLite 收尾、释放） | 代码 + 回归 → 本地提交 | 改变锁 / 事务语义：只加计时、不改控制流 | 先红后绿；相关回归；完整门禁（隔离端口、临时库、本机假供应商） |
-| C-ACC-C 人工签收入口 | TODO | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
-| C-ACC-D 补测决策表 | TODO | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
+| C-ACC-A 持久化出处只读核验 | DONE（`a094714`） | 两门课（course1 PDF 76 点、course2 PDF 68 点）草稿持久化后的 `source_refs`：数量、同课文档与 chunk、页码或章节、悬空 / 跨课 / 空出处；区分 `source="ai"` 与 `source_refs` | 共享 Neo4j（只读会话，连接变量按用户授权从测量区 `.env` 载入进程、不打印不写盘）+ 测量区 SQLite（`mode=ro`）→ 脱敏报告与证据（只含编号、计数、哈希） | 误写共享库：只读会话 + 只读 SQLite 双重防护；凭据泄露：不打印、不落盘 | 脚本退出码、计数断言、可复跑 |
+| C-ACC-B 入库子步骤计时 | DONE（`4304fec`） | `run_persist_stage` 子步骤脱敏计时（候选读取、构建、来源读取、锁等待、Neo4j 事务、SQLite 收尾、释放） | 代码 + 回归 → 本地提交 | 改变锁 / 事务语义：只加计时、不改控制流 | 先红后绿；相关回归；完整门禁（隔离端口、临时库、本机假供应商） |
+| C-ACC-C 人工签收入口 | DONE（`452d446`）；**用户签收 OPEN** | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
+| C-ACC-D 补测决策表 | DONE（提案）；**是否执行待用户决定** | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
+
+**C-ACC 验收证据**（本轮真实生成 0、在线向量 0；台账仍 844451 / 900000，向量 12005 另计）：
+
+- **A**：`evaluation/audit_persisted_sources.py` 走 API 知识点详情同一路径（草稿、教师，Neo4j 读路由，SQLite `mode=ro&immutable=1` + `query_only`）。实际 exit 0、`defect_items: 0`：course1 76/76、course2 68/68 个 AI 知识点详情都有可定位的本课 `source_refs`（79 / 76 条，均带页码、章节、文件名），悬空块、他课文档、跨课证据边、读取失败均为 0；测量库前后 SHA-256 一致。报告 `evaluation/reports/c-acc-a-persisted-sources.md`，证据 `evaluation/raw/c-acc-a/sources.json`，测试 `tests/tooling/test_c_acc_sources.py` 5 passed（红灯阶段只是「工具文件不存在」，行为断言首次运行即通过，照实记录）。只证明可定位与课程隔离，不证明出处语义正确。
+- **B**：`run_persist_stage` 新增一行 `persist steps` INFO（candidates / plan / chunks / lock_wait / lease_check / neo4j + neo4j_attempts / t6 / lock_release / task_release / total），只记任务编号、结果、毫秒数与次数。`tests/backend/test_c02_phase_logs.py` 新增 3 例：RED 3 failed / 3 passed → GREEN 6 passed，覆盖成功、锁未获取、Neo4j 失败与租约丢失。锁、事务、重试、预算与业务语义不变。**只为以后的运行提供归因能力；course1 6471 ms 与旧 15.643 秒的根因仍 OPEN，不做事后归因。**
+- **C**：`evaluation/raw/c04-signoff/`：原样复制的两份 predictions 与工作表（SHA-256 与测量区一致）、`judge` 为空的用户签收文件、`claude-assist` 辅助判定（`is_human_judgment: false`）与签收说明。辅助参考数 course1 实体 64/76、关系 58/61，course2 实体 61/68、关系 45/58（离 70% 差 5 条），**不是人工验收，不宣布达标**。
+- **D**：`evaluation/reports/c-acc-d-retest-decisions.md`：浏览器可见首字（先免费测前端附加时延，再选 3 题真实，52016 落在现剩 55549 之内）、关闭思考的 MD 抽取（course1 一份，建议 95000 / 940000，不发布、向量 0）、v3 + 思考开启（沿用 Codex 185000 / 1030000，A/B 352000 / 1200000）。均未执行。
+- **门禁**：`4304fec` 代码树在无 `.env` 的临时工作树、隔离端口、一次性 Neo4j、临时库、本机假供应商下整次 `./scripts/verify.sh integration` **exit 0**：backend+tooling 3878 passed / 27 登记 skip；frontend 38 文件 934 passed；integration 393 passed / 4 登记 skip；backend-live 44 passed；演示 E2E 2 passed；个人本机假供应商 E2E 4 passed；basic 契约、type-check、build 通过。相对 `043c274` 多 8 例（A 5 + B 3），无新增 skip、删用例或放宽断言。最终树 `./scripts/verify.sh`（basic）exit 0。交接 `docs/handoffs/claude-plan-c-acceptance-closeout.md`。**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
+
