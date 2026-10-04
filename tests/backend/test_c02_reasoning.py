@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+
+import pytest
 from dataclasses import fields
 from typing import Any
 
@@ -18,6 +20,9 @@ from app.repositories.sqlite import migrate
 from app.services.ai.client import (
     Message,
     ModelRequest,
+    ModelCallError,
+    ModelMalformedResponseError,
+    ModelStreamInterruptedError,
     ModelResult,
     StreamDelta,
     StreamDone,
@@ -221,3 +226,48 @@ def test_migration_017_adds_nullable_reasoning_columns(tmp_path):
         assert name in columns and columns[name][3] == 0          # 可空
     assert files.count("017_model_call_reasoning.sql") == 1
     assert migrate(url) == []  # 后续迁移不影响 017 的一次性应用与可空语义
+
+
+@pytest.mark.parametrize("streaming", [False, True], ids=["complete", "stream"])
+@pytest.mark.parametrize("usage", [Usage(10, 100, reasoning_tokens=90), Usage(10, 100, reasoning_tokens=0),
+                                   Usage(10, 100), None], ids=["known", "zero", "unknown-reasoning", "no-usage"])
+def test_failed_calls_preserve_reasoning_usage_without_double_billing(tmp_path, streaming, usage):
+    clock = _Clock()
+    error_type = ModelStreamInterruptedError if streaming else ModelMalformedResponseError
+
+    class FailingClient:
+        def complete(self, request):
+            clock.now += 2.0
+            raise error_type(MODEL, usage=usage)
+
+        def stream(self, request):
+            clock.now += 1.0
+            yield StreamReasoning(len(REASONING_TEXT))
+            clock.now += 0.5
+            yield StreamDelta("答[1]。")
+            clock.now += 0.5
+            raise error_type(MODEL, usage=usage)
+
+    policy, url = _policy(tmp_path, FailingClient(), clock)
+    events = []
+    with pytest.raises(ModelCallError):
+        if streaming:
+            for event in _bound(policy).stream(_request()):
+                events.append(event)
+        else:
+            _bound(policy).complete(_request())
+    row = _row(url)  # also asserts exactly one call: no retry introduced
+    assert row["status"] == "error"
+    assert (row["usage_input"], row["usage_output"]) == ((10, 100) if usage else (None, None))
+    assert row["usage_reasoning"] == (usage.reasoning_tokens if usage else None)
+    assert not any(isinstance(event, StreamReasoning) for event in events)
+    assert REASONING_TEXT not in repr(events)
+    if streaming:
+        assert row["reasoning_chars"] == len(REASONING_TEXT)
+        assert (row["first_reasoning_ms"], row["first_content_ms"]) == (1000, 1500)
+    else:
+        assert (row["reasoning_chars"], row["first_reasoning_ms"], row["first_content_ms"]) == (None, None, None)
+    with sqlite3.connect(url.removeprefix("sqlite:///")) as db:
+        from app.repositories.model_calls import BILLED_TOKENS_SQL
+        (billed,) = db.execute(f"SELECT {BILLED_TOKENS_SQL} FROM model_calls").fetchone()
+    assert billed == (110 if usage else row["input_tokens_est"] + row["max_output_tokens"])

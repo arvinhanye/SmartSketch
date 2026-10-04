@@ -565,6 +565,7 @@ class ModelCallPolicy:
             usage_output=usage.output_tokens if usage is not None else None,
             latency_ms=self._latency_ms(started), error_class=error_class,
             rejected_before_generation=rejected,
+            usage_reasoning=usage.reasoning_tokens if usage is not None else None,
             reasoning_chars=timing.reasoning_chars or None if timing is not None else None,
             first_reasoning_ms=timing.first_reasoning_ms if timing is not None else None,
             first_content_ms=timing.first_content_ms if timing is not None else None,
