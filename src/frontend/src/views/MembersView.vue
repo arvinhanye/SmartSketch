@@ -125,21 +125,22 @@ const counts = computed(() => ({
           <div class="members__field">
             <!-- label 只包住输入框本身（按钮在 label 之外），这样 input.closest('label') 仍是「学生用户名」，
                  而按钮文案（含提交中的「添加中…」）不会被算进输入框的无障碍名称；
-                 aria-label 再显式锁定该名称，避免以后误把别的文字放进 label 时被污染。 -->
-            <label class="members__field-label" for="member-username">
-              学生用户名
-              <input
-                id="member-username"
-                v-model="username"
-                name="username"
-                type="text"
-                autocomplete="off"
-                placeholder="输入学生用户名"
-                aria-label="学生用户名"
-                required
-              />
-            </label>
+                 aria-label 再显式锁定该名称，避免以后误把别的文字放进 label 时被污染。
+                 输入框与按钮放在同一个横向容器里，桌面端保持同行。 -->
             <div class="members__field-row">
+              <label class="members__field-label" for="member-username">
+                学生用户名
+                <input
+                  id="member-username"
+                  v-model="username"
+                  name="username"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="输入学生用户名"
+                  aria-label="学生用户名"
+                  required
+                />
+              </label>
               <button type="submit" class="members__submit" :disabled="adding">
                 <svg class="members__submit-icon" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
                   <path d="M8 3.2v9.6M3.2 8h9.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
@@ -422,11 +423,12 @@ const counts = computed(() => ({
   font-size: 0.875rem;
 }
 
-/* 标签只包住输入框本身：文字在上、输入框占满宽度（按钮在 label 之外，与输入框同排居右） */
+/* 标签只包住输入框本身：文字在上、输入框占满标签宽度（按钮在 label 之外） */
 .members__field-label {
   display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 0.35rem;
-  width: 100%;
   color: var(--color-text);
   font-size: 0.875rem;
   font-weight: 500;
@@ -434,25 +436,20 @@ const counts = computed(() => ({
 
 .members__field-label input {
   width: 100%;
+  min-width: 0;
   min-height: 2.6rem;
 }
 
 /* 桌面端：输入框占主要宽度，砖红按钮同排居右 */
 .members__field-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.6rem;
   min-width: 0;
 }
 
-.members__field-row input {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 2.6rem;
-}
-
 .members__submit {
-  flex: none;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -628,7 +625,18 @@ const counts = computed(() => ({
     padding: 1.1rem;
   }
 
-  /* 输入框与按钮改纵向排列，按钮铺满整行 */
+  /* 标题与人数标签换行后各自占一行 */
+  .members__card-head {
+    align-items: flex-start;
+  }
+
+  .members__counts {
+    width: 100%;
+  }
+}
+
+/* 窄屏：输入框与按钮改纵向排列，按钮铺满整行 */
+@media (max-width: 480px) {
   .members__field-row {
     flex-direction: column;
     align-items: stretch;
@@ -636,15 +644,6 @@ const counts = computed(() => ({
 
   .members__submit {
     justify-content: center;
-    width: 100%;
-  }
-
-  /* 标题与人数标签换行后各自占一行 */
-  .members__card-head {
-    align-items: flex-start;
-  }
-
-  .members__counts {
     width: 100%;
   }
 }
