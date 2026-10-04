@@ -6,6 +6,8 @@
 审查报告：`.review-artifacts/a770278-ui-review.md`（本轮视觉复刻审查）、`.review-artifacts/055d914-complete-review.md`（功能迁移审查）、`.review-artifacts/ccf5602-review.md`（第 1 批）
 执行方案：[`docs/superpowers/plans/2026-10-04-frontend-ui-exact-replica.md`](../superpowers/plans/2026-10-04-frontend-ui-exact-replica.md)
 
+> **接手入口**：新的接手者请先读 [`NEXT-frontend-ui-replica.md`](NEXT-frontend-ui-replica.md)（状态、边界、环境恢复步骤、剩余任务与踩坑清单）。本文件保留逐批的完整历史与证据细节。
+
 > **本文件的定位**：主人要求「前端完全复刻 `frontend-ui-revision`，重点检查 UI 效果」。
 > 因此第 1 节之后先记录**视觉复刻**结果（U1–U7），再记录此前功能迁移的批次状态。
 > 「展示范围已覆盖」不等于「视觉完全复刻」，两者分别验收、不互相替代。
@@ -153,7 +155,8 @@ node ../../../.review-artifacts/ui-replica-compare.mjs   # 同数据同视窗与
 | 视觉对照（vs 来源 27bff16，同数据同视窗） | **15 项判定全部 PASS**，见 §0 与下方明细 |
 | `git diff --check 68762e8 HEAD` | 通过（无空白错误） |
 | 边界 diff | `git diff --name-only 68762e8 HEAD -- src/backend src/contracts scripts .env.example src/frontend/src/{stores,router,main.ts}` **无输出**。`src/frontend/src/api` 与 `src/frontend/src/composables` 下**只有 `composables/useRelationEditor.ts` 的冲突边配色**（`#ff4d4f` → `#8a3b26`）与注释不同；已核实来源 `27bff16` 的色值同样是 `#8a3b26`，因此这不是视觉复刻缺口，请求/冲突处理/保存/图谱算法未改 |
-| `bash scripts/verify.sh` | **未通过**：Git Bash 内找不到 `python3`（复审的 `basic` 运行 exit 1）；`full/integration` 未运行（见 §7） |
+| `bash scripts/verify.sh basic` | **实测通过（exit 0）**：契约门禁全绿——`OpenAPI 3.1.0，32 条路径 / 129 个 schema / 385 处 $ref`，B08/B09/B10/B12/B13/B14 共 236 项通过，`Scaffold verification passed.`。前置条件见下方说明 |
+| `bash scripts/verify.sh full` / `integration` | **未运行**（见 §7） |
 
 视觉对照明细（脚本 `.review-artifacts/ui-replica-compare.mjs`，来源构建 `ui-source-27bff16-dist` + 本轮构建 `ui-replica-fixed-dist`，同一合成数据夹具与同一视窗）：
 
@@ -189,7 +192,8 @@ node ../../../.review-artifacts/ui-replica-compare.mjs   # 同数据同视窗与
 
 ## 7. 未完成项与受阻说明
 
-1. **系统门禁未通过**：本机 **Git Bash 存在，但其内找不到 `python3`**，`scripts/verify.sh basic` 以 exit 1 停在第 24 行（复审实测）；`full/integration` 因此未运行。先前「本机无 Bash」的表述不准确，已按复审结论改正。本分支只能记为「**前端实现与前端/视觉验收完成，系统门禁受阻**」，原 R1 的系统级关闭条件尚未满足。真实前后端已由主人本机联调启动（Neo4j 容器 + API + worker + Vite），系统级门禁仍应在约定的质量门禁环境补跑。
+1. **系统门禁**：**`basic` 已实测通过**（exit 0，见 §5）。它的前置条件此前不满足，曾一度被误记为「本机无 Bash / 找不到 python3」——**该结论是错的**：Git Bash 在 `D:\Workspace\Git`（不在 PATH），其内 `python3` 完全可用（`/c/Program Files/Python313/python3`，3.13.7）。真实原因是三者同时缺失：① 契约工具链依赖未安装；② Python 用户级 `Scripts` 目录（`datamodel-codegen` 所在）不在 PATH；③ 未设 `PYTHONUTF8=1`，Python 用 GBK 打印 `✓`/`×` 抛 `UnicodeEncodeError`。补齐后 `basic` 全绿。
+   **`full` / `integration` 仍未运行**：需要后端测试依赖（httpx/pytest 等）与一次性 Neo4j，未在本轮执行。因此本分支记为「**前端实现与前端/视觉验收完成，full 门禁与系统级验收未完成**」，原 R1 的系统级关闭条件尚未满足。
 2. **合成数据的浏览器验收**：U1–U5 与 R1–R5 的对照多为**合成 API 数据**（仓库外脚本托管构建产物并注入固定响应）；R1/R3/R4/R5 另有**真实前后端**实测补充。审核的处理/合并/发布回滚、成员增删、上传进度流、真实模型问答仍需带真实后端逐页验收。
 3. **视觉对照的覆盖范围**：重新出图的是登录、注册、审核、成员、个人设置与 U5 的可读性场景；教师/学生首页、课程概览、资料、教师/学生图谱、问答页沿用审查轮「基本一致」的结论，展示层未改动，但**没有重新逐页出图**。弹窗的完整键盘路径只覆盖了 Esc（R4），Tab 焦点限制未做完整回放。
 4. **`authGraphMotion.ts` 与 `auth-graph-motion.test.ts`**：U1 把 AuthLayout 换回来源的静态示意图后，该动效矩阵不再被页面引用；按计划保留文件与单测，未删除。`h13` 中原本验证动效的三项断言已改为验证来源静态示意图（单图、9 条连线、节点不随帧位移、900px 断点），不是删除测试。
@@ -248,7 +252,7 @@ fd17d50 fix(frontend): restore frontend-ui-revision visual fidelity             
 | 前端全量检查与旧独立探针在最终提交通过 | 已完成：两套 `vue-tsc` 0 错误、29 文件 843 项通过、仓库外 F1/F3 探针 2 项通过、审查方 R1–R3 独立探针 4 项通过、构建成功 |
 | 浏览器的布局、焦点与主要交互验收通过 | 视觉复刻部分已完成：与来源同数据同视窗的 15 项对照判定全部 PASS（含认证页分栏/断点、审核页外层、成员断点、设置页骨架、引用与删除按钮可读性）；**真实后端数据下的写操作链路未验** |
 | 后端与业务保护边界保持 | 已完成：`src/backend`、`src/contracts`、`scripts`、`.env.example`、`stores`、`router`、`main.ts` 无差异；`api/` 无差异；`composables/` 仅 `useRelationEditor.ts` 的冲突边配色与来源一致。个人模型配置、发送锁、会话隔离、晚到结果保护保留 |
-| 所需系统门禁/隔离链路完成 | **未完成**：`scripts/verify.sh basic` 在 Git Bash 内因缺少 `python3` exit 1；`full/integration` 未运行 |
+| 所需系统门禁/隔离链路完成 | **部分完成**：`basic` 实测通过（exit 0）；`full`/`integration` 未运行。此前「缺 Bash/python3」的归因已更正为「缺依赖 + Scripts 不在 PATH + 未设 UTF-8」 |
 | 任务文档、交接、本地提交完成 | 已完成：本交接、执行方案与本地提交齐全；`docs/tasks.md` 已记 FE-MIG 行 |
 
 结论：**视觉复刻与前端验收已完成，系统门禁与真实后端链路验收仍受阻**，原 R1 现在可以记为「界面部分已闭合（含视觉复刻），系统部分待环境」，不能记为完整验收通过。
