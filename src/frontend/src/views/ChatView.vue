@@ -5,6 +5,8 @@ import { CHAT_STREAM_CLIENT_KEY } from '../api/chatStream'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { createPublishedGraphApi, PUBLISHED_GRAPH_API_KEY } from '../api/graph'
 import ChatMarkdown from '../components/ChatMarkdown.vue'
+import SourceViewer from '../components/SourceViewer.vue'
+import { formatSourceLine } from '../composables/sourceLabel'
 import { useChat, type Citation } from '../composables/useChat'
 import { CHAT_ROUTE, COURSE_ROUTE, SETTINGS_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
 import { useCourseStore } from '../stores/course'
@@ -55,6 +57,11 @@ function kpLabel(id: string): string {
   return kpNames.value.get(id) ?? id
 }
 
+const graphLinkAvailable = router.hasRoute(STUDENT_GRAPH_ROUTE)
+function kpQuery(id: string, graphVersion: number | undefined): Record<string, string> {
+  return graphVersion === undefined ? { kp: id } : { kp: id, v: String(graphVersion) }
+}
+
 function openKnowledgePoint(id: string): void {
   if (course.graph && course.graph.graph_version === currentVersion.value && !course.graph.nodes.some((node) => node.id === id)) {
     notice.value = '当前版本已无此知识点'
@@ -63,11 +70,18 @@ function openKnowledgePoint(id: string): void {
   notice.value = `知识点：${kpLabel(id)}`
 }
 
+/** 「文件名 · 第 N 页 · 章节」；缺文件名写「资料不可用」（L12，ADR-085） */
+function citationSource(citation: Citation): { documentName?: string; page?: number; sectionPath?: string; excerpt?: string } {
+  return {
+    documentName: citation.document_name ?? undefined,
+    page: citation.page ?? undefined,
+    sectionPath: citation.section_path ?? undefined,
+    excerpt: citation.text,
+  }
+}
+
 function sourceLine(citation: Citation): string {
-  const parts: string[] = []
-  if (citation.section_path) parts.push(citation.section_path)
-  if (citation.page) parts.push(`第 ${citation.page} 页`)
-  return parts.join(' · ')
+  return formatSourceLine({ documentName: citation.document_name, page: citation.page, sectionPath: citation.section_path })
 }
 
 // 右栏按回答列出全部出处；点正文中的编号时高亮对应一条
@@ -113,16 +127,20 @@ function onKeydown(event: KeyboardEvent): void {
               <p v-if="entry.status === 'error'" class="state" role="alert">本次回答未完成</p>
               <p v-if="entry.relatedKpIds.length && (entry.status === 'answered' || entry.status === 'not_covered')" class="kps">
                 <span class="kps__label">涉及的知识点：</span>
-                <button
-                  v-for="id in entry.relatedKpIds"
-                  :key="id"
-                  type="button"
-                  class="kps__chip"
-                  data-test="chat-kp"
-                  @click="openKnowledgePoint(id)"
-                >
-                  {{ kpLabel(id) }}
-                </button>
+                <template v-for="id in entry.relatedKpIds" :key="id">
+                  <!-- L13-4：跳到本课程图谱并选中该知识点；带上回答所依据的图谱版本，图谱页据此提示版本差异 -->
+                  <RouterLink
+                    v-if="graphLinkAvailable && courseId"
+                    class="kps__chip"
+                    data-test="chat-kp"
+                    :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: courseId }, query: kpQuery(id, entry.graphVersion) }"
+                  >
+                    {{ kpLabel(id) }}
+                  </RouterLink>
+                  <button v-else type="button" class="kps__chip" data-test="chat-kp" @click="openKnowledgePoint(id)">
+                    {{ kpLabel(id) }}
+                  </button>
+                </template>
               </p>
               <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" :disabled="sending" @click="ask(entry.question)">重试</button>
             </div>
@@ -173,10 +191,10 @@ function onKeydown(event: KeyboardEvent): void {
             </button>
           </li>
         </ul>
+        <!-- C05-2：与图谱来源同一个查看器（600 字折叠、文件名与位置、纯文本渲染） -->
         <article v-if="selectedCitation" class="source">
-          <p class="source__where"><b>出处 [{{ selectedCitation.index }}]</b> {{ sourceLine(selectedCitation) }}</p>
-          <blockquote>{{ selectedCitation.text }}</blockquote>
-          <button type="button" data-variant="secondary" @click="selectedCitation = null">收起原文</button>
+          <p class="source__where"><b>出处 [{{ selectedCitation.index }}]</b></p>
+          <SourceViewer :source="citationSource(selectedCitation)" @close="selectedCitation = null" />
         </article>
       </aside>
     </div>

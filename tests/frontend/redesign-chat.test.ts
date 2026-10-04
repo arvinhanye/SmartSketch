@@ -77,10 +77,11 @@ describe('问答页改版', () => {
     expect(wrapper.findAll('[data-test="chat-kp"]').map((chip) => chip.text())).toEqual([KP_STACK, KP_MISSING])
   })
 
-  it('出处列出章节与页码，不显示文档标识；点开后显示原文', async () => {
+  it('出处列出文件名、页码与章节，不显示文档标识；点开后显示原文', async () => {
     const wrapper = await mountChat({ getPublished: async (_cid, version) => graph(version) })
     const aside = wrapper.get('aside[aria-label="引用原文"]')
-    expect(aside.text()).toContain('第3章 栈与队列 > 3.2 栈 · 第 46 页')
+    // L12（ADR-085）：统一为「文件名 · 第 N 页 · 章节」；本用例的引用没有 document_name，写「资料不可用」
+    expect(aside.text()).toContain('资料不可用 · 第 46 页 · 第3章 栈与队列 > 3.2 栈')
     expect(wrapper.text()).not.toContain('doc_a92d011b8b')
     expect(aside.find('blockquote').exists()).toBe(false)
     await aside.get('.source-list__item').trigger('click')

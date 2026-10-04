@@ -1,0 +1,280 @@
+{
+  "measurement_commit": "88f9f6f8a9fa2cf66c0754050df96fb4df6d363f",
+  "read_only": true,
+  "paid_calls": 0,
+  "migrations": [
+    "017_model_call_reasoning.sql",
+    "018_model_config_disable_thinking.sql"
+  ],
+  "pdf": {
+    "course2": {
+      "task_id": "4ca2a373c5ad4dd4beac3d7f1269a5cc",
+      "course_id": "5772f37ff9e041e0bb5e5606ba4587b0",
+      "server_seconds": 20.738,
+      "client_seconds": 20.9,
+      "model_span_seconds": 17.646,
+      "non_model_client_seconds": 3.254,
+      "last_model_finished_at": "2026-10-04T04:56:42.120Z",
+      "awaiting_review_at": "2026-10-04T04:56:43.174Z",
+      "tail_without_model_seconds": 1.054,
+      "calls": 30,
+      "tokens": 32842,
+      "repair": 0,
+      "nodes": 68,
+      "edges": 58,
+      "edge_types": {
+        "CONTAINS": 28,
+        "RELATED_TO": 23,
+        "EXAMPLE_OF": 3,
+        "PREREQUISITE": 4
+      },
+      "isolated": 2,
+      "acyclic": true,
+      "nonempty_origin_tag": 68,
+      "checkpoint_entity_sources_with_same_course_chunk_locator": 68,
+      "persisted_node_source_refs_independently_verified": false,
+      "binding": {
+        "config_version": 2,
+        "disable_thinking": 1
+      },
+      "reported_phases_ms_not_retained_in_logs": {
+        "parsing_ms": 629,
+        "extracting_ms": 17720,
+        "merging_ms": 9,
+        "persisting_ms": 1037
+      },
+      "server_minus_reported_phases_seconds": 1.343
+    },
+    "course1": {
+      "task_id": "fc66ece9f71d419485490e44273ee266",
+      "course_id": "ee9633a27f23407dbb30fee6c9a6490b",
+      "server_seconds": 27.726,
+      "client_seconds": 28.08,
+      "model_span_seconds": 18.866,
+      "non_model_client_seconds": 9.214,
+      "last_model_finished_at": "2026-10-04T05:04:57.379Z",
+      "awaiting_review_at": "2026-10-04T05:05:03.866Z",
+      "tail_without_model_seconds": 6.487,
+      "calls": 31,
+      "tokens": 40292,
+      "repair": 0,
+      "nodes": 76,
+      "edges": 61,
+      "edge_types": {
+        "EXAMPLE_OF": 12,
+        "RELATED_TO": 25,
+        "PREREQUISITE": 2,
+        "CONTAINS": 22
+      },
+      "isolated": 11,
+      "acyclic": true,
+      "nonempty_origin_tag": 76,
+      "checkpoint_entity_sources_with_same_course_chunk_locator": 76,
+      "persisted_node_source_refs_independently_verified": false,
+      "binding": {
+        "config_version": 2,
+        "disable_thinking": 1
+      },
+      "reported_phases_ms_not_retained_in_logs": {
+        "parsing_ms": 807,
+        "extracting_ms": 18959,
+        "merging_ms": 6,
+        "persisting_ms": 6471
+      },
+      "server_minus_reported_phases_seconds": 1.483
+    }
+  },
+  "qa": {
+    "counts": {
+      "answered": 11,
+      "not_covered": 2
+    },
+    "statistics": {
+      "client_elapsed_seconds": {
+        "n": 13,
+        "min": 0.48,
+        "p50": 1.62,
+        "p95": 3.34,
+        "max": 3.34
+      },
+      "server_latency_ms": {
+        "n": 13,
+        "min": 481,
+        "p50": 1613,
+        "p95": 3329,
+        "max": 3329
+      },
+      "server_first_delta_ms": {
+        "n": 11,
+        "min": 779,
+        "p50": 1342,
+        "p95": 2918,
+        "max": 2918
+      },
+      "client_sse_first_delta_ms": {
+        "n": 11,
+        "min": 783,
+        "p50": 1346,
+        "p95": 2927,
+        "max": 2927
+      }
+    },
+    "answered_client_seconds": {
+      "n": 11,
+      "min": 1.41,
+      "p50": 1.66,
+      "p95": 3.34,
+      "max": 3.34
+    },
+    "citations_same_course_with_locator": 20,
+    "browser_first_token": "not_measured",
+    "generation_tokens": 24960,
+    "embedding_tokens": 59,
+    "generation_calls": 11,
+    "embedding_calls": 10,
+    "repeat_comparison_answered": 3,
+    "comparison_answered_including_original": 4,
+    "v3_thinking_on_projection": {
+      "observed_input_tokens": 23879,
+      "output_ceiling": 22528,
+      "actual_input_plus_output_ceiling": 46407,
+      "unknown_usage_upper_estimate": 118052,
+      "largest_call_estimate": 13004,
+      "thirteen_calls_at_largest_estimate": 169052
+    }
+  },
+  "budget": {
+    "generation_known": 829784,
+    "old_unknown_estimate": 12116,
+    "manual_probe": 2551,
+    "generation_system_before": 746357,
+    "increment": 98094,
+    "generation_system_after": 844451,
+    "approved_total": 900000,
+    "remaining": 55549,
+    "embedding_before": 11946,
+    "embedding_after": 12005,
+    "new_unknown_usage_calls": 0,
+    "measurement_groups": "two PDF tasks plus one QA round (three question groups)"
+  },
+  "old_c03_1": {
+    "task_id": "ee55f36cf0ca46fb84f99ed5c9839941",
+    "client_seconds": 91.34,
+    "server_seconds": 91.229,
+    "non_model_client_seconds": 18.742,
+    "last_model_finished_at": "2026-10-04T02:58:54.598Z",
+    "awaiting_review_at": "2026-10-04T02:59:10.241Z",
+    "tail_without_model_seconds": 15.643,
+    "calls": 33,
+    "repair": 2,
+    "usage_reasoning": 47055
+  },
+  "retained_logs": {
+    ".demo/c03b/logs/worker.log": {
+      "bytes": 82,
+      "lines": 1,
+      "stage_timer_lines": 0
+    },
+    ".demo/c03b/logs/api.log": {
+      "bytes": 2126,
+      "lines": 27,
+      "stage_timer_lines": 0
+    },
+    ".demo/c03b/logs/migrate.log": {
+      "bytes": 25,
+      "lines": 1,
+      "stage_timer_lines": 0
+    }
+  },
+  "manifest": {
+    "evaluation/raw/c03b/course2-pdf-task-audit.json": {
+      "sha256": "2a3d487cb866d7d9bb2eb4504cb86a3c81b08c4020029e51121172bc0e851325",
+      "bytes": 2282
+    },
+    "evaluation/raw/c03b/course2-pdf-draft-thinking-disabled.json": {
+      "sha256": "9c6b8ce343b1d3d644cd0098ea4c5e67b1ba73cdec0c7d8353345abc94ec7315",
+      "bytes": 55909
+    },
+    "evaluation/raw/c03b/course2-pdf-extract.json": {
+      "sha256": "3975fbd757c9390787c3b33da92d53700b12e13cf0467ac10934771c82862839",
+      "bytes": 192
+    },
+    "evaluation/raw/c04/course2-pdf-h2-thinking-off-predictions.json": {
+      "sha256": "50fa5348ae0c24bd458181f2f6b39ab35a09aaca7d5f776cc4a07f972aa2a640",
+      "bytes": 40219
+    },
+    "evaluation/raw/c03b/course1-pdf-task-audit.json": {
+      "sha256": "e1658f33bccad304a52077da26df81531e39c2bef530cb666b21eabd453dcca5",
+      "bytes": 2283
+    },
+    "evaluation/raw/c03b/course1-pdf-draft-thinking-disabled.json": {
+      "sha256": "2db2aff95ca217c017bb589e2a31fe4936508dd9eebc71d92be501e20135fbdc",
+      "bytes": 60830
+    },
+    "evaluation/raw/c03b/course1-pdf-extract.json": {
+      "sha256": "bf7c01083b4679187ea3b47e4dabd2e783af625e14b415ffb413a701396f7a96",
+      "bytes": 193
+    },
+    "evaluation/raw/c04/course1-pdf-h2-thinking-off-predictions.json": {
+      "sha256": "a94bb86cca66a4ca24c498bfd3938dee67326ac87d75a5d3488b322a378acd47",
+      "bytes": 44131
+    },
+    "evaluation/raw/c02b-qa/all.jsonl": {
+      "sha256": "3594d9ee483829e7d7cc2935dc1d4aa4f9b8de7581ee997e3766f2af5d9d5d64",
+      "bytes": 5168
+    },
+    "evaluation/raw/c02b-qa/audit-records.json": {
+      "sha256": "1441653621e35d6c1c11bbb36603603fe8344dce80c7c721217b028837629fb9",
+      "bytes": 15303
+    },
+    "evaluation/raw/c02b-qa/audit-window.json": {
+      "sha256": "57ff028140c5ad5f15343e4708a1bbf18a2a74c081977dacf67ffbb3bcb48e49",
+      "bytes": 11825
+    },
+    "evaluation/raw/c02b-qa/repeat.jsonl": {
+      "sha256": "9ce085f368ede0dee9cd57cd06af5065dd279f09714a9928adbb0f89f7cebd7e",
+      "bytes": 1187
+    },
+    "evaluation/raw/c03/course2-pdf-task-audit.json": {
+      "sha256": "bba67f4d580c5cc36091fa4967fd852e64fed934dda575824c9bbb2f3df2ebe6",
+      "bytes": 2415
+    },
+    ".demo/c03b/logs/worker.log": {
+      "sha256": "a91e53499f2a0f18296a57b70a93f7c82e1536718b35b67c52ba5efdb31e406f",
+      "bytes": 82
+    },
+    ".demo/c03b/logs/api.log": {
+      "sha256": "eb3bd283cc2f954470bc9f9231bd836a376d04c522ca60728986a05f8bc385a8",
+      "bytes": 2126
+    },
+    ".demo/c03b/logs/migrate.log": {
+      "sha256": "e613c2e782b43dd391463bd60fdbd34597bb46dadb495a9b4bf19c7d356a4f63",
+      "bytes": 25
+    },
+    "docs/handoffs/deepseek-plan-c-to-codex.md": {
+      "sha256": "68e4fcf02dd84425e03c267fdf6c58477cba365acfb50a6335f5ad1a0b116ec5",
+      "bytes": 9814
+    },
+    "docs/handoffs/deepseek-plan-c-thinking-disabled.md": {
+      "sha256": "21a1681f0c74c4d715d531629add5e07c7558c55bd914a1c3b90a2ad85aabc53",
+      "bytes": 12138
+    },
+    "evaluation/reports/c03b-pdf-thinking-disabled.md": {
+      "sha256": "94d031226a17411f4b65862b29c86ebd5057000196788fd269c28d02d93d6222",
+      "bytes": 15522
+    },
+    "evaluation/reports/c02b-qa-thinking-disabled.md": {
+      "sha256": "e7abcc20cdfde0aa55593d50d31411842c657754c1b43bdbfa3627914c4d3fae",
+      "bytes": 10723
+    },
+    "evaluation/raw/c04/course1-pdf-h2-thinking-off-worksheet.md": {
+      "sha256": "16a086202c6ebd3fd553ad51842b19d09d1ce6a32ce3e15e30064794197c80a0",
+      "bytes": 26759
+    },
+    "evaluation/raw/c04/course2-pdf-h2-thinking-off-worksheet.md": {
+      "sha256": "f11ebc136d8f22fd27e3feda6e82874546f2eea50e829c05e8d96c70fa7d4122",
+      "bytes": 24118
+    }
+  },
+  "stage_c_status": "OPEN"
+}

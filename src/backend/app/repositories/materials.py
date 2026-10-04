@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import sqlite3
 from dataclasses import dataclass
 from typing import Literal
@@ -178,3 +180,16 @@ def _delete_material(
     database.execute("DELETE FROM processing_tasks WHERE course_id = ? AND document_id = ?", scope)
     database.execute("DELETE FROM materials WHERE course_id = ? AND id = ?", scope)
     return MaterialDeleted(material.storage_name)
+
+
+def material_names(sqlite_url: str, *, course_id: str, material_ids: Iterable[str]) -> dict[str, str]:
+    """同一课程内资料 ID → 原始文件名（L12，ADR-085）；他课或已删除的 ID 不出现在结果里。"""
+    ids = sorted(set(material_ids))
+    if not ids:
+        return {}
+    marks = ",".join("?" * len(ids))
+    with connect(sqlite_url) as database:
+        rows = database.execute(
+            f"SELECT id, filename FROM materials WHERE course_id = ? AND id IN ({marks})", (course_id, *ids)
+        ).fetchall()
+    return {row[0]: row[1] for row in rows}

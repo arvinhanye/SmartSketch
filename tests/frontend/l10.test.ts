@@ -226,3 +226,34 @@ describe('L10 未配置个人模型 API 的引导', () => {
     expect(wrapper.find('[data-test="model-config-required"]').exists()).toBe(false)
   })
 })
+
+describe('ADR-090 关闭模型思考开关', () => {
+  it('显示已存状态；改动后保存才发送该字段', async () => {
+    const api = fakeApi({ ...SAVED, disable_thinking: false },
+      { save: async (body) => ({ ...SAVED, base_url: body.base_url, model: body.model, disable_thinking: body.disable_thinking ?? false }) })
+    const wrapper = await mountView(api)
+    const box = wrapper.get('[data-test="mc-disable-thinking"]')
+    expect((box.element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.text()).toContain('thinking')
+    await box.setValue(true)
+    await wrapper.get('[data-test="mc-form"]').trigger('submit')
+    await flushPromises()
+    expect(api.save).toHaveBeenLastCalledWith({ base_url: SAVED.base_url, model: 'm1', disable_thinking: true }, expect.anything())
+    expect((wrapper.get('[data-test="mc-disable-thinking"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('测试表单值时带上开关；测试已存配置但开关已改时先要求保存', async () => {
+    const api = fakeApi({ ...SAVED, disable_thinking: false })
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-disable-thinking"]').setValue(true)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(api.test).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-test="mc-error"]').text()).toContain('开关')
+    await wrapper.get('[data-test="mc-api-key"]').setValue(KEY)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    expect(api.test).toHaveBeenLastCalledWith(
+      { base_url: SAVED.base_url, model: 'm1', api_key: KEY, disable_thinking: true }, expect.anything())
+  })
+})

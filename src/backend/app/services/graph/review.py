@@ -58,7 +58,7 @@ from app.services.fusion.normalize import (
 )
 from app.services.graph.edit_node import EditContext, InvalidEdit, _course_write
 from app.services.graph.merge_nodes import merge_nodes
-from app.services.graph.read import _chunks, _relation, _relation_chunk_ids, _source_ref
+from app.services.graph.read import _chunk_names, _chunks, _relation, _relation_chunk_ids, _source_ref
 
 __all__ = [
     "DEFAULT_LIMIT",
@@ -277,10 +277,11 @@ def _ref(p: Mapping[str, Any]) -> dict[str, Any]:
 
 def _relations(ctx: EditContext, scope: GraphScope, edges: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     chunks = _chunks(ctx.sqlite_url, scope.course_id, {c for e in edges for c in _relation_chunk_ids(e, scope)})
+    names = _chunk_names(ctx.sqlite_url, scope.course_id, chunks)
     out = []
     for e in edges:
         refs = [ref for cid in _relation_chunk_ids(e, scope)
-                if (ref := _source_ref(chunks.get(cid), None, None, None)) is not None]
+                if (ref := _source_ref(chunks.get(cid), None, None, None, names)) is not None]
         relation: Relation | None = _relation(scope.course_id, e, refs)
         if relation is not None:
             out.append(relation.model_dump(mode="json", exclude_none=True))

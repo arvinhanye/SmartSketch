@@ -13,6 +13,7 @@ import {
 /**
  * 课程知识图谱画布（H04）：只负责把适配图画出来并支持缩放、拖拽。
  * 数据请求、筛选与详情由页面和后续组件负责；`graph` 为 null 表示数据尚未到达。
+ * L13：初始视口不低于可读缩放（`data-zoom` 记录当前缩放）；`focus(kpId)` 供页面在搜索、跳转后聚焦。
  */
 const props = withDefaults(
   defineProps<{ graph: GraphCanvasData | null; label?: string; layout?: GraphLayoutName }>(),
@@ -25,7 +26,10 @@ const factory = inject(GRAPH_FACTORY_KEY, loadG6Graph)
 const stage = ref<HTMLElement | null>(null)
 const status = ref<LifecycleStatus | 'idle'>('idle')
 const drawnOnce = ref(false)
+const zoom = ref<number | null>(null)
 let lifecycle: GraphLifecycle | null = null
+/** 生命周期建好之前请求的聚焦 */
+let pendingFocus: string | null = null
 
 const loading = computed(
   () => props.graph === null || (!drawnOnce.value && status.value !== 'error'),
@@ -50,8 +54,23 @@ function start(): void {
       status.value = next
       if (next === 'ready') drawnOnce.value = true
     },
+    onZoom: (value) => {
+      zoom.value = Math.round(value * 100) / 100
+    },
   })
+  if (pendingFocus !== null) {
+    lifecycle.focus(pendingFocus)
+    pendingFocus = null
+  }
 }
+
+/** 把视口移到该知识点；画布尚未建好时在首次渲染后执行 */
+function focus(kpId: string): void {
+  if (lifecycle === null) pendingFocus = kpId
+  else lifecycle.focus(kpId)
+}
+
+defineExpose({ focus })
 
 function stop(): void {
   lifecycle?.destroy()
@@ -85,7 +104,7 @@ onBeforeUnmount(stop)
 </script>
 
 <template>
-  <section class="graph-canvas" :aria-busy="loading ? 'true' : 'false'">
+  <section class="graph-canvas" data-test="graph-canvas" :data-zoom="zoom ?? undefined" :aria-busy="loading ? 'true' : 'false'">
     <div ref="stage" class="graph-canvas__stage" role="img" :aria-label="ariaLabel" />
     <div v-if="status === 'error'" class="graph-canvas__overlay" role="alert">
       <p>图谱渲染失败，请重试。</p>

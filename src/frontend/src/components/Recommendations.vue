@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Recommendation } from '../api/recommend'
-import { PRIMARY_FACTOR_LABELS, reasonFactRows, weightedFactRows } from '../composables/useLearning'
+import { pathLine, PRIMARY_FACTOR_LABELS, reasonFactRows, weightedFactRows } from '../composables/useLearning'
+import type { LearningPath } from '../graph/learningPath'
 
 /**
  * 下一步推荐列表（I06，ADR-075）。
@@ -9,6 +11,9 @@ import { PRIMARY_FACTOR_LABELS, reasonFactRows, weightedFactRows } from '../comp
  * 事实行取自 `reason_facts`——前端不自行计算分量、不把权重乘出分数（`specs/learning-path.md` §4）。
  * `state` 是契约闭集：`recommendations`（有候选）与 `all_mastered`（全部掌握的空态）；两者都不是错误。
  * `selectedId` 命中的条目高亮，与图谱上的 `recommended` 状态色对应。
+ *
+ * L14：顶部一行用先修事实说明当前解释的推荐项（`narrative`，来自 `graph/learningPath`）；每项带序号，
+ * 与画布节点标签的「1. 」一致；分量明细改称「排序参考」，中性值 0.5 写「未标注」。
  */
 const props = withDefaults(
   defineProps<{
@@ -19,11 +24,25 @@ const props = withDefaults(
     loading?: boolean
     error?: string | null
     selectedId?: string | null
+    narrative?: LearningPath['narrative'] | null
+    /** C05-3：与 narrative 同序的编号；给出时「之后解锁」的名称可点击定位 */
+    narrativeIds?: LearningPath['narrativeIds'] | null
   }>(),
-  { version: null, loading: false, error: null, selectedId: null },
+  { version: null, loading: false, error: null, selectedId: null, narrative: null, narrativeIds: null },
 )
 
-defineEmits<{ select: [kpId: string]; retry: [] }>()
+const line = computed(() => (props.narrative === null ? '' : pathLine(props.narrative)))
+/** 「之后解锁」之前的部分（与 pathLine 同一写法），解锁名称另渲染为按钮 */
+const lead = computed(() => (props.narrative === null ? '' : pathLine({ ...props.narrative, unlocks: [] })))
+const unlockLinks = computed(() => {
+  const names = props.narrative?.unlocks ?? []
+  const ids = props.narrativeIds?.unlocks ?? []
+  return line.value !== '' && names.length > 0 && names.length === ids.length
+    ? names.map((name, i) => ({ id: ids[i]!, name }))
+    : []
+})
+
+defineEmits<{ select: [kpId: string]; retry: []; locate: [kpId: string] }>()
 
 function highlighted(kpId: string): string {
   return props.selectedId === kpId ? 'true' : 'false'
@@ -49,12 +68,13 @@ function highlighted(kpId: string): string {
     <p v-else-if="items.length === 0" data-test="rc-empty" role="status">当前没有可学的知识点。</p>
 
     <template v-else>
+      <p v-if="line !== ''" class="recommendations__path" data-test="rc-path-line"><template v-if="unlockLinks.length > 0">{{ lead }} → 之后解锁：<template v-for="(item, index) in unlockLinks" :key="item.id"><span v-if="index > 0">、</span><button type="button" class="recommendations__unlock" :data-test="`rc-unlock-${item.id}`" :aria-label="`在图中定位：${item.name}`" @click="$emit('locate', item.id)">{{ item.name }}</button></template></template><template v-else>{{ line }}</template></p>
       <p class="recommendations__total" data-test="rc-total">
         共 {{ totalEligible }} 个可学知识点，显示前 {{ items.length }} 个。
       </p>
       <ol class="recommendations__list">
         <li
-          v-for="item in items"
+          v-for="(item, index) in items"
           :key="item.kp_id"
           class="recommendations__item"
           data-test="rc-item"
@@ -62,14 +82,21 @@ function highlighted(kpId: string): string {
           :data-primary-factor="item.reason_facts.primary_factor"
           :data-highlighted="highlighted(item.kp_id)"
         >
-          <button type="button" class="recommendations__select" :data-test="`rc-select-${item.kp_id}`" @click="$emit('select', item.kp_id)">
+              <span class="recommendations__order" data-test="rc-order" aria-hidden="true">{{ index + 1 }}.</span>
+        <button type="button" class="recommendations__select" :data-test="`rc-select-${item.kp_id}`" @click="$emit('select', item.kp_id)">
             {{ item.name }}
           </button>
           <p class="recommendations__reason" data-test="rc-reason">{{ item.reason }}</p>
           <details class="recommendations__details">
-          <summary>评分明细</summary>
+          <summary>排序参考</summary>
           <dl class="recommendations__facts">
-            <div v-for="row in reasonFactRows(item)" :key="row.key" data-test="rc-fact" :data-fact="row.key">
+            <div
+              v-for="row in reasonFactRows(item)"
+              :key="row.key"
+              data-test="rc-fact"
+              :data-fact="row.key"
+              :data-default="row.labelledDefault ? 'true' : undefined"
+            >
               <dt>{{ row.label }}</dt>
               <dd>{{ row.value }}</dd>
             </div>
@@ -109,10 +136,8 @@ function highlighted(kpId: string): string {
   margin: 0;
   display: grid;
   gap: 0.5rem;
-  counter-reset: rc;
 }
 .recommendations__item {
-  counter-increment: rc;
   border: 1px solid var(--color-border, #d9d9d9);
   border-radius: var(--radius-sm, 6px);
   padding: 0.5rem 0.65rem;
@@ -132,10 +157,24 @@ function highlighted(kpId: string): string {
   font-weight: 600;
   text-align: left;
 }
-.recommendations__select::before {
-  content: counter(rc) ' · ';
+.recommendations__order {
   color: var(--color-text-muted, #595959);
   font-weight: 500;
+  margin-right: 0.25rem;
+}
+.recommendations__unlock {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-primary, #1c6e8c);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+.recommendations__path {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 .recommendations__select:hover:not(:disabled) {
   background: none;

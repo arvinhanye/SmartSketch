@@ -127,6 +127,8 @@ function recommendation(kpId: string, overrides: Partial<Recommendation> = {}): 
       importance: 1,
       centrality: 1,
       difficulty: 0.5,
+      importance_defaulted: false,
+      difficulty_defaulted: true,
     },
     ...overrides,
   }
@@ -274,9 +276,11 @@ async function selectNode(wrapper: VueWrapper, kpId: string): Promise<void> {
   await flushPromises()
 }
 
+/** 掌握与推荐状态；L14 叠加的学习路径状态在 l14.test.ts 单独断言，这里滤掉 */
+const PATH_STATES: ReadonlySet<string> = new Set(['dimmed', 'pathPrereq', 'pathUnlock'])
 function nodeStates(wrapper: VueWrapper): Map<string, readonly string[]> {
   const graph = wrapper.findComponent(GraphCanvas).props('graph') as GraphCanvasData | null
-  return new Map((graph?.nodes ?? []).map((node) => [node.data.kpId, node.states ?? []]))
+  return new Map((graph?.nodes ?? []).map((node) => [node.data.kpId, (node.states ?? []).filter((s) => !PATH_STATES.has(s))]))
 }
 
 function masteryButtons(wrapper: VueWrapper): Array<ReturnType<VueWrapper['get']>> {
@@ -376,7 +380,10 @@ describe('I06 掌握状态到节点视觉属性（纯函数）', () => {
   it('画布为四个学习状态定义了样式（状态色真实接线，不是测试里的硬编码）', () => {
     const options = buildGraphOptions({ container: document.createElement('div'), width: 100, height: 100, data: graph })
     const nodeState = (options.node as { state: Record<string, unknown> }).state
-    expect(Object.keys(nodeState).sort()).toEqual(['learning', 'lowConfidence', 'mastered', 'notStarted', 'recommended', 'rejected', 'selected'])
+    // L14 追加的学习路径状态（dimmed/pathPrereq/pathUnlock）另见 l14.test.ts
+    expect(Object.keys(nodeState).sort()).toEqual(
+      ['dimmed', 'learning', 'lowConfidence', 'mastered', 'notStarted', 'pathPrereq', 'pathUnlock', 'recommended', 'rejected', 'selected'],
+    )
     expect(nodeState.mastered).toMatchObject({ stroke: '#52c41a' })
   })
 })
@@ -388,7 +395,8 @@ describe('I06 推荐理由与服务端分量一致（纯函数）', () => {
     expect(rows.get('unlock_count')).toBe('2 个')
     expect(rows.get('importance')).toBe('1.0000')
     expect(rows.get('centrality')).toBe('1.0000')
-    expect(rows.get('difficulty')).toBe('0.5000')
+    // L14-3：缺失属性的中性值 0.5 不冒充测量值
+    expect(rows.get('difficulty')).toBe('未标注（按中性值 0.5 排序）')
     expect(rows.get('chapter')).toBe('第一章 线性表（秩 0）')
     expect(rows.get('primary_factor')).toBe(PRIMARY_FACTOR_LABELS.unlock)
     const weighted = new Map(weightedFactRows(item).map((row) => [row.key, row.value]))

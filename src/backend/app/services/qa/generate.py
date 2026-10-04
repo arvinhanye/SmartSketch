@@ -109,11 +109,11 @@ logger = logging.getLogger(__name__)
 
 #: 提示词用途与本模块固定使用的版本；改模板须同时升此版本与 ``prompts/MANIFEST.md``。
 ANSWER_PROMPT_PURPOSE: Final = "answer_with_context"
-ANSWER_PROMPT_VERSION: Final = 2
+ANSWER_PROMPT_VERSION: Final = 3
 #: ``ModelRequest.purpose`` / ``model_calls.purpose``：Q5「生成调用」按此用途计数。
 ANSWER_CALL_PURPOSE: Final = ANSWER_PROMPT_PURPOSE
 #: 输出上限（暂定值，ADR-068 待决 1）：约 800～1000 个汉字的回答，覆盖分点讲解；超出即 O6 截断。
-ANSWER_MAX_OUTPUT_TOKENS: Final = 1024
+ANSWER_MAX_OUTPUT_TOKENS: Final = 2048
 #: 供应商超时时，剩余链路时间不超过此值才算链路时限到期（两套单调时钟的读数误差）。
 TIMEOUT_SLACK_SECONDS: Final = 0.25
 #: 没有图谱结构上下文时的占位行，避免提示里出现空段。

@@ -69,6 +69,7 @@ import ssl
 import threading
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final, Literal, Protocol
 from urllib.parse import urlsplit
 
@@ -91,6 +92,7 @@ from .client import (
     StreamDelta,
     StreamDone,
     StreamEvent,
+    StreamReasoning,
     Usage,
 )
 
@@ -367,7 +369,39 @@ def _parse_usage(value: object) -> Usage | None:
         return None
     if not _is_count(prompt) or not _is_count(completion):  # also rejects bool
         return None
-    return Usage(prompt, completion)
+    details = value.get("completion_tokens_details")
+    reasoning = details.get("reasoning_tokens") if isinstance(details, dict) else None
+    # ADR-089: optional; an unparseable count is dropped without discarding the usage itself
+    return Usage(prompt, completion, reasoning_tokens=reasoning if _is_count(reasoning) else None)
+
+
+#: ADR-090: request fields an ``extra_body`` may never replace
+CORE_PAYLOAD_FIELDS: Final = frozenset({"model", "messages", "stream", "stream_options", "response_format"}) | MAX_TOKENS_FIELDS
+
+
+def _plain_copy(value: Any) -> Any:
+    """Deep copy into plain JSON types (mappings → dict, sequences → list)."""
+    if isinstance(value, Mapping):
+        return {str(key): _plain_copy(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_copy(item) for item in value]
+    return value
+
+
+#: ADR-090: the only thinking switch verified on a real provider (C02b probe, DeepSeek)
+THINKING_DISABLED: Final = MappingProxyType({"thinking": MappingProxyType({"type": "disabled"})})
+
+def thinking_body(disable_thinking: bool) -> Mapping[str, Any] | None:
+    """ADR-090: the ``extra_body`` for a user's switch; ``None`` (nothing added) when it is off."""
+    return THINKING_DISABLED if disable_thinking else None
+
+
+#: ADR-089: fields providers use for (non-answer) reasoning text; only their length is kept
+REASONING_FIELDS: Final = ("reasoning_content", "reasoning")
+
+
+def _reasoning_chars(container: dict[str, Any]) -> int:
+    return sum(len(text) for name in REASONING_FIELDS if isinstance(text := container.get(name), str))
 
 
 def _parse_embedding_usage(value: object) -> Usage | None:
@@ -609,6 +643,7 @@ class CompatibleModelClient(_CompatibleHttpClient):
         max_tokens_field: Literal["max_tokens", "max_completion_tokens"] = "max_tokens",
         max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
         clock: Callable[[], float] = time.monotonic,
+        extra_body: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             base_url,
@@ -621,6 +656,11 @@ class CompatibleModelClient(_CompatibleHttpClient):
         if max_tokens_field not in MAX_TOKENS_FIELDS:
             raise ValueError(f"CompatibleModelClient: max_tokens_field must be one of {sorted(MAX_TOKENS_FIELDS)}")
         self._max_tokens_field = max_tokens_field
+        # ADR-090: extra request fields fixed at construction (a deep, plain copy); never override core fields
+        self._extra_body = _plain_copy(extra_body or {})
+        clash = sorted(set(self._extra_body) & CORE_PAYLOAD_FIELDS)
+        if clash:
+            raise ValueError(f"CompatibleModelClient: extra_body must not override {clash}")
 
     @classmethod
     def from_settings(
@@ -658,6 +698,7 @@ class CompatibleModelClient(_CompatibleHttpClient):
             payload["response_format"] = {"type": "json_object"}
         if stream:
             payload["stream_options"] = {"include_usage": True}
+        payload.update(_plain_copy(self._extra_body))
         return payload
 
     def _open(self, request: ModelRequest, *, stream: bool) -> tuple[HttpResponse, float]:
@@ -697,12 +738,14 @@ class CompatibleModelClient(_CompatibleHttpClient):
         finish_reason = _finish(choices[0].get("finish_reason"))
         if not isinstance(content, str) or finish_reason is None:
             raise _Fail(_malformed(model, status, usage))
+        reasoning = _reasoning_chars(message) if isinstance(message, dict) else 0
         return ModelResult(
             text=content,
             model_requested=model,
             model_responded=_parse_model(parsed.get("model")),
             usage=usage,
             finish_reason=finish_reason,
+            reasoning_chars=reasoning or None,
         )
 
     def stream(self, request: ModelRequest) -> Generator[StreamEvent, None, None]:
@@ -742,6 +785,7 @@ class CompatibleModelClient(_CompatibleHttpClient):
             usage: Usage | None = None
             responded: str | None = None
             finish_reason: str | None = None
+            reasoning = 0
             for data in self._sse_data(response, deadline, model, status):
                 if data == "[DONE]":
                     reason = _finish(finish_reason)
@@ -753,6 +797,7 @@ class CompatibleModelClient(_CompatibleHttpClient):
                         model_responded=responded,
                         usage=usage,
                         finish_reason=reason,
+                        reasoning_chars=reasoning or None,
                     )
                     response.close()  # release before handing over the last event
                     yield StreamDone(result)
@@ -787,6 +832,11 @@ class CompatibleModelClient(_CompatibleHttpClient):
                     content = delta.get("content")
                     if content is not None and not isinstance(content, str):
                         raise _Fail(_malformed(model, status, usage))
+                    thought = _reasoning_chars(delta)
+                    if thought:
+                        # ADR-089: length only; the reasoning text never joins the answer
+                        reasoning += thought
+                        yield StreamReasoning(thought)
                     if choice.get("finish_reason") is not None:
                         finish_reason = choice["finish_reason"]
                     if content:

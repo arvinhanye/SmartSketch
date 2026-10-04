@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-04",
+  "task_id": "C-INTEGRATE-20261004",
+  "code_base": "54a7c67",
+  "repair_branch": "codex/plan-c-acceptance-fixes",
+  "worktree_head_before_repair_commit": "df2b44a57671c9b990b088be6a0b9c466b976b34",
+  "clean_verification_worktree": "/Users/arvinhan/.codex/worktrees/plan-c-publish-verify/SmartSketch",
+  "no_env_file_in_gate": true,
+  "model_calls": "local fake provider only; no real generation or online embedding requests",
+  "targeted": {
+    "command": "PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/test_c02_phase_logs.py tests/tooling/test_c_acc_sources.py tests/tooling/test_c04_signoff_sheet.py tests/tooling/test_c04_accuracy.py -q -p no:cacheprovider",
+    "passed": 61,
+    "exit_code": 0,
+    "log": "/private/tmp/codex-publish-targeted.log",
+    "sha256": "4e4547a8fe0c09046c6df606ae059d37e8d06e0f5be8c1303d9c4f72a36eeed1"
+  },
+  "integration": {
+    "command": "env -i [isolated local variables] /bin/bash ./scripts/verify.sh integration",
+    "exit_code": 0,
+    "log": "/private/tmp/codex-publish-integration.log",
+    "sha256": "2b53d5181f7d7c67ca8be2023477df88cb472953881d26ced3c6c9d1209a1517",
+    "backend_tooling": {
+      "passed": 3921,
+      "registered_skips": 27
+    },
+    "frontend": {
+      "passed": 934,
+      "files": 38,
+      "typecheck_build": "passed"
+    },
+    "integration": {
+      "passed": 393,
+      "registered_skips": 4
+    },
+    "backend_live": {
+      "passed": 44
+    },
+    "demo_e2e": {
+      "passed": 2
+    },
+    "personal_fake_e2e": {
+      "passed": 4
+    },
+    "ports": {
+      "api": 19400,
+      "web": 16483,
+      "e2e_neo4j": 19388,
+      "fake_provider": 19890,
+      "verify_neo4j": 19389
+    }
+  },
+  "verification_code_sha256": {
+    "evaluation/c04_signoff.py": "5392ecf7971c4bb3adcb19615dcf300025db9d3df3005ffaff7d0f34dd0ad2f8",
+    "src/backend/app/workers/persist_graph.py": "c391f6781b4870110049ec85b1b55bc7d8b1d145c56430cc39c79666a2a14b01",
+    "tests/backend/test_c02_phase_logs.py": "7a6a1b89530f0541b0ebdc3b092725bf2759e1294b78ba596bacfd9e63b470ca",
+    "tests/tooling/test_c04_signoff_sheet.py": "a07dc025fe6bd890489fce49236b053828c7103717cf8b98b85cfd7cd67953c9"
+  },
+  "readonly_evidence": {
+    "business_equivalence_paths": 27,
+    "signoff_rows_recomputed": 263,
+    "source_state_unchanged": true,
+    "no_new_paid_calls": true
+  },
+  "secret_scan": {
+    "working_files_known_secret_matches": 0,
+    "new_history_blobs_checked": 561,
+    "new_history_known_secret_matches": 0,
+    "generic_key_candidates": "2 historical blobs in offline probe test; same known fixture, not a real credential"
+  },
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED",
+  "github": "pending current-head CI and dependency merges"
+}

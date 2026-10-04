@@ -1,5 +1,8 @@
 # 任务看板
 
+> **当前状态（2026-10-04，Codex 验收修复轮）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；当前依据以末节与 `docs/handoffs/codex-plan-c-acceptance-fixes.md` 为准。
+
+
 ## 2026-10-02 Claude 认领：A10 一周参赛冲刺设计
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
@@ -81,19 +84,31 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/G
 - 2026-10-03 全部 11 项及 §3.7 已修并提交（`0745ea6` `cc26d4c` `8e539a8` `a787b0b` `45dd86e` `f580b74` `29a10f6` `959331e`），ready_for_review。**门禁（代码 HEAD `959331e`）**：`./scripts/verify.sh integration` 中基础档 PASS；后端 full 3725 passed / 27 skipped（已登记）PASS；前端 full 29 文件 811 passed、type-check 与 build 通过；集成用例 393 passed / 4 skipped（已登记）PASS；图库后端用例 44 passed PASS；端到端首次因本工作树缺根目录 `@playwright/test` 失败（环境原因），补齐依赖后单独运行 `scripts/e2e.sh` 2 passed（演示模型，无费用）。同一次 `verify.sh integration` 未整体 exit 0，端到端为补跑。`git diff --check e86f4b9 HEAD` exit 0。未决：D1 的输出上限是否提高或增加有限重试，需人工按 15 秒与费用实测决定。详见交接。
 - 计划 B/C（L11–L19）不在本节范围。
 
-## 2026-10-03 Claude 规划：冲刺计划 B（L11–L15 功能闭环）——规划待确认
+## 2026-10-03 Claude 认领：冲刺计划 B（L11–L15 功能闭环）——功能交付已收尾，质量/性能验收有保留（2026-10-03）
 
-计划：`docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md`；交接 `docs/handoffs/claude-plan-b-planning.md`。基线 `d766f40`（计划 A 审查修复版本，代码 HEAD `959331e`）。用户确认前不实施。
+计划：`docs/superpowers/plans/2026-10-03-contest-sprint-b-functional-loop.md`；交接 `docs/handoffs/claude-plan-b-planning.md`。基线 `d766f40`（计划 A 审查修复版本，代码 HEAD `959331e`）。用户 2026-10-03 批准执行；需要阿里云百炼向量或真实模型的测试写交接稿交 DeepSeek harness 运行，本会话不调用真实模型。
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| L11 | 规划待确认 | Claude | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量（需预算确认） | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告分列 |
-| L12 | 规划待确认 | Claude | `SourceRef`/`Citation` 加可选 `document_name`（ADR-083）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
-| L13 | 规划待确认 | Claude | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
-| L14 | 规划待确认 | Claude | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
-| L15 | 规划待确认 | Claude | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15_isolation.py`；`verify.sh integration` 与 D/N 回归 |
+| L11 | IMPLEMENTED（功能代码完成；L11-7 真实模型复测 OPEN） | Claude（L11-1～L11-5）；DeepSeek harness（L11-6 真实模型测量） | 自编两门课资料与 PDF、本机假供应商、个人模式端到端、发布阻断原因、失败路径验收、真实模型测量 | `personal.spec.ts` 教师 PDF+MD 闭环与鉴权失败用例通过；真实模型报告 `evaluation/reports/l11-teacher-loop-2026-10.md` 分列假供应商接线与真实质量/耗时 |
+| L12 | DONE（Codex 复审修复；本地验收） | Claude → Codex | `SourceRef`/`Citation` 加可选 `document_name`（ADR-085）、后端同课查名、`SourceViewer`、四入口 | `test_l12.py`（含跨课负例）、`l12.test.ts`、端到端四入口 |
+| L13 | DONE（Codex 复审修复；本地验收） | Claude → Codex | 可读初始视口与聚焦、搜索定位、详情栏收起、问答 → 图谱选中 | `l13.test.ts`；端到端 20+ 节点 `data-zoom` ≥ 0.7、问答跳转选中 |
+| L14 | DONE（Codex 已修回归；完整本地门禁通过） | Claude → Codex | 学习路径纯函数、画布路径高亮与序号、推荐解释（缺省值标为未标注） | `l14.test.ts` 确定性 DAG；端到端掌握联动 |
+| L15 | DONE（本地闭环与真实 QA 抽样完成；性能/质量有保留） | Codex | 课程内角色侧栏、概览阶段与下一步、入课空态、跨课隔离、恶意文本、两课程总验收 | `l15.test.ts`、`test_l15.py`、`l15-creation-scope.test.ts`；`verify.sh integration` 与 D/N 回归 |
 
-- 未决（待用户）：是否批准执行；是否批准约 30～53 万 token 的真实调用；问答输出上限是否在 L16 前调整；第二门课主题（默认「操作系统 第 2 章 进程与线程」）。
+- 2026-10-03 L11-1 完成：`datasets/contest/` 两门课各一章（Markdown 为源，PDF 由 `scripts/build-contest-pdfs.sh` 用 Chrome 无头打印：第 3 章 5 页、第 2 章 4 页），`tests/backend/test_l11_datasets.py` red（无清单）→ green。**发现并修复阻断**：macOS 字体 PDF 的部首形近字（⽬⾃⻓⻅），ADR-083、解析器 `pdf/2`，red 4 failed → green；解析相关 1840 passed。已知：pdfminer 对 Chrome 字体打印大量 FontBBox 告警，不影响提取。
+- 2026-10-03 L11-2～L11-5 完成：本机 OpenAI 兼容假供应商（`scripts/fake_provider.py`，`tests/tooling/test_l11_fake_provider.py` 13 passed）；个人模式端到端 `tests/e2e/personal.spec.ts` 3 passed（教师 PDF+MD 闭环、处理中取消后重传、供应商拒绝密钥）。走查发现并修复两个前端阻断：教师图谱页没有画布外的选节点方式、没有新建知识点入口（`tests/frontend/l11.test.ts`）；发布被拦时逐条列出原因（L11-4）。`e2e.sh` 修复 bash 3.2 下清理报错导致的容器残留；B02 嵌套 vitest 用例超时与子进程对齐。前端全量 818 passed。
+- 观察（不修，R05）：同一章 PDF 与 Markdown 都上传会产生大量同名知识点（审核队列「疑似重复」60 组），跨任务融合不在本期。
+- L11-6 真实模型测量交接：`docs/handoffs/claude-l11-6-deepseek-handoff.md`（DeepSeek harness 在冲刺工作树执行；含迁移 016 首次启动核对、预算停止线累计 60 万）。
+- 2026-10-03 L11-6 完成（DeepSeek harness）：四次抽取（两门课 × MD/PDF）+ 两次发布全部成功，交接 `docs/handoffs/deepseek-l11-6.md`，报告 `evaluation/reports/l11-teacher-loop-2026-10.md`。**赛题指标**：知识点 75/71/71/74 与关系种类 4/3/4/3 均达标；**抽取耗时四份全部未达 60 秒**（83.97 / 200.37 / 75.51 / 162.54 秒）；准确率未判定（原始输出已导出到 `evaluation/raw/l11/`，待 L16）。**发布与向量记账**：两门 MD 课程 HTTP 200（11.21 / 6.58 秒），`model_calls` 出现 `purpose='embedding'`、`request_id=publish:<version_id>`、`status=ok` 各 10 行，**ADR-082 决定 6 首次真实验证通过**（上一轮的「发布期向量未记账」缺口已消失）。**ADR-083** 在真实 PDF 上核对通过（32 个块里康熙部首/部首补充区字符 0 个）。**迁移 016** 已执行，备份实际在 `src/backend/storage/backups/`（交接写的仓根 `backups/` 有误），`integrity_check=ok`。**新发现（未修）**：PDF 路径成本约为 MD 的 1.6～2.2 倍且 repair 次数达 13 次；PDF 两份都抽不出 `PREREQUISITE`、孤立节点 37/71 与 39/74；旧基线「入库 45.7 秒是头号瓶颈」的判断已不成立（本次非模型阶段仅 1.04～12.39 秒）。**用量**：本次 478987 token，累计 **619217 / 5000000**；越线经用户明确授权（详见交接）。
+- 2026-10-03 L11 阶段门禁（`fc2ad94`，`verify.sh integration`，独立端口）：后端 1 failed / 3750 passed / 27 skipped（`test_shell_multibyte_vars` 拦下本轮两处中文前未加花括号的变量，`4ee7b52` 修复后单测通过）；前端 824 passed；集成 393 passed / 4 skipped；图库 44 passed；演示端到端 2 passed、个人模式端到端 3 passed。同一次运行未整体 exit 0。
+- 2026-10-03 **L11-7（新增，用户批准在 L12 前修）**：L11-6 实测 PDF 路径成本高、无 PREREQUISITE、近半孤立节点。离线定位根因为一行一块、句子被换行切断；修复为自动换行的续行并回同一段（ADR-084，`headings/2`），比赛 PDF 38/24 块，与 Markdown 37/24 相当。`tests/backend/test_l11_pdf_reflow.py` red 5 → green 10；D06 三个用例按新行为更新期望；解析相关 1850 passed。真实模型复测交接 `docs/handoffs/claude-l11-7-deepseek-retest.md`。
+- 2026-10-03 **L12 完成**（`af671cc`、`8b79ccc` 及端到端提交）：契约 `SourceRef`/`Citation` 增加可选 `document_name`（ADR-085），后端按同课资料填写知识点来源、关系来源与问答引用（他课/已删除省略、查名失败不影响回答）；前端统一「文件名 · 第 N 页 · 章节」、缺名写「资料不可用」，知识点详情点开来源即展开查看器（教师、学生共用），问答右栏带文件名。证据：`tests/backend/test_l12.py` 8 passed（含跨课负例）、`tests/frontend/l12.test.ts` 11 passed、前端全量 835 passed；个人模式端到端教师图谱、学生图谱、问答引用三入口均断言文件名与对应格式的位置（3 passed），演示端到端 2 passed。
+- 2026-10-03 **L13 完成**（`1d50a33` `50e5389` `25470ab` `8aa5cfb` 及端到端提交）：初始视口不低于可读缩放 0.7 并聚焦入口节点（无前置的第一个节点），页面可按知识点聚焦；搜索框回车按「名称完全一致优先、包含其次、只在当前筛选可见节点中」定位并选中；类型、状态、章节筛选收进默认收起的「更多筛选」（关系图例与布局常显）；问答知识点按钮链接到 `?kp=&v=`，学生图谱选中目标，目标不在当前版本或版本不同时给出提示，不跨课找同 ID 节点。学生页右栏还承载学习路径，详情与掌握标记本就只在选中时渲染，未再收起整栏。证据：`tests/frontend/l13.test.ts` 10 passed、`l13-kp-link.test.ts` 8 passed；个人模式端到端 3 passed（`.e2e/20261003-115144`）：71+ 节点画布 `data-zoom` ≥ 0.7、问答点知识点后详情标题与按钮名称一致、刷新直达仍选中、搜索回车选中教师新建节点。
+- 2026-10-03 **L14 完成**（`3b50380` `8d6988e` `5d171e4` `aa2d7ad` `d668e0d` `09349d3` `653089e`）：学习路径纯函数（`graph/learningPath.ts`：只看未被拒的先修边，后继须全部前置满足才算解锁，推荐顺序以服务端为准只给序号）；画布推荐项标签「1. 」、缺失前置/之后解锁/淡化/路径边各有状态，焦点为点选的推荐项或第一个推荐项，视口跟随；推荐列表顶部「已掌握 → 还需先学 → 下一步 → 之后解锁」，「排序参考」中中性值 0.5 写「未标注」。**走查（真实浏览器截图）另发现并修复三处**：服务端理由句把缺失属性的 0.5 写成测量值（后端 `ranking._reason`）；G6 5.1.1 每次 render 都按 autoFit 整图适配，状态更新会把视口拉回整图（L13 的聚焦也受影响）；画布尺寸变化后重新聚焦回入口节点。证据：`tests/frontend/l14.test.ts` 21 passed、`tests/backend/test_l14_reason.py` 3 passed；个人模式端到端 3 passed（标记推荐第 1 项 → 推荐与路径行更新、刷新保留、自助注册的第二个学生看到「未开始」且推荐不变、取消后恢复）。`h05`/`i06` 的样式键清单与 0.5 展示断言按新行为更新。
+- 2026-10-03 **计划 B 移交 Codex**：L11（除 L11-7 真实模型复测待 DeepSeek）、L12～L14 已完成待复审；L15 未开始，设计决定与前端测试草稿见交接 `docs/handoffs/claude-plan-b-handoff-to-codex.md`、`docs/handoffs/claude-l15-draft-tests.txt`。L13+L14 合并门禁在交接时未跑完，接手者需重跑。
+- 2026-10-03 **L13+L14 合并门禁**（代码 HEAD `56610d4`，`verify.sh integration`，独立端口）**整体 exit 1**：后端 full 3772 passed / 27 skipped，前端 874 passed，集成 393 passed / 4 skipped，图库 44 passed，个人模式端到端 3 passed，均 PASS；**演示端到端 `student.spec.ts` FAIL**。原因是 L14-3 把推荐序号放进按钮，用例取按钮文字首词得到「1.」（证据 `.e2e/20261003-124107`）。交 Codex 修复，根因与建议修法见 `docs/handoffs/claude-plan-b-handoff-to-codex.md` §2。L14 因此不算完成，状态改回 IN_PROGRESS。
+- 2026-10-03 用户决定：L12～L14 的 16 个提交（`5a34fec..56610d4`）交 Codex 复审；需要向量模型或真实模型的测试仍交 DeepSeek harness；**调高问答输出上限**（`ANSWER_MAX_OUTPUT_TOKENS` 1024 → 建议 2048，交 Codex 先写 ADR 再按 TDD 实施，实测交 DeepSeek）。详见 `docs/handoffs/claude-plan-b-handoff-to-codex.md` §0。
 
 ## 2026-09-28 Codex 认领：认证页动态图谱
 
@@ -1670,3 +1685,206 @@ C12、E09、H01、C15、K14 的前置均已合入 main@`d624208`（C12：B15、C
 - 起因：用户在 macOS（Intel，Docker Desktop 29.8）运行 `scripts/start-demo.sh`，只得到「Neo4j 健康检查失败」。实际原因两个：另一个目录里的 SmartSketch 副本的 Neo4j 容器（`smartsketch-neo4j-1`）一直占着 7474/7687；本目录的 Neo4j 数据/日志在反复崩溃后留下坏状态，以退出码 3、无 ERROR 反复重启。停掉另一份、换全新数据卷后启动成功（2026-10-01 用户确认）。
 - 验收条件：① 容器未运行且端口被占时不启动容器、给出 `lsof` 命令；② 容器停在 created/exited 或重启次数增加时立即失败，打印 Docker 报错、退出码与最近 40 行日志；③ 认证被拒时立即失败并说明口令只在首次初始化生效，输出不含口令；④ `unhealthy` 不立即失败，截止时打印最后一次连接输出；⑤ 正常启动行为不变。
 - 已排除：「桌面」目录挂载（改用 Docker 卷后照旧退出）；镜像、APOC、内存设置（原版镜像三组对照在该 Mac 上都正常）。坏状态的具体文件未定位，数据已随旧卷删除。
+
+
+## 2026-10-03 Codex 接手计划 B（c85ee53）
+
+| ID | 状态 | 负责人 | 范围及验收 |
+| --- | --- | --- | --- |
+| B-TAKEOVER | DONE（本地修复/完整门禁；96f3885 实测已复核） | Codex | 复审 5a34fec..56610d4、修复推荐按钮及确认缺陷、L15、QA 2048；最终稳定代码 integration 门禁；真实模型只交 DeepSeek |
+| L15 | DONE（本地闭环与真实测量复核；有保留） | Codex | 课程内角色导航、阶段下一步、入课空态、课程隔离/恶意文本、个人模式双课程 E2E |
+
+输入：claude-plan-b-handoff-to-codex.md 与 c85ee53 文档提交。输出：修复、测试、Codex 审查和 DeepSeek 交接。依赖：现有接口/本地演示与假供应商；风险：切课/换号迟到响应、1024->2048 延迟费用待实测。验证：最小前后端回归、type-check/build、./scripts/verify.sh integration、git diff --check。文件所有权：本轮 Codex 顺序修改相关前后端、契约和文档；不写 Claude 工作树，不推送不合并。旧 Codex 工作树基线较早且有文档改动，保留；新托管 worktree codex/plan-b-takeover 基于 c85ee53。
+
+验收证据（Codex，最终稳定代码）：./scripts/verify.sh integration 整体 exit 0；后端3780 passed/27白名单skip，前端901 passed，集成393 passed/4白名单skip，图库44 passed，演示E2E2 passed、个人假供应商E2E4 passed（包含两课程隔离）；type-check/build与契约门禁均通过，git diff --check exit0。独立 D/N 后端116与前端107均通过。报告 docs/reviews/codex-plan-b-c85ee53.md；接手交接 docs/handoffs/codex-plan-b-takeover.md；真实模型交接 docs/handoffs/codex-plan-b-deepseek-qa.md。
+
+2026-10-03 收尾更新：96f3885 的 L15-6 Step4 真实 QA 已执行并由 Codex 对照 HTTP/只读日志核验：10题=7回答/1截断错误/2课外未覆盖，全部≤15秒；回答成功率7/8，不是抽取准确率；已回答首个delta全超3秒。生成累计648168/5000000，向量累计11943另计。补齐失败题关联与19条调用证据，测量脚本存在时间字符串筛选漏行与两类预算混算（正式报告总量正确）。报告 docs/reviews/codex-plan-b-96f3885-closeout.md，交接 docs/handoffs/codex-plan-b-closeout.md。第二阶段功能交付已收尾；L11-7、抽取准确率/60秒和QA质量/首字目标保留OPEN，不推送不合并不快进冲刺分支。
+
+
+## 2026-10-03 Codex 认领：第二阶段收尾（96f3885）
+
+| ID | 状态 | 负责人 | 范围及验收 |
+| --- | --- | --- | --- |
+| B-CLOSEOUT | DONE（证据复核/本地门禁/状态与交接完成） | Codex | 复核 96f3885 十题证据、日志关联、预算和出处；补齐可移交证据；区分功能闭环与性能/质量未达标；更新任务状态与收尾交接 |
+
+输入：96f3885、L15 脱敏证据、既有本地 SQLite（仅只读查询允许字段）、计划 B/L11-7 交接。输出：Codex 审查报告、脱敏核验产物、第二阶段状态及后续待办。依赖：257750e 功能基线和个人模型实测；风险：HTTP 错误与 chat_logs 字段混用、首字口径不是浏览器 SSE、预算汇总漏计中断调用、将未测项误标通过。验证：只读证据核验脚本、相关 D/L 回归、./scripts/verify.sh full、git diff --check。只编辑本 worktree 的 docs/specs/evaluation 核验产物；不改 DeepSeek 原始报告，不调用真实模型，不修改数据、接口或部署配置，不推送不合并。
+
+
+### 第二阶段收尾后的显式待办（不是已实施的计划 C）
+
+| ID | 状态 | 下一阶段归属 | 验收/首个动作 |
+| --- | --- | --- | --- |
+| B-EVAL-01 | OPEN | L16 / 待认领 | 固定测量脚本：错误 details.request_id、毫秒时间边界、生成/向量分账、未知 usage；离线负例先测，真实 SSE 首字单独抓取 |
+| B-QA-01 | OPEN | L16 / 待认领 | 比较题2048仍截断；研究短答案/上下文和首字分段延迟，不放宽出处/15秒；模型付费复测仍交 DeepSeek且先确认新预算 |
+| B-PDF-01 / L11-7-real | OPEN（未收到复测报告） | L11 验收留项 / DeepSeek待接手 | 两份PDF headings/2真实复测；执行前最新生成起点648168（或最新值），旧850000累计止损余201832；预算临界先确认，不自动调额 |
+| B-QUALITY-01 | OPEN | L16 / 待认领 | 未改写抽取快照人工评估实体/关系准确率≥70%；抽取≤60秒旧四份全部未达；数量/类型达标不替代准确率 |
+| B-INTEGRATE-01 | WAITING_USER | 发布集成 | 当前本地 codex/plan-b-takeover 保留，推送/PR/合并方式及目标分支由用户决定；不自动清理测量数据 |
+
+无新接口、数据模型、迁移、依赖或业务改动。下一阶段范围沿用L16–L19，先质量/性能再美化与材料，不在收尾时增加自动出题或管理员统一模型功能。
+
+收尾验收证据（Codex本轮）：./scripts/verify.sh full 整体exit0，后端3780 passed/27白名单skip，前端901 passed，type-check/build/契约通过；D1/D2/D3/L15/PDF-reflow定向56 passed；只读关联核验十题+额外尝试/19调用通过；git diff --check通过；DeepSeek原始三文件未改。此次无新的真实调用、未重跑integration/E2E，257750e的完整integration仅作为既有代码证据。完整命令、日志、限制和后续首个动作见docs/handoffs/codex-plan-b-closeout.md。
+
+
+## 2026-10-03 Codex：第三阶段启动交接 prompt
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| C-HANDOFF-01 | DONE（prompt/范围记录/基础验证完成） | Codex（规划交接） | 基于9ca6e88/第二阶段收尾，交付Claude启动prompt；九类参赛材料从第三阶段暂缓；保留质量/性能/技术验收与预算边界，不实施业务修复 |
+
+输入：用户第三阶段范围调整、codex-plan-b-closeout.md、codex-plan-b-96f3885-closeout.md与已知待办。输出：docs/handoffs/codex-claude-plan-c-start-prompt-2026-10-03.md、ADR-088范围记录、看板状态。依赖：现有第二阶段基线和未完成验收；风险：将推送/合并/付费调用误作已授权、把材料暂缓误作取消技术证据、交接旧工作树代码。验证：引用路径/预算/排除项断言、./scripts/verify.sh basic、git diff --check。仅本工作树文档改动；Claude先提交原子计划供用户确认，真实生成/向量测试继续交DeepSeek。
+
+第三阶段范围覆盖更新（用户2026-10-03确认，ADR-088）：此前收尾清单里“美化与材料/运行材料”的材料部分现在暂缓，九类参赛材料不进入第三阶段验收。B-EVAL-01/B-QA-01/B-PDF-01/B-QUALITY-01仍OPEN；L17轻量美化以主线稳定为前置，L19保留隔离技术复测。内部技术证据/测试/人工判定/预算与交接仍须完成。启动prompt：docs/handoffs/codex-claude-plan-c-start-prompt-2026-10-03.md；Claude未被工具派发，先核9ca6e88基线、提交原子计划，获用户确认再实施。不新增模型调用、合并/推送、环境/数据同步授权。
+
+C-HANDOFF-01验收：启动prompt含六个技术任务、八个已存在证据引用和最新预算边界，路径/范围/预算断言通过；./scripts/verify.sh basic整体exit0，日志/private/tmp/plan-c-prompt-basic.log；git diff --check通过。仅修改本工作树交接、任务、决策文档；未运行full/integration、未修改业务代码或数据、未调用模型。此处交付供用户转交的prompt，尚未向Claude会话发送，也未启动第三阶段实施。
+
+## 2026-10-03 Claude 认领：冲刺计划 C（第三阶段：可靠性、性能与技术冻结）——用户已确认
+
+计划：`docs/superpowers/plans/2026-10-03-contest-sprint-c-reliability-performance.md`。工作区 `/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`，分支 `claude/plan-c-reliability`（用户确认自 `ec1291a` 新建，包含 `9ca6e88`）。九类参赛材料暂缓（ADR-088）；美化轻量化，技术达标后由用户另开前端设计任务。本会话不发真实生成或在线向量请求，付费测量交 DeepSeek 并先确认预算（生成累计 648168 / 5000000，向量 11943 另计）。
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| C01（B-EVAL-01） | DONE（已复审；Codex修复续跑预检） | Claude/Codex | 测量工具：错误编号、毫秒时间边界、生成/向量分账、未知 usage、分位统计、SSE 首字三列口径 | 离线重算 11 请求 / 19 调用 = 9+10、生成 28951、向量 59；`tests/tooling/test_c01_measure.py` |
+| C02（B-QA-01） | IN_PROGRESS（13题真实终态/服务端与SSE达标；浏览器可见首字、v3+思考开启基线：2026-10-04 用户决定三项补测均不做，保持「未测」） | Codex（本地接手）；DeepSeek（真实轮） | 比较题截断离线定位、最小修法（策略先确认）、分段耗时、真实复测交接 | 出处与 15 秒不放宽；截断仍撤回；回归 |
+| C03（B-PDF-01 / L16） | IN_PROGRESS（新两份PDF20.90/28.08秒已核；关闭思考MD抽取：2026-10-04 用户决定三项补测均不做，保持「未测」；慢段根因仍OPEN） | DeepSeek（真实轮）；Codex（本地复审） | 修复后 PDF 真实复测、阶段分解、60 秒最小优化 | 前后对照；不排除真实 AI 耗时 |
+| C04（B-QUALITY-01） | DONE（2026-10-04 用户签收新两份 PDF：两课实体、关系均 ≥70%；复核后采纳辅助判定，见 C-ACC 证据） | Claude（工具与辅助判定）；用户（人工签收） | 未改写快照与新快照分别抽样判定 | 实体、关系各 ≥70%（人工） |
+| C05 | DONE（待复审；视觉美化移出本阶段） | Claude | 未保存编辑时的搜索定位、问答长来源折叠、视口外解锁节点定位、PDF+MD 重复上传提示 | 失败测试先红后绿 |
+| C06 | IN_PROGRESS（本地完整门禁已通过；真实冻结待指标/人工签收） | Codex | 最终门禁、隔离从零复测、交接 | 整次 integration 实际 exit 0 |
+
+- 2026-10-03 C00 基线：`git switch -c claude/plan-c-reliability ec1291a`（用户确认的方式；旧分支保留在 `c85ee53`）。`./scripts/verify.sh basic` exit 0（`env -u LLM_MODE -u EMBEDDING_MODE`）。
+- 2026-10-03 **C01 完成**：`measure_web_flow.py` 新增 `audit` 子命令、`ask --stream/--out/--audit-db/--cap`。错误编号兼容 `details.request_id`；按 UTC 时刻的 `[since, until)` 窗口或固定请求 ID 关联；生成与向量分账；未知 usage 不当 0，止损遇未知即停；最近秩分位并注明分母；首字三列口径。离线重算 L15：11 请求、19 调用 = 9+10、生成 28951、向量 59。`tests/tooling/test_c01_measure.py` 22 passed（17 例先红），`tests/tooling` 97 passed，`verify.sh basic` exit 0。交接 `docs/handoffs/claude-plan-c-c01.md`。
+- 2026-10-03 **C02-1 诊断完成**（`evaluation/reports/c02-qa-diagnosis.md`，离线、零调用）：可见回答每字 2.9～17 个输出 token，首个 delta ≈ 生成耗时。推断为模型的不可见推理吃掉 2048 预算并推迟可见内容；兼容客户端只读 `delta.content`。输入侧不是主因（平均输入约 2085 token）。修法 A（推理埋点）/B（思考控制）/C（提示词 v3）/D（思考提示）**待用户决定**。**C02-3 完成**：`audit` 逐请求给出查询向量 / 生成 / 其余三段耗时（现有字段，无迁移），`test_c01_measure.py` 新增 2 例先红后绿，共 24 passed。
+- 2026-10-03 **C02-2 完成**（用户选 A+C）：ADR-089（`0469bad`）。A：迁移 017 + 推理字数 / 推理 token / 首次推理与首次可见内容时刻，只计量不存正文，回答与 SSE 不变（`33177c0`）。C：提示词 v3（`088a601`）。测量工具读推理列、`--round-started-at`、`audit-task`（`e709ccb`）。后端全量 3825 passed / 27 skipped。交接 `docs/handoffs/claude-plan-c-c02.md`；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02-4-deepseek-qa-retest.md`（止损 45000）、`docs/handoffs/claude-plan-c-c03-1-deepseek-pdf-retest.md`（course2 PDF，止损 110000），**需用户安排带本分支代码与测量数据的环境后执行**。
+- 2026-10-03 更正：第三阶段交接文件统一用 `claude-plan-c-` 前缀（`claude-c02.md` 等旧名属于原子清单同号任务；本轮写交接时曾误覆盖 `claude-c02.md` 的工作区副本，未提交，已原样恢复）。`claude-c01.md` 改名为 `claude-plan-c-c01.md`。
+- 2026-10-04 **DeepSeek C02-4（`16d9ebd`）与 C03-1（`72fed5e`）完成，Claude 复核** `docs/reviews/claude-deepseek-c02-4-c03-1.md`：
+  - C03-1：PDF 修复生效（关系 25→59、`PREREQUISITE` 0→5、孤立 39→3），83522 token、91.34 秒，仍超 60 秒。抽取输出 80% 是推理，两次关系调用推理用满 4096 导致 2 次 repair；末段 15.6 秒非模型时间未归因。
+  - C02-4：只测 1 题（冷启动首问超时；8.15 秒无调用记录的空档未归因），因 usage 未知止损规则过严提前停止（工具问题，Claude 负责）。
+  - 累计：记录口径 731690，系统计费口径 743806（含 1 次未知调用估算 12116），均在批准上限 803168 内；向量 11946 另计。
+- 2026-10-04 用户决定：进入方案 B（思考控制），批准探测预算 5000；course1 PDF 等 B 完成后再测。探测工具 `evaluation/probe_thinking.py`（`8f0fc14`，`tests/tooling/test_c02b_probe.py` 7 例先红后绿）；DeepSeek 交接 `docs/handoffs/claude-plan-c-c02b-deepseek-thinking-probe.md`（5 个变体，最坏 4110 token，直连不进 `model_calls`，需手工记账）。
+- 2026-10-04 离线推进（等待方案 B 探测期间）：测量工具止损改用系统计费口径（`312cccb`）；问答准备与 worker 阶段耗时日志（`f8c549f`，后端全量 3838 passed / 27 skipped）；**C05 完成**：C05-1 `ce378bc`、C05-2 `1a8da3f`、C05-3 `c7f15e4`、C05-4 `3101b54`，前端全量 911 passed、type-check 与 build 通过。交接 `docs/handoffs/claude-plan-c-c05.md`。
+- 2026-10-04 **C04-1 工具与工作表**：`evaluation/draft_to_predictions.py`（草稿 → K01 predictions + 判定工作表）与 `evaluate_extraction.py judge-report`（无金标只按人工判定算硬指标；`claude-assist` 判定标为非人工验收），`tests/tooling/test_c04_accuracy.py` 7 例（先红）。三份当前版本草稿（course1 MD 75/66、course2 MD 71/55、course2 PDF headings/2 74/59）均 ≤100，按 README §6.2 **全量检查**，工作表在 `evaluation/raw/c04/`。修复前的两份 PDF 草稿已被 headings/2 取代，不再判定。**人工判定待用户**；Claude 辅助判定可按需先做（标 `claude-assist`）。
+- 2026-10-04 **计划 C 移交 Codex**：交接 `docs/handoffs/claude-plan-c-handoff-to-codex.md`。已完成 C00/C01/C02-1～3/C05 与 C04-1 工具；DeepSeek 已完成 C02-4（只测 1 题）、C03-1、C02b 探测。**方案 B（ADR-090）已实现但未提交**：后端全量 1 failed / 4153 passed / 27 skipped，失败为 `test_c02_reasoning.py` 写死「最后迁移为 017」的断言；前端全量与整次 integration 未跑。未完成：方案 B 收尾与真实验证（需新预算）、C02-4 重跑、C03 两段未归因时间与 60 秒、C04 人工判定、C06 门禁与冻结。预算（系统计费口径）746357 / 5000000，批准上限 803168 余约 56800。
+
+## 2026-10-04 Codex 认领：计划 C 接手复审
+
+| ID | 状态 | 负责人 | 范围及验收 |
+| --- | --- | --- | --- |
+| C-TAKEOVER | DONE（本地接手/修复/完整门禁；整阶段仍OPEN） | Codex | 082323a 基线与 Claude 16 个未提交文件的 SHA-256 一致副本；复现迁移断言失败、复审 ADR-090 全调用链、修复确认缺陷、隔离完整门禁、审查与下一轮真实测量交接 |
+
+输入：claude-plan-c-handoff-to-codex.md、计划 C、ADR-089/090、DeepSeek 三轮脱敏结果。输出：本地修复、回归、Codex 报告/交接。依赖：现有 Python/Node 依赖与本地假供应商、一次性 Neo4j。风险：旧迁移升级、开关快照/缓存/连接测试不一致、真实性能结论越界、误写实测数据。验证：test_c02_reasoning/test_c02b_disable_thinking、相关前端回归、contracts、./scripts/verify.sh integration、git diff --check。文件所有权：Codex 顺序编辑独立 codex/plan-c-takeover；源工作区/旧 Codex 工作区保留。未复制 .env、数据库或真实凭据；本轮不发真实生成/在线向量请求，不推送不合并。当前系统计费累计 746357，旧批准上限 803168（剩56811），新实测先确认预算。
+
+
+### Codex接手后的显式待办（2026-10-04）
+
+| ID | 状态 | 负责人/下一步 | 验收 |
+| --- | --- | --- | --- |
+| C-MINOR-01 | DONE（本轮RED→GREEN，72f7430） | Codex | 已收到usage后失败/中断仍保存usage_reasoning；增加回归，保持总计费不变 |
+| C-MINOR-02 | DONE（本轮RED→GREEN，a6b19b7） | Codex | 长出处A展开后切B重置折叠，保留纯文本/正确引用与文件名 |
+| C-REAL-B | DONE（88f9f6f实测已接手；准确率另项） | DeepSeek实测/Codex只读复核 | 两份PDF20.90/28.08秒、13题11answered/2not_covered；系统746357→844451/累计900000，向量12005另计；不要重复花钱 |
+| C04-SIGNOFF | DONE（用户 arvin 签收，复核后采纳 claude-assist 263/263；整阶段仍 OPEN） | 用户人工判定 | 新两份PDF工作表全量：course1实体76/关系61，course2实体68/关系58；各≥70%；辅助仅claude-assist，旧快照另存 |
+| C-LEGACY-CREDENTIALS | OPEN（仅交接提示，未读取内容） | 原数据持有人 | 收紧旧测量口令文件权限、按需轮换，停止沿用硬编码口令/未知usage记0的旧脚本；不复制进新工区 |
+
+已修C-R1：同轮达到cap后续跑不再先发一次付费问答，新增两例RED→GREEN；仍需保守留足单题/并发在途余量，不能将题前题后检查宣传为严格预留的全局硬上限。旧报告中reasoning_tokens=null必须保留“未返回”语义。当前真实生成/在线向量调用0，新旧实测原始文件保留。
+
+2026-10-04 用户明确选择：本地收尾后再确认真实测量预算。本轮继续仅本地修复/验证，不执行DeepSeek真实轮，不使用旧余额自动开跑。
+
+
+C-TAKEOVER验收：最终稳定代码树 `./scripts/verify.sh integration` exit0，backend+tooling3862 passed/27登记skip；frontend37文件913 passed；integration393 passed/4登记skip；backend-live44 passed；演示E2E2 passed；个人假供应商E2E4 passed（教师/学生开关保存刷新、抽取问答、取消/鉴权终止、两课隔离）；type-check/build/basic契约通过。定向推理/开关22 passed、测量54 passed、契约全量296 passed；git diff --check通过。报告 `docs/reviews/codex-plan-c-takeover.md`；接手 `docs/handoffs/codex-plan-c-takeover.md`；下一轮准备 `docs/handoffs/codex-plan-c-deepseek-next-round.md`。不把注册SKIP当PASS；无新增skip/删测试/依赖升级；真实调用0，源Claude工作区和旧实测数据保留。用户明确本地收尾后再确认预算，阶段C保持OPEN。
+
+## 2026-10-04 Codex：计划 C 真实结果接手
+
+| ID | 状态 | 负责人 | 范围/验收 |
+| --- | --- | --- | --- |
+| C-REAL-CLOSEOUT | DONE（本轮范围；整阶段仍OPEN） | Codex | 只读复核88f9f6f的PDF/QA/预算及耗时证据；按RED→GREEN修复两项Minor；对照缺口/预算方案；本地完整门禁与更新交接，整阶段仍OPEN |
+
+输入：deepseek-plan-c-to-codex及指定四份交接/报告、95e0797本地代码；输出：Codex脱敏审计产物/归因与复核报告、Minor修复、本轮验收与待签收项。依赖：测量SQLite仅mode=ro+query_only白名单、已存JSON/日志、既有依赖/本地假供应商。风险：统计分母或轮数误写、日志被后续启动替换、推理null误作0、共享库误写/付费误触发。验证：只读审计、两项定向回归、./scripts/verify.sh integration、git diff --check。本轮仅codex/plan-c-takeover写入；测量分支不合并，旧证据不修改，真实调用0。
+
+### 真实结果接手时已确认与仍 OPEN（88f9f6f，历史状态；最新状态见顶部与验收修复节）
+
+- stage_c_status: **OPEN（准确率未签收，未冻结）**。本轮付费生成/在线向量均0，不推送、不合并。报告`docs/reviews/codex-plan-c-88f9f6f-closeout.md`；交接`docs/handoffs/codex-plan-c-real-closeout.md`；可复现数值/哈希`evaluation/raw/codex-plan-c-closeout/audit.json`。本节取代上轮“待预算/尚未实测”的当前状态，旧历史记录不删除。
+- PDF两份68/58、76/61；四关系、DAG、候选来源68/68与76/76已核；QA13题、11answered/2not_covered、无错误/截断/撤回、比较题3重复均answered；浏览器可见首字仍未测。
+- 真实累计**844451/900000，剩55549**；向量**12005**另计；unknown新增0。旧746357/803168余额已过时。只读复核总增量98094，无第四项未解释开销；原报告部分中位数、answered分母、15.6秒轮次/来源标签解释在Codex报告校正，原证据不改。
+- Minor01后端18 passed；Minor02前端16 passed；新增8后端/4前端参数例与既有ChatView切换断言，先RED后GREEN，不删用例/不放宽断言。
+
+| ID | 当前状态 | 下一步/判定边界 |
+| --- | --- | --- |
+| C-PERSIST-TRACE | OPEN（证据不足） | 6471ms只能定位run_persist_stage范围；现存日志缺阶段行；旧C03-1末段15.643秒根因仍未判定，未在本轮同幅重现不是已修 |
+| C-QA-V3-BASELINE | NOT_EXECUTED（2026-10-04 用户决定三项补测均不做；结论只写「未测」，不能声称关闭思考带来的改善幅度） | 最小同13题v3思考开启未测；保守11调用118052，13调用+余量182056；建议增量185000/累计1030000仅提案，无授权不执行 |
+| C-MD-THINKING-OFF | NOT_EXECUTED（用户决定不补测） | 关闭思考的新 Markdown 抽取未测；已有 MD 课程 QA 不是新 MD 抽取证据；PDF ≤60 秒不外推 |
+| C-BROWSER-FIRST-TOKEN | NOT_EXECUTED（用户决定不补测） | 浏览器可见首字未测；SSE783～2927ms不替代页面首字 |
+| C-PERSISTED-SOURCES | DONE（C-ACC-A 已存只读证据，草稿限定） | 两课草稿详情 76/76、68/68 来源可定位/同课；不证明语义正确，不外推发布副本 |
+| C06-FREEZE | WAITING_USER_FREEZE / OPEN | 准确率已签收、三项补测决定不做；修复后由用户自行检查并决定冻结，当前不冻结 |
+
+完整门禁/新上下文审查已按本轮实际结果在末节登记；不能引用旧通过代替当前证据。九类参赛材料、美化、凭据文件处理仍不扩围。
+
+本轮首个完整门禁exit1：个人假供应商E2E3passed/1failed，其他层通过。失败trace/API明确应用连接测试429、Retry-After3；共用teacher六次连接测试触发5次/60秒滚动窗口。只修本机测试夹具调度`3742a4e`，17新增例先RED13failed/4passed，后与来源回归共33passed；非本机发请求前阻断、预算/认证不重试、应用429最多尊重Retry-After再试一次，不放宽生产限流或原断言。第二次实际结果见后文；首轮为失败，不把部分通过算整次PASS。
+
+第二次完整门禁仍exit1：全部运行用例通过，但测试替身headers联合类型引出5处TS2345。单独type-check REDexit2→测试替身显式字典声明`043c274`→完整frontend类型/38文件934测试/build exit0；无any/type断言、删检查或改运行逻辑。第三次整次integration最终exit0见下方验收；前两次exit1保留，不合并部分通过为整次成功。
+
+**C-REAL-CLOSEOUT 本轮验收**：043c274稳定代码树整次`./scripts/verify.sh integration` **exit0**；backend+tooling3870passed/27登记skip，frontend38文件934passed，integration393passed/4登记skip，backend-live44passed，演示E2E2passed，个人本机假供应商E2E4passed；basic/type-check/build通过。无新增skip、删用例、放宽断言或依赖升级。新上下文只读审查Critical0/Important0，1项文档误标已校正；后发现测试夹具问题一次修复通路含类型校验修正，RED→GREEN与最终完整门禁给证据。只读审计exit0，源88f9f6f证据/分支未改，付费生成/在线向量均0；本地提交72f7430、a6b19b7、3742a4e、043c274，不推送不合并。台账仍844451/批准900000、向量12005另计；准确率/基线/浏览器/MD/来源详情/慢段根因边界分别保留OPEN。**stage_c_status: OPEN；未技术冻结**。
+
+## 2026-10-04 Claude 认领：计划 C 验收收尾（stage_c_status: OPEN，technical_freeze: NOT_PERFORMED）
+
+执行工作区 `/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34`，分支 `claude/plan-c-acceptance`（用户确认自 Codex `4a6308b` 新建，含完整门禁提交 `043c274`）。上轮未提交的方案 B 文件已由 Codex 原样采纳，备份为 `claude/plan-c-b-wip-backup@2692648`，不合并。测量区 `smartsketch-c03b-measure@88f9f6f` 严格只读。本轮不发真实生成或在线向量调用。
+
+| ID | 状态 | 范围 | 输入 → 输出 | 风险 | 验证 |
+| --- | --- | --- | --- | --- | --- |
+| C-ACC-A 持久化出处只读核验 | DONE（`a094714`） | 两门课（course1 PDF 76 点、course2 PDF 68 点）草稿持久化后的 `source_refs`：数量、同课文档与 chunk、页码或章节、悬空 / 跨课 / 空出处；区分 `source="ai"` 与 `source_refs` | 共享 Neo4j（只读会话，连接变量按用户授权从测量区 `.env` 载入进程、不打印不写盘）+ 测量区 SQLite（`mode=ro`）→ 脱敏报告与证据（只含编号、计数、哈希） | 误写共享库：只读会话 + 只读 SQLite 双重防护；凭据泄露：不打印、不落盘 | 脚本退出码、计数断言、可复跑 |
+| C-ACC-B 入库子步骤计时 | DONE（`4304fec`） | `run_persist_stage` 子步骤脱敏计时（候选读取、构建、来源读取、锁等待、Neo4j 事务、SQLite 收尾、释放） | 代码 + 回归 → 本地提交 | 改变锁 / 事务语义：只加计时、不改控制流 | 先红后绿；相关回归；完整门禁（隔离端口、临时库、本机假供应商） |
+| C-ACC-C 人工签收入口 | DONE（`452d446`）；用户已签收（见下方证据） | 两份工作表的签收模板与 `judge-report` 命令；Claude 辅助判定另存并标 `claude-assist` | 测量区 predictions（只读复制哈希核对）→ 签收入口与辅助判定文件 | 辅助判定被当作签收：文件与报告均标非人工验收 | 哈希一致；`judge-report` 可运行 |
+| C-ACC-D 补测决策表 | DONE（提案）；2026-10-04 用户决定三项补测均不做 | 浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线 | Codex 报告预算 → 决策表（只提案） | 提案被当授权 | 文档审阅 |
+
+**C-ACC 验收证据**（本轮真实生成 0、在线向量 0；台账仍 844451 / 900000，向量 12005 另计）：
+
+- **A**：`evaluation/audit_persisted_sources.py` 走 API 知识点详情同一路径（草稿、教师，Neo4j 读路由，SQLite `mode=ro&immutable=1` + `query_only`）。实际 exit 0、`defect_items: 0`：course1 76/76、course2 68/68 个 AI 知识点详情都有可定位的本课 `source_refs`（79 / 76 条，均带页码、章节、文件名），悬空块、他课文档、跨课证据边、读取失败均为 0；测量库前后 SHA-256 一致。报告 `evaluation/reports/c-acc-a-persisted-sources.md`，证据 `evaluation/raw/c-acc-a/sources.json`，测试 `tests/tooling/test_c_acc_sources.py` 5 passed（红灯阶段只是「工具文件不存在」，行为断言首次运行即通过，照实记录）。只证明可定位与课程隔离，不证明出处语义正确。
+- **B**：`run_persist_stage` 新增一行 `persist steps` INFO（candidates / plan / chunks / lock_wait / lease_check / neo4j + neo4j_attempts / t6 / lock_release / task_release / total），只记任务编号、结果、毫秒数与次数。`tests/backend/test_c02_phase_logs.py` 新增 3 例：RED 3 failed / 3 passed → GREEN 6 passed，覆盖成功、锁未获取、Neo4j 失败与租约丢失。锁、事务、重试、预算与业务语义不变。**只为以后的运行提供归因能力；course1 6471 ms 与旧 15.643 秒的根因仍 OPEN，不做事后归因。**
+- **C**：`evaluation/raw/c04-signoff/`：原样复制的两份 predictions 与工作表（SHA-256 与测量区一致）、初始为空后由用户 arvin 签收的判定文件（最新结果见下方 C04 签收登记）、`claude-assist` 辅助判定（`is_human_judgment: false`）与签收说明。辅助参考数 course1 实体 64/76、关系 58/61，course2 实体 61/68、关系 45/58（离 70% 差 5 条），**不是人工验收，不宣布达标**。
+- **D**：`evaluation/reports/c-acc-d-retest-decisions.md`：浏览器可见首字（先免费测前端附加时延，再选 3 题真实，52016 落在现剩 55549 之内）、关闭思考的 MD 抽取（course1 一份，建议 95000 / 940000，不发布、向量 0）、v3 + 思考开启（沿用 Codex 185000 / 1030000，A/B 352000 / 1200000）。均未执行。
+- **门禁**：`4304fec` 代码树在无 `.env` 的临时工作树、隔离端口、一次性 Neo4j、临时库、本机假供应商下整次 `./scripts/verify.sh integration` **exit 0**：backend+tooling 3878 passed / 27 登记 skip；frontend 38 文件 934 passed；integration 393 passed / 4 登记 skip；backend-live 44 passed；演示 E2E 2 passed；个人本机假供应商 E2E 4 passed；basic 契约、type-check、build 通过。相对 `043c274` 多 8 例（A 5 + B 3），无新增 skip、删用例或放宽断言。最终树 `./scripts/verify.sh`（basic）exit 0。交接 `docs/handoffs/claude-plan-c-acceptance-closeout.md`。**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
+- **C 补充（签收填写工具）**：用户要求「在工作表里填 ✓ ✗」。新增 `evaluation/c04_signoff.py`（`init` 生成 `*-worksheet-user.md` 副本，`convert` 校验后写 `*-judgments-user.json` 与 `*-report-user.json`）；原工作表与 predictions 不动。未填、非法标记、判 ✗ 无依据、判定人为空或以 `claude-assist` 开头、改动其他列一律拒绝且不写文件。`tests/tooling/test_c04_signoff_sheet.py` 12 例：先以占位模块 RED（2 failed / 10 errors，均为 NotImplementedError）→ GREEN 12 passed（连同 `test_c04_accuracy.py` 共 19 passed）。真实两课副本用辅助判定在临时目录试填，转换结果与辅助数逐条一致（263 行全部解析），试填产物不入库。
+- **C04 人工准确率签收结果**：用户 `arvin` 于 2026-10-04 在本机签收网页逐条复核两课全部 263 条（course1 76 实体 + 61 关系，course2 68 实体 + 58 关系），**采纳 Claude 辅助判定**：263/263 判定一致；35 条 ✗ 的依据中 30 条沿用辅助原文，5 条仅删去【请复核】标记。按用户确认如实记为「复核后采纳辅助判定」，不是独立盲判。course1 实体 64/76（84.21%）、关系 58/61（95.08%）；course2 实体 61/68（89.71%）、关系 45/58（77.59%）；实体数 76 / 68 均 ≥20；`judge-report` 结论两课均为「达标」，`is_human_judgment: true`。证据 `evaluation/raw/c04-signoff/*-worksheet-user.md`、`*-judgments-user.json`、`*-report-user.json`；Claude 复核：判定 JSON 与工作表逐条一致、报告可由判定重算得到、原 predictions / 工作表 / 辅助文件未改。**风险**：course2 关系离 70% 仅 5 条余量，删去【请复核】的 5 条正是两可项，改判可能使结论翻转。签收完成不等于技术冻结：**stage_c_status: OPEN；technical_freeze: NOT_PERFORMED**。
+- **补测决定**：2026-10-04 用户决定三项补测均不做（浏览器可见首字、关闭思考的 Markdown 抽取、v3 + 思考开启 13 题基线）。无付费调用，台账仍 844451 / 900000，向量 12005 另计。冻结说明须如实写这三项「未测」：首字只有服务端首 delta 与客户端 SSE 首 delta；关闭思考的新 MD 抽取未测；旧思考开启 MD 为 83.97 / 75.51 秒，均未达 ≤60 秒，≤60 秒实测仅两份 PDF（20.90 / 28.08 秒）；关闭思考的问答改善幅度无法与 v3 提示词分离。整轮交 Codex 复审：`docs/handoffs/claude-plan-c-acceptance-closeout.md`（review_status: ready_for_review）。
+- **最终门禁（`bf81d20`，干净临时工作树、隔离端口、一次性 Neo4j、本机假供应商）**：**第 2 次 exit 0**：backend+tooling 3893 passed / 27 登记 skip；frontend 38 文件 934 passed；integration 393 passed / 4 登记 skip；backend-live 44 passed；演示 E2E 2 passed；个人本机假供应商 E2E 4 passed（日志 `scratchpad/logs/c-acc-gate-bf81d20-r2.log`，23356 字节，SHA-256 前 16 位 `0769aeb27f1d9dbb`）。第 1 次 exit 1：backend 3893 / 27 skip、frontend 934 均通过，integration 层因本 shell 的 PATH 缺 `~/.docker/bin` 找不到 docker 命令、未能启动一次性 Neo4j（Docker Desktop 在运行）；第 2 次只把 `~/.docker/bin` 加进 PATH，其余命令、工作树与代码相同（日志 `c-acc-gate-bf81d20.log`，18670 字节，`677970d7dc15994f`）。相对 `4304fec` 多 15 例（签收工具 12 + 3），无新增 skip、删用例或放宽断言。
+
+
+## 2026-10-04 Codex 认领：计划 C 验收收尾复审（54a7c67）
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| C-ACC-REVIEW-54 | DONE（REQUEST_CHANGES；仅复审，未冻结） | Codex | 只读逐提交复审4a6308b..54a7c67的24文件；核对入库语义、只读审计、签收工具/证据/措辞与不补测边界；在本隔离工作区验证并输出P1/P2/P3报告及Codex交接；不实施修复/冻结/合并/推送 |
+
+输入：Claude提交与交接、测量区88f9f6f的签收源文件（只读哈希）；输出：docs/reviews/codex-claude-plan-c-acceptance-54a7c67.md与Codex交接。风险：遗漏工具拒绝/表格解析边界、批量转换半写入、历史文档误作当前状态、外部环境污染。验证：指定4份定向测试、离线异常输入探测、签收数据重算、隔离完整门禁与git diff --check。API/DTO/迁移/依赖无改动；本轮仅本工作区文档/脱敏复审资产；真实生成/向量调用0，台账844451/900000、向量12005另计；stage_c_status OPEN、technical_freeze NOT_PERFORMED。
+
+C-ACC-REVIEW-54验收：固定54a7c67隔离工作副本，指定四文件33passed；整次integration实际exit0（backend+tooling3893passed/27登记skip、frontend934、integration393/4登记skip、backend-live44、演示2、个人假供应商4，type-check/build通过）。两课四源哈希一致、签收JSON/报告重算一致，27种入库语义探测等价；发现P2两项（重复行/额外列漏拒绝、批量拒绝部分写入）、P3两项（失败释放计时遗漏、文档当前状态矛盾）。报告docs/reviews/codex-claude-plan-c-acceptance-54a7c67.md；交接docs/handoffs/codex-plan-c-acceptance-review-54a7c67.md。人工准确率已签收，方式为用户arvin逐条复核后采纳辅助判定，非独立盲判；三项补测不做并保留未测。修复另开一轮；stage_c_status OPEN、technical_freeze NOT_PERFORMED；真实生成/向量增量0、台账844451/900000和12005另计；未改源分支/证据，未推送合并。源范围diff-check只报tasks.md末尾空行（exit2），未替Claude改。
+
+## 2026-10-04 Codex 认领：验收复审四项修复与本机检查入口
+
+| ID | 状态 | 负责人 | 范围/验收 |
+| --- | --- | --- | --- |
+| C-ACC-FIX-54 | DONE（本轮修复；用户手工检查待执行，未冻结） | Codex | 修复 P2-01 工作表重复行/列数校验、P2-02 批量转换拒绝零写入、P3-01 异常解锁计时、P3-02 当前文档矛盾；先回归后实现、隔离完整门禁；交付本修复版本启动及人工闭环检查步骤 |
+
+输入：54a7c67 与 Codex 复审报告；输出：最小代码/测试修复、当前状态统一、Codex 修复交接及启动指南。依赖：既有本机依赖、一次性 Neo4j 和假供应商；风险：表格转义回归、批量半写入、finally 改变异常传播、启动错目录误触共享库。验证：新增回归 RED→GREEN、指定四文件测试、./scripts/verify.sh integration、签收只读重算与 git diff --check。无 API/DTO/契约/迁移/依赖变化。仅自己的 codex/plan-c-acceptance-fixes 工作区；不改 Claude 交接与测量源文件、不复制 .env/业务库/课程正文、不发真实调用、不推送合并。stage_c_status OPEN；technical_freeze NOT_PERFORMED；人工准确率已签收（复核后采纳辅助判定）。用户要求先修复、自行检查后决定是否冻结。
+
+
+C-ACC-FIX-54 验收：签收新增回归 RED23failed/16passed、计时 RED4failed/6passed；修复后最终指定四文件61passed。整次隔离 `./scripts/verify.sh integration` 实际exit0：backend+tooling3921passed/27登记skip，frontend934（38文件）+type-check/build，integration393/4登记skip，backend-live44，演示E2E2，个人本机假供应商E2E4；无新增skip/删测试/放宽断言/升级依赖。只读签收哈希/263项工作表-判定-报告重算一致、27种入库业务语义与4a6308b等价、异常输入拒绝且批次零写入。新增列探测勘误在Codex自己的复审报告登记，旧资产保留。P3文档以顶部当前状态/README及Codex新交接覆盖历史措辞，Claude原交接按所有权规则不代写。报告 docs/reviews/codex-plan-c-acceptance-fixes.md；交接 docs/handoffs/codex-plan-c-acceptance-fixes.md；启动/本机闭环检查 docs/handoffs/codex-plan-c-manual-start.md。真实个人模式启动本轮未执行，新真实生成/在线向量调用0，台账844451/900000、向量12005另计；源码、签收与测量原证据不改源工作区、不推送合并。**stage_c_status OPEN；technical_freeze NOT_PERFORMED；等待用户本机检查反馈和冻结决定。**
+
+## 2026-10-04 Codex：全站向量 API 网页配置设计
+
+| ID | 状态 | 负责人 | 范围/验收 |
+| --- | --- | --- | --- |
+| C-EMBED-SETTINGS-DESIGN | CANCELLED_BY_USER（2026-10-04） | Codex | 用户要求暂时不改、撤销全站向量网页配置计划；仅保留设计备档，未开始实现，不再形成实施计划或请求审批；保留原验收修复与现有启动行为 |
+
+输入：用户选择前者、ADR-081、现有启动/配置/向量/个人模型实现；输出：docs/superpowers/specs/2026-10-04-global-embedding-settings-design.md 与Codex设计交接。依赖：现有AES-GCM/SQLite/Neo4j/契约工具链；风险：所有教师可改全站Key、首次无配置打不开网页、API/worker空间不一致、模型同名但供应商不同导致向量混用、测试隐式计费。验证：本轮静态核验与文档自审；实现后的RED→GREEN/契约与完整隔离integration为设计要求，当前不宣称功能已完成。保留既有未提交验收修复、不改Claude/测量区、不出站真实模型、不动共享图谱；stage_c_status OPEN，technical_freeze NOT_PERFORMED。
+
+2026-10-04 用户撤销全站向量 API 网页配置计划：本项停止，不修改启动流程、权限、API、数据或迁移；不继续设计/实施/测试该功能。已有 C-ACC-FIX-54 修复保留，用户仍可按原启动指南检查，stage_c_status OPEN、technical_freeze NOT_PERFORMED。
+
+
+## 2026-10-04 Codex 认领：最新结果 GitHub 集成
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| C-INTEGRATE-20261004 | IN_PROGRESS | Codex | 整合当前验收四项修复、复审/交接/启动指南及已撤销设计记录；本机凭据与业务库不入库；干净无.env隔离门禁后提交推送修复PR，按依赖顺序合并相关合格PR至main；不执行技术冻结 |
+
+输入：用户本轮明确授权提交GitHub、开PR和合并可合并PR；现有#317（计划A，base main）、#318（计划B/C与验收，base #317分支、草稿）、本地codex/plan-c-acceptance-fixes最新修复。输出：可追溯提交/PR、独立本地门禁与远程CI结果、本Agent集成交接。依赖：GitHub与Docker可用；风险：叠加PR基线错位、把旧REQUEST_CHANGES直接合并、凭据从说明文档泄露、测试误连用户库、将合并误作冻结。验证：指定四文件回归、无.env干净工作副本./scripts/verify.sh integration、只读签收重算、敏感值扫描、git diff --check、PR头提交与CI状态匹配。只改自己的工作区；不移动/清空用户运行环境，不合并测量分支88f9f6f，不发真实生成或向量请求。此次发布授权覆盖先前历史任务的“不推送合并”约束，但不授权技术冻结：stage_c_status OPEN，technical_freeze NOT_PERFORMED。
+
+
+C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整次integration exit0，backend+tooling3921passed/27登记skip、frontend934+type-check/build、integration393/4登记skip、backend-live44、演示2、个人假供应商4；定向61passed与只读核验通过。对561个待推送历史blob和可发布文件的本机敏感值匹配0；启动指南真实值已恢复占位，私人备档保留在忽略目录，用户.env未改。结果与代码SHA见evaluation/raw/codex-c-acc-fixes/publication-verification.json；远程PR/CI和main合并待执行，不将本地通过记为已合并。

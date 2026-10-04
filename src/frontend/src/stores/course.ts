@@ -25,6 +25,7 @@ export interface CourseRequestScope {
  */
 export const useCourseStore = defineStore('course', () => {
   const courseId = ref<string | null>(null)
+  const myRole = ref<'teacher' | 'student' | null>(null)
   // 图谱体量大且整体替换，不需要深层响应
   const graph = shallowRef<GraphExchange | null>(null)
   // 问答多轮历史由客户端维护并随请求提交（specs/grounded-qa.md Q8）
@@ -41,6 +42,7 @@ export const useCourseStore = defineStore('course', () => {
     controller = new AbortController()
     generation += 1
     courseId.value = id
+    myRole.value = null
     graph.value = null
     chatHistory.value = []
   }
@@ -79,5 +81,9 @@ export const useCourseStore = defineStore('course', () => {
     })
   }
 
-  return { courseId, graph, chatHistory, selectCourse, beginRequest, commit, setGraph, appendChatTurns }
+  function setRole(scope: CourseRequestScope, role: 'teacher' | 'student'): boolean {
+    return commit(scope, () => { myRole.value = role })
+  }
+
+  return { courseId, myRole, setRole, graph, chatHistory, selectCourse, beginRequest, commit, setGraph, appendChatTurns }
 })

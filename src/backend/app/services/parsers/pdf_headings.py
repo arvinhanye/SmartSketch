@@ -87,7 +87,7 @@ __all__ = [
 ]
 
 #: 标题判定规则的版本；阈值或规则变化时递增。
-HEADINGS_VERSION = "headings/1"
+HEADINGS_VERSION = "headings/2"  # headings/2：自动换行的续行并回同一段（L11-7，ADR-084）
 #: 带标题判定、未清洗的 PDF 解析结果的 `parser_version`（D05 → D06）。
 PARSER_VERSION = ",".join((_pdf.PARSER_VERSION, HEADINGS_VERSION))
 #: D05 → D07 清洗 → D06 流水线的 `parser_version`；D11 编排 PDF 时用它。清洗只用默认阈值，
@@ -213,9 +213,10 @@ def to_sectioned_document(
     starts = {(h.lines[0].page, h.lines[0].index): h for h in result.headings if h.lines}
     members = {(line.page, line.index) for h in result.headings for line in h.lines}
 
+    right_edge = _text_right_edge(seq)
     stack: list[PdfHeading] = []
     groups: list[tuple[int, tuple[str, ...], list[str]]] = []
-    last_key: tuple[int, int] | None = None
+    previous: PdfLine | None = None
     for line in seq:
         key = (line.page, line.index)
         if key in members:
@@ -224,13 +225,15 @@ def to_sectioned_document(
                 while stack and stack[-1].level >= heading.level:
                     stack.pop()
                 stack.append(heading)
-            last_key = None
+            previous = None
             continue
-        group_key = (line.page, line.box)
-        if group_key != last_key:
-            groups.append((line.page, tuple(h.title for h in stack), []))
-            last_key = group_key
-        groups[-1][2].append(line.text)
+        if previous is not None and _wraps_into(previous, line, right_edge):
+            groups[-1][2][-1] = _join_wrapped(groups[-1][2][-1], line.text)
+        elif previous is not None and (previous.page, previous.box) == (line.page, line.box):
+            groups[-1][2].append(line.text)
+        else:
+            groups.append((line.page, tuple(h.title for h in stack), [line.text]))
+        previous = line
 
     if not groups:
         return _pdf.to_parsed_document(seq, parser_version)
@@ -244,6 +247,37 @@ def to_sectioned_document(
         for ordinal, (page, titles, texts) in enumerate(groups)
     )
     return ParsedDocument(SourceFormat.PDF, parser_version, blocks)
+
+
+# 段落续行（L11-7，ADR-084）：版面分析常把同一段的每一行切成独立文本框（Chrome 打印的 PDF 尤甚），
+# 一行一块会把句子从中间切断。下一行满足以下全部条件时并回上一行所在的段：同页、同字号、
+# 行距不超过 1 倍字号（实测续行约 0.7 倍、段落之间约 1.3 倍）、左边界对齐、上一行写满到正文右边界附近。
+# 右边界取全文档各行的最右端，避免整页都是短行（如列表页）时把短行误判为满行。
+_CONTINUATION_GAP = 1.0      # 行距上限，单位为字号
+_ALIGN_TOLERANCE = 1.0       # 左边界差上限，单位为字号
+_FULL_LINE_SLACK = 2.5       # 上一行右端距本页最右边界的允许空余，单位为字号
+_ASCII_WORD = re.compile(r"[A-Za-z0-9]")
+
+
+def _text_right_edge(lines: Sequence[PdfLine]) -> float:
+    return max((line.x1 for line in lines), default=0.0)
+
+
+def _wraps_into(previous: PdfLine, line: PdfLine, right_edge: float) -> bool:
+    size = previous.font_size
+    if line.page != previous.page or size <= 0 or abs(line.font_size - size) > 0.5:
+        return False
+    gap = previous.y0 - line.y1
+    return (0 <= gap <= _CONTINUATION_GAP * size
+            and abs(line.x0 - previous.x0) <= _ALIGN_TOLERANCE * size
+            and previous.x1 >= right_edge - _FULL_LINE_SLACK * size)
+
+
+def _join_wrapped(head: str, tail: str) -> str:
+    """自动换行处的拼接：西文单词之间补一个空格，中文与标点直接相连。"""
+    if head and tail and _ASCII_WORD.match(head[-1]) and _ASCII_WORD.match(tail[0]):
+        return f"{head} {tail}"
+    return head + tail
 
 
 def parse_pdf_with_headings(data: bytes) -> ParsedDocument:

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { MATERIALS_API_KEY } from '../api/materials'
+import { useRuntimeStore } from '../stores/runtime'
 import { COURSES_API_KEY } from '../api/courses'
-import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, useCourses } from '../composables/useCourses'
+import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, courseNextStep, useCourses } from '../composables/useCourses'
 import {
   COURSE_MEMBERS_ROUTE,
   COURSE_ROUTE,
@@ -14,6 +16,7 @@ import {
   TEACHER_GRAPH_ROUTE,
   REVIEW_ROUTE,
   CHAT_ROUTE,
+  SETTINGS_ROUTE,
 } from '../router'
 import { useSessionStore } from '../stores/session'
 
@@ -23,6 +26,8 @@ if (api === null) throw new Error('CoursesView 需要注入 COURSES_API_KEY')
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const runtime = useRuntimeStore()
+const materialsApi = inject(MATERIALS_API_KEY, null)
 
 const courseId = computed(() => {
   const cid = route.params.cid
@@ -43,11 +48,14 @@ const {
   createdName,
   createCourse,
   current,
+  materialCount,
   currentStatus,
   currentError,
   selectedId,
 } = useCourses({
   api,
+  materialsApi,
+  sessionKey: computed(() => session.accessToken),
   courseId,
   canCreate,
   // errors.v1.md：COURSE_FORBIDDEN 提示无权限并返回课程列表
@@ -72,6 +80,14 @@ const hasTeacherGraph = router.hasRoute(TEACHER_GRAPH_ROUTE)
 // 审核队列页（H09）只对课程内教师显示入口
 const hasReview = router.hasRoute(REVIEW_ROUTE)
 
+const nextStep = computed(() => current.value ? courseNextStep({ ...current.value, materialCount: materialCount.value }, runtime.needsConfig) : null)
+const actionRoutes = {settings: SETTINGS_ROUTE, materials: MATERIALS_ROUTE, review: REVIEW_ROUTE, teacherGraph: TEACHER_GRAPH_ROUTE, studentGraph: STUDENT_GRAPH_ROUTE}
+const actionLabels = {settings: '配置模型 API', materials: '上传与检查资料', review: '审核并发布', teacherGraph: '维护课程图谱', studentGraph: '浏览图谱与学习路径'}
+const nextLink = computed(() => {
+  const action = nextStep.value?.action
+  if (!action || !current.value || !router.hasRoute(actionRoutes[action])) return null
+  return { to: {name: actionRoutes[action], ...(action === 'settings' ? {} : {params: {cid: current.value.id}})}, label: actionLabels[action] }
+})
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
 </script>
 
@@ -99,6 +115,8 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
           课程内身份：{{ current.roleLabel }}（{{ current.myRole === 'teacher' ? '教师视图' : '学生视图' }}）
           · 状态：{{ current.statusLabel }}
         </p>
+        <p v-if="nextStep" data-test="course-stage" role="status">{{ nextStep.text }}</p>
+        <RouterLink v-if="nextLink" data-test="course-next-action" :to="nextLink.to">{{ nextLink.label }}</RouterLink>
         <p v-if="current.description">{{ current.description }}</p>
         <p v-if="hasStudentGraph && current.myRole === 'student'">
           <RouterLink data-test="student-graph-link" :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: current.id } }">
@@ -145,7 +163,7 @@ const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORB
         <button type="button" data-test="courses-retry" @click="loadCourses">重试</button>
       </div>
       <p v-else-if="isEmpty" data-test="courses-empty">
-        暂无课程。{{ canCreate ? '可在下方创建第一门课程。' : '教师将你加入课程并发布图谱后，课程会出现在这里。' }}
+        {{ canCreate ? '暂无课程。可在下方创建第一门课程。' : `你还没有加入任何课程。请把用户名「${session.user?.username ?? ''}」告诉任课教师，由教师在「成员」中添加你；发布后即可学习。` }}
       </p>
       <ul v-else class="cards">
         <li v-for="card in courses" :key="card.id" data-test="course-card">

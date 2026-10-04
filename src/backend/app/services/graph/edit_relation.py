@@ -44,7 +44,7 @@ from app.services.access import not_found
 from app.services.graph import audit
 from app.services.graph.dag import check_candidates
 from app.services.graph.edit_node import EditContext, InvalidEdit, _course_write
-from app.services.graph.read import _chunks, _relation, _relation_chunk_ids, _source_ref
+from app.services.graph.read import _chunk_names, _chunks, _relation, _relation_chunk_ids, _source_ref
 from app.services.graph.relations import CycleDetectedError, apply_relations
 
 __all__ = ["RelationFields", "create_relation", "delete_relation", "update_relation"]
@@ -144,8 +144,9 @@ def _body(ctx: EditContext, scope: GraphScope, detail: Mapping[str, Any]) -> dic
     row = {"type": detail["type"], "from_id": detail["from_id"], "to_id": detail["to_id"], "p": detail["p"]}
     chunk_ids = _relation_chunk_ids(row, scope)
     chunks = _chunks(ctx.sqlite_url, scope.course_id, chunk_ids)
+    names = _chunk_names(ctx.sqlite_url, scope.course_id, chunks)
     refs = [ref for cid in chunk_ids
-            if (ref := _source_ref(chunks.get(cid), None, None, None)) is not None]
+            if (ref := _source_ref(chunks.get(cid), None, None, None, names)) is not None]
     relation = _relation(scope.course_id, row, refs)
     if relation is None:  # 存储里的关系不满足契约：不应出现
         raise RuntimeError(f"relation {detail['p'].get('rel_id')} does not satisfy the contract after the write")

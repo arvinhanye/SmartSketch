@@ -238,7 +238,7 @@ def texts(extraction: PdfExtraction) -> list[tuple[int, str]]:
 
 
 def test_parser_version_is_pdf_1_and_valid_for_revision_key() -> None:
-    assert PARSER_VERSION == "pdf/1"
+    assert PARSER_VERSION == "pdf/2"  # L11：部首形近字规范化
     RevisionKey("doc-1", "sha256:" + "0" * 64, PARSER_VERSION)
 
 

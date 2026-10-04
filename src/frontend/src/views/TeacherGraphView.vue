@@ -4,13 +4,17 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRoute
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
+import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY } from '../api/knowledgeDetail'
+import { createNodeEditApi, NODE_EDIT_API_KEY } from '../api/nodeEdit'
 import { createRelationsApi, RELATIONS_API_KEY } from '../api/relations'
 import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
+import NodeCreator from '../components/NodeCreator.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
-import { chapterOptions, useGraphFilters } from '../composables/useGraphFilters'
+import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
+import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
 import {
@@ -72,7 +76,7 @@ const relations = useRelationEditor({
 const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value))
 const { selected, visible, summary, isDefault, selectedHidden } = filters
 
-type PanelTab = 'detail' | 'edit' | 'relations'
+type PanelTab = 'detail' | 'edit' | 'relations' | 'create'
 const tab = ref<PanelTab>('detail')
 const tabs: Array<{ value: PanelTab; label: string }> = [
   { value: 'detail', label: '详情' },
@@ -90,6 +94,45 @@ const pendingName = computed(() => {
   return graph.value?.nodes.find((n) => n.id === target.kpId)?.name ?? target.kpId
 })
 const currentName = computed(() => graph.value?.nodes.find((n) => n.id === selected.value)?.name ?? null)
+
+// L13-2：搜索框回车定位；选中经过「未保存修改」守卫，画布聚焦到该节点
+const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
+const searchNotice = ref<string | null>(null)
+function onLocate(query: string): void {
+  const full = graph.value === null ? null : relations.canvasData.value
+  const kpId = full === null ? null : locateNode(full, filters.state.value, query)
+  searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
+  if (kpId === null) return
+  // C05-1：有未保存修改时先确认；画布只在选中真正切换后才聚焦，取消则画布与详情都留在原节点
+  guard.request(kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
+}
+
+// L11：画布之外的可访问选择方式（键盘与自动化可用），选择同样经过「未保存修改」守卫
+const pickerOptions = computed(() => nodePickerOptions(graph.value))
+function onPick(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value
+  guard.request(value === '' ? null : value)
+}
+
+// L11：新建知识点（ADR-035：必带来源，来源取自当前选中知识点）
+const nodeEditApi = inject(NODE_EDIT_API_KEY, null) ?? createNodeEditApi(fallbackClient())
+const detailApi = inject(KNOWLEDGE_DETAIL_API_KEY, null) ?? createKnowledgeDetailApi(fallbackClient())
+const creator = useNodeCreator({
+  api: nodeEditApi,
+  detailApi,
+  sourceKpId: selected,
+  onCreated: async (kp) => {
+    await teacher.refresh()
+    guard.request(kp.id)
+  },
+})
+function openCreator(): void {
+  tab.value = 'create'
+  void creator.open()
+}
+watch(selected, () => {
+  if (tab.value === 'create' && creator.success.value === null) void creator.open()
+})
 
 /** 画布点击：关系页签下用于依次点选起点、终点；其余页签切换当前知识点 */
 function onNodeClick(kpId: string): void {
@@ -215,14 +258,23 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             :selected-hidden="selectedHidden"
             vertical
             @clear="filters.clear"
+            @locate="onLocate"
           />
+          <p v-if="searchNotice" data-test="tg-search-notice" role="status">{{ searchNotice }}</p>
         </aside>
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
           <p class="teacher-graph__hint">
             {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
           </p>
-          <GraphCanvas :graph="visible" :layout="filters.layout.value" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <label class="teacher-graph__picker">
+            选择知识点
+            <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
+              <option value="">（未选择）</option>
+              <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
+          </label>
+          <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div class="teacher-graph__panel">
@@ -236,6 +288,14 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
               @click="tab = item.value"
             >
               {{ item.label }}
+            </button>
+            <button
+              type="button"
+              data-test="tg-create-open"
+              :aria-pressed="tab === 'create' ? 'true' : 'false'"
+              @click="openCreator"
+            >
+              新建知识点
             </button>
           </div>
 
@@ -279,6 +339,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
           />
 
           <RelationEditor v-if="tab === 'relations'" :editor="relations" />
+          <NodeCreator v-if="tab === 'create'" :creator="creator" :source-name="currentName" />
         </div>
       </div>
     </template>
@@ -295,6 +356,12 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.75rem;
+}
+.teacher-graph__picker {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
 .teacher-graph__header h2 {
   margin: 0;

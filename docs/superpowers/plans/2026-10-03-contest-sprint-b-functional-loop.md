@@ -1,7 +1,7 @@
 # 冲刺计划 B：教师与学生功能闭环（L11–L15）实施计划
 
 > **执行方式**：沿用本会话逐任务执行（用户已确认，不再重选）。每个子任务按「失败测试 → 确认红 → 最小实现 → 确认绿 → 记录 / 原子提交 / 交接」推进，步骤用 `- [ ]` 跟踪。
-> **状态**：规划待确认（2026-10-03）。用户确认前不改业务代码、契约或迁移，也不调用真实模型。
+> **状态（Codex 收尾更新，2026-10-03）**：用户已批准并执行，第二阶段功能交付已收尾；L11-7 PDF 修复后的真实复测仍 OPEN，真实性能/质量验收有保留。实际实现偏差、验证和待办见 `docs/tasks.md`、`docs/reviews/codex-plan-b-96f3885-closeout.md`、`docs/handoffs/codex-plan-b-closeout.md`。下方保留执行前设计与步骤，不用旧复选框替代现时任务状态，也不把未测项目补勾为通过。
 
 **Goal**：在修复后的计划 A 基线上，把教师「上传 → 进度 → 草稿 → 修正 → 发布」和学生「浏览 → 来源 → 掌握 → 路径 → 提问 → 定位」两条闭环在真实页面走通。每一步都要有可复跑的测试和页面证据。
 
@@ -415,12 +415,12 @@ describe('L11 发布阻断原因', () => {
           type: string
           minLength: 1
           maxLength: 255
-          description: "资料文件名（课程内资料的原始文件名）；资料已删除或不可读时省略，客户端显示「资料不可用」。仅来自同一课程（ADR-083）。"
+          description: "资料文件名（课程内资料的原始文件名）；资料已删除或不可读时省略，客户端显示「资料不可用」。仅来自同一课程（ADR-085）。"
 ```
 
 - Modify: `specs/grounded-qa.md` 的 Q4 `citations` 行，加入「`document_name` 由服务端按同课程资料填写」。
 - Modify: `specs/course-knowledge-graph.md`，在知识点详情来源一节写入同一规则。
-- Modify: `docs/decisions.md`，新增 ADR-083「来源文件名的可选字段与课程隔离」。
+- Modify: `docs/decisions.md`，新增 ADR-085「来源文件名的可选字段与课程隔离」。
 - Regenerate: `PATH="$PWD/.venv/bin:$PATH" ./scripts/gen-contracts.sh`
 - Test: `tests/contracts/`（既有门禁）
 

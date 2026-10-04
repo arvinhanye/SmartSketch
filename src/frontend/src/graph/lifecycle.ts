@@ -1,6 +1,6 @@
 import type { GraphData, GraphOptions } from '@antv/g6'
 import type { InjectionKey } from 'vue'
-import type { G6Edge, G6Node } from './adapter'
+import { nodeElementId, type G6Edge, type G6Node } from './adapter'
 
 /**
  * G6 画布生命周期（H04）。
@@ -22,7 +22,24 @@ import type { G6Edge, G6Node } from './adapter'
  * I06 追加学习状态：学生页按服务端投影的 `MasteryStatus`（`mastered`/`learning`/`notStarted`）
  * 与推荐项（`recommended`）给节点打标；元素只携带状态名，颜色只在 `buildGraphOptions` 定义一处。
  */
-export type CanvasElementState = 'selected' | 'rejected' | 'lowConfidence' | 'mastered' | 'learning' | 'notStarted' | 'recommended'
+export type CanvasElementState =
+  | 'selected'
+  | 'rejected'
+  | 'lowConfidence'
+  | 'mastered'
+  | 'learning'
+  | 'notStarted'
+  | 'recommended'
+  // L14 学习路径：未满足的前置、之后解锁、与当前路径无关（淡化）；边：路径上的先修边
+  | 'pathPrereq'
+  | 'pathUnlock'
+  | 'dimmed'
+  | 'pathEdge'
+
+/** 节点标签：推荐项前加序号「1. 」（L14），其余为名称 */
+export function nodeLabel(data: Pick<G6Node['data'], 'name' | 'pathOrder'>): string {
+  return data.pathOrder === undefined ? data.name : `${data.pathOrder}. ${data.name}`
+}
 
 export type CanvasNode = G6Node & { states?: CanvasElementState[] }
 export type CanvasEdge = G6Edge & { states?: CanvasElementState[] }
@@ -52,7 +69,22 @@ export interface CanvasGraph {
   /** G6 `Graph` 均有；测试替身可不实现，此时布局切换不生效（H05） */
   setLayout?(layout: NonNullable<GraphOptions['layout']>): void
   layout?(): Promise<void>
+  /** 视口（L13）：G6 `Graph` 均有；测试替身可不实现，此时保持整图适配、不做聚焦 */
+  getZoom?(): number
+  zoomTo?(zoom: number): Promise<void>
+  focusElement?(id: string): Promise<void>
+  /**
+   * L14：G6 5.x 的 `render()` 每次都按 `autoFit` 重新整图适配，掌握状态、选中、路径高亮引起的数据更新
+   * 因此会把视口拉回整图。首次渲染后用它关掉 `autoFit`；之后的适配只在尺寸变化与切换布局时显式 `fitView`。
+   */
+  setOptions?(options: Partial<GraphOptions>): void
 }
+
+/**
+ * 可读缩放（L13-1，R06）：整图适配后低于此值时放大到此值并聚焦入口节点，
+ * 避免节点多时整图缩成一条不可读的细线（L11 走查：129 个节点）。
+ */
+export const READABLE_ZOOM = 0.7
 
 export interface CanvasGraphInit {
   container: HTMLElement
@@ -82,6 +114,8 @@ export interface GraphLifecycleOptions {
   /** 参数是知识点 ID（契约 ID，不带 `kp:` 前缀） */
   onNodeClick?: (kpId: string) => void
   onStatus?: (status: LifecycleStatus, error?: unknown) => void
+  /** 视口调整后的缩放值（L13，页面写到 `data-zoom` 供验收） */
+  onZoom?: (zoom: number) => void
 }
 
 export interface GraphLifecycle {
@@ -91,6 +125,8 @@ export interface GraphLifecycle {
   setLayout(layout: GraphLayoutName): void
   /** 容器可能变了尺寸但观察器不会通知时（如 KeepAlive 重新激活）主动复查 */
   refreshSize(): void
+  /** 把视口移到该知识点（搜索定位、问答跳转）；尚未建图时在首次渲染后执行；不在图中的知识点忽略 */
+  focus(kpId: string): void
   destroy(): void
 }
 
@@ -123,7 +159,7 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         fill: '#ffffff',
         stroke: '#1677ff',
         lineWidth: 1.5,
-        labelText: (datum: unknown) => (datum as G6Node).data.name,
+        labelText: (datum: unknown) => nodeLabel((datum as G6Node).data),
         labelPlacement: 'bottom',
         labelFontSize: 12,
       },
@@ -136,6 +172,10 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         learning: { fill: '#fffbe6', stroke: '#faad14', lineWidth: 2 },
         notStarted: { fill: '#ffffff', stroke: '#bfbfbf' },
         recommended: { stroke: '#722ed1', lineWidth: 3, halo: true, haloStroke: '#9254de', haloLineWidth: 10 },
+        // L14：学习路径。淡化在推荐/选中之前叠加，选中的节点不会被淡化（`applyLearningStates`）
+        pathPrereq: { stroke: '#fa541c', lineWidth: 2.5, lineDash: [4, 3] },
+        pathUnlock: { stroke: '#13c2c2', lineWidth: 2.5 },
+        dimmed: { opacity: 0.25 },
         selected: { stroke: '#0958d9', lineWidth: 3, halo: true, haloStroke: '#1677ff', haloLineWidth: 10 },
       },
     },
@@ -145,6 +185,8 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
       state: {
         rejected: { opacity: 0.3 },
         lowConfidence: { opacity: 0.6 },
+        pathEdge: { stroke: '#722ed1', lineWidth: 3.5, opacity: 1 },
+        dimmed: { opacity: 0.2 },
       },
     },
     layout: layoutOptions(init.layout ?? 'hierarchical'),
@@ -195,6 +237,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   let pending: GraphCanvasData | null = copyData(options.data)
   /** 当前画布上的元素 ID → 知识点 ID */
   let drawn = new Map<string, string>()
+  /** 当前画布上的边（入口节点判定用） */
+  let lastEdges: GraphCanvasData['edges'] = []
   let width = 0
   let height = 0
   /** 期望的布局，与 G6 实例当前使用的布局 */
@@ -203,6 +247,10 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   let frame: number | null = null
   /** 所有对 G6 的异步操作串行执行 */
   let chain: Promise<void> = Promise.resolve()
+  /** 建图前请求的聚焦目标（知识点 ID） */
+  let pendingFocus: string | null = null
+  /** 最近一次页面请求聚焦的知识点（L14）：尺寸变化重新适配后回到它，而不是入口节点 */
+  let anchor: string | null = null
 
   const alive = () => status !== 'destroyed' && status !== 'error'
 
@@ -231,6 +279,34 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     return [container.clientWidth, container.clientHeight]
   }
 
+  function reportZoom(g: CanvasGraph): void {
+    if (g.getZoom !== undefined) options.onZoom?.(g.getZoom())
+  }
+
+  /** 入口节点：数据中第一个没有入边的节点；全图成环时取第一个节点 */
+  function entryNode(): string | null {
+    const ids = [...drawn.keys()]
+    if (ids.length === 0) return null
+    return ids.find((id) => !lastEdges.some((e) => e.target === id)) ?? ids[0]!
+  }
+
+  /** 整图适配之后：缩放低于可读值时放大并聚焦（有待聚焦目标时聚焦目标，否则入口节点） */
+  async function ensureReadable(g: CanvasGraph): Promise<void> {
+    if (g.getZoom !== undefined && g.zoomTo !== undefined && g.getZoom() < READABLE_ZOOM) {
+      await g.zoomTo(READABLE_ZOOM)
+      if (!alive()) return
+      const wanted = pendingFocus ?? anchor
+      const target = wanted !== null && drawn.has(nodeElementId(wanted)) ? nodeElementId(wanted) : entryNode()
+      pendingFocus = null
+      if (target !== null && drawn.has(target) && g.focusElement !== undefined) await g.focusElement(target)
+    } else if (pendingFocus !== null) {
+      const target = nodeElementId(pendingFocus)
+      pendingFocus = null
+      if (drawn.has(target) && g.focusElement !== undefined) await g.focusElement(target)
+    }
+    if (alive()) reportZoom(g)
+  }
+
   function create(): void {
     creating = true
     enqueue(async () => {
@@ -245,11 +321,16 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       }
       graph = created
       drawn = kpIndex(data)
+      lastEdges = data.edges
       graph.on('node:click', (event) => {
         const kpId = event.target?.id === undefined ? undefined : drawn.get(event.target.id)
         if (kpId !== undefined && alive()) options.onNodeClick?.(kpId)
       })
       await graph.render()
+      if (!alive()) return
+      // 之后的数据更新保持学生正在看的位置，不再回到整图适配（见 `CanvasGraph.setOptions`）
+      graph.setOptions?.({ autoFit: undefined })
+      await ensureReadable(graph)
       if (!alive()) return
       if (pending !== null) flush()
       else setStatus('ready')
@@ -271,6 +352,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (!alive()) return
       await g.fitView()
       if (!alive()) return
+      await ensureReadable(g)
+      if (!alive()) return
       // 期间又有更新或切换时，已排队的 flush / relayout 负责收尾
       if (pending === null && appliedLayout === layout) setStatus('ready')
     })
@@ -285,6 +368,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       setStatus('rendering')
       graph.setData(data)
       drawn = kpIndex(data)
+      lastEdges = data.edges
       await graph.render()
       if (!alive()) return
       if (pending !== null) flush()
@@ -306,6 +390,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     enqueue(async () => {
       graph!.setSize(w, h)
       await graph!.fitView()
+      if (alive()) await ensureReadable(graph!)
     })
   }
 
@@ -344,6 +429,20 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     },
     refreshSize() {
       scheduleSize()
+    },
+    focus(kpId) {
+      if (!alive()) return
+      anchor = kpId
+      if (graph === null) {
+        pendingFocus = kpId
+        return
+      }
+      enqueue(async () => {
+        const g = graph
+        const target = nodeElementId(kpId)
+        if (g === null || g.focusElement === undefined || !drawn.has(target)) return
+        await g.focusElement(target)
+      })
     },
     destroy() {
       if (status === 'destroyed') return

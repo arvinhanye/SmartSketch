@@ -52,6 +52,12 @@ class ModelConfig(BaseModel):
     version: Annotated[Optional[int], Field(ge=1)] = None
     updated_at: Optional[datetime] = None
     last_test: Optional[ModelConfigLastTest] = None
+    disable_thinking: Annotated[
+        Optional[bool],
+        Field(
+            description='开启时，该用户的全部生成调用请求体追加 `thinking: {type: disabled}`（DeepSeek 等兼容接口；ADR-090）。'
+        ),
+    ] = None
 
 
 class ModelConfigUpdate(BaseModel):
@@ -68,6 +74,12 @@ class ModelConfigUpdate(BaseModel):
         ),
     ]
     api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+    disable_thinking: Annotated[
+        Optional[bool],
+        Field(
+            description='关闭模型思考（ADR-090）。省略时保留已存值；新建配置默认 false。'
+        ),
+    ] = None
 
 
 class ModelConfigTestRequest(BaseModel):
@@ -84,6 +96,12 @@ class ModelConfigTestRequest(BaseModel):
         ),
     ] = None
     api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+    disable_thinking: Annotated[
+        Optional[bool],
+        Field(
+            description='测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。'
+        ),
+    ] = None
 
 
 class ModelConfigTestResult(BaseModel):
@@ -502,6 +520,14 @@ class SourceRef1(BaseModel):
     text: Annotated[
         Optional[str], Field(description='原文片段，供前端高亮', min_length=1)
     ] = None
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
+    ] = None
 
 
 class SourceRef2(BaseModel):
@@ -520,6 +546,14 @@ class SourceRef2(BaseModel):
     ] = None
     text: Annotated[
         Optional[str], Field(description='原文片段，供前端高亮', min_length=1)
+    ] = None
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
     ] = None
 
 
@@ -1025,6 +1059,13 @@ class RecommendReasonFacts(BaseModel):
         float,
         Field(description='参与计算的重要度属性；缺失时为中性值 0.5', ge=0.0, le=1.0),
     ]
+    importance_defaulted: Annotated[
+        Optional[bool],
+        Field(description='原重要度缺失时为 true；可选，省略时客户端不猜测缺失'),
+    ] = None
+    difficulty_defaulted: Annotated[
+        Optional[bool], Field(description='原难度缺失时为 true；显式 0.5 为 false')
+    ] = None
     centrality: Annotated[
         float,
         Field(
@@ -1175,6 +1216,14 @@ class Citation1(BaseModel):
     section_path: Annotated[Optional[str], Field(min_length=1)] = None
     page: Annotated[int, Field(ge=1)]
     text: Annotated[str, Field(min_length=1)]
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
+    ] = None
 
 
 class Citation2(BaseModel):
@@ -1184,6 +1233,14 @@ class Citation2(BaseModel):
     section_path: Annotated[str, Field(min_length=1)]
     page: Annotated[Optional[int], Field(ge=1)] = None
     text: Annotated[str, Field(min_length=1)]
+    document_name: Annotated[
+        Optional[str],
+        Field(
+            description='资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。',
+            max_length=255,
+            min_length=1,
+        ),
+    ] = None
 
 
 class Citation(RootModel[Union[Citation1, Citation2]]):

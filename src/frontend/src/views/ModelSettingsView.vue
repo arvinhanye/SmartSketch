@@ -57,6 +57,16 @@ async function confirmClear(): Promise<void> {
         <input id="mc-api-key" v-model="form.apiKey" data-test="mc-api-key" type="password"
                autocomplete="off" spellcheck="false" :aria-required="keyRequired" />
 
+        <label class="model-settings__check">
+          <input v-model="form.disableThinking" data-test="mc-disable-thinking" type="checkbox"
+                 aria-describedby="mc-disable-thinking-hint" />
+          关闭模型思考
+        </label>
+        <p id="mc-disable-thinking-hint" class="model-settings__hint">
+          适用于支持 <code>thinking</code> 字段的接口（如 DeepSeek）。开启后抽取与问答不再先做长篇推理，
+          通常明显更快、更省 token；复杂问题的回答质量可能下降。其他接口可能不认这个字段，保存前请先测试连接。
+        </p>
+
         <p v-if="error" data-test="mc-error" role="alert">{{ error }}</p>
         <p v-if="notice" data-test="mc-notice" role="status">{{ notice }}</p>
         <p v-if="testResult" data-test="mc-test-result" :class="testResult.ok ? 'is-ok' : 'is-bad'" role="status">
@@ -103,6 +113,9 @@ async function confirmClear(): Promise<void> {
   font: inherit;
 }
 .model-settings__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.model-settings__check { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
+.model-settings__check input { padding: 0; }
+.model-settings__hint { margin: 0; font-size: 0.85rem; color: var(--color-text-muted); }
 .model-settings__confirm {
   padding: 0.75rem;
   border: 1px solid var(--color-danger-border);

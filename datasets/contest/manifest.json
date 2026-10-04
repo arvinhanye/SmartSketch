@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "note": "L11 参赛演示与评测资料：两门课各一章，Markdown 为源，PDF 由 scripts/build-contest-pdfs.sh 生成。全部自编。",
+  "courses": [
+    {
+      "key": "course1-ds-ch3",
+      "name": "数据结构：栈与队列"
+    },
+    {
+      "key": "course2-os-ch2",
+      "name": "操作系统：进程与线程"
+    }
+  ],
+  "documents": [
+    {
+      "path": "course1-ds-ch3/ch3-stack-queue.md",
+      "bytes": 11779,
+      "sha256": "4847e2e4b5ef36c6fff107e39e763485019d094d0b571506927584f4b1d566a9",
+      "source": "SmartSketch 项目自编",
+      "content_type": "text/markdown",
+      "chars": 4773
+    },
+    {
+      "path": "course1-ds-ch3/ch3-stack-queue.pdf",
+      "bytes": 391115,
+      "sha256": "4d01c6c85e8d98742802178f61834c583d7e7362d63c4ad4a9a1bc45d6f94a00",
+      "source": "SmartSketch 项目自编",
+      "content_type": "application/pdf",
+      "pages": 5
+    },
+    {
+      "path": "course2-os-ch2/ch2-process-thread.md",
+      "bytes": 8767,
+      "sha256": "e7f2ef4241ce4fbad315a80ac5f0cc0b1531834d31ace42e3e467ea41a3b3513",
+      "source": "SmartSketch 项目自编",
+      "content_type": "text/markdown",
+      "chars": 3187
+    },
+    {
+      "path": "course2-os-ch2/ch2-process-thread.pdf",
+      "bytes": 368606,
+      "sha256": "1907e13f66d33008ba65ff579e33c55d2f205416151459c5614491a10e32816e",
+      "source": "SmartSketch 项目自编",
+      "content_type": "application/pdf",
+      "pages": 4
+    }
+  ]
+}

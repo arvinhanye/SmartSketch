@@ -1,0 +1,539 @@
+{
+  "source_commit": "96f3885af54cbc788cc6756c02779e63ae04187e",
+  "measurement_code_commit": "257750e185f43d547bf9045558d9adc4a183201d",
+  "audit_mode": "read-only SQLite mode=ro + query_only; HTTP artifacts replay; no paid calls",
+  "measurement_started_at": "2026-10-03T18:16:00Z",
+  "questions": [
+    {
+      "request_id": "01M41FR9CM2BT6CKQ6HY4C93YP",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "version_id": "01M4124TTXYE98SBV93PATDZCZ",
+      "question": "什么是栈",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 8224,
+      "first_delta_latency_ms": 7828,
+      "created_at": "2026-10-03T18:17:29.758Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 8.24,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-2",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        },
+        {
+          "index": 4,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.6 本章小结 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-15",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FRHE0X39SFJZ1AKAYEERQ",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "version_id": "01M4124TTXYE98SBV93PATDZCZ",
+      "question": "栈和队列有什么区别",
+      "outcome": "error",
+      "reason": null,
+      "error_code": "LLM_UNAVAILABLE",
+      "error_reason": "truncated",
+      "truncated": 1,
+      "invalidation_subtype": "uncited_sentence",
+      "latency_ms": 10255,
+      "first_delta_latency_ms": 9762,
+      "created_at": "2026-10-03T18:17:40.032Z",
+      "http_status": 503,
+      "client_elapsed_seconds": 10.27,
+      "graph_version": null,
+      "citations": []
+    },
+    {
+      "request_id": "01M41FRVEWY7EMGX7RCZ5AZB63",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "version_id": "01M4124TTXYE98SBV93PATDZCZ",
+      "question": "顺序栈入栈需要检查什么",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 9500,
+      "first_delta_latency_ms": 9287,
+      "created_at": "2026-10-03T18:17:49.547Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 9.51,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-3",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FS4RAPGHK1ADRT2A02P20",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "version_id": "01M4124TTXYE98SBV93PATDZCZ",
+      "question": "循环队列如何判断空与满",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 5098,
+      "first_delta_latency_ms": 4816,
+      "created_at": "2026-10-03T18:17:54.662Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 5.11,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch3-stack-queue.md",
+          "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列 > 第1段",
+          "chunk_id": "rev_280ef651bb22be263c83b0a20ca1aebbc1db827403c7b6ad3e4a3219de157e54-7",
+          "document_id": "fcf95f9b496447c79d0f21c697f8b5ec"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FS9R01P03B54QXZKJEDGV",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "version_id": "01M4124TTXYE98SBV93PATDZCZ",
+      "question": "今天天气怎么样",
+      "outcome": "not_covered",
+      "reason": "below_similarity_threshold",
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 524,
+      "first_delta_latency_ms": null,
+      "created_at": "2026-10-03T18:17:55.199Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 0.54,
+      "graph_version": 1,
+      "citations": []
+    },
+    {
+      "request_id": "01M41FSA97G121ZQZ1FHDTRXFW",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "version_id": "01M41255Q0VRWZHGY4T45KTMSD",
+      "question": "什么是进程",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 3169,
+      "first_delta_latency_ms": 3028,
+      "created_at": "2026-10-03T18:17:58.385Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 3.18,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.1 进程的定义 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-2",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FSDCJ5KTASCXB8RY98YC4",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "version_id": "01M41255Q0VRWZHGY4T45KTMSD",
+      "question": "进程和线程有什么区别",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 6840,
+      "first_delta_latency_ms": 6537,
+      "created_at": "2026-10-03T18:18:05.245Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 6.86,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.4 线程 > 2.4.2 进程与线程的比较 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-11",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        },
+        {
+          "index": 2,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.4 线程 > 2.4.1 线程的定义 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-10",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        },
+        {
+          "index": 5,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.4 进程切换 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-5",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FSM2WH6CN5GTPY71J1EH9",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "version_id": "01M41255Q0VRWZHGY4T45KTMSD",
+      "question": "进程有哪些基本状态",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 3742,
+      "first_delta_latency_ms": 3460,
+      "created_at": "2026-10-03T18:18:09.005Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 3.75,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.3 进程的状态 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-4",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FSQREDSW12Y61V3AJTGB3",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "version_id": "01M41255Q0VRWZHGY4T45KTMSD",
+      "question": "PCB 保存哪些信息",
+      "outcome": "answered",
+      "reason": null,
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 5167,
+      "first_delta_latency_ms": 5020,
+      "created_at": "2026-10-03T18:18:14.191Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 5.18,
+      "graph_version": 1,
+      "citations": [
+        {
+          "index": 1,
+          "document_name": "ch2-process-thread.md",
+          "section_path": "第2章 进程与线程 > 2.2 进程 > 2.2.2 进程控制块 > 第1段",
+          "chunk_id": "rev_9facceff5e94ff80f74033d190c25ad612654a6be0b5288bc1f7894817cdde64-3",
+          "document_id": "b1c48fe941e441ab812a89975115d52d"
+        }
+      ]
+    },
+    {
+      "request_id": "01M41FSWTTSGVZ03YPBPN6GDWE",
+      "course_id": "777c327ca1a247cea7ae36a69ec4a106",
+      "version_id": "01M41255Q0VRWZHGY4T45KTMSD",
+      "question": "怎么制作红烧肉",
+      "outcome": "not_covered",
+      "reason": "below_similarity_threshold",
+      "error_code": null,
+      "error_reason": null,
+      "truncated": 0,
+      "invalidation_subtype": null,
+      "latency_ms": 646,
+      "first_delta_latency_ms": null,
+      "created_at": "2026-10-03T18:18:14.861Z",
+      "http_status": 200,
+      "client_elapsed_seconds": 0.66,
+      "graph_version": 1,
+      "citations": []
+    }
+  ],
+  "extra_attempts": [
+    {
+      "request_id": "01M41FNT0S7EEYCSSGV6HQYWST",
+      "course_id": "4f32542066b44f4890cb6f6d765971ed",
+      "version_id": "01M4124TTXYE98SBV93PATDZCZ",
+      "question": "什么是栈",
+      "outcome": "error",
+      "reason": null,
+      "error_code": "LLM_UNAVAILABLE",
+      "error_reason": "truncated",
+      "truncated": 1,
+      "invalidation_subtype": "no_markers",
+      "latency_ms": 11412,
+      "first_delta_latency_ms": null,
+      "created_at": "2026-10-03T18:16:11.649Z"
+    }
+  ],
+  "model_calls": [
+    {
+      "request_id": "01M41FNT0S7EEYCSSGV6HQYWST",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 3,
+      "usage_output": 0,
+      "latency_ms": 595,
+      "created_at": "2026-10-03T18:16:00.314Z",
+      "finished_at": "2026-10-03T18:16:00.916Z"
+    },
+    {
+      "request_id": "01M41FNT0S7EEYCSSGV6HQYWST",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 2558,
+      "usage_output": 2048,
+      "latency_ms": 9168,
+      "created_at": "2026-10-03T18:16:02.459Z",
+      "finished_at": "2026-10-03T18:16:11.634Z"
+    },
+    {
+      "request_id": "01M41FR9CM2BT6CKQ6HY4C93YP",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 2558,
+      "usage_output": 984,
+      "latency_ms": 8053,
+      "created_at": "2026-10-03T18:17:21.687Z",
+      "finished_at": "2026-10-03T18:17:29.750Z"
+    },
+    {
+      "request_id": "01M41FRHE0X39SFJZ1AKAYEERQ",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 7,
+      "usage_output": 0,
+      "latency_ms": 589,
+      "created_at": "2026-10-03T18:17:29.798Z",
+      "finished_at": "2026-10-03T18:17:30.395Z"
+    },
+    {
+      "request_id": "01M41FRHE0X39SFJZ1AKAYEERQ",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 2356,
+      "usage_output": 2048,
+      "latency_ms": 9297,
+      "created_at": "2026-10-03T18:17:30.721Z",
+      "finished_at": "2026-10-03T18:17:40.028Z"
+    },
+    {
+      "request_id": "01M41FRVEWY7EMGX7RCZ5AZB63",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 8,
+      "usage_output": 0,
+      "latency_ms": 454,
+      "created_at": "2026-10-03T18:17:40.067Z",
+      "finished_at": "2026-10-03T18:17:40.526Z"
+    },
+    {
+      "request_id": "01M41FRVEWY7EMGX7RCZ5AZB63",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 2447,
+      "usage_output": 1810,
+      "latency_ms": 8789,
+      "created_at": "2026-10-03T18:17:40.745Z",
+      "finished_at": "2026-10-03T18:17:49.542Z"
+    },
+    {
+      "request_id": "01M41FS4RAPGHK1ADRT2A02P20",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 9,
+      "usage_output": 0,
+      "latency_ms": 431,
+      "created_at": "2026-10-03T18:17:49.583Z",
+      "finished_at": "2026-10-03T18:17:50.018Z"
+    },
+    {
+      "request_id": "01M41FS4RAPGHK1ADRT2A02P20",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 2806,
+      "usage_output": 879,
+      "latency_ms": 4188,
+      "created_at": "2026-10-03T18:17:50.460Z",
+      "finished_at": "2026-10-03T18:17:54.654Z"
+    },
+    {
+      "request_id": "01M41FS9R01P03B54QXZKJEDGV",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 4,
+      "usage_output": 0,
+      "latency_ms": 431,
+      "created_at": "2026-10-03T18:17:54.695Z",
+      "finished_at": "2026-10-03T18:17:55.131Z"
+    },
+    {
+      "request_id": "01M41FSA97G121ZQZ1FHDTRXFW",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 3,
+      "usage_output": 0,
+      "latency_ms": 431,
+      "created_at": "2026-10-03T18:17:55.244Z",
+      "finished_at": "2026-10-03T18:17:55.680Z"
+    },
+    {
+      "request_id": "01M41FSA97G121ZQZ1FHDTRXFW",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 1730,
+      "usage_output": 340,
+      "latency_ms": 1871,
+      "created_at": "2026-10-03T18:17:56.501Z",
+      "finished_at": "2026-10-03T18:17:58.379Z"
+    },
+    {
+      "request_id": "01M41FSDCJ5KTASCXB8RY98YC4",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 7,
+      "usage_output": 0,
+      "latency_ms": 448,
+      "created_at": "2026-10-03T18:17:58.429Z",
+      "finished_at": "2026-10-03T18:17:58.885Z"
+    },
+    {
+      "request_id": "01M41FSDCJ5KTASCXB8RY98YC4",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 2014,
+      "usage_output": 1402,
+      "latency_ms": 6183,
+      "created_at": "2026-10-03T18:17:59.050Z",
+      "finished_at": "2026-10-03T18:18:05.239Z"
+    },
+    {
+      "request_id": "01M41FSM2WH6CN5GTPY71J1EH9",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 5,
+      "usage_output": 0,
+      "latency_ms": 422,
+      "created_at": "2026-10-03T18:18:05.284Z",
+      "finished_at": "2026-10-03T18:18:05.711Z"
+    },
+    {
+      "request_id": "01M41FSM2WH6CN5GTPY71J1EH9",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 1788,
+      "usage_output": 503,
+      "latency_ms": 3163,
+      "created_at": "2026-10-03T18:18:05.831Z",
+      "finished_at": "2026-10-03T18:18:08.998Z"
+    },
+    {
+      "request_id": "01M41FSQREDSW12Y61V3AJTGB3",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 7,
+      "usage_output": 0,
+      "latency_ms": 3510,
+      "created_at": "2026-10-03T18:18:09.048Z",
+      "finished_at": "2026-10-03T18:18:12.563Z"
+    },
+    {
+      "request_id": "01M41FSQREDSW12Y61V3AJTGB3",
+      "purpose": "answer_with_context",
+      "status": "ok",
+      "max_output_tokens": 2048,
+      "usage_input": 507,
+      "usage_output": 173,
+      "latency_ms": 1539,
+      "created_at": "2026-10-03T18:18:12.638Z",
+      "finished_at": "2026-10-03T18:18:14.183Z"
+    },
+    {
+      "request_id": "01M41FSWTTSGVZ03YPBPN6GDWE",
+      "purpose": "embedding",
+      "status": "ok",
+      "max_output_tokens": 0,
+      "usage_input": 6,
+      "usage_output": 0,
+      "latency_ms": 479,
+      "created_at": "2026-10-03T18:18:14.246Z",
+      "finished_at": "2026-10-03T18:18:14.732Z"
+    }
+  ],
+  "verified_metrics": {
+    "planned_questions": 10,
+    "course_questions": 8,
+    "answered": 7,
+    "error_truncated": 1,
+    "not_covered": 2,
+    "course_answer_success_rate_percent": 87.5,
+    "client_max_elapsed_seconds": 10.27,
+    "answered_first_delta_min_ms": 3028,
+    "answered_first_delta_median_ms": 5020,
+    "answered_first_delta_max_ms": 9287,
+    "answered_first_delta_le_3000ms": 0,
+    "generation_calls": 9,
+    "generation_usage_input": 18764,
+    "generation_usage_output": 10187,
+    "generation_round_tokens": 28951,
+    "generation_cumulative_tokens": 648168,
+    "generation_cap_remaining_tokens": 4351832,
+    "embedding_calls": 10,
+    "embedding_round_tokens": 59,
+    "embedding_cumulative_tokens": 11943
+  },
+  "evidence_corrections": {
+    "failed_question_request_id": "01M41FRHE0X39SFJZ1AKAYEERQ",
+    "failed_question_http_request_id_path": "response.details.request_id",
+    "lexicographic_start_filter_calls": 18,
+    "timestamp_normalized_start_filter_calls": 19,
+    "summary_json_billed_includes_embedding_and_misses_3_tokens": 29007,
+    "all_call_usage_including_embedding_not_generation_budget": 29010
+  },
+  "limitations": [
+    "Server first_delta_latency_ms is not browser-visible SSE first-token timing.",
+    "No real PDF headings/2 retest evidence; L11-7 remains open.",
+    "Accept differs between extra attempt and official ten questions; this is not controlled repeatability or strict 1024/2048 A/B evidence.",
+    "Generation cumulative is the synchronized checkout ledger, not a provider-account bill or a future global total."
+  ]
+}

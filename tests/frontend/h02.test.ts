@@ -795,6 +795,22 @@ describe('H02 任务失败与重试', () => {
       expect(text).not.toContain('服务端原文')
     })
 
+  it('L11-5：预算用尽显示预算文案', async () => {
+    const { wrapper, events } = await uploaded()
+    events.failed('t1', 'BUDGET_EXCEEDED')
+    await flushPromises()
+    expect(row(wrapper, 'd_t1').get('[data-test="task-error"]').text()).toBe('模型调用预算已用尽。')
+  })
+
+  it('L11-5：模型超时是通用的不可用文案，不引导去检查个人配置', async () => {
+    const { wrapper, events } = await uploaded()
+    events.failed('t1', 'LLM_UNAVAILABLE', { reason: 'timeout' })
+    await flushPromises()
+    const text = row(wrapper, 'd_t1').get('[data-test="task-error"]').text()
+    expect(text).toBe('模型服务暂不可用，抽取未完成。')
+    expect(text).not.toContain('模型 API 设置')
+  })
+
   it('LLM_UNAVAILABLE 没有凭据原因时仍是通用文案', async () => {
     const { wrapper, events } = await uploaded()
     events.failed('t1', 'LLM_UNAVAILABLE')
@@ -1189,5 +1205,32 @@ describe('H02 删除资料（ADR-021）', () => {
 
     expect(materials.deleteDocument).toHaveBeenCalledWith(CID, 'd_t1', expect.anything())
     expect(wrapper.find('[data-test="material-row"][data-document-id="d_t1"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------- C05-4 同一章 PDF 与 Markdown 重复上传提示
+
+import { sameChapterOtherFormat } from '../../src/frontend/src/composables/useMaterials'
+
+describe('C05-4 同章不同格式的重复上传提示', () => {
+  it('同名不同格式才算；同格式（重传）或不同名不算；比较忽略大小写与 .markdown/.md 差异', () => {
+    expect(sameChapterOtherFormat('ch3-stack-queue.pdf', ['ch3-stack-queue.md'])).toBe('ch3-stack-queue.md')
+    expect(sameChapterOtherFormat('CH3.MD', ['ch3.pdf', 'ch2.md'])).toBe('ch3.pdf')
+    expect(sameChapterOtherFormat('ch3.markdown', ['ch3.md'])).toBe(null)
+    expect(sameChapterOtherFormat('ch3.pdf', ['ch3.pdf'])).toBe(null)
+    expect(sameChapterOtherFormat('ch3.pdf', ['ch2.md'])).toBe(null)
+    expect(sameChapterOtherFormat('noext', ['noext.md'])).toBe(null)
+  })
+
+  it('选择文件后在上传前提示，不阻止上传', async () => {
+    const materials = fakeMaterialsApi({ list: async () => [doc('d1', { filename: 'ch3-stack-queue.md', format: 'markdown' })] })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('ch3-stack-queue.pdf'))
+    const hint = wrapper.get('[data-test="upload-duplicate-hint"]')
+    expect(hint.text()).toContain('ch3-stack-queue.md')
+    expect(hint.text()).toContain('同名知识点')
+    expect(wrapper.get('[data-test="upload-submit"]').attributes('disabled')).toBeUndefined()
+    await chooseFile(wrapper, file('ch2-process.pdf'))
+    expect(wrapper.find('[data-test="upload-duplicate-hint"]').exists()).toBe(false)
   })
 })

@@ -10,7 +10,7 @@ from app.config import Settings
 from app.repositories.model_calls import SqliteCallStore
 from app.repositories.model_configs import binding_active, get_binding
 from app.repositories.task_leases import Lease
-from app.services.ai.compatible import CompatibleModelClient, HttpTransport
+from app.services.ai.compatible import CompatibleModelClient, HttpTransport, thinking_body
 from app.services.ai.entities import EntityExtractor
 from app.services.ai.outbound import build_transport
 from app.services.ai.policy import CallStore, ModelCallPolicy
@@ -44,7 +44,8 @@ class TaskToolkits:
         try:
             api_key = self._cipher.open(binding.user_id, binding.sealed)
             client = CompatibleModelClient(binding.base_url, api_key, transport=self._transport,
-                                           default_timeout_seconds=self._settings.LLM_REQUEST_TIMEOUT_SECONDS)
+                                           default_timeout_seconds=self._settings.LLM_REQUEST_TIMEOUT_SECONDS,
+                                           extra_body=thinking_body(binding.disable_thinking))
         except (CredentialError, ValueError):
             raise CredentialUnavailable("credential_unreadable") from None
         policy = ModelCallPolicy.from_settings(self._settings, primary=client, store=self._store)

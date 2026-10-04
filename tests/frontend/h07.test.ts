@@ -79,6 +79,8 @@ function fakeApi(overrides: Partial<NodeEditApi> = {}) {
       overrides.unlock ?? (async (_cid, kid) => ({ ...kp(kid, { locked: true }), locked: false, revision: 4 })),
     ),
     remove: vi.fn<NodeEditApi['remove']>(overrides.remove ?? (async () => undefined)),
+    // L11 新增的新建接口；编辑面板不调用
+    create: vi.fn<NodeEditApi['create']>(overrides.create ?? (async () => kp('created'))),
   }
 }
 

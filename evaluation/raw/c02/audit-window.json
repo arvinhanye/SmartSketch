@@ -1,0 +1,51 @@
+{
+  "audit": {
+    "window": {
+      "started_at": "2026-10-04T02:54:51.000Z",
+      "ended_at": "2026-10-04T02:55:06.000Z",
+      "request_ids": null
+    },
+    "requests": 0,
+    "per_request": [],
+    "reasoning_columns": true,
+    "ledger": {
+      "generation": {
+        "calls": 1,
+        "usage_input": 0,
+        "usage_output": 0,
+        "tokens": 0,
+        "unknown_usage_calls": 1,
+        "tokens_complete": false,
+        "reasoning_tokens": null,
+        "reasoning_unknown_calls": 1
+      },
+      "embedding": {
+        "calls": 1,
+        "usage_input": 3,
+        "usage_output": 0,
+        "tokens": 3,
+        "unknown_usage_calls": 0,
+        "tokens_complete": true
+      },
+      "by_purpose": {
+        "answer_with_context": {
+          "calls": 1,
+          "usage_input": 0,
+          "usage_output": 0,
+          "tokens": 0,
+          "unknown_usage_calls": 1,
+          "tokens_complete": false
+        },
+        "embedding": {
+          "calls": 1,
+          "usage_input": 3,
+          "usage_output": 0,
+          "tokens": 3,
+          "unknown_usage_calls": 0,
+          "tokens_complete": true
+        }
+      }
+    },
+    "unmatched_calls": 2
+  }
+}

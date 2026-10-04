@@ -45,6 +45,7 @@ class Evidence:
     text: str
     page: int | None = None
     section_path: str | None = None
+    document_name: str | None = None
 
     def citation(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -55,6 +56,8 @@ class Evidence:
             result["page"] = self.page
         if self.section_path:
             result["section_path"] = self.section_path
+        if self.document_name:
+            result["document_name"] = self.document_name   # 同课资料文件名（L12，ADR-085）
         return result
 
 

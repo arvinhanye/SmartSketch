@@ -1,6 +1,8 @@
 import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
+import type { MaterialsApi } from '../api/materials'
 import type { Course, CourseCreate, CoursesApi } from '../api/courses'
 import { AbortedError, ApiError, NetworkError, TimeoutError } from '../api/http'
+import { readCourseDetail } from './courseDetailRequest'
 import { useCourseStore } from '../stores/course'
 
 /**
@@ -23,6 +25,8 @@ export interface CourseCard {
   roleLabel: string
   statusLabel: string
   knowledgePointCount: number
+  status: Course['status']
+  publishedVersion: number | null
 }
 
 const ROLE_LABEL: Record<CourseRole, string> = { teacher: '教师', student: '学生' }
@@ -41,6 +45,8 @@ export function toCourseCard(course: Course): CourseCard {
     roleLabel: ROLE_LABEL[course.my_role],
     statusLabel: STATUS_LABEL[course.status],
     knowledgePointCount: course.kp_count ?? 0,
+    status: course.status,
+    publishedVersion: course.published_version ?? null,
   }
 }
 
@@ -55,6 +61,8 @@ export type CurrentStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export interface UseCoursesOptions {
   api: CoursesApi
+  materialsApi?: Pick<MaterialsApi, 'list'> | null
+  sessionKey?: Ref<string | null>
   /** 当前路由中的课程 ID；`null` 表示在课程列表（首页） */
   courseId: Ref<string | null>
   /** 是否显示创建表单（账号类型为教师）；只是界面引导 */
@@ -63,7 +71,7 @@ export interface UseCoursesOptions {
   onCourseForbidden: () => void
 }
 
-export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseCoursesOptions) {
+export function useCourses({ api, materialsApi, sessionKey, courseId, canCreate, onCourseForbidden }: UseCoursesOptions) {
   const store = useCourseStore()
 
   // ------------------------------------------------------------ 列表
@@ -104,6 +112,18 @@ export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseC
   const createdName = ref<string | null>(null)
   // 防重入用同步标志：两次 submit 事件可能在一次渲染（按钮禁用）之前连续到达
   let inFlight = false
+  let createGeneration = 0
+  let createController: AbortController | null = null
+  watch(() => sessionKey?.value ?? null, () => {
+    createGeneration++
+    createController?.abort()
+    createController = null
+    inFlight = false
+    creating.value = false
+    form.value = { name: '', description: '' }
+    createError.value = null
+    createdName.value = null
+  }, { flush: 'sync' })
 
   function createErrorMessage(cause: unknown): string {
     if (cause instanceof ApiError) {
@@ -133,25 +153,37 @@ export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseC
       return
     }
     const body: CourseCreate = description === '' ? { name } : { name, description }
+    const owner = createGeneration
+    const key = sessionKey?.value ?? null
+    const controller = new AbortController()
+    createController = controller
+    const isCurrent = () => !disposed && owner === createGeneration && key === (sessionKey?.value ?? null)
     inFlight = true
     creating.value = true
     createError.value = null
     try {
-      const created = await api.create(body)
+      const created = await api.create(body, { signal: controller.signal })
+      if (!isCurrent()) return
       const card = toCourseCard(created)
       // 列表处于加载/错误态时不改其状态：之后的加载或重试结果本就包含新课程
       courses.value = [card, ...courses.value.filter((c) => c.id !== card.id)]
       form.value = { name: '', description: '' }
       createdName.value = card.name
     } catch (cause) {
-      createError.value = createErrorMessage(cause)
+      if (isCurrent()) createError.value = createErrorMessage(cause)
     } finally {
-      inFlight = false
-      creating.value = false
+      if (isCurrent()) {
+        createController = null
+        inFlight = false
+        creating.value = false
+      }
     }
   }
 
   // ------------------------------------------------------------ 当前课程
+  const materialCount = ref<number | null>(null)
+  let openSequence = 0
+  let disposed = false
   const current = shallowRef<CourseCard | null>(null)
   const currentStatus = ref<CurrentStatus>('idle')
   const currentError = ref<string | null>(null)
@@ -166,6 +198,8 @@ export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseC
   }
 
   function openCourse(id: string | null): void {
+    const sequence = ++openSequence
+    materialCount.value = null
     store.selectCourse(id)
     current.value = null
     currentError.value = null
@@ -175,20 +209,27 @@ export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseC
     }
     const scope = store.beginRequest()
     currentStatus.value = 'loading'
-    api.get(id, { signal: scope.signal }).then(
+    readCourseDetail(api, id, scope.signal).then(
       (detail) => {
+        if (disposed || sequence !== openSequence) return
         store.commit(scope, () => {
           if (detail.id !== scope.courseId) {
             currentStatus.value = 'error'
             currentError.value = '课程加载失败，请稍后重试。'
             return
           }
+          store.setRole(scope, detail.my_role)
           current.value = toCourseCard(detail)
           currentStatus.value = 'ready'
+          if (detail.my_role === 'teacher' && materialsApi) {
+            void materialsApi.list(id, { signal: scope.signal }).then((items) => {
+              if (!disposed && sequence === openSequence) store.commit(scope, () => { materialCount.value = items.length })
+            }, () => { /* 未知数目，不误报无资料。 */ })
+          }
         })
       },
       (cause: unknown) => {
-        if (!scope.isCurrent() || cause instanceof AbortedError) return
+        if (disposed || sequence !== openSequence || !scope.isCurrent() || cause instanceof AbortedError) return
         if (cause instanceof ApiError && cause.code === 'COURSE_FORBIDDEN') {
           store.selectCourse(null)
           currentStatus.value = 'idle'
@@ -203,10 +244,15 @@ export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseC
     )
   }
 
-  watch(courseId, openCourse, { immediate: true })
+  watch([courseId, () => sessionKey?.value ?? null], ([cid], old) => {
+    openCourse(cid)
+    if (old.length > 0 && old[1] !== (sessionKey?.value ?? null)) { courses.value = []; void loadCourses() }
+  }, { immediate: true })
   void loadCourses()
 
   onScopeDispose(() => {
+    disposed = true
+    createController?.abort()
     listController?.abort()
     listController = null
   })
@@ -223,8 +269,24 @@ export function useCourses({ api, courseId, canCreate, onCourseForbidden }: UseC
     createdName,
     createCourse,
     current,
+    materialCount,
     currentStatus,
     currentError,
     selectedId: computed(() => store.courseId),
   }
+}
+
+export type CourseAction = 'settings' | 'materials' | 'review' | 'teacherGraph' | 'studentGraph'
+export function courseNextStep(input: { myRole: CourseRole; status: Course['status']; publishedVersion: number | null; materialCount: number | null }, needsConfig: boolean): {stage: string; text: string; action: CourseAction | null} {
+  const { myRole, status, publishedVersion, materialCount } = input
+  const published = publishedVersion !== null
+  if (myRole === 'student') {
+    if (!published) return { stage: 'waiting_teacher', text: '等待教师发布课程图谱。', action: null }
+    return { stage: 'published', text: `第 ${publishedVersion} 版已发布，可浏览图谱与学习路径。${needsConfig ? '提问前请配置个人模型 API。' : ''}`, action: 'studentGraph' }
+  }
+  if (published && status === 'revising') return { stage: 'waiting_publish', text: `草稿修订中，学生仍看到第 ${publishedVersion} 版；请审核并发布。`, action: 'review' }
+  if (published) return { stage: 'published', text: `学生看到第 ${publishedVersion} 版；可继续维护课程图谱。`, action: 'teacherGraph' }
+  if (needsConfig) return { stage: 'needs_config', text: '先配置个人模型 API，再上传课程资料。', action: 'settings' }
+  if (materialCount === 0) return { stage: 'no_material', text: '尚无资料，请上传课程资料。', action: 'materials' }
+  return { stage: 'drafting', text: materialCount === null ? '前往资料页检查处理进度，再审核发布。' : '资料已上传；检查处理进度，审核草稿并发布。', action: materialCount === null ? 'materials' : 'review' }
 }

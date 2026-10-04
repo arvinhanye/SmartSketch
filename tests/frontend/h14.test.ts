@@ -109,6 +109,9 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+/** C05-1：记录画布聚焦到哪些节点（只有容器有尺寸时画布才会真正建图，见对应用例） */
+const focused: string[] = []
+
 function fakeCanvasFactory(): CanvasGraphFactory {
   return (() =>
     ({
@@ -116,6 +119,10 @@ function fakeCanvasFactory(): CanvasGraphFactory {
       setData: () => {},
       setSize: () => {},
       fitView: () => Promise.resolve(),
+      focusElement: (id: string) => {
+        focused.push(id)
+        return Promise.resolve()
+      },
       on() {
         return this
       },
@@ -311,6 +318,30 @@ describe('useSelectionGuard', () => {
     const { guard } = setup(true)
     guard.request('a')
     expect(guard.pending.value).toBeNull()
+  })
+
+  it('C05-1：切换真正生效后才执行后续动作；取消或被外部改变时丢弃', async () => {
+    const calls: Array<string | null> = []
+    const then = (k: string | null) => calls.push(k)
+    const clean = setup(false)
+    clean.guard.request('b', { then })
+    expect(calls).toEqual(['b'])                      // 没有未保存修改：立即
+    const dirty = setup(true)
+    dirty.guard.request('b', { then })
+    expect(calls).toEqual(['b'])                      // 挂起：还没执行
+    dirty.guard.cancel()
+    dirty.guard.confirm()
+    expect(calls).toEqual(['b'])                      // 取消后丢弃
+    dirty.guard.request('c', { then })
+    dirty.guard.confirm()
+    expect(calls).toEqual(['b', 'c'])                 // 确认后执行
+    dirty.guard.request('d', { then })
+    dirty.selected.value = 'e'
+    await nextTick()
+    dirty.guard.confirm()
+    expect(calls).toEqual(['b', 'c'])                 // 选中被外部改变（删除、换课）：丢弃
+    dirty.guard.request('e', { then })
+    expect(calls).toEqual(['b', 'c', 'e'])            // 已是当前节点：直接执行（仍可聚焦）
   })
 })
 
@@ -571,6 +602,52 @@ describe('有未保存修改时切换节点先确认', () => {
     await clickNode(wrapper, 'k2')
     expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k2')
+  })
+
+  describe('C05-1 搜索定位同样经过确认，画布与详情一起切换', () => {
+    beforeEach(() => {
+      focused.length = 0
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+    })
+
+    async function search(wrapper: VueWrapper, query: string) {
+      const input = wrapper.find('input[type="search"]')
+      await input.setValue(query)
+      await input.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      await flushPromises()
+    }
+
+    it('有修改时：搜索只弹确认，不移动画布；继续编辑后画布与详情都留在原节点', async () => {
+      const { wrapper } = await dirtyOn('k1')
+      await search(wrapper, '知识点 k2')
+      expect(wrapper.find('[data-test="tg-discard-confirm"]').text()).toContain('知识点 k2')
+      expect(focused).not.toContain('kp:k2')
+      await wrapper.find('[data-test="tg-discard-no"]').trigger('click')
+      await flushPromises()
+      expect(focused).not.toContain('kp:k2')
+      expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k1')
+    })
+
+    it('确认放弃后：画布聚焦到搜索目标，详情同时切换', async () => {
+      const { wrapper } = await dirtyOn('k1')
+      await search(wrapper, '知识点 k2')
+      await wrapper.find('[data-test="tg-discard-yes"]').trigger('click')
+      await flushPromises()
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      expect(focused.at(-1)).toBe('kp:k2')
+      expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k2')
+    })
+
+    it('没有修改时：直接切换并聚焦', async () => {
+      const f = fakes()
+      const { wrapper } = await mountPage(f)
+      await search(wrapper, '知识点 k3')
+      expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(false)
+      expect(focused.at(-1)).toBe('kp:k3')
+    })
   })
 
   it('有修改时离开页面先确认，取消则留下', async () => {

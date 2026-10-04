@@ -446,6 +446,12 @@
         "text": {
           "type": "string",
           "minLength": 1
+        },
+        "document_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "资料文件名，由服务端按同一课程的资料填写（ADR-085）；资料已删除或不可读时省略，客户端显示「资料不可用」。"
         }
       }
     },

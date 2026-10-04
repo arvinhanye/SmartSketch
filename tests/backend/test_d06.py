@@ -105,7 +105,8 @@ BODY_C = para("栈是只允许在一端进行插入和删除的线性表，遵�
 
 
 def joined(spec_lines: list[dict]) -> str:
-    return "\n".join(s["text"] for s in spec_lines)
+    """块文本：headings/2 起自动换行的续行（`para` 中排满的行）并回同一段，中文直接相连（ADR-084）。"""
+    return "".join(s["text"] for s in spec_lines)
 
 
 def titles(doc: ParsedDocument) -> list[tuple[str, ...]]:
@@ -143,8 +144,8 @@ def textbook() -> tuple[PdfLine, ...]:
 
 def test_parser_version_extends_d05_version_without_whitespace():
     # ADR-018 修订 1：解析器段内各步骤用 "," 连接、按处理顺序排列；"+" 只留给分块段。
-    assert HEADINGS_VERSION == "headings/1"
-    assert PARSER_VERSION == "pdf/1,headings/1"
+    assert HEADINGS_VERSION == "headings/2"
+    assert PARSER_VERSION == "pdf/2,headings/2"
     assert PARSER_VERSION == f"{pdf_mod.PARSER_VERSION},{HEADINGS_VERSION}"
     assert "+" not in PARSER_VERSION
     assert not any(ch.isspace() for ch in PARSER_VERSION)
@@ -152,7 +153,7 @@ def test_parser_version_extends_d05_version_without_whitespace():
 
 
 def test_cleaned_parser_version_lists_d05_d07_d06_in_order():
-    assert CLEANED_PARSER_VERSION == "pdf/1,cleanup/1,headings/1"
+    assert CLEANED_PARSER_VERSION == "pdf/2,cleanup/1,headings/2"
     assert CLEANED_PARSER_VERSION == f"{pdf_mod.PARSER_VERSION},{CLEANUP_VERSION},{HEADINGS_VERSION}"
     assert "+" not in CLEANED_PARSER_VERSION
 
@@ -612,13 +613,16 @@ def test_single_level_list_numbers_are_not_headings():
 # ---------------------------------------------------------------------------
 
 
-def test_document_without_headings_matches_d05_output():
+def test_document_without_headings_matches_d05_blocks_with_wrapped_lines_rejoined():
+    # 无标题时块的划分、页码与定位与 D05 相同；headings/2 只是把自动换行的续行并回（中文不插换行，ADR-084）
     lines = make([BODY_A, BODY_B], [BODY_C])
     result = detect_headings(lines)
     assert result.strategy is HeadingStrategy.NONE
     assert result.tree == ()
     doc = to_sectioned_document(lines)
-    assert doc == pdf_mod.to_parsed_document(lines, PARSER_VERSION)
+    d05 = pdf_mod.to_parsed_document(lines, PARSER_VERSION)
+    assert [b.locator for b in doc.blocks] == [b.locator for b in d05.blocks]
+    assert [b.text for b in doc.blocks] == [b.text.replace("\n", "") for b in d05.blocks]
     assert all(b.locator.to_source_fields() == {"page": b.locator.page} for b in doc.blocks)
 
 

@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-10-04T07:16:04Z",
+  "read_path": "app.services.graph.read.read_knowledge_point（草稿、教师）+ GraphReader 读路由",
+  "neo4j_endpoint": "bolt://localhost:7688",
+  "sqlite": {
+    "path": "/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-c03b-measure/src/backend/storage/smartsketch.sqlite3",
+    "sha256_before": "ec78857ab5d500cd1b8e71cb445aa2363a6c2d94e6da0c28131c87474f434c9f",
+    "sha256_after": "ec78857ab5d500cd1b8e71cb445aa2363a6c2d94e6da0c28131c87474f434c9f",
+    "open_mode": "mode=ro&immutable=1 + query_only"
+  },
+  "courses": [
+    {
+      "course_id": "ee9633a27f23407dbb30fee6c9a6490b",
+      "effective_task_ids": [
+        "fc66ece9f71d419485490e44273ee266"
+      ],
+      "nodes": 76,
+      "source_label": {
+        "ai": 76
+      },
+      "ai_nodes_with_located_refs": 76,
+      "manual_nodes_without_refs": 0,
+      "refs": {
+        "total": 79,
+        "with_page": 79,
+        "with_section_path": 79,
+        "with_document_name": 79
+      },
+      "evidence_edges": 79,
+      "distinct_chunks": 15,
+      "defects": {
+        "ai_nodes_without_located_refs": [],
+        "dangling_chunks": [],
+        "foreign_documents": [],
+        "cross_course_evidence_edges": 0,
+        "unreadable_nodes": []
+      },
+      "refs_digest": "12c49a83d716a5b28ce1407f5bc5b18a5be9faa51b463142a099721e7e459cbf"
+    },
+    {
+      "course_id": "5772f37ff9e041e0bb5e5606ba4587b0",
+      "effective_task_ids": [
+        "4ca2a373c5ad4dd4beac3d7f1269a5cc"
+      ],
+      "nodes": 68,
+      "source_label": {
+        "ai": 68
+      },
+      "ai_nodes_with_located_refs": 68,
+      "manual_nodes_without_refs": 0,
+      "refs": {
+        "total": 76,
+        "with_page": 76,
+        "with_section_path": 76,
+        "with_document_name": 76
+      },
+      "evidence_edges": 76,
+      "distinct_chunks": 14,
+      "defects": {
+        "ai_nodes_without_located_refs": [],
+        "dangling_chunks": [],
+        "foreign_documents": [],
+        "cross_course_evidence_edges": 0,
+        "unreadable_nodes": []
+      },
+      "refs_digest": "6cbad132c52488e684339795589b7af7cb2e44162ee5f88fccd5b49f41542aa1"
+    }
+  ]
+}

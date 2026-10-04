@@ -2,6 +2,8 @@ import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
 import type { Course, CoursesApi } from '../api/courses'
 import { AbortedError, ApiError, NetworkError, TimeoutError } from '../api/http'
 import type { GraphVersion, VersionsApi } from '../api/versions'
+import { getActivePinia } from 'pinia'
+import { useCourseStore } from '../stores/course'
 
 export type VersionsStatus = 'idle' | 'loading' | 'ready' | 'error' | 'not_teacher'
 
@@ -10,6 +12,37 @@ export interface UseVersionsOptions {
   coursesApi: Pick<CoursesApi, 'get'>
   versionsApi: VersionsApi
   onCourseForbidden?: () => void
+  /** 知识点 ID → 名称，用于把阻断原因写成名称（可异步，如按需读草稿图）；缺省取课程 store 中已加载的草稿图 */
+  nodeNames?: (cid: string) => ReadonlyMap<string, string> | Promise<ReadonlyMap<string, string>>
+}
+
+const OTHER_REASON: Record<string, (target: string) => string> = {
+  dangling_endpoint: (target) => `关系 ${target} 的端点已不存在`,
+  invalid_source_ref: (target) => `知识点 ${target} 的来源无法定位`,
+  invalid_lineage: (target) => `知识点 ${target} 的合并谱系异常`,
+}
+
+/**
+ * L11-4：把 409 `PUBLISH_BLOCKED` 的 `details.reasons`（契约 `PublishBlockedReason`）写成可读的逐条原因。
+ * 只认契约闭集里的 kind，结构不符的项跳过；不回显服务端 message。
+ */
+export function blockedReasonLines(reasons: unknown, names: ReadonlyMap<string, string>): string[] {
+  if (!Array.isArray(reasons)) return []
+  const label = (id: unknown) => (typeof id === 'string' ? names.get(id) ?? id : '')
+  const lines: string[] = []
+  for (const item of reasons) {
+    if (typeof item !== 'object' || item === null) continue
+    const reason = item as Record<string, unknown>
+    if (reason.kind === 'cycle' && Array.isArray(reason.cycle) && reason.cycle.length > 0) {
+      lines.push(`先修关系成环：${reason.cycle.map(label).join(' → ')}`)
+    } else if (reason.kind === 'empty_graph') {
+      lines.push('图谱为空，没有可发布的知识点')
+    } else if (typeof reason.kind === 'string' && reason.kind in OTHER_REASON) {
+      const target = reason.kind === 'dangling_endpoint' ? reason.relation_id : reason.kp_id ?? reason.chunk_id
+      if (typeof target === 'string') lines.push(OTHER_REASON[reason.kind](label(target)))
+    }
+  }
+  return lines
 }
 
 function validVersion(value: unknown): value is GraphVersion {
@@ -30,7 +63,13 @@ function message(cause: unknown, operation: 'load' | 'publish' | 'rollback'): st
   return operation === 'load' ? '加载版本历史失败，请重试。' : '操作结果未确认，请重新加载以核对当前发布版本。'
 }
 
-export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidden }: UseVersionsOptions) {
+export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidden, nodeNames }: UseVersionsOptions) {
+  // 缺省取课程 store 中已加载的草稿图；未装 Pinia（单独测试本组合式）时只显示 ID
+  const namesOf = nodeNames ?? ((_cid: string): ReadonlyMap<string, string> => {
+    const graph = getActivePinia() ? useCourseStore().graph : null
+    return new Map((graph?.nodes ?? []).map((node) => [node.id, node.name] as const))
+  })
+  const blockedReasons = ref<string[]>([])
   const status = ref<VersionsStatus>('idle')
   const course = shallowRef<Course | null>(null)
   const versions = shallowRef<GraphVersion[]>([])
@@ -143,6 +182,7 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
     busy.value = kind
     error.value = null
     notice.value = null
+    blockedReasons.value = []
     try {
       const result = kind === 'publish'
         ? await versionsApi.publish(cid, { signal: controller.signal })
@@ -164,6 +204,16 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
       // 超时/断网可能发生在服务端提交之后，先核对课程指针再允许重复写入。
       if (cause instanceof NetworkError || cause instanceof TimeoutError) stale.value = true
       if (!handleForbidden(cause)) error.value = message(cause, kind)
+      if (cause instanceof ApiError && cause.code === 'PUBLISH_BLOCKED') {
+        const reasons = cause.details?.reasons
+        blockedReasons.value = blockedReasonLines(reasons, new Map())
+        try {
+          const names = await namesOf(cid)
+          if (current(cid, token)) blockedReasons.value = blockedReasonLines(reasons, names)
+        } catch {
+          // 取不到名称时保留按 ID 列出的原因
+        }
+      }
     } finally {
       if (writeController === controller) writeController = null
       if (current(cid, token)) busy.value = null
@@ -189,6 +239,6 @@ export function useVersions({ courseId, coursesApi, versionsApi, onCourseForbidd
   watch(courseId, reset, { immediate: true })
   onScopeDispose(() => { disposed = true; epoch += 1; readController?.abort(); writeController?.abort() })
 
-  return { status, course, history, currentVersion, error, notice, busy, pendingRollback, refreshing, stale,
+  return { status, course, history, currentVersion, error, notice, busy, pendingRollback, refreshing, stale, blockedReasons,
     reload, chooseRollback, cancelRollback, publish: () => operate('publish'), rollback: () => operate('rollback') }
 }

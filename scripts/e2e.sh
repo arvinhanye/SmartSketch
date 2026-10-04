@@ -6,6 +6,8 @@
 # 隔离：每次运行在 .e2e/<时间戳>/ 下新建 SQLite 与存储目录，端口默认 18000/15173，
 #       不碰开发库；Neo4j 缺省为一次性容器，结束即删除。
 # 模型：缺省 LLM_MODE=demo、EMBEDDING_MODE=demo（确定性规则模型，不联网、不产生费用）。
+#       E2E_LLM_MODE=personal（L11）：再起本机假供应商 scripts/fake_provider.py（包装演示模型），
+#       导出测试专用根密钥与 MODEL_ENDPOINT_ALLOW_PRIVATE=1；用户在设置页填写 E2E_PROVIDER_URL。
 # 用法：scripts/e2e.sh [playwright 参数…]，例如 scripts/e2e.sh tests/e2e/teacher.spec.ts
 #       浏览器与 @playwright/test 版本不符时设 PLAYWRIGHT_CHROMIUM_EXECUTABLE。
 # 失败证据：.e2e/<时间戳>/ 下的 api.log、worker.log、web.log 与 playwright/（截图与 trace）。
@@ -41,15 +43,23 @@ export E2E_PASSWORD="${E2E_PASSWORD:-e2e-demo-pass-1}"
 export E2E_TEACHER_PASSWORD="$E2E_PASSWORD" E2E_STUDENT_PASSWORD="$E2E_PASSWORD"
 # 演示向量下的相似度闸门（ADR-076 实测：覆盖问题 ≥ 0.63、无关问题 ≤ 0.54）
 export QA_SIMILARITY_THRESHOLD="${E2E_QA_SIMILARITY_THRESHOLD:-0.58}"
+if [[ $LLM_MODE == personal ]]; then
+  # 个人模式（L11，ADR-080）：测试专用随机根密钥（迁移与启动前就要有）；放行回环才能连本机假供应商
+  # （仅开发环境，APP_ENV=production 下拒绝启动）。
+  PROVIDER_PORT="${E2E_PROVIDER_PORT:-18900}"
+  [[ -n ${MODEL_CREDENTIAL_KEY:-} ]] || export MODEL_CREDENTIAL_KEY="$("$PY" -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')"
+  export MODEL_ENDPOINT_ALLOW_PRIVATE=1 E2E_PROVIDER_URL="http://127.0.0.1:$PROVIDER_PORT/v1"
+fi
 
 set -m  # 后台任务各自成组，便于清理
 pids=()
 neo4j_container=""
 cleanup() {
   # 每个服务在自己的进程组里（set -m），整组结束，避免 npx 的子进程残留占用端口
-  for pid in "${pids[@]}"; do kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; done
+  for pid in ${pids[@]+"${pids[@]}"}; do kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; done
   wait 2>/dev/null || true
-  [[ -z $neo4j_container ]] || docker rm -f "$neo4j_container" >/dev/null 2>&1 || true
+  [[ -z $neo4j_container ]] || docker rm -f "$neo4j_container" >> "$RUN_DIR/cleanup.log" 2>&1 \
+    || echo "未能删除一次性 Neo4j 容器 ${neo4j_container}，请手动 docker rm -f" >&2
 }
 trap cleanup EXIT INT TERM
 
@@ -80,6 +90,10 @@ echo "→ 运行目录 $RUN_DIR"
 SEED_DEMO_PASSWORD="$E2E_PASSWORD" "$PY" scripts/seed-demo-accounts.py > "$RUN_DIR/seed.log" 2>&1 \
   || { cat "$RUN_DIR/seed.log" >&2; die "预置演示账号失败"; }
 
+if [[ $LLM_MODE == personal ]]; then
+  PYTHONPATH="$REPO_ROOT/src/backend" "$PY" scripts/fake_provider.py --port "$PROVIDER_PORT" \
+    > "$RUN_DIR/provider.log" 2>&1 & pids+=($!)
+fi
 (cd src/backend && exec "$PY" -m app) > "$RUN_DIR/api.log" 2>&1 & pids+=($!)
 (cd src/backend && exec "$PY" -m app.workers) > "$RUN_DIR/worker.log" 2>&1 & pids+=($!)
 # 用构建产物 + vite preview（与 nginx 同源反代一致，避免 dev server 按需编译的抖动）
@@ -98,6 +112,11 @@ wait_for() {
 }
 wait_for "http://127.0.0.1:$API_PORT/health" "API"
 wait_for "http://127.0.0.1:$WEB_PORT/" "前端"
+if [[ $LLM_MODE == personal ]]; then
+  # 个人模式（L11）：用户在设置页填写本机假供应商（scripts/fake_provider.py，包装演示模型）的地址。
+  # 根密钥与放行回环已在启动 API/worker 前导出（见上）。
+  wait_for "http://127.0.0.1:$PROVIDER_PORT/health" "假供应商"
+fi
 echo "→ 服务就绪：前端 http://127.0.0.1:$WEB_PORT ，API http://127.0.0.1:$API_PORT"
 
 set +e

@@ -2,6 +2,7 @@ import { computed, onScopeDispose, ref, shallowRef, toValue, watch, type MaybeRe
 import type { ProgressApi, ProgressEntry, ProgressResponse, MasteryStatus } from '../api/progress'
 import type { Recommendation, RecommendApi, RecommendResponse } from '../api/recommend'
 import { AbortedError, ApiError, NetworkError, TimeoutError } from '../api/http'
+import { buildLearningPath, pathInputFromCanvas, type LearningPath, type PathRole } from '../graph/learningPath'
 import type { CanvasElementState, GraphCanvasData } from '../graph/lifecycle'
 import { useCourseStore, type CourseRequestScope } from '../stores/course'
 
@@ -33,6 +34,8 @@ export interface ReasonFactRow {
   key: string
   label: string
   value: string
+  /** L14：该值是缺失属性时的中性值 0.5（ADR-014 修订 1 决定 5），展示为「未标注」而不是测量值 */
+  labelledDefault?: boolean
 }
 
 export const MASTERY_LABELS: Readonly<Record<MasteryStatus, string>> = Object.freeze({
@@ -73,23 +76,52 @@ export function masteryElementStates(status: MasteryStatus, recommended: boolean
   return recommended ? [base, 'recommended'] : [base]
 }
 
+const PATH_NODE_STATE: Readonly<Partial<Record<PathRole, CanvasElementState>>> = Object.freeze({
+  prereqMissing: 'pathPrereq',
+  unlocks: 'pathUnlock',
+  dimmed: 'dimmed',
+})
+
 /**
  * 纯函数：把服务端投影的掌握状态与推荐集合落到节点状态上，不修改输入。
  * 保留筛选层已有的状态（如 `selected`），输出节点是新对象。
+ *
+ * L14：给出 `path` 且有焦点时再叠加学习路径——推荐项带序号（`data.pathOrder`），缺失前置/之后解锁/无关节点
+ * 分别带 `pathPrereq`/`pathUnlock`/`dimmed`（选中的节点不淡化），路径上的先修边 `pathEdge`、其余边 `dimmed`。
+ * 没有焦点（全部掌握、无推荐）时不叠加任何路径状态，避免整图变灰。
  */
 export function applyLearningStates(
   graph: GraphCanvasData,
   entries: ReadonlyMap<string, ProgressEntry>,
   recommendedIds: ReadonlySet<string>,
+  path: LearningPath | null = null,
 ): GraphCanvasData {
+  const active = path !== null && path.focus !== null
   return {
     nodes: graph.nodes.map((node) => {
-      const status = entries.get(node.data.kpId)?.status ?? 'unknown'
-      const recommended = recommendedIds.has(node.data.kpId)
-      // 学习状态是底色，筛选/选中状态叠加在后（后者优先），与 `buildGraphOptions` 的 states 顺序一致
-      return { ...node, states: [...masteryElementStates(status, recommended), ...(node.states ?? [])] }
+      const kpId = node.data.kpId
+      const status = entries.get(kpId)?.status ?? 'unknown'
+      const own = node.states ?? []
+      const learning = masteryElementStates(status, recommendedIds.has(kpId))
+      if (!active) {
+        // 学习状态是底色，筛选/选中状态叠加在后（后者优先），与 `buildGraphOptions` 的 states 顺序一致
+        return { ...node, states: [...learning, ...own] }
+      }
+      const role = path.roles.get(kpId) ?? 'dimmed'
+      const pathState = role === 'dimmed' && own.includes('selected') ? undefined : PATH_NODE_STATE[role]
+      const order = path.order.get(kpId)
+      return {
+        ...node,
+        data: order === undefined ? node.data : { ...node.data, pathOrder: order },
+        states: [...learning, ...(pathState === undefined ? [] : [pathState]), ...own],
+      }
     }),
-    edges: graph.edges,
+    edges: active
+      ? graph.edges.map((edge) => ({
+          ...edge,
+          states: [...(edge.states ?? []), path.edges.has(edge.data.relationId) ? 'pathEdge' : 'dimmed'],
+        }))
+      : graph.edges,
   }
 }
 
@@ -98,17 +130,37 @@ export function formatFactor(value: number): string {
   return Number.isFinite(value) ? value.toFixed(4) : String(value)
 }
 
+/** 缺失属性标志取自服务端，不根据数值 0.5 猜测缺失（ADR-087）。 */
+export const NEUTRAL_ATTRIBUTE = 0.5
+const UNLABELLED_TEXT = '未标注（按中性值 0.5 排序）'
+
+function attributeRow(key: string, label: string, value: number, defaulted?: boolean): ReasonFactRow {
+  const labelledDefault = defaulted === true
+  return { key, label, value: labelledDefault ? UNLABELLED_TEXT : formatFactor(value), labelledDefault }
+}
+
 /** 理由的结构化事实行：逐条取自服务端 `reason_facts`，不做任何换算 */
 export function reasonFactRows(item: Recommendation): ReasonFactRow[] {
   const facts = item.reason_facts
   return [
     { key: 'unlock_count', label: '可立即解锁', value: `${item.unlock_count} 个` },
-    { key: 'importance', label: '重要度', value: formatFactor(facts.importance) },
+    attributeRow('importance', '重要度', facts.importance, facts.importance_defaulted),
     { key: 'centrality', label: '中心度', value: formatFactor(facts.centrality) },
-    { key: 'difficulty', label: '难度', value: formatFactor(facts.difficulty) },
+    attributeRow('difficulty', '难度', facts.difficulty, facts.difficulty_defaulted),
     { key: 'chapter', label: '章节', value: facts.chapter_name === null ? '未分章' : `${facts.chapter_name}（秩 ${facts.chapter_rank}）` },
     { key: 'primary_factor', label: '主要理由', value: PRIMARY_FACTOR_LABELS[facts.primary_factor] },
   ]
+}
+
+/** L14：「已掌握：A、B → 还需先学：X → 下一步：C → 之后解锁：D、E」；空段省略，没有下一步时为空串 */
+export function pathLine(narrative: LearningPath['narrative']): string {
+  if (narrative.next.length === 0) return ''
+  const parts: string[] = []
+  if (narrative.mastered.length > 0) parts.push(`已掌握：${narrative.mastered.join('、')}`)
+  if (narrative.missing.length > 0) parts.push(`还需先学：${narrative.missing.join('、')}`)
+  parts.push(`下一步：${narrative.next.join('、')}`)
+  if (narrative.unlocks.length > 0) parts.push(`之后解锁：${narrative.unlocks.join('、')}`)
+  return parts.join(' → ')
 }
 
 /** 服务端的四类加权分量与总分：原样展示，不用 `factors` 乘权重重算 */
@@ -215,6 +267,10 @@ export interface UseLearningOptions {
   ready: MaybeRefOrGetter<boolean>
   /** 交给画布的可见图（筛选层输出）；提供时组合式同时给出落好状态色的图 */
   graph?: MaybeRefOrGetter<GraphCanvasData | null>
+  /** L14：计算学习路径用的完整已发布图（不受筛选影响，被筛掉的前置仍算数）；缺省用 `graph` */
+  pathGraph?: MaybeRefOrGetter<GraphCanvasData | null>
+  /** L14：希望解释的推荐项（通常是选中项）；不是推荐项时退回第一个推荐项 */
+  focus?: MaybeRefOrGetter<string | null>
   onCourseForbidden?: () => void
   /** 显示版本与服务端绑定版本不一致：由页面重新加载图谱与进度 */
   onVersionStale?: () => void
@@ -227,6 +283,8 @@ export function useLearning({
   graphVersion,
   ready,
   graph,
+  pathGraph,
+  focus,
   onCourseForbidden,
   onVersionStale,
 }: UseLearningOptions) {
@@ -254,12 +312,25 @@ export function useLearning({
   const totalEligible = computed(() => recommend.value?.total_eligible ?? 0)
   const recommendedIds = computed<ReadonlySet<string>>(() => new Set(recommendations.value.map((item) => item.kp_id)))
 
-  /** 落好掌握状态色与推荐高亮的可见图；未启用学习功能时原样返回（保持 H11 行为与对象标识） */
+  /** L14：基于完整已发布图、服务端掌握投影与推荐顺序的学习路径；未就绪时为 null */
+  const pathSource = computed(() => {
+    const full = pathGraph === undefined ? null : toValue(pathGraph)
+    return full ?? (graph === undefined ? null : toValue(graph))
+  })
+  const pathInput = computed(() => (pathSource.value === null ? null : pathInputFromCanvas(pathSource.value)))
+  const learningPath = computed<LearningPath | null>(() => {
+    const input = pathInput.value
+    if (!enabled || input === null || status.value !== 'ready') return null
+    const mastery = new Map([...entries.value].map(([id, entry]) => [id, entry.status]))
+    return buildLearningPath(input.nodes, input.edges, mastery, recommendations.value, focus === undefined ? null : toValue(focus))
+  })
+
+  /** 落好掌握状态色、推荐高亮与学习路径的可见图；未启用学习功能时原样返回（保持 H11 行为与对象标识） */
   const learningGraph = computed<GraphCanvasData | null>(() => {
     const source = graph === undefined ? null : toValue(graph)
     if (source === null) return null
     if (!enabled) return source
-    return applyLearningStates(source, entries.value, recommendedIds.value)
+    return applyLearningStates(source, entries.value, recommendedIds.value, learningPath.value)
   })
 
   let seq = 0
@@ -599,6 +670,7 @@ export function useLearning({
     totalEligible,
     recommendedIds,
     learningGraph,
+    learningPath,
     recommendError,
     recommendLoading,
     busyKpId,

@@ -13,7 +13,7 @@ from collections import OrderedDict
 from app.config import Settings
 from app.repositories.model_calls import SqliteCallStore
 from app.repositories.model_configs import get_config
-from app.services.ai.compatible import CompatibleModelClient, HttpTransport
+from app.services.ai.compatible import CompatibleModelClient, HttpTransport, thinking_body
 from app.services.ai.outbound import build_transport
 from app.services.ai.policy import CallStore, ModelCallPolicy
 from app.services.credentials import CredentialCipher, CredentialError, CredentialUnavailable, ModelConfigRequired
@@ -48,7 +48,8 @@ class UserChatModels:
             try:
                 api_key = self._cipher.open(user_id, row.sealed)
                 client = CompatibleModelClient(row.base_url, api_key, transport=self._transport,
-                                               default_timeout_seconds=self._settings.LLM_REQUEST_TIMEOUT_SECONDS)
+                                               default_timeout_seconds=self._settings.LLM_REQUEST_TIMEOUT_SECONDS,
+                                               extra_body=thinking_body(row.disable_thinking))
             except (CredentialError, ValueError):
                 raise CredentialUnavailable("credential_unreadable") from None
             policy = ModelCallPolicy.from_settings(self._settings, primary=client, store=self._store)

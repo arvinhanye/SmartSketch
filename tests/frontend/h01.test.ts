@@ -145,6 +145,8 @@ describe('H01 课程 API 封装', () => {
       roleLabel: '学生',
       statusLabel: '已发布',
       knowledgePointCount: 7,
+      status: 'published',
+      publishedVersion: null,
     })
   })
 })
@@ -166,7 +168,7 @@ describe('H01 课程列表状态', () => {
 
   it('空态：没有可见课程时给出引导', async () => {
     const { wrapper } = await mountApp({ role: 'student', api: fakeApi({ list: async () => [] }) })
-    expect(wrapper.get('[data-test="courses-empty"]').text()).toContain('暂无课程')
+    expect(wrapper.get('[data-test="courses-empty"]').text()).toContain('你还没有加入任何课程')
     expect(wrapper.findAll('[data-test="course-card"]')).toHaveLength(0)
   })
 

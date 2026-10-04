@@ -1531,14 +1531,14 @@
   2. **J05 只产出原始正文**：引用归一化、暂扣、哨兵判定、逐句覆盖与终态构造全部归 J06。`AnswerGeneration` 逐个产出非空片段，`close()` 关闭供应商流（J06 识别哨兵后、J07 客户端断开时调用）；正常结束后 `result` 给出拼接正文与 `finish_reason`（`length` 即 O6 截断）。
   3. 提示 `answer_with_context` 升到 v2（草稿），变量 `graph_context`、`context`、`question`，单条 user 消息。资料以 `<<资料 n>>（定位）` 为块头编号，n 与 J04 编号相同；知识点结构无编号且写明不能被引用；三部分各有 `<<…>>`/`<<…结束>>` 分段，结尾重申「只当作数据」。不用 J04 的 `[n]（定位）` 渲染，是为了让块号只出现在块头里：资料原文中的 `[3]`、代码 `a[1]` 保持原样，不会被当成块号。
   4. **原文注入按资料处理**：资料原文、结构上下文与问题中能伪造分段、块头或哨兵的开头（`<<`/`＜＜` 后接 `资料`、`课程资料`、`知识点结构`、`学生问题`、`INSUFFICIENT_EVIDENCE`）把 `<<` 换成 `«`，长度不增加；其余字符（含 `cout << x`）不动。注入文本不删除，仍作为数据留在资料段内。J06 的引用原文取自文本块数据，不受替换影响。
-  5. 请求 `purpose = answer_with_context`、`response_format = text`、输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 1024`（暂定）；不设单次超时，由 E04 按链路剩余时间补上。经 `bind(CallAttribution(course_id, request_id), deadline=...)` 调用，首字前切备用、出字后不切由 E04 保证。
+  5. 请求 `purpose = answer_with_context`、`response_format = text`、输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 2048`（2026-10-03 ADR-086 修订，按已批准的调高方向定稿）；不设单次超时，由 E04 按链路剩余时间补上。经 `bind(CallAttribution(course_id, request_id), deadline=...)` 调用，首字前切备用、出字后不切由 E04 保证。
   6. **故障分类**（`GenerationErrorKind` 闭集，`code` 与 `details_reason` 直接对应契约）：E04 截止时间、读取中链路到期、无状态码且剩余时间 ≤ 0.25 秒的供应商超时 → `timeout`；401/403 → `auth`；首字前其他供应商故障（含 408、熔断、主备都失败）→ `upstream`；出字后 → `stream_interrupted`；预算拒绝 → `BUDGET_EXCEEDED`；预写失败 → `STORAGE_UNAVAILABLE`；400/404/422 与意外异常 → `INTERNAL_ERROR`。`delivered` 标明故障前是否已出字，供 J07/J09 撤回。**超时是独立错误**：与 `upstream` 同为 `LLM_UNAVAILABLE`，以 `details.reason` 区分，不新增错误码（Q5 说明）。
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。J04 预算按 J04 的 `render_evidence()`（`[n]（定位）` 块头、每块以 `\n\n` 结尾）估算，实际提示的块头是 `<<资料 n>>（定位）` 且只有末块少一个 `\n\n`，故每块差 8 字节、末块再多 2 字节，上界为 `max_chunks × 8 + 2` 字节（独立审查按字节实测，已由 `test_prompt_blocks_are_no_larger_than_the_budgeted_rendering` 断言）。资料原文里的 `<<` 被换成 `«`（每个发生替换的 `<<` 少 1 字节），只会缩小该差值。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
-- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限已由 ADR-086 确认为 2048；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
 - **后果**：J06 拿到的是可逐段处理、可随时关闭的原始流；J07 只需把 `SkippedGeneration` 映射为 `meta(not_covered)` + `done`，把 `GenerationError` 映射为 `error` 事件或 Q7 的 HTTP 错误。块头比 J04 估算用的 `[n]` 多约 9 字节/块，J04 预算按 J04 渲染估算，实际提示略大，差值有上界（`max_chunks × 9` 字节），可接受。`LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` 尚无实现：E03 适配器的超时覆盖整条流，同步生成器无法在首字前中断读取；将来补上时，其超时因剩余时间充足会被归为 `upstream`，与本 ADR 一致。`close()` 须与迭代在同一线程调用（生成器不可跨线程关闭），J07 用线程读流时需另行安排。提示只经 fake 模型验证，逐句标注与防注入的实际效果待 K03 真实模型评测（付费调用需另行同意）。
 - **回滚**：撤销 `services/qa/generate.py`、`tests/backend/test_j05.py`，把 `prompts/answer_with_context.yaml` 与 `prompts/MANIFEST.md` 对应行恢复为 v1，`tests/backend/test_e01.py` 一行恢复；无迁移、契约与依赖变更。
-- **签收**：待 ArvinHan 审阅。需确认：输出上限 1024 的暂定值；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
+- **签收**：待 ArvinHan 审阅。需确认：输出上限已由 ADR-086 确认为 2048；以 `<<资料 n>>` 块头代替 `[n]` 渲染；超时判定的 0.25 秒容差。
 
 ## ADR-069：I05 推荐查询从绑定版本的已提交快照读图，一次解析、全量排序后截断
 
@@ -1754,8 +1754,119 @@
 - **背景**：Codex 审查（`/Users/arvinhan/.codex/worktrees/e92f/SmartSketch/docs/reviews/codex-claude-plan-a-2026-10-03.md`，对象 `6ff8a8d → e86f4b9`）确认 D1–D3、N01–N08 共 11 项缺陷。ADR-080/081 的方案不变；本 ADR 只补齐实现它们时缺失的身份、分类与记账语义。修复任务见 `docs/tasks.md`「计划 A 审查修复」。
 - **决定**：
   1. **配置身份 `revision`（N01、N06）**：`user_model_configs` 新增 `revision`，每次保存（新建、换 key、只改模型）都生成新的 128 位随机值，清除后重建也不会与旧值相同。`version` 保留为面向用户的保存计数（契约不变，删除重建后仍可能从 1 开始），不再用于判断「是不是同一份配置」。问答的「用户 + 配置」缓存按 `revision` 比较；每次取模型都读库，因此另一进程的保存/清除同样生效，不依赖进程内清缓存。测试已存配置时记下读取时的 `revision`，结果只在该 `revision` 仍是当前值时落库（条件更新），否则丢弃、不污染新配置；测试本身的结果照实返回给调用方。`revision` 是服务端内部身份，不进 API 响应。任务快照语义不变（仍复制创建时的地址、模型与密文）。迁移 `016_model_config_revision.sql` 加可空列并为已有行回填随机值；回滚见迁移文件头。
-  2. **截断是生成故障（D1；部分修订 ADR-015 决定表「输出达到上限按正常结束判定」）**：`finish_reason = length` 且逐句出处校验（Q3.5）不通过——没有有效标记、只有未知标记、或有结论单元缺标记——时，终态是 `error`：`LLM_UNAVAILABLE`，`details.reason = truncated`，整段撤回临时正文；不再返回 `not_covered` / `all_citations_invalidated`（那是检索资料不足的语义）。截断但每个结论单元都有有效出处时仍按 ADR-015 为 `answered`（不浪费已付费生成，正文全部有出处）。没有截断的校验失败、哨兵、真实无检索命中保持原终态。不放松出处校验，不把无出处的截断正文当回答，不新增重试：本轮不做「缩短回答再生成」，输出上限 `ANSWER_MAX_OUTPUT_TOKENS = 1024` 不变（调整上限属 ADR-068 待决 1，需要按 15 秒时限与费用另行实测决定）。`ChatLlmUnavailableReason` 增加 `truncated`，JSON 503 与 SSE `error` 同值，`chat_logs` 记 `error_code = LLM_UNAVAILABLE`、`error_reason = truncated`、`truncated = 1` 及子类；前端按原因提示「回答过长被截断，已撤回，请缩小问题范围或分开提问」。
+  2. **截断是生成故障（D1；部分修订 ADR-015 决定表「输出达到上限按正常结束判定」）**：`finish_reason = length` 且逐句出处校验（Q3.5）不通过——没有有效标记、只有未知标记、或有结论单元缺标记——时，终态是 `error`：`LLM_UNAVAILABLE`，`details.reason = truncated`，整段撤回临时正文；不再返回 `not_covered` / `all_citations_invalidated`（那是检索资料不足的语义）。截断但每个结论单元都有有效出处时仍按 ADR-015 为 `answered`（不浪费已付费生成，正文全部有出处）。没有截断的校验失败、哨兵、真实无检索命中保持原终态。不放松出处校验，不把无出处的截断正文当回答，不新增重试：本轮不做「缩短回答再生成」，输出上限按 ADR-086 修订为 `ANSWER_MAX_OUTPUT_TOKENS = 2048`（用户确认；15 秒时限与费用实测交 DeepSeek）。`ChatLlmUnavailableReason` 增加 `truncated`，JSON 503 与 SSE `error` 同值，`chat_logs` 记 `error_code = LLM_UNAVAILABLE`、`error_reason = truncated`、`truncated = 1` 及子类；前端按原因提示「回答过长被截断，已撤回，请缩小问题范围或分开提问」。
   3. **问答链路一个截止时刻（D3）**：截止时刻 = 进入问答路由时的 `time.monotonic()` + `LLM_CHAT_TIMEOUT_SECONDS`，由同一时钟贯穿改写、查询向量、图检索与生成；每一步开始前检查，到期即不再出站。查询向量的 `EmbeddingRequest.timeout_seconds` 取剩余时间，多批共用；图库读取在问答准备期间带 `neo4j.Query(timeout=剩余时间)`（服务端终止事务），剩余为零时不发查询；生成沿用 E04 按剩余时间截断的既有行为。HTTP 传输（系统级 `StdlibTransport` 与个人配置的 `GuardedTransport`）把 `timeout` 当作**整次交换的总预算**：域名解析放在有界等待中（超时即放弃结果、不再连接，解析线程只可能在系统解析器内自行结束，不会再发出供应商请求），多个地址依次连接、共用剩余预算，TLS 握手、发送、等待响应头都设剩余时间，另有看门狗在截止时刻关闭套接字，所以挂起或慢速逐字节的响应会在截止时刻真正断开，而不是外层先返回、请求在后台继续。准备阶段任一环节到期或在到期后失败，统一为 `LLM_UNAVAILABLE` + `details.reason = timeout`（开流前，两种传输都是 503 JSON；`chat_logs.error_reason = timeout`），不归资料未覆盖。地址校验、钉 IP 与 TLS 主机名校验不变。发布与离线重新向量化不带截止时刻，仍按 `LLM_REQUEST_TIMEOUT_SECONDS` 约束每次请求；worker 抽取的单次请求时限同样变为严格的总时限（原先读取阶段已按总时限，连接与解析阶段此前不受约束）。已知边界：Neo4j 驱动建立连接/取连接池的等待由驱动配置约束（本机实例，非本轮改动）。
   4. **供应商鉴权失败任务级终止（N02）**：抽取阶段任一块或小节的模型调用收到 401/403（`ModelAuthError`），该单元不做 L2 重试，阶段停止派发新单元，已在途单元的结果不再写检查点，任务以 `LLM_UNAVAILABLE`、`details = {"reason": "auth"}` 失败（不进入 `merging`，不切备用、不换 key；E04 本就不对鉴权失败做 L1 重试与主备切换）。与本人清除配置的 `credential_revoked` 等快照原因区分。普通的关系输出不合规仍按既有容错只记小节检查点。此规则对 `live` 的全站 key 同样成立：鉴权失败不会靠重试恢复。
   5. **凭据存储门禁先于一切、模型名共享校验（N07、N08）**：`/me/model-config/test` 的每个分支（完整请求体、空请求体、已有配置）都先确认凭据存储已启用，未启用即 503 `credential_store_disabled`，在任何域名解析与出站之前结束，与规格 §3.5「写入与测试返回 503」一致。保存与测试共用 `normalize_model`：去掉首尾空白后为空即 422 `VALIDATION_ERROR`（`field = model`，`reason = blank`），不写库、不解析、不出站；不靠前端拦截，也不把异常吞成 200。
   6. **共享向量调用记账（D2，落实 ADR-011 修订 2 决定 12）**：发布与问答共用 `build_embedding_adapter` 装配系统级向量；`EMBEDDING_MODE=online` 时适配器带 `model_calls` 存储，每次实际向量请求发出前预写一行（`purpose = embedding`、`max_output_tokens = 0`、输入按 UTF-8 字节估算，`call_id` 各自独立），预写失败则不发请求（问答为 `STORAGE_UNAVAILABLE`），返回后按 `call_id` 回写状态、usage（缺 usage 留空）与耗时，失败记错误分类。归属：问答 `course_id` + 问答 `request_id`（与 `chat_logs` 对应）；发布 `course_id` + `request_id = publish:<version_id>`（与 `graph_versions` 对应）；不填 `user_id`、`task_id`。向量费用归部署者：`embedding` 用途照既有规则不做预算检查、不计入任务或个人/全站生成模型日预算。缓存命中、内容未变的重复发布与回滚复制向量都不发请求、不新增行。E07 批大小与客户端批大小同为 `EMBEDDING_BATCH_SIZE`，一行对应一次 HTTP 请求；本层没有重试，若将来加重试须每次重试各记一行。fake/demo 不出站，不记；离线重新向量化脚本沿用自己的调用台账。
+
+## ADR-083：PDF 提取把部首形近字改回统一汉字（解析器 `pdf/2`）
+
+- **日期**：2026-10-03
+- **背景**：L11 用本机 Chrome 打印的中文文本型 PDF 首次经过解析器，发现 macOS 字体的 ToUnicode 会把部分汉字映射成康熙部首（U+2F00–U+2FD5，如「⽬」「⾃」）或部首补充区字符（U+2E80–U+2EF3，如「⻓」「⻅」）。外观与正常汉字相同，编码不同，会让检索、引用片段与模型输入出错。Mac 上导出的教师 PDF 很可能普遍如此。
+- **决定**：D05 提取行文本时调用 `normalize_ideographs`：康熙部首区按 NFKC 映射（全部有兼容分解）；部首补充区按 Unicode EquivalentUnifiedIdeograph 显式对照，只收能在正文中单独成字的简化字形，偏旁专用形态不映射。不做全量 NFKC，全角标点与全角字母数字保持原样。PDF 解析器版本 `pdf/1 → pdf/2`，修订解析器版本随之变为 `pdf/2,cleanup/1,headings/1`。
+- **后果**：同一份 PDF 重新上传会得到新的资料修订（版本号参与修订身份）；已有修订、草稿与发布版不变，不需要迁移。Markdown、DOCX、TXT 直接读 Unicode 文本，不受影响。
+- **回滚**：回退本提交，`PARSER_VERSION` 改回 `pdf/1`；之后上传的 PDF 回到旧行为。
+
+## ADR-084：PDF 分节构块时把自动换行的续行并回同一段（解析器 `headings/2`）
+
+- **日期**：2026-10-03
+- **背景**：L11-6 真实模型实测（`evaluation/reports/l11-teacher-loop-2026-10.md`）发现 PDF 路径成本是 Markdown 的 1.6～2.2 倍、repair 多达 13 次，两份 PDF 都抽不出 `PREREQUISITE`、近半节点孤立。离线核对原因：版面分析把 Chrome 打印 PDF 的几乎每一行切成独立文本框，D06 按「页 + 文本框」分组，于是一行一块（同章 PDF 114 块、平均 38 字，Markdown 37 块、平均 119 字），组内又以换行连接，「学习 X 之前需要先掌握 Y」这类先修句式在换行处被切断。用户 2026-10-03 选择在 L12 之前修复。
+- **决定**：`to_sectioned_document` 判定段落续行：下一行与上一行同页、同字号（差 ≤ 0.5pt）、行距不超过 1 倍字号、左边界差不超过 1 倍字号、且上一行右端到达全文档正文最右边界减 2.5 倍字号以内（实测续行行距约 0.7 倍字号、段落之间约 1.3 倍）。满足时并回上一段：中文与标点直接相连，两侧都是西文字母或数字时补一个空格。不满足续行条件、但同一文本框的行仍按原样以换行连接（列表、短行不被合并）。不跨页合并，不改标题判定、页码与章节定位。`HEADINGS_VERSION` 升为 `headings/2`，修订解析器版本随之变为 `pdf/2,cleanup/1,headings/2`。
+- **后果**：比赛 PDF 的块数与对应 Markdown 基本一致（38 对 37、24 对 24），块内不再有换行。同一 PDF 重新上传会得到新修订，已有修订、草稿与发布版不变，不需要迁移。D05 简单路径（`to_parsed_document`）不变；无标题时分节路径与它的差别仅在续行被并回。PDF 路径的质量与成本改善需要真实模型复测确认（交接 `docs/handoffs/claude-l11-7-deepseek-retest.md`）。
+- **回滚**：回退本提交，`HEADINGS_VERSION` 改回 `headings/1`；之后上传的 PDF 回到一行一块。
+
+## ADR-085：来源与问答引用带同课资料文件名（`SourceRef` / `Citation` 的可选 `document_name`）
+
+- **日期**：2026-10-03
+- **背景**：R04——图谱来源与问答引用只有 `document_id`，界面显示资料编号或什么都不显示；两个图谱页也没有接上「查看来源」。学生没有资料列表权限，前端无法自行把编号换成文件名。冲刺设计 §6 已定由契约给来源加可选文件名（计划 B L12）。
+- **决定**：`SourceRef` 与 `Citation` 增加可选字段 `document_name`（1～255 字符），由服务端按**同一课程**的 `materials.filename` 填写：知识点详情、关系来源（图谱读取、关系编辑、审核队列）与问答引用都带上；他课或已删除的资料省略该字段，来源本身照常返回；问答查名失败只记 WARNING 并省略，不影响回答。不新增读取整份资料的接口，查看器只显示随来源返回的片段。前端统一以「文件名 · 第 N 页 · 章节」显示，缺文件名时写「资料不可用」，不再拿资料编号冒充文件名（H06 原「显示资料编号」的约定随之修订）；片段与文件名按纯文本渲染，超长片段先折叠。
+- **后果**：契约新增可选字段，旧客户端可忽略；DTO 已重新生成。每次读取多一次按课程过滤的资料查询（主键 + 课程条件）。
+- **回滚**：回退 L12 提交并重新生成 DTO；不涉及数据迁移。
+
+
+## ADR-086：问答输出上限 2048（2026-10-03）
+
+背景：1024 上限易截断带出处的课程回答，用户在 Claude 交接中已批准提高上限，交接建议 2048 并交 Codex 定稿。
+决定：ANSWER_MAX_OUTPUT_TOKENS=2048；改写仍 300；D1 逐句出处和 finish_reason=length 分类、15 秒链路时限、无额外重试均不变。替代 ADR-068 决定 5 和 ADR-082 决定 2 的 1024 保持条款。
+后果：本地仅测试接线和边界；真实成功率、延迟、费用交 DeepSeek 对照实测。回滚：恢复常量 1024、同步规格并重跑测试，不涉及数据迁移。用户已确认调高方向，Codex 按交接建议定稿 2048；真实测量待办。
+
+## ADR-087：计划 B 复审及课程闭环补齐（2026-10-03）
+
+背景：教师编辑支持 importance/difficulty 显式 0.5，前端把数字等于 0.5 猜成未标注；课程导航却按账号类型而非课程角色。
+决定：推荐 reason_facts 增加可选 importance_defaulted/difficulty_defaulted 布尔字段，由服务端根据原属性为 None 决定；前端只有 true 才展示未标注，旧响应省略字段时显示数值。不改变排序分数。课程 store 保存当前 myRole，按会话和课程作用域读取，未知角色只显示课程概览。下一步根据课程状态、发布版、资料数和个人 API 配置；不把发布版 kp_count 当草稿或资料计数。
+后果：新增字段向后兼容，无数据库迁移；教师账号可以是他课学生。已掌握后继不再算解锁；用户点选/问答目标优先于自动推荐聚焦；来源预览最多 600 字，只有主动展开才显示全文。回滚：撤销本提交并重生成契约，旧接口可继续消费。
+
+
+## ADR-088：第三阶段暂缓九类参赛材料（2026-10-03）
+
+- 背景：第二阶段功能交付已收尾，真实性能/质量仍有未达或未验项目；用户明确要求九类参赛材料暂不列入第三阶段，并请求Claude启动交接prompt。
+- 决定：第三阶段优先可靠性、测量工具、PDF/抽取性能与准确率、交互修复、条件满足后的轻量美化和隔离技术复测。L18的九类参赛材料制作/排版/录制/打包延期，不作为本阶段完成门槛。技术测试集、原始输出、人工判定、性能与计费证据、任务/规格/ADR和技术交接继续保留，按工程规则验收。
+- 后果：此前L16–L19范围中的材料工作暂缓而非取消；本阶段技术完成不等于参赛材料齐套或赛题全达标。历史材料整理延期，仅直接妨碍技术复现的启动说明可最小更正。Claude先核基线并交原子计划供用户确认，真实生成/在线向量测量继续交DeepSeek；不新增付费、推送、合并或数据同步授权。
+- 回滚/后续：用户另行恢复材料任务时更新看板与计划；无代码或数据变更。
+- 签收依据：ArvinHan本会话2026-10-03明确范围调整。
+
+## ADR-089：模型推理用量埋点与问答提示词 v3（C02-2，2026-10-03）
+
+- **背景**：C02-1 离线诊断（`evaluation/reports/c02-qa-diagnosis.md`）发现 L15 真实问答可见回答每字 2.9～17 个输出 token，首个可见 delta 几乎等于整个生成耗时。推断为所用模型先做不可见推理：推理 token 计入 `completion_tokens` 并占用 2048 上限，可见内容在生成末尾才流出。兼容客户端只读 `delta.content`，推理内容被静默丢弃，现有记录无法证实或否定这一推断。用户 2026-10-03 选择方案 A（埋点）+ C（提示词 v3），并批准 C02-4 真实复测预算（增量止损 45000 生成 token）。
+- **决定**：
+  1. **推理埋点（只计量，不保存内容）**：
+     - 兼容客户端识别流式 `delta.reasoning_content` 与 `delta.reasoning`（非流式 `message.` 同名字段），只把字数作为内部事件上报，**推理正文不进入回答、日志、数据库或前端**。
+     - 用量解析 `usage.completion_tokens_details.reasoning_tokens`（可选）。
+     - 调用策略层记录首次推理与首次可见内容相对调用开始的毫秒数。内部推理事件不转发给调用方，回答行为、SSE 契约与出处校验全部不变。
+     - 迁移 017 给 `model_calls` 增加四个可空列：`usage_reasoning`、`reasoning_chars`、`first_reasoning_ms`、`first_content_ms`。供应商不提供时留空，不当作 0。
+     - `usage_reasoning` 是 `usage_output` 的组成部分，不另行计费，计费公式不变。
+  2. **问答提示词 `answer_with_context` v3**：在 v2 规则不变的基础上要求：直接给出结论，不复述问题、不写铺垫，不输出推理或思考过程；比较类问题按要点逐条对照，每点一句；回答通常不超过 300 字。每句仍以有效 `[n]` 结尾，资料不足仍只输出哨兵。
+  3. 不改输出上限（ADR-086 的 2048）、15 秒总截止、出处校验与截断判定（ADR-082 决定 2），不加重试，不切换学生模型；思考开关（方案 B）待埋点实测后另行决定。
+- **后果**：
+  - C01 `audit` 可按调用列出推理 token、推理字数与首次推理 / 首次可见内容时刻，用于 C02-4 判断截断与首字的根因。
+  - 提示词效果只能由真实模型验证：假模型通过只证明装配与规则正确，不证明真实模型更短或更快。
+  - 旧库执行迁移 017 后历史行的新列为空。
+- **回滚**：
+  - 提示词：`ANSWER_PROMPT_VERSION` 改回 2 并恢复清单摘要，v3 文件内容回退。
+  - 埋点：回退代码提交；迁移 017 按文件内 `ROLLBACK` 注释停机删列并删除 `schema_migrations` 记录，或用迁移前自动备份恢复。
+- **签收依据**：ArvinHan 本会话 2026-10-03「按推荐 A+C 执行，两轮预算同意」。
+
+## ADR-090：个人模型配置增加「关闭模型思考」开关（方案 B，2026-10-04）
+
+- **背景**：
+  - C03-1 实测：抽取输出 80% 是推理，两次关系调用的 4096 输出全部是推理，导致截断与 repair，91 秒中模型跨度 72.6 秒。
+  - C02b 探测（`evaluation/reports/c02b-thinking-probe.md`）在 DeepSeek `deepseek-flash` 上确认：只有 `thinking: {"type": "disabled"}` 有效，推理 1121 字 → 0、输出 512（撞顶）→ 49、耗时 2895 → 513 ms；`enable_thinking`、`chat_template_kwargs.enable_thinking`、`reasoning_effort` 返回 200 但被静默忽略。
+  - 用户 2026-10-04 决定进入方案 B。
+- **决定**：
+  1. 个人模型配置增加布尔项 `disable_thinking`（默认 `false`）。开启时，该用户的**全部生成调用**（问答改写、答案生成、抽取、repair、连接测试）请求体追加且只追加 `{"thinking": {"type": "disabled"}}`。关闭时请求体与现状逐字节相同。向量调用不受影响。
+  2. 只提供经真实探测验证的这一种写法，不猜其他供应商的字段。界面注明「DeepSeek 等兼容 `thinking` 字段的接口」。供应商不认识该字段时，可能报错或静默忽略：报错会在「测试连接」暴露；静默忽略由推理埋点（ADR-089）发现。
+  3. 契约：
+     - `ModelConfig` 增加可选 `disable_thinking`；
+     - `ModelConfigUpdate` 增加可选 `disable_thinking`，省略时保留已存值，新建配置默认 `false`；
+     - `ModelConfigTestRequest` 增加可选 `disable_thinking`：测试未保存的表单时按表单值；测试已存配置时用已存值。保证测的就是将要用的请求形状。
+  4. 数据：迁移 018 给 `user_model_configs` 与 `task_model_bindings` 各加 `disable_thinking INTEGER NOT NULL DEFAULT 0`（取值 0/1）。任务创建时与地址、模型一起快照，抽取中途改开关不影响进行中的任务。改开关属于一次保存，`revision` 随之更新，问答模型缓存失效（ADR-082 决定 1）。
+  5. 兼容客户端增加只读的 `extra_body`（构造时固定），合并进请求体；不得覆盖 `model`、`messages`、输出上限、`stream`、`stream_options`、`response_format`，冲突时构造即报错。
+  6. 输出上限、15 秒截止、出处校验、截断判定、重试策略全部不变。
+- **后果**：
+  - 预期抽取与问答的输出 token 和耗时大幅下降，截断与 repair 减少。真实效果、抽取准确率与回答质量的变化必须由 DeepSeek 实测与人工判定确认，不以探测的单次短请求代替。
+  - 关闭思考可能降低复杂问题的回答质量，因此作为用户可选项，默认不开。
+- **回滚**：
+  - 代码：回退对应提交（关闭时行为与现状相同，可先让用户全部关闭再回退）。
+  - 数据：迁移 018 按文件内 `ROLLBACK` 注释停机删列并删除 `schema_migrations` 记录，或用迁移前自动备份恢复。
+  - 契约：字段可选，旧客户端可忽略。
+- **签收依据**：ArvinHan 2026-10-04「按推荐进入方案 B」；探测结果 DeepSeek `3d38015`。
+
+### 2026-10-04：验收复审修复后由用户本机检查，再决定技术冻结
+
+- 背景：Codex 对 Claude 计划 C 收尾复审发现两项 P2 和两项 P3；人工准确率已经逐条复核后采纳辅助判定，不是独立盲判。
+- 用户决定：先修复复审问题，提供修复版本启动说明；用户自行检查后再决定是否冻结。
+- 后果：仅 Codex 自有修复分支改动，stage_c_status 保持 OPEN、technical_freeze 保持 NOT_PERFORMED；不推送合并、不重跑真实测量。浏览器可见首字、关闭思考 MD 抽取、v3 思考开启基线继续按已有决定不补测，不以门禁或人工功能检查代替性能证据。
+
+### 2026-10-04：用户选择全站向量网页配置入口（历史选择，随后撤销）
+
+- 已确认：向量配置全站一份，而非每位教师独立；教师/学生的生成模型API仍按个人配置。
+- 待评审提案：先启动再通过网页设置，加密入库与旧env兼容；部署者一次初始化码领取配置所有权，首次成功激活后锁定空间字段，只允许同空间Key替换。
+- 设计：docs/superpowers/specs/2026-10-04-global-embedding-settings-design.md。此记录确认范围选择，不宣称详细设计、接口或实现已经批准；ADR-081的密钥存储来源修订待设计审批后落地。
+- 不执行真实测试、共享库迁移、合并推送或技术冻结。
+
+### 2026-10-04：用户暂不修改，撤销向量网页配置计划
+
+- 最新决定取代上条候选方向：取消全站向量 API 可视化设置方案及后续设计/实施计划，不再等待审批或推进。
+- 当前仍采用个人生成 API 网页设置 + 系统向量环境配置；原 ADR-081 未被新方案修订。
+- 只保留已撤销设计备档；没有该功能产品代码、接口、迁移或业务数据改动需要回滚。此前四项验收修复保留；stage_c_status OPEN，technical_freeze NOT_PERFORMED。

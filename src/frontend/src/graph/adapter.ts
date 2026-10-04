@@ -49,6 +49,8 @@ export interface G6NodeData {
   confidence: number
   source: KnowledgePoint['source']
   locked: boolean
+  /** 学生页推荐序号（L14，1 起）：由 `useLearning` 叠加，适配层不填；画布标签显示为「1. 名称」 */
+  pathOrder?: number
 }
 
 export interface G6Node {

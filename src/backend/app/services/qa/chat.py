@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import copy
+import logging
 import sqlite3
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import Event
 from typing import Any
 
 from app.config import Settings
 from app.repositories.chunks import ChunkStoreError, get_chunks
+from app.repositories.materials import material_names
 from app.repositories.graph_migrations import VectorSpaceError, sqlite_current_space
 from app.repositories.graph_search import search_subgraph
 from app.repositories.neo4j import Neo4jRepository, RepositoryError, read_deadline
@@ -26,6 +29,8 @@ from app.services.qa.generate import AnswerGeneration, AnswerGenerator, Generati
 from app.services.qa.rewrite import QueryRewriter
 from app.services.versions.resolver import PublishedVersion
 
+
+logger = logging.getLogger(__name__)
 
 _MESSAGES = {
     "LLM_UNAVAILABLE": "问答模型暂不可用，请稍后重试",
@@ -91,6 +96,39 @@ def _capture_audit(prepared: PreparedChat, citations: CitationStream | None) -> 
         prepared.audit.truncated = citations.truncated
 
 
+class _Phases:
+    """C02-3 续：问答准备各步耗时，结束时写一行 INFO（只有编号与毫秒数，不含问题或资料原文）。
+
+    ``since_request_ms`` 是进入准备时距请求开始的时间（含版本解析与个人模型客户端构建）；失败时只写已完成的步骤。
+    """
+
+    def __init__(self, request_id: str, started: float) -> None:
+        self.request_id = request_id
+        self.started = started
+        self.entered = time.monotonic()
+        self.done: dict[str, int] = {}
+        self._open: dict[str, float] = {}
+
+    def start(self, name: str) -> None:
+        self._open[name] = time.monotonic()
+
+    def stop(self, name: str) -> None:
+        self.done[name] = max(0, round((time.monotonic() - self._open.pop(name)) * 1000))
+
+    @contextmanager
+    def time(self, name: str) -> Iterator[None]:
+        self.start(name)
+        yield
+        self.stop(name)
+
+    def log(self, outcome: str) -> None:
+        since = max(0, round((self.entered - self.started) * 1000))
+        total = max(0, round((time.monotonic() - self.entered) * 1000))
+        steps = " ".join(f"{name}_ms={ms}" for name, ms in self.done.items())
+        logger.info("chat prepare phases request_id=%s outcome=%s since_request_ms=%s %s total_ms=%s",
+                    self.request_id, outcome, since, steps, total)
+
+
 class ChatService:
     def __init__(self, settings: Settings, repo: Neo4jRepository, embedding: EmbeddingAdapter,
                  rewriter: QueryRewriter | None, generator: AnswerGenerator | None) -> None:
@@ -114,27 +152,46 @@ class ChatService:
         so nothing goes out once the deadline has passed; a failure after it is reported as ``timeout``.
         """
         deadline = started + self.settings.LLM_CHAT_TIMEOUT_SECONDS
+        phases = _Phases(request_id, started)
 
         def check() -> None:
             if time.monotonic() >= deadline:
                 raise ChatFailure("LLM_UNAVAILABLE", reason="timeout")
 
-        rewritten = self.rewriter.rewrite(question, history, course_id=version.course_id,
-                                          request_id=request_id, deadline=deadline)
+        try:
+            return self._prepare(version, request_id, started, deadline, question, history, kp_id, phases, check)
+        except ChatFailure as failure:
+            phases.log(failure.code)
+            raise
+        except Exception as error:
+            phases.log(type(error).__name__)
+            raise
+
+    def _prepare(self, version: PublishedVersion, request_id: str, started: float, deadline: float,
+                 question: str, history: list[object] | None, kp_id: str | None, phases: _Phases,
+                 check: Callable[[], None]) -> PreparedChat:
+        with phases.time("rewrite"):
+            rewritten = self.rewriter.rewrite(question, history, course_id=version.course_id,
+                                              request_id=request_id, deadline=deadline)
         query = rewritten.query
         check()
         try:
             with read_deadline(deadline), embedding_calls(course_id=version.course_id, request_id=request_id):
-                [vector] = self.embedding.embed((query,), deadline=deadline)
+                with phases.time("embed"):
+                    [vector] = self.embedding.embed((query,), deadline=deadline)
                 check()
-                space = self.current_space()
+                with phases.time("space"):
+                    space = self.current_space()
                 scope = version.graph_scope()
-                hits = search_chunks(self.repo, scope, version.revision_ids, vector, space=space,
-                                     limit=self.settings.QA_VECTOR_LIMIT)
+                with phases.time("vector"):
+                    hits = search_chunks(self.repo, scope, version.revision_ids, vector, space=space,
+                                         limit=self.settings.QA_VECTOR_LIMIT)
                 check()
-                graph = search_subgraph(self.repo, scope, version.revision_ids, (query,),
-                                        seed_kp_ids=(kp_id,) if kp_id else ())
+                with phases.time("subgraph"):
+                    graph = search_subgraph(self.repo, scope, version.revision_ids, (query,),
+                                            seed_kp_ids=(kp_id,) if kp_id else ())
                 check()
+                phases.start("context")
                 context = build_context(
                     course_id=version.course_id, revision_ids=version.revision_ids,
                     vector_hits=hits, subgraph=graph,
@@ -145,6 +202,7 @@ class ChatService:
                                          self.settings.QA_CONTEXT_GRAPH_TOKENS,
                                          self.settings.QA_CONTEXT_MAX_CHUNKS),
                 )
+                phases.stop("context")
         except EmbeddingDeadlineExceeded as error:
             raise ChatFailure("LLM_UNAVAILABLE", reason="timeout") from error
         except EmbeddingRecordError as error:      # model_calls 预写失败：请求未发出（ADR-082 决定 6）
@@ -157,7 +215,17 @@ class ChatService:
             check()
             raise ChatFailure("STORAGE_UNAVAILABLE") from error
         check()
+        phases.log("ok")
         return PreparedChat(version, request_id, started, deadline, query, context)
+
+    def _document_names(self, course_id: str, context: EvidenceContext) -> dict[str, str]:
+        """引用的资料文件名（L12，ADR-085）；只取同课资料，查不到或出错都只是省略文件名，不影响回答。"""
+        try:
+            return material_names(self.settings.SQLITE_URL, course_id=course_id,
+                                  material_ids={chunk.document_id for chunk in context.chunks})
+        except sqlite3.Error as error:
+            logger.warning("chat citation document names unavailable (%s)", type(error).__name__)
+            return {}
 
     def events(self, prepared: PreparedChat, stop: Event | None = None) -> Iterator[dict[str, Any]]:
         context = prepared.context
@@ -181,11 +249,13 @@ class ChatService:
             if not isinstance(candidate, AnswerGeneration):
                 raise ChatFailure("INTERNAL_ERROR")
             generation = candidate
+            names = self._document_names(prepared.version.course_id, context)
             citations = CitationStream(
                 prepared.version, prepared.request_id,
                 (Evidence(chunk.index, chunk.chunk_id, chunk.document_id,
                           prepared.version.course_id, chunk.revision_id, chunk.text,
-                          page=chunk.page, section_path=chunk.section_path)
+                          page=chunk.page, section_path=chunk.section_path,
+                          document_name=names.get(chunk.document_id))
                  for chunk in context.chunks),
             )
             for raw in generation:

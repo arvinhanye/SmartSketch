@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # K11 集成门禁：真实 Neo4j 上的 tests/integration + 依赖图库的后端用例（F11 等），报告判定同 gate.py，
-# 然后跑 K05/K06 端到端（scripts/e2e.sh，演示模型）。
+# 然后跑 K05/K06 端到端（scripts/e2e.sh，演示模型），以及 L11 个人模式端到端（本机假供应商）。
 #
 # Neo4j：缺省起一次性容器（结束即删，F14 会清库，所以绝不连开发库）；
 #        也可设 VERIFY_NEO4J_URI / VERIFY_NEO4J_USER / VERIFY_NEO4J_PASSWORD 指向一个可清空的实例。
@@ -59,6 +59,7 @@ PYTHONPATH="$PWD/src/backend${PYTHONPATH:+:$PYTHONPATH}" "$py" -m pytest tests/b
 "$py" scripts/verify/gate.py backend-live integration "$out/backend-live.xml" --min-tests 10 || status=1
 
 if ((run_e2e)); then
-  scripts/e2e.sh || status=$?
+  scripts/e2e.sh tests/e2e/teacher.spec.ts tests/e2e/student.spec.ts || status=$?
+  E2E_LLM_MODE=personal scripts/e2e.sh tests/e2e/personal.spec.ts || status=$?
 fi
 exit "$status"

@@ -24,6 +24,7 @@ evaluation/
 ├── evaluate_extraction.py       # K02：离线评测脚本
 ├── run_live_extraction.py       # K02：本机真实模型抽取
 ├── ablation.py                  # K13：抽取消融（单阶段 / 两阶段 / 两阶段 + 补漏）
+├── measure_web_flow.py          # L02 / C01：经 HTTP 测抽取与问答耗时；只读核对调用账本（§9）
 ├── prompts/extract_joint.yaml   # K13：单阶段对照组专用提示词（不进生产）
 └── reports/
     ├── extraction-accuracy.md   # K02：抽取准确率测试报告（参赛材料）
@@ -235,3 +236,33 @@ evaluation/
 
   由此报告 `NOT_COVERED` 的精确率、召回率与臆答率（臆答数 / 资料未覆盖问题数），空分母同样给 `null`。
 - 问答阈值同样不在测试集上调，判定对象同样只算真实模型。
+
+## 9. 真实测量与预算核对（`measure_web_flow.py`，C01）
+
+只用标准库；口令从 `--password-env` 指定的环境变量读取；数据库只读打开（`mode=ro` + `PRAGMA query_only`）。
+
+```bash
+# 问答：逐题写 JSONL；每题发出前及完成后按生成 token 检查本轮增量止损（默认 45000），usage 未知也停
+python evaluation/measure_web_flow.py ask --base-url http://127.0.0.1:<port> --username <学生> \
+    --password-env MEASURE_PASSWORD --course-id <cid> --questions q.txt \
+    --out run.jsonl --audit-db <只读 SQLite 路径> --cap 45000 [--stream]
+
+# 事后核对：按 JSONL 中的请求 ID 关联；或给固定 ID；或给 [since, until) 窗口（必须带结束边界）
+python evaluation/measure_web_flow.py audit --db <只读 SQLite 路径> --records run.jsonl
+```
+
+口径：
+
+- **结局**：`answered` / `not_covered` / `error` / `no_response` 分开计数，`total` 为分母。HTTP 错误对象的请求编号取 `details.request_id`；`outcome`、`error_code`、`error_reason` 分列。`ask` 退出码 0 只表示测量跑完，看 `all_answered` 判断是否全部答成功；提前停止退出码为 3。
+- **时间边界**：所有时刻按 UTC 时刻比较，不做字符串比较；窗口为 `[since, until)`。缺时区的时间直接拒绝。
+- **分账**：`purpose = embedding` 为向量，其余为生成（计入生成预算）；另列 `by_purpose`。缓存命中不产生调用；中断（`status = sent`）与失败的调用照样计数；usage 缺失计入 `unknown_usage_calls`，`tokens` 只累加已知部分，并标 `tokens_complete = false`，不当作 0；`billed_tokens` 按系统计费规则（`BILLED_TOKENS_SQL`）把未知 usage 计为「输入估算 + 输出上限」、生成前被拒计 0，**止损按 `billed_tokens` 判断**，库里缺估算列时才因未知 usage 停止（复核 `docs/reviews/claude-deepseek-c02-4-c03-1.md` §4）。窗口内没有对应 `chat_logs` 的调用单列 `unmatched_calls`。
+- **耗时**：分位数用最近秩法（排序后取第 ⌈q·n⌉ 个），每项注明分母。首字分三列，不能互相替代：
+  - 服务端首个 delta：`chat_logs.first_delta_latency_ms`，只统计已回答题；
+  - 客户端 SSE 首个 delta：`ask --stream` 收到第一条 `delta` 事件的时刻；
+  - 浏览器可见首字：本工具不测，写「未测」。
+  - 另有客户端完整响应 `client_elapsed_seconds` 与服务端 `latency_ms`。
+- **一轮多次调用**：同一轮分几次调用 `ask` 时传同一个 `--round-started-at`，止损按整轮累计。
+- **推理（ADR-089，迁移 017）**：`audit` 逐请求给出最后一次生成调用的 `generation_reasoning_tokens`、`generation_reasoning_chars`、`generation_first_reasoning_ms`、`generation_first_content_ms`；账本给出 `reasoning_tokens`（已报告部分之和，属于输出 token，不另计费）与 `reasoning_unknown_calls`。迁移 017 之前的库 `reasoning_columns = false`，推理一律为未知。
+- **抽取任务拆解（C03-2）**：`audit-task --db <库> --task-id <tid> [--client-elapsed-seconds <extract 的 elapsed_seconds>]` 给出各用途调用数、repair 数、usage、首条创建 → 末条完成的跨度、非 ok 调用、块数、模型调用总跨度，以及派生的 `non_model_seconds`（客户端总耗时 − 模型跨度：排队、解析、分块、融合、入库）。有调用未完成时跨度为未知。赛题「解析 + 知识抽取」以客户端总耗时为准，不剔除模型时间。
+- **分段（C02-3）**：`audit` 逐请求给出 `embedding_ms`（查询向量）、`generation_ms`（生成）与 `other_ms` = `chat_logs.latency_ms` − 两者（检索、组装、校验等）；任一调用缺耗时即为未知。诊断见 `reports/c02-qa-diagnosis.md`。
+- 第二阶段 L15 十题可用 `evaluation/raw/l15/codex-closeout-audit.json` 离线重算：11 个请求、19 次调用 = 9 生成 + 10 向量，生成 28951、向量 59（`tests/tooling/test_c01_measure.py`）。

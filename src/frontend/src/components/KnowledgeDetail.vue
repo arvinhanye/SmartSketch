@@ -8,13 +8,17 @@ import {
   type SourceLocation,
   type SourceView,
 } from '../composables/useKnowledgeDetail'
+import { EXCERPT_FOLD_CHARS, documentLabel as documentName } from '../composables/sourceLabel'
+import SourceViewer from './SourceViewer.vue'
 
 /**
  * 知识点详情抽屉（H06）：定义、别名、直接关系与可定位来源。
  *
  * - `kpId` 来自画布 `nodeClick`；null 时显示空态提示。
- * - 点击来源发出 `locateSource`（页码/章节/块 ID），由页面打开原文；点击关联知识点发出 `selectKnowledgePoint`。
- * - 资料名由页面经 `documentNames` 提供；没有时只显示资料编号，不编造标题。
+ * - 点击来源发出 `locateSource`（页码/章节/块 ID），并在该条下展开来源查看器（文件名、位置、原文片段，
+ *   L12/R04），可收起；点击关联知识点发出 `selectKnowledgePoint`。
+ * - 资料名优先取服务端随来源返回的同课文件名（L12，ADR-085），其次取页面经 `documentNames` 提供的映射；
+ *   都没有时写「资料不可用」，不编造标题，也不拿资料编号冒充。
  * - 所有服务端文本以插值渲染，不用 `v-html`。
  */
 const props = withDefaults(
@@ -61,10 +65,16 @@ const relationGroups = computed(() =>
       ],
 )
 
-function documentLabel(documentId: string): string {
+/** 资料文件名：服务端随来源返回的优先，其次页面提供的映射；都没有时为 undefined */
+function resolvedName(source: SourceView): string | undefined {
+  if (source.documentName) return source.documentName
   const names = props.documentNames
-  const name = Object.prototype.hasOwnProperty.call(names, documentId) ? names[documentId] : undefined
-  return typeof name === 'string' && name.trim() !== '' ? name : `资料 ${documentId}`
+  const name = Object.prototype.hasOwnProperty.call(names, source.documentId) ? names[source.documentId] : undefined
+  return typeof name === 'string' && name.trim() !== '' ? name : undefined
+}
+
+function documentLabel(source: SourceView): string {
+  return documentName(resolvedName(source))
 }
 
 function onLocate(source: SourceView): void {
@@ -141,15 +151,20 @@ watch(detail, async (next) => {
               :aria-pressed="activeSourceKey === source.key ? 'true' : 'false'"
               @click="onLocate(source)"
             >
-              <span>{{ documentLabel(source.documentId) }}</span>
+              <span>{{ documentLabel(source) }}</span>
               <span>：{{ source.locationLabel }}</span>
             </button>
-            <blockquote v-if="source.excerpt" data-test="kd-source-excerpt"
-              ><template v-for="(segment, i) in highlightSegments(source.excerpt, detail.highlightTerms)" :key="i"
+            <blockquote v-if="source.excerpt && activeSourceKey !== source.key" data-test="kd-source-excerpt"
+              ><template v-for="(segment, i) in highlightSegments(source.excerpt.length > EXCERPT_FOLD_CHARS ? source.excerpt.slice(0, EXCERPT_FOLD_CHARS) + '…' : source.excerpt, detail.highlightTerms)" :key="i"
                 ><mark v-if="segment.mark">{{ segment.text }}</mark
                 ><template v-else>{{ segment.text }}</template></template
               ></blockquote
             >
+                      <SourceViewer
+              v-if="activeSourceKey === source.key"
+              :source="{ ...source, documentName: resolvedName(source) }"
+              @close="activeSourceKey = null"
+            />
           </li>
         </ol>
         <p v-else data-test="kd-sources-none" role="note">该知识点的来源无法定位到页码或章节，暂不显示。</p>

@@ -1,0 +1,265 @@
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory } from 'vue-router'
+import App from '../../src/frontend/src/App.vue'
+import type { Course, CoursesApi } from '../../src/frontend/src/api/courses'
+import { COURSES_API_KEY } from '../../src/frontend/src/api/courses'
+import { courseNextStep } from '../../src/frontend/src/composables/useCourses'
+import { createAppRouter } from '../../src/frontend/src/router/index.ts'
+import { useCourseStore } from '../../src/frontend/src/stores/course'
+import { useRuntimeStore } from '../../src/frontend/src/stores/runtime'
+import { useSessionStore } from '../../src/frontend/src/stores/session'
+import CoursesView from '../../src/frontend/src/views/CoursesView.vue'
+
+// L15（R07、R09、R10）：课程内角色决定侧栏入口；课程概览给出当前阶段与下一步；入课空态说明添加流程。
+// 账号类型只决定首页与能否建课（specs/identity-access.md §1），教师账号可以在别的课程做学生。
+
+const stub = { render: () => null }
+
+function course(id: string, role: 'teacher' | 'student', overrides: Partial<Course> = {}): Course {
+  return { id, name: `课程 ${id}`, status: 'published', my_role: role, kp_count: 30, published_version: 2,
+    created_at: '2026-10-03T00:00:00Z', ...overrides }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => { resolve = res })
+  return { promise, resolve }
+}
+
+let pinia: Pinia
+beforeEach(() => {
+  sessionStorage.clear()
+  pinia = createPinia()
+  setActivePinia(pinia)
+})
+
+function signIn(role: 'teacher' | 'student', id = 'u_t', token = 'tok') {
+  useSessionStore(pinia).signIn({ access_token: token, token_type: 'bearer', expires_in: 3600, user: { id, username: `${id}_name`, role } })
+}
+
+async function mountShell(api: Partial<CoursesApi>, path: string) {
+  const session = useSessionStore(pinia)
+  const router = createAppRouter({
+    history: createMemoryHistory(), getAccountRole: () => session.role,
+    coursesComponent: stub, studentGraphComponent: stub, teacherGraphComponent: stub, reviewComponent: stub,
+    materialsComponent: stub, membersComponent: stub, chatComponent: stub,
+  })
+  await router.push(path)
+  await router.isReady()
+  const wrapper = mount(App, {
+    global: { plugins: [pinia, router], provide: { [COURSES_API_KEY as symbol]: { list: async () => [], create: vi.fn(), ...api } } },
+  })
+  await flushPromises()
+  return { wrapper, router }
+}
+
+function navLabels(wrapper: VueWrapper): string[] {
+  return wrapper.findAll('.app-nav__item').map((item) => item.text().replace(/\s+/g, ' ').trim())
+}
+
+describe('L15-1 侧栏按当前课程内角色', () => {
+  it('教师账号进入自己是学生的课程：显示学生入口，不显示图谱编辑', async () => {
+    signIn('teacher')
+    const { wrapper } = await mountShell({ get: async (cid) => course(cid, 'student') }, '/courses/c2')
+    expect(navLabels(wrapper)).toEqual(expect.arrayContaining(['课程概览', '知识图谱与学习路径', '课程问答']))
+    expect(navLabels(wrapper)).not.toContain('图谱编辑')
+    expect(navLabels(wrapper)).not.toContain('教学资料')
+    wrapper.unmount()
+  })
+
+  it('进入自己是教师的课程：显示教师入口', async () => {
+    signIn('teacher')
+    const { wrapper } = await mountShell({ get: async (cid) => course(cid, 'teacher') }, '/courses/c1')
+    expect(navLabels(wrapper)).toEqual(expect.arrayContaining(['课程概览', '教学资料', '图谱编辑', '审核队列', '成员']))
+    expect(navLabels(wrapper)).not.toContain('知识图谱与学习路径')
+    wrapper.unmount()
+  })
+
+  it('角色未知（读取中或失败）时只显示课程概览', async () => {
+    signIn('teacher')
+    const pending = deferred<Course>()
+    const { wrapper } = await mountShell({ get: () => pending.promise }, '/courses/c1')
+    const courseItems = navLabels(wrapper).filter((label) => !['我的课程', '模型 API 设置'].includes(label))
+    expect(courseItems).toEqual(['课程概览'])
+    wrapper.unmount()
+  })
+
+  it('从课程 1 切到课程 2：课程 1 晚到的读取被丢弃，不改课程 2 的入口', async () => {
+    signIn('teacher')
+    const first = deferred<Course>()
+    const get = vi.fn((cid: string) => (cid === 'c1' ? first.promise : Promise.resolve(course('c2', 'student'))))
+    const { wrapper, router } = await mountShell({ get }, '/courses/c1')
+    await router.push('/courses/c2')
+    await flushPromises()
+    first.resolve(course('c1', 'teacher'))
+    await flushPromises()
+    expect(useCourseStore(pinia).myRole).toBe('student')
+    expect(navLabels(wrapper)).toContain('知识图谱与学习路径')
+    expect(navLabels(wrapper)).not.toContain('图谱编辑')
+    wrapper.unmount()
+  })
+
+  it('同课同角色换号：旧账号晚到的权限不能覆盖新账号', async () => {
+    signIn('teacher', 'first', 'token-first')
+    const pending = deferred<Course>()
+    const get = vi.fn().mockImplementationOnce(() => pending.promise).mockResolvedValue(course('c1', 'student'))
+    const { wrapper } = await mountShell({ get }, '/courses/c1')
+    signIn('teacher', 'second', 'token-second')
+    await flushPromises()
+    pending.resolve(course('c1', 'teacher'))
+    await flushPromises()
+    expect(useCourseStore(pinia).myRole).toBe('student')
+    expect(navLabels(wrapper)).toContain('课程问答')
+    expect(navLabels(wrapper)).not.toContain('图谱编辑')
+    wrapper.unmount()
+  })
+
+  it('角色读取失败：只显示概览，不沿用账号教师权限', async () => {
+    signIn('teacher')
+    const { wrapper } = await mountShell({ get: async () => { throw new Error('offline') } }, '/courses/c1')
+    expect(navLabels(wrapper)).not.toContain('图谱编辑')
+    expect(useCourseStore(pinia).myRole).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('退出登录时角色清空；换号后重新读取', async () => {
+    signIn('teacher')
+    const get = vi.fn(async (cid: string) => course(cid, 'teacher'))
+    const { wrapper } = await mountShell({ get }, '/courses/c1')
+    expect(useCourseStore(pinia).myRole).toBe('teacher')
+    useSessionStore(pinia).signOut()
+    await flushPromises()
+    expect(useCourseStore(pinia).myRole).toBe(null)
+    wrapper.unmount()
+  })
+})
+
+describe('L15-2 课程下一步（纯函数）', () => {
+  const base = { status: 'draft' as const, publishedVersion: null, materialCount: null as number | null }
+
+  it('教师：未配置模型且未发布时先配置', () => {
+    expect(courseNextStep({ ...base, myRole: 'teacher' }, true)).toMatchObject({ stage: 'needs_config', action: 'settings' })
+  })
+
+  it('教师：没有资料去上传；已有资料未发布去审核并发布；资料数未知时去上传', () => {
+    expect(courseNextStep({ ...base, myRole: 'teacher', materialCount: 0 }, false)).toMatchObject({ stage: 'no_material', action: 'materials' })
+    expect(courseNextStep({ ...base, myRole: 'teacher', materialCount: 2 }, false)).toMatchObject({ stage: 'drafting', action: 'review' })
+    expect(courseNextStep({ ...base, myRole: 'teacher' }, false)).toMatchObject({ stage: 'drafting', action: 'materials' })
+  })
+
+  it('教师：已发布但草稿有修改（revising）去审核；已发布去图谱编辑维护，并说明学生看到的版本', () => {
+    const revising = courseNextStep({ myRole: 'teacher', status: 'revising', publishedVersion: 3, materialCount: 2 }, false)
+    expect(revising).toMatchObject({ stage: 'waiting_publish', action: 'review' })
+    expect(revising.text).toContain('第 3 版')
+    const published = courseNextStep({ myRole: 'teacher', status: 'published', publishedVersion: 3, materialCount: 2 }, true)
+    expect(published).toMatchObject({ stage: 'published', action: 'teacherGraph' })
+    expect(published.text).toContain('第 3 版')
+  })
+
+  it('学生：未发布时等待教师，没有动作', () => {
+    expect(courseNextStep({ ...base, myRole: 'student' }, false)).toMatchObject({ stage: 'waiting_teacher', action: null })
+  })
+
+  it('学生：已发布未配置可以浏览，并提示提问前需配置；已配置去浏览图谱与学习路径', () => {
+    const unconfigured = courseNextStep({ myRole: 'student', status: 'published', publishedVersion: 1, materialCount: null }, true)
+    expect(unconfigured).toMatchObject({ stage: 'published', action: 'studentGraph' })
+    expect(unconfigured.text).toContain('配置')
+    const ready = courseNextStep({ myRole: 'student', status: 'published', publishedVersion: 1, materialCount: null }, false)
+    expect(ready).toMatchObject({ stage: 'published', action: 'studentGraph' })
+    expect(ready.text).not.toContain('配置')
+  })
+})
+
+async function mountCourses(role: 'teacher' | 'student', path: string, api: Partial<CoursesApi>) {
+  signIn(role, role === 'student' ? 'stu_li' : 'u_t')
+  const session = useSessionStore(pinia)
+  const router = createAppRouter({
+    history: createMemoryHistory(), getAccountRole: () => session.role,
+    coursesComponent: CoursesView, studentGraphComponent: stub, teacherGraphComponent: stub, reviewComponent: stub,
+    materialsComponent: stub, membersComponent: stub, chatComponent: stub,
+  })
+  await router.push(path)
+  await router.isReady()
+  const wrapper = mount(CoursesView, {
+    global: { plugins: [pinia, router], provide: { [COURSES_API_KEY as symbol]: { list: async () => [], create: vi.fn(), get: vi.fn(), ...api } } },
+  })
+  await flushPromises()
+  return wrapper
+}
+
+describe('L15-2 课程概览显示阶段与下一步', () => {
+  it('学生、已发布、已配置：阶段文字与「浏览图谱与学习路径」主按钮', async () => {
+    useRuntimeStore(pinia).apply({ runtime_mode: 'personal', configured: true })
+    const wrapper = await mountCourses('student', '/courses/c1', { get: async (cid) => course(cid, 'student') })
+    expect(wrapper.get('[data-test="course-stage"]').text()).toContain('学习路径')
+    const action = wrapper.get('[data-test="course-next-action"]')
+    expect(action.text()).toBe('浏览图谱与学习路径')
+    expect(action.attributes('href')).toBe('/courses/c1/graph')
+    wrapper.unmount()
+  })
+
+  it('学生、未发布：显示等待教师发布，没有主按钮', async () => {
+    const wrapper = await mountCourses('student', '/courses/c1', {
+      get: async (cid) => course(cid, 'student', { status: 'draft', published_version: null, kp_count: 0 }),
+    })
+    expect(wrapper.get('[data-test="course-stage"]').text()).toContain('等待教师发布')
+    expect(wrapper.find('[data-test="course-next-action"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('教师、修订中：主按钮去审核并发布', async () => {
+    const wrapper = await mountCourses('teacher', '/courses/c1', {
+      get: async (cid) => course(cid, 'teacher', { status: 'revising', published_version: 2 }),
+    })
+    const action = wrapper.get('[data-test="course-next-action"]')
+    expect(action.text()).toBe('审核并发布')
+    expect(action.attributes('href')).toBe('/courses/c1/review')
+    wrapper.unmount()
+  })
+})
+
+describe('L15-3 入课空态', () => {
+  it('学生没有课程：说明把用户名告诉任课教师，由教师在「成员」中添加', async () => {
+    const wrapper = await mountCourses('student', '/student', {})
+    const empty = wrapper.get('[data-test="courses-empty"]').text()
+    expect(empty).toContain('你还没有加入任何课程')
+    expect(empty).toContain('「stu_li_name」')
+    expect(empty).toContain('「成员」')
+    wrapper.unmount()
+  })
+
+  it('教师没有课程：仍提示可创建第一门课程', async () => {
+    const wrapper = await mountCourses('teacher', '/teacher', {})
+    expect(wrapper.get('[data-test="courses-empty"]').text()).toContain('可在下方创建第一门课程')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------- L15-5 恶意文本
+
+import ChatMarkdown from '../../src/frontend/src/components/ChatMarkdown.vue'
+import SourceViewer from '../../src/frontend/src/components/SourceViewer.vue'
+
+describe('L15-5 恶意文本与不可信来源', () => {
+  const hostile = '<script>alert(1)</script><img src=x onerror=alert(2)> [点我](javascript:alert(3)) [1]'
+
+  it('SourceViewer：片段、文件名、章节都按纯文本显示', () => {
+    const wrapper = mount(SourceViewer, { props: { source: { documentName: hostile, sectionPath: hostile, excerpt: hostile } } })
+    expect(wrapper.find('script').exists()).toBe(false)
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('a').exists()).toBe(false)
+    expect(wrapper.get('[data-test="sv-excerpt"]').text()).toBe(hostile)
+  })
+
+  it('ChatMarkdown：回答里的脚本、事件属性与 javascript: 链接不产生可执行节点；伪造的 [1] 不是可点的引用', () => {
+    const wrapper = mount(ChatMarkdown, { props: { text: hostile, citations: [], final: true } })
+    expect(wrapper.find('button.citation').exists()).toBe(false)
+    expect(wrapper.find('script').exists()).toBe(false)
+    expect(wrapper.find('img').exists()).toBe(false)
+    for (const link of wrapper.findAll('a')) expect(link.attributes('href') ?? '').not.toMatch(/^\s*javascript:/i)
+    expect(wrapper.find('[onerror]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('<script>alert(1)</script>')
+  })
+})

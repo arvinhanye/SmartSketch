@@ -302,7 +302,7 @@ def test_each_format_reaches_extracting_with_chunks_persisted(db_url, storage, f
 
 def test_pdf_parser_version_has_no_plus_and_names_the_pipeline():
     assert "+" not in parse_task.PDF_PARSER_VERSION
-    assert parse_task.PDF_PARSER_VERSION == "pdf/1,cleanup/1,headings/1"
+    assert parse_task.PDF_PARSER_VERSION == "pdf/2,cleanup/1,headings/2"
     # ADR-018 修订 1：取 D06 常量，不在 worker 里另拼字符串。
     assert parse_task.PDF_PARSER_VERSION is pdf_headings.CLEANED_PARSER_VERSION
 

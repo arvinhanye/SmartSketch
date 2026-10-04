@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, type InjectionKey } from 'vue'
+import { computed, inject, ref, watch, type InjectionKey } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
@@ -14,6 +14,7 @@ import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import Recommendations from '../components/Recommendations.vue'
 import { chapterOptions, useGraphFilters } from '../composables/useGraphFilters'
 import { MASTERY_LABELS, useLearning } from '../composables/useLearning'
+import { kpLinkOutcome } from '../composables/kpLink'
 import { toKnowledgeCards, useStudentGraph } from '../composables/useStudentGraph'
 import { COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
@@ -72,6 +73,41 @@ const { status, error, retryable, courseName, graphVersion, graph, chapters, rel
 const filters = useGraphFilters(graph)
 const { selected, visible, summary, isDefault, selectedHidden } = filters
 
+const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
+
+// L13-4：问答知识点链接 ?kp=&v=：当前课程的图加载完后选中并聚焦；目标不在或版本不同时提示。
+// 同一链接只处理一次（之后用户可自由选择）；切课时组合式重置图谱，旧课程的 kp 不会落到新课程。
+const linkNotice = ref<string | null>(null)
+let handledLink: string | null = null
+watch(
+  [() => route.query.kp, () => route.query.v, courseId, status, graphVersion] as const,
+  ([kp, v, cid, current]) => {
+    if (current !== 'ready' || graph.value === null || cid === null) return
+    const key = `${cid}|${String(kp)}|${String(v)}|${graphVersion.value}`
+    if (key === handledLink) return
+    const outcome = kpLinkOutcome({ kp, v }, cid, {
+      course_id: cid,
+      graph_version: graphVersion.value,
+      nodes: graph.value.nodes.map((node) => ({ id: node.data.kpId })),
+    })
+    if (outcome === null) return
+    handledLink = key
+    linkNotice.value = outcome.notice
+    if (outcome.select !== null) {
+      filters.select(outcome.select)
+    }
+  },
+  { immediate: true },
+)
+
+// L13-2：搜索框回车定位并选中，画布聚焦到该节点；未找到时提示
+const searchNotice = ref<string | null>(null)
+function onLocate(query: string): void {
+  const kpId = filters.locate(query)
+  searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
+  if (kpId !== null) canvas.value?.focus(kpId)
+}
+
 type ViewMode = 'graph' | 'cards'
 const mode = ref<ViewMode>('graph')
 const modes: Array<{ value: ViewMode; label: string }> = [
@@ -98,6 +134,7 @@ const {
   busyKpId,
   notice: learningNotice,
   learningGraph,
+  learningPath,
   statusOf,
   setMastery,
   reload: reloadLearning,
@@ -110,10 +147,30 @@ const {
   graphVersion,
   ready: computed(() => status.value === 'ready'),
   graph: visible,
+  // L14：路径按完整已发布图计算；点推荐项（即选中它）就解释它，否则解释第一个推荐项
+  pathGraph: graph,
+  focus: selected,
   onCourseForbidden: leaveForbidden,
   // 显示版本落后于服务端绑定版本：重新加载图谱与进度，而不是把新投影套到旧图
   onVersionStale: reload,
 })
+
+// L14：视口跟随路径焦点（首个推荐项，或学生点选的推荐项），让高亮的路径落在画面里
+watch(
+  [canvas, selected, () => learningPath.value?.focus ?? null, status],
+  () => {
+    if (status.value !== 'ready') return
+    const target = selected.value ?? learningPath.value?.focus ?? null
+    if (target !== null) canvas.value?.focus(target)
+  },
+  { flush: 'post', immediate: true },
+)
+
+// C05-3：路径行里点「之后解锁」的名称：选中该节点并把画布移过去（解锁节点可能在视口外）
+function onUnlockLocate(kpId: string): void {
+  filters.select(kpId)
+  canvas.value?.focus(kpId)
+}
 
 const masteryOptions: Array<{ value: MasteryStatus; label: string }> = [
   { value: 'unknown', label: MASTERY_LABELS.unknown },
@@ -187,12 +244,15 @@ const selectedName = computed(() => {
         :selected-hidden="selectedHidden"
         :show-statuses="false"
         @clear="filters.clear"
+        @locate="onLocate"
       />
+      <p v-if="searchNotice" data-test="sg-search-notice" role="status">{{ searchNotice }}</p>
+      <p v-if="linkNotice" data-test="sg-link-notice" role="status">{{ linkNotice }}</p>
 
       <div class="student-graph__body">
         <div v-if="mode === 'graph'" class="student-graph__canvas" data-test="sg-graph">
           <p class="student-graph__hint">画布支持鼠标缩放与拖拽；使用键盘请切换到「卡片」视图。</p>
-          <GraphCanvas :graph="learningGraph" :layout="filters.layout.value" @node-click="filters.select" />
+          <GraphCanvas ref="canvas" :graph="learningGraph" :layout="filters.layout.value" @node-click="filters.select" />
         </div>
         <KnowledgeCards
           v-else
@@ -230,7 +290,10 @@ const selectedName = computed(() => {
             :loading="recommendLoading"
             :error="recommendError"
             :selected-id="selected"
+            :narrative="learningPath?.narrative ?? null"
+            :narrative-ids="learningPath?.narrativeIds ?? null"
             @select="filters.select"
+            @locate="onUnlockLocate"
             @retry="refreshRecommend"
           />
 

@@ -109,12 +109,16 @@ class Usage:
 
     input_tokens: int
     output_tokens: int
+    #: ADR-089：``completion_tokens_details.reasoning_tokens``，属于 ``output_tokens`` 的一部分；未提供为 None
+    reasoning_tokens: int | None = None
 
     def __post_init__(self) -> None:
         for name in ("input_tokens", "output_tokens"):
             value = getattr(self, name)
             if not _is_int(value) or value < 0:
                 raise ValueError(f"Usage: {name} must be an int >= 0")
+        if self.reasoning_tokens is not None and (not _is_int(self.reasoning_tokens) or self.reasoning_tokens < 0):
+            raise ValueError("Usage: reasoning_tokens must be an int >= 0 or None")
 
     @property
     def total(self) -> int:
@@ -128,10 +132,14 @@ class ModelResult:
     model_responded: str | None
     usage: Usage | None
     finish_reason: FinishReason
+    #: ADR-089：响应里推理内容的字数（只计数，正文不保留、不进入 ``text``）；没有推理内容为 None
+    reasoning_chars: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.text, str):
             raise ValueError("ModelResult: text must be str")
+        if self.reasoning_chars is not None and (not _is_int(self.reasoning_chars) or self.reasoning_chars < 0):
+            raise ValueError("ModelResult: reasoning_chars must be an int >= 0 or None")
         _check_model_id(self.model_requested, "ModelResult")
         if self.model_responded is not None and not isinstance(self.model_responded, str):
             raise ValueError("ModelResult: model_responded must be str or None")
@@ -158,13 +166,24 @@ class StreamDelta:
 
 
 @dataclass(frozen=True)
+class StreamReasoning:
+    """ADR-089：供应商流里的一段推理内容，只带字数，不带正文。
+
+    只在供应商客户端与调用策略之间流动：策略据此记录首次推理时刻与字数，**不转发给调用方**，
+    因此回答文本、SSE 契约与出处校验都看不到它。
+    """
+
+    chars: int
+
+
+@dataclass(frozen=True)
 class StreamDone:
     """Last event of a successful stream; ``result.text`` equals the concatenated deltas."""
 
     result: ModelResult
 
 
-StreamEvent = StreamDelta | StreamDone
+StreamEvent = StreamDelta | StreamReasoning | StreamDone
 
 
 @dataclass(frozen=True)
@@ -396,5 +415,6 @@ __all__ = [
     "StreamDelta",
     "StreamDone",
     "StreamEvent",
+    "StreamReasoning",
     "Usage",
 ]

@@ -130,6 +130,22 @@ function chapterMatches(filter: ChapterFilter, chapterId: string | null): boolea
   return chapterId === filter.id
 }
 
+/**
+ * 搜索定位（L13-2）：在类型、状态、章节筛选可见的节点中按名称查找，完全一致优先，其次包含；
+ * 规范化规则同 `query`（忽略大小写、全半角与首尾空白）。没有匹配或关键字为空时返回 null。
+ */
+export function locateNode(graph: GraphCanvasData, state: GraphFilterState, query: string): string | null {
+  const wanted = normalize(query)
+  if (wanted === '') return null
+  const nodeTypes = new Set(state.nodeTypes)
+  const statuses = new Set(state.statuses)
+  const candidates = graph.nodes.filter((node) => nodeTypes.has(node.data.type) && statuses.has(node.data.status)
+    && chapterMatches(state.chapter, node.data.chapterId))
+  const exact = candidates.find((node) => normalize(node.data.name) === wanted)
+  if (exact) return exact.data.kpId
+  return candidates.find((node) => normalize(node.data.name).includes(wanted))?.data.kpId ?? null
+}
+
 /** 纯函数：不修改输入；输出的节点与边是新对象（`data`/`style` 与输入共享，画布生命周期会再复制） */
 export function filterGraph(
   graph: GraphCanvasData,
@@ -213,6 +229,8 @@ export interface GraphFilters {
   selectedHidden: ComputedRef<boolean>
   clear(): void
   select(kpId: string | null): void
+  /** 搜索定位：命中即选中并返回知识点 ID；未命中返回 null，不改当前选中 */
+  locate(query: string): string | null
   toggleRelationType(type: RelationType): void
 }
 
@@ -263,6 +281,13 @@ export function useGraphFilters(
     selectedHidden,
     clear() {
       state.value = cloneState(initial)
+    },
+    locate(query) {
+      const current = graph.value
+      if (current === null) return null
+      const kpId = locateNode(current, state.value, query)
+      if (kpId !== null) selected.value = kpId
+      return kpId
     },
     select(kpId) {
       selected.value = kpId

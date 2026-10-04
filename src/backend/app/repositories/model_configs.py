@@ -14,7 +14,7 @@ from app.repositories.sqlite import connect
 _NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
 _TERMINAL = "('awaiting_review', 'completed', 'failed', 'cancelled')"
 _CONFIG_COLUMNS = ("user_id, base_url, model, key_ciphertext, key_nonce, key_hint, version, updated_at, "
-                   "last_test_at, last_test_ok, last_test_error_class, revision")
+                   "last_test_at, last_test_ok, last_test_error_class, revision, disable_thinking")
 
 
 class KeyRequired(Exception):
@@ -43,6 +43,8 @@ class ModelConfigRow:
     last_test_error_class: str | None
     revision: str | None = None
     """Never-repeating identity of this saved configuration (ADR-082 decision 1); ``version`` can repeat."""
+    disable_thinking: bool = False
+    """ADR-090: append ``thinking: {type: disabled}`` to every generation request of this user."""
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,7 @@ class TaskBindingRow:
     model: str
     sealed: SealedKey | None
     scrub_reason: str | None
+    disable_thinking: bool = False
 
 
 def _config(row: tuple | None) -> ModelConfigRow | None:
@@ -63,6 +66,7 @@ def _config(row: tuple | None) -> ModelConfigRow | None:
         user_id=row[0], base_url=row[1], model=row[2], sealed=SealedKey(bytes(row[3]), bytes(row[4])),
         key_hint=row[5], version=row[6], updated_at=row[7], last_test_at=row[8],
         last_test_ok=None if row[9] is None else bool(row[9]), last_test_error_class=row[10], revision=row[11],
+        disable_thinking=bool(row[12]),
     )
 
 
@@ -78,37 +82,43 @@ def get_config(sqlite_url: str, user_id: str) -> ModelConfigRow | None:
 
 
 def save_config(sqlite_url: str, *, user_id: str, base_url: str, model: str,
-                sealed: SealedKey | None, key_hint: str | None) -> ModelConfigRow:
+                sealed: SealedKey | None, key_hint: str | None,
+                disable_thinking: bool | None = None) -> ModelConfigRow:
     """Insert or update; ``sealed=None`` keeps the stored key and requires an unchanged ``base_url``.
 
     Every save gets a fresh ``revision``, so a clear-and-recreate never looks like the old configuration.
+    ``disable_thinking=None`` keeps the stored switch (off for a new configuration), ADR-090.
     """
     revision = uuid.uuid4().hex
     with connect(sqlite_url) as database:
         database.execute("BEGIN IMMEDIATE")
         try:
             current = _read(database, user_id)
+            thinking_off = int(disable_thinking if disable_thinking is not None
+                               else (current.disable_thinking if current is not None else False))
             if sealed is None:
                 if current is None or current.base_url != base_url:
                     raise KeyRequired()
                 database.execute(
                     f"UPDATE user_model_configs SET model = ?, version = version + 1, revision = ?, updated_at = {_NOW},"
+                    " disable_thinking = ?,"
                     " last_test_at = NULL, last_test_ok = NULL, last_test_error_class = NULL WHERE user_id = ?",
-                    (model, revision, user_id),
+                    (model, revision, thinking_off, user_id),
                 )
             else:
                 if not key_hint:
                     raise ValueError("key_hint is required with a new key")
                 database.execute(
                     "INSERT INTO user_model_configs"
-                    " (user_id, base_url, model, key_ciphertext, key_nonce, key_hint, version, revision)"
-                    " VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
+                    " (user_id, base_url, model, key_ciphertext, key_nonce, key_hint, version, revision,"
+                    " disable_thinking)"
+                    " VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)"
                     " ON CONFLICT(user_id) DO UPDATE SET base_url = excluded.base_url, model = excluded.model,"
                     " key_ciphertext = excluded.key_ciphertext, key_nonce = excluded.key_nonce,"
                     f" key_hint = excluded.key_hint, version = user_model_configs.version + 1, revision = excluded.revision,"
-                    f" updated_at = {_NOW},"
+                    f" updated_at = {_NOW}, disable_thinking = excluded.disable_thinking,"
                     " last_test_at = NULL, last_test_ok = NULL, last_test_error_class = NULL",
-                    (user_id, base_url, model, sealed.ciphertext, sealed.nonce, key_hint, revision),
+                    (user_id, base_url, model, sealed.ciphertext, sealed.nonce, key_hint, revision, thinking_off),
                 )
             row = _read(database, user_id)
             database.execute("COMMIT")
@@ -153,8 +163,9 @@ def record_test(sqlite_url: str, user_id: str, *, revision: str, ok: bool, error
 def bind_task(database: sqlite3.Connection, *, task_id: str, user_id: str) -> bool:
     """Copy the owner's current configuration into the task snapshot on the caller's transaction."""
     return database.execute(
-        "INSERT INTO task_model_bindings (task_id, user_id, config_version, base_url, model, key_ciphertext, key_nonce)"
-        " SELECT ?, user_id, version, base_url, model, key_ciphertext, key_nonce"
+        "INSERT INTO task_model_bindings"
+        " (task_id, user_id, config_version, base_url, model, key_ciphertext, key_nonce, disable_thinking)"
+        " SELECT ?, user_id, version, base_url, model, key_ciphertext, key_nonce, disable_thinking"
         " FROM user_model_configs WHERE user_id = ?",
         (task_id, user_id),
     ).rowcount == 1
@@ -163,13 +174,13 @@ def bind_task(database: sqlite3.Connection, *, task_id: str, user_id: str) -> bo
 def get_binding(sqlite_url: str, task_id: str) -> TaskBindingRow | None:
     with connect(sqlite_url) as database:
         row = database.execute(
-            "SELECT task_id, user_id, config_version, base_url, model, key_ciphertext, key_nonce, scrub_reason"
-            " FROM task_model_bindings WHERE task_id = ?", (task_id,)
+            "SELECT task_id, user_id, config_version, base_url, model, key_ciphertext, key_nonce, scrub_reason,"
+            " disable_thinking FROM task_model_bindings WHERE task_id = ?", (task_id,)
         ).fetchone()
     if row is None:
         return None
     sealed = None if row[5] is None else SealedKey(bytes(row[5]), bytes(row[6]))
-    return TaskBindingRow(row[0], row[1], row[2], row[3], row[4], sealed, row[7])
+    return TaskBindingRow(row[0], row[1], row[2], row[3], row[4], sealed, row[7], disable_thinking=bool(row[8]))
 
 
 def binding_active(sqlite_url: str, task_id: str) -> bool:

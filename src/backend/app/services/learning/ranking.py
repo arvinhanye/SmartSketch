@@ -162,6 +162,8 @@ class ReasonFacts:
     importance: float
     centrality: float
     difficulty: float
+    importance_defaulted: bool = False
+    difficulty_defaulted: bool = False
 
 
 @dataclass(frozen=True)
@@ -257,6 +259,8 @@ def rank_candidates(
             importance=importance,
             centrality=centrality,
             difficulty=difficulty,
+            importance_defaulted=attr.importance is None,
+            difficulty_defaulted=attr.difficulty is None,
         )
         ranked.append(
             RankedCandidate(
@@ -266,7 +270,15 @@ def rank_candidates(
                 factors=factors,
                 weighted=weighted,
                 score=score,
-                reason=_reason(facts, factors, weighted, count, chapter_count),
+                reason=_reason(
+                    facts,
+                    factors,
+                    weighted,
+                    count,
+                    chapter_count,
+                    importance_missing=attr.importance is None,
+                    difficulty_missing=attr.difficulty is None,
+                ),
                 reason_facts=facts,
             )
         )
@@ -297,10 +309,24 @@ def _primary_factor(weighted: Factors) -> FactorName:
     return best
 
 
+_UNLABELLED = "未标注，按中性值 0.5 计"
+
+
 def _reason(
-    facts: ReasonFacts, factors: Factors, weighted: Factors, unlock_count: int, chapter_count: int
+    facts: ReasonFacts,
+    factors: Factors,
+    weighted: Factors,
+    unlock_count: int,
+    chapter_count: int,
+    *,
+    importance_missing: bool = False,
+    difficulty_missing: bool = False,
 ) -> str:
-    """One sentence from structured facts only (§4); never calls a model."""
+    """One sentence from structured facts only (§4); never calls a model.
+
+    A missing ``importance`` / ``difficulty`` is ranked with the neutral 0.5 but described
+    as unlabelled rather than as a measured value (L14, ``specs/learning-path.md`` §4.1).
+    """
     if all(value == 0 for value in weighted.as_dict().values()):
         return "当前无可直接解锁的后继；此点的直接前置均已掌握"
     primary = facts.primary_factor
@@ -308,10 +334,8 @@ def _reason(
         # weighted.unlock > 0 here, hence unlock_count > 0
         return f"完成该点可立即解锁 {unlock_count} 个知识点（解锁度 {factors.unlock:.4f}）"
     if primary == "importance":
-        return (
-            f"该点的主要推荐依据是重要度（重要度 {facts.importance:.4f}，"
-            f"中心度 {facts.centrality:.4f}）"
-        )
+        importance = f"重要度{_UNLABELLED}" if importance_missing else f"重要度 {facts.importance:.4f}"
+        return f"该点的主要推荐依据是重要度（{importance}，中心度 {facts.centrality:.4f}）"
     if primary == "chapter_order":
         # weighted.chapter_order > 0 here, hence the node has a chapter; the rank is the
         # pre-order position over all chapters (sub-chapters included), 1-based in the text
@@ -320,7 +344,8 @@ def _reason(
             f"该点所在章节「{facts.chapter_name}」在课程章节顺序中排第 {position} 位"
             f"（共 {chapter_count} 个章节，章节顺序 {factors.chapter_order:.4f}）"
         )
-    return f"该点的主要推荐依据是易学度（难度 {facts.difficulty:.4f}，易学度 {factors.ease:.4f}）"
+    difficulty = f"难度{_UNLABELLED}" if difficulty_missing else f"难度 {facts.difficulty:.4f}"
+    return f"该点的主要推荐依据是易学度（{difficulty}，易学度 {factors.ease:.4f}）"
 
 
 def _sort_key(item: RankedCandidate) -> tuple[float, int, int, bytes]:

@@ -1,0 +1,1203 @@
+{
+  "run_id": "contest-course1-ds-ch3-md-c454cb79d537",
+  "dataset_id": "contest-course1-ds-ch3-md",
+  "model": {
+    "id": "deepseek-flash",
+    "is_fake": false
+  },
+  "prompt_versions": {
+    "extract_entities": 2,
+    "extract_entities_gleaning": 2,
+    "extract_relations": 2
+  },
+  "source_draft_course_id": "4f32542066b44f4890cb6f6d765971ed",
+  "entities": [
+    {
+      "id": "kp_006121661ba1e339293914d86fad025e",
+      "name": "链队列的优点",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "链队列不会产生假溢出，也不需要预先确定容量，适合元素个数变化较大的场合。"
+    },
+    {
+      "id": "kp_040b2bcb0d65cc65766749df4aac6dad",
+      "name": "栈和队列",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈和队列是两种操作受限的线性表。"
+    },
+    {
+      "id": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "name": "栈",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈（又称堆栈，英文 stack）是只允许在一端进行插入和删除操作的线性表，其操作特性为后进先出（LIFO）。"
+    },
+    {
+      "id": "kp_1137a42595653d073a46ea754d5e4f1b",
+      "name": "中缀转后缀算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "从左到右扫描中缀表达式：操作数直接输出，左括号入栈，右括号则弹出并输出栈顶运算符直到弹出左括号，遇到运算符时先弹出并输出栈中优先级大于或等于它的运算符（遇左括号停止）再入栈，扫描结束后弹出栈中剩余运算符。"
+    },
+    {
+      "id": "kp_1153aa1eb87550bd62a23cc324019c99",
+      "name": "出栈序列计数定理",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "n 个不同元素依次入栈，可能得到的不同出栈序列的个数等于第 n 个卡特兰数。"
+    },
+    {
+      "id": "kp_154a5add769b23d118161023de6bef41",
+      "name": "栈的典型应用场景",
+      "type": "example",
+      "source": "ai",
+      "definition": "撤销操作、回溯搜索和函数调用等需要“暂存后逆序处理”的场合，适合用栈。"
+    },
+    {
+      "id": "kp_1bb4ac2371fedd76be3e62d0aea3bc4e",
+      "name": "队尾",
+      "type": "concept",
+      "source": "ai",
+      "definition": "队列中允许插入元素的一端。"
+    },
+    {
+      "id": "kp_2784333a45f872ae678c22ae931db97c",
+      "name": "出栈序列",
+      "type": "concept",
+      "source": "ai",
+      "definition": "n 个元素按 1,2,…,n 的顺序依次入栈，入栈与出栈可以任意交错，可能得到多种不同的出栈序列。"
+    },
+    {
+      "id": "kp_2a556a8838dc783fc15009279bfaa2ab",
+      "name": "队列的典型应用场景",
+      "type": "example",
+      "source": "ai",
+      "definition": "任务排队、消息缓冲和逐层访问等需要“按到达先后依次处理”的场合，适合用队列。"
+    },
+    {
+      "id": "kp_2bd7406980fcb22c1bc4cb62e98e27a1",
+      "name": "栈与队列的逻辑结构",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "从逻辑结构看，栈和队列与线性表完全相同，都是元素之间一对一的线性关系，二者的区别只在于允许进行插入和删除的位置不同。"
+    },
+    {
+      "id": "kp_34e8c1e84be0c411e287f7ef9d8d55fb",
+      "name": "先进先出服务次序",
+      "type": "concept",
+      "source": "ai",
+      "definition": "队列按先到先服务的方式工作，先到的请求先被处理，后到的请求在队尾等待，不会被插队。"
+    },
+    {
+      "id": "kp_361d5cdf6461309c8e966080d6783c03",
+      "name": "空栈",
+      "type": "concept",
+      "source": "ai",
+      "definition": "不含任何元素的栈称为空栈。"
+    },
+    {
+      "id": "kp_46989da85cff2e63b3a81a060d9426a2",
+      "name": "链栈",
+      "type": "concept",
+      "source": "ai",
+      "definition": "采用链式存储的栈称为链栈；通常用不带头结点的单链表实现，所有操作都在表头进行，表头指针就是栈顶指针。"
+    },
+    {
+      "id": "kp_49bc90d9252196b03bbe65005b79fa87",
+      "name": "队列的缓冲作用",
+      "type": "concept",
+      "source": "ai",
+      "definition": "队列适合处理需要按到达次序服务的问题，在请求到达速度与被处理速度不一致的场合起缓冲作用，先到的请求先被处理，后到的请求在队尾等待，既不会丢失也不会被插队。"
+    },
+    {
+      "id": "kp_4c1e4627b6a20c739b0b3b2847fd5a52",
+      "name": "顺序实现与链式实现的选择",
+      "type": "method",
+      "source": "ai",
+      "definition": "实际编程时，若元素个数的上限可以预先估计，通常优先选用顺序实现；若元素个数波动很大或无法估计，则选用链式实现更为稳妥。"
+    },
+    {
+      "id": "kp_508118a78d3dacef2f090f6722fc6898",
+      "name": "循环队列元素个数计算公式",
+      "type": "formula",
+      "source": "ai",
+      "definition": "循环队列中元素个数的计算公式为：(rear - front + MaxSize) % MaxSize。"
+    },
+    {
+      "id": "kp_50dd341362ab95bd44de7e4d13f08bf7",
+      "name": "括号匹配实例",
+      "type": "example",
+      "source": "ai",
+      "definition": "用串 [(]) 与 {[()]} 演示括号匹配过程：前者在读到 ] 时栈顶为 ( 而类型不符导致失败，后者扫描结束时栈为空因而匹配成功。"
+    },
+    {
+      "id": "kp_53c208fb5f9f522f362c9f2bae49d84f",
+      "name": "栈与队列的存储结构",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "从存储结构看，栈和队列都可以采用顺序存储或链式存储。"
+    },
+    {
+      "id": "kp_54d90179677039720f5673bb237d638d",
+      "name": "顺序栈与链栈的比较",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "顺序栈与链栈的入栈、出栈时间复杂度都是 O(1)；顺序栈需要预先估计容量，链栈则按需申请结点。"
+    },
+    {
+      "id": "kp_5a9efe671385195aaccb2eb3a8f2a995",
+      "name": "队列的典型应用",
+      "type": "example",
+      "source": "ai",
+      "definition": "队列的典型应用包括排队服务与广度优先遍历。"
+    },
+    {
+      "id": "kp_5e0db526fb496250fae56ec2c15a0ff1",
+      "name": "栈的后进先出特性",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "栈的插入和删除都在同一端完成，因此最后到达的元素总是最先被处理。"
+    },
+    {
+      "id": "kp_62398dd289be98370c6353b6fbeeff94",
+      "name": "递归工作栈",
+      "type": "concept",
+      "source": "ai",
+      "definition": "每进入一层递归调用，系统就把当前层的返回地址、实参和局部变量作为一个工作记录压入递归工作栈；该层返回时再弹出这一记录，它是栈在程序运行时的典型应用。"
+    },
+    {
+      "id": "kp_624822161f347618bfbbc2adc70a1dd2",
+      "name": "下溢",
+      "type": "concept",
+      "source": "ai",
+      "definition": "对空栈执行出栈则发生下溢。"
+    },
+    {
+      "id": "kp_6d648942eabcdb7e45d47f5fb3889d0b",
+      "name": "括号匹配算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "基于栈的后进先出特性，从左到右扫描表达式：遇左括号入栈，遇右括号时检查栈是否为空及栈顶左括号类型是否相符，扫描结束栈为空才算全部匹配成功。"
+    },
+    {
+      "id": "kp_6ec5739b657edec26f3ba86486ce1be6",
+      "name": "后缀表达式",
+      "type": "concept",
+      "source": "ai",
+      "definition": "把运算符放在两个操作数之后的写法，也叫逆波兰式；不含括号，计算次序完全由运算符出现的位置决定，适合计算机处理。"
+    },
+    {
+      "id": "kp_702539b4e585e0edc6907416a51dd51f",
+      "name": "栈的基本操作",
+      "type": "method",
+      "source": "ai",
+      "definition": "栈的基本操作包括初始化、判空、入栈、出栈和读栈顶元素。"
+    },
+    {
+      "id": "kp_753c8dbaa1a0390aba18ca9b22e7eac2",
+      "name": "队头",
+      "type": "concept",
+      "source": "ai",
+      "definition": "队列中允许删除元素的一端。"
+    },
+    {
+      "id": "kp_75d8028fc8a101bcee880ea202c52b20",
+      "name": "阶乘的递归计算",
+      "type": "example",
+      "source": "ai",
+      "definition": "计算 3! 时 fact(3) 调用 fact(2)，fact(2) 调用 fact(1)，递归工作栈中依次压入三层记录；fact(1) 返回 1 后逐层弹出，依次得到 fact(2) = 2 和 fact(3) = 6。"
+    },
+    {
+      "id": "kp_7859387a026067defa483b360de0cadf",
+      "name": "表达式求值两步流程",
+      "type": "method",
+      "source": "ai",
+      "definition": "表达式求值通常分两步完成：先用中缀转后缀算法得到后缀表达式，再用后缀表达式求值算法算出结果。"
+    },
+    {
+      "id": "kp_80d0ddb1ccdacd933465ea79602ab59a",
+      "name": "链队列入队",
+      "type": "method",
+      "source": "ai",
+      "definition": "入队在链表尾部插入结点。"
+    },
+    {
+      "id": "kp_87431e2a3c3238d1a0ff189f86106b69",
+      "name": "操作受限的线性表",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈和队列都是操作受限的线性表，即操作受到限制的线性表。"
+    },
+    {
+      "id": "kp_87de6994600f658b2eb49b01fa563b84",
+      "name": "先进先出",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "最先进入队列的元素最先离开，是队列的操作特性，与栈的后进先出相反。"
+    },
+    {
+      "id": "kp_8f206ead788918fb472df2697225e757",
+      "name": "递归的栈溢出问题",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "递归算法结构清晰，但层数过深时递归工作栈会占用大量空间，甚至导致栈溢出。"
+    },
+    {
+      "id": "kp_920fd6f5e67a4c2e6a7375eb0d56b5f2",
+      "name": "栈和队列的存储实现",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈和队列的两种实现方式都直接沿用线性表的顺序存储与链式存储，因此学习前需要先掌握线性表的顺序存储与链式存储。"
+    },
+    {
+      "id": "kp_93c062720f236e6dcde251142166824b",
+      "name": "出栈",
+      "type": "method",
+      "source": "ai",
+      "definition": "出栈（Pop）是删除栈顶元素并返回它。"
+    },
+    {
+      "id": "kp_9a30f8cefe6608ab086003d2f7f96c93",
+      "name": "队列的基本操作",
+      "type": "method",
+      "source": "ai",
+      "definition": "队列的基本操作包括初始化、判空、入队、出队和读队头元素。"
+    },
+    {
+      "id": "kp_9c311b45c6b23e16c19f598fbaf39115",
+      "name": "双端队列与栈和队列的关系",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "双端队列限制只在一端插入和删除时退化为栈，限制只在一端插入、另一端删除时退化为普通队列，因此与栈、队列密切相关。"
+    },
+    {
+      "id": "kp_9d64b02efbbb334e1fe155b583086c74",
+      "name": "出栈序列判断实例",
+      "type": "example",
+      "source": "ai",
+      "definition": "元素 1、2、3 依次入栈，3 1 2 不合法：3 最先出栈时 1 和 2 都在栈中且 2 在 1 之上，下一个出栈只能是 2；按性质 3.1 取 i=1、j=2、k=3 亦有 p2=1 < p3=2 < p1=3。全部 5 个合法序列为 123、132、213、231、321。"
+    },
+    {
+      "id": "kp_a0f870526e9b51507fba20a1b830c5df",
+      "name": "入队",
+      "type": "method",
+      "source": "ai",
+      "definition": "在队尾插入元素的操作。"
+    },
+    {
+      "id": "kp_a41bd426ea88539b6d0ace7e9a7e3c61",
+      "name": "栈底",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈中不允许进行插入和删除操作的另一端称为栈底。"
+    },
+    {
+      "id": "kp_a429fc8233f1715c3a07e33ff039e84d",
+      "name": "平均等待时间计算",
+      "type": "formula",
+      "source": "ai",
+      "definition": "银行排队模拟中，顾客 A、B、C 的等待时间分别为 0、2、4 分钟，平均等待时间为 (0 + 2 + 4) / 3 = 2 分钟。"
+    },
+    {
+      "id": "kp_a4ce31a0c23f938446a1e0f07348900d",
+      "name": "共享栈的上溢条件",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "只有当两个栈顶相遇时，共享栈才会发生上溢。"
+    },
+    {
+      "id": "kp_a87bcbbdaf559257cb6707d83049891d",
+      "name": "循环队列",
+      "type": "concept",
+      "source": "ai",
+      "definition": "为解决假溢出，把数组在逻辑上视为首尾相接的环，这样的队列称为循环队列；其指针回绕依靠取模运算实现。"
+    },
+    {
+      "id": "kp_aa2f9225a82a75f83bcf035c07805ede",
+      "name": "队列的先进先出特性",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "队列的插入和删除分别在两端完成，因此最早到达的元素总是最先被处理。"
+    },
+    {
+      "id": "kp_b10b34e20ed4e4eb90661abc08966abb",
+      "name": "后进先出",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "由于最后进入的元素最先被删除，栈的操作特性可以概括为后进先出（Last In First Out，LIFO）。"
+    },
+    {
+      "id": "kp_b218f91b76d38846b5585ef828b2e834",
+      "name": "队列",
+      "type": "concept",
+      "source": "ai",
+      "definition": "一种操作受限的线性表，只允许在一端插入、在另一端删除，其操作特性是先进先出。"
+    },
+    {
+      "id": "kp_b601a953506210551b291fb7bbe295fd",
+      "name": "栈顶",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈中允许进行插入和删除操作的一端称为栈顶。"
+    },
+    {
+      "id": "kp_bd158804ebaba7ca6ec5bfb17e4279dd",
+      "name": "循环队列指针后移公式",
+      "type": "formula",
+      "source": "ai",
+      "definition": "循环队列中指针后移的公式为 rear = (rear + 1) % MaxSize，front 的后移方式相同，用于实现指针回绕。"
+    },
+    {
+      "id": "kp_beec8b5aaebfb67c7cfc410f0cba2d81",
+      "name": "上溢",
+      "type": "concept",
+      "source": "ai",
+      "definition": "当栈中已有 MaxSize 个元素时再执行入栈，就会发生上溢；上溢说明预分配的空间不足，是顺序栈的主要缺点。"
+    },
+    {
+      "id": "kp_bfe85f7faa118b63a66766892233dc68",
+      "name": "链队列出队",
+      "type": "method",
+      "source": "ai",
+      "definition": "出队删除链表的第一个结点。"
+    },
+    {
+      "id": "kp_c0c5437876eb9fcdbb37098dd1a156ef",
+      "name": "卡特兰数公式",
+      "type": "formula",
+      "source": "ai",
+      "definition": "卡特兰数 Cn = C(2n, n) / (n + 1)，其中 C(2n, n) 表示从 2n 个元素中取 n 个的组合数。"
+    },
+    {
+      "id": "kp_c1b2e0645e3cd949c07516f53ee54161",
+      "name": "链栈的优点与代价",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "链栈不存在上溢问题，便于多个栈共享存储空间；代价是每个结点需要额外的指针域。"
+    },
+    {
+      "id": "kp_d1243376b75220cf4e67a28dbd136c7f",
+      "name": "入栈与出栈的时间复杂度",
+      "type": "formula",
+      "source": "ai",
+      "definition": "入栈和出栈都只涉及栈顶，因此不论栈中有多少元素，这两个操作都可以在常数时间内完成。"
+    },
+    {
+      "id": "kp_d185d39ee9c8c3a290374593ebeacd77",
+      "name": "顺序存储与链式存储的优缺点",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "顺序存储的优点是结构简单、访问局部性好，缺点是容量需要事先确定；链式存储能够按需扩展，但每个结点都要额外保存指针。"
+    },
+    {
+      "id": "kp_d782a4e97755f333d5f611adb0782c53",
+      "name": "合法出栈序列判定",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "一个排列 p1 p2 … pn 是合法出栈序列，当且仅当不存在下标 i < j < k 使得 pj < pk < pi；即若某个较大元素先出栈，则比它小且仍在栈中的元素必须按从大到小的顺序出栈。"
+    },
+    {
+      "id": "kp_d8d60b37f1d1d7a4d236ff09a96e2381",
+      "name": "栈和队列的应用",
+      "type": "example",
+      "source": "ai",
+      "definition": "栈和队列可用于括号匹配、表达式求值、递归和排队服务等场景。"
+    },
+    {
+      "id": "kp_d905878de657f45ceaeb416cedb87ad2",
+      "name": "中缀表达式求值示例",
+      "type": "example",
+      "source": "ai",
+      "definition": "求中缀表达式 (3 + 4) * 2 - 6 / 3 的值：先转换为后缀表达式 3 4 + 2 * 6 3 / -，再逐步求值，最终结果为 12。"
+    },
+    {
+      "id": "kp_da178655f245dd680bf893f038d037ff",
+      "name": "顺序栈",
+      "type": "concept",
+      "source": "ai",
+      "definition": "采用顺序存储的栈称为顺序栈，用一个数组 data[0..MaxSize-1] 存放元素，并用整型变量 top 指示栈顶元素的下标。"
+    },
+    {
+      "id": "kp_dcff22c1a39dd7d2a07afe963648884f",
+      "name": "后缀表达式求值算法",
+      "type": "method",
+      "source": "ai",
+      "definition": "从左到右扫描后缀表达式，操作数入栈；遇运算符则弹出两个操作数，先弹出的是右操作数、后弹出的是左操作数，计算后把结果压回栈中，扫描结束时栈中唯一元素即为表达式的值。"
+    },
+    {
+      "id": "kp_de324cee341b7dbd5b9e4dcbbcaf29d6",
+      "name": "双端队列",
+      "type": "concept",
+      "source": "ai",
+      "definition": "允许在两端都进行插入和删除的线性表。"
+    },
+    {
+      "id": "kp_e163bc8cb08ecbad0845c65c26c8205b",
+      "name": "出队",
+      "type": "method",
+      "source": "ai",
+      "definition": "删除队头元素的操作。"
+    },
+    {
+      "id": "kp_e1c6fc51266ef16de53cda8b86538faf",
+      "name": "链队列",
+      "type": "concept",
+      "source": "ai",
+      "definition": "采用链式存储的队列称为链队列，它是同时带有队头指针和队尾指针的单链表。"
+    },
+    {
+      "id": "kp_e608e3ac39ada5931218ffd8ed455b18",
+      "name": "顺序栈的入栈与出栈操作",
+      "type": "method",
+      "source": "ai",
+      "definition": "约定空栈时 top = -1；入栈时先令 top 加 1 再写入元素，出栈时先读出元素再令 top 减 1。"
+    },
+    {
+      "id": "kp_e61de93878296bc7acc55c6d100d3096",
+      "name": "栈的典型应用",
+      "type": "example",
+      "source": "ai",
+      "definition": "栈的典型应用包括括号匹配、表达式求值和递归。"
+    },
+    {
+      "id": "kp_e74f8028c6ee6aa694e420427b088124",
+      "name": "循环队列判空与判满",
+      "type": "theorem",
+      "source": "ai",
+      "definition": "约定 front 指向队头元素、rear 指向队尾元素的下一个位置，并牺牲一个存储单元，则队空条件是 front == rear，队满条件是 (rear + 1) % MaxSize == front；牺牲一个单元是为了区分队空和队满，也可改用计数变量 size 区分。"
+    },
+    {
+      "id": "kp_e9ea970ae96c9d0a1966aab36479ddc7",
+      "name": "循环队列指针变化实例",
+      "type": "example",
+      "source": "ai",
+      "definition": "设 MaxSize = 6，初始 front = rear = 0，依次入队 a、b、c、d、e 后 rear = 5 且队列已满，最多存放 5 个元素；出队两次后 front = 2，再入队 f 时 rear 回绕到 0，此时元素个数为 (0 - 2 + 6) % 6 = 4，即 c、d、e、f。"
+    },
+    {
+      "id": "kp_ef347159e5950fee69380b4310a47043",
+      "name": "栈和队列的实现方式",
+      "type": "concept",
+      "source": "ai",
+      "definition": "栈和队列都有顺序和链式两种实现方式。"
+    },
+    {
+      "id": "kp_f1beb4559040cc02bafa2ef17b50e58d",
+      "name": "递归转非递归",
+      "type": "method",
+      "source": "ai",
+      "definition": "借助显式的栈保存待处理的状态，把递归算法改写为非递归算法。"
+    },
+    {
+      "id": "kp_f44f7c6735de6371fdae6fa3d0700eee",
+      "name": "入栈",
+      "type": "method",
+      "source": "ai",
+      "definition": "入栈（Push）是在栈顶插入一个新元素，使之成为新的栈顶。"
+    },
+    {
+      "id": "kp_f5c8e22b3ffddc1f32b882d96295ce9a",
+      "name": "栈与队列的选用依据",
+      "type": "method",
+      "source": "ai",
+      "definition": "选择使用栈还是队列，关键是看问题要求的处理次序：需要“暂存后逆序处理”的场合适合用栈，需要“按到达先后依次处理”的场合适合用队列。"
+    },
+    {
+      "id": "kp_f602102fb6d558896f4afe424c0dc28c",
+      "name": "共享栈",
+      "type": "concept",
+      "source": "ai",
+      "definition": "为了提高空间利用率，让两个栈共享同一个数组，两个栈底分别设在数组两端、栈顶相向增长，这种结构称为共享栈。"
+    },
+    {
+      "id": "kp_f72d28b52db08af3e907a3a81cb59b66",
+      "name": "递归",
+      "type": "concept",
+      "source": "ai",
+      "definition": "递归是指函数在执行过程中直接或间接调用自身。"
+    },
+    {
+      "id": "kp_f9e4a6a659db5f221e1cd9b996aaeb8b",
+      "name": "假溢出",
+      "type": "concept",
+      "source": "ai",
+      "definition": "用数组实现队列时，若每次出队都只让 front 后移，数组前部腾出的空间无法再利用，可能出现 rear 已到数组末尾而数组前部仍有空位的现象。"
+    },
+    {
+      "id": "kp_fdcefa65ea76b859604e09eb2b2e180e",
+      "name": "银行排队模拟",
+      "type": "example",
+      "source": "ai",
+      "definition": "银行只有一个窗口时，顾客按到达时间依次入队，窗口空闲时让队头顾客出队办理业务；顾客 A、B、C 分别在第 0、1、2 分钟到达，每人办理 3 分钟，平均等待时间为 2 分钟。"
+    },
+    {
+      "id": "kp_ff63cdb77eef0ef5084496a6b0cb46ae",
+      "name": "中缀表达式",
+      "type": "concept",
+      "source": "ai",
+      "definition": "把运算符放在两个操作数中间的算术表达式写法，需要依靠运算符优先级和括号才能确定计算次序。"
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_00e71ba8da3ca80794c230f4d70ff915",
+      "type": "RELATED_TO",
+      "from": "kp_d1243376b75220cf4e67a28dbd136c7f",
+      "to": "kp_93c062720f236e6dcde251142166824b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_0118e1cce17ef0e2084019e68d466cde",
+      "type": "CONTAINS",
+      "from": "kp_9a30f8cefe6608ab086003d2f7f96c93",
+      "to": "kp_a0f870526e9b51507fba20a1b830c5df",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_051fc11fa70a729cab8a2c7e21ce1dab",
+      "type": "PREREQUISITE",
+      "from": "kp_62398dd289be98370c6353b6fbeeff94",
+      "to": "kp_f72d28b52db08af3e907a3a81cb59b66",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.3 递归与栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_0a64f3778875e53d0608ffb54a90f75c",
+      "type": "RELATED_TO",
+      "from": "kp_ff63cdb77eef0ef5084496a6b0cb46ae",
+      "to": "kp_6ec5739b657edec26f3ba86486ce1be6",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_0e44ecdb895e17fc0fe049fa2bb10973",
+      "type": "RELATED_TO",
+      "from": "kp_46989da85cff2e63b3a81a060d9426a2",
+      "to": "kp_54d90179677039720f5673bb237d638d",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.3 链栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_10aaeb5ac80308c4d0deae8bfb690e03",
+      "type": "EXAMPLE_OF",
+      "from": "kp_5a9efe671385195aaccb2eb3a8f2a995",
+      "to": "kp_b218f91b76d38846b5585ef828b2e834",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_112f8a4010471e88e23be0b19d6c24b4",
+      "type": "RELATED_TO",
+      "from": "kp_f44f7c6735de6371fdae6fa3d0700eee",
+      "to": "kp_93c062720f236e6dcde251142166824b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_1c70ea5a5ae7fb7f875dec78cfafdf25",
+      "type": "CONTAINS",
+      "from": "kp_a87bcbbdaf559257cb6707d83049891d",
+      "to": "kp_508118a78d3dacef2f090f6722fc6898",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_29168df717444664fa1f63667c0f0a09",
+      "type": "RELATED_TO",
+      "from": "kp_da178655f245dd680bf893f038d037ff",
+      "to": "kp_beec8b5aaebfb67c7cfc410f0cba2d81",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_3626edb05dff09c31a6c71924fcfcb40",
+      "type": "RELATED_TO",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_ef347159e5950fee69380b4310a47043",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_388ef64e87488780386d4c9d643de8b2",
+      "type": "RELATED_TO",
+      "from": "kp_62398dd289be98370c6353b6fbeeff94",
+      "to": "kp_8f206ead788918fb472df2697225e757",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.3 递归与栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_38c45ec925c4c8760f0d8ce2e70f599d",
+      "type": "CONTAINS",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_361d5cdf6461309c8e966080d6783c03",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_3ee75458d1f5b2ce262463c56ec494d3",
+      "type": "RELATED_TO",
+      "from": "kp_beec8b5aaebfb67c7cfc410f0cba2d81",
+      "to": "kp_624822161f347618bfbbc2adc70a1dd2",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_3fc15b780e901f5d595dc0b1c39adba4",
+      "type": "EXAMPLE_OF",
+      "from": "kp_e61de93878296bc7acc55c6d100d3096",
+      "to": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_4b67423e1e2cf692f66356e11df4558d",
+      "type": "RELATED_TO",
+      "from": "kp_d185d39ee9c8c3a290374593ebeacd77",
+      "to": "kp_4c1e4627b6a20c739b0b3b2847fd5a52",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_4c16f8293cc0d3fbc54c778befe0ec68",
+      "type": "CONTAINS",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_b10b34e20ed4e4eb90661abc08966abb",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_56d9e536dce5beadbd42e6a7ab7a3b93",
+      "type": "RELATED_TO",
+      "from": "kp_f5c8e22b3ffddc1f32b882d96295ce9a",
+      "to": "kp_154a5add769b23d118161023de6bef41",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_5a06e91a71b7e66edaf06d48230859c9",
+      "type": "CONTAINS",
+      "from": "kp_87431e2a3c3238d1a0ff189f86106b69",
+      "to": "kp_b218f91b76d38846b5585ef828b2e834",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_5ebaad3b5d423d503384431804eb949a",
+      "type": "RELATED_TO",
+      "from": "kp_b218f91b76d38846b5585ef828b2e834",
+      "to": "kp_ef347159e5950fee69380b4310a47043",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_60eef226ce3b0ea99f76d083b77c920f",
+      "type": "CONTAINS",
+      "from": "kp_e1c6fc51266ef16de53cda8b86538faf",
+      "to": "kp_006121661ba1e339293914d86fad025e",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.3 链队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_633b5d59b9b6d372f5a6d1cd130e85ee",
+      "type": "RELATED_TO",
+      "from": "kp_beec8b5aaebfb67c7cfc410f0cba2d81",
+      "to": "kp_a4ce31a0c23f938446a1e0f07348900d",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_650755cb7731b40a178bfc6ef3592fc9",
+      "type": "RELATED_TO",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_b218f91b76d38846b5585ef828b2e834",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_65531b3dc1f8a76dd22b3b9b8bd951ec",
+      "type": "CONTAINS",
+      "from": "kp_7859387a026067defa483b360de0cadf",
+      "to": "kp_dcff22c1a39dd7d2a07afe963648884f",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_66f206a44e1a6a26973f2feedd83e472",
+      "type": "CONTAINS",
+      "from": "kp_da178655f245dd680bf893f038d037ff",
+      "to": "kp_e608e3ac39ada5931218ffd8ed455b18",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_670856a619553897465c2531f96c042f",
+      "type": "RELATED_TO",
+      "from": "kp_de324cee341b7dbd5b9e4dcbbcaf29d6",
+      "to": "kp_9c311b45c6b23e16c19f598fbaf39115",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.4 双端队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_8573ce51d190ffe857571ad9b2b0d2fc",
+      "type": "EXAMPLE_OF",
+      "from": "kp_d905878de657f45ceaeb416cedb87ad2",
+      "to": "kp_7859387a026067defa483b360de0cadf",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_872b702f44cfcced0e6255294ccd05ca",
+      "type": "RELATED_TO",
+      "from": "kp_a0f870526e9b51507fba20a1b830c5df",
+      "to": "kp_e163bc8cb08ecbad0845c65c26c8205b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_890f9b81712fbf9a96d8ae82ad02c45a",
+      "type": "CONTAINS",
+      "from": "kp_53c208fb5f9f522f362c9f2bae49d84f",
+      "to": "kp_d185d39ee9c8c3a290374593ebeacd77",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_89c6c9ae015078546abf2a7ce2cacc31",
+      "type": "CONTAINS",
+      "from": "kp_702539b4e585e0edc6907416a51dd51f",
+      "to": "kp_93c062720f236e6dcde251142166824b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_92166758445f5394f8a94757d63dd89b",
+      "type": "CONTAINS",
+      "from": "kp_7859387a026067defa483b360de0cadf",
+      "to": "kp_1137a42595653d073a46ea754d5e4f1b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_9340639eaa8212c094e1a87e862480ea",
+      "type": "CONTAINS",
+      "from": "kp_702539b4e585e0edc6907416a51dd51f",
+      "to": "kp_f44f7c6735de6371fdae6fa3d0700eee",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_937dec253609a49b216763947df421db",
+      "type": "RELATED_TO",
+      "from": "kp_f72d28b52db08af3e907a3a81cb59b66",
+      "to": "kp_f1beb4559040cc02bafa2ef17b50e58d",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.3 递归与栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_93f016db1cdfd72b61967a4ba57986de",
+      "type": "RELATED_TO",
+      "from": "kp_e163bc8cb08ecbad0845c65c26c8205b",
+      "to": "kp_753c8dbaa1a0390aba18ca9b22e7eac2",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_95c8ebdef48f152f63317a571b1a3c8f",
+      "type": "PREREQUISITE",
+      "from": "kp_6ec5739b657edec26f3ba86486ce1be6",
+      "to": "kp_dcff22c1a39dd7d2a07afe963648884f",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_99a1f7f106861b6f70894925cfeda799",
+      "type": "CONTAINS",
+      "from": "kp_f602102fb6d558896f4afe424c0dc28c",
+      "to": "kp_a4ce31a0c23f938446a1e0f07348900d",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_9ba03e02b3fca6f3402d8cbbf62df077",
+      "type": "RELATED_TO",
+      "from": "kp_da178655f245dd680bf893f038d037ff",
+      "to": "kp_f602102fb6d558896f4afe424c0dc28c",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_a0cd6854003d93a60aa332cf9a242bb8",
+      "type": "RELATED_TO",
+      "from": "kp_d1243376b75220cf4e67a28dbd136c7f",
+      "to": "kp_f44f7c6735de6371fdae6fa3d0700eee",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_a48937af635cee4a8c958d6c4a982c25",
+      "type": "CONTAINS",
+      "from": "kp_b218f91b76d38846b5585ef828b2e834",
+      "to": "kp_9a30f8cefe6608ab086003d2f7f96c93",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_a76ad3387c8482536631a8b4ee2dd023",
+      "type": "RELATED_TO",
+      "from": "kp_a0f870526e9b51507fba20a1b830c5df",
+      "to": "kp_1bb4ac2371fedd76be3e62d0aea3bc4e",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_a97c0eaf4f0e1167045b0e4d16fb7598",
+      "type": "CONTAINS",
+      "from": "kp_2bd7406980fcb22c1bc4cb62e98e27a1",
+      "to": "kp_aa2f9225a82a75f83bcf035c07805ede",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_b0c99ce0afe0e5861660888417ec61a7",
+      "type": "EXAMPLE_OF",
+      "from": "kp_9d64b02efbbb334e1fe155b583086c74",
+      "to": "kp_2784333a45f872ae678c22ae931db97c",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.4 出栈序列的性质 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_b1ebb8e152c61988f813f00c65e9aec3",
+      "type": "CONTAINS",
+      "from": "kp_87431e2a3c3238d1a0ff189f86106b69",
+      "to": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.6 本章小结 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_b40d32beeb235fdca40864921926992e",
+      "type": "EXAMPLE_OF",
+      "from": "kp_9d64b02efbbb334e1fe155b583086c74",
+      "to": "kp_d782a4e97755f333d5f611adb0782c53",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.4 出栈序列的性质 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_bb584782a0b4b9f1ff7e30bd07ff93c0",
+      "type": "CONTAINS",
+      "from": "kp_040b2bcb0d65cc65766749df4aac6dad",
+      "to": "kp_920fd6f5e67a4c2e6a7375eb0d56b5f2",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.1 本章导读 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_bd25d897be7490dda1d439b8a4b07d14",
+      "type": "EXAMPLE_OF",
+      "from": "kp_fdcefa65ea76b859604e09eb2b2e180e",
+      "to": "kp_34e8c1e84be0c411e287f7ef9d8d55fb",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.5 队列的应用 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_c05a1ad93d626d4007b255e1a7bb8d0b",
+      "type": "CONTAINS",
+      "from": "kp_b218f91b76d38846b5585ef828b2e834",
+      "to": "kp_753c8dbaa1a0390aba18ca9b22e7eac2",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_c7a65345936b565975a12604d92f8c02",
+      "type": "CONTAINS",
+      "from": "kp_a87bcbbdaf559257cb6707d83049891d",
+      "to": "kp_bd158804ebaba7ca6ec5bfb17e4279dd",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_cef09917a3bed5cad398e7ad0ff99612",
+      "type": "CONTAINS",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_a41bd426ea88539b6d0ace7e9a7e3c61",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_cfba6eff8605dcd300cc9875ad11d670",
+      "type": "RELATED_TO",
+      "from": "kp_f9e4a6a659db5f221e1cd9b996aaeb8b",
+      "to": "kp_a87bcbbdaf559257cb6707d83049891d",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_d1331af04e9a6ff17b81f9dd11a50e35",
+      "type": "CONTAINS",
+      "from": "kp_9a30f8cefe6608ab086003d2f7f96c93",
+      "to": "kp_e163bc8cb08ecbad0845c65c26c8205b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_d1b3cf68d12211290846b780975f245f",
+      "type": "CONTAINS",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_702539b4e585e0edc6907416a51dd51f",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_d504edb86a3212af0a1b04602fd7430f",
+      "type": "CONTAINS",
+      "from": "kp_b218f91b76d38846b5585ef828b2e834",
+      "to": "kp_87de6994600f658b2eb49b01fa563b84",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_d78f4f176faa8c52d7bb22c1d2e82819",
+      "type": "RELATED_TO",
+      "from": "kp_1153aa1eb87550bd62a23cc324019c99",
+      "to": "kp_c0c5437876eb9fcdbb37098dd1a156ef",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.4 出栈序列的性质 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_d965de2b4ef1a328386356a712c46cd6",
+      "type": "CONTAINS",
+      "from": "kp_46989da85cff2e63b3a81a060d9426a2",
+      "to": "kp_c1b2e0645e3cd949c07516f53ee54161",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.3 链栈 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_da42430e7d01016f9bd4d638d8925800",
+      "type": "EXAMPLE_OF",
+      "from": "kp_50dd341362ab95bd44de7e4d13f08bf7",
+      "to": "kp_6d648942eabcdb7e45d47f5fb3889d0b",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.4 栈的应用 > 3.4.1 括号匹配 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_e275ce92bce64ae63be0cd56deae0696",
+      "type": "RELATED_TO",
+      "from": "kp_49bc90d9252196b03bbe65005b79fa87",
+      "to": "kp_34e8c1e84be0c411e287f7ef9d8d55fb",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.5 队列的应用 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_e45570c4d1d01f43c0f550d399ee96b3",
+      "type": "CONTAINS",
+      "from": "kp_e1c6fc51266ef16de53cda8b86538faf",
+      "to": "kp_80d0ddb1ccdacd933465ea79602ab59a",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.3 链队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_e58cc21e9802b72044fde08c050e0e4f",
+      "type": "CONTAINS",
+      "from": "kp_b218f91b76d38846b5585ef828b2e834",
+      "to": "kp_1bb4ac2371fedd76be3e62d0aea3bc4e",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_e82445d06bf1c8ded0809a743ff373fa",
+      "type": "RELATED_TO",
+      "from": "kp_f5c8e22b3ffddc1f32b882d96295ce9a",
+      "to": "kp_2a556a8838dc783fc15009279bfaa2ab",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_e9f3a31bbd30b06604c0b3b4b60323bc",
+      "type": "CONTAINS",
+      "from": "kp_040b2bcb0d65cc65766749df4aac6dad",
+      "to": "kp_d8d60b37f1d1d7a4d236ff09a96e2381",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.1 本章导读 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_eed316c8e9a49b9f657598b27efb3d30",
+      "type": "CONTAINS",
+      "from": "kp_2bd7406980fcb22c1bc4cb62e98e27a1",
+      "to": "kp_5e0db526fb496250fae56ec2c15a0ff1",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_f6f8dc4e8c090e71ca4b47c1826c46d0",
+      "type": "CONTAINS",
+      "from": "kp_05eb908d7bd3cadbe7845b5d281ee651",
+      "to": "kp_b601a953506210551b291fb7bbe295fd",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_f7fc801ac9784b15d4a75855f158c411",
+      "type": "RELATED_TO",
+      "from": "kp_9d64b02efbbb334e1fe155b583086c74",
+      "to": "kp_1153aa1eb87550bd62a23cc324019c99",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.2 栈 > 3.2.4 出栈序列的性质 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_fbb7a4d0549aba9b71dc086f6bd096a9",
+      "type": "RELATED_TO",
+      "from": "kp_5e0db526fb496250fae56ec2c15a0ff1",
+      "to": "kp_aa2f9225a82a75f83bcf035c07805ede",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_fead15090866943c10435b026f893e66",
+      "type": "CONTAINS",
+      "from": "kp_e1c6fc51266ef16de53cda8b86538faf",
+      "to": "kp_bfe85f7faa118b63a66766892233dc68",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.3 队列 > 3.3.3 链队列 > 第1段"
+      ]
+    },
+    {
+      "id": "rel_feb7260a3a48f9df7569ad2de132e0b0",
+      "type": "RELATED_TO",
+      "from": "kp_fdcefa65ea76b859604e09eb2b2e180e",
+      "to": "kp_a429fc8233f1715c3a07e33ff039e84d",
+      "source": "ai",
+      "section_paths": [
+        "第3章 栈与队列 > 3.5 队列的应用 > 第1段"
+      ]
+    }
+  ]
+}

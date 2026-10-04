@@ -222,6 +222,7 @@ ADR-011 修订 2（Codex A07-R01）。每次向供应商发出的实际请求（
 | `model_requested`、`model_responded` | 请求时的模型 ID；响应中的 `model` 字段（未收到响应为空） |
 | `input_tokens_est`、`max_output_tokens` | 预写时的输入估算与声明的输出上限 |
 | `usage_input`、`usage_output` | 响应中的真实 usage；未收到响应或响应不带可解析的 usage 时为空 |
+| `usage_reasoning`、`reasoning_chars`、`first_reasoning_ms`、`first_content_ms` | ADR-089（迁移 017）：响应 usage 里的推理 token（`completion_tokens_details.reasoning_tokens`，属于 `usage_output` 的一部分，不另计费）；流里推理内容的字数（只计字数，不保存正文）；首次推理与首次可见内容相对调用开始的毫秒数。供应商不提供或非流式时为空，不当作 0 |
 | `usage_estimated` | 派生：usage 为空且不属于生成前被拒即为真，包括停在 `sent`（未收到响应）与已回写但无 usage 两种情形，计费量取估算值；不单独写入（修订 3） |
 | `created_at`、`finished_at`、`error_class` | 预写时间（SQLite 求值，每日预算按此归日）、回写时间、错误分类（含「生成前被拒」类，见第 5 条） |
 

@@ -66,3 +66,13 @@ def test_identity_security_is_explicit_for_protected_operations():
             assert operation["responses"].get("401") == {
                 "$ref": "#/components/responses/Unauthenticated"
             }, f"{method.upper()} {path} must document 401"
+
+
+def test_source_ref_and_citation_carry_an_optional_document_name():
+    """L12（ADR-085）：来源与问答引用可带同课资料文件名；可选，不改变「可定位」约束。"""
+    for name in ("SourceRef", "Citation"):
+        schema = SCHEMAS[name]
+        field = schema["properties"]["document_name"]
+        assert field["type"] == "string" and field["minLength"] == 1 and field["maxLength"] == 255
+        assert "document_name" not in schema["required"]
+        assert schema["anyOf"] == [{"required": ["page"]}, {"required": ["section_path"]}]

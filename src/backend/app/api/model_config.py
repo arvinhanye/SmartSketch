@@ -49,6 +49,7 @@ def _to_wire(view: service.ModelConfigView) -> dict[str, Any]:
     wire: dict[str, Any] = {
         "runtime_mode": view.runtime_mode, "configured": True, "base_url": row.base_url, "model": row.model,
         "key_hint": row.key_hint, "version": row.version, "updated_at": row.updated_at,
+        "disable_thinking": row.disable_thinking,
     }
     if row.last_test_at is not None:
         last: dict[str, Any] = {"ok": bool(row.last_test_ok), "tested_at": row.last_test_at}
@@ -74,7 +75,8 @@ def save_model_config(payload: ModelConfigUpdate, request: Request,
                       user: AccountRecord = Depends(current_user)) -> JSONResponse:
     try:
         view = service.save(request.app.state.settings, user.id, base_url=payload.base_url,
-                            model=payload.model, api_key=_plain(payload.api_key))
+                            model=payload.model, api_key=_plain(payload.api_key),
+                            disable_thinking=payload.disable_thinking)
     except EndpointBlocked as blocked:
         return _invalid("base_url", blocked.reason)
     except service.KeyRequired:
@@ -110,7 +112,8 @@ def test_model_config(request: Request, payload: ModelConfigTestRequest | None =
         return JSONResponse(status_code=429, content=body.model_dump(exclude_none=True), headers={"Retry-After": str(wait)})
     try:
         outcome = service.run_test(request.app.state.settings, user.id, base_url=values[0], model=values[1],
-                                   api_key=values[2], transport=_transport(request))
+                                   api_key=values[2], transport=_transport(request),
+                                   disable_thinking=bool(payload is not None and payload.disable_thinking))
     except ModelConfigRequired:
         body = Error(code="MODEL_CONFIG_REQUIRED", message=_REQUIRED_MESSAGE)
         return JSONResponse(status_code=409, content=body.model_dump(exclude_none=True))

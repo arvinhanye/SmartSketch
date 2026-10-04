@@ -355,16 +355,20 @@ describe('H05 布局参数', () => {
   it('节点定义选中/驳回/低置信度与 I06 的四个学习状态样式，边定义驳回与低置信度', () => {
     const el = document.createElement('div')
     const options = buildGraphOptions({ container: el, width: 1, height: 1, data: sample() })
+    // L14 追加学习路径状态：节点 dimmed/pathPrereq/pathUnlock，边 dimmed/pathEdge
     expect(Object.keys(options.node?.state ?? {}).sort()).toEqual([
+      'dimmed',
       'learning',
       'lowConfidence',
       'mastered',
       'notStarted',
+      'pathPrereq',
+      'pathUnlock',
       'recommended',
       'rejected',
       'selected',
     ])
-    expect(Object.keys(options.edge?.state ?? {}).sort()).toEqual(['lowConfidence', 'rejected'])
+    expect(Object.keys(options.edge?.state ?? {}).sort()).toEqual(['dimmed', 'lowConfidence', 'pathEdge', 'rejected'])
   })
 })
 

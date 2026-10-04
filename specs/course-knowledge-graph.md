@@ -65,7 +65,7 @@
 2. 每次上传返回任务 ID；任务按 `queued → parsing → extracting → merging → persisting → awaiting_review → completed` 转换。处理阶段（直到 `awaiting_review`、`failed` 或 `cancelled`）可通过 SSE 观察；`awaiting_review` 表示处理完成，SSE 在此关流；`completed` 由教师发布触发，通过任务查询 `GET /api/v1/tasks/{tid}` 或课程发布状态观察，不经已有 SSE 连接送达；`failed` 只能从 `parsing`～`persisting` 转入，`cancelled` 只能从 `queued`～`merging` 转入。终态为 `completed`、`failed`、`cancelled`。转换表、取消协议、部分失败与重连见 `specs/task-processing.md`（A03 / ADR-010）。
 3. 图谱查询、编辑和学生浏览均按 `course_id` 隔离。
 4. 人工新增/修改前置关系形成环时操作被拒绝，并返回导致冲突的节点/关系信息；自动候选成环按上方「前置关系成环处理」降级，不拒绝整个任务。
-5. 2D 图谱具备缩放、拖拽、节点详情、关系图例/筛选；节点详情展示至少一个来源。
+5. 2D 图谱具备缩放、拖拽、节点详情、关系图例/筛选；节点详情展示至少一个来源。来源可点开查看资料文件名（`SourceRef.document_name`，只取同课资料，缺失时显示「资料不可用」）、页码或章节与原文片段（ADR-085）。
 6. 教师发布后学生可读取该版本；未发布草稿不可由学生读取。
 7. **抽取质量（赛题「技术要求与指标（一）」硬指标，REQ-01）**：
    - **基准材料**：一门完整课程中的一章。使用自编材料，或许可允许使用的开源教材（赛题第 7 节的版权要求）；真实课程资料不进仓库。具体用哪门课由 D-01 决定（已定：自编「数据结构 第3章 栈与队列」，`evaluation/fixtures/synthetic.json`，ADR-026）。2026-09-26 首次真实模型实测（DeepSeek `deepseek-flash`，简化融合）：AI 实体 74 个，人工全量判定实体 74/74、关系 61/63，三项达标；完整融合接入后须重跑，见 `evaluation/reports/extraction-accuracy.md`。
@@ -84,3 +84,5 @@
 - `downgrade_cycle` 首尾同 ID 是跨数组元素等值约束，JSON Schema 不负责比较；F13 在持久化与序列化前必须验证，契约以 `x-closed-cycle: true` 标记这一服务端不变量。
 - 降级条数不纳入 `TaskCounts`：审核队列可按上述标记统计，任务阶段计数仍只表示处理量，避免重复的派生计数。
 - 节点融合阈值、低置信度阈值和版本回滚交互由 M1 设计时补入。
+
+来源预览最多 600 字（L12 复审），来源查看器打开时隐藏重复预览；全文仅由用户展开显示。
