@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { testLocalConnection } from '../e2e/configTestRetry'
 
 function response(status: number, retryAfter?: string, code = 'RATE_LIMITED') {
-  return { status: () => status, headers: () => retryAfter === undefined ? {} : { 'retry-after': retryAfter },
+  const headers: Record<string, string> = {}
+  if (retryAfter !== undefined) headers['retry-after'] = retryAfter
+  return { status: () => status, headers: () => headers,
     json: async () => ({ code }) }
 }
 const localProvider = 'http://127.0.0.1:19590/v1'
