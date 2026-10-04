@@ -1,0 +1,91 @@
+# C04 人工准确率签收入口（C-ACC-C，2026-10-04）
+
+> **状态：待用户签收。** 本目录里的 `claude-assist` 判定是 Claude 的辅助参考，**不是人工验收，不能据此宣布准确率达标**。赛题硬指标以用户本人逐条判定为准（`evaluation/README.md` §6）。
+
+## 1. 签收对象
+
+计划 C 真实测量（DeepSeek，`deepseek-flash`，关闭思考，PDF 按二级标题分节）的两份草稿，全量检查（总体 ≤ 100，不抽样），种子 `20260926`。
+
+| 课程 | run_id | 实体 | 关系 |
+| --- | --- | ---: | ---: |
+| course1（数据结构第 3 章） | `contest-course1-ds-ch3-pdf-headings2-thinking-off-2db2aff95ca2` | 76 | 61 |
+| course2（操作系统第 2 章） | `contest-course2-os-ch2-pdf-headings2-thinking-off-9c6b8ce343b1` | 68 | 58 |
+
+章节原文：`datasets/contest/course1-ds-ch3/ch3-stack-queue.md`、`datasets/contest/course2-os-ch2/ch2-process-thread.md`。
+
+## 2. 文件
+
+| 文件 | 说明 |
+| --- | --- |
+| `*-predictions.json`、`*-worksheet.md` | 原始预测与工作表，从测量区 `smartsketch-c03b-measure`（`88f9f6f`）的 `evaluation/raw/c04/` 原样复制，**未改动** |
+| `*-judgments-user.json` | **用户签收文件**：`judge` 为空，每条判定为 `null`，由用户独立填写 |
+| `*-judgments-claude-assist.json` | Claude 辅助判定：`judge` 以 `claude-assist` 开头，`is_human_judgment: false`；每条都有依据（`notes`，判错写明 E/R 编号），存疑项列在 `needs_review` |
+
+原始文件 SHA-256（与测量区逐字节一致）：
+
+| 文件 | SHA-256 前 16 位 |
+| --- | --- |
+| `course1-pdf-h2-thinking-off-predictions.json` | `a94bb86cca66a4ca` |
+| `course1-pdf-h2-thinking-off-worksheet.md` | `16a086202c6ebd3f` |
+| `course2-pdf-h2-thinking-off-predictions.json` | `50fa5348ae0c24bd` |
+| `course2-pdf-h2-thinking-off-worksheet.md` | `f11ebc136d8f22fd` |
+
+## 3. 用户怎么签收
+
+1. 对照章节原文和工作表，按 `evaluation/README.md` §6.3（实体 E1～E5、关系 R1～R6）逐条判定，填进 `*-judgments-user.json`：
+   - `judge` 填本人姓名，**不得**以 `claude-assist` 开头；
+   - 每条填 `correct` 或 `incorrect`，判错在 `notes` 写明编号。
+   - 可以参考辅助文件的依据，但每条须本人判断。未填完时 `judge-report` 会直接拒绝计算（`null` 不是合法判定），不会得出半截结论。
+2. 计算硬指标：
+
+   ```bash
+   D=evaluation/raw/c04-signoff
+   for s in course1 course2; do
+     PYTHONPATH=src/backend .venv/bin/python evaluation/evaluate_extraction.py judge-report \
+       --predictions $D/$s-pdf-h2-thinking-off-predictions.json \
+       --judgments $D/$s-pdf-h2-thinking-off-judgments-user.json \
+       --out $D/$s-pdf-h2-thinking-off-report-user.json
+   done
+   ```
+
+   报告里 `is_human_judgment` 为 `true` 才算人工结论；任一准确率 < 70% 照实写「未达标」，不得换种子、放宽标准或剔除样本（§6.5）。
+3. 对比本人判定与辅助判定的分歧（只读）：
+
+   ```bash
+   D=evaluation/raw/c04-signoff
+   for s in course1 course2; do .venv/bin/python - "$D/$s-pdf-h2-thinking-off-judgments-user.json" \
+     "$D/$s-pdf-h2-thinking-off-judgments-claude-assist.json" <<'PY'
+   import json, sys
+   u, a = (json.load(open(p, encoding="utf-8")) for p in sys.argv[1:])
+   for kind in ("entities", "relations"):
+       for i, v in u[kind].items():
+           if v != a[kind][i]:
+               print(kind, i, "user:", v, "assist:", a[kind][i], "|", a["notes"][i])
+   PY
+   done
+   ```
+
+## 4. 辅助判定的参考数（非人工验收）
+
+由 `judge-report` 按辅助文件计算，报告标注「Claude 辅助判定（非人工验收）」。这里只列数字，**不作为达标结论**。
+
+| 课程 | 实体判对 | 关系判对 | 存疑项 |
+| --- | --- | --- | ---: |
+| course1 | 64 / 76（84.21%） | 58 / 61（95.08%） | 7 |
+| course2 | 61 / 68（89.71%） | 45 / 58（77.59%） | 6 |
+
+- **course2 关系离 70% 只差 5 条**：45 → 40 即降到 68.97%。签收时请重点看该课关系，尤其 `needs_review` 里的两可项。
+- 主要错误类型（辅助判定）：
+  - course1 实体：类型（「后进先出」「先进先出」按 §3.1 应为 concept；复杂度结论标成 formula）、融合遗漏的重复（「栈/队列的应用」各出现 2～3 条）、章标题与导读概述混入。
+  - course2 实体：小结里的目录式条目（「进程定义」「常见调度算法」「进程的创建与撤销」，定义为「本章介绍的内容」之类元描述）、两个知识点拼成一条（「创建态与终止态」）。
+  - course2 关系：把本章小结的**叙述顺序或并列列举**抽成 `CONTAINS`（如「进程定义 → 进程切换」，共 8 条），以及证据不支持（「先来先服务 → 饥饿」「撤销进程 → 进程标识符」）。
+- 判定规则的字面适用（请用户裁定）：E5 只在「另一条已判对」时才把后出现者判错。所以 course1「后进先出」（#3）因类型判错后，同义的「栈的后进先出特性」（#11）不触发重复，辅助判定按字面判对，已标存疑。
+
+复现辅助数字（输出写到临时目录，不入库）：
+
+```bash
+D=evaluation/raw/c04-signoff
+PYTHONPATH=src/backend .venv/bin/python evaluation/evaluate_extraction.py judge-report \
+  --predictions $D/course2-pdf-h2-thinking-off-predictions.json \
+  --judgments $D/course2-pdf-h2-thinking-off-judgments-claude-assist.json
+```
