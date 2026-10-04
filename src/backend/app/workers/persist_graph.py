@@ -514,18 +514,26 @@ def _persist_stage(
         steps.neo4j_attempts += 1
         return _write_draft(tx, lease.task_id, plan, chunks)
 
+    lock_release_started = False
     try:
-        with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds):
-            with steps.step("lease_check"):
-                _check_lease(sqlite_url, lease)  # 租约已丢则不写 Neo4j
-                scope = GraphScope(lease.course_id, DRAFT_VERSION,
-                                   effective_task_ids=_effective(sqlite_url, lease.course_id))
-            with steps.step("neo4j"):
-                written = repo.write_transaction(scope, work)
-            with steps.step("t6"):
-                _t6(sqlite_url, lease)
-            steps.start("lock_release")
-        steps.stop("lock_release")
+        try:
+            with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds):
+                try:
+                    with steps.step("lease_check"):
+                        _check_lease(sqlite_url, lease)  # 租约已丢则不写 Neo4j
+                        scope = GraphScope(lease.course_id, DRAFT_VERSION,
+                                           effective_task_ids=_effective(sqlite_url, lease.course_id))
+                    with steps.step("neo4j"):
+                        written = repo.write_transaction(scope, work)
+                    with steps.step("t6"):
+                        _t6(sqlite_url, lease)
+                finally:
+                    steps.start("lock_release")
+                    lock_release_started = True
+        finally:
+            # 只计持锁上下文的退出；进入失败不虚构释放，退出抛错也完成计时。
+            if lock_release_started:
+                steps.stop("lock_release")
     except LeaseLost:
         return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
     except UnresolvableCycleError as exc:

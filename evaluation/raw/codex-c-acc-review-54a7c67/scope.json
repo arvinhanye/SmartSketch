@@ -1,0 +1,242 @@
+{
+  "base": "4a6308b",
+  "head": "54a7c67",
+  "commits": [
+    {
+      "commit": "2f1061cb99b1fa69cd984362f1bc9c469b82ed35",
+      "subject": "docs: 认领计划 C 验收收尾（A 出处核验、B 入库计时、C 签收入口、D 补测决策）",
+      "paths": [
+        "docs/tasks.md"
+      ]
+    },
+    {
+      "commit": "a094714a3396701ae3b25a63717cea0eea11b0bd",
+      "subject": "feat(eval): C-ACC-A 只读核验持久化后知识点详情的实际出处",
+      "paths": [
+        "evaluation/audit_persisted_sources.py",
+        "evaluation/raw/c-acc-a/sources.json",
+        "evaluation/reports/c-acc-a-persisted-sources.md",
+        "tests/tooling/test_c_acc_sources.py"
+      ]
+    },
+    {
+      "commit": "4304fec7290b66eb358b98894075c9a6896bf481",
+      "subject": "feat(obs): C-ACC-B 入库阶段子步骤脱敏计时",
+      "paths": [
+        "src/backend/app/workers/persist_graph.py",
+        "tests/backend/test_c02_phase_logs.py"
+      ]
+    },
+    {
+      "commit": "452d44601c58628137c2f07c3c8cdd2b45391b9b",
+      "subject": "feat(eval): C-ACC-C 两课 C04 人工签收入口与 claude-assist 辅助判定",
+      "paths": [
+        "evaluation/raw/c04-signoff/README.md",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-claude-assist.json",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-user.json",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-predictions.json",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet.md",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-claude-assist.json",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-user.json",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-predictions.json",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet.md"
+      ]
+    },
+    {
+      "commit": "03af1b9cc7ab4fa85c7cfc101661366395eafb0a",
+      "subject": "docs: C-ACC-D 补测决策表、任务状态与验收收尾交接",
+      "paths": [
+        "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+        "docs/tasks.md",
+        "evaluation/reports/c-acc-d-retest-decisions.md"
+      ]
+    },
+    {
+      "commit": "b3c91b620ea0d941246c60b046ee126eabc4dae0",
+      "subject": "feat(eval): C04 签收在工作表副本填 ✓/✗，脚本转 judgments 与报告",
+      "paths": [
+        "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+        "docs/tasks.md",
+        "evaluation/c04_signoff.py",
+        "evaluation/raw/c04-signoff/README.md",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet-user.md",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet-user.md",
+        "tests/tooling/test_c04_signoff_sheet.py"
+      ]
+    },
+    {
+      "commit": "4c6b56de0ea177ba4bd78098d99ccd75757962f4",
+      "subject": "feat(eval): C04 签收副本回写函数 apply_marks / read_marks",
+      "paths": [
+        "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+        "evaluation/c04_signoff.py",
+        "tests/tooling/test_c04_signoff_sheet.py"
+      ]
+    },
+    {
+      "commit": "7956b72e2893690c684441948d7711cc098ce8ba",
+      "subject": "docs(eval): 登记 C04 人工准确率签收（复核后采纳辅助判定，两课均 ≥70%）",
+      "paths": [
+        "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+        "docs/tasks.md",
+        "evaluation/raw/c04-signoff/README.md",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-user.json",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-report-user.json",
+        "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet-user.md",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-user.json",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-report-user.json",
+        "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet-user.md"
+      ]
+    },
+    {
+      "commit": "bf81d20a1830cd2954a2a8ba39a1bd4963a83dcc",
+      "subject": "docs: 登记用户决定三项补测均不做，冻结说明照实写「未测」",
+      "paths": [
+        "docs/tasks.md",
+        "evaluation/reports/c-acc-d-retest-decisions.md"
+      ]
+    },
+    {
+      "commit": "54a7c67f9137e0135109eacad4adfec58994d4bf",
+      "subject": "docs: 计划 C 验收收尾交 Codex 复审（最终门禁 bf81d20 exit 0）",
+      "paths": [
+        "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+        "docs/tasks.md"
+      ]
+    }
+  ],
+  "reviewed_paths": [
+    {
+      "path": "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+      "sha256": "18e2ecdfb780507187f6b9e56a932277419ade3dcfb657c2aee816faf1430d81",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "docs/tasks.md",
+      "sha256": "58f3f0a6438137cb405896cfb0d50f9cdc552a075dfb4f49a9b6e2f93572355d",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/audit_persisted_sources.py",
+      "sha256": "d2cf34c38949a37a383a2288ef97856f13b1c8a37c88dcfa65b9137e48af8f94",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/c04_signoff.py",
+      "sha256": "4b209498fdcfc6ffc4110eb40921d311b9078f0fb0c5b22d36202d7abfe39664",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c-acc-a/sources.json",
+      "sha256": "10b2ab104836dfbde7bd99742d5cdbf4cb4210946a7c250439fc3ca54aad11f4",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/README.md",
+      "sha256": "d475a5b9e0ea864fac01d981ca3cde07da657f2ab2da28f5da8df46cc21f42eb",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-claude-assist.json",
+      "sha256": "c5b630847b16b1a94d12e19311932bb0b59418ffd0832ba02e1f18d2772ca774",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-user.json",
+      "sha256": "5ef5c1233bcd8bad348c57dd72beef4b95d5842553ea9d246e862cdd745189ab",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-predictions.json",
+      "sha256": "a94bb86cca66a4ca24c498bfd3938dee67326ac87d75a5d3488b322a378acd47",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-report-user.json",
+      "sha256": "eb014b7aeb7dcd9452f2c85bec15f183c34be9d72580e7a54f260ace0a509af5",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet-user.md",
+      "sha256": "62504e669440260415e442d2c94938fd8dc7e92f9bbf11b831c06820d5522477",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet.md",
+      "sha256": "16a086202c6ebd3fd553ad51842b19d09d1ce6a32ce3e15e30064794197c80a0",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-claude-assist.json",
+      "sha256": "73beddde721a8339db320f18a520c7c21b3b690464a5c363efc82f3056d50edb",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-user.json",
+      "sha256": "a167703af5f5c1f72c1e4a9cfca2f8ce663f7cf89e8bce60a668a1c19beb8a43",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-predictions.json",
+      "sha256": "50fa5348ae0c24bd458181f2f6b39ab35a09aaca7d5f776cc4a07f972aa2a640",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-report-user.json",
+      "sha256": "d4939bb6771618adad907e9d370db49a05e4feb9735776544f34eeb1b8fcc5bc",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet-user.md",
+      "sha256": "798592427cb6c650242ccaa92d54744585c584c75438411c90093ded8c4f1f02",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet.md",
+      "sha256": "f11ebc136d8f22fd27e3feda6e82874546f2eea50e829c05e8d96c70fa7d4122",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/reports/c-acc-a-persisted-sources.md",
+      "sha256": "ef4665529d5690a7d46625d15c57e29ca9c2178ae320cfbfc2410e9d8a971618",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "evaluation/reports/c-acc-d-retest-decisions.md",
+      "sha256": "a55a24b8dd2ccbb150da2a4d169c54e40edd80c9e67b76c30c2bff352b18eb8f",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "src/backend/app/workers/persist_graph.py",
+      "sha256": "8aaa2a975b82bcf5bcf73e6c22d0b970b9dc50c7711d18c6130509554c216220",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "tests/backend/test_c02_phase_logs.py",
+      "sha256": "a9c52348f3afd907f167cd1999595a2de4d33705299ac76b8e380b9dc8e8fa0f",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "tests/tooling/test_c04_signoff_sheet.py",
+      "sha256": "3416875f462be749f1dbd5cfe4678cac0c8a960db493d285ae2c4f5e1d805384",
+      "claude_matches_commit": true
+    },
+    {
+      "path": "tests/tooling/test_c_acc_sources.py",
+      "sha256": "6089fd7901b7fd9867b757d89be195564a37c4b3b2ae513fe7b2f1203bf4d58f",
+      "claude_matches_commit": true
+    }
+  ],
+  "pending_paths": [],
+  "source_status": {
+    "/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-plan-a-fixes-e70a34": [
+      "?? .claude/launch.json"
+    ],
+    "/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-c03b-measure": []
+  },
+  "source_main_db_sha256": "ec78857ab5d500cd1b8e71cb445aa2363a6c2d94e6da0c28131c87474f434c9f",
+  "paid_generation_calls": 0,
+  "paid_embedding_calls": 0,
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED"
+}

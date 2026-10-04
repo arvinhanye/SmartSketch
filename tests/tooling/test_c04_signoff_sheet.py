@@ -200,3 +200,85 @@ def test_apply_marks_rejects_unknown_ids_and_marks(setup):
         signoff.apply_marks(sheet, "李四", {"kp_zzz": ("✓", "")})
     with pytest.raises(signoff.SignoffError, match="标记"):
         signoff.apply_marks(sheet, "李四", {"kp_a": ("对", "")})
+
+
+@pytest.mark.parametrize("item_id", ["kp_a", "rel_1"])
+@pytest.mark.parametrize("position", ["before", "after"])
+def test_duplicate_number_is_rejected_even_with_conflicting_verdict(setup, item_id, position):
+    predictions, original, sheet = setup
+    filled = _fill(sheet, ALL_OK)
+    row = next(line for line in filled.splitlines() if f"`{item_id}`" in line)
+    conflicting = row.replace("| ✓ |  |", "| ✗ | E1：重复行 |")
+    replacement = conflicting + "\n" + row if position == "before" else row + "\n" + conflicting
+    with pytest.raises(signoff.SignoffError):
+        signoff.to_judgments(filled.replace(row, replacement), original, predictions)
+
+
+@pytest.mark.parametrize("item_id", ["kp_a", "rel_1"])
+@pytest.mark.parametrize("shape", ["extra", "missing", "malformed"])
+def test_table_row_shape_must_match_the_seven_original_columns(setup, item_id, shape):
+    predictions, original, sheet = setup
+    filled = _fill(sheet, ALL_OK)
+    row = next(line for line in filled.splitlines() if f"`{item_id}`" in line)
+    if shape == "extra":
+        changed = row + " hidden |"
+    elif shape == "missing":
+        changed = row.rsplit("|", 2)[0] + "|"
+    else:
+        changed = row + "\n| invalid | `extra` | a | b | c | ✓ |  |"
+    with pytest.raises(signoff.SignoffError):
+        signoff.to_judgments(filled.replace(row, changed), original, predictions)
+
+
+@pytest.mark.parametrize("order", [[], ["course1", "course2"], ["course2", "course1"]])
+@pytest.mark.parametrize("bad_course", ["course1", "course2"])
+@pytest.mark.parametrize("failure", ["unfilled", "missing"])
+def test_convert_validates_the_whole_batch_before_overwriting_any_result(tmp_path, setup, order,
+                                                                        bad_course, failure):
+    predictions, original, sheet = setup
+    before = {}
+    for course, stem in signoff.COURSES.items():
+        paths = signoff._paths(tmp_path, stem)
+        paths["predictions.json"].write_text(json.dumps(predictions), encoding="utf-8")
+        paths["worksheet.md"].write_text(original, encoding="utf-8")
+        if course != bad_course or failure != "missing":
+            paths["worksheet-user.md"].write_text(sheet if course == bad_course else _fill(sheet, ALL_OK),
+                                                 encoding="utf-8")
+        for key in ("judgments-user.json", "report-user.json"):
+            paths[key].write_bytes(f"original-{course}-{key}".encode())
+        before.update({path: path.read_bytes() for path in paths.values() if path.exists()})
+    args = ["convert", "--dir", str(tmp_path)]
+    for course in order:
+        args += ["--course", course]
+    assert signoff.main(args) == 1
+    assert {path: path.read_bytes() for path in before} == before
+    assert set(tmp_path.iterdir()) == set(before)
+
+
+def test_rejected_batch_creates_no_fresh_result_files(tmp_path, setup):
+    predictions, original, sheet = setup
+    for course, stem in signoff.COURSES.items():
+        paths = signoff._paths(tmp_path, stem)
+        paths["predictions.json"].write_text(json.dumps(predictions), encoding="utf-8")
+        paths["worksheet.md"].write_text(original, encoding="utf-8")
+        paths["worksheet-user.md"].write_text(_fill(sheet, ALL_OK) if course == "course1" else sheet,
+                                             encoding="utf-8")
+    before = {p: p.read_bytes() for p in tmp_path.iterdir()}
+    assert signoff.main(["convert", "--dir", str(tmp_path)]) == 1
+    assert {p: p.read_bytes() for p in tmp_path.iterdir()} == before
+
+
+def test_valid_batch_writes_both_courses_after_validation(tmp_path, setup):
+    predictions, original, sheet = setup
+    for stem in signoff.COURSES.values():
+        paths = signoff._paths(tmp_path, stem)
+        paths["predictions.json"].write_text(json.dumps(predictions), encoding="utf-8")
+        paths["worksheet.md"].write_text(original, encoding="utf-8")
+        paths["worksheet-user.md"].write_text(_fill(sheet, ALL_OK), encoding="utf-8")
+    assert signoff.main(["convert", "--dir", str(tmp_path)]) == 0
+    for stem in signoff.COURSES.values():
+        paths = signoff._paths(tmp_path, stem)
+        judgments = json.loads(paths["judgments-user.json"].read_text(encoding="utf-8"))
+        assert judgments == signoff.to_judgments(_fill(sheet, ALL_OK), original, predictions).judgments
+        assert json.loads(paths["report-user.json"].read_text(encoding="utf-8")) == signoff.evaluate.judge_report(
+            predictions, judgments)

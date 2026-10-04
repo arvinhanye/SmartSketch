@@ -1,0 +1,80 @@
+{
+  "head": "54a7c67",
+  "logs": [
+    {
+      "kind": "integration",
+      "log": "/private/tmp/codex-c-acc-54a7c67-integration.log",
+      "bytes": 25566,
+      "sha256": "308f6a3112d48cd1954c4b47b8e13e229e21de7f8eadfdf32c37441e7c967219",
+      "exit": 0,
+      "status": "recorded_exit"
+    },
+    {
+      "kind": "targeted-final",
+      "log": "/private/tmp/codex-c-acc-54a7c67-targeted-final.log",
+      "bytes": 99,
+      "sha256": "63a498121cd8bcae62bd7d7d226f876882981a6468b50cb30b8a21e38ccffd38",
+      "exit": 0,
+      "status": "recorded_exit"
+    },
+    {
+      "kind": "review-probes-final",
+      "log": "/private/tmp/codex-c-acc-review-probes-final.log",
+      "bytes": 1145,
+      "sha256": "3564b0d4e58f1ff3d85054f333b6d918294834b55b374b39336cab94c0046e7f",
+      "exit": 0,
+      "status": "recorded_exit"
+    },
+    {
+      "kind": "basic-final",
+      "log": "/private/tmp/codex-c-acc-54a7c67-basic-final.log",
+      "bytes": 486,
+      "sha256": "90ff9605e97ed745bc92ba86ea06b125c4c3017394c03b8e5e41aa96413ab5e2",
+      "exit": null,
+      "status": "interrupted_session_no_final_exit_record"
+    }
+  ],
+  "gate_counts": {
+    "backend_tooling": {
+      "passed": 3893,
+      "registered_skips": 27
+    },
+    "frontend": {
+      "passed": 934,
+      "files": 38
+    },
+    "integration": {
+      "passed": 393,
+      "registered_skips": 4
+    },
+    "backend_live": {
+      "passed": 44
+    },
+    "demo_e2e": {
+      "passed": 2
+    },
+    "personal_fake_e2e": {
+      "passed": 4
+    }
+  },
+  "targeted_passed": 33,
+  "persist_equivalent_cases": 27,
+  "priority_counts": {
+    "P1": 0,
+    "P2": 2,
+    "P3": 2
+  },
+  "review_conclusion": "REQUEST_CHANGES",
+  "source_fingerprints_unchanged": true,
+  "source_range_diff_check": {
+    "exit": 2,
+    "warning": "docs/tasks.md:1844: new blank line at EOF"
+  },
+  "paid_generation_calls": 0,
+  "paid_embedding_calls": 0,
+  "generation_total": 844451,
+  "approved_cap": 900000,
+  "embedding_total_separate": 12005,
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED"
+}

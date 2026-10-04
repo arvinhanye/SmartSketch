@@ -1,0 +1,1280 @@
+{
+  "scope": {
+    "base": "4a6308b",
+    "head": "54a7c67",
+    "files": [
+      "docs/handoffs/claude-plan-c-acceptance-closeout.md",
+      "docs/tasks.md",
+      "evaluation/audit_persisted_sources.py",
+      "evaluation/c04_signoff.py",
+      "evaluation/raw/c-acc-a/sources.json",
+      "evaluation/raw/c04-signoff/README.md",
+      "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-claude-assist.json",
+      "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-judgments-user.json",
+      "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-predictions.json",
+      "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-report-user.json",
+      "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet-user.md",
+      "evaluation/raw/c04-signoff/course1-pdf-h2-thinking-off-worksheet.md",
+      "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-claude-assist.json",
+      "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-judgments-user.json",
+      "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-predictions.json",
+      "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-report-user.json",
+      "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet-user.md",
+      "evaluation/raw/c04-signoff/course2-pdf-h2-thinking-off-worksheet.md",
+      "evaluation/reports/c-acc-a-persisted-sources.md",
+      "evaluation/reports/c-acc-d-retest-decisions.md",
+      "src/backend/app/workers/persist_graph.py",
+      "tests/backend/test_c02_phase_logs.py",
+      "tests/tooling/test_c04_signoff_sheet.py",
+      "tests/tooling/test_c_acc_sources.py"
+    ]
+  },
+  "source_state_before": {
+    "claude": {
+      "head": "54a7c67f9137e0135109eacad4adfec58994d4bf",
+      "status": [
+        "?? .claude/launch.json"
+      ]
+    },
+    "measurement": {
+      "head": "88f9f6f8a9fa2cf66c0754050df96fb4df6d363f",
+      "status": []
+    }
+  },
+  "signoff_evidence": [
+    {
+      "course": "course1",
+      "original_hashes": {
+        "predictions.json": {
+          "source_sha256": "a94bb86cca66a4ca24c498bfd3938dee67326ac87d75a5d3488b322a378acd47",
+          "review_sha256": "a94bb86cca66a4ca24c498bfd3938dee67326ac87d75a5d3488b322a378acd47",
+          "equal": true
+        },
+        "worksheet.md": {
+          "source_sha256": "16a086202c6ebd3fd553ad51842b19d09d1ce6a32ce3e15e30064794197c80a0",
+          "review_sha256": "16a086202c6ebd3fd553ad51842b19d09d1ce6a32ce3e15e30064794197c80a0",
+          "equal": true
+        }
+      },
+      "judgments_equal": true,
+      "report_equal": true,
+      "judge": "arvin",
+      "is_human_judgment": true,
+      "hard_indicators": {
+        "entity_count": {
+          "value": 76,
+          "threshold": 20,
+          "passed": true,
+          "gap": 0
+        },
+        "entity_accuracy": {
+          "threshold": 0.7,
+          "threshold_fraction": "7/10",
+          "sampled": 76,
+          "status": "judged",
+          "correct": 64,
+          "judged": 76,
+          "missing": 0,
+          "value": 0.8421,
+          "passed": true,
+          "gap": 0.0
+        },
+        "relation_accuracy": {
+          "threshold": 0.7,
+          "threshold_fraction": "7/10",
+          "sampled": 61,
+          "status": "judged",
+          "correct": 58,
+          "judged": 61,
+          "missing": 0,
+          "value": 0.9508,
+          "passed": true,
+          "gap": 0.0
+        },
+        "is_fake_model": false,
+        "passed": true,
+        "verdict": "达标"
+      },
+      "matched_assist": 137,
+      "incorrect": 15,
+      "same_wrong_notes_after_row_prefix_removal": 11,
+      "removed_review_marker": 4,
+      "edited_ids": [
+        {
+          "kind": "entities",
+          "id": "kp_7cc6867c2d7f73d1707494dfe2983321"
+        },
+        {
+          "kind": "entities",
+          "id": "kp_8836dd5eebce1db365c74d805d8c3319"
+        },
+        {
+          "kind": "entities",
+          "id": "kp_d8e5e75c830e3437a67bb91e037cc343"
+        },
+        {
+          "kind": "entities",
+          "id": "kp_daaf3c6f3e1b627df3f9bcd075892314"
+        }
+      ]
+    },
+    {
+      "course": "course2",
+      "original_hashes": {
+        "predictions.json": {
+          "source_sha256": "50fa5348ae0c24bd458181f2f6b39ab35a09aaca7d5f776cc4a07f972aa2a640",
+          "review_sha256": "50fa5348ae0c24bd458181f2f6b39ab35a09aaca7d5f776cc4a07f972aa2a640",
+          "equal": true
+        },
+        "worksheet.md": {
+          "source_sha256": "f11ebc136d8f22fd27e3feda6e82874546f2eea50e829c05e8d96c70fa7d4122",
+          "review_sha256": "f11ebc136d8f22fd27e3feda6e82874546f2eea50e829c05e8d96c70fa7d4122",
+          "equal": true
+        }
+      },
+      "judgments_equal": true,
+      "report_equal": true,
+      "judge": "arvin",
+      "is_human_judgment": true,
+      "hard_indicators": {
+        "entity_count": {
+          "value": 68,
+          "threshold": 20,
+          "passed": true,
+          "gap": 0
+        },
+        "entity_accuracy": {
+          "threshold": 0.7,
+          "threshold_fraction": "7/10",
+          "sampled": 68,
+          "status": "judged",
+          "correct": 61,
+          "judged": 68,
+          "missing": 0,
+          "value": 0.8971,
+          "passed": true,
+          "gap": 0.0
+        },
+        "relation_accuracy": {
+          "threshold": 0.7,
+          "threshold_fraction": "7/10",
+          "sampled": 58,
+          "status": "judged",
+          "correct": 45,
+          "judged": 58,
+          "missing": 0,
+          "value": 0.7759,
+          "passed": true,
+          "gap": 0.0
+        },
+        "is_fake_model": false,
+        "passed": true,
+        "verdict": "达标"
+      },
+      "matched_assist": 126,
+      "incorrect": 20,
+      "same_wrong_notes_after_row_prefix_removal": 19,
+      "removed_review_marker": 1,
+      "edited_ids": [
+        {
+          "kind": "relations",
+          "id": "rel_5c7f1900416337f2a2f3a3b232e94a8e"
+        }
+      ]
+    }
+  ],
+  "apply_marks_clear_original_rows_identical": true,
+  "escaped_pipe_roundtrip_valid": true,
+  "batch_invalid_second_course": {
+    "exit": 1,
+    "changed_files": [
+      "course1-pdf-h2-thinking-off-judgments-user.json",
+      "course1-pdf-h2-thinking-off-report-user.json"
+    ]
+  },
+  "signoff_boundary_probes": [
+    {
+      "name": "duplicate_row_conflicting_first",
+      "accepted": true,
+      "judgments": {
+        "run_id": "contest-course1-md-64f893370b5e",
+        "judge": "张三",
+        "seed": 20260926,
+        "entities": {
+          "kp_a": "correct",
+          "kp_b": "correct",
+          "kp_c": "incorrect"
+        },
+        "relations": {
+          "rel_1": "correct"
+        },
+        "notes": {
+          "kp_c": "E2：把命令当名称"
+        }
+      }
+    },
+    {
+      "name": "duplicate_row_conflicting_last",
+      "accepted": true,
+      "judgments": {
+        "run_id": "contest-course1-md-64f893370b5e",
+        "judge": "张三",
+        "seed": 20260926,
+        "entities": {
+          "kp_a": "incorrect",
+          "kp_b": "correct",
+          "kp_c": "incorrect"
+        },
+        "relations": {
+          "rel_1": "correct"
+        },
+        "notes": {
+          "kp_a": "E2: conflicting duplicate",
+          "kp_c": "E2：把命令当名称"
+        }
+      }
+    },
+    {
+      "name": "additional_column",
+      "accepted": true,
+      "judgments": {
+        "run_id": "contest-course1-md-64f893370b5e",
+        "judge": "张三",
+        "seed": 20260926,
+        "entities": {
+          "kp_a": "correct",
+          "kp_b": "correct",
+          "kp_c": "incorrect"
+        },
+        "relations": {
+          "rel_1": "correct"
+        },
+        "notes": {
+          "kp_a": "unexpected extra column",
+          "kp_c": "E2：把命令当名称"
+        }
+      }
+    },
+    {
+      "name": "deleted_row",
+      "accepted": false,
+      "exception": "SignoffError",
+      "message": "实体行与原工作表不一致：缺 [1]，多 无"
+    },
+    {
+      "name": "invalid_marker",
+      "accepted": false,
+      "exception": "SignoffError",
+      "message": "实体 #1：判定「invalid」不认识，只能填 ✓ 或 ✗"
+    },
+    {
+      "name": "blank_judge",
+      "accepted": false,
+      "exception": "SignoffError",
+      "message": "判定人为空：在「- 判定人：」后填你的名字"
+    },
+    {
+      "name": "uppercase_assist_judge",
+      "accepted": false,
+      "exception": "SignoffError",
+      "message": "判定人不能以 claude-assist 开头（那是 Claude 辅助判定的标记）"
+    },
+    {
+      "name": "unfilled",
+      "accepted": false,
+      "exception": "SignoffError",
+      "message": "判定人为空：在「- 判定人：」后填你的名字\n未填 4 条：实体 #1、实体 #2、实体 #3、关系 #1"
+    },
+    {
+      "name": "incorrect_without_note",
+      "accepted": false,
+      "exception": "SignoffError",
+      "message": "实体 #3：判 ✗ 必须在「依据」写违反的编号（如 E3、R5）"
+    }
+  ],
+  "persist_semantics_comparison": [
+    {
+      "case": "success",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "t6",
+        "lock_exit"
+      ],
+      "outcome": {
+        "return": {
+          "status": "advanced",
+          "task_id": "t-review",
+          "stage": "awaiting_review",
+          "error_code": null,
+          "not_before": null,
+          "nodes": 4,
+          "relations": 3,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "retry",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "write",
+        "t6",
+        "lock_exit"
+      ],
+      "outcome": {
+        "return": {
+          "status": "advanced",
+          "task_id": "t-review",
+          "stage": "awaiting_review",
+          "error_code": null,
+          "not_before": null,
+          "nodes": 4,
+          "relations": 3,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "lock_missing",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "candidates_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "plan_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "chunks_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "plan_runtime",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan"
+      ],
+      "outcome": {
+        "exception": "RuntimeError",
+        "message": "synthetic failure"
+      }
+    },
+    {
+      "case": "lock_acquire_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire"
+      ],
+      "outcome": {
+        "exception": "OperationalError",
+        "message": "synthetic failure"
+      }
+    },
+    {
+      "case": "lock_enter_lost",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter"
+      ],
+      "outcome": {
+        "return": {
+          "status": "lost",
+          "task_id": "t-review",
+          "stage": null,
+          "error_code": null,
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "lease_lost",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "lock_exit"
+      ],
+      "outcome": {
+        "return": {
+          "status": "lost",
+          "task_id": "t-review",
+          "stage": null,
+          "error_code": null,
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "effective_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "lock_exit",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "neo4j_repository",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "neo4j_cycle",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "CYCLE_DETECTED",
+            "details": {
+              "cycle": [
+                "a",
+                "b",
+                "a"
+              ]
+            },
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "failed",
+          "task_id": "t-review",
+          "stage": "failed",
+          "error_code": "CYCLE_DETECTED",
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": true
+        }
+      }
+    },
+    {
+      "case": "neo4j_runtime",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "failed",
+          "task_id": "t-review",
+          "stage": "failed",
+          "error_code": "INTERNAL_ERROR",
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": true
+        }
+      }
+    },
+    {
+      "case": "neo4j_value",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "failed",
+          "task_id": "t-review",
+          "stage": "failed",
+          "error_code": "INTERNAL_ERROR",
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": true
+        }
+      }
+    },
+    {
+      "case": "neo4j_key",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit"
+      ],
+      "outcome": {
+        "exception": "KeyError",
+        "message": "'synthetic key'"
+      }
+    },
+    {
+      "case": "t6_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "t6",
+        "lock_exit",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "t6_lost",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "t6",
+        "lock_exit"
+      ],
+      "outcome": {
+        "return": {
+          "status": "lost",
+          "task_id": "t-review",
+          "stage": null,
+          "error_code": null,
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      }
+    },
+    {
+      "case": "lock_exit_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "t6",
+        "lock_exit",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "released",
+          "task_id": "t-review",
+          "stage": "persisting",
+          "error_code": null,
+          "not_before": 10,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": false
+        }
+      },
+      "persist_steps_fields": "candidates_ms=0 plan_ms=0 chunks_ms=0 lock_wait_ms=0 lease_check_ms=0 neo4j_ms=0 t6_ms=0 task_release_ms=0 neo4j_attempts=1",
+      "lock_release_ms_present": false
+    },
+    {
+      "case": "lock_exit_runtime",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "t6",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "failed",
+          "task_id": "t-review",
+          "stage": "failed",
+          "error_code": "INTERNAL_ERROR",
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": true
+        }
+      }
+    },
+    {
+      "case": "t6_runtime",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "t6",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "failed",
+          "task_id": "t-review",
+          "stage": "failed",
+          "error_code": "INTERNAL_ERROR",
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": true
+        }
+      }
+    },
+    {
+      "case": "neo4j_relation",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "return": {
+          "status": "failed",
+          "task_id": "t-review",
+          "stage": "failed",
+          "error_code": "INTERNAL_ERROR",
+          "not_before": null,
+          "nodes": null,
+          "relations": null,
+          "downgraded": [],
+          "cleanup_pending": true
+        }
+      }
+    },
+    {
+      "case": "release_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "exception": "OperationalError",
+        "message": "synthetic failure"
+      }
+    },
+    {
+      "case": "release_runtime",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        [
+          "release",
+          {
+            "max_attempts": 3,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "exception": "RuntimeError",
+        "message": "synthetic failure"
+      }
+    },
+    {
+      "case": "failure_sqlite",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "exception": "OperationalError",
+        "message": "synthetic failure"
+      }
+    },
+    {
+      "case": "failure_runtime",
+      "equivalent": true,
+      "events": [
+        "candidates",
+        "plan",
+        "source_ids",
+        "chunks",
+        "lock_acquire",
+        "lock_enter",
+        "lease",
+        "effective",
+        "transaction",
+        [
+          "scope",
+          "c-review",
+          "draft",
+          [
+            "t-current"
+          ]
+        ],
+        "write",
+        "lock_exit",
+        [
+          "failure",
+          {
+            "code": "INTERNAL_ERROR",
+            "details": null,
+            "holder": "override",
+            "lock_seconds": 60,
+            "lock_wait_seconds": 1
+          }
+        ]
+      ],
+      "outcome": {
+        "exception": "RuntimeError",
+        "message": "synthetic failure"
+      }
+    },
+    {
+      "case": "invalid_stage",
+      "equivalent": true,
+      "events": [],
+      "outcome": {
+        "exception": "ValueError",
+        "message": "lease is on stage parsing, not persisting"
+      }
+    }
+  ],
+  "readonly_four_module_patch_and_exception_restore": true,
+  "source_state_after": {
+    "claude": {
+      "head": "54a7c67f9137e0135109eacad4adfec58994d4bf",
+      "status": [
+        "?? .claude/launch.json"
+      ]
+    },
+    "measurement": {
+      "head": "88f9f6f8a9fa2cf66c0754050df96fb4df6d363f",
+      "status": []
+    }
+  },
+  "measurement_db_main_sha256_matches_stored_sources": true,
+  "measurement_db_sidecar_sizes": {
+    "-wal": 0,
+    "-shm": 32768
+  },
+  "paid_generation_calls": 0,
+  "paid_embedding_calls": 0
+}
