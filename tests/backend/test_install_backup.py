@@ -48,3 +48,18 @@ def test_restore_preserves_volume_root_permissions(tmp_path):
     restore_volumes(targets,export)
     assert targets['app'].stat().st_mode & 0o777==0o700
     assert targets['app'].stat().st_uid==volumes['app'].stat().st_uid
+
+
+def test_db_gate_checks_copied_live_wal_without_opening_readonly_source(tmp_path,monkeypatch):
+    from app.tools import install_backup as tool
+    root=tmp_path/'source';root.mkdir();db=root/'smartsketch.sqlite3'
+    conn=sqlite3.connect(db);conn.execute('PRAGMA journal_mode=WAL');conn.execute('CREATE TABLE processing_tasks(lease_expires_at INTEGER)');conn.execute('INSERT INTO processing_tasks VALUES(unixepoch()+120)');conn.commit()
+    original_connect=sqlite3.connect
+    def read_only_volume_connect(filename,*args,**kwargs):
+        if str(filename).startswith(db.as_uri()):raise sqlite3.OperationalError('synthetic read-only mount cannot create shm')
+        return original_connect(filename,*args,**kwargs)
+    before=db.read_bytes();wal=Path(str(db)+'-wal').read_bytes();monkeypatch.setattr(tool.sqlite3,'connect',read_only_volume_connect)
+    try:
+        with pytest.raises(BackupError,match='Live task lease'):tool._db_gate(root)
+        assert db.read_bytes()==before and Path(str(db)+'-wal').read_bytes()==wal
+    finally:conn.close()

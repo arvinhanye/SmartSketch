@@ -13,14 +13,23 @@ class BackupError(ValueError): pass
 
 def _db_gate(root):
     db=root/'smartsketch.sqlite3'
-    if not db.is_file(): raise BackupError('SQLite snapshot missing')
+    if db.is_symlink() or not db.is_file(): raise BackupError('SQLite snapshot missing')
+    # Source mounts stay physically read-only. Even an offline WAL-mode database
+    # may need a writable -shm file for a mode=ro reader; validate a private copy
+    # including WAL instead of writing source metadata or ignoring WAL with immutable.
     try:
-        with sqlite3.connect(db.as_uri()+'?mode=ro',uri=True) as conn:
-            conn.execute('PRAGMA query_only=ON')
-            if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok': raise BackupError('SQLite snapshot invalid')
-            if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='processing_tasks'").fetchone():
-                if conn.execute('SELECT 1 FROM processing_tasks WHERE lease_expires_at >= unixepoch() LIMIT 1').fetchone(): raise BackupError('Live task lease blocks backup')
-    except sqlite3.Error: raise BackupError('SQLite snapshot invalid') from None
+        with tempfile.TemporaryDirectory(prefix='smartsketch-db-check-') as temp:
+            copied=Path(temp)/db.name
+            shutil.copyfile(db,copied)
+            wal=Path(str(db)+'-wal')
+            if wal.is_symlink(): raise BackupError('Unsupported volume entry')
+            if wal.exists(): shutil.copyfile(wal,Path(str(copied)+'-wal'))
+            with sqlite3.connect(copied.as_uri()+'?mode=ro',uri=True) as conn:
+                conn.execute('PRAGMA query_only=ON')
+                if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok': raise BackupError('SQLite snapshot invalid')
+                if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='processing_tasks'").fetchone():
+                    if conn.execute('SELECT 1 FROM processing_tasks WHERE lease_expires_at >= unixepoch() LIMIT 1').fetchone(): raise BackupError('Live task lease blocks backup')
+    except (OSError,sqlite3.Error): raise BackupError('SQLite snapshot invalid') from None
 
 def _source_files(root):
     if root.is_symlink() or not root.is_dir(): raise BackupError('Invalid volume source')
