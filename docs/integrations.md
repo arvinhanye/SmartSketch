@@ -325,9 +325,11 @@ docker compose --profile app down        # 保留 app-data 卷
 
 ## 候选：跨平台本机发行启动（STARTUP-01，未实现）
 
-- 用户已确认双击入口＋首次安装向导＋Docker方向；详细方案见docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md，状态AWAITING_SPEC_APPROVAL。
+- 用户已确认双击入口＋首次安装向导＋Docker方向；详细方案见docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md，规格已APPROVED，实施计划仍AWAITING_PLAN_APPROVAL。
 - 继续消费现有个人生成模式与在线向量环境变量。向导拟在本机私有配置目录写.env，应用仍经环境读取配置；未新增系统模型配置表或业务API，ADR-081不变。此处不含真实凭据，也未新增可用的环境变量。
 - 拟采用独立发行Compose、稳定安装ID/命名卷、固定多架构镜像与容器内教师引导。当前开发Compose与start.sh继续有效；不要执行尚不存在的发行入口，也不要把现有.env复制到评测隔离目录。
 - 初版目标Mac arm64/amd64与Windows11 x64＋Docker Desktop WSL2；三平台支持须有实机记录，当前均未验证。普通用户无需宿主Python/Node；共用编译启动核心拟使用Go，构建依赖尚未增加。
 - 镜像拟通过仓库关联GHCR发布，公开发行匿名拉取和固定摘要为验收条件；发布权限/网络与实机条件要在实施期落实，本轮不访问或写镜像仓库。
 - 默认无真实模型/向量连接测试；格式/容器健康通过不代表供应商可用。升级只针对本安装，先停机备份；不接管原开发或测量库。新功能实现完成前以现有本机启动指南为准。
+
+- 2026-10-04计划补充：拟采用Go1.26.8开发/构建工具链（官方发布记录https://go.dev/doc/devel/release，本机尚无Go），不新增用户运行依赖。计划docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md；开发工具准备、GHCR推送/公开发行和跨平台实测均未执行。环境文件格式按Docker官方插值规则，需用实际Compose读取诱饵值验证：https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/。

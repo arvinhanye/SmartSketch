@@ -1,5 +1,7 @@
 # Codex 交接：跨平台双击启动设计
 
+> 后续更新：用户2026-10-04已确认正式规格；以下为设计交付时的历史记录。当前计划与审批边界以docs/handoffs/codex-cross-platform-startup-plan.md为准。
+
 - 日期：2026-10-04；任务STARTUP-01
 - 状态：AWAITING_SPEC_APPROVAL；本轮仅设计，无启动器代码
 - 工作区：/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch

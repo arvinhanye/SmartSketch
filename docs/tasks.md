@@ -1899,12 +1899,27 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| STARTUP-01 | AWAITING_SPEC_APPROVAL（方向已确认；设计文档已交付） | Codex | docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md、当前登记、方向决策/集成边界、Codex交接 | 本机双击入口＋首次向导＋Docker的架构、状态、配置与数据保护、账号引导、平台验收明确；用户审核本文后才写实施计划 |
+| STARTUP-01 | DONE（设计已获用户确认，2026-10-04；非功能完成） | Codex | docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md、当前登记、方向决策/集成边界、Codex交接 | 本机双击入口＋首次向导＋Docker的架构、状态、配置与数据保护、账号引导、平台验收明确；用户审核本文后才写实施计划 |
 
 - 用户已确认采用“双击入口＋安装向导＋Docker”，继续保留 Web 业务；没有批准尚未存在的实施计划或原生桌面应用。
 - 输入：bdb89c46、现有 Compose/Dockerfile/start.sh、ADR-080/081、身份规格；输出：正式待审核设计与交接。写入范围仅文档，未改业务代码/配置/数据。
-- 已核对：Compose完整应用基础可复用；后端镜像未打包教师引导脚本；学生注册已存在；开发启动依赖宿主Python/npm，发行入口需独立。拟共用Go启动核心为设计细节，随规格待审批，当前未安装新依赖。
+- 已核对：Compose完整应用基础可复用；后端镜像未打包教师引导脚本；学生注册已存在；开发启动依赖宿主Python/npm，发行入口需独立。共用Go启动核心已随规格获用户确认，当前未安装新依赖。
 - 风险：Windows/Intel Mac实机、预构建多架构镜像、镜像仓库发布权限仍需实施期落实；本期只管理新的独立安装或自身已有安装，不自动迁移当前工作区的课程库。
 - 验证：./scripts/verify.sh basic（实际命令未传参数，使用默认basic）exit 0；git diff --check exit 0；设计自审无实现占位。日志 /private/tmp/smartsketch-startup-design-basic-retry.log。首次因PATH缺/usr/local/bin的契约工具而exit 1，未计PASS；补齐既有工具路径后重跑。full/integration及启动器定向/三平台实测未执行，不计PASS。
-- 未决：规格用户审核→实施计划审核/执行方式→发行镜像发布授权与各平台实机资源。全局向量业务设置保持CANCELLED_BY_USER；向导只生成本机环境配置，不改ADR-081。
+- 当前：规格已获用户确认；未决为实施计划审核/执行方式→发行镜像发布授权与各平台实机资源。全局向量业务设置保持CANCELLED_BY_USER；向导只生成本机环境配置，不改ADR-081。
 - 交接：docs/handoffs/codex-cross-platform-startup-design.md。stage_c_status OPEN；technical_freeze NOT_PERFORMED；本轮生成调用0、在线向量0，未操作共享或测量数据库、未推送合并。
+
+
+## 2026-10-04 Codex 认领：STARTUP-02 启动方案实施计划
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| STARTUP-02 | AWAITING_PLAN_APPROVAL（计划已交付；执行方式未选） | Codex | docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md、已确认规格的状态更新、项目文档及Codex交接 | 九项任务明确文件/接口/红绿测试/提交/隔离与实机验收；用户审核计划并选择执行方式后才进入产品实现 |
+
+- 用户本轮“确认”批准正式规格，允许编写计划；不视为已批准此前不存在的实施计划、真实调用、镜像发布或技术冻结。
+- 输入：d517eeb的正式规格、既有代码bdb89c46；输出：T1–T9实施计划与交接。规划只改文档，不新增Go/Python/脚本代码、构建依赖或运行配置。
+- T1/STARTUP-03配置/权限/锁；T2/04受控Docker；T3/05教师引导；T4/06发行编排/探测；T5/07生命周期；T6/08向导/诊断；T7/09备份恢复；T8/10打包/CI；T9/11隔离门禁/平台实测。全部PLANNED（未执行、未另认领）。
+- 验证：默认basic ./scripts/verify.sh exit 0（日志/private/tmp/smartsketch-startup-plan-basic.log；受限工作区pytest缓存写入产生警告，不影响测试退出）；git diff --check exit 0；任务/接口/规格覆盖自审。第一次基础检查权限审批超时，未执行；之后默认权限重跑完成，未规避代码测试。
+- 未验证：新启动器、三平台打包/双击、Go定向测试、发行镜像、full/integration。当前无Go；Go1.26.8按官方发布记录选择，实施获批后再准备开发工具链。
+- 风险：新增部署核心接管密码/本机Docker控制，必须完成权限/所有权/跨站门禁回归；恢复要保留原卷；Windows/Mac Intel实机和GHCR权限尚未落实，不计PASS。
+- 交接：docs/handoffs/codex-cross-platform-startup-plan.md。生成调用0、在线向量0；未读真实.env、未启动容器、未改业务/测量库、未推送合并；stage_c_status OPEN，technical_freeze NOT_PERFORMED。
