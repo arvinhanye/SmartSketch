@@ -45,6 +45,7 @@ const (
 )
 
 type InstallState struct {
+	DataGeneration                         string
 	SchemaVersion                          int
 	InstallID, ReleaseVersion              string
 	Phase                                  Phase

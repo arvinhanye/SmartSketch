@@ -81,7 +81,7 @@ func (s *Store) atomic(name string, b []byte) error {
 	return nil
 }
 func validState(st InstallState) bool {
-	if st.SchemaVersion != 1 || !idPattern.MatchString(st.InstallID) || st.WebPort < 1024 || st.WebPort > 65535 {
+	if (st.DataGeneration != "" && !idPattern.MatchString(st.DataGeneration)) || st.SchemaVersion != 1 || !idPattern.MatchString(st.InstallID) || st.WebPort < 1024 || st.WebPort > 65535 {
 		return false
 	}
 	switch st.Phase {

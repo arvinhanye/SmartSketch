@@ -24,7 +24,7 @@ func (d *Docker) run(ctx context.Context, args []string, stdin []byte) (ProcessR
 	if d.Runner == nil {
 		d.Runner = ExecRunner{}
 	}
-	env := childEnv()
+	env := append(childEnv(), "BACKUP_DIR="+filepath.Join(filepath.Dir(d.EnvPath), "backups"))
 	for _, a := range args {
 		if strings.HasPrefix(a, "smartsketch-") && idPattern.MatchString(strings.TrimPrefix(a, "smartsketch-")) {
 			env = append(env, "INSTALL_ID="+strings.TrimPrefix(a, "smartsketch-"), "BACKEND_IMAGE="+d.Manifest.BackendImage, "FRONTEND_IMAGE="+d.Manifest.FrontendImage, "NEO4J_IMAGE="+d.Manifest.Neo4jImage)
@@ -55,6 +55,12 @@ func (d *Docker) compose(s InstallState, args ...string) ([]string, error) {
 		return nil, e
 	}
 	base := []string{"compose", "--project-name", p, "--project-directory", filepath.Dir(d.EnvPath), "--env-file", d.EnvPath, "-f", d.ComposePath}
+	if s.DataGeneration != "" {
+		if !idPattern.MatchString(s.DataGeneration) {
+			return nil, fail("OWNERSHIP", "volume")
+		}
+		base = append(base, "-f", filepath.Join(filepath.Dir(d.EnvPath), "volumes.json"))
+	}
 	return append(base, args...), nil
 }
 func (d *Docker) RunStage(ctx context.Context, s InstallState, stage string, stdin []byte) error {

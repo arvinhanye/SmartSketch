@@ -51,6 +51,32 @@ services:
     volumes: ["app-data:/data:ro"]
     command: [python, -m, app.tools.install_probe]
     restart: "no"
+  backup:
+    image: *backend
+    profiles: [offline-tools]
+    labels: *labels
+    user: "0"
+    network_mode: none
+    command: [python, -m, app.tools.install_backup, backup]
+    volumes:
+      - app-data:/source/app:ro
+      - neo4j-data:/source/neo4j:ro
+      - neo4j-logs:/source/neo4j-logs:ro
+      - ${BACKUP_DIR:?}:/backup
+    restart: "no"
+  restore:
+    image: *backend
+    profiles: [offline-tools]
+    labels: *labels
+    user: "0"
+    network_mode: none
+    command: [python, -m, app.tools.install_backup, restore]
+    volumes:
+      - restore-app:/stage/app
+      - restore-neo4j:/stage/neo4j
+      - restore-neo4j-logs:/stage/neo4j-logs
+      - ${BACKUP_DIR:?}:/backup:ro
+    restart: "no"
   api:
     image: *backend
     labels: *labels
@@ -86,4 +112,10 @@ volumes:
   neo4j-data:
     labels: *labels
   neo4j-logs:
+    labels: *labels
+  restore-app:
+    labels: *labels
+  restore-neo4j:
+    labels: *labels
+  restore-neo4j-logs:
     labels: *labels
