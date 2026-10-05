@@ -1955,3 +1955,19 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 - 仍OPEN：独立整支复审完整结论（reviewer用量中断，已收到发现均处理）；Mac Intel正式包、Mac ARM、Windows11真实双击/ACL/WSL2、中文路径、拉取中断；GHCR多架构真实摘要、匿名拉取、正式包SHA与下载渠道。不得用测试adapter/跨编译冒充正式发行。
 - 本轮未推送/合并/发布、未自动迁移旧开发安装、未改共享Neo4j/测量区、真实生成/向量调用0；生成844451/900000、向量12005另计不变。当前本地分支保留，需用户另授权正式发行。
 - stage_c_status OPEN、technical_freeze NOT_PERFORMED，用户检查与冻结决定保留；不因启动器门禁通过改写计划C历史未测项、准确率签收方式或归因缺口。
+
+
+## 2026-10-05 STARTUP-12：实际安装包与配置至登录验收
+
+负责人 Codex；状态 IN_PROGRESS。用户要求继续完整“双击→配置→启动→登录”，接续 STARTUP-10/11 的发行缺口，不重复已完成源码任务。
+- 输入：e88b56a（源码7fee1c8）、批准规格/计划；输出：真实镜像摘要、版本匹配的三目标包、当前 Mac 的真实入口/向导/登录验证记录、更新用户指南与Codex交接。
+- 范围：发行构建/打包/验收资产及必要回归修复；不改旧e92f或Claude/测量工作区，不读取个人.env，不用业务库。
+- 依赖：本机 Docker Desktop、已校验 Go SDK、GitHub/GHCR发布权限；公开镜像发布单独等待用户答复。未获许可不push/发布。
+- 验收：正式摘要而非测试标签/adapter，真实启动器进入向导、隔离新安装、教师浏览器登录、重开复用；Windows/ARM无实机则OPEN，跨编译不冒充实测。
+- 风险：网络/注册表权限、冷拉取耗时、未签名系统提示。仅处理本轮新合成资源；不prune、不触及原发布、共享Neo4j；不调用真实生成/在线向量。
+- 验证：干净git archive副本，官方Dockerfiles镜像构建；scripts/package-launcher.py及SHA核对；Go race/vet与相关pytest；有代码修改则补红绿及./scripts/verify.sh integration，无代码修改至少basic；实际包入口和浏览器全链路。
+- stage_c_status OPEN；technical_freeze NOT_PERFORMED；生成844451/900000、向量12005另计不变。
+
+STARTUP-12 发布授权：用户已明确同意将后端/前端镜像发布GHCR并设公开，制作本地安装包；GitHub设备授权packages权限已完成。此授权不含合并分支或技术冻结。干净后端第一次PyPI依赖查询失败；官方PyPI与一次性容器确认固定版本存在，未降级/改版本，保持Dockerfile重跑继续。Go首次回环监听受sandbox限制，获准隔离目录重跑race/vet exit0，前端双架构官方构建exit0；均不冒充正式包登录证据。
+
+STARTUP-12当前收尾检查点（非完成）：本地源码8314092/9e8b4a1；真实GHCR双架构镜像已上传，仍Private；UI公开步骤被审批要求临近确认，已询问，未绕过。3份真实摘要包生成并SHA3 OK，dist/startup-preview-20261005保留。真实Mac入口/向导/非法口令拒绝通过，private pull401失败未到登录，0本安装运行残留。独立复审4 Important已修正/明确缩小口径，4红绿helper PASS；Minor输出canary扫描deferred。完整integration首次缺默认浏览器exit1（其他层已过），指定Chrome纠正重跑后台36170仍运行，接续先读结果。报告docs/reviews/codex-startup-delivery-20261005.md、JSON startup-delivery-verification.json、交接docs/handoffs/codex-startup-delivery-20261005.md。OPEN直到公开匿名拉取与实际登录验收；technical_freeze NOT_PERFORMED。

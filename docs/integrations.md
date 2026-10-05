@@ -342,3 +342,7 @@ docker compose --profile app down        # 保留 app-data 卷
 - 环境变量沿用 .env.example：EMBEDDING_*、NEO4J_PASSWORD、AUTH_JWT_SECRET、MODEL_CREDENTIAL_KEY、LLM_MODE=personal；INSTALL_ID / BACKEND_IMAGE / FRONTEND_IMAGE / NEO4J_IMAGE / BACKUP_DIR 仅启动器向 Compose 注入，由核心生成/校验，不接受网页供应。
 - 向导无自动 API 联网测试；会话令牌只在本机 fragment/内存及权限保护的控制 capability 文件，诊断不含任何真实配置值。
 - .github/workflows/release-local.yml 仅上传构建 artifacts，无 packages:write / 镜像推送 / 自动发布。正式发行仍需用户另行授权。
+
+## 2026-10-05 启动预览发行镜像（尚未公开签收）
+
+经用户授权，GHCR ghcr.io/arvinhanye/smartsketch-backend 与 smartsketch-frontend 的 preview-20261005-e88b56a 双架构镜像已上传；固定真实摘要见 packaging/release-manifest.preview-20261005.json。当前仍Private，公开访问的UI提交等待临近确认；普通用户匿名拉取尚未通过。Docker发布认证仅在本机工具/密钥存储中，凭据不进镜像、包、源码或诊断；不引入业务模型API变化，不把拉取成功等同于供应商API验证。

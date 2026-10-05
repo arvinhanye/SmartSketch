@@ -1,0 +1,114 @@
+{
+  "status": "OPEN",
+  "version": "preview-20261005-e88b56a",
+  "launcher_source_commit": "e88b56a47645ef757948a73dfac6a7a522f7f7c8",
+  "build_fix_commit": "83140929b0881d2112b5ce0cec9b9022d9145555",
+  "acceptance_fix_commit": "9e8b4a1b6a043081724b9aa5cebb82b131857761",
+  "release_manifest": {
+    "version": "preview-20261005-e88b56a",
+    "backend_image": "ghcr.io/arvinhanye/smartsketch-backend@sha256:fa9cff4449a32f9245a0bd1c658dcb92f83030aeb41318f4c7e596ab321ae784",
+    "frontend_image": "ghcr.io/arvinhanye/smartsketch-frontend@sha256:126ada210c9a275316f5de33bd8c5f7feb86a26033a36c1403643e77315053a9",
+    "neo4j_image": "neo4j@sha256:ab3aafb0020e6fed65bb2b59f7db1fabd7ee0568c4da46f3cc3b8fad77801d61",
+    "compose_sha256": "a468d27a535e73c6198d31d2688619416327ec4888629002b6f172f750981eab",
+    "targets": [
+      "darwin-amd64",
+      "darwin-arm64",
+      "windows-amd64"
+    ]
+  },
+  "visibility": {
+    "frontend": "private",
+    "backend": "private",
+    "pending": "action-time user confirmation after UI guard rejection"
+  },
+  "packages": {
+    "SmartSketch-preview-20261005-e88b56a-darwin-amd64.tar.gz": {
+      "sha256": "beea90ba5aa13ddff3e332605f4d8a032b988dc204822d070a3de480ae5bc6c5",
+      "bytes": 5786268,
+      "files": [
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/README.md",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/bin",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/bin/smartsketch-launcher",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/compose.release.yaml",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/release-manifest.json",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/start-macos.command",
+        "SmartSketch-preview-20261005-e88b56a-darwin-amd64/target.txt"
+      ]
+    },
+    "SmartSketch-preview-20261005-e88b56a-darwin-arm64.tar.gz": {
+      "sha256": "b8d25504dac3df6f69aad88645416b7b411efa125148a1736774fd325a31ab12",
+      "bytes": 5413116,
+      "files": [
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/README.md",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/bin",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/bin/smartsketch-launcher",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/compose.release.yaml",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/release-manifest.json",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/start-macos.command",
+        "SmartSketch-preview-20261005-e88b56a-darwin-arm64/target.txt"
+      ]
+    },
+    "SmartSketch-preview-20261005-e88b56a-windows-amd64.zip": {
+      "sha256": "7aa3f6c162ab0b71b2afd6dcef52bbe041e5f4b4030fad5759df4442416d7f82",
+      "bytes": 5707001,
+      "files": [
+        "SmartSketch-preview-20261005-e88b56a-windows-amd64/README.md",
+        "SmartSketch-preview-20261005-e88b56a-windows-amd64/bin/smartsketch-launcher.exe",
+        "SmartSketch-preview-20261005-e88b56a-windows-amd64/compose.release.yaml",
+        "SmartSketch-preview-20261005-e88b56a-windows-amd64/release-manifest.json",
+        "SmartSketch-preview-20261005-e88b56a-windows-amd64/start-windows.cmd",
+        "SmartSketch-preview-20261005-e88b56a-windows-amd64/target.txt"
+      ]
+    }
+  },
+  "gate_first": {
+    "exit": 1,
+    "backend_passed": 3949,
+    "backend_skipped_registered": 27,
+    "frontend_passed": 934,
+    "integration_passed": 393,
+    "integration_skipped_registered": 4,
+    "backend_live_passed": 44,
+    "demo_e2e_failed": 2,
+    "personal_e2e_failed": 4,
+    "cause": "missing default Playwright executable"
+  },
+  "gate_retry": {
+    "status": "RUNNING_AT_LAST_CHECK",
+    "log": "/private/tmp/smartsketch-delivery-20261005/logs/integration-browser-retry.log",
+    "session_id": 36170,
+    "browser": "installed Google Chrome"
+  },
+  "go_race_vet": "PASS (loopback sandbox retry)",
+  "guard_tests": {
+    "passed": 4,
+    "skipped": 0
+  },
+  "package_tooling_tests": {
+    "passed": 10
+  },
+  "package_actual_private_probe": {
+    "result": "FAIL",
+    "passed_stages": [
+      "actual-entry-start",
+      "real-wizard-ready",
+      "invalid-password-rejected-without-config"
+    ],
+    "failure": "private registry pull unauthorized under isolated HOME",
+    "cleanup": {
+      "stopped": true,
+      "residual_count": 0
+    }
+  },
+  "handoffs_unverified": [
+    "initial OS browser destination",
+    "open-software-button browser destination",
+    "Finder double click",
+    "Mac ARM hardware",
+    "Windows11 hardware"
+  ],
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED"
+}
