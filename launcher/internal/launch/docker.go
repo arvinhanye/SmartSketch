@@ -24,9 +24,16 @@ func (d *Docker) run(ctx context.Context, args []string, stdin []byte) (ProcessR
 	if d.Runner == nil {
 		d.Runner = ExecRunner{}
 	}
+	env := childEnv()
+	for _, a := range args {
+		if strings.HasPrefix(a, "smartsketch-") && idPattern.MatchString(strings.TrimPrefix(a, "smartsketch-")) {
+			env = append(env, "INSTALL_ID="+strings.TrimPrefix(a, "smartsketch-"), "BACKEND_IMAGE="+d.Manifest.BackendImage, "FRONTEND_IMAGE="+d.Manifest.FrontendImage, "NEO4J_IMAGE="+d.Manifest.Neo4jImage)
+			break
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, 180*time.Second)
 	defer cancel()
-	r, e := d.Runner.Run(ctx, ProcessRequest{d.CLI, args, childEnv(), stdin})
+	r, e := d.Runner.Run(ctx, ProcessRequest{d.CLI, args, env, stdin})
 	if e != nil || r.ExitCode != 0 {
 		return r, fail("PROCESS", "docker")
 	}
