@@ -1,0 +1,49 @@
+name: Build launcher artifacts (no publishing)
+on:
+  workflow_dispatch:
+    inputs:
+      manifest_path:
+        description: Optional checked repository manifest with real immutable image digests
+        type: string
+        required: false
+permissions:
+  contents: read
+jobs:
+  artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.8'
+          cache-dependency-path: launcher/go.mod
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Verify and cross-compile (no image push)
+        env:
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+          CGO_ENABLED: '0'
+          GOTOOLCHAIN: local
+        run: |
+          scripts/verify/startup.sh
+          mkdir -p dist/binaries
+          version=development
+          if [[ -n "$MANIFEST_PATH" ]]; then
+            version="$(python -c 'import importlib.util,os,pathlib; s=importlib.util.spec_from_file_location("p","scripts/package-launcher.py"); m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(m._manifest(pathlib.Path(os.environ["MANIFEST_PATH"]))["version"])')"
+          fi
+          for target in darwin-arm64 darwin-amd64 windows-amd64; do
+            platform=${target%-*}; arch=${target#*-}; suffix=""; [[ $platform != windows ]] || suffix=.exe
+            (cd launcher && GOOS="$platform" GOARCH="$arch" go build -trimpath -ldflags "-X github.com/arvinhanye/SmartSketch/launcher/internal/launch.Version=$version" -o "../dist/binaries/smartsketch-launcher-$target$suffix" ./cmd/smartsketch-launcher)
+          done
+          if [[ -n "$MANIFEST_PATH" ]]; then
+            python scripts/package-launcher.py --manifest "$MANIFEST_PATH" --binaries dist/binaries --output dist/packages
+          else
+            echo 'No release manifest supplied: binaries only, not a usable published installation package.'
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smartsketch-launcher-build
+          path: dist/

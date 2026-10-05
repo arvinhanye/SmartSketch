@@ -153,7 +153,7 @@ func (d *Docker) Inspect(ctx context.Context, s InstallState) (Snapshot, error) 
 	if e != nil {
 		return snap, e
 	}
-	var rows []struct{ Service, State, Health string }
+	var rows []struct{ ID, Service, State, Health string }
 	trim := strings.TrimSpace(string(r.Stdout))
 	if strings.HasPrefix(trim, "[") {
 		if json.Unmarshal(r.Stdout, &rows) != nil {
@@ -164,7 +164,7 @@ func (d *Docker) Inspect(ctx context.Context, s InstallState) (Snapshot, error) 
 			if line == "" {
 				continue
 			}
-			var row struct{ Service, State, Health string }
+			var row struct{ ID, Service, State, Health string }
 			if json.Unmarshal([]byte(line), &row) != nil {
 				return snap, fail("PROCESS", "inspect")
 			}
@@ -172,6 +172,14 @@ func (d *Docker) Inspect(ctx context.Context, s InstallState) (Snapshot, error) 
 		}
 	}
 	for _, row := range rows {
+		if row.ID == "" {
+			return Snapshot{}, fail("OWNERSHIP", "container")
+		}
+		r, e := d.run(ctx, []string{"container", "inspect", row.ID, "--format", "{{json .Config.Labels}}"}, nil)
+		var labels map[string]string
+		if e != nil || json.Unmarshal(r.Stdout, &labels) != nil || checkVolumeOwner(labels, s.InstallID) != nil {
+			return Snapshot{}, fail("OWNERSHIP", "container")
+		}
 		healthy := row.State == "running" && row.Health == "healthy"
 		switch row.Service {
 		case "neo4j":

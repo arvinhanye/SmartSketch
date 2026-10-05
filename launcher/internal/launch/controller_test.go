@@ -82,21 +82,29 @@ func TestCrashAfterTeacherCreatedResumesWithoutReset(t *testing.T) {
 
 // Transport fake implements the Docker CLI protocol, exercising real controller sequencing.
 type engineRunner struct {
-	Requests []ProcessRequest
-	FailApp  bool
+	InstallID string
+	Requests  []ProcessRequest
+	FailApp   bool
 }
 
 func (r *engineRunner) Run(_ context.Context, q ProcessRequest) (ProcessResult, error) {
 	r.Requests = append(r.Requests, q)
 	a := strings.Join(q.Args, " ")
+	for _, value := range q.Env {
+		if strings.HasPrefix(value, "INSTALL_ID=") {
+			r.InstallID = strings.TrimPrefix(value, "INSTALL_ID=")
+		}
+	}
 	out := ""
 	switch {
 	case a == "context inspect":
 		out = `[{"Endpoints":{"docker":{"Host":"unix:///local.sock"}}}]`
 	case strings.HasPrefix(a, "info "):
 		out = "linux"
+	case strings.Contains(a, "container inspect"):
+		out = `{"com.docker.compose.project":"smartsketch-` + r.InstallID + `","io.smartsketch.installation":"` + r.InstallID + `"}`
 	case strings.Contains(a, " ps "):
-		out = `[{"Service":"neo4j","State":"running","Health":"healthy"},{"Service":"api","State":"running","Health":"healthy"},{"Service":"worker","State":"running","Health":"healthy"},{"Service":"web","State":"running"}]`
+		out = `[{"ID":"fixture-container","Service":"neo4j","State":"running","Health":"healthy"},{"ID":"fixture-container","Service":"api","State":"running","Health":"healthy"},{"ID":"fixture-container","Service":"worker","State":"running","Health":"healthy"},{"ID":"fixture-container","Service":"web","State":"running"}]`
 	case strings.HasSuffix(a, " probe"):
 		out = `{"schema_current":true,"embedding_space_matches":true,"vector_indexes_online":true}`
 	case strings.HasSuffix(a, " bootstrap"):
@@ -158,6 +166,11 @@ func TestReadyDoubleLaunchOnlyOpensExisting(t *testing.T) {
 	}
 	for _, q := range r.Requests {
 		a := strings.Join(q.Args, " ")
+		for _, value := range q.Env {
+			if strings.HasPrefix(value, "INSTALL_ID=") {
+				r.InstallID = strings.TrimPrefix(value, "INSTALL_ID=")
+			}
+		}
 		if strings.Contains(a, " migrate") || strings.Contains(a, " bootstrap") || strings.HasSuffix(a, " pull") || strings.Contains(a, " up ") {
 			t.Fatal("healthy relaunch changed services")
 		}
@@ -192,6 +205,11 @@ func TestResumeTeacherCheckpointSkipsBootstrapAndMigration(t *testing.T) {
 	}
 	for _, q := range r.Requests {
 		a := strings.Join(q.Args, " ")
+		for _, value := range q.Env {
+			if strings.HasPrefix(value, "INSTALL_ID=") {
+				r.InstallID = strings.TrimPrefix(value, "INSTALL_ID=")
+			}
+		}
 		if strings.HasSuffix(a, " bootstrap") || strings.HasSuffix(a, " migrate") {
 			t.Fatal("checkpoint ignored")
 		}

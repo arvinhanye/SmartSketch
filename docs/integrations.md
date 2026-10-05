@@ -333,3 +333,12 @@ docker compose --profile app down        # 保留 app-data 卷
 - 默认无真实模型/向量连接测试；格式/容器健康通过不代表供应商可用。升级只针对本安装，先停机备份；不接管原开发或测量库。新功能实现完成前以现有本机启动指南为准。
 
 - 2026-10-04计划补充：拟采用Go1.26.8开发/构建工具链（官方发布记录https://go.dev/doc/devel/release，本机尚无Go），不新增用户运行依赖。计划docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md；开发工具准备、GHCR推送/公开发行和跨平台实测均未执行。环境文件格式按Docker官方插值规则，需用实际Compose读取诱饵值验证：https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/。
+
+## 双击启动发行基础设施（2026-10-05）
+
+- 开发/CI：Go 1.26.8（仅开发者工具）；用户发行核心为预编译 Go，用户不安装 Go/Python/Node。
+- 用户环境：Docker Desktop、Mac Intel/Apple Silicon 或 Windows 11 x64 + WSL2/Linux 容器；实机支持以验收报告为准。
+- 发行资源：GHCR smartsketch-backend / smartsketch-frontend 多架构固定 sha256 清单，Neo4j 固定 sha256；当前未发布或验证匿名拉取，不填写虚构摘要。
+- 环境变量沿用 .env.example：EMBEDDING_*、NEO4J_PASSWORD、AUTH_JWT_SECRET、MODEL_CREDENTIAL_KEY、LLM_MODE=personal；INSTALL_ID / BACKEND_IMAGE / FRONTEND_IMAGE / NEO4J_IMAGE / BACKUP_DIR 仅启动器向 Compose 注入，由核心生成/校验，不接受网页供应。
+- 向导无自动 API 联网测试；会话令牌只在本机 fragment/内存及权限保护的控制 capability 文件，诊断不含任何真实配置值。
+- .github/workflows/release-local.yml 仅上传构建 artifacts，无 packages:write / 镜像推送 / 自动发布。正式发行仍需用户另行授权。

@@ -85,3 +85,24 @@ func TestUnknownProjectVolumesAreRejected(t *testing.T) {
 		t.Fatal("foreign volume accepted")
 	}
 }
+
+func TestHealthyContainersWithForeignLabelsAreRejected(t *testing.T) {
+	r := &ownershipRunner{}
+	d := dockerFixture(r)
+	if _, e := d.Inspect(context.Background(), InstallState{InstallID: "0123456789abcdef"}); e == nil {
+		t.Fatal("foreign container was accepted")
+	}
+}
+
+type ownershipRunner struct{}
+
+func (*ownershipRunner) Run(_ context.Context, q ProcessRequest) (ProcessResult, error) {
+	a := strings.Join(q.Args, " ")
+	if strings.Contains(a, " ps ") {
+		return ProcessResult{Stdout: []byte(`[{"ID":"fixture-container","Service":"api","State":"running","Health":"healthy"}]`)}, nil
+	}
+	if strings.Contains(a, "container inspect") {
+		return ProcessResult{Stdout: []byte(`{"io.smartsketch.installation":"foreign"}`)}, nil
+	}
+	return ProcessResult{}, nil
+}

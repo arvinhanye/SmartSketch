@@ -237,3 +237,9 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 - 发行Compose使用稳定安装ID的私有命名卷，与原开发/测量环境分离；首个教师通过一次性容器CLI/服务/仓储完成事务建号，无教师公开注册。已有学生注册与课程授权规则不变。
 - 就绪不是/health单点成功，须确认迁移/向量空间与索引、Neo4j、API、worker及同源网页；停止保留数据。版本迁移先停机整组备份，恢复保留原卷并核验整组版本，禁止仅降级代码。
 - 此段只登记已确认架构方向；新API/DTO/迁移/依赖与启动器代码本轮均未变，技术冻结NOT_PERFORMED。
+
+## 本机启动控制层（2026-10-05，实现验收中）
+
+Go 启动核心位于 launcher/，仅管理本机独立 Docker 安装；其 loopback HTTP 控制接口不是业务 API。配置/安装 ID/发行摘要位于用户私有目录，业务数据留在 ID 对应命名卷。浏览器向导把向量基础设施配置写入本机 .env；业务后端仍仅从环境变量读取。个人生成模型设置沿用 ADR-080，不增加全站向量配置 API。
+
+发行 Compose 位于 packaging/compose.release.yaml，无 Neo4j 宿主端口，web 仅绑定 127.0.0.1。服务、schema、embedding space、索引与代理探测齐备才 READY。首位教师由容器 stdin 工具事务创建；不公开教师注册。升级先阻断、停机整组快照；恢复暂存并二次确认，保留原卷。缺真实发行摘要/三平台验收时不声明正式可用，stage_c_status 与 technical_freeze 不变。
