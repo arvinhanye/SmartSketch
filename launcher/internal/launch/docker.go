@@ -31,8 +31,12 @@ func (d *Docker) run(ctx context.Context, args []string, stdin []byte) (ProcessR
 			break
 		}
 	}
-	ctx, cancel := context.WithTimeout(ctx, 180*time.Second)
-	defer cancel()
+	isPull := len(args) > 0 && args[len(args)-1] == "pull"
+	if !isPull {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 180*time.Second)
+		defer cancel()
+	}
 	r, e := d.Runner.Run(ctx, ProcessRequest{d.CLI, args, env, stdin})
 	if e != nil || r.ExitCode != 0 {
 		return r, fail("PROCESS", "docker")
@@ -194,4 +198,26 @@ func (d *Docker) Probe(ctx context.Context, s InstallState) (Snapshot, error) {
 		return Snapshot{}, fail("HEALTH", "probe")
 	}
 	return Snapshot{SchemaCurrent: v.Schema, EmbeddingSpaceMatches: v.Space, VectorIndexesOnline: v.Indexes}, nil
+}
+
+type BootstrapResult struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Created  bool   `json:"created"`
+}
+
+func (d *Docker) Bootstrap(ctx context.Context, s InstallState, stdin []byte) (BootstrapResult, error) {
+	q, e := d.compose(s, "run", "--rm", "--no-deps", "-T", "bootstrap")
+	if e != nil {
+		return BootstrapResult{}, e
+	}
+	r, e := d.run(ctx, q, stdin)
+	if e != nil {
+		return BootstrapResult{}, e
+	}
+	var result BootstrapResult
+	if strictJSON(r.Stdout, &result) != nil || result.UserID == "" || result.Username != s.TeacherUsername {
+		return result, fail("PROCESS", "teacher")
+	}
+	return result, nil
 }
