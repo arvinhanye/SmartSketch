@@ -158,3 +158,12 @@ Go 二进制与 .command 执行位、Windows .cmd 路径/编码、macOS下载来
 自审：设计不要求隐式 Docker socket 挂载、宿主 Python依赖、旧数据自动接管、教师公开注册、业务向量设置接口或演示降级；新启动器使用 Go 的选择已随本文确认，不声称已实现。各状态、数据归属、恢复与发行缺口已区分。
 
 后续顺序：本文已获用户批准→实施计划见docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md，等待用户审核与选择执行方式→逐项实现与验证。stage_c_status继续 OPEN，technical_freeze继续 NOT_PERFORMED；新增启动体验不代替原测量或用户功能检查。
+
+
+## 2026-10-05 收尾复审后的内部协议澄清
+
+- URL fragment 只是一次性引导值。进程控制文件中的 reopen capability 与引导值分别随机生成，页面 token / 已消耗 fragment 都没有重新生成会话的权限；业务 API 不变。
+- 固定文件组（.env、发行 compose / manifest、卷映射、安装状态）采用私有写前日志。启动器读配置前完成校验与重放，状态最后发布；中断不重新生成密钥。未知或被外部改写的组保持错误，既有数据不覆盖。
+- 暂存恢复失败可继续检查／启动；原安装未切换前仍保留。切换需二次确认，已切换的 generation 登记已消费；再次恢复同一快照须重新解包到新的卷，不复用已发生新写入的活跃卷。
+- 内部 POST /control/port 要求 confirmed=true 与有效 web_port；先检查端口，再只停止本安装并保存端口，保留 InstallID、密钥、教师与数据 generation。后续启动仍经过原就绪检查。状态仅补 web_port 与 port 可用操作，不返回凭据。
+- 上述属于原设计的安全恢复与端口交互约束，不新增业务接口／DTO／迁移／依赖，不启用已撤销的业务向量配置页。

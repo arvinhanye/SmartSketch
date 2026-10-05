@@ -200,21 +200,52 @@ func (d *Docker) snapshotTool(ctx context.Context, st InstallState, root, mode, 
 	_, e = d.run(ctx, args, nil)
 	return e
 }
-func writeVolumeMap(s *Store, st InstallState) error {
+func volumeMapBytes(st InstallState) ([]byte, error) {
 	vols, e := volumeNames(st, st.DataGeneration)
 	if e != nil {
-		return e
+		return nil, e
 	}
 	entries := map[string]any{}
 	for logical, key := range map[string]string{"app-data": "app", "neo4j-data": "neo4j", "neo4j-logs": "neo4j-logs"} {
 		entries[logical] = map[string]string{"name": vols[key]}
 	}
-	b, _ := json.Marshal(map[string]any{"volumes": entries})
-	return s.atomic("volumes.json", b)
+	return json.Marshal(map[string]any{"volumes": entries})
 }
 
-// Restore first stages and checks the snapshot, then awaits a separate confirmation call.
-// Original named volumes are never deleted or overwritten.
+func writeVolumeMap(s *Store, st InstallState) error {
+	b, e := volumeMapBytes(st)
+	if e != nil {
+		return e
+	}
+	return s.atomic("volumes.json", b)
+}
+func restoreGroup(cfg Config, st InstallState, source *Store) (map[string][]byte, error) {
+	env, e := EncodeEnv(cfg)
+	if e != nil {
+		return nil, e
+	}
+	state, e := json.Marshal(st)
+	if e != nil {
+		return nil, fail("BACKUP", "state")
+	}
+	vols, e := volumeMapBytes(st)
+	if e != nil {
+		return nil, e
+	}
+	files := map[string][]byte{".env": env, "installation.json": state, "volumes.json": vols}
+	for _, name := range []string{"compose.yaml", "release-manifest.json"} {
+		b, e := fileContent(source, name)
+		if e != nil {
+			return nil, e
+		}
+		files[name] = b
+	}
+	return files, nil
+}
+
+// Restore first stages and checks the snapshot, then awaits a separate confirmation.
+// A consumed generation is never offered again: the immutable backup is re-extracted.
+// Interrupted candidates resume without mutating the active installation metadata.
 func (c *Controller) Restore(ctx context.Context, set BackupSet, confirmed bool) error {
 	if !confirmed {
 		return fail("BACKUP", "confirmation")
@@ -232,97 +263,104 @@ func (c *Controller) Restore(ctx context.Context, set BackupSet, confirmed bool)
 		return e
 	}
 	root, _ := c.backupPath(set.ID)
-	candidateRoot := filepath.Join(c.store.Root, "candidates", set.ID)
-	candidate := Store{Root: candidateRoot}
-	candidateStateFile := filepath.Join(candidateRoot, "installation.json")
-	if b, e := os.ReadFile(candidateStateFile); e == nil {
-		var ready InstallState
-		if strictJSON(b, &ready) != nil || ready.Checkpoint != "restore-verified" || ready.InstallID != current.InstallID || ready.DataGeneration == "" {
-			return fail("BACKUP", "candidate")
-		}
-		d := *c.docker
-		d.Manifest = old
-		d.ComposePath = filepath.Join(candidateRoot, "compose.yaml")
-		d.EnvPath = filepath.Join(candidateRoot, ".env")
-		s, e := d.Inspect(ctx, ready)
-		if e != nil || mergeProbe(ctx, &d, ready, &s) != nil || !isReady(s) || c.WebCheck(ctx, ready.WebPort) != nil {
-			return fail("BACKUP", "candidate-health")
-		}
-		if e = c.store.SaveConfig(cfg, ready); e != nil {
-			return e
-		}
-		for _, name := range []string{"compose.yaml", "release-manifest.json", "volumes.json"} {
-			b, e := os.ReadFile(filepath.Join(candidateRoot, name))
-			if e != nil {
-				return fail("BACKUP", "candidate")
-			}
-			if e = c.store.atomic(name, b); e != nil {
-				return e
-			}
-		}
-		c.docker.Manifest = old
-		c.docker.ComposePath = filepath.Join(c.store.Root, "compose.yaml")
-		return nil
-	}
-	if _, e = c.docker.Inspect(ctx, current); e != nil {
-		return e
-	}
-	if e = c.docker.Stop(ctx, current); e != nil {
-		return e
-	}
-	current.Phase = STOPPED
-	if e = c.store.SaveState(current); e != nil {
-		return e
-	}
-	generation, e := newID()
+	snapshot := Store{Root: root}
+	candidate := Store{Root: filepath.Join(c.store.Root, "candidates", set.ID)}
+	d := *c.docker
+	d.Manifest = old
+	d.ComposePath = filepath.Join(candidate.Root, "compose.yaml")
+	d.EnvPath = filepath.Join(candidate.Root, ".env")
+	candidateCfg, ready, e := candidate.Load()
 	if e != nil {
 		return e
 	}
-	volumes, _ := volumeNames(st, generation)
-	for _, name := range []string{"app", "neo4j", "neo4j-logs"} {
-		_, e = c.docker.run(ctx, []string{"volume", "create", "--label", "io.smartsketch.installation=" + st.InstallID, "--label", "com.docker.compose.project=smartsketch-" + st.InstallID, volumes[name]}, nil)
+	reusable := ready.Phase != NEW && ready.DataGeneration != "" && ready.Checkpoint != "restore-consumed" && current.RestoreHistory[set.ID] != ready.DataGeneration
+	if ready.Phase != NEW && (ready.InstallID != current.InstallID || ready.DataGeneration == "" || candidateCfg.ModelCredentialKey.value != cfg.ModelCredentialKey.value || candidateCfg.Neo4jPassword.value != cfg.Neo4jPassword.value) {
+		return fail("BACKUP", "candidate")
+	}
+	if reusable && ready.Checkpoint == "restore-verified" {
+		snap, inspectErr := d.Inspect(ctx, ready)
+		if inspectErr != nil {
+			return inspectErr
+		}
+		if mergeProbe(ctx, &d, ready, &snap) == nil && isReady(snap) && c.WebCheck(ctx, ready.WebPort) == nil {
+			ready.RestoreHistory = map[string]string{}
+			for id, generation := range current.RestoreHistory {
+				ready.RestoreHistory[id] = generation
+			}
+			ready.RestoreHistory[set.ID] = ready.DataGeneration
+			files, e := restoreGroup(cfg, ready, &snapshot)
+			if e != nil {
+				return e
+			}
+			if e = c.store.commitGroup(files); e != nil {
+				return e
+			}
+			// The root journal records consumption even if this best-effort marker is interrupted.
+			ready.Checkpoint = "restore-consumed"
+			_ = candidate.SaveState(ready)
+			c.docker.Manifest = old
+			c.docker.ComposePath = filepath.Join(c.store.Root, "compose.yaml")
+			c.docker.EnvPath = filepath.Join(c.store.Root, ".env")
+			c.mu.Lock()
+			c.view = StatusView{Phase: READY, Stage: "readiness", WebURL: webURL(ready.WebPort)}
+			c.mu.Unlock()
+			return nil
+		}
+	}
+	if !reusable {
+		if _, e = c.docker.Inspect(ctx, current); e != nil {
+			return e
+		}
+		if e = c.docker.Stop(ctx, current); e != nil {
+			return e
+		}
+		current.Phase = STOPPED
+		if e = c.store.SaveState(current); e != nil {
+			return e
+		}
+		generation, e := newID()
 		if e != nil {
 			return e
 		}
-		r, e := c.docker.run(ctx, []string{"volume", "inspect", volumes[name], "--format", "{{json .Labels}}"}, nil)
-		var labels map[string]string
-		if e != nil || json.Unmarshal(r.Stdout, &labels) != nil || checkVolumeOwner(labels, st.InstallID) != nil {
-			return fail("OWNERSHIP", "restore-volume")
+		volumes, _ := volumeNames(st, generation)
+		for _, name := range []string{"app", "neo4j", "neo4j-logs"} {
+			_, e = c.docker.run(ctx, []string{"volume", "create", "--label", "io.smartsketch.installation=" + st.InstallID, "--label", "com.docker.compose.project=smartsketch-" + st.InstallID, volumes[name]}, nil)
+			if e != nil {
+				return e
+			}
+			r, e := c.docker.run(ctx, []string{"volume", "inspect", volumes[name], "--format", "{{json .Labels}}"}, nil)
+			var labels map[string]string
+			if e != nil || json.Unmarshal(r.Stdout, &labels) != nil || checkVolumeOwner(labels, st.InstallID) != nil {
+				return fail("OWNERSHIP", "restore-volume")
+			}
 		}
-	}
-	d := *c.docker
-	d.Manifest = old
-	if e = d.snapshotTool(ctx, st, root, "restore", generation); e != nil {
-		return e
-	}
-	st.DataGeneration = generation
-	st.Fresh = false
-	st.Phase = STOPPED
-	st.Checkpoint = "restore-staged"
-	if e = candidate.SaveConfig(cfg, st); e != nil {
-		return e
-	}
-	for _, name := range []string{"compose.yaml", "release-manifest.json"} {
-		b, e := os.ReadFile(filepath.Join(root, name))
-		if e != nil {
-			return fail("BACKUP", "file")
-		}
-		if e = candidate.atomic(name, b); e != nil {
+		if e = d.snapshotTool(ctx, st, root, "restore", generation); e != nil {
 			return e
 		}
+		ready = st
+		ready.DataGeneration = generation
+		ready.Fresh = false
+		ready.Phase = STOPPED
+		ready.Checkpoint = "restore-staged"
 	}
-	if e = writeVolumeMap(&candidate, st); e != nil {
+	// Rebuild fixed assets from the verified backup before resuming a staged candidate.
+	files, e := restoreGroup(cfg, ready, &snapshot)
+	if e != nil {
 		return e
 	}
-	d.EnvPath = filepath.Join(candidateRoot, ".env")
-	d.ComposePath = filepath.Join(candidateRoot, "compose.yaml")
+	if e = candidate.commitGroup(files); e != nil {
+		return e
+	}
 	cc := NewController(&candidate, &d, c.clock)
 	cc.WebCheck = c.WebCheck
 	if e = cc.Start(ctx, nil); e != nil {
-		_ = d.Stop(ctx, st)
+		_ = d.Stop(ctx, ready)
 		return e
 	}
-	_, ready, _ := candidate.Load()
+	_, ready, e = candidate.Load()
+	if e != nil {
+		return e
+	}
 	ready.Checkpoint = "restore-verified"
 	if e = candidate.SaveState(ready); e != nil {
 		return e
@@ -380,20 +418,24 @@ func (c *Controller) ApplyUpgrade(ctx context.Context, set BackupSet, confirmed 
 	if e != nil {
 		return fail("MANIFEST", "read")
 	}
-	if e = c.store.atomic("compose.yaml", b); e != nil {
-		return e
-	}
 	mb, _ := json.Marshal(c.docker.Manifest)
-	if e = c.store.atomic("release-manifest.json", mb); e != nil {
-		return e
-	}
 	current.ReleaseVersion = c.docker.Manifest.Version
 	current.Fresh = true
 	current.Checkpoint = ""
 	current.Phase = CONFIGURED
-	if e = c.store.SaveState(current); e != nil {
+	state, _ := json.Marshal(current)
+	files := map[string][]byte{"compose.yaml": b, "release-manifest.json": mb, "installation.json": state}
+	if current.DataGeneration != "" {
+		vols, e := volumeMapBytes(current)
+		if e != nil {
+			return e
+		}
+		files["volumes.json"] = vols
+	}
+	if e = c.store.commitGroup(files); e != nil {
 		return e
 	}
+
 	c.operation.Unlock()
 	locked = false
 	return c.Start(ctx, nil)

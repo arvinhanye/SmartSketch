@@ -37,8 +37,18 @@ type controlServer struct {
 }
 
 func NewServer(c *Controller, session Secret, origin string) http.Handler {
-	u, _ := url.Parse(origin)
-	return &controlServer{controller: c, host: u.Host, origin: origin, master: session, seed: session, expires: time.Now().Add(20 * time.Minute)}
+	master, e := NewSession()
+	if e != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "control initialization failed", 500) })
+	}
+	return NewServerWithMaster(c, session, master, origin)
+}
+func NewServerWithMaster(c *Controller, seed, master Secret, origin string) http.Handler {
+	u, e := url.Parse(origin)
+	if e != nil || validateWebURL(origin) != nil || seed.value == "" || master.value == "" || equalToken(seed.value, master.value) {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "control initialization failed", 500) })
+	}
+	return &controlServer{controller: c, host: u.Host, origin: origin, master: master, seed: seed, expires: time.Now().Add(20 * time.Minute)}
 }
 func equalToken(a, b string) bool {
 	return a != "" && b != "" && subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
@@ -167,12 +177,21 @@ func (s *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.write(w, 200, v)
 		return
 	}
+	var portChange struct {
+		WebPort   int  `json:"web_port"`
+		Confirmed bool `json:"confirmed"`
+	}
 	var input SetupInput
 	var recovery struct {
 		Confirmed bool   `json:"confirmed"`
 		BackupID  string `json:"backup_id,omitempty"`
 	}
 	switch path {
+	case "/control/port":
+		if readBody(r, &portChange) != nil || !portChange.Confirmed || portChange.WebPort < 1024 || portChange.WebPort > 65535 {
+			s.bad(w, 400, "FIELD")
+			return
+		}
 	case "/control/setup":
 		if readBody(r, &input) != nil {
 			s.bad(w, 400, "FIELD")
@@ -275,6 +294,10 @@ func (s *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if e != nil {
+				s.controller.recordFailure(e)
+			}
+		} else if path == "/control/port" {
+			if e := s.controller.ChangePort(ctx, portChange.WebPort, portChange.Confirmed); e != nil {
 				s.controller.recordFailure(e)
 			}
 		} else if path == "/control/stop" {

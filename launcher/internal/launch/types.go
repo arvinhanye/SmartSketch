@@ -45,6 +45,7 @@ const (
 )
 
 type InstallState struct {
+	RestoreHistory                         map[string]string
 	DataGeneration                         string
 	SchemaVersion                          int
 	InstallID, ReleaseVersion              string

@@ -198,6 +198,32 @@ func TestLocalOwnedBackupRestore(t *testing.T) {
 		t.Fatal("staging mapping not activated")
 	}
 	postSynthetic(t, ctx, webURL(st.WebPort)+"/api/v1/auth/login", map[string]string{"username": "teacher_one", "password": "fixture-pass-one"})
+	// New writes after activation must disappear when restoring the same immutable snapshot again.
+	postSynthetic(t, ctx, webURL(st.WebPort)+"/api/v1/auth/register", map[string]string{"username": "after_restore", "password": "fixture-pass-one"})
+	if e = c.Restore(ctx, set, true); e == nil {
+		t.Fatal("repeat restore missed confirmation")
+	} else if f, ok := e.(*Failure); !ok || f.Stage != "restore-confirm" {
+		t.Fatal(e)
+	}
+	if e = c.Restore(ctx, set, true); e != nil {
+		t.Fatal(e)
+	}
+	_, second, _ := c.store.Load()
+	if second.DataGeneration == st.DataGeneration {
+		t.Fatal("repeat restore reused live data")
+	}
+	body, _ := json.Marshal(map[string]string{"username": "after_restore", "password": "fixture-pass-one"})
+	req, _ := http.NewRequestWithContext(ctx, "POST", webURL(second.WebPort)+"/api/v1/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	response, e := http.DefaultClient.Do(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	response.Body.Close()
+	if response.StatusCode != 401 {
+		t.Fatalf("post-snapshot account persisted: %d", response.StatusCode)
+	}
+	postSynthetic(t, ctx, webURL(second.WebPort)+"/api/v1/auth/login", map[string]string{"username": "teacher_one", "password": "fixture-pass-one"})
 	original, _ := volumeNames(st, "")
 	result, e := c.docker.run(ctx, []string{"volume", "inspect", original["app"], "--format", "{{json .Labels}}"}, nil)
 	if e != nil || !strings.Contains(string(result.Stdout), st.InstallID) {

@@ -294,3 +294,50 @@ func TestMigrationFailureDoesNotRunAppOrClaimReady(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmedPortChangePreservesInstallationAndKeys(t *testing.T) {
+	c, r := controllerFixture(t)
+	cfg, st, _ := c.store.Load()
+	l, e := net.Listen("tcp4", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	if c.ChangePort(context.Background(), port, false) == nil {
+		t.Fatal("unconfirmed port change")
+	}
+	if len(r.Requests) != 0 {
+		t.Fatal("unconfirmed change touched Docker")
+	}
+	if e = c.ChangePort(context.Background(), port, true); e != nil {
+		t.Fatal(e)
+	}
+	after, got, e := c.store.Load()
+	if e != nil || got.InstallID != st.InstallID || after.ModelCredentialKey.value != cfg.ModelCredentialKey.value || after.Neo4jPassword.value != cfg.Neo4jPassword.value || after.JWTSecret.value != cfg.JWTSecret.value || after.WebPort != port || got.WebPort != port {
+		t.Fatal("port change altered installation")
+	}
+}
+
+func TestOccupiedPortChangeLeavesOtherProcessAndConfigUntouched(t *testing.T) {
+	c, r := controllerFixture(t)
+	before, st, _ := c.store.Load()
+	l, e := net.Listen("tcp4", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer l.Close()
+	port := l.Addr().(*net.TCPAddr).Port
+	if e = c.ChangePort(context.Background(), port, true); e == nil {
+		t.Fatal("occupied port accepted")
+	}
+	after, got, e := c.store.Load()
+	if e != nil || got.WebPort != st.WebPort || after.ModelCredentialKey.value != before.ModelCredentialKey.value || len(r.Requests) != 0 {
+		t.Fatal("occupied port touched installation")
+	}
+	conn, e := net.Dial("tcp4", fmt.Sprintf("127.0.0.1:%d", port))
+	if e != nil {
+		t.Fatal("other listener stopped")
+	}
+	conn.Close()
+}

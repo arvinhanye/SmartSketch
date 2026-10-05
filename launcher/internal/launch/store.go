@@ -81,6 +81,11 @@ func (s *Store) atomic(name string, b []byte) error {
 	return nil
 }
 func validState(st InstallState) bool {
+	for id, generation := range st.RestoreHistory {
+		if !idPattern.MatchString(id) || !idPattern.MatchString(generation) {
+			return false
+		}
+	}
 	if (st.DataGeneration != "" && !idPattern.MatchString(st.DataGeneration)) || st.SchemaVersion != 1 || !idPattern.MatchString(st.InstallID) || st.WebPort < 1024 || st.WebPort > 65535 {
 		return false
 	}
@@ -104,32 +109,24 @@ func (s *Store) SaveConfig(c Config, st InstallState) error {
 	if !validState(st) || st.WebPort != c.WebPort {
 		return fail("CONFIG", "state")
 	}
-	if e := s.ensure(); e != nil {
-		return e
-	}
-	old, e := os.ReadFile(filepath.Join(s.Root, "installation.json"))
-	if e == nil {
-		var prev InstallState
-		if strictJSON(old, &prev) != nil || prev.InstallID != st.InstallID {
-			return fail("OWNERSHIP", "config")
-		}
-	} else if !os.IsNotExist(e) {
-		return fail("CONFIG", "state")
-	}
 	b, e := EncodeEnv(c)
 	if e != nil {
 		return e
 	}
-	if _, e = DecodeEnv(b); e != nil {
-		return e
+	state, e := json.Marshal(st)
+	if e != nil {
+		return fail("CONFIG", "state")
 	}
-	if e = s.atomic(".env", b); e != nil {
-		return e
-	}
-	return s.SaveState(st)
+	return s.commitGroup(map[string][]byte{".env": b, "installation.json": state})
 }
 func (s *Store) Load() (Config, InstallState, error) {
+	if e := s.recoverGroup(); e != nil {
+		return Config{}, InstallState{}, e
+	}
 	if e := noLinks(s.Root); e != nil {
+		return Config{}, InstallState{}, e
+	}
+	if e := noLinks(filepath.Join(s.Root, "installation.json")); e != nil {
 		return Config{}, InstallState{}, e
 	}
 	b, e := os.ReadFile(filepath.Join(s.Root, "installation.json"))

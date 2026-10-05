@@ -160,3 +160,58 @@ func TestStoreRejectsSymlink(t *testing.T) {
 		t.Fatal("symlink accepted")
 	}
 }
+
+type failAfterEnv struct {
+	root  string
+	fired bool
+}
+
+func (p *failAfterEnv) SecureDir(path string) error {
+	b, _ := os.ReadFile(filepath.Join(p.root, ".env"))
+	if path == p.root && !p.fired && strings.Contains(string(b), `WEB_PUBLISH_PORT="9000"`) {
+		p.fired = true
+		return fmt.Errorf("synthetic interruption")
+	}
+	return OSProtector{}.SecureDir(path)
+}
+func (p *failAfterEnv) SecureFile(path string) error { return OSProtector{}.SecureFile(path) }
+func TestConfigurationInterruptedPairRecoversWithoutRekey(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	cfg := configFixture(t)
+	st := InstallState{SchemaVersion: 1, InstallID: "0123456789abcdef", Phase: CONFIGURED, WebPort: 8080}
+	if e := s.SaveConfig(cfg, st); e != nil {
+		t.Fatal(e)
+	}
+	fault := &failAfterEnv{root: s.Root}
+	s.Permissions = fault
+	cfg.WebPort = 9000
+	st.WebPort = 9000
+	if s.SaveConfig(cfg, st) == nil || !fault.fired {
+		t.Fatal("fault not exercised")
+	}
+	s.Permissions = OSProtector{}
+	got, state, e := s.Load()
+	if e != nil {
+		t.Fatal("configuration not recoverable")
+	}
+	if got.WebPort != 9000 || state.WebPort != 9000 || got.ModelCredentialKey.value != cfg.ModelCredentialKey.value {
+		t.Fatal("inconsistent/rekeyed recovery")
+	}
+}
+
+func TestInitialConfigurationInterruptedAfterEnvRecoversIdentity(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	cfg := configFixture(t)
+	cfg.WebPort = 9000
+	st := InstallState{SchemaVersion: 1, InstallID: "0123456789abcdef", Phase: CONFIGURED, WebPort: 9000, Fresh: true}
+	fault := &failAfterEnv{root: s.Root}
+	s.Permissions = fault
+	if s.SaveConfig(cfg, st) == nil || !fault.fired {
+		t.Fatal("initial interruption not exercised")
+	}
+	s.Permissions = OSProtector{}
+	got, state, e := s.Load()
+	if e != nil || state.InstallID != st.InstallID || got.Neo4jPassword.value != cfg.Neo4jPassword.value || got.JWTSecret.value != cfg.JWTSecret.value || got.ModelCredentialKey.value != cfg.ModelCredentialKey.value {
+		t.Fatal("initial configuration not recovered intact")
+	}
+}

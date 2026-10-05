@@ -14,6 +14,7 @@ import (
 )
 
 type StatusView struct {
+	WebPort          int      `json:"web_port,omitempty"`
 	NeedsUpgrade     bool     `json:"needs_upgrade"`
 	PendingUpgradeID string   `json:"pending_upgrade_id,omitempty"`
 	NeedsTeacher     bool     `json:"needs_teacher"`
@@ -266,6 +267,7 @@ func (c *Controller) Status(ctx context.Context) (StatusView, error) {
 			return v, e
 		}
 		v.Phase = st.Phase
+		v.WebPort = st.WebPort
 		v.NeedsTeacher = st.Fresh && st.TeacherID == ""
 		v.NeedsUpgrade = st.Phase != NEW && st.ReleaseVersion != c.docker.Manifest.Version
 		if v.NeedsUpgrade {
@@ -295,7 +297,7 @@ func (c *Controller) Status(ctx context.Context) (StatusView, error) {
 		if v.Phase == NEW {
 			v.Actions = append(v.Actions, "setup")
 		} else {
-			v.Actions = append(v.Actions, "start", "stop", "diagnostics", "restore")
+			v.Actions = append(v.Actions, "start", "stop", "diagnostics", "restore", "port")
 			if v.NeedsUpgrade {
 				v.Actions = append(v.Actions, "upgrade")
 			}
@@ -331,4 +333,51 @@ func (c *Controller) recordFailure(e error) {
 		st.Phase = ERROR
 		_ = c.store.SaveState(st)
 	}
+}
+
+// ChangePort stops only the owned installation after explicit confirmation. Secrets,
+// account metadata and the selected data generation remain unchanged.
+func (c *Controller) ChangePort(ctx context.Context, port int, confirmed bool) error {
+	if !confirmed {
+		return fail("FIELD", "confirmation")
+	}
+	if port < 1024 || port > 65535 {
+		return fail("FIELD", "port")
+	}
+	if !c.operation.TryLock() {
+		return fail("LOCK", "operation")
+	}
+	defer c.operation.Unlock()
+	cfg, st, e := c.store.Load()
+	if e != nil {
+		return e
+	}
+	if st.Phase == NEW {
+		return fail("CONFIG", "setup")
+	}
+	if port == cfg.WebPort {
+		return nil
+	}
+	if e = checkPort(port); e != nil {
+		return e
+	}
+	if _, e = c.docker.Inspect(ctx, st); e != nil {
+		return e
+	}
+	if e = c.docker.Stop(ctx, st); e != nil {
+		return e
+	}
+	cfg.WebPort = port
+	st.WebPort = port
+	st.Phase = STOPPED
+	if st.Fresh {
+		st.Phase = CONFIGURED
+	}
+	if e = c.store.SaveConfig(cfg, st); e != nil {
+		return e
+	}
+	c.mu.Lock()
+	c.view = StatusView{Phase: st.Phase, Stage: "stopped", WebPort: port}
+	c.mu.Unlock()
+	return nil
 }

@@ -76,14 +76,18 @@ func run() error {
 	if e != nil {
 		return e
 	}
+	master, e := launch.NewSession()
+	if e != nil {
+		return e
+	}
 	listener, e := net.Listen("tcp4", "127.0.0.1:0")
 	if e != nil {
 		return fmt.Errorf("本机控制端口建立失败。")
 	}
 	defer listener.Close()
 	origin := "http://" + listener.Addr().String()
-	server := &http.Server{Handler: launch.NewServer(controller, token, origin), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
-	if e = store.SaveControl(origin, token); e != nil {
+	server := &http.Server{Handler: launch.NewServerWithMaster(controller, token, master, origin), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
+	if e = store.SaveControl(origin, master); e != nil {
 		return e
 	}
 	defer store.RemoveControl()
