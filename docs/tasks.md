@@ -1927,7 +1927,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 ## 2026-10-04 Codex：STARTUP 实施（本会话执行已批准）
 
-- STARTUP-03（T1）IN_PROGRESS，负责人Codex；范围launcher配置/状态/权限/锁；验收对应批准计划回归，Windows实机项单列OPEN。后续04–11按依赖执行；不发布/推送/真实调用/冻结。
+- STARTUP-03（T1）IMPLEMENTED（最终本地验收见2026-10-05收尾），负责人Codex；范围launcher配置/状态/权限/锁；验收对应批准计划回归，Windows实机项单列OPEN。后续04–11按依赖执行；不发布/推送/真实调用/冻结。
 - 用户本轮“同意”确认计划并选择native执行；正式规格不变。隔离分支codex/cross-platform-startup-design，基线8b3267e，真实.env不读取/复制。测试副本通过git archive创建于/private/tmp/smartsketch-startup-exec，仅含已跟踪源码；开发SDK仅临时解压，不安装系统。
 
 ## 2026-10-05 STARTUP 实现验收（Codex）
@@ -1935,11 +1935,23 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 | 任务 | 当前状态 | 证据 / 剩余 |
 |---|---|---|
 | STARTUP-03～08（T1～6） | IMPLEMENTED / 本地回归已测 | 私有配置、实例控制、教师引导、发行编排、就绪/停启、认证向导；实机项另列 |
-| STARTUP-09（T7） | IMPLEMENTED / 验收中 | 合成归档/根权限回归通过；真实隔离卷恢复与可视化操作正在验证 |
+| STARTUP-09（T7） | LOCAL_VERIFIED / 实机OPEN | 真实合成卷整组/重复恢复通过；确认操作/源卷保留/根权限/WAL/完整租约回归通过，非用户业务库签收 |
 | STARTUP-10（T8） | IMPLEMENTED / 未发行 | 三平台编译和打包测试通过；Windows/ARM 实机 OPEN；真实摘要未填写 |
-| STARTUP-11（T9） | IN_PROGRESS | basic exit0，完整门禁与 Docker 场景收集中；整支复审/平台签收待做 |
+| STARTUP-11（T9） | LOCAL_VERIFIED / PLATFORM_RELEASE_OPEN | 7fee1c8完整integration exit0、定向29/真实Docker3 PASS；独立复审未有完整clean结论；三平台正式包与发行验收仍OPEN |
 
 - 最新审查及交接：docs/reviews/codex-startup-platform-validation.md、docs/handoffs/codex-cross-platform-startup-implementation.md。
 - 升级/恢复控制仅属 loopback 启动层，不改变业务 API/DTO/迁移；备份含密钥，仅留本机私有目录。
 - 正式镜像、下载包发布需另行授权；不从测试本地标签或虚构摘要生成正式清单。现有 scripts/start.sh 继续适用于原开发环境。
 - stage_c_status=OPEN、technical_freeze=NOT_PERFORMED；无收费模型/在线向量请求、无 push/merge。
+
+
+## 2026-10-05 STARTUP 收尾：本地验证通过，平台／发行未签收
+
+负责人Codex。最终启动器/业务工具代码7fee1c88f870cee1af4a17bee9536bf244baf80c；后续仅文档登记。基于批准计划补齐独立复审提出的令牌权限、写入中断、候选重试、重复恢复、端口确认；真实Docker阶段另修实际挂载代际核验、WAL只读挂载与离线门禁，并复用既有完整租约检查。修复全部有失败回归／合成现场证据，原断言与用例保留。
+
+- 无.env冻结快照+env -i，最终 ./scripts/verify.sh integration exit0：backend+tooling3948 PASS/27登记SKIP；frontend934 PASS/type-check/build；integration393 PASS/4登记SKIP；backend-live44 PASS；演示E2E2、个人假供应商E2E4 PASS。
+- Go race47 PASS/3显式opt-in Docker SKIP、vet exit0；3平台CGO=0编译exit0（非实机）。安装/探测/备份/打包/浏览器定向29 PASS；真实本地镜像三场景3 PASS（641.38s），登录停启/双安装隔离/整组重复恢复。
+- 审查报告docs/reviews/codex-startup-platform-validation.md；摘要docs/reviews/startup-verification.json；交接docs/handoffs/codex-cross-platform-startup-implementation.md；用户指南docs/startup-guide.md。完整本地日志在本工作区忽略且私有的.superpowers验证目录，无个人凭据/业务正文。
+- 仍OPEN：独立整支复审完整结论（reviewer用量中断，已收到发现均处理）；Mac Intel正式包、Mac ARM、Windows11真实双击/ACL/WSL2、中文路径、拉取中断；GHCR多架构真实摘要、匿名拉取、正式包SHA与下载渠道。不得用测试adapter/跨编译冒充正式发行。
+- 本轮未推送/合并/发布、未自动迁移旧开发安装、未改共享Neo4j/测量区、真实生成/向量调用0；生成844451/900000、向量12005另计不变。当前本地分支保留，需用户另授权正式发行。
+- stage_c_status OPEN、technical_freeze NOT_PERFORMED，用户检查与冻结决定保留；不因启动器门禁通过改写计划C历史未测项、准确率签收方式或归因缺口。
