@@ -12,6 +12,7 @@ import (
 )
 
 type StatusView struct {
+	NeedsTeacher  bool     `json:"needs_teacher"`
 	Phase         Phase    `json:"phase"`
 	Stage         string   `json:"stage"`
 	WebURL        string   `json:"web_url,omitempty"`
@@ -255,6 +256,7 @@ func (c *Controller) Status(ctx context.Context) (StatusView, error) {
 			return v, e
 		}
 		v.Phase = st.Phase
+		v.NeedsTeacher = st.Fresh && st.TeacherID == ""
 		if st.Phase == READY {
 			snap, e := c.docker.Inspect(ctx, st)
 			if e != nil || !isReadyWithProbe(ctx, c, snap, st) {
@@ -285,4 +287,21 @@ func mergeProbe(ctx context.Context, d *Docker, st InstallState, s *Snapshot) er
 	s.EmbeddingSpaceMatches = p.EmbeddingSpaceMatches
 	s.VectorIndexesOnline = p.VectorIndexesOnline
 	return e
+}
+
+func (c *Controller) recordFailure(e error) {
+	var f *Failure
+	if !errors.As(e, &f) {
+		f = fail("PROCESS", "control")
+	}
+	c.mu.Lock()
+	c.view.Failure = f
+	c.view.Phase = ERROR
+	c.view.Busy = false
+	c.mu.Unlock()
+	_, st, loadErr := c.store.Load()
+	if loadErr == nil && st.Phase != NEW {
+		st.Phase = ERROR
+		_ = c.store.SaveState(st)
+	}
 }
