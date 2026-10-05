@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md`（用户2026-10-04确认）；实现前读 AGENTS.md、docs/tasks.md、身份/任务/发布规格。
 
-**Status:** AWAITING_PLAN_APPROVAL；尚未实施。规划基线 d517eeb（产品代码基线 bdb89c46）；本文中的命令与测试均是未来步骤，除本轮交接明确记录的检查外，不表示已运行。
+**Status:** APPROVED_NATIVE_EXECUTION（用户同意本会话逐项执行）；开始实施。规划基线 d517eeb（产品代码基线 bdb89c46）；本文中的命令与测试均是未来步骤，除本轮交接明确记录的检查外，不表示已运行。
 
 ## Global Constraints
 
@@ -65,7 +65,7 @@ Go包`launch`：
 
 每任务新增接口如下定义；不建立业务OpenAPI新路径。测试用隔离TempDir、诱饵Key，不接触真实.env。
 
-### T1 / STARTUP-03：安全配置、原子状态和单实例
+### Task 1 / STARTUP-03：安全配置、原子状态和单实例
 
 **Files:** 新建launcher/go.mod、上述配置/状态/权限/锁文件及对应*_test.go。新模块构建锁Go1.26.8，标准库优先，不新增Go第三方运行库。
 
@@ -88,7 +88,7 @@ func TestSecretHasNoPlaintextRepresentation(t *testing.T) {
 - [ ] **5. 运行绿灯。** 同命令全部PASS；`go test ./... -count=1`，三目标`go build`在T8补做；WindowsACL/锁必须Windows实际运行，不计交叉编译为PASS。
 - [ ] **6. 提交。** 只stage本任务文件；`git commit -m "feat: add secure launcher configuration and instance state"`；任务登记测试命令/结果与缺平台项。
 
-### T2 / STARTUP-04：受控Docker调用与实例所有权
+### Task 2 / STARTUP-04：受控Docker调用与实例所有权
 
 **Files:** 新建launcher/internal/launch/{process,host,docker,manifest}.go及*_test.go、test_helpers_test.go；packaging/release-manifest.schema.json。
 
@@ -111,7 +111,7 @@ func TestChildEnvDropsInheritedConfig(t *testing.T) {
 - [ ] **4. 实现主机发现。** `ResolveRoot`用系统用户配置目录；定位Docker CLI兼顾Mac ~/.docker/bin及Windows官方安装位置，不写PATH。确认Compose v2/profile/完成依赖能力、Docker Desktop Linux引擎可用；缺环境显示固定中文下载/打开指引。浏览器打开仅接收自行构造的loopback URL；启动DockerDesktop也只用固定app路径。test_helpers_test.go定义`recordingRunner`（记录请求、排队结果）供后续测试，不调用真实进程。
 - [ ] **5. 绿灯并提交。** 同组go test及`go vet ./...`通过；`git commit -m "feat: scope launcher Docker commands to owned installations"`；不运行pull/push。
 
-### T3 / STARTUP-05：容器内首个教师引导
+### Task 3 / STARTUP-05：容器内首个教师引导
 
 **Files:** 新建src/backend/app/tools/{__init__,bootstrap_teacher}.py、services/install_bootstrap.py、repositories/install_bootstrap.py、tests/backend/test_install_bootstrap.py；修正scripts/manage-accounts.py旧注册注释。无迁移。
 
@@ -133,7 +133,7 @@ def test_bootstrap_teacher_is_idempotent_and_preserves_password_hash(migrated_sq
 - [ ] **3. 实现。** 服务复用auth.normalize_username、USERNAME_PATTERN.fullmatch、口令长度常量、hash_password；仓储SQL只在repositories。只允许空库创建或唯一启用同名教师幂等返回；其他数据保持原样。SQLiteconnect是autocommit，事务必须显式BEGIN IMMEDIATE/COMMIT/ROLLBACK，不依赖with自动持锁。CLI先schema门禁再服务；无密钥repr/traceback。由controller限定首次新托管实例调用，不作为常驻教师注册路由。
 - [ ] **4. 绿灯并提交。** 同组pytest全部PASS，连同已有auth/account_admin相关用例运行；记录实际选取的既有文件。`git commit -m "feat: bootstrap first teacher through protected container input"`。
 
-### T4 / STARTUP-06：发行Compose与只读就绪探测
+### Task 4 / STARTUP-06：发行Compose与只读就绪探测
 
 **Files:** 新建packaging/compose.release.yaml、src/backend/app/tools/install_probe.py、tests/backend/test_install_probe.py、tests/tooling/test_startup_release.py；必要时src/backend/Dockerfile仅调整发行运行模块，不复制秘密/宿主脚本目录。
 
@@ -145,7 +145,7 @@ def test_bootstrap_teacher_is_idempotent_and_preserves_password_hash(migrated_sq
 - [ ] **4. 实现只读探测与实际.env兼容验证。** SQLite用mode=ro/query_only（不对活跃WAL库使用immutable=1），检查schema历史及向量行；Neo4j只读取当前预期索引状态/维度，不修复或写图。测试用临时配置执行`docker compose ... config --format json`并解析捕获的结果，断言含特殊字符诱饵Key逐字节一致；绝不把渲染全量配置打印到日志。该语法测试不启动容器或联网；缺Docker明确FAIL/未验证。
 - [ ] **5. 绿灯并提交。** 同组pytest+发行Compose配置解析通过；检查无api/DTO/迁移变化。`git commit -m "feat: define isolated Docker release stack and readiness probe"`。
 
-### T5 / STARTUP-07：启动/停止状态机和恢复
+### Task 5 / STARTUP-07：启动/停止状态机和恢复
 
 **Files:** 新建launcher/internal/launch/{controller,readiness}.go及*_test.go。
 
@@ -157,7 +157,7 @@ def test_bootstrap_teacher_is_idempotent_and_preserves_password_hash(migrated_sq
 - [ ] **4. 生命周期补充。** Stop仅自己的API/worker/web/Neo4j，沿用worker90s宽限/租约处理；不覆盖共享DB。端口变更经确认后仅改本机Config.WebPort/WEB_ORIGIN，并重新验证映射；不kill别的PID。Compose service restart policy存在，最终健康失败不靠无限重启宣布成功。
 - [ ] **5. 绿灯并提交。** 同组与所有go test通过，无真实容器调用；`git commit -m "feat: coordinate recoverable startup and data-preserving shutdown"`。
 
-### T6 / STARTUP-08：本机安装/控制向导与诊断
+### Task 6 / STARTUP-08：本机安装/控制向导与诊断
 
 **Files:** 新建launcher/internal/launch/{server,diagnostics}.go、ui/{index.html,app.js,style.css}、server_test.go、diagnostics_test.go；tests/startup/test_wizard_ui.py（Playwright，使用本机模拟控制服务）。
 
@@ -169,7 +169,7 @@ def test_bootstrap_teacher_is_idempotent_and_preserves_password_hash(migrated_sq
 - [ ] **4. 页面文案与状态。** 清楚分离向量API与个人生成API；提示“新独立安装，不包含旧开发环境课程”“格式检查通过不代表供应商连接/额度已验证”。按钮只显示当前允许操作，操作期间禁重复点击，轮询阶段；恢复时若bootstrap返回created=false，显示“账号已存在，仍使用首次口令”，不把重新输入当密码重置。Docker缺失仍给终端中文官方下载指引，不能等向导服务才发现打不开。
 - [ ] **5. 绿灯并提交。** 单元+浏览器模拟向导通过，检查网页/日志诱饵秘密零匹配；`git commit -m "feat: add authenticated local setup wizard and redacted diagnostics"`。
 
-### T7 / STARTUP-09：停机备份、版本变更与恢复保护
+### Task 7 / STARTUP-09：停机备份、版本变更与恢复保护
 
 **Files:** 新建launcher/internal/launch/backup.go、backup_test.go；src/backend/app/tools/install_backup.py；tests/backend/test_install_backup.py；修改packaging/compose.release.yaml加入本任务backup/restore工具服务、docs/startup-guide.md的恢复段落。
 
@@ -181,7 +181,7 @@ def test_bootstrap_teacher_is_idempotent_and_preserves_password_hash(migrated_sq
 - [ ] **4. 实现恢复保护。** 在写数据前校验全部归档、身份、摘要、镜像版本与剩余空间；恢复到本安装的暂存卷，probe通过后经再次确认切换卷映射，保留原卷，不直接覆盖原卷或只降级代码。无同版本镜像或配置根密钥则停，给出恢复缺口。此为手动确认恢复，不增加自动更新/自动回滚机制。
 - [ ] **5. 绿灯并提交。** 合成目录回归通过；真实本安装卷恢复演练在T9隔离沙箱完成前不宣称备份有效。`git commit -m "feat: protect managed installation upgrades with verified backups"`。
 
-### T8 / STARTUP-10：入口、三平台发行包与CI
+### Task 8 / STARTUP-10：入口、三平台发行包与CI
 
 **Files:** 新建launcher/cmd/smartsketch-launcher/main.go及main_test.go；packaging/start-macos.command、start-windows.cmd；scripts/package-launcher.py、scripts/verify/startup.sh；tests/tooling/test_startup_package.py；.github/workflows/startup.yml、release-local.yml；修改scripts/verify.sh、.github/workflows/ci.yml、.gitignore、docs/integrations.md、docs/architecture.md。
 
@@ -193,7 +193,7 @@ def test_bootstrap_teacher_is_idempotent_and_preserves_password_hash(migrated_sq
 - [ ] **4. 门禁与构建。** `startup.yml`在Mac arm64/amd64、Windows x64 runner跑平台权限/锁/路径Go测试；Linux跑Docker配置/容器工具相关回归。full/integration增加startup.sh必跑Go测试/vet，缺工具明确FAIL；既有CI补setup-go固定1.26.8而非改Python/Node锁版本。`release-local.yml`先只构建上传CI artifacts，无默认packages:write或自动GitHub发行；获发布授权后才启用GHCR双架构buildx推送并写真实摘要、发布固定发行包。测试不能预填SHA或把本地镜像名标正式发行。
 - [ ] **5. 绿灯并提交。** `cd launcher && go test ./... -count=1 && go vet ./...`；GOOS/GOARCH三组`go build`（跨编译是构建证据，不是实机PASS）；tooling pytest与basic门禁通过。`git commit -m "feat: package cross-platform launchers and enforce startup gates"`。
 
-### T9 / STARTUP-11：隔离容器冒烟、主线回归和三平台验收
+### Task 9 / STARTUP-11：隔离容器冒烟、主线回归和三平台验收
 
 **Files:** 新建tests/startup/test_release_smoke.py、tests/startup/README.md、docs/reviews/codex-startup-platform-validation.md；完成docs/startup-guide.md、docs/tasks.md、docs/handoffs/codex-cross-platform-startup-implementation.md。
 

@@ -1914,7 +1914,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围 | 验收 |
 | --- | --- | --- | --- | --- |
-| STARTUP-02 | AWAITING_PLAN_APPROVAL（计划已交付；执行方式未选） | Codex | docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md、已确认规格的状态更新、项目文档及Codex交接 | 九项任务明确文件/接口/红绿测试/提交/隔离与实机验收；用户审核计划并选择执行方式后才进入产品实现 |
+| STARTUP-02 | DONE（计划/本会话执行已获用户同意） | Codex | docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md、已确认规格的状态更新、项目文档及Codex交接 | 九项任务明确文件/接口/红绿测试/提交/隔离与实机验收；用户审核计划并选择执行方式后才进入产品实现 |
 
 - 用户本轮“确认”批准正式规格，允许编写计划；不视为已批准此前不存在的实施计划、真实调用、镜像发布或技术冻结。
 - 输入：d517eeb的正式规格、既有代码bdb89c46；输出：T1–T9实施计划与交接。规划只改文档，不新增Go/Python/脚本代码、构建依赖或运行配置。
@@ -1923,3 +1923,9 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 - 未验证：新启动器、三平台打包/双击、Go定向测试、发行镜像、full/integration。当前无Go；Go1.26.8按官方发布记录选择，实施获批后再准备开发工具链。
 - 风险：新增部署核心接管密码/本机Docker控制，必须完成权限/所有权/跨站门禁回归；恢复要保留原卷；Windows/Mac Intel实机和GHCR权限尚未落实，不计PASS。
 - 交接：docs/handoffs/codex-cross-platform-startup-plan.md。生成调用0、在线向量0；未读真实.env、未启动容器、未改业务/测量库、未推送合并；stage_c_status OPEN，technical_freeze NOT_PERFORMED。
+
+
+## 2026-10-04 Codex：STARTUP 实施（本会话执行已批准）
+
+- STARTUP-03（T1）IN_PROGRESS，负责人Codex；范围launcher配置/状态/权限/锁；验收对应批准计划回归，Windows实机项单列OPEN。后续04–11按依赖执行；不发布/推送/真实调用/冻结。
+- 用户本轮“同意”确认计划并选择native执行；正式规格不变。隔离分支codex/cross-platform-startup-design，基线8b3267e，真实.env不读取/复制。测试副本通过git archive创建于/private/tmp/smartsketch-startup-exec，仅含已跟踪源码；开发SDK仅临时解压，不安装系统。
