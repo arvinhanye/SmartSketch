@@ -1981,3 +1981,9 @@ STARTUP-12后续实际结果：匿名PASS；公开包自动验收62895整体FAIL
 负责人Codex；状态DONE（仅草稿和附件，不代表发行验收）。用户明确请求创建Release草稿，范围仅草稿及既有三平台安装包、SHA256SUMS、清单和启动说明附件；不发布、不推源码/合并、不冻结。输入：已校验preview-20261005-e88b56a包与公开镜像；输出：可登录下载的草稿URL/附件核验与Codex交接。无API/DTO/迁移变化。风险：构建源码尚未推送，草稿暂存已核对main SHA，并在说明中明确不代表附件源码、发布前阻断源码/Tag对齐；平台与重复验收缺口保留。验收：draft=true、prerelease=true、附件名/大小/逐个SHA与本地一致；定向打包测试与无.env副本./scripts/verify.sh basic。公开发布/源码推送另行征询用户。
 
 STARTUP-13实际交付：Release ID403670008，draft=true/prerelease=true，URL https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936；三包＋SHA256SUMS＋release-manifest.json＋START-HERE.md共6附件上传state=uploaded，远端大小及SHA均等于本地。3小附件认证回下载逐字节一致；大包可选回下载网络缓慢，02:34停止并保留部分文件，不计完整下载PASS。未创建Tag ref，不推源码/合并，不公开发布；草稿暂存已核对main SHA，不代表构建源码，正文已写发布阻断。隔离basic98260 exit0，打包/发行定向10 PASS。交接docs/handoffs/codex-startup-release-draft-20261005.md，摘要docs/reviews/startup-release-draft-20261005.json。待用户从GitHub下载Mac Intel包人工测试；STARTUP-12、stage_c_status仍OPEN，technical_freeze NOT_PERFORMED；公开发布前需另批源码同步及准确Tag绑定。
+
+## 2026-10-05 STARTUP-14：下载后Mac入口Killed:9
+
+负责人Codex；状态IN_PROGRESS/发行签收OPEN。输入：用户Downloads实际包、PID44020错误；输出：已定位的签名/隔离证据、SIGKILL诊断回归、明确启动说明及交接。只读检查确认二进制SHA9116108b...与发布一致，unsigned且有com.apple.quarantine；spctl exit3/no usable signature，syspolicyd明确Gatekeeper rejection PID44020。不是Docker或个人API故障。本机可用Developer ID Application身份数0；完整分发修复需用户提供签名条件，不读取私钥。修复范围先补入口137条件诊断，不把提示修复冒充信任修复；不自动删quarantine、不更改Gatekeeper或用户配置、数据库，不重发镜像/替换Release附件。先写SIGKILL/成功/其他错误回归，运行定向测试与无.env副本verify.sh basic。未知平台和签收状态保持OPEN。
+
+STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功/其他失败回归先2 RED/1 PASS，修后打包7 PASS、完整打包发行13 PASS，diff-check无误。basic50362仍RUNNING（B14已过，负向契约阶段在执行），未记PASS。用户答复无Apple账号/证书，选择继续测试预览版；由用户本人审阅系统单程序“仍要打开”，代理未执行信任或删隔离。下载信任/完整启动仍OPEN；原下载包、Release附件、系统安全设置和数据未改。详见Codex故障handoff/review。

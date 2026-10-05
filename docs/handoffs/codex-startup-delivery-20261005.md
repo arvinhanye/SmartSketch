@@ -53,3 +53,7 @@ stage_c_status OPEN；technical_freeze NOT_PERFORMED；生成844451/900000、向
 ## Release草稿接续
 
 2026-10-05用户另批仅Release草稿；STARTUP-13已交付，URL/六附件/服务端SHA/认证小文件回下载与源码绑定阻断见docs/handoffs/codex-startup-release-draft-20261005.md。仍不公开发布、不推源码、无Tag ref、无技术冻结。大包完整回下载未完成，不混写PASS。
+
+## 下载启动故障（优先的新事实）
+
+用户实际GitHub下载Intel包Killed:9，PID44020；SHA一致，unsigned+quarantine，syspolicyd明确Gatekeeper拒绝。先前本地无隔离测试仍有效但不代表网络发行。诊断回归已补，实际下载信任仍OPEN，不重发包或删隔离。接续读docs/handoffs/codex-mac-download-gatekeeper-20261005.md及review；等待用户签名条件/本人系统单程序确认。

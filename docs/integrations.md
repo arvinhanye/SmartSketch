@@ -350,3 +350,7 @@ docker compose --profile app down        # 保留 app-data 卷
 ## 2026-10-05 GitHub Release下载测试草稿
 
 用户授权创建arvinhanye/SmartSketch Release草稿（ID403670008）；draft/prerelease，未发布。附件仅三个既有安装包、SHA256SUMS、清单与中文启动说明，无真实配置/业务库。可登录仓库账号下载：https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936 。目标暂存已核对main SHA，不是附件构建源码；发布前必须另批源码推送和正确Tag绑定。未添加新集成密钥或业务变量，不改已公开GHCR摘要。
+
+## 2026-10-05 Mac下载信任门禁
+
+preview Intel二进制经GitHub下载后有隔离属性且未签名，系统明确拒绝PID44020。当前本机可用Developer ID Application身份数0，签名与公证接入待用户说明条件；不采集私钥/证书密码，不加入业务环境变量。源码仅修137错误提示，不移除隔离、不关安全策略，不冒充Apple验证。正式签名公证与下载后验收仍OPEN。

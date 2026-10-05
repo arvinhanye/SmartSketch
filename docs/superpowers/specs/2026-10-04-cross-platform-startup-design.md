@@ -169,3 +169,7 @@ Go 二进制与 .command 执行位、Windows .cmd 路径/编码、macOS下载来
 - 上述属于原设计的安全恢复与端口交互约束，不新增业务接口／DTO／迁移／依赖，不启用已撤销的业务向量配置页。
 
 - 真实隔离冒烟证实 SQLite WAL 数据库在物理只读卷上可能因共享内存文件不存在报 SQLITE_CANTOPEN。probe 保持 mode=ro + query_only（业务数据只读），允许挂载层创建／锁定 WAL 共享内存；不用 immutable=1 忽略活跃 WAL。容器挂载核对选中 generation，旧代际即便健康也不宣布 READY。
+
+## 2026-10-05下载信任故障约束补充
+
+用户下载的Intel预览包被Gatekeeper拒绝执行，SHA一致但未签名；原本本地生成、无下载隔离属性的入口验收不足以证明网络发行可启动。网络发行门禁仍OPEN，正式Mac分发应具备Developer ID签名/Apple公证与真实下载验收；ad-hoc签名不是通过该门禁的证据。入口遇137须保留原退出码，指出可能的安全检查或内存原因、指导用户核对来源/校验并自行审阅系统单程序确认，不自动添加例外、不移除quarantine、不关闭系统保护、不把未知SIGKILL笼统当成Gatekeeper。该补充不改变业务API/DTO、镜像摘要、数据位置或用户配置。

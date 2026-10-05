@@ -1,0 +1,34 @@
+{
+  "task": "STARTUP-14",
+  "status": "OPEN / signing-notarization-and-user-trust-pending",
+  "diagnosis": "Gatekeeper rejection established for user PID44020, not inferred from signal alone",
+  "download_binary": "/Users/arvinhan/Downloads/SmartSketch-preview-20261005-e88b56a-darwin-amd64/bin/smartsketch-launcher",
+  "sha256": "9116108b62d5028da07cc63ff96a86b4b5773cb144eef6a3fd829586d330868f",
+  "signature": "unsigned; codesign_verify_exit=1",
+  "quarantine_attribute_present": true,
+  "spctl_exit": 3,
+  "spctl_source": "no usable signature",
+  "system_log_evidence": [
+    "2026-10-05 08:19:38.744 syspolicyd: Terminating process due to Gatekeeper rejection: 44020",
+    "2026-10-05 08:19:38.744 kernel: Security policy would not allow process: 44020, downloaded smartsketch-launcher"
+  ],
+  "usable_developer_id_application_identities": 0,
+  "same_local_binary_version_probe": "preview-20261005-e88b56a / exit0; does not validate internet distribution",
+  "fix_scope": "wrapper137 diagnostic only, no security-policy bypass or signature claim",
+  "tests": {
+    "red": "2 failed / 1 passed; SIGKILL and noninteractive generic error assertions",
+    "green_package": "7 passed / exit0",
+    "all_package_release": "13 passed / exit0"
+  },
+  "basic_gate": "RUNNING_AT_CHECKPOINT / session50362, log mac-gatekeeper-basic.log; not PASS",
+  "unchanged": [
+    "user Downloads bundle",
+    "Release assets",
+    "GHCR images",
+    "user security settings",
+    "API keys and business data"
+  ],
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED",
+  "user_decision": "No Apple account/certificate; continue preview testing; per-program system confirmation remains user-operated"
+}

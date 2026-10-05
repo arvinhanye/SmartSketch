@@ -47,3 +47,50 @@ def test_mutable_or_incomplete_manifest_is_rejected(tmp_path):
     path,binaries,dest=inputs(tmp_path);data=json.loads(path.read_text());data['backend_image']='image:latest';path.write_text(json.dumps(data))
     with pytest.raises(ValueError):module().package_release(path,binaries,dest)
     assert not dest.exists()
+
+
+def run_macos_entry(tmp_path, code):
+    import os
+    import subprocess
+    bundle = tmp_path / '中文 空格 bundle'
+    (bundle / 'bin').mkdir(parents=True)
+    (bundle / 'start-macos.command').write_bytes((ROOT / 'packaging/start-macos.command').read_bytes())
+    (bundle / 'target.txt').write_text('darwin-amd64\n')
+    launcher = bundle / 'bin/smartsketch-launcher'
+    launcher.write_text('#!/bin/bash\nexit ' + str(code) + '\n')
+    launcher.chmod(0o755)
+    tools = tmp_path / 'tools'
+    tools.mkdir()
+    uname = tools / 'uname'
+    uname.write_text('#!/bin/bash\necho x86_64\n')
+    uname.chmod(0o755)
+    env = {'PATH': str(tools) + ':/usr/bin:/bin', 'HOME': str(tmp_path), 'LANG': 'en_US.UTF-8'}
+    result = subprocess.run(['/bin/bash', str(bundle / 'start-macos.command')], input='\n', env=env, capture_output=True, text=True, timeout=10)
+    return result, bundle
+
+
+def test_macos_sigkill_explains_possible_gatekeeper_without_bypassing_it(tmp_path):
+    result, bundle = run_macos_entry(tmp_path, 137)
+    assert result.returncode == 137
+    assert 'SIGKILL' in result.stdout and '137' in result.stdout
+    assert '隐私与安全性' in result.stdout and '仍要打开' in result.stdout
+    assert '可能' in result.stdout  # Signal alone does not establish Gatekeeper.
+    assert '内存' in result.stdout  # Retain a non-Gatekeeper investigation route.
+    assert '签名' in result.stdout and '公证' in result.stdout
+    assert '不要关闭' in result.stdout
+    source = (ROOT / 'packaging/start-macos.command').read_text()
+    assert 'xattr' not in source and 'spctl' not in source and 'sudo' not in source
+    assert not (bundle / '.env').exists()
+
+
+def test_macos_success_does_not_show_security_error(tmp_path):
+    result, _ = run_macos_entry(tmp_path, 0)
+    assert result.returncode == 0
+    assert 'SIGKILL' not in result.stdout and '仍要打开' not in result.stdout
+
+
+def test_macos_other_failure_preserves_code_without_gatekeeper_claim(tmp_path):
+    result, _ = run_macos_entry(tmp_path, 2)
+    assert result.returncode == 2
+    assert '启动未完成' in result.stdout
+    assert 'SIGKILL' not in result.stdout and '仍要打开' not in result.stdout
