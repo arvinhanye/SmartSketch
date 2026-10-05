@@ -1971,3 +1971,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 STARTUP-12 发布授权：用户已明确同意将后端/前端镜像发布GHCR并设公开，制作本地安装包；GitHub设备授权packages权限已完成。此授权不含合并分支或技术冻结。干净后端第一次PyPI依赖查询失败；官方PyPI与一次性容器确认固定版本存在，未降级/改版本，保持Dockerfile重跑继续。Go首次回环监听受sandbox限制，获准隔离目录重跑race/vet exit0，前端双架构官方构建exit0；均不冒充正式包登录证据。
 
 STARTUP-12当前收尾检查点（非完成）：本地源码8314092/9e8b4a1；真实GHCR双架构镜像已上传，仍Private；UI公开步骤被审批要求临近确认，已询问，未绕过。3份真实摘要包生成并SHA3 OK，dist/startup-preview-20261005保留。真实Mac入口/向导/非法口令拒绝通过，private pull401失败未到登录，0本安装运行残留。独立复审4 Important已修正/明确缩小口径，4红绿helper PASS；Minor输出canary扫描deferred。完整integration首次缺默认浏览器exit1（其他层已过），指定Chrome纠正重跑后台36170仍运行，接续先读结果。报告docs/reviews/codex-startup-delivery-20261005.md、JSON startup-delivery-verification.json、交接docs/handoffs/codex-startup-delivery-20261005.md。OPEN直到公开匿名拉取与实际登录验收；technical_freeze NOT_PERFORMED。
+
+STARTUP-12公开接续（2026-10-05）：用户临近确认“现在将两个GHCR镜像设为Public”；已在GitHub UI逐个提交并观察两包Public。空auth/无密钥助手配置匿名拉取两个固定摘要exit0（warm cache，不代表冷下载速度），未动用户原Docker配置。首次临时context自动选择osxkeychain，首次拉取不计匿名证据；纠正后通过。完整integration重跑session36170实际exit0：backend3949/27登记SKIP、frontend934、integration393/4登记SKIP、backend-live44、演示E2E2、个人fake E2E4；文档basic98359 exit0。实际公开包隔离验收session62895仍在运行，尚不签收登录/跨平台。stage_c_status OPEN；technical_freeze NOT_PERFORMED。
+
+STARTUP-12后续实际结果：匿名PASS；公开包自动验收62895整体FAIL（首次就绪及教师登录已达成，重复入口完成前失败），保留原失败。另独立系统Chrome观察：真实入口→就绪→打开软件按钮→同一教师/teacher→第二入口exit0/既有服务页面已验证；不等同Finder双击。停止确认CDP超时，按钮完成未测；标签核对只stop本fixture，0残留、卷保留，控制器已退出。public-docs-basic43928 exit0。OPEN待自动重复用例诊断、停止UI与平台补验；无冻结、推送合并或真实模型调用。

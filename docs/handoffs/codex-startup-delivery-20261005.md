@@ -31,3 +31,21 @@
 stage_c_status OPEN；technical_freeze NOT_PERFORMED；生成844451/900000、向量12005不变。不得读真实.env、迁移旧数据、改测量证据、prune/down-v或停止其他项目。临时SDK /private/tmp/smartsketch-go1268、源码/日志 /private/tmp/smartsketch-delivery-20261005；打包sha存JSON。原始日志只私有保存，发布证据摘要不含凭据。由于发行/平台OPEN，保留ledger和分支，不删除计划目录。
 
 额外文档快照basic门禁后台session98359，日志/private/tmp/smartsketch-delivery-20261005/logs/docs-basic.log；最后核对未退出。该副本 /private/tmp/smartsketch-delivery-doccheck 无.env，包含本轮文档与清单。原先RUNNING记录不是PASS；接续读取实际退出，不重跑已在进行的门禁。Chrome公开设置恢复后的tab786447081已markHandoff；仍未提交Public。
+
+## 公开接续检查点（优先于上文旧状态）
+
+2026-10-05用户临近确认Public后，GitHub UI已完成frontend/backend公开并观察“currently public”，截图保存在logs/ghcr-{frontend,backend}-public.jpg。空认证且无助手的anonymous-docker配置拉取两固定digest exit0（warm cache）；context最初自动选择osxkeychain，第一次拉取不计匿名证据，第二次明确空auth后通过。不修改用户原配置。
+
+后台36170 integration与98359 docs-basic实际已exit0，计数见JSON；不重跑。真实公开Mac包验收62895正在运行（当前teacher checkpoint），log logs/public-package-check.log，fixture public-package-check、安装ID d3e4bfc14a9401d2；读实际结果，不冒充PASS。系统Chrome确实打开向导tab786447084，但脚本交换另一能力后该原页面会话被替换，所以不能拿它宣布系统全交接通过。测试完成后需仅用实际entry重开该fixture，再在系统Chrome观察，不与headless交换能力竞争；不动用户真实安装。Finder/ARM/Win仍OPEN。
+
+## Public完成后的实际验收检查点（2026-10-05）
+
+两包已Public，匿名固定摘要拉取exit0（warm cache）；截图logs/ghcr-{frontend,backend}-public-full.jpg含完整公开设置。文档basic43928实际exit0，无新业务代码变更。
+
+真实包自动验收62895整体exit1：首次入口、真实向导、错误口令拒绝、固定镜像/迁移/索引/服务就绪、首次教师登录均已到达；失败在teacher-browser-login标记之后、repeat阶段完成标记之前。证据public-package-check/acceptance.json保存，不能将“failed_stage=teacher-browser-login”误解为首次登录失败，也不猜根因。0本安装运行残留、卷保留。自动重复验收尚待诊断，不改断言或凭据。
+
+另按自然系统浏览器流程重新启动同一fixture：入口39778实际打开Chrome向导786447090→READY→点击“打开软件”打开49376登录页786447093→使用同一合成教师进入/teacher；再次入口exit0，786447096观察既有服务/同端口。此过程没有私有能力绕行，证据public-os-handoff.json与logs/public-os-{teacher-login,wizard-ready,repeat-ready}.jpg。仅证明当前Mac Intel实际入口进程/系统浏览器/按钮/登录与重开，仍不证明Finder双击或其他平台。
+
+停止按钮弹出浏览器confirm后CDP操作超时，确认提交未测；不得称按钮停止通过。未使用别的UI技术绕过；已按项目/安装双标签核对并仅docker stop本fixture d3e4bfc14a9401d2，0运行残留、保留卷。再核对完整二进制路径与父入口，仅SIGINT该controller，39778 exit0。浏览器若仍显示这个测试停止确认框，交用户手动关闭；不要操作其他账号/页面或重新发起确认。
+
+总体STARTUP-12仍OPEN：自动重复用例定位、停止确认UI、Finder/Gatekeeper、Mac ARM/Win实机待补；完整分支复审仍部分中断，canary输出扫描Minor仍deferred。stage_c_status OPEN、technical_freeze NOT_PERFORMED；账本844451/900000、向量12005不变。没有源码push/merge/Release。

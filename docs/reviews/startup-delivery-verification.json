@@ -17,9 +17,13 @@
     ]
   },
   "visibility": {
-    "frontend": "private",
-    "backend": "private",
-    "pending": "action-time user confirmation after UI guard rejection"
+    "frontend": "public",
+    "backend": "public",
+    "confirmation": "user action-time confirmation 2026-10-05; submitted through GitHub UI",
+    "screenshots": [
+      "/private/tmp/smartsketch-delivery-20261005/logs/ghcr-frontend-public-full.jpg",
+      "/private/tmp/smartsketch-delivery-20261005/logs/ghcr-backend-public-full.jpg"
+    ]
   },
   "packages": {
     "SmartSketch-preview-20261005-e88b56a-darwin-amd64.tar.gz": {
@@ -76,10 +80,19 @@
     "cause": "missing default Playwright executable"
   },
   "gate_retry": {
-    "status": "RUNNING_AT_LAST_CHECK",
+    "status": "PASS",
     "log": "/private/tmp/smartsketch-delivery-20261005/logs/integration-browser-retry.log",
     "session_id": 36170,
-    "browser": "installed Google Chrome"
+    "browser": "installed Google Chrome",
+    "exit": 0,
+    "backend_passed": 3949,
+    "backend_skipped_registered": 27,
+    "frontend_passed": 934,
+    "integration_passed": 393,
+    "integration_skipped_registered": 4,
+    "backend_live_passed": 44,
+    "demo_e2e_passed": 2,
+    "personal_fake_e2e_passed": 4
   },
   "go_race_vet": "PASS (loopback sandbox retry)",
   "guard_tests": {
@@ -103,12 +116,103 @@
     }
   },
   "handoffs_unverified": [
-    "initial OS browser destination",
-    "open-software-button browser destination",
     "Finder double click",
     "Mac ARM hardware",
-    "Windows11 hardware"
+    "Windows11 hardware",
+    "stop-button UI confirmation completion"
   ],
   "stage_c_status": "OPEN",
-  "technical_freeze": "NOT_PERFORMED"
+  "technical_freeze": "NOT_PERFORMED",
+  "anonymous_pull": {
+    "result": "PASS",
+    "exit": 0,
+    "credentials": "empty ghcr.io auth; no credsStore or credHelpers",
+    "cache": "warm; not a cold-download speed measurement",
+    "log": "/private/tmp/smartsketch-delivery-20261005/logs/anonymous-pull-no-helper.log",
+    "first_check": "Docker context initialization auto-selected osxkeychain; first successful pull excluded from anonymous evidence"
+  },
+  "docs_basic": {
+    "result": "PASS",
+    "exit": 0,
+    "log": "/private/tmp/smartsketch-delivery-20261005/logs/docs-basic.log"
+  },
+  "package_public_run": {
+    "mode": "entry-process-plus-connected-browser",
+    "provider_calls": "not instrumented; fixture configuration only, no business requests",
+    "handoffs": {
+      "initial_os_browser": "UNVERIFIED",
+      "open_software_button": "UNVERIFIED",
+      "finder_double_click": "UNVERIFIED"
+    },
+    "stages": [
+      {
+        "stage": "actual-entry-start",
+        "at": "2026-10-05T11:01:33.727Z"
+      },
+      {
+        "stage": "real-wizard-ready",
+        "at": "2026-10-05T11:01:36.641Z"
+      },
+      {
+        "stage": "invalid-password-rejected-without-config",
+        "at": "2026-10-05T11:01:36.870Z"
+      },
+      {
+        "stage": "pinned-pull-services-schema-indexes-ready",
+        "at": "2026-10-05T11:02:38.114Z"
+      },
+      {
+        "stage": "teacher-browser-login",
+        "at": "2026-10-05T11:02:39.684Z"
+      }
+    ],
+    "manifest": {
+      "version": "preview-20261005-e88b56a",
+      "backend_image": "ghcr.io/arvinhanye/smartsketch-backend@sha256:fa9cff4449a32f9245a0bd1c658dcb92f83030aeb41318f4c7e596ab321ae784",
+      "frontend_image": "ghcr.io/arvinhanye/smartsketch-frontend@sha256:126ada210c9a275316f5de33bd8c5f7feb86a26033a36c1403643e77315053a9",
+      "neo4j_image": "neo4j@sha256:ab3aafb0020e6fed65bb2b59f7db1fabd7ee0568c4da46f3cc3b8fad77801d61",
+      "compose_sha256": "a468d27a535e73c6198d31d2688619416327ec4888629002b6f172f750981eab",
+      "targets": [
+        "darwin-amd64",
+        "darwin-arm64",
+        "windows-amd64"
+      ]
+    },
+    "entry_sha256": "83d6f19e4c2aa6ed49b3e319644577d3a7fb35ad01618575ae3c7e7009724496",
+    "binary_sha256": "9116108b62d5028da07cc63ff96a86b4b5773cb144eef6a3fd829586d330868f",
+    "build_source_commit": "e88b56a47645ef757948a73dfac6a7a522f7f7c8",
+    "archive_sha256": "beea90ba5aa13ddff3e332605f4d8a032b988dc204822d070a3de480ae5bc6c5",
+    "result": "FAIL",
+    "failed_stage": "teacher-browser-login",
+    "cleanup": {
+      "stopped": true,
+      "residual_count": 0
+    },
+    "evidence": "/private/tmp/smartsketch-delivery-20261005/public-package-check/acceptance.json"
+  },
+  "public_docs_basic": {
+    "result": "PASS",
+    "exit": 0,
+    "log": "/private/tmp/smartsketch-delivery-20261005/logs/public-docs-basic.log"
+  },
+  "os_handoff_observation": {
+    "installation": "d3e4bfc14a9401d2",
+    "initial_os_browser": "OBSERVED",
+    "open_software_button": "OBSERVED",
+    "teacher_login_after_restart": "OBSERVED /teacher with teacher_package role teacher",
+    "repeat_entry": "exit0; same origin/port; observed existing-services page",
+    "stop_button": "UNVERIFIED: browser confirmation handling hit CDP timeout",
+    "cleanup": {
+      "method": "label-checked docker stop only this fixture",
+      "residual_count": 0,
+      "volumes": "preserved"
+    },
+    "finder_double_click": "UNVERIFIED",
+    "screenshots": [
+      "logs/public-os-teacher-login.jpg",
+      "logs/public-os-wizard-ready.jpg",
+      "logs/public-os-repeat-ready.jpg"
+    ],
+    "controller_cleanup": "matching full binary path and parent entry checked; SIGINT then exit0"
+  }
 }
