@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Operator commands for local accounts: create, disable, enable, reset-password, list.
 
-There is no registration endpoint (specs/identity-access.md §1.2); this script is the only
-way to manage accounts. Passwords are never taken as a command-line argument (they would
+Students self-register through the API (ADR-079); this script manages teacher accounts
+and account lifecycle operations. Passwords are never taken as a command-line argument (they would
 land in shell history and the process list): they are prompted for, or read from the
 environment variable named by ``--password-env``. Output never includes passwords or hashes.
 
