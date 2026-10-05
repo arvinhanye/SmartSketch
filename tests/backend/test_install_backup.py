@@ -63,3 +63,13 @@ def test_db_gate_checks_copied_live_wal_without_opening_readonly_source(tmp_path
         with pytest.raises(BackupError,match='Live task lease'):tool._db_gate(root)
         assert db.read_bytes()==before and Path(str(db)+'-wal').read_bytes()==wal
     finally:conn.close()
+
+
+@pytest.mark.parametrize('table,column',[('tasks','lease_expires_at'),('course_locks','expires_at')])
+def test_snapshot_gate_rejects_all_existing_lease_tables(tmp_path,table,column):
+    volumes=fixtures(tmp_path);export=tmp_path/'backup';export.mkdir()
+    with sqlite3.connect(volumes['app']/'smartsketch.sqlite3') as conn:
+        conn.execute(f'CREATE TABLE {table} ({column} INTEGER)')
+        conn.execute(f'INSERT INTO {table} VALUES(unixepoch()+120)')
+    with pytest.raises(BackupError,match='Live task lease'):backup_volumes(volumes,export)
+    assert not list(export.iterdir())

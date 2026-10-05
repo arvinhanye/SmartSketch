@@ -27,8 +27,9 @@ def _db_gate(root):
             with sqlite3.connect(copied.as_uri()+'?mode=ro',uri=True) as conn:
                 conn.execute('PRAGMA query_only=ON')
                 if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok': raise BackupError('SQLite snapshot invalid')
-                if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='processing_tasks'").fetchone():
-                    if conn.execute('SELECT 1 FROM processing_tasks WHERE lease_expires_at >= unixepoch() LIMIT 1').fetchone(): raise BackupError('Live task lease blocks backup')
+                from app.repositories.sqlite import _check_no_live_leases, MigrationError
+                try: _check_no_live_leases(conn)
+                except MigrationError: raise BackupError('Live task lease blocks backup') from None
     except (OSError,sqlite3.Error): raise BackupError('SQLite snapshot invalid') from None
 
 def _source_files(root):
