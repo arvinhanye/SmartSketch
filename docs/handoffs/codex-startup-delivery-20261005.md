@@ -49,3 +49,7 @@ stage_c_status OPEN；technical_freeze NOT_PERFORMED；生成844451/900000、向
 停止按钮弹出浏览器confirm后CDP操作超时，确认提交未测；不得称按钮停止通过。未使用别的UI技术绕过；已按项目/安装双标签核对并仅docker stop本fixture d3e4bfc14a9401d2，0运行残留、保留卷。再核对完整二进制路径与父入口，仅SIGINT该controller，39778 exit0。浏览器若仍显示这个测试停止确认框，交用户手动关闭；不要操作其他账号/页面或重新发起确认。
 
 总体STARTUP-12仍OPEN：自动重复用例定位、停止确认UI、Finder/Gatekeeper、Mac ARM/Win实机待补；完整分支复审仍部分中断，canary输出扫描Minor仍deferred。stage_c_status OPEN、technical_freeze NOT_PERFORMED；账本844451/900000、向量12005不变。没有源码push/merge/Release。
+
+## Release草稿接续
+
+2026-10-05用户另批仅Release草稿；STARTUP-13已交付，URL/六附件/服务端SHA/认证小文件回下载与源码绑定阻断见docs/handoffs/codex-startup-release-draft-20261005.md。仍不公开发布、不推源码、无Tag ref、无技术冻结。大包完整回下载未完成，不混写PASS。

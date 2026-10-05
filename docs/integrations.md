@@ -346,3 +346,7 @@ docker compose --profile app down        # 保留 app-data 卷
 ## 2026-10-05 启动预览发行镜像（已公开，安装包验收尚未签收）
 
 经用户授权，GHCR ghcr.io/arvinhanye/smartsketch-backend 与 smartsketch-frontend 的 preview-20261005-e88b56a 双架构镜像已上传；固定真实摘要见 packaging/release-manifest.preview-20261005.json。用户临近确认后已通过GitHub UI设为Public；无凭据/无密钥助手配置匿名拉取两个固定摘要exit0（使用已有镜像缓存，不代表冷下载速度）。Docker发布认证仅在本机工具/密钥存储中，凭据不进镜像、包、源码或诊断；不引入业务模型API变化，不把拉取成功等同于供应商API验证。
+
+## 2026-10-05 GitHub Release下载测试草稿
+
+用户授权创建arvinhanye/SmartSketch Release草稿（ID403670008）；draft/prerelease，未发布。附件仅三个既有安装包、SHA256SUMS、清单与中文启动说明，无真实配置/业务库。可登录仓库账号下载：https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936 。目标暂存已核对main SHA，不是附件构建源码；发布前必须另批源码推送和正确Tag绑定。未添加新集成密钥或业务变量，不改已公开GHCR摘要。
