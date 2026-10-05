@@ -50,3 +50,14 @@ def test_probe_mount_supports_live_wal_but_db_connection_stays_read_only():
     source=(ROOT/'src/backend/app/tools/install_probe.py').read_text()
     assert "?mode=ro" in source and "PRAGMA query_only=ON" in source
     assert 'immutable=1' not in source  # A live WAL must not be ignored.
+
+
+def test_backend_dependency_download_has_bounded_slow_network_timeout():
+    import re
+    source=(ROOT/'src/backend/Dockerfile').read_text()
+    command=next(line for line in source.splitlines() if '&& pip install ' in line)
+    match=re.search(r'--timeout\s+(\d+)',command)
+    assert match is not None, 'Release builds need an explicit finite download timeout.'
+    assert 60 <= int(match.group(1)) <= 180
+    assert '--trusted-host' not in source  # Never trade TLS validation for reliability.
+    assert 'pip install' in command and '-r /tmp/requirements.txt' in command

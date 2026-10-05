@@ -30,7 +30,7 @@ WORKDIR /app/src/backend
 # 依赖以 pyproject.toml 为唯一来源（只取运行依赖，不装 test extra）。
 COPY src/backend/pyproject.toml ./pyproject.toml
 RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']))" > /tmp/requirements.txt \
-    && pip install -r /tmp/requirements.txt \
+    && pip install --timeout 120 -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
 COPY src/backend/app ./app
