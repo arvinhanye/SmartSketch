@@ -168,6 +168,10 @@ func (s *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input SetupInput
+	var recovery struct {
+		Confirmed bool   `json:"confirmed"`
+		BackupID  string `json:"backup_id,omitempty"`
+	}
 	switch path {
 	case "/control/setup":
 		if readBody(r, &input) != nil {
@@ -195,6 +199,11 @@ func (s *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		input = SetupInput{Embedding: cfg.Embedding, WebPort: cfg.WebPort, TeacherUsername: data.Username, TeacherPassword: data.Password, ConfirmPassword: data.Confirm}
 		if st.Fresh && st.TeacherID == "" && ValidateSetup(input) != nil {
+			s.bad(w, 400, "FIELD")
+			return
+		}
+	case "/control/upgrade", "/control/restore":
+		if readBody(r, &recovery) != nil || !recovery.Confirmed || (recovery.BackupID != "" && !idPattern.MatchString(recovery.BackupID)) || (path == "/control/restore" && recovery.BackupID == "") {
 			s.bad(w, 400, "FIELD")
 			return
 		}
@@ -250,7 +259,25 @@ func (s *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer func() { input = SetupInput{}; s.mu.Lock(); s.busy = false; s.mu.Unlock() }()
 		ctx := context.Background()
-		if path == "/control/stop" {
+		if path == "/control/upgrade" || path == "/control/restore" {
+			var e error
+			if recovery.BackupID == "" {
+				_, e = s.controller.PrepareUpgrade(ctx, s.controller.docker.Manifest, true)
+			} else {
+				var set BackupSet
+				set, e = s.controller.LoadBackup(recovery.BackupID)
+				if e == nil {
+					if path == "/control/upgrade" {
+						e = s.controller.ApplyUpgrade(ctx, set, true)
+					} else {
+						e = s.controller.Restore(ctx, set, true)
+					}
+				}
+			}
+			if e != nil {
+				s.controller.recordFailure(e)
+			}
+		} else if path == "/control/stop" {
 			if e := s.controller.Stop(ctx); e != nil {
 				s.controller.recordFailure(e)
 			}

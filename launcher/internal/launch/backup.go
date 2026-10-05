@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,12 +30,16 @@ func fileSHA(path string) (string, error) {
 	if noLinks(path) != nil {
 		return "", fail("BACKUP", "path")
 	}
-	b, e := os.ReadFile(path)
+	f, e := os.Open(path)
 	if e != nil {
 		return "", fail("BACKUP", "file")
 	}
-	h := sha256.Sum256(b)
-	return hex.EncodeToString(h[:]), nil
+	defer f.Close()
+	hash := sha256.New()
+	if _, e = io.Copy(hash, f); e != nil {
+		return "", fail("BACKUP", "file")
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 func (c *Controller) backupPath(id string) (string, error) {
 	if !idPattern.MatchString(id) {
@@ -147,6 +152,10 @@ func (c *Controller) PrepareUpgrade(ctx context.Context, target ReleaseManifest,
 	}
 	b, _ := json.Marshal(set)
 	if e = snapStore.atomic("backup.json", b); e != nil {
+		return BackupSet{}, e
+	}
+	pending, _ := json.Marshal(map[string]string{"backup_id": set.ID, "target_version": target.Version})
+	if e = c.store.atomic("upgrade.json", pending); e != nil {
 		return BackupSet{}, e
 	}
 	return set, nil
@@ -275,6 +284,11 @@ func (c *Controller) Restore(ctx context.Context, set BackupSet, confirmed bool)
 		if e != nil {
 			return e
 		}
+		r, e := c.docker.run(ctx, []string{"volume", "inspect", volumes[name], "--format", "{{json .Labels}}"}, nil)
+		var labels map[string]string
+		if e != nil || json.Unmarshal(r.Stdout, &labels) != nil || checkVolumeOwner(labels, st.InstallID) != nil {
+			return fail("OWNERSHIP", "restore-volume")
+		}
 	}
 	d := *c.docker
 	d.Manifest = old
@@ -314,4 +328,73 @@ func (c *Controller) Restore(ctx context.Context, set BackupSet, confirmed bool)
 		return e
 	}
 	return fail("BACKUP", "restore-confirm")
+}
+
+func (c *Controller) LoadBackup(id string) (BackupSet, error) {
+	root, e := c.backupPath(id)
+	if e != nil {
+		return BackupSet{}, e
+	}
+	b, e := os.ReadFile(filepath.Join(root, "backup.json"))
+	var set BackupSet
+	if e != nil || len(b) > 16384 || strictJSON(b, &set) != nil || set.ID != id {
+		return BackupSet{}, fail("BACKUP", "metadata")
+	}
+	if _, _, _, e = c.verifyBackup(set); e != nil {
+		return BackupSet{}, e
+	}
+	return set, nil
+}
+func (c *Controller) ApplyUpgrade(ctx context.Context, set BackupSet, confirmed bool) error {
+	if !confirmed {
+		return fail("VERSION", "confirmation")
+	}
+	if !c.operation.TryLock() {
+		return fail("LOCK", "operation")
+	}
+	locked := true
+	defer func() {
+		if locked {
+			c.operation.Unlock()
+		}
+	}()
+	_, original, _, e := c.verifyBackup(set)
+	if e != nil {
+		return e
+	}
+	_, current, e := c.store.Load()
+	if e != nil {
+		return e
+	}
+	if current.InstallID != original.InstallID || current.Phase != STOPPED || current.ReleaseVersion != set.ReleaseVersion || current.ReleaseVersion == c.docker.Manifest.Version {
+		return fail("VERSION", "upgrade")
+	}
+	if c.docker.Manifest.VerifyCompose(c.docker.ComposePath) != nil {
+		return fail("MANIFEST", "compose")
+	}
+	if _, e = c.docker.Inspect(ctx, current); e != nil {
+		return e
+	}
+	// Both groups remain stopped; original snapshots have already passed verification.
+	b, e := os.ReadFile(c.docker.ComposePath)
+	if e != nil {
+		return fail("MANIFEST", "read")
+	}
+	if e = c.store.atomic("compose.yaml", b); e != nil {
+		return e
+	}
+	mb, _ := json.Marshal(c.docker.Manifest)
+	if e = c.store.atomic("release-manifest.json", mb); e != nil {
+		return e
+	}
+	current.ReleaseVersion = c.docker.Manifest.Version
+	current.Fresh = true
+	current.Checkpoint = ""
+	current.Phase = CONFIGURED
+	if e = c.store.SaveState(current); e != nil {
+		return e
+	}
+	c.operation.Unlock()
+	locked = false
+	return c.Start(ctx, nil)
 }

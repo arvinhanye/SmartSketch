@@ -42,6 +42,7 @@ def backup_volumes(volumes,export):
             if dest.exists(): raise BackupError('Snapshot already exists')
             temporary=export/(name+'.partial')
             with tarfile.open(temporary,'w:gz',format=tarfile.PAX_FORMAT) as archive:
+                archive.add(volumes[name],arcname=".",recursive=False)
                 for path in all_files[name]: archive.add(path,arcname=path.relative_to(volumes[name]).as_posix(),recursive=False)
             os.chmod(temporary,0o600);os.replace(temporary,dest)
     except (OSError,tarfile.TarError): raise BackupError('Snapshot export failed') from None
@@ -50,7 +51,7 @@ def _members(archive):
     seen=set(); total=0
     for item in archive.getmembers():
         path=PurePosixPath(item.name)
-        if path.is_absolute() or not path.parts or any(x in ('..','') for x in path.parts) or '\\' in item.name or ':' in item.name or item.name in seen or not (item.isfile() or item.isdir()): raise BackupError('Unsupported archive entry')
+        if path.is_absolute() or (not path.parts and not (item.name=='.' and item.isdir())) or any(x in ('..','') for x in path.parts) or '\\' in item.name or ':' in item.name or item.name in seen or not (item.isfile() or item.isdir()): raise BackupError('Unsupported archive entry')
         seen.add(item.name);total+=item.size
         if item.size<0 or total>2**40: raise BackupError('Archive size limit')
     return total

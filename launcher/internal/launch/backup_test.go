@@ -95,3 +95,13 @@ func TestVerifiedBackupRejectsChangedFileBeforeDocker(t *testing.T) {
 		t.Fatal("unknown path accepted")
 	}
 }
+
+func TestApplyUpgradeRejectsUnverifiedBackup(t *testing.T) {
+	c, r := controllerFixture(t)
+	if e := c.ApplyUpgrade(context.Background(), BackupSet{ID: "1111111111111111"}, true); e == nil {
+		t.Fatal("unverified upgrade")
+	}
+	if len(r.Requests) != 0 {
+		t.Fatal("unverified upgrade invoked Docker")
+	}
+}

@@ -3,6 +3,7 @@ package launch
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -212,6 +213,84 @@ func TestResumeTeacherCheckpointSkipsBootstrapAndMigration(t *testing.T) {
 		}
 		if strings.HasSuffix(a, " bootstrap") || strings.HasSuffix(a, " migrate") {
 			t.Fatal("checkpoint ignored")
+		}
+	}
+}
+
+type racingPortRunner struct {
+	base     *engineRunner
+	listener net.Listener
+	port     int
+}
+
+func (r *racingPortRunner) Run(ctx context.Context, q ProcessRequest) (ProcessResult, error) {
+	if strings.HasSuffix(strings.Join(q.Args, " "), "api worker web") {
+		var e error
+		r.listener, e = net.Listen("tcp4", fmt.Sprintf("127.0.0.1:%d", r.port))
+		if e != nil {
+			return ProcessResult{}, e
+		}
+		return ProcessResult{ExitCode: 1}, nil
+	}
+	return r.base.Run(ctx, q)
+}
+func TestActualPortBindingRaceReturnsPortFailure(t *testing.T) {
+	c, r := controllerFixture(t)
+	l, e := net.Listen("tcp4", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	cfg, st, _ := c.store.Load()
+	cfg.WebPort = port
+	st.WebPort = port
+	c.store.SaveConfig(cfg, st)
+	runner := &racingPortRunner{base: r, port: port}
+	c.docker.Runner = runner
+	in := setupFixture()
+	in.WebPort = port
+	e = c.Start(context.Background(), &in)
+	if runner.listener == nil {
+		t.Fatal("race not triggered")
+	}
+	defer runner.listener.Close()
+	if f, ok := e.(*Failure); !ok || f.Code != "PORT" {
+		t.Fatal("not classified port")
+	}
+	probe, e := net.Dial("tcp4", fmt.Sprintf("127.0.0.1:%d", port))
+	if e != nil {
+		t.Fatal("unrelated listener killed")
+	}
+	probe.Close()
+	_, got, _ := c.store.Load()
+	if got.Phase != ERROR {
+		t.Fatal("false READY")
+	}
+}
+
+type failingMigrationRunner struct{ base *engineRunner }
+
+func (r failingMigrationRunner) Run(ctx context.Context, q ProcessRequest) (ProcessResult, error) {
+	if strings.HasSuffix(strings.Join(q.Args, " "), " migrate") {
+		return ProcessResult{ExitCode: 1}, nil
+	}
+	return r.base.Run(ctx, q)
+}
+func TestMigrationFailureDoesNotRunAppOrClaimReady(t *testing.T) {
+	c, r := controllerFixture(t)
+	c.docker.Runner = failingMigrationRunner{r}
+	in := setupFixture()
+	if c.Start(context.Background(), &in) == nil {
+		t.Fatal("migration failure ignored")
+	}
+	_, st, _ := c.store.Load()
+	if st.Phase != ERROR || st.TeacherID != "" {
+		t.Fatal("false checkpoint")
+	}
+	for _, q := range r.Requests {
+		if strings.HasSuffix(strings.Join(q.Args, " "), "api worker web") {
+			t.Fatal("app started after migration failure")
 		}
 	}
 }

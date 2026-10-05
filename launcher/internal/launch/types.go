@@ -72,6 +72,9 @@ func fail(code, stage string) *Failure {
 	if !ok {
 		msg = "操作未完成，请重试或查看诊断。"
 	}
+	if code == "BACKUP" && stage == "restore-confirm" {
+		msg = "暂存快照已通过检查。请再次点击恢复并确认切换；原数据卷保留。"
+	}
 	return &Failure{code, stage, msg, true}
 }
 

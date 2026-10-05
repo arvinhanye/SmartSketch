@@ -21,8 +21,9 @@ type Snapshot struct {
 }
 
 func (d *Docker) run(ctx context.Context, args []string, stdin []byte) (ProcessResult, error) {
-	if d.Runner == nil {
-		d.Runner = ExecRunner{}
+	runner := d.Runner
+	if runner == nil {
+		runner = ExecRunner{}
 	}
 	env := append(childEnv(), "BACKUP_DIR="+filepath.Join(filepath.Dir(d.EnvPath), "backups"))
 	for _, a := range args {
@@ -37,7 +38,7 @@ func (d *Docker) run(ctx context.Context, args []string, stdin []byte) (ProcessR
 		ctx, cancel = context.WithTimeout(ctx, 180*time.Second)
 		defer cancel()
 	}
-	r, e := d.Runner.Run(ctx, ProcessRequest{d.CLI, args, env, stdin})
+	r, e := runner.Run(ctx, ProcessRequest{d.CLI, args, env, stdin})
 	if e != nil || r.ExitCode != 0 {
 		return r, fail("PROCESS", "docker")
 	}

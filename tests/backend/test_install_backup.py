@@ -38,3 +38,13 @@ def test_restore_rejects_traversal_links_and_partial_archives(tmp_path,kind):
     for path in target.values(): path.mkdir()
     with pytest.raises(BackupError): restore_volumes(target,export)
     assert all(not list(path.iterdir()) for path in target.values())
+
+def test_restore_preserves_volume_root_permissions(tmp_path):
+    import os
+    volumes=fixtures(tmp_path);os.chmod(volumes['app'],0o700)
+    export=tmp_path/'backup';export.mkdir();backup_volumes(volumes,export)
+    targets={name:tmp_path/('stage-'+name) for name in volumes}
+    for root in targets.values():root.mkdir(mode=0o755)
+    restore_volumes(targets,export)
+    assert targets['app'].stat().st_mode & 0o777==0o700
+    assert targets['app'].stat().st_uid==volumes['app'].stat().st_uid

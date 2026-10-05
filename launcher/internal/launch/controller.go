@@ -6,20 +6,24 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 )
 
 type StatusView struct {
-	NeedsTeacher  bool     `json:"needs_teacher"`
-	Phase         Phase    `json:"phase"`
-	Stage         string   `json:"stage"`
-	WebURL        string   `json:"web_url,omitempty"`
-	Busy          bool     `json:"busy"`
-	Failure       *Failure `json:"failure,omitempty"`
-	Actions       []string `json:"actions"`
-	AccountNotice string   `json:"account_notice,omitempty"`
+	NeedsUpgrade     bool     `json:"needs_upgrade"`
+	PendingUpgradeID string   `json:"pending_upgrade_id,omitempty"`
+	NeedsTeacher     bool     `json:"needs_teacher"`
+	Phase            Phase    `json:"phase"`
+	Stage            string   `json:"stage"`
+	WebURL           string   `json:"web_url,omitempty"`
+	Busy             bool     `json:"busy"`
+	Failure          *Failure `json:"failure,omitempty"`
+	Actions          []string `json:"actions"`
+	AccountNotice    string   `json:"account_notice,omitempty"`
 }
 type Controller struct {
 	store     *Store
@@ -251,12 +255,31 @@ func (c *Controller) Status(ctx context.Context) (StatusView, error) {
 	v := c.view
 	c.mu.Unlock()
 	if !v.Busy {
+		if !c.operation.TryLock() {
+			v.Busy = true
+			v.Actions = []string{}
+			return v, nil
+		}
+		defer c.operation.Unlock()
 		_, st, e := c.store.Load()
 		if e != nil {
 			return v, e
 		}
 		v.Phase = st.Phase
 		v.NeedsTeacher = st.Fresh && st.TeacherID == ""
+		v.NeedsUpgrade = st.Phase != NEW && st.ReleaseVersion != c.docker.Manifest.Version
+		if v.NeedsUpgrade {
+			b, e := os.ReadFile(filepath.Join(c.store.Root, "upgrade.json"))
+			if e == nil {
+				var pending struct {
+					ID     string `json:"backup_id"`
+					Target string `json:"target_version"`
+				}
+				if strictJSON(b, &pending) == nil && idPattern.MatchString(pending.ID) && pending.Target == c.docker.Manifest.Version {
+					v.PendingUpgradeID = pending.ID
+				}
+			}
+		}
 		if st.Phase == READY {
 			snap, e := c.docker.Inspect(ctx, st)
 			if e != nil || !isReadyWithProbe(ctx, c, snap, st) {
@@ -272,7 +295,10 @@ func (c *Controller) Status(ctx context.Context) (StatusView, error) {
 		if v.Phase == NEW {
 			v.Actions = append(v.Actions, "setup")
 		} else {
-			v.Actions = append(v.Actions, "start", "stop", "diagnostics")
+			v.Actions = append(v.Actions, "start", "stop", "diagnostics", "restore")
+			if v.NeedsUpgrade {
+				v.Actions = append(v.Actions, "upgrade")
+			}
 			if v.Phase == READY {
 				v.Actions = append(v.Actions, "open")
 			}
@@ -296,6 +322,7 @@ func (c *Controller) recordFailure(e error) {
 	}
 	c.mu.Lock()
 	c.view.Failure = f
+	c.view.Stage = f.Stage
 	c.view.Phase = ERROR
 	c.view.Busy = false
 	c.mu.Unlock()

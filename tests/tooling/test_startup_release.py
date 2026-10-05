@@ -28,3 +28,16 @@ def test_compose_environment_preserves_emitted_special_characters(tmp_path):
     r=subprocess.run([cli,'compose','--env-file',str(env),'-f',str(compose),'config','--environment'],capture_output=True,text=True)
     assert r.returncode==0
     assert next(x for x in r.stdout.splitlines() if x.startswith('KEY='))[4:]==val
+
+def test_actual_release_compose_parses_fixed_runtime(tmp_path):
+    import os
+    import shutil
+    cli=shutil.which('docker') or str(Path.home()/'.docker/bin/docker')
+    env_file=tmp_path/'.env';env_file.write_text('NEO4J_PASSWORD="fixture-private-pass"\nWEB_PUBLISH_PORT="18080"\nLLM_MODE="personal"\n')
+    env={k:v for k,v in os.environ.items() if k in ('HOME','USER','PATH','SYSTEMROOT','WINDIR','USERPROFILE')}
+    env.update(INSTALL_ID='0123456789abcdef',BACKEND_IMAGE='ghcr.io/arvinhanye/smartsketch-backend@sha256:'+'0'*64,FRONTEND_IMAGE='ghcr.io/arvinhanye/smartsketch-frontend@sha256:'+'1'*64,NEO4J_IMAGE='neo4j@sha256:'+'2'*64,BACKUP_DIR=str(tmp_path/'backups'))
+    result=subprocess.run([cli,'compose','--project-name','smartsketch-0123456789abcdef','--project-directory',str(tmp_path),'--env-file',str(env_file),'-f',str(ROOT/'packaging/compose.release.yaml'),'config','--format','json'],env=env,capture_output=True,text=True)
+    assert result.returncode==0, 'Release Compose failed parsing (configuration output not logged).'
+    data=json.loads(result.stdout);assert data['services']['web']['ports'][0]['host_ip']=='127.0.0.1'
+    assert not data['services']['neo4j'].get('ports')
+    assert data['services']['api']['environment']['LLM_MODE']=='personal'

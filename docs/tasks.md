@@ -1929,3 +1929,17 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 - STARTUP-03（T1）IN_PROGRESS，负责人Codex；范围launcher配置/状态/权限/锁；验收对应批准计划回归，Windows实机项单列OPEN。后续04–11按依赖执行；不发布/推送/真实调用/冻结。
 - 用户本轮“同意”确认计划并选择native执行；正式规格不变。隔离分支codex/cross-platform-startup-design，基线8b3267e，真实.env不读取/复制。测试副本通过git archive创建于/private/tmp/smartsketch-startup-exec，仅含已跟踪源码；开发SDK仅临时解压，不安装系统。
+
+## 2026-10-05 STARTUP 实现验收（Codex）
+
+| 任务 | 当前状态 | 证据 / 剩余 |
+|---|---|---|
+| STARTUP-03～08（T1～6） | IMPLEMENTED / 本地回归已测 | 私有配置、实例控制、教师引导、发行编排、就绪/停启、认证向导；实机项另列 |
+| STARTUP-09（T7） | IMPLEMENTED / 验收中 | 合成归档/根权限回归通过；真实隔离卷恢复与可视化操作正在验证 |
+| STARTUP-10（T8） | IMPLEMENTED / 未发行 | 三平台编译和打包测试通过；Windows/ARM 实机 OPEN；真实摘要未填写 |
+| STARTUP-11（T9） | IN_PROGRESS | basic exit0，完整门禁与 Docker 场景收集中；整支复审/平台签收待做 |
+
+- 最新审查及交接：docs/reviews/codex-startup-platform-validation.md、docs/handoffs/codex-cross-platform-startup-implementation.md。
+- 升级/恢复控制仅属 loopback 启动层，不改变业务 API/DTO/迁移；备份含密钥，仅留本机私有目录。
+- 正式镜像、下载包发布需另行授权；不从测试本地标签或虚构摘要生成正式清单。现有 scripts/start.sh 继续适用于原开发环境。
+- stage_c_status=OPEN、technical_freeze=NOT_PERFORMED；无收费模型/在线向量请求、无 push/merge。
