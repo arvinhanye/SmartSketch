@@ -14,9 +14,25 @@ const { spawn, execFileSync } = require('node:child_process');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-let stage = 'inputs', processGroup, browser, page, control, token, root;
-const evidence = { mode: 'real-package-entry-browser', paid_requests: 0, stages: [] };
+let stage = 'inputs', processGroup, browser, page, control, token, root, ownedDir, childEnvironment;
+const evidence = { mode: 'entry-process-plus-connected-browser', provider_calls: 'not instrumented; fixture configuration only, no business requests', handoffs: {initial_os_browser:'UNVERIFIED',open_software_button:'UNVERIFIED',finder_double_click:'UNVERIFIED'}, stages: [] };
 const record = name => { stage = name; evidence.stages.push({stage:name,at:new Date().toISOString()}); console.log(name); };
+function createOutput(raw) {
+ assert.ok(raw && path.isAbsolute(raw) && raw===path.resolve(raw) && raw.startsWith('/private/tmp/'));
+ assert.equal(fs.realpathSync(path.dirname(raw)),path.dirname(raw));
+ fs.mkdirSync(raw,{mode:0o700}); return raw;
+}
+function writeEvidence(dir,value) {if(dir)fs.writeFileSync(path.join(dir,'acceptance.json'),JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});}
+function verifyBinary(file,expected) {assert.match(expected||'',/^[a-f0-9]{64}$/);assert.equal(hash(file),expected,'binary provenance mismatch');}
+function stopOwned(id,runner) {
+ assert.match(id,/^[a-f0-9]{16}$/); const project='smartsketch-'+id;
+ const query=['ps','--filter','label=com.docker.compose.project='+project,'--format','{{.ID}}'];
+ const ids=runner(query).trim().split(/\s+/).filter(Boolean);
+ for(const cid of ids){assert.match(cid,/^[a-f0-9]+$/);const labels=JSON.parse(runner(['inspect',cid,'--format','{{json .Config.Labels}}']));assert.equal(labels['io.smartsketch.installation'],id);assert.equal(labels['com.docker.compose.project'],project);}
+ if(ids.length)runner(['stop','-t','30',...ids]);
+ const remaining=runner(query).trim().split(/\s+/).filter(Boolean);assert.equal(remaining.length,0,'owned containers still running');return {stopped:true,residual_count:remaining.length};
+}
+module.exports={createOutput,writeEvidence,verifyBinary,stopOwned};
 async function request(action, body) {
  const r = await fetch(control.origin + '/control/' + action, {method:body===undefined?'GET':'POST',headers:{Origin:control.origin,'Content-Type':'application/json',Authorization:'Bearer '+token},...(body===undefined?{}:{body:JSON.stringify(body)})});
  assert.equal(r.status,200,'control operation failed'); return r.json();
@@ -51,19 +67,23 @@ async function login(webURL, name, password) {
  await app.screenshot({path:path.join(process.env.PACKAGED_TEST_DIR,'teacher-login.png'),fullPage:true});
  await app.close();
 }
-(async()=>{
+async function main(){
  assert.equal(process.platform,'darwin');
  const bundle=fs.realpathSync(process.env.PACKAGED_BUNDLE);
- const dir=process.env.PACKAGED_TEST_DIR; assert.ok(dir&&path.isAbsolute(dir)&&dir.startsWith('/private/tmp/'));
- fs.mkdirSync(dir,{mode:0o700}); const home=path.join(dir,'home');fs.mkdirSync(home,{mode:0o700});
+ const dir=createOutput(process.env.PACKAGED_TEST_DIR); ownedDir=dir; const home=path.join(dir,'home');fs.mkdirSync(home,{mode:0o700});
  root=path.join(home,'Library','Application Support','SmartSketch');
  const manifest=JSON.parse(fs.readFileSync(path.join(bundle,'release-manifest.json'),'utf8'));
  assert.equal(hash(path.join(bundle,'compose.release.yaml')),manifest.compose_sha256);
  for(const key of ['backend_image','frontend_image','neo4j_image'])assert.match(manifest[key],/@sha256:[a-f0-9]{64}$/);
  assert.equal(fs.readFileSync(path.join(bundle,'target.txt'),'utf8').trim(),'darwin-'+(os.arch()==='x64'?'amd64':'arm64'));
  const entry=path.join(bundle,'start-macos.command');assert.ok(fs.statSync(entry).mode&0o100);
- evidence.manifest=manifest; evidence.entry_sha256=hash(entry);
- const env={HOME:home,USER:os.userInfo().username,LANG:'en_US.UTF-8',PATH:path.join(os.homedir(),'.docker','bin')+':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',DOCKER_CONFIG:path.join(os.homedir(),'.docker'),TMPDIR:'/private/tmp'};
+ verifyBinary(path.join(bundle,'bin/smartsketch-launcher'),process.env.PACKAGED_BINARY_SHA256);
+ assert.match(process.env.PACKAGED_SOURCE_COMMIT||'',/^[a-f0-9]{40}$/);
+ evidence.manifest=manifest; evidence.entry_sha256=hash(entry);evidence.binary_sha256=hash(path.join(bundle,'bin/smartsketch-launcher'));evidence.build_source_commit=process.env.PACKAGED_SOURCE_COMMIT;
+ const archive=process.env.PACKAGED_ARCHIVE;assert.ok(archive&&path.isAbsolute(archive));verifyBinary(archive,process.env.PACKAGED_ARCHIVE_SHA256);
+ evidence.archive_sha256=hash(archive);
+ const env={HOME:home,USER:os.userInfo().username,LANG:'en_US.UTF-8',PATH:path.join(os.homedir(),'.docker','bin')+':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',DOCKER_CONFIG:process.env.PACKAGED_DOCKER_CONFIG||path.join(os.homedir(),'.docker'),TMPDIR:'/private/tmp'};
+ childEnvironment=env;
  const out=fs.openSync(path.join(dir,'entry.log'),'wx',0o600);
  record('actual-entry-start');
  processGroup=spawn(entry,[],{cwd:bundle,env,detached:true,stdio:['ignore',out,out]});
@@ -99,14 +119,20 @@ async function login(webURL, name, password) {
  await login(restarted.web_url,name,password);record('restart-same-teacher-login');
  await request('stop',{});await waitPhase('STOPPED'); record('owned-test-installation-stopped');
  const project='smartsketch-'+initial.InstallID;
- const running=execFileSync(path.join(os.homedir(),'.docker/bin/docker'),['ps','--filter','label=com.docker.compose.project='+project,'--format','{{.ID}}'],{encoding:'utf8'});assert.equal(running.trim(),'');
+ const running=execFileSync(path.join(os.homedir(),'.docker/bin/docker'),['ps','--filter','label=com.docker.compose.project='+project,'--format','{{.ID}}'],{encoding:'utf8',env:childEnvironment});assert.equal(running.trim(),'');
  evidence.InstallID=initial.InstallID;evidence.result='PASS';
- fs.writeFileSync(path.join(dir,'acceptance.json'),JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
-})().catch(()=>{evidence.result='FAIL';evidence.failed_stage=stage;
- if(process.env.PACKAGED_TEST_DIR&&fs.existsSync(process.env.PACKAGED_TEST_DIR))fs.writeFileSync(path.join(process.env.PACKAGED_TEST_DIR,'acceptance.json'),JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
+}
+if(require.main===module) main().catch(()=>{evidence.result='FAIL';evidence.failed_stage=stage;
  console.error('Package acceptance failed at: '+stage+' (no credential-bearing stack output)');process.exitCode=1;
-}).finally(async()=>{
- // Best effort stop is scoped by the authenticated controller for this NEW fixture only.
- if(control&&token){try{const s=await request('status');if(s.phase!=='NEW'&&!s.busy){await request('stop',{});await waitPhase('STOPPED');}}catch{}}
- if(browser)await browser.close(); if(processGroup){try{process.kill(-processGroup.pid,'SIGINT');}catch{}await sleep(1200);try{process.kill(-processGroup.pid,'SIGTERM');}catch{}}
+ }).finally(async()=>{
+ if(browser)await browser.close();
+ // Kill the controller/CLI process group to cancel a busy operation before scoped stop.
+ if(processGroup){try{process.kill(-processGroup.pid,'SIGINT');}catch{}await sleep(1200);try{process.kill(-processGroup.pid,'SIGTERM');}catch{}await sleep(500);}
+ if(ownedDir&&root&&fs.existsSync(path.join(root,'installation.json'))){
+  try{const state=JSON.parse(fs.readFileSync(path.join(root,'installation.json'),'utf8'));
+   const run=args=>execFileSync(path.join(os.homedir(),'.docker/bin/docker'),args,{encoding:'utf8',env:childEnvironment,timeout:120000,stdio:['ignore','pipe','pipe']});
+   evidence.cleanup=stopOwned(state.InstallID,run);
+  }catch{evidence.cleanup={stopped:false,residual_count:'UNVERIFIED'};evidence.result='FAIL';process.exitCode=1;console.error('Owned fixture cleanup failed; inspect this test installation only.');}
+ }
+ try{writeEvidence(ownedDir,evidence);}catch{process.exitCode=1;console.error('Evidence write failed; existing files left unchanged.');}
 });
