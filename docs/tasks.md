@@ -1893,3 +1893,18 @@ C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整�
 C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCESS，merge commit 3d696158；#319（头d03b5e7，本轮修复）全部8检查SUCCESS，先合入claude/plan-c-acceptance，merge commit bbc8fbea；#318基线改为main、纳入修复后头bbc8fbea全部8检查SUCCESS，merge commit 0436ff34，已进入main。merge commit保留作者/历史，不force-push、不删除分支；没有合并测量分支88f9f6f。验证origin/main包含d03b5e7且完整代码树与已验修复提交一致。仓库当时开放PR列表为空；发布交接与启动说明的文档同步另由后续PR承载，不冒充新的业务修复或冻结。
 
 上述PR状态、头/合并提交与CI链接存evaluation/raw/codex-c-acc-fixes/publication-verification.json。当前代码入口scripts/start.sh已在GitHub main；本地主目录代码未自动pull/切换，本机.env/业务库未改。说明文档不存真实Key，向量仍.env全局online、生成API仍个人网页配置；网页向量配置计划保持CANCELLED_BY_USER。真实测量与人工签收口径不变，三项不补测仍未测，历史慢段根因OPEN；stage_c_status OPEN、technical_freeze NOT_PERFORMED。用户手工检查与冻结决定仍等待用户，不因GitHub合并自动签收。
+
+
+## 2026-10-04 Codex 认领：STARTUP-01 跨平台双击入口与安装向导设计
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| STARTUP-01 | AWAITING_SPEC_APPROVAL（方向已确认；设计文档已交付） | Codex | docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md、当前登记、方向决策/集成边界、Codex交接 | 本机双击入口＋首次向导＋Docker的架构、状态、配置与数据保护、账号引导、平台验收明确；用户审核本文后才写实施计划 |
+
+- 用户已确认采用“双击入口＋安装向导＋Docker”，继续保留 Web 业务；没有批准尚未存在的实施计划或原生桌面应用。
+- 输入：bdb89c46、现有 Compose/Dockerfile/start.sh、ADR-080/081、身份规格；输出：正式待审核设计与交接。写入范围仅文档，未改业务代码/配置/数据。
+- 已核对：Compose完整应用基础可复用；后端镜像未打包教师引导脚本；学生注册已存在；开发启动依赖宿主Python/npm，发行入口需独立。拟共用Go启动核心为设计细节，随规格待审批，当前未安装新依赖。
+- 风险：Windows/Intel Mac实机、预构建多架构镜像、镜像仓库发布权限仍需实施期落实；本期只管理新的独立安装或自身已有安装，不自动迁移当前工作区的课程库。
+- 验证：./scripts/verify.sh basic（实际命令未传参数，使用默认basic）exit 0；git diff --check exit 0；设计自审无实现占位。日志 /private/tmp/smartsketch-startup-design-basic-retry.log。首次因PATH缺/usr/local/bin的契约工具而exit 1，未计PASS；补齐既有工具路径后重跑。full/integration及启动器定向/三平台实测未执行，不计PASS。
+- 未决：规格用户审核→实施计划审核/执行方式→发行镜像发布授权与各平台实机资源。全局向量业务设置保持CANCELLED_BY_USER；向导只生成本机环境配置，不改ADR-081。
+- 交接：docs/handoffs/codex-cross-platform-startup-design.md。stage_c_status OPEN；technical_freeze NOT_PERFORMED；本轮生成调用0、在线向量0，未操作共享或测量数据库、未推送合并。
