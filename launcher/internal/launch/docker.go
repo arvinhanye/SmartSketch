@@ -181,7 +181,41 @@ func (d *Docker) Inspect(ctx context.Context, s InstallState) (Snapshot, error) 
 		if e != nil || json.Unmarshal(r.Stdout, &labels) != nil || checkVolumeOwner(labels, s.InstallID) != nil {
 			return Snapshot{}, fail("OWNERSHIP", "container")
 		}
-		healthy := row.State == "running" && row.Health == "healthy"
+		mounted := true
+		if row.Service == "neo4j" || row.Service == "api" || row.Service == "worker" {
+			expected, e := volumeNames(s, s.DataGeneration)
+			if e != nil {
+				return Snapshot{}, e
+			}
+			key := "app"
+			if row.Service == "neo4j" {
+				key = "neo4j"
+			}
+			r, e := d.run(ctx, []string{"container", "inspect", row.ID, "--format", "{{json .Mounts}}"}, nil)
+			var mounts []struct{ Type, Destination, Name string }
+			if e != nil || json.Unmarshal(r.Stdout, &mounts) != nil {
+				return Snapshot{}, fail("PROCESS", "mounts")
+			}
+			mounted = false
+			for _, mount := range mounts {
+				if mount.Destination != "/data" {
+					continue
+				}
+				if mount.Type != "volume" || mount.Name == "" {
+					return Snapshot{}, fail("OWNERSHIP", "mount")
+				}
+				if mount.Name != expected[key] {
+					owned, e := d.run(ctx, []string{"volume", "inspect", mount.Name, "--format", "{{json .Labels}}"}, nil)
+					var labels map[string]string
+					if e != nil || json.Unmarshal(owned.Stdout, &labels) != nil || checkVolumeOwner(labels, s.InstallID) != nil {
+						return Snapshot{}, fail("OWNERSHIP", "mount")
+					}
+				} else {
+					mounted = true
+				}
+			}
+		}
+		healthy := row.State == "running" && row.Health == "healthy" && mounted
 		switch row.Service {
 		case "neo4j":
 			snap.Neo4jHealthy = healthy

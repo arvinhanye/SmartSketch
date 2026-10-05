@@ -2,8 +2,11 @@ package launch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -83,9 +86,10 @@ func TestCrashAfterTeacherCreatedResumesWithoutReset(t *testing.T) {
 
 // Transport fake implements the Docker CLI protocol, exercising real controller sequencing.
 type engineRunner struct {
-	InstallID string
-	Requests  []ProcessRequest
-	FailApp   bool
+	InstallID       string
+	Requests        []ProcessRequest
+	FailApp         bool
+	SelectedVolumes map[string]string
 }
 
 func (r *engineRunner) Run(_ context.Context, q ProcessRequest) (ProcessResult, error) {
@@ -96,16 +100,38 @@ func (r *engineRunner) Run(_ context.Context, q ProcessRequest) (ProcessResult, 
 			r.InstallID = strings.TrimPrefix(value, "INSTALL_ID=")
 		}
 	}
+	if strings.Contains(a, " ps ") {
+		r.SelectedVolumes = map[string]string{"app": "smartsketch-" + r.InstallID + "_app-data", "neo4j": "smartsketch-" + r.InstallID + "_neo4j-data"}
+		for _, arg := range q.Args {
+			if filepath.Base(arg) == "volumes.json" {
+				b, _ := os.ReadFile(arg)
+				var spec struct {
+					Volumes map[string]struct{ Name string }
+				}
+				if json.Unmarshal(b, &spec) == nil {
+					r.SelectedVolumes["app"] = spec.Volumes["app-data"].Name
+					r.SelectedVolumes["neo4j"] = spec.Volumes["neo4j-data"].Name
+				}
+			}
+		}
+	}
 	out := ""
 	switch {
 	case a == "context inspect":
 		out = `[{"Endpoints":{"docker":{"Host":"unix:///local.sock"}}}]`
 	case strings.HasPrefix(a, "info "):
 		out = "linux"
+	case strings.Contains(a, "container inspect") && strings.Contains(a, ".Mounts"):
+		key := "app"
+		if strings.Contains(a, "fixture-neo4j") {
+			key = "neo4j"
+		}
+		b, _ := json.Marshal([]map[string]string{{"Type": "volume", "Destination": "/data", "Name": r.SelectedVolumes[key]}})
+		out = string(b)
 	case strings.Contains(a, "container inspect"):
 		out = `{"com.docker.compose.project":"smartsketch-` + r.InstallID + `","io.smartsketch.installation":"` + r.InstallID + `"}`
 	case strings.Contains(a, " ps "):
-		out = `[{"ID":"fixture-container","Service":"neo4j","State":"running","Health":"healthy"},{"ID":"fixture-container","Service":"api","State":"running","Health":"healthy"},{"ID":"fixture-container","Service":"worker","State":"running","Health":"healthy"},{"ID":"fixture-container","Service":"web","State":"running"}]`
+		out = `[{"ID":"fixture-neo4j","Service":"neo4j","State":"running","Health":"healthy"},{"ID":"fixture-api","Service":"api","State":"running","Health":"healthy"},{"ID":"fixture-worker","Service":"worker","State":"running","Health":"healthy"},{"ID":"fixture-web","Service":"web","State":"running"}]`
 	case strings.HasSuffix(a, " probe"):
 		out = `{"schema_current":true,"embedding_space_matches":true,"vector_indexes_online":true}`
 	case strings.HasSuffix(a, " bootstrap"):

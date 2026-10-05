@@ -106,3 +106,28 @@ func (*ownershipRunner) Run(_ context.Context, q ProcessRequest) (ProcessResult,
 	}
 	return ProcessResult{}, nil
 }
+
+type wrongGenerationRunner struct{ base *engineRunner }
+
+func (r wrongGenerationRunner) Run(ctx context.Context, q ProcessRequest) (ProcessResult, error) {
+	if len(q.Args) > 0 && q.Args[0] == "container" && strings.Contains(strings.Join(q.Args, " "), ".Mounts") {
+		return ProcessResult{Stdout: []byte(`[{"Type":"volume","Destination":"/data","Name":"smartsketch-` + r.base.InstallID + `_app-data"}]`)}, nil
+	}
+	if len(q.Args) > 1 && q.Args[0] == "volume" && q.Args[1] == "inspect" {
+		return ProcessResult{Stdout: []byte(`{"com.docker.compose.project":"smartsketch-` + r.base.InstallID + `","io.smartsketch.installation":"` + r.base.InstallID + `"}`)}, nil
+	}
+	return r.base.Run(ctx, q)
+}
+func TestHealthyServicesOnOldGenerationAreNotReady(t *testing.T) {
+	c, r := controllerFixture(t)
+	_, st, _ := c.store.Load()
+	st.DataGeneration = "2222222222222222"
+	c.docker.Runner = wrongGenerationRunner{r}
+	snap, e := c.docker.Inspect(context.Background(), st)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if snap.APIHealthy || snap.WorkerHealthy || snap.Neo4jHealthy {
+		t.Fatal("old generation counted as selected data generation")
+	}
+}

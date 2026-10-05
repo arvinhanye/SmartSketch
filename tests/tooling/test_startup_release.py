@@ -41,3 +41,12 @@ def test_actual_release_compose_parses_fixed_runtime(tmp_path):
     data=json.loads(result.stdout);assert data['services']['web']['ports'][0]['host_ip']=='127.0.0.1'
     assert not data['services']['neo4j'].get('ports')
     assert data['services']['api']['environment']['LLM_MODE']=='personal'
+
+
+def test_probe_mount_supports_live_wal_but_db_connection_stays_read_only():
+    import yaml
+    compose=yaml.safe_load((ROOT/'packaging/compose.release.yaml').read_text())
+    assert compose['services']['probe']['volumes']==['app-data:/data']
+    source=(ROOT/'src/backend/app/tools/install_probe.py').read_text()
+    assert "?mode=ro" in source and "PRAGMA query_only=ON" in source
+    assert 'immutable=1' not in source  # A live WAL must not be ignored.

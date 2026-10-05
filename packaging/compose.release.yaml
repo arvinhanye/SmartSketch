@@ -48,7 +48,9 @@ services:
     labels: *labels
     env_file: *env
     environment: *runtime
-    volumes: ["app-data:/data:ro"]
+    # Live SQLite WAL readers may create/lock -shm. The probe itself uses mode=ro
+    # plus query_only; immutable=1 would incorrectly ignore live WAL contents.
+    volumes: ["app-data:/data"]
     command: [python, -m, app.tools.install_probe]
     restart: "no"
   backup:

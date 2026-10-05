@@ -167,3 +167,5 @@ Go 二进制与 .command 执行位、Windows .cmd 路径/编码、macOS下载来
 - 暂存恢复失败可继续检查／启动；原安装未切换前仍保留。切换需二次确认，已切换的 generation 登记已消费；再次恢复同一快照须重新解包到新的卷，不复用已发生新写入的活跃卷。
 - 内部 POST /control/port 要求 confirmed=true 与有效 web_port；先检查端口，再只停止本安装并保存端口，保留 InstallID、密钥、教师与数据 generation。后续启动仍经过原就绪检查。状态仅补 web_port 与 port 可用操作，不返回凭据。
 - 上述属于原设计的安全恢复与端口交互约束，不新增业务接口／DTO／迁移／依赖，不启用已撤销的业务向量配置页。
+
+- 真实隔离冒烟证实 SQLite WAL 数据库在物理只读卷上可能因共享内存文件不存在报 SQLITE_CANTOPEN。probe 保持 mode=ro + query_only（业务数据只读），允许挂载层创建／锁定 WAL 共享内存；不用 immutable=1 忽略活跃 WAL。容器挂载核对选中 generation，旧代际即便健康也不宣布 READY。
