@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-06",
+  "source_commit": "5f45a5ce1b35c61b21a824d3c287b7c3cc95a8ee",
+  "branch": "codex/startup-hotfix-20261006",
+  "release": {
+    "id": 404525654,
+    "html_url": "https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-65399947b0be0212bc45",
+    "tag_name": "untagged-65399947b0be0212bc45",
+    "target_commitish": "5f45a5ce1b35c61b21a824d3c287b7c3cc95a8ee",
+    "draft": true,
+    "prerelease": true
+  },
+  "artifacts": {
+    "source_commit": "5f45a5ce1b35c61b21a824d3c287b7c3cc95a8ee",
+    "output": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/dist/startup-hotfix-20261006-5f45a5c",
+    "verified_payloads": true,
+    "archives": {
+      "SmartSketch-hotfix-20261006-5f45a5c-darwin-amd64.tar.gz": {
+        "sha256": "12976b02863d3d91eada0e30d6d1890f769f8898f9fbe2cf619f0bccb9de105e",
+        "bytes": 3017554
+      },
+      "SmartSketch-hotfix-20261006-5f45a5c-darwin-arm64.tar.gz": {
+        "sha256": "99ed096aa3d20c5d965c4dc104c9c95852a0346320bd3ac5b89ec78cbcc72660",
+        "bytes": 2783360
+      },
+      "SmartSketch-hotfix-20261006-5f45a5c-windows-amd64.zip": {
+        "sha256": "d34ca68b5b4727bdaa0ab5a4207085bafc004298e62482a3ab4de1c81e4c02b7",
+        "bytes": 3071627
+      }
+    }
+  },
+  "remote_assets": [
+    {
+      "id": 615052203,
+      "name": "BUILD-INFO.json",
+      "size": 1060,
+      "state": "uploaded",
+      "digest": "sha256:d22e0a1d03a4aca97284aa261b093de681051d3df3bc7ec20be05f8d0fbcc190"
+    },
+    {
+      "id": 615052177,
+      "name": "release-manifest.json",
+      "size": 578,
+      "state": "uploaded",
+      "digest": "sha256:7ab0df5fd0094f717100fa71f5b6df67ccde959db9188776b9f7fb84cc509e67"
+    },
+    {
+      "id": 615052174,
+      "name": "SHA256SUMS",
+      "size": 364,
+      "state": "uploaded",
+      "digest": "sha256:7b4f6a8539344b2d8ff32775c836540599bf9d1ca37f484f81e8eb412758efcf"
+    },
+    {
+      "id": 615052167,
+      "name": "SmartSketch-hotfix-20261006-5f45a5c-darwin-amd64.tar.gz",
+      "size": 3017554,
+      "state": "uploaded",
+      "digest": "sha256:12976b02863d3d91eada0e30d6d1890f769f8898f9fbe2cf619f0bccb9de105e"
+    },
+    {
+      "id": 615052152,
+      "name": "SmartSketch-hotfix-20261006-5f45a5c-darwin-arm64.tar.gz",
+      "size": 2783360,
+      "state": "uploaded",
+      "digest": "sha256:99ed096aa3d20c5d965c4dc104c9c95852a0346320bd3ac5b89ec78cbcc72660"
+    },
+    {
+      "id": 615052151,
+      "name": "SmartSketch-hotfix-20261006-5f45a5c-windows-amd64.zip",
+      "size": 3071627,
+      "state": "uploaded",
+      "digest": "sha256:d34ca68b5b4727bdaa0ab5a4207085bafc004298e62482a3ab4de1c81e4c02b7"
+    },
+    {
+      "id": 615052204,
+      "name": "START-HERE.md",
+      "size": 2020,
+      "state": "uploaded",
+      "digest": "sha256:5815a2e94c8d6f91e839f378b083dffb9f7c5a51a6298159bfda6a2b517a0625"
+    }
+  ],
+  "verification": {
+    "full_exit": 0,
+    "backend_tooling_passed": 3952,
+    "registered_backend_skips": 27,
+    "backend_warnings": 1,
+    "frontend_passed": 934,
+    "frontend_files": 38,
+    "typecheck_build": "PASS",
+    "targeted_python_passed": 20,
+    "go_race": "PASS",
+    "go_vet": "PASS",
+    "real_synthetic_legacy_resume": "PASS",
+    "real_synthetic_legacy_resume_seconds": 211.26,
+    "cross_compile_targets": [
+      "darwin-amd64",
+      "darwin-arm64",
+      "windows-amd64"
+    ],
+    "full_log_sha256": "ba744879546ca3692cd2a512f7b3a6f196d4a7a1e71605af06fe421c18e539db"
+  },
+  "not_verified": [
+    "downloaded Finder double-click",
+    "ARM and Windows hardware",
+    "this-round full integration/E2E",
+    "user business data signoff"
+  ],
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED",
+  "paid_model_calls_issued": false
+}

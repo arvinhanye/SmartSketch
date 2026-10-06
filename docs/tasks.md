@@ -2009,3 +2009,5 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - 依赖/风险：锁定Go1.26.8临时恢复、GitHub写权限；三平台跨编译不等于ARM/Win实机验收；Mac未签名条件不变。验证：相关Go/打包全量、隔离 ./scripts/verify.sh full 与合成安装恢复（不挂用户库/凭据）；远端草稿/附件hash/源码commit核对。
 
 - STARTUP-16 源码检查点：旧代码新回归5个顶层FAIL/1 PASS（含3个恢复输入子例失败），最小修改后Go全量PASS，最终race/vet PASS；定向Python20 PASS；真实合成Docker旧migrated混合大小写恢复1 PASS（211.26秒），保留原ID/首次密码/配置。隔离basic exit0，full仍执行中，不把检查点当作完成。
+
+- STARTUP-16最终：DONE（修复/草稿交付；用户下载/实机签收OPEN）。源码5f45a5c已推codex/startup-hotfix-20261006；最终race/vet/定向20/真实合成旧状态恢复1 PASS；无.env隔离full单次exit0，backend+tooling3952/27登记skip/1既有warning，frontend934/typecheck/build PASS。三平台包内容与SHA核对、新草稿404525654 draft/prerelease true、7附件远端SHA一致，target精准5f45a5c。保留旧运行兼容ID，不改用户配置/卷/首次密码、业务镜像或迁移；不合并/公开/冻结。P3诊断丢阶段、Mac信任及ARM/Win实机仍OPEN。报告docs/reviews/codex-startup-hotfix-release-20261006.{md,json}与自身handoff已更新。
