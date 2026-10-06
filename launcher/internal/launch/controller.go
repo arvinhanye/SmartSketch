@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -64,7 +65,7 @@ func (c *Controller) Configure(in SetupInput) error {
 	if _, e = rand.Read(id); e != nil {
 		return fail("CONFIG", "random")
 	}
-	st := InstallState{SchemaVersion: 1, InstallID: hex.EncodeToString(id), ReleaseVersion: c.docker.Manifest.Version, Phase: CONFIGURED, WebPort: cfg.WebPort, Fresh: true, TeacherUsername: in.TeacherUsername}
+	st := InstallState{SchemaVersion: 1, InstallID: hex.EncodeToString(id), ReleaseVersion: c.docker.Manifest.Version, Phase: CONFIGURED, WebPort: cfg.WebPort, Fresh: true, TeacherUsername: strings.ToLower(in.TeacherUsername)}
 	return c.store.SaveConfig(cfg, st)
 }
 func (c *Controller) setStage(stage string) {
@@ -128,10 +129,12 @@ func (c *Controller) Start(ctx context.Context, in *SetupInput) (err error) {
 		}
 	}
 	if st.Fresh && st.TeacherID == "" {
-		if in == nil || ValidateSetup(*in) != nil || in.TeacherUsername != st.TeacherUsername {
+		if in == nil || ValidateSetup(*in) != nil || strings.ToLower(in.TeacherUsername) != strings.ToLower(st.TeacherUsername) {
 			return fail("FIELD", "teacher")
 		}
 	}
+	// Recover pre-hotfix mixed-case identities without changing the existing account.
+	st.TeacherUsername = strings.ToLower(st.TeacherUsername)
 	if st.Fresh {
 		c.setStage("pull")
 		if e = c.docker.Pull(ctx, st); e != nil {
@@ -167,7 +170,7 @@ func (c *Controller) Start(ctx context.Context, in *SetupInput) (err error) {
 	}
 	if st.Fresh && st.TeacherID == "" {
 		c.setStage("teacher")
-		payload, _ := json.Marshal(map[string]string{"username": in.TeacherUsername, "password": in.TeacherPassword.value})
+		payload, _ := json.Marshal(map[string]string{"username": st.TeacherUsername, "password": in.TeacherPassword.value})
 		result, e := c.docker.Bootstrap(ctx, st, payload)
 		clear(payload)
 		in.TeacherPassword = Secret{}

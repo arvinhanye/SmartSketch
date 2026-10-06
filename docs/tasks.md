@@ -1987,3 +1987,25 @@ STARTUP-13实际交付：Release ID403670008，draft=true/prerelease=true，URL 
 负责人Codex；状态IN_PROGRESS/发行签收OPEN。输入：用户Downloads实际包、PID44020错误；输出：已定位的签名/隔离证据、SIGKILL诊断回归、明确启动说明及交接。只读检查确认二进制SHA9116108b...与发布一致，unsigned且有com.apple.quarantine；spctl exit3/no usable signature，syspolicyd明确Gatekeeper rejection PID44020。不是Docker或个人API故障。本机可用Developer ID Application身份数0；完整分发修复需用户提供签名条件，不读取私钥。修复范围先补入口137条件诊断，不把提示修复冒充信任修复；不自动删quarantine、不更改Gatekeeper或用户配置、数据库，不重发镜像/替换Release附件。先写SIGKILL/成功/其他错误回归，运行定向测试与无.env副本verify.sh basic。未知平台和签收状态保持OPEN。
 
 STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功/其他失败回归先2 RED/1 PASS，修后打包7 PASS、完整打包发行13 PASS，diff-check无误。basic50362仍RUNNING（B14已过，负向契约阶段在执行），未记PASS。用户答复无Apple账号/证书，选择继续测试预览版；由用户本人审阅系统单程序“仍要打开”，代理未执行信任或删隔离。下载信任/完整启动仍OPEN；原下载包、Release附件、系统安全设置和数据未改。详见Codex故障handoff/review。
+
+
+## 2026-10-06 STARTUP-15：Intel 下载包启动失败排查
+
+- 负责人：Codex；状态 IN_PROGRESS，仅定位，不改用户配置、容器、课程或发布版本。
+- 输入：用户报告 Intel 预览包启动失败；复用 STARTUP-14 与原包，不重编、不重发。输出：只读证据、原因与自身交接。
+- 依赖/风险：安装状态 ERROR，未记录失败阶段；需用户提供脱敏诊断。读取安装非敏感字段与镜像清单，不读取 .env、控制令牌或 API Key，不发模型/向量请求。
+- 验证：下载二进制 SHA-256、Docker engine 与本安装容器/卷状态、公开镜像清单探针；未知归因保持 OPEN。源码/接口/模型无变更。
+
+- 实际检查点：用户诊断 PROCESS/unknown；最小 PATH 的缓存镜像 pull exit1（凭据助手缺失），仅补 ~/.docker/bin 后 exit0。Docker正常、本安装无容器/卷；下载SHA一致。发现P2路径继承与P3诊断丢阶段，尚未采集用户实际启动 PATH，唯一归因与完整启动保持OPEN。仅文档记录，未修包/配置/源码。报告 docs/reviews/codex-intel-startup-failure-20261006.md，自身交接 docs/handoffs/codex-intel-startup-failure-20261006.md；完整门禁未跑，未冻结。
+
+- 第二次诊断接续：用户 (1).json 与截图明确失败 teacher/PROCESS，checkpoint=migrated，Neo4j healthy/三卷存在。当前根因为用户名含大写，前端允许/状态原样、后端转小写、启动器精确比较误判。固定发行后端断网临时合成库复现exit0：创建成功但比较false，重入保留ID与原密码；未读取用户库/凭据。P2及旧状态恢复回归方案已追加报告。状态仍OPEN（仅定位；尚未修包/源码/用户配置、完整启动未验）；不删库重装、不冻结。
+
+
+## 2026-10-06 STARTUP-16：启动器热修复与新版草稿 Release
+
+- 负责人 Codex；状态 IN_PROGRESS；用户明确要求修复并提交新草稿。范围：用户名规范化与旧 migrated 配置恢复、Docker子进程工具目录、已有SIGKILL入口提示一并打包。保留首次密码/InstallID/配置/卷，业务镜像/迁移/DTO不变。
+- 输入：STARTUP-15诊断与固定源码3bc7e9b；输出：先红后绿回归、启动器三平台包/摘要、新GitHub草稿及自身交接。只推自己的codex源码分支/草稿，不合并main、不公开发行、不冻结、不执行真实API。
+- 本次仅启动器热修，运行兼容标识沿用 preview-20261005-e88b56a（前后端镜像/数据版本不变），新草稿以20261006-hotfix和源码提交区分，避免未完成安装进入不必要的数据升级流程；说明文件必须明确热修源码出处。
+- 依赖/风险：锁定Go1.26.8临时恢复、GitHub写权限；三平台跨编译不等于ARM/Win实机验收；Mac未签名条件不变。验证：相关Go/打包全量、隔离 ./scripts/verify.sh full 与合成安装恢复（不挂用户库/凭据）；远端草稿/附件hash/源码commit核对。
+
+- STARTUP-16 源码检查点：旧代码新回归5个顶层FAIL/1 PASS（含3个恢复输入子例失败），最小修改后Go全量PASS，最终race/vet PASS；定向Python20 PASS；真实合成Docker旧migrated混合大小写恢复1 PASS（211.26秒），保留原ID/首次密码/配置。隔离basic exit0，full仍执行中，不把检查点当作完成。

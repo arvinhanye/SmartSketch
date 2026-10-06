@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -52,3 +53,27 @@ func BuildChildEnv(parent []string) []string {
 	return out
 }
 func childEnv() []string { return BuildChildEnv(os.Environ()) }
+
+// Docker discovers its credential helpers via PATH even when its CLI is absolute.
+// Preserve the parent's allowed environment; never modify credential configuration.
+func dockerChildEnv(cli string) []string {
+	env := childEnv()
+	if !filepath.IsAbs(cli) {
+		return env
+	}
+	dir := filepath.Dir(cli)
+	for i, value := range env {
+		key, original, ok := strings.Cut(value, "=")
+		if ok && strings.EqualFold(key, "PATH") {
+			paths := []string{dir}
+			for _, item := range filepath.SplitList(original) {
+				if item != dir {
+					paths = append(paths, item)
+				}
+			}
+			env[i] = "PATH=" + strings.Join(paths, string(os.PathListSeparator))
+			return env
+		}
+	}
+	return append(env, "PATH="+dir)
+}

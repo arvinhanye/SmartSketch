@@ -25,7 +25,7 @@ func (d *Docker) run(ctx context.Context, args []string, stdin []byte) (ProcessR
 	if runner == nil {
 		runner = ExecRunner{}
 	}
-	env := append(childEnv(), "BACKUP_DIR="+filepath.Join(filepath.Dir(d.EnvPath), "backups"))
+	env := append(dockerChildEnv(d.CLI), "BACKUP_DIR="+filepath.Join(filepath.Dir(d.EnvPath), "backups"))
 	for _, a := range args {
 		if strings.HasPrefix(a, "smartsketch-") && idPattern.MatchString(strings.TrimPrefix(a, "smartsketch-")) {
 			env = append(env, "INSTALL_ID="+strings.TrimPrefix(a, "smartsketch-"), "BACKEND_IMAGE="+d.Manifest.BackendImage, "FRONTEND_IMAGE="+d.Manifest.FrontendImage, "NEO4J_IMAGE="+d.Manifest.Neo4jImage)
@@ -265,7 +265,7 @@ func (d *Docker) Bootstrap(ctx context.Context, s InstallState, stdin []byte) (B
 		return BootstrapResult{}, e
 	}
 	var result BootstrapResult
-	if strictJSON(r.Stdout, &result) != nil || result.UserID == "" || result.Username != s.TeacherUsername {
+	if strictJSON(r.Stdout, &result) != nil || result.UserID == "" || result.Username != strings.ToLower(s.TeacherUsername) {
 		return result, fail("PROCESS", "teacher")
 	}
 	return result, nil
