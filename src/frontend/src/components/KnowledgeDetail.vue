@@ -26,8 +26,10 @@ const props = withDefaults(
     kpId: string | null
     /** document_id → 资料显示名（可选） */
     documentNames?: Record<string, string>
+    /** 工作台已有「返回课程」时隐藏重复关闭入口；其他调用保持原行为 */
+    showClose?: boolean
   }>(),
-  { documentNames: () => ({}) },
+  { documentNames: () => ({}), showClose: true },
 )
 
 const emit = defineEmits<{
@@ -96,9 +98,9 @@ watch(detail, async (next) => {
     :aria-labelledby="detail ? titleId : undefined"
     :aria-label="detail ? undefined : '知识点详情'"
     :aria-busy="busy ? 'true' : 'false'"
-    @keydown.esc="emit('close')"
+    @keydown.esc="showClose && emit('close')"
   >
-    <button type="button" class="knowledge-detail__close" data-test="kd-close" aria-label="关闭知识点详情" @click="emit('close')">
+    <button v-if="showClose" type="button" class="knowledge-detail__close" data-test="kd-close" aria-label="关闭知识点详情" @click="emit('close')">
       ×
     </button>
 

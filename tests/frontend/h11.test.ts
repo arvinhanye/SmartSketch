@@ -463,6 +463,8 @@ describe('H11 学生图谱页：图/卡片切换', () => {
   it('图上选中后切到卡片：跳到选中项所在页并标记', async () => {
     const f = fakes({ graph: async (cid, v) => exchange(cid, v, manyKps(30, cid)) })
     const { wrapper } = await mountPage(f)
+    // UI-GRAPH-PILOT-01：单击只预览，再次单击同一节点才打开详情（选中）
+    wrapper.findComponent(GraphCanvas).vm.$emit('nodeClick', 'k27')
     wrapper.findComponent(GraphCanvas).vm.$emit('nodeClick', 'k27')
     await flushPromises()
     await toCards(wrapper)
@@ -476,7 +478,7 @@ describe('H11 学生图谱页：图/卡片切换', () => {
     await toCards(wrapper)
     await wrapper.findAll('[data-test="kc-card"]')[0]!.trigger('click')
     await flushPromises()
-    await wrapper.get('[data-test="kd-close"]').trigger('click')
+    await wrapper.get('[data-test="gw-back"]').trigger('click')
     expect(wrapper.find('[data-test="knowledge-detail"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-test="kc-card"][aria-pressed="true"]')).toHaveLength(0)
   })

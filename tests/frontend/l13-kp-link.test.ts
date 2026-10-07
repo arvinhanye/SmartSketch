@@ -172,7 +172,8 @@ describe('offline QA viewport probes', () => {
     const {wrapper}=await mountGraph('/courses/c1/graph?kp=b&v=3')
     await flushPromises()
     expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点 b')
-    expect(captured.at(-1)).toBe('kp:b')
+    // 章节分区布局是异步计算的，算完才建图并聚焦
+    await vi.waitFor(() => expect(captured.at(-1)).toBe('kp:b'))
     wrapper.unmount(); vi.restoreAllMocks()
   })
   it('QA direct link with learning preserves requested focus b', async () => {
@@ -181,7 +182,8 @@ describe('offline QA viewport probes', () => {
     const {wrapper}=await mountGraph('/courses/c1/graph?kp=b&v=3',3,true)
     await flushPromises()
     expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点 b')
-    expect(captured.at(-1)).toBe('kp:b')
+    // 章节分区布局是异步计算的，算完才建图并聚焦
+    await vi.waitFor(() => expect(captured.at(-1)).toBe('kp:b'))
     wrapper.unmount(); vi.restoreAllMocks()
   })
 })

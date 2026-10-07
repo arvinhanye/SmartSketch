@@ -39,7 +39,7 @@ export interface ReasonFactRow {
 }
 
 export const MASTERY_LABELS: Readonly<Record<MasteryStatus, string>> = Object.freeze({
-  unknown: '未开始',
+  unknown: '未学习',
   learning: '学习中',
   mastered: '已掌握',
 })
@@ -250,7 +250,7 @@ function recommendFailureText(cause: unknown): string {
 function successText(status: MasteryStatus): string {
   if (status === 'mastered') return '已标记为已掌握。'
   if (status === 'learning') return '已标记为学习中。'
-  return '已标记为未开始。'
+  return '已标记为未学习。'
 }
 
 // ---------------------------------------------------------------- 组合式

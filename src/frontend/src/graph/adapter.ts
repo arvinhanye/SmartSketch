@@ -33,10 +33,10 @@ function style(value: RelationStyle): RelationStyle {
 
 /** 四类关系的边样式，图例（H 组）与画布共用此表 */
 export const RELATION_STYLES: Readonly<Record<RelationType, RelationStyle>> = Object.freeze({
-  CONTAINS: style({ label: '包含', stroke: '#8c8c8c', lineWidth: 1.5, lineDash: [], directed: true }),
-  PREREQUISITE: style({ label: '前置', stroke: '#1677ff', lineWidth: 2, lineDash: [], directed: true }),
-  RELATED_TO: style({ label: '相关', stroke: '#52c41a', lineWidth: 1, lineDash: [6, 4], directed: false }),
-  EXAMPLE_OF: style({ label: '应用实例', stroke: '#fa8c16', lineWidth: 1, lineDash: [2, 3], directed: true }),
+  CONTAINS: style({ label: '包含', stroke: '#727A89', lineWidth: 1.5, lineDash: [], directed: true }),
+  PREREQUISITE: style({ label: '前置', stroke: '#5145CD', lineWidth: 2, lineDash: [], directed: true }),
+  RELATED_TO: style({ label: '相关', stroke: '#4C7480', lineWidth: 1.5, lineDash: [6, 4], directed: false }),
+  EXAMPLE_OF: style({ label: '应用实例', stroke: '#906638', lineWidth: 1.5, lineDash: [2, 3], directed: true }),
 })
 
 export interface G6NodeData {
@@ -51,6 +51,12 @@ export interface G6NodeData {
   locked: boolean
   /** 学生页推荐序号（L14，1 起）：由 `useLearning` 叠加，适配层不填；画布标签显示为「1. 名称」 */
   pathOrder?: number
+  /** 展示字段（`graph/presentation.ts` 在增强模式下写入；适配层不填） */
+  k?: number // 标签放大系数
+  nk?: number // 节点放大系数
+  lw?: number // 线宽屏幕下限（画布像素）
+  labelOn?: boolean // 标签是否显示
+  mastery?: 'mastered' | 'learning' | 'unknown'
 }
 
 export interface G6Node {
@@ -67,6 +73,11 @@ export interface G6EdgeData {
   source: Relation['source']
   /** 自动成环降级而来的 `RELATED_TO`（B11） */
   downgraded: boolean
+  lw?: number
+  ak?: number // 箭头放大系数
+  cross?: boolean // 跨章关系
+  emph?: boolean // 被预览/选中/章节聚焦涉及
+  showLabel?: boolean
 }
 
 export interface G6EdgeStyle {
@@ -97,6 +108,11 @@ export interface AdaptedGraph {
 
 export function nodeElementId(kpId: string): string {
   return `kp:${kpId}`
+}
+
+/** 元素 ID 还原为契约的知识点 ID（`nodeElementId` 的逆运算） */
+export function kpIdFromElementId(elementId: string): string {
+  return elementId.startsWith('kp:') ? elementId.slice(3) : elementId
 }
 
 export function edgeElementId(relationId: string): string {

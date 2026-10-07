@@ -245,7 +245,7 @@ test.describe('个人模式（L11）', () => {
         const other = await otherContext.newPage()
         await login(other, otherName, studentPassword)
         await other.goto(`${appUrl}/courses/${courseId}/graph?kp=${firstId}`)
-        await expect(other.locator('[data-test=sg-mastery-target]')).toContainText('当前：未开始')
+        await expect(other.locator('[data-test=sg-mastery-target]')).toContainText('当前：未学习')
         await expect(other.locator('[data-test=recommendations] [data-test=rc-item]').first()).toHaveAttribute('data-kp-id', firstId)
       } finally {
         await otherContext.close()
@@ -254,7 +254,7 @@ test.describe('个人模式（L11）', () => {
       await student.goto(`${appUrl}/courses/${courseId}/graph?kp=${firstId}`)
       await expect(student.locator('[data-test=sg-mastery-target]')).toContainText('当前：已掌握')
       await student.locator('[data-test=sg-mastery-unknown]').click()
-      await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为未开始')
+      await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为未学习')
       await expect(items.first()).toHaveAttribute('data-kp-id', firstId)
       await expect(pathLine).toHaveText(firstLine)
 
