@@ -4,7 +4,9 @@
 - review_status: in_progress
 - 工作区：`/Users/arvinhan/SmartSketch/.claude/worktrees/smartsketch-frontend-init-0d2af9`
 - branch: `claude/smartsketch-frontend-init-0d2af9`
-- base/head: `bdb89c46f9a4a9f10930675848abdd1b7af6edaf`（未提交）
+- base: `bdb89c46f9a4a9f10930675848abdd1b7af6edaf`
+- implementation_head: `4375ee55f4c0e0010b17c6e3830e9645d0ca6ee5`（发布记录写入前的实施提交；PR HEAD 随后含发布记录提交）
+- pull_request: https://github.com/arvinhanye/SmartSketch/pull/321（Draft）
 - 输入：已确认规格、17 项实施计划及隔离预览。输出：计划内前端代码与测试、文档、验收证据。
 - 依赖：沿用锁定依赖；现有本地 Node/npm 与 Python 3.13；无新依赖、接口、后端或数据库变更。
 - 风险：真实实例、登录环境与 0.9 缩放目测需用户提供/确认；计划代码与基线冲突时停止并询问。
@@ -150,3 +152,11 @@ User-approved bounded follow-up (2026-10-07): implement 35% wide /90% narrow ada
 用户最新要求「提交并开PR」取代此前暂不提交/推送约束。沿用当前 claude 分支、目标 main，创建 Draft PR，不合并。当前任务仍 IN_PROGRESS，review_status 不提前改 ready_for_review。第二批路线图与本地未跟踪 preview 保留、不纳入本次提交；docs/tasks 中第二批路线图条目也仅保留工作区、不进入提交。发布前重跑前端 type-check/全量测试/build，实际结果稍后追加；既有 basic PASS/full仅backend环境FAIL、任务17未验证范围照实保留。
 
 发布前 fresh 验证：`npm --prefix src/frontend run type-check` exit0；`npm --prefix src/frontend run test -- --run` exit0（57文件/1144条）；`npm --prefix src/frontend run build` exit0（既有chunk警告）。日志 `/private/tmp/codex-ui-graph-pilot-01/publish/`。
+
+## 发布结果（2026-10-07）
+
+- 用户已明确授权提交/开PR，实施提交 `4375ee55f4c0e0010b17c6e3830e9645d0ca6ee5` 已通过 `git push --set-upstream origin claude/smartsketch-frontend-init-0d2af9` 推送。
+- `gh pr create --repo arvinhanye/SmartSketch --base main --head claude/smartsketch-frontend-init-0d2af9 --draft ...` 成功创建 [Draft PR #321](https://github.com/arvinhanye/SmartSketch/pull/321)，已附到当前聊天。未合并/未开启自动合并；PR正文分列PASS与未验证范围。
+- 本条发布记录另作docs提交，代码树与fresh前端57文件/1144条通过时一致；最新PR HEAD以 `gh pr view 321 --json headRefOid` 为准。
+- 任务17仍IN_PROGRESS、review_status仍in_progress。0.9目测、其余浏览器/对比度/真实环境验收与preview清理待做；full门禁仅backend环境FAIL保持记录。
+- 保留未纳入PR的 `src/frontend/preview/`、第二批路线图及docs/tasks里的对应原始条目。回滚实施提交可恢复代码，发布记录是独立docs提交；工作区保留用于后续验收，不执行清理/重置。
