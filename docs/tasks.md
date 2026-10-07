@@ -11,6 +11,7 @@
 
 - 设计规格：`docs/superpowers/specs/2026-10-06-graph-workbench-design.md`（方向与规格已确认，2026-10-07）。
 - 实施计划：`docs/superpowers/plans/2026-10-07-graph-workbench-pilot.md`（17 个任务：纯函数模块 → 画布样式与增强 → 页面层 → 暗色外壳 → 验收与收尾；含与规格不一致处的差异表与未验证清单）。执行方式（子代理逐任务 / 本会话内联）待用户选择；提交、推送、PR 仅在用户明确指示后做。
+- 第二批（其余页面推广）计划：`docs/superpowers/plans/2026-10-07-ui-rollout-batch2.md`（2026-10-07，仅计划设计、未实现；沿用 Linear/Kumu/NotebookLM/Bloom/Linkurious/Obsidian 参考。阶段 R1 外壳通用化与通用件 → R2 课程列表与课程主页 → R3 模型 API 设置 → R4 课程问答（暗色页）→ R5 教师图谱页 → R6 资料/审核与发布/成员 → R7 认证页对齐与收口；基线为 Draft PR #321，每阶段一条叠加分支与 Draft PR，开工前先写代码级计划）。未经用户指示不提交、不推送。
 - Codex 接手（2026-10-07，用户指定本会话顺序执行）：输入为已确认规格、17 项计划与现有隔离预览；输出为计划内前端文件、测试与 Codex 交接。禁止提交/推送；既有 Claude 未提交文档保留。验收按计划各任务命令及任务 17 清单，基线核验结果与执行进度见 `docs/handoffs/codex-ui-graph-pilot-01.md`。
 - Codex 续做证据（2026-10-07）：任务 1–16 已完成 RED/GREEN。任务 14 用户批准章节菜单外点击调用 `close(true)` 的一行修正，补充测试 11/11 通过。用户批准节点详情局部修正已落地：35% 并置 /90% 覆盖、整页滚动取代面板滚动、学生详情移除重复关闭叉；教师关闭行为保留。新增布局/行为测试先 RED 后 GREEN，最新相关子集 4 文件 /117 条、全量 57 文件 /1144 条通过；复审发现收起隐藏内容仍撑高页面及画布零宽，均补 RED 断言并修正，1440 收起后页面900高、画布1364宽；最终 type-check/build/basic exit0，full exit1（仅 backend：现有 argon2 缺 InvalidHashError，frontend gate PASS），顺序复跑日志见交接；基础与 full 门禁结果见 Codex 交接。四宽度节点详情实测无横向裁切、侧栏无内部滚动条；390 宽长内容整页高度 1190px，Esc 关闭抽屉还焦点、返回课程清除详情已走查。0.9 目测确认、其余任务 17 浏览器清单/对比度、真实实例前后截图与 E2E 仍未完成（后两项缺环境）。任务维持 IN_PROGRESS；预览暂保留，未提交/推送。
 - 发布授权（用户，2026-10-07）：提交并开 PR；沿用现有分支，目标 main，[Draft PR #321](https://github.com/arvinhanye/SmartSketch/pull/321) 已创建，实施提交 `4375ee5`；明列任务17未验收项及 full 后端环境失败，不合并。第二批路线图和本地 preview 不纳入本次提交；其文件与工作区内容保留。
