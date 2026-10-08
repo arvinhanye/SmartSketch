@@ -47,7 +47,12 @@ SMARTSKETCH_API_TARGET=http://127.0.0.1:18321 npx vite --port 15322             
 - 最终门禁：见下节。
 
 ## 最终门禁
-（由最后一次 `scripts/verify.sh basic|full|integration` 填写）
+在提交 `c8c33fb`（代码最终态）上，单独执行（无其它重任务并发）：
+- `./scripts/verify.sh basic`：PASS，退出 0（实现此前已单独运行；契约 36 路径 / 133 schema）。
+- `./scripts/verify.sh integration`（含 basic + full）：**PASS，退出 0**。其中后端全量 3975 passed / 27 skipped（均在 `scripts/verify/allowed-skips.txt` 登记，不计为通过的功能证明）；前端全量 62 文件 / 1194 passed，type-check 与 build 通过；集成 393 passed / 4 skipped（含此前失败的 `test_f13::test_migration_009_rolls_back`）；图库专项 44 passed；E2E 教师 + 学生 2 passed，个人模式 4 passed（演示模型/本机假供应商）。
+- `./scripts/verify.sh full` 的前后端部分已包含在 integration 内（同一命令的前两步），没有单独另跑一遍；因此 full 不作为独立运行记录。
+- 3 项历史“暂不补测”（浏览器可见首字、v3+ 思考开启基线、关闭思考 MD 抽取）继续标为**未测**，未恢复付费测量。
+- 环境提示：评审用 Neo4j 容器中途退出过一次（`--rm` 容器，原因未查明，疑与同机 Docker 资源争用有关），已重建环境重新核对；门禁运行使用各自的一次性容器，不受影响。
 
 ## 回滚
 前端改动均为独立提交，`git revert <hash>` 即可；无数据迁移、无接口变化。

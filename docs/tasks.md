@@ -2007,5 +2007,5 @@ CURRENT-HANDOFF-20261009 验收：实际查询PR #321/#322/#323、c81f409最新C
 CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - 前端全量 `scripts/verify/frontend.sh full`：62 文件 / 1194 条通过，type-check 与 build 通过；后端全量 `scripts/verify/backend.sh full`：3975 通过、27 登记跳过，gate PASS；`scripts/verify.sh basic` 退出 0。
 - E2E（演示模式）教师 + 学生用例通过；个人模式 4/4 通过（首次与全量门禁并发时 3 项失败：1 项旧搜索断言、2 项负载超时，隔离重跑通过）。
-- `scripts/verify.sh integration` 的最终结果见交接文档“最终门禁”一节。
+- 最终门禁（提交 c8c33fb 上单独运行）：`./scripts/verify.sh integration` PASS 退出 0：后端 3975 passed/27 登记 skipped，前端 1194 passed + build，集成 393 passed/4 skipped，图库专项 44 passed，E2E 教师+学生 2 passed、个人模式 4 passed；`verify.sh basic` PASS。详见 `docs/handoffs/claude-ui-review-20261008.md`。
 - 未验证：真实供应商、付费模型、历史“暂不补测”三项；教师页首屏缩放策略（见交接建议）未改。
