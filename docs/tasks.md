@@ -1951,3 +1951,10 @@ REVIEW-LAYOUT 验收：去重回归先 RED（两次）后 GREEN（一次）；H0
 - 风险：用户名超长、窄屏表格、添加/移除反馈和教师不可移除。验收 H12/H14、type-check/build、五宽度浏览器及 scoped 本地提交。运行文件/密钥/日志不入提交，不推送。
 
 MEMBERS-LAYOUT 验收：H12/H14 共 81 PASS；type-check/build PASS；五宽度 × 列表/无学生/错误十五组浏览器 PASS，包含长用户名不跨列、教师无移除按钮、假 API 添加/移除与反馈。局部文件保存为本地 Git 提交，未推送。交接 `docs/handoffs/codex-members-layout.md`。
+
+## 2026-10-08 Codex：登录页书页与知识插画
+
+- LOGIN-EDITORIAL：DONE；负责人 Codex；用户已确认方案 D 并要求先做前端。输入为已确认登录页预览；输出为独立登录布局、资料/书页/知识/路径 SVG 插画及密码显隐。仅前端与交接文档，无后端/API/数据库修改；注册页保持原版。当前版本以备份分支 codex/login-before-redesign-f54abfd 保存。
+- 依赖现有登录 API、路由和会话；风险为密码显隐、错误后的口令清空、窄矮屏按钮可达和样式污染。验证 H13/ADR079/装饰运动、type-check/build、basic 门禁及五宽度浏览器检查。
+
+LOGIN-EDITORIAL 验收：密码显隐先 RED（缺少按钮）后 GREEN；H13/ADR079/auth-graph-motion 共 47 PASS，type-check/build PASS，scripts/verify.sh basic PASS（契约生成、25 项门禁负向与契约回归）。浏览器 2559/1440/1280/768/390 五宽度及 390×460、1024×500 矮窗口共七组 PASS，包含装饰读屏隐藏、窄屏隐藏、无横向溢出、密码显隐无提交、401 口令清空/恢复隐藏、错误提示、注册保留八组装饰图。交接 docs/handoffs/codex-login-editorial.md；只保存本地提交，不推送。

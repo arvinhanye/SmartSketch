@@ -414,3 +414,8 @@
  .light-surface.members .members-add-fields button { align-self:flex-start; min-height:44px; }
  .members-list-card { padding:0 18px 8px; }
 }
+
+/* Confirmed login illustration layout; registration keeps its existing shell. */
+.app.app--login:has(.auth-layout--editorial) .app-header{min-height:84px;padding:20px 52px;border:0;background:var(--ss-bg)}
+.app.app--login:has(.auth-layout--editorial) .app-tagline{margin-left:auto;font-size:12px}
+@media(max-width:760px){.app.app--login:has(.auth-layout--editorial) .app-header{min-height:72px;padding:18px 24px}.app.app--login:has(.auth-layout--editorial) .app-tagline{display:none}}

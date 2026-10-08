@@ -215,3 +215,7 @@ Node 22.22+ 或 24.15+；后端与运行手册见 [`docs/runbook.md`](runbook.md
 | `docs/handoffs/claude-ui-graph-pilot-01*.md`、`codex-ui-graph-pilot-01.md` | 样板页的设计过程、实施记录、踩坑与验收证据 |
 | `docs/handoffs/codex-ui-login-01.md`、`codex-ui-auth-art-02.md`、`codex-ui-auth-motion-03.md` | 认证页既有 UI 工作（第二批不得回退） |
 | [`docs/runbook.md`](runbook.md) | 运行与验收手册 |
+
+## 2026-10-08 用户确认：登录页方案 D
+
+用户经过四版预览确认“资料 → 展开书页 → 知识关联 → 学习路径”的原创 SVG 插画与左右分栏布局，并要求先做前端、不改后端。此指示覆盖 R7 对登录页八组旧装饰图的保留限制；注册页沿用 AuthLayout，旧运动逻辑和减少动态/窄屏行为保持。登录页使用独立 LoginLayout，不启用装饰动画，窄屏隐藏插画并保留表单滚动。详见 `docs/handoffs/codex-login-editorial.md`。
