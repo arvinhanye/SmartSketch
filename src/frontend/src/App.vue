@@ -28,6 +28,7 @@ import './styles.css'
 // 图谱工作区 tokens 与组件样式（新命名空间 --ss-* / --gw-*，不改现有 --color-*）
 import './styles/tokens.css'
 import './styles/graph-workspace.css'
+import './styles/ui.css'
 
 const appName = '智绘学途'
 // 未安装路由时（如 B02 单独挂载外壳）只渲染标题，不报错
@@ -77,14 +78,19 @@ const courseId = computed(() => {
 // L15：课程权限与账号类型分离；读取失败/未知时不猜测权限。
 const courseApi = inject(COURSES_API_KEY, null)
 const courseStore = getActivePinia() ? useCourseStore() : null
+const courseName = ref<string | null>(null)
 watch([courseId, () => session?.accessToken ?? null], async ([cid, token]) => {
+  courseName.value = null
   if (courseStore === null) return
   courseStore.selectCourse(token === null ? null : cid)
   if (cid === null || token === null || courseApi === null) return
   const scope = courseStore.beginRequest()
   try {
     const detail = await readCourseDetail(courseApi, cid, scope.signal)
-    if (session?.accessToken === token && detail.id === cid) courseStore.setRole(scope, detail.my_role)
+    if (session?.accessToken === token && detail.id === cid && scope.isCurrent()) {
+      courseStore.setRole(scope, detail.my_role)
+      courseName.value = detail.name
+    }
   } catch { /* 未知角色只提供概览，页面负责错误提示。 */ }
 }, { immediate: true, flush: 'sync' })
 const courseNav = computed<NavItem[]>(() => {
@@ -149,10 +155,15 @@ const settingsLink = computed<RouteLocationRaw | null>(() =>
 const settingsActive = computed(() => route?.name === SETTINGS_ROUTE)
 
 // ---------------------------------------------------------------- 图谱页的暗色外壳（UI-GRAPH-PILOT-01）：顶栏 + 64px 图标栏
-// 只有学生图谱页用它；其他页面沿用左侧栏，推广到其他页面前保持原样。
-const graphShell = computed(() => withSidebar.value && route?.name === STUDENT_GRAPH_ROUTE)
+// 课程业务页面统一使用暗色外壳，内容页与图谱页各自组织布局。
+const upgradedPage = computed(() => homeActive.value || [COURSE_ROUTE, SETTINGS_ROUTE, MATERIALS_ROUTE, COURSE_MEMBERS_ROUTE, REVIEW_ROUTE, CHAT_ROUTE, TEACHER_GRAPH_ROUTE].includes(route?.name as string))
+const graphShell = computed(() => withSidebar.value && (route?.name === STUDENT_GRAPH_ROUTE || upgradedPage.value))
 const NAV_ICONS: Record<string, string> = {
   我的课程: 'home',
+  教学资料: 'chapters',
+  图谱编辑: 'graph',
+  审核队列: 'check',
+  成员: 'members',
   课程概览: 'overview',
   知识图谱与学习路径: 'graph',
   课程问答: 'chat',
@@ -166,11 +177,13 @@ const railItems = computed(() => {
   return items
 })
 const crumbs = computed<Crumb[]>(() => {
+  if (homeActive.value) return [{ label: '我的课程' }]
   const list: Crumb[] = []
   if (homeLink.value !== null) list.push({ label: '我的课程', to: homeLink.value })
   const cid = courseId.value
-  if (cid !== null && router !== null && router.hasRoute(COURSE_ROUTE)) list.push({ label: '课程', to: { name: COURSE_ROUTE, params: { cid } } })
-  list.push({ label: '知识图谱' })
+  if (cid !== null && router !== null && router.hasRoute(COURSE_ROUTE)) list.push({ label: courseName.value ?? '课程', to: route?.name === COURSE_ROUTE ? undefined : { name: COURSE_ROUTE, params: { cid } } })
+  const labels: Record<string, string> = { [SETTINGS_ROUTE]: '模型 API 设置', [COURSE_ROUTE]: '课程概览', [MATERIALS_ROUTE]: '教学资料', [COURSE_MEMBERS_ROUTE]: '成员管理', [REVIEW_ROUTE]: '审核与发布', [CHAT_ROUTE]: '课程问答', [TEACHER_GRAPH_ROUTE]: '图谱编辑' }
+  list.push({ label: labels[String(route?.name)] ?? '知识图谱' })
   return list
 })
 const railExpanded = ref(false)
@@ -228,11 +241,12 @@ function signOut(): void {
         <p class="app-tagline">AIGC 课程知识图谱智能构建与学习导航</p>
       </div>
     </header>
-    <main class="app-main" :class="{ 'app-main--graph': graphShell }">
+    <main class="app-main" :class="{ 'app-main--graph': graphShell, 'app-main--sheet': graphShell && upgradedPage }">
       <div v-if="notice" class="app-notice" role="alert">
         <span>{{ notice }}</span>
         <button type="button" class="app-notice__close" aria-label="关闭提示" @click="dismissedNotice = true">×</button>
       </div>
+      <p v-if="graphShell && runtime?.isDemo" class="app-mode ui-mode" data-test="mode-demo" role="status">演示模式 · 使用内置演示模型，不调用个人 API</p>
       <RouterView v-if="route" />
     </main>
     <!-- 侧栏在 DOM 中位于主内容之后，读屏与键盘先到页面内容；视觉上由网格放在左侧 -->
@@ -246,9 +260,11 @@ function signOut(): void {
         :aria-current="item.active ? 'page' : undefined"
         :aria-label="railExpanded ? undefined : item.label"
         :title="item.label"
+        :data-test="item.icon === 'key' ? 'nav-model-settings' : undefined"
       >
         <AppIcon :name="item.icon" :size="18" />
         <span v-if="railExpanded" class="app-rail__label">{{ item.label }}</span>
+        <span v-if="item.icon === 'key' && runtime?.needsConfig" class="ui-rail-pending" data-test="nav-model-settings-pending">{{ railExpanded ? '未配置' : '!' }}</span>
       </RouterLink>
       <button
         type="button"
@@ -272,9 +288,11 @@ function signOut(): void {
           class="app-rail__item is-wide"
           :class="{ 'is-current': item.active }"
           :aria-current="item.active ? 'page' : undefined"
+          :data-test="item.icon === 'key' ? 'nav-model-settings' : undefined"
           @click="closeNav"
         >
           <AppIcon :name="item.icon" :size="18" /><span class="app-rail__label">{{ item.label }}</span>
+          <span v-if="item.icon === 'key' && runtime?.needsConfig" data-test="nav-model-settings-pending">未配置</span>
         </RouterLink>
       </nav>
     </template>

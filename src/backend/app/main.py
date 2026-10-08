@@ -98,6 +98,8 @@ def create_app() -> FastAPI:
     application.state.registration_limiter = RegistrationRateLimiter()
     # ADR-080：个人模型配置的测试连接限流；model_transport 为 None 时按设置构建出站校验传输（测试可注入）
     application.state.config_test_limiter = ConfigTestLimiter()
+    application.state.model_discovery_limiter = ConfigTestLimiter(limit=10)
+    application.state.model_discovery_transport = None
     application.state.model_transport = None
     application.state.auth_clock = time.time
     prepare_timing_dummy_hash()  # never let the first unknown-user login take twice as long

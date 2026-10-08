@@ -30,12 +30,13 @@ const props = withDefaults(
     label?: string
     layout?: GraphLayoutName
     enhanced?: boolean
+    audience?: 'student' | 'teacher'
     /** 章节分区布局的位置（知识点 ID → 坐标）；增强模式下 null 表示还在计算，画布等它 */
     positions?: Positions | null
     /** 章节外框成员（知识点 ID）；null 为没有 */
     scope?: readonly string[] | null
   }>(),
-  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, positions: null, scope: null },
+  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null },
 )
 
 const emit = defineEmits<{ nodeClick: [kpId: string]; blankClick: [] }>()
@@ -87,7 +88,9 @@ function showTip(info: { kpId: string; clientX: number; clientY: number } | null
     const node = props.graph?.nodes.find((n) => n.data.kpId === info.kpId)
     if (node === undefined) return
     tip.value = {
-      text: `${node.data.name}（${MASTERY_TEXT[masteryOfStates(node.states)]}）`,
+      text: props.audience === 'teacher'
+        ? `${node.data.name}（${({draft:'待审核',approved:'已通过',rejected:'已驳回'} as Record<string,string>)[node.data.status] ?? node.data.status}${node.data.locked ? ' · 已锁定' : ''}${node.data.source === 'manual' ? ' · 人工来源' : ''}）`
+        : `${node.data.name}（${MASTERY_TEXT[masteryOfStates(node.states)]}）`,
       x: info.clientX - box.left,
       y: info.clientY - box.top,
     }
@@ -168,6 +171,9 @@ watch(
     else lifecycle.update(toRaw(graph))
   },
 )
+
+// 布局降级或恢复时重建，等待 DOM 更新后取得增强模式的小地图容器。
+watch(() => props.enhanced, retry, { flush: 'post' })
 
 // 位置就绪（章节布局算完）后建图
 watch(ready, (now) => {

@@ -56,7 +56,7 @@ async function mountShell(api: Partial<CoursesApi>, path: string) {
 }
 
 function navLabels(wrapper: VueWrapper): string[] {
-  return wrapper.findAll('.app-nav__item').map((item) => item.text().replace(/\s+/g, ' ').trim())
+  return wrapper.findAll('.app-nav__item, .app-rail__item').map((item) => (item.attributes('title') ?? item.attributes('aria-label') ?? item.text()).replace(/\s+/g, ' ').trim())
 }
 
 describe('L15-1 侧栏按当前课程内角色', () => {
@@ -232,7 +232,7 @@ describe('L15-3 入课空态', () => {
 
   it('教师没有课程：仍提示可创建第一门课程', async () => {
     const wrapper = await mountCourses('teacher', '/teacher', {})
-    expect(wrapper.get('[data-test="courses-empty"]').text()).toContain('可在下方创建第一门课程')
+    expect(wrapper.get('[data-test="courses-empty"]').text()).toContain('新建第一门课程')
     wrapper.unmount()
   })
 })

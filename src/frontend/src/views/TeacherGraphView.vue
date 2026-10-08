@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageSheet from '../components/PageSheet.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
@@ -13,6 +15,8 @@ import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
+import { useGraphLayout } from '../composables/useGraphLayout'
+import { kpIdFromElementId } from '../graph/adapter'
 import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
@@ -200,18 +204,28 @@ const chapterList = computed(() => {
   const full = graph.value === null ? null : relations.canvasData.value
   return full === null ? [] : chapterOptions(full, chapters.value)
 })
+const layoutSource = computed(() => {
+  const g = graph.value === null ? null : relations.canvasData.value
+  if (g === null) return null
+  return {
+    nodes: g.nodes.map(n => ({ id: n.data.kpId, chapter: n.data.chapterId })),
+    edges: g.edges.map(e => ({ id: e.data.relationId, source: kpIdFromElementId(e.source), target: kpIdFromElementId(e.target), type: e.data.type })),
+    chapterOrder: [...chapters.value].sort((a,b) => a.order - b.order || a.id.localeCompare(b.id)).map(c => c.id),
+  }
+})
+const { positions, error: layoutError } = useGraphLayout(() => layoutSource.value)
 const empty = computed(() => status.value === 'ready' && graph.value !== null && graph.value.nodes.length === 0)
 </script>
 
 <template>
-  <section
-    class="teacher-graph"
+  <PageSheet
+    labelledby="teacher-graph-title"
+    class="teacher-graph ui-management ui-teacher-workspace"
     data-test="teacher-graph-page"
-    aria-labelledby="teacher-graph-title"
     :aria-busy="status === 'loading' ? 'true' : 'false'"
   >
     <header class="teacher-graph__header">
-      <h2 id="teacher-graph-title">编辑课程知识图谱（草稿）</h2>
+      <PageHeader id="teacher-graph-title" title="编辑课程知识图谱（草稿）" />
       <span v-if="status === 'ready'" class="teacher-graph__badge">草稿</span>
       <p v-if="courseName" class="teacher-graph__course">
         课程：{{ courseName }}<span v-if="status === 'ready'" data-test="tg-draft"> · 草稿，学生在发布前看不到这些修改</span>
@@ -274,10 +288,12 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
               <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </label>
-          <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
+          <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" :enhanced="!layoutError" :positions="positions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div class="teacher-graph__panel">
+          <p v-if="nodeEditor?.dirty" class="ui-unsaved" role="status">未保存</p>
           <div class="teacher-graph__tabs" role="group" aria-label="面板切换">
             <button
               v-for="item in tabs"
@@ -343,125 +359,5 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         </div>
       </div>
     </template>
-  </section>
+  </PageSheet>
 </template>
-
-<style scoped>
-.teacher-graph {
-  display: grid;
-  gap: 0.75rem;
-}
-.teacher-graph__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.75rem;
-}
-.teacher-graph__picker {
-  display: inline-flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.teacher-graph__header h2 {
-  margin: 0;
-}
-.teacher-graph__badge {
-  font-size: 0.75rem;
-  border-radius: 4px;
-  padding: 0.05rem 0.5rem;
-  background: var(--color-warning-bg);
-  color: var(--color-warning-text);
-}
-.teacher-graph__course {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-  flex-basis: 100%;
-}
-.teacher-graph__back {
-  margin: 0;
-  font-size: 0.875rem;
-}
-/* 工作台三栏：筛选 | 画布 | 详情与编辑 */
-.teacher-graph__body {
-  display: grid;
-  grid-template-columns: 13.5rem minmax(0, 1fr) minmax(280px, 22rem);
-  gap: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  min-height: 560px;
-}
-.teacher-graph__filters {
-  background: var(--color-surface-muted);
-  border-right: 1px solid var(--color-border);
-  padding: 0.85rem;
-}
-.teacher-graph__canvas {
-  min-height: 560px;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-surface);
-  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
-  background-size: 18px 18px;
-}
-.teacher-graph__canvas > :last-child {
-  flex: 1;
-}
-.teacher-graph__hint {
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  margin: 0;
-  padding: 0.5rem 0.75rem 0;
-}
-.teacher-graph__panel {
-  border-left: 1px solid var(--color-border);
-  padding: 0.85rem;
-  background: var(--color-surface);
-  min-width: 0;
-}
-.teacher-graph__tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-}
-.teacher-graph__tabs button {
-  background: none;
-  color: var(--color-text-muted);
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 0.4rem 0.6rem;
-  margin-bottom: -1px;
-}
-.teacher-graph__tabs button:hover:not(:disabled) {
-  background: none;
-  color: var(--color-text);
-}
-.teacher-graph__tabs button[aria-pressed='true'] {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  font-weight: 600;
-}
-.teacher-graph__confirm {
-  border: 1px solid var(--color-warning-border);
-  background: var(--color-warning-bg);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
-}
-.teacher-graph__confirm button + button {
-  margin-left: 0.5rem;
-}
-@media (max-width: 1100px) {
-  .teacher-graph__body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .teacher-graph__filters,
-  .teacher-graph__panel {
-    border: none;
-  }
-}
-</style>

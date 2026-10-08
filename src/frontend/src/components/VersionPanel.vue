@@ -27,7 +27,7 @@ const state = useVersions({
 </script>
 
 <template>
-  <section class="version-panel" data-test="version-panel" aria-labelledby="version-panel-title">
+  <section class="version-panel ui-version-section" data-test="version-panel" aria-labelledby="version-panel-title">
     <h3 id="version-panel-title">发布与版本历史</h3>
     <p v-if="state.status.value === 'loading'" data-test="vp-loading" role="status">正在加载版本历史…</p>
     <p v-if="state.status.value === 'not_teacher'" data-test="vp-not-teacher" role="status">只有本课程教师可以发布或回滚。</p>
@@ -74,11 +74,3 @@ const state = useVersions({
     <button v-if="state.status.value === 'error' && !state.course.value" type="button" data-test="vp-retry" @click="state.reload">重试</button>
   </section>
 </template>
-
-<style scoped>
-.version-panel { border: 1px solid #d9d9d9; border-radius: 6px; padding: 0.75rem; margin: 1rem 0; }
-.version-panel__actions { display: flex; gap: 0.5rem; }
-.version-panel__history { padding-left: 1.5rem; }
-.version-panel__history li { margin: 0.5rem 0; }
-.version-panel__confirm { border: 1px solid #d48806; border-radius: 4px; padding: 0.5rem; }
-</style>

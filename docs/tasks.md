@@ -1911,3 +1911,23 @@ C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整�
 C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCESS，merge commit 3d696158；#319（头d03b5e7，本轮修复）全部8检查SUCCESS，先合入claude/plan-c-acceptance，merge commit bbc8fbea；#318基线改为main、纳入修复后头bbc8fbea全部8检查SUCCESS，merge commit 0436ff34，已进入main。merge commit保留作者/历史，不force-push、不删除分支；没有合并测量分支88f9f6f。验证origin/main包含d03b5e7且完整代码树与已验修复提交一致。仓库当时开放PR列表为空；发布交接与启动说明的文档同步另由后续PR承载，不冒充新的业务修复或冻结。
 
 上述PR状态、头/合并提交与CI链接存evaluation/raw/codex-c-acc-fixes/publication-verification.json。当前代码入口scripts/start.sh已在GitHub main；本地主目录代码未自动pull/切换，本机.env/业务库未改。说明文档不存真实Key，向量仍.env全局online、生成API仍个人网页配置；网页向量配置计划保持CANCELLED_BY_USER。真实测量与人工签收口径不变，三项不补测仍未测，历史慢段根因OPEN；stage_c_status OPEN、technical_freeze NOT_PERFORMED。用户手工检查与冻结决定仍等待用户，不因GitHub合并自动签收。
+
+## 2026-10-08 Codex：课程列表与模型设置 UI
+
+- UI-ROLLOUT-R2-R3：IMPLEMENTED（基础门禁环境阻塞）；负责人 Codex；范围为批准计划 `docs/superpowers/plans/2026-10-08-courses-model-settings-ui.md`。保留业务/API/密钥安全；验收为相关与全量测试、类型、构建、基础门禁、四宽度页面。
+
+## 2026-10-08 Codex：剩余页面 UI 统一
+
+- UI-ROLLOUT-REMAINING：IMPLEMENTED（基础门禁环境阻塞）；负责人 Codex；输入为用户继续修改其他页面的指示与 PR #322 已确认设计；输出为资料、审核/发布、成员、问答、教师图谱视觉升级及认证样式对齐。沿用本地分支，不覆盖已完成两页。
+- 依赖现有 API、组合式逻辑及共享 tokens；不新增接口、权限、统计数据。主要风险为编辑确认、SSE 进度、问答引用状态与窄屏溢出；验证为 H02/H09/H10/H12/H14、问答与认证相关回归、全量前端、type-check/build、基础门禁及四宽度浏览器。
+
+UI-ROLLOUT-REMAINING：28 个浏览器页面/宽度组合通过，复审生命周期恢复问题已补 RED/GREEN 回归；交接 `docs/handoffs/codex-remaining-pages-ui.md`。基础门禁因缺少 datamodel-codegen 失败，未记录为全绿；修改仅本地，未提交/推送。
+
+UI-ROLLOUT-REMAINING 最终：前端 60 文件 / 1166 测试 PASS，type-check/build PASS；git diff --check PASS（移除五处末尾空行后）；本地预览保持 5322。
+
+## 2026-10-08 Codex：模型供应商与自动发现
+
+- MODEL-DISCOVERY：DONE；负责人 Codex；用户要求供应商选择、输入 Key 后获取模型列表并允许手填。输入为现有 L10 配置接口与公网出站守卫；输出为供应商预设、自动/手动查询及鉴权只读模型发现接口。
+- 无库表迁移；接口先更新契约与身份规格再生成。风险是 Key 跨供应商、DNS/重定向绕过、晚到模型列表与上游响应泄露；验收为服务/接口安全回归、前端状态隔离、真实浏览器假供应商、契约生成检查及相关/全量前端。
+
+MODEL-DISCOVERY 验收：后端发现/原配置/出站回归 74 PASS；全量前端 61 文件 / 1169 PASS，新增发现回归最终 6 PASS；type-check/build PASS；basic 门禁 PASS（已定位现有用户目录生成器并加入检查 PATH）；桌面/手机浏览器 PASS。交接 `docs/handoffs/codex-model-discovery.md`；本地 5322/8321 已运行新接口，未提交或推送。

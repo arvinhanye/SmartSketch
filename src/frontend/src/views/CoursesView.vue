@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, inject, nextTick, ref, watch } from 'vue'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
+import PageSheet from '../components/PageSheet.vue'
+import PageHeader from '../components/PageHeader.vue'
+import AppIcon from '../components/AppIcon.vue'
+import CourseList from '../components/courses/CourseList.vue'
+import CourseOverview from '../components/courses/CourseOverview.vue'
+import CourseCreate from '../components/courses/CourseCreate.vue'
 import { MATERIALS_API_KEY } from '../api/materials'
 import { useRuntimeStore } from '../stores/runtime'
 import { COURSES_API_KEY } from '../api/courses'
-import { COURSE_DESCRIPTION_MAX, COURSE_NAME_MAX, courseNextStep, useCourses } from '../composables/useCourses'
+import { courseNextStep, useCourses } from '../composables/useCourses'
 import {
   COURSE_MEMBERS_ROUTE,
   COURSE_ROUTE,
@@ -89,168 +95,75 @@ const nextLink = computed(() => {
   return { to: {name: actionRoutes[action], ...(action === 'settings' ? {} : {params: {cid: current.value.id}})}, label: actionLabels[action] }
 })
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
+const createOpen = ref(false)
+const createButton = ref<HTMLButtonElement | null>(null)
+const highlightedId = ref<string | null>(null)
+const copyStatus = ref('')
+watch(() => session.accessToken, () => {
+  copyStatus.value = ''
+  createOpen.value = false
+  highlightedId.value = null
+}, { flush: 'sync' })
+function closeCreate(): void {
+  if (creating.value) return
+  createOpen.value = false
+  void nextTick(() => createButton.value?.focus())
+}
+async function submitCourse(): Promise<void> {
+  await createCourse()
+  if (createdName.value !== null) {
+    highlightedId.value = courses.value[0]?.id ?? null
+    closeCreate()
+  }
+}
+async function copyUsername(): Promise<void> {
+  const username = session.user?.username
+  const token = session.accessToken
+  if (!username) return
+  try {
+    await navigator.clipboard.writeText(username)
+    if (session.accessToken === token) copyStatus.value = '用户名已复制。'
+  } catch {
+    if (session.accessToken === token) copyStatus.value = `复制失败，请手动复制用户名「${username}」。`
+  }
+}
+const entryLinks = computed(() => {
+  const c = current.value
+  if (!c) return []
+  const entries: Array<{test:string;label:string;description:string;icon:string;to:RouteLocationRaw}> = []
+  const add = (visible:boolean,name:string,test:string,label:string,description:string,icon:string) => {
+    if (visible) entries.push({test,label,description,icon,to:{name,params:{cid:c.id}}})
+  }
+  add(hasStudentGraph && c.myRole === 'student',STUDENT_GRAPH_ROUTE,'student-graph-link','浏览课程图谱','查看知识点、掌握进度与学习路径。','graph')
+  add(hasTeacherGraph && c.myRole === 'teacher',TEACHER_GRAPH_ROUTE,'teacher-graph-link','编辑课程图谱（草稿）','检查与维护知识点及其关系。','graph')
+  add(hasReview && c.myRole === 'teacher',REVIEW_ROUTE,'review-link','审核队列','审核抽取结果并发布课程图谱。','check')
+  add(hasMaterials && c.myRole === 'teacher',MATERIALS_ROUTE,'materials-link','资料上传与处理进度','上传课程资料，查看处理状态。','chapters')
+  add(hasChat && c.myRole === 'student',CHAT_ROUTE,'chat-link','课程问答','依据已发布资料提问并查看出处。','chat')
+  add(hasMembersRoute && c.myRole === 'teacher',COURSE_MEMBERS_ROUTE,'members-link','管理成员','添加课程成员并管理课程内身份。','overview')
+  return entries
+})
 </script>
 
 <template>
-  <section class="courses" aria-labelledby="courses-title">
-    <h2 id="courses-title">我的课程</h2>
-
-    <p v-if="courseForbidden" data-test="course-forbidden" role="alert">
-      你无权访问该课程（可能已被移出课程），已返回课程列表。
-    </p>
-
-    <section
-      v-if="courseId !== null"
-      class="current"
-      data-test="current-course"
-      aria-labelledby="current-course-title"
-      :aria-busy="currentStatus === 'loading'"
-    >
-      <h3 id="current-course-title">当前课程</h3>
-      <p v-if="currentStatus === 'loading'" role="status">正在加载课程…</p>
-      <p v-else-if="currentStatus === 'error'" data-test="current-course-error" role="alert">{{ currentError }}</p>
-      <template v-else-if="current">
-        <p class="current-name">{{ current.name }}</p>
-        <p>
-          课程内身份：{{ current.roleLabel }}（{{ current.myRole === 'teacher' ? '教师视图' : '学生视图' }}）
-          · 状态：{{ current.statusLabel }}
-        </p>
-        <p v-if="nextStep" data-test="course-stage" role="status">{{ nextStep.text }}</p>
-        <RouterLink v-if="nextLink" data-test="course-next-action" :to="nextLink.to">{{ nextLink.label }}</RouterLink>
-        <p v-if="current.description">{{ current.description }}</p>
-        <p v-if="hasStudentGraph && current.myRole === 'student'">
-          <RouterLink data-test="student-graph-link" :to="{ name: STUDENT_GRAPH_ROUTE, params: { cid: current.id } }">
-            浏览课程图谱
-          </RouterLink>
-        </p>
-        <p v-if="hasTeacherGraph && current.myRole === 'teacher'">
-          <RouterLink data-test="teacher-graph-link" :to="{ name: TEACHER_GRAPH_ROUTE, params: { cid: current.id } }">
-            编辑课程图谱（草稿）
-          </RouterLink>
-        </p>
-        <p v-if="hasReview && current.myRole === 'teacher'">
-          <RouterLink data-test="review-link" :to="{ name: REVIEW_ROUTE, params: { cid: current.id } }">
-            审核队列
-          </RouterLink>
-        </p>
-        <p v-if="hasMaterials && current.myRole === 'teacher'">
-          <RouterLink data-test="materials-link" :to="{ name: MATERIALS_ROUTE, params: { cid: current.id } }">
-            资料上传与处理进度
-          </RouterLink>
-        </p>
-        <p v-if="hasChat && current.myRole === 'student'">
-          <RouterLink :to="{ name: CHAT_ROUTE, params: { cid: current.id } }">课程问答</RouterLink>
-        </p>
-        <p v-if="hasMembersRoute && current.myRole === 'teacher'">
-          <RouterLink data-test="members-link" :to="{ name: COURSE_MEMBERS_ROUTE, params: { cid: current.id } }">
-            管理成员
-          </RouterLink>
-        </p>
-      </template>
-    </section>
-
-    <section
-      class="list"
-      data-test="course-list-region"
-      aria-labelledby="course-list-title"
-      :aria-busy="listStatus === 'loading'"
-    >
-      <h3 id="course-list-title">课程列表</h3>
-      <p v-if="listStatus === 'loading'" data-test="courses-loading" role="status">正在加载课程…</p>
-      <p v-else-if="listStatus === 'forbidden'" data-test="courses-forbidden" role="alert">{{ listError }}</p>
-      <div v-else-if="listStatus === 'error'">
-        <p data-test="courses-error" role="alert">{{ listError }}</p>
-        <button type="button" data-test="courses-retry" @click="loadCourses">重试</button>
-      </div>
-      <p v-else-if="isEmpty" data-test="courses-empty">
-        {{ canCreate ? '暂无课程。可在下方创建第一门课程。' : `你还没有加入任何课程。请把用户名「${session.user?.username ?? ''}」告诉任课教师，由教师在「成员」中添加你；发布后即可学习。` }}
-      </p>
-      <ul v-else class="cards">
-        <li v-for="card in courses" :key="card.id" data-test="course-card">
-          <RouterLink
-            :to="{ name: COURSE_ROUTE, params: { cid: card.id } }"
-            :aria-current="card.id === selectedId ? 'page' : undefined"
-          >
-            {{ card.name }}
-          </RouterLink>
-          <p class="meta">
-            <span>我的身份：{{ card.roleLabel }}</span>
-            <span>状态：{{ card.statusLabel }}</span>
-            <span>知识点：{{ card.knowledgePointCount }}</span>
-          </p>
-          <p v-if="card.description" class="description">{{ card.description }}</p>
-        </li>
-      </ul>
-    </section>
-
-    <form
-      v-if="canCreate"
-      class="create"
-      data-test="course-create"
-      novalidate
-      :aria-busy="creating"
-      @submit.prevent="createCourse"
-    >
-      <fieldset :disabled="creating">
-        <legend>创建课程</legend>
-        <label>
-          课程名称
-          <input v-model="form.name" name="name" type="text" required :maxlength="COURSE_NAME_MAX" />
-        </label>
-        <label>
-          课程简介（可选）
-          <textarea v-model="form.description" name="description" rows="3" :maxlength="COURSE_DESCRIPTION_MAX" />
-        </label>
-        <p v-if="createError" data-test="create-error" role="alert">{{ createError }}</p>
-        <p v-if="createdName" data-test="create-success" role="status">已创建课程「{{ createdName }}」。</p>
-        <button type="submit" :disabled="creating">{{ creating ? '创建中…' : '创建课程' }}</button>
-      </fieldset>
-    </form>
+ <PageSheet labelledby="courses-title" class="courses">
+  <PageHeader id="courses-title" :title="courseId ? '课程概览' : '我的课程'" :description="courseId ? undefined : canCreate ? '管理课程资料、图谱与成员。' : '从课程图谱开始，查看知识点与学习路径。'">
+   <template v-if="canCreate" #actions><button ref="createButton" type="button" class="ui-btn ui-btn--primary" data-test="course-create-open" :aria-expanded="createOpen" aria-controls="course-create-panel" :disabled="creating" @click="createOpen ? closeCreate() : createOpen = true"><AppIcon name="plus" :size="16" />新建课程</button></template>
+  </PageHeader>
+  <p v-if="courseForbidden" data-test="course-forbidden" class="ui-notice ui-notice--danger" role="alert">你无权访问该课程（可能已被移出课程），已返回课程列表。</p>
+  <p v-if="createdName" data-test="create-success" class="ui-notice ui-notice--success" role="status">已创建课程「{{ createdName }}」。</p>
+  <CourseCreate v-if="canCreate && createOpen" :form="form" :creating="creating" :error="createError" @submit="submitCourse" @cancel="closeCreate" />
+  <section v-if="courseId !== null" class="ui-current" data-test="current-course" aria-labelledby="current-course-title" :aria-busy="currentStatus === 'loading'">
+   <p v-if="currentStatus === 'loading'" role="status">正在加载课程…</p>
+   <p v-else-if="currentStatus === 'error'" data-test="current-course-error" class="ui-notice ui-notice--danger" role="alert">{{ currentError }}</p>
+   <CourseOverview v-else-if="current" :current="current" :next-step="nextStep?.text ?? null" :next-link="nextLink" :links="entryLinks" />
   </section>
+  <section class="ui-list-region" data-test="course-list-region" aria-labelledby="course-list-title" :aria-busy="listStatus === 'loading'">
+   <div class="ui-section-heading"><h3 id="course-list-title">{{ courseId ? '其他课程' : '课程列表' }}</h3><span v-if="listStatus === 'ready'" class="ui-muted">{{ courses.length }} 门课程</span></div>
+   <div v-if="listStatus === 'loading'" data-test="courses-loading" class="ui-state" role="status"><p>正在加载课程…</p><div v-for="i in 3" :key="i" class="ui-skeleton" aria-hidden="true" /></div>
+   <p v-else-if="listStatus === 'forbidden'" data-test="courses-forbidden" class="ui-notice ui-notice--danger" role="alert">{{ listError }}</p>
+   <div v-else-if="listStatus === 'error'" class="ui-state"><p data-test="courses-error" role="alert">{{ listError }}</p><button type="button" class="ui-btn" data-test="courses-retry" @click="loadCourses">重试</button></div>
+   <div v-else-if="isEmpty" class="ui-empty"><span class="ui-empty__icon"><AppIcon name="chapters" :size="28" /></span><p data-test="courses-empty">{{ canCreate ? '暂无课程。新建第一门课程，开始上传资料。' : `你还没有加入任何课程。请把用户名「${session.user?.username ?? ''}」告诉任课教师，由教师在「成员」中添加你；发布后即可学习。` }}</p><button v-if="canCreate" type="button" class="ui-btn ui-btn--primary" @click="createOpen = true">新建第一门课程</button><button v-else type="button" class="ui-btn" data-test="course-copy-username" @click="copyUsername">复制用户名</button><p v-if="copyStatus" data-test="course-copy-status" role="status">{{ copyStatus }}</p></div>
+   <CourseList v-else :courses="courses" :selected-id="selectedId" :highlighted-id="highlightedId" />
+  </section>
+ </PageSheet>
 </template>
-
-<style scoped>
-.courses {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.cards {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.cards li {
-  border: 1px solid #d0d7de;
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-}
-
-.cards a[aria-current='page'] {
-  font-weight: 700;
-}
-
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  font-size: 0.875rem;
-}
-
-.create fieldset {
-  display: grid;
-  gap: 0.75rem;
-  max-width: 28rem;
-  border: none;
-  padding: 0;
-}
-
-.create label {
-  display: grid;
-  gap: 0.25rem;
-}
-</style>

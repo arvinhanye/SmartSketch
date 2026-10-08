@@ -847,3 +847,15 @@ describe('审查补充', () => {
     expect(document.activeElement).toBe(box.element)
   })
 })
+
+describe('教师图谱新版界面',()=>{
+ it('增强画布使用完整草稿章节位置且保留审核筛选和键盘选择',async()=>{
+  const {wrapper}=await mountPage(fakes())
+  const canvas=wrapper.findComponent(GraphCanvas)
+  expect(canvas.props('enhanced')).toBe(true)
+  await vi.waitFor(()=>expect(canvas.props('positions')).not.toBeNull())
+  expect(wrapper.find('[data-test="status-filter"]').exists()).toBe(true)
+  expect(wrapper.find('[data-test="tg-node-picker"]').exists()).toBe(true)
+  expect(wrapper.find('.ui-sheet').exists()).toBe(true)
+ })
+})

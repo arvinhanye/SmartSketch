@@ -116,6 +116,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/model-config/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 查询本人可用的模型名称
+         * @description 后端对 base_url/models 发一次带 Bearer Key 的 GET，返回去重模型 ID，不保存表单配置、不调用生成。
+         *     api_key 留空时只能使用本人已保存且地址一致的密钥；地址变更必须重新输入密钥。
+         *     仅 HTTPS 公网，DNS 固定与禁止重定向规则同测试接口；每用户每分钟 10 次；限时 15 秒、响应最多 1 MiB/1000 项。
+         *
+         */
+        post: operations["discoverModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses": {
         parameters: {
             query?: never;
@@ -896,6 +919,17 @@ export interface components {
             api_key?: string;
             /** @description 测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。 */
             disable_thinking?: boolean;
+        };
+        ModelDiscoveryRequest: {
+            base_url?: string;
+            /** Format: password */
+            api_key?: string;
+        };
+        ModelDiscoveryResult: {
+            ok: boolean;
+            models: string[];
+            /** @enum {string} */
+            error_class?: "auth" | "timeout" | "rate_limited" | "connection" | "unsupported" | "server" | "malformed_response" | "blocked_address";
         };
         ModelConfigTestResult: {
             ok: boolean;
@@ -2397,6 +2431,67 @@ export interface operations {
                 };
             };
             /** @description 服务端未配置凭据根密钥（`STORAGE_UNAVAILABLE`，`details.reason = credential_store_disabled`） */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    discoverModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ModelDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description 查询结果；供应商失败以 ok=false 和固定错误分类返回，永不回显原始响应或密钥 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDiscoveryResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description 本人尚无已保存配置（MODEL_CONFIG_REQUIRED） */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 地址变更但未给新密钥、缺地址或密钥格式不合法（VALIDATION_ERROR） */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 查询过于频繁（RATE_LIMITED），带 Retry-After */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 服务端未配置凭据根密钥（STORAGE_UNAVAILABLE） */
             503: {
                 headers: {
                     [name: string]: unknown;

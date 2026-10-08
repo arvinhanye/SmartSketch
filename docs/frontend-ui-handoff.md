@@ -4,6 +4,8 @@
 >
 > 状态截至 **2026-10-07**。分支 `claude/smartsketch-frontend-init-0d2af9`，基线 `main@bdb89c4`，对应 [Draft PR #321](https://github.com/arvinhanye/SmartSketch/pull/321)（未合并，HEAD `ab60183`）。
 
+> **2026-10-08 本地实施补充**：`codex/courses-model-settings-ui` 已完成课程/模型设置及剩余业务页面视觉改版，尚未提交/推送。以下 2026-10-07 状态为历史基线；当前交付和未完成路线图项见 [课程与设置交接](handoffs/codex-courses-model-settings-ui.md)、[剩余页面交接](handoffs/codex-remaining-pages-ui.md)。
+
 ## 1. 一页概览
 
 - **在做什么**：把前端的视觉与交互整体升级为「Linear 式暗色应用外壳 + Kumu 式浅色图谱画布」。原因：原界面信息层级松散、入口多、有「AI 味」、部分文字没有样式，约 100 个节点时图谱标签不可读。

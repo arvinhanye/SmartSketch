@@ -104,6 +104,38 @@ class ModelConfigTestRequest(BaseModel):
     ] = None
 
 
+class ModelDiscoveryRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    base_url: Annotated[Optional[str], Field(max_length=512, min_length=9)] = None
+    api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+
+
+class Model(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1)]
+
+
+class ErrorClass(Enum):
+    auth = 'auth'
+    timeout = 'timeout'
+    rate_limited = 'rate_limited'
+    connection = 'connection'
+    unsupported = 'unsupported'
+    server = 'server'
+    malformed_response = 'malformed_response'
+    blocked_address = 'blocked_address'
+
+
+class ModelDiscoveryResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ok: bool
+    models: Annotated[list[Model], Field(max_length=1000)]
+    error_class: Optional[ErrorClass] = None
+
+
 class ModelConfigTestResult(BaseModel):
     model_config = ConfigDict(
         extra='forbid',

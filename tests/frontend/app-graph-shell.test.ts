@@ -45,7 +45,7 @@ async function mountAt(path: string, width: number) {
   return { wrapper, router, session }
 }
 
-describe('图谱页的暗色外壳（仅学生图谱页）', () => {
+describe('图谱与已升级课程页的暗色外壳', () => {
   it('图谱页：顶栏（面包屑、用户、退出）+ 64px 图标栏，没有旧侧栏；当前页是 aria-current 的最后一项', async () => {
     const { wrapper } = await mountAt('/courses/c1/graph', 1440)
     expect(wrapper.get('.app').classes()).toContain('app--graph')
@@ -97,12 +97,14 @@ describe('图谱页的暗色外壳（仅学生图谱页）', () => {
     wrapper.unmount()
   })
 
-  it('其他页面沿用左侧栏，不出现顶栏与图标栏（推广前保持原样）', async () => {
+  it('课程主页使用暗色外壳与正确面包屑（本次推广）', async () => {
     const { wrapper } = await mountAt('/courses/c1', 1440)
-    expect(wrapper.get('.app').classes()).not.toContain('app--graph')
-    expect(wrapper.find('.app-sidebar').exists()).toBe(true)
-    expect(wrapper.find('.app-topbar').exists()).toBe(false)
-    expect(wrapper.find('nav.app-rail').exists()).toBe(false)
+    expect(wrapper.get('.app').classes()).toContain('app--graph')
+    expect(wrapper.find('.app-sidebar').exists()).toBe(false)
+    expect(wrapper.find('.app-topbar').exists()).toBe(true)
+    expect(wrapper.find('nav.app-rail').exists()).toBe(true)
+    expect(wrapper.get('nav[aria-label="当前位置"] [aria-current="page"]').text()).toBe('课程概览')
+    expect(wrapper.get('nav[aria-label="当前位置"]').text()).toContain('数据结构')
     wrapper.unmount()
   })
 })

@@ -94,7 +94,7 @@ async function submit(): Promise<void> {
 .login legend {
   font-size: 1.4rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--ss-text);
   margin-bottom: 0.5rem;
   padding: 0;
 }
@@ -107,7 +107,7 @@ async function submit(): Promise<void> {
   padding-block: 0.6rem;
 }
 .login__hint {
-  color: var(--color-text-muted);
+  color: var(--ss-text-2);
   font-size: 0.85rem;
   margin: 0;
 }

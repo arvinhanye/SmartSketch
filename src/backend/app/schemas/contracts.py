@@ -67,3 +67,6 @@ ModelConfigLastTest = _module.ModelConfigLastTest
 ModelConfigUpdate = _module.ModelConfigUpdate
 ModelConfigTestRequest = _module.ModelConfigTestRequest
 ModelConfigTestResult = _module.ModelConfigTestResult
+
+ModelDiscoveryRequest = _module.ModelDiscoveryRequest
+ModelDiscoveryResult = _module.ModelDiscoveryResult

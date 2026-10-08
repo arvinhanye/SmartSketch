@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.dependencies import current_user
 from app.repositories.accounts import AccountRecord
-from app.schemas.contracts import ModelConfig, ModelConfigTestRequest, ModelConfigTestResult, ModelConfigUpdate
+from app.schemas.contracts import ModelDiscoveryRequest, ModelDiscoveryResult, ModelConfig, ModelConfigTestRequest, ModelConfigTestResult, ModelConfigUpdate
 from app.schemas.errors import Error
 from app.services import model_configs as service
 from app.services.ai.compatible import HttpTransport
@@ -124,6 +124,37 @@ def test_model_config(request: Request, payload: ModelConfigTestRequest | None =
     except service.CredentialStoreDisabled:
         return _disabled()
     wire: dict[str, Any] = {"ok": outcome.ok, "latency_ms": outcome.latency_ms}
+    if outcome.error_class is not None:
+        wire["error_class"] = outcome.error_class
+    return JSONResponse(content=wire)
+
+
+@router.post("/models", operation_id="discoverModels", response_model=ModelDiscoveryResult,
+             response_model_exclude_none=True,
+             responses={**_ERRORS, 409: {"model": Error}, 429: {"model": Error}, 503: {"model": Error}})
+def discover_models(request: Request, payload: ModelDiscoveryRequest | None = None,
+                    user: AccountRecord = Depends(current_user)) -> JSONResponse:
+    base_url = payload.base_url if payload is not None else None
+    api_key = _plain(payload.api_key) if payload is not None else None
+    if api_key is not None and base_url is None:
+        return _invalid("base_url", "missing")
+    wait = request.app.state.model_discovery_limiter.acquire(user.id)
+    if wait:
+        body = Error(code="RATE_LIMITED", message="获取模型过于频繁，请稍后再试")
+        return JSONResponse(status_code=429, content=body.model_dump(exclude_none=True), headers={"Retry-After": str(wait)})
+    try:
+        outcome = service.discover_models(request.app.state.settings, user.id, base_url=base_url, api_key=api_key,
+                    transport=getattr(request.app.state, "model_discovery_transport", None) or build_transport(request.app.state.settings))
+    except ModelConfigRequired:
+        body = Error(code="MODEL_CONFIG_REQUIRED", message=_REQUIRED_MESSAGE)
+        return JSONResponse(status_code=409, content=body.model_dump(exclude_none=True))
+    except service.KeyRequired:
+        return _invalid("api_key", "required_when_endpoint_changes")
+    except service.InvalidKey:
+        return _invalid("api_key", "invalid_characters")
+    except service.CredentialStoreDisabled:
+        return _disabled()
+    wire = {"ok": outcome.ok, "models": outcome.models}
     if outcome.error_class is not None:
         wire["error_class"] = outcome.error_class
     return JSONResponse(content=wire)

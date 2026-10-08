@@ -57,7 +57,7 @@ class NoopResizeObserver {
   disconnect(): void {}
 }
 
-function setup(props: { enhanced?: boolean; positions?: Ref<Positions | null>; layout?: Ref<GraphLayoutName>; scope?: Ref<string[] | null> } = {}) {
+function setup(props: { enhanced?: boolean | Ref<boolean>; positions?: Ref<Positions | null>; layout?: Ref<GraphLayoutName>; scope?: Ref<string[] | null> } = {}) {
   const graphs: FakeEnhancedGraph[] = []
   const factory: CanvasGraphFactory = (init) => {
     const g = new FakeEnhancedGraph({}, init)
@@ -74,7 +74,7 @@ function setup(props: { enhanced?: boolean; positions?: Ref<Positions | null>; l
       return () =>
         h(GraphCanvas, {
           graph: sample(),
-          enhanced: props.enhanced ?? true,
+          enhanced: typeof props.enhanced === 'object' ? props.enhanced.value : props.enhanced ?? true,
           positions: positions.value,
           layout: layout.value,
           scope: scope.value,
@@ -103,6 +103,21 @@ afterEach(() => {
 })
 
 describe('GraphCanvas 增强模式', () => {
+  it('章节布局失败的基础模式恢复后重建增强生命周期，控件可以缩放', async () => {
+    const enhanced = ref(false), positions = ref<Positions|null>(null)
+    const { wrapper, graphs } = setup({ enhanced, positions })
+    await settle();expect(graphs).toHaveLength(1)
+    enhanced.value = true;await settle()
+    positions.value = positionsA;await settle()
+    expect(graphs).toHaveLength(2)
+    expect(graphs[1]!.init!.positions).toBe(positionsA)
+    await wrapper.get('[aria-label="放大"]').trigger('click');await settle()
+    expect(graphs[1]!.calls).toContain('zoomBy 1.25')
+    enhanced.value=false;await settle();expect(graphs).toHaveLength(3)
+    expect(wrapper.find('[aria-label="放大"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('位置还在计算（null）时只显示加载，不建图；位置到达后用同一份位置建图并带上小地图容器', async () => {
     const positions = ref<Positions | null>(null)
     const { wrapper, graphs } = setup({ positions })

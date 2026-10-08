@@ -106,6 +106,12 @@ class GuardedTransport:
         self._connector = connector or _pinned_connect
 
     def open(self, url: str, body: bytes, headers: Mapping[str, str], timeout: float) -> HttpResponse:
+        return self._request(url, body, headers, timeout, method="POST")
+
+    def get(self, url: str, headers: Mapping[str, str], timeout: float) -> HttpResponse:
+        return self._request(url, b"", headers, timeout, method="GET")
+
+    def _request(self, url: str, body: bytes, headers: Mapping[str, str], timeout: float, *, method: str) -> HttpResponse:
         parts = check_endpoint_url(url, allow_private=self._allow_private)
         host, port = parts.hostname or "", _default_port(parts)
 
@@ -116,7 +122,7 @@ class GuardedTransport:
         # Only checked addresses are ever connected to; TLS verifies ``host``, not the IP.
         return exchange(scheme=parts.scheme, host=host, port=port, path=parts.path, body=body, headers=headers,
                         timeout=timeout, addresses=checked, connector=self._connector,
-                        ssl_context=self._ssl_context)
+                        ssl_context=self._ssl_context, method=method)
 
 
 def build_transport(settings: Settings) -> GuardedTransport:

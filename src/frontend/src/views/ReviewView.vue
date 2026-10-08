@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageSheet from '../components/PageSheet.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
@@ -119,8 +121,8 @@ function otherName(pair: SuspectedDuplicate): string {
 </script>
 
 <template>
-  <section class="review" data-test="review-page" aria-labelledby="review-title" :aria-busy="status === 'loading' ? 'true' : 'false'">
-    <h2 id="review-title">审核队列</h2>
+  <PageSheet class="review ui-management" data-test="review-page" labelledby="review-title" :aria-busy="status === 'loading'">
+    <PageHeader id="review-title" title="审核与发布" description="检查待处理条目，整理草稿，再发布给学生。" />
     <p v-if="courseName" class="review__course">课程：{{ courseName }}<span v-if="status === 'ready'"> · 处理的是草稿，发布后学生才看到</span></p>
     <p v-if="courseId">
       <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
@@ -155,13 +157,15 @@ function otherName(pair: SuspectedDuplicate): string {
       </p>
       <p v-if="allEmpty" data-test="rv-all-empty" role="status">审核队列已清空，可以直接发布。</p>
       <p v-else class="review__hint">队列不阻塞发布：发布时只排除低置信度关系，疑似重复与孤立知识点仅作提示。</p>
-      <VersionPanel v-if="courseId" :course-id="courseId" @forbidden="leaveForbidden" />
 
+
+      <div class="ui-review-inbox">
       <nav class="review__summary" aria-label="审核栏目">
         <a v-for="kind in REVIEW_KINDS" :key="kind" :href="`#rv-${kind}`" :data-test="`rv-total-${kind}`">
           {{ KIND_LABELS[kind] }}（{{ count(kind) }}）
         </a>
       </nav>
+      <div class="ui-review-content">
 
       <section
         v-for="kind in REVIEW_KINDS"
@@ -302,50 +306,9 @@ function otherName(pair: SuspectedDuplicate): string {
         </div>
         <p v-if="moreError?.kind === kind" :data-test="`rv-more-error-${kind}`" role="alert">{{ moreError.message }}</p>
       </section>
+      </div>
+      </div>
+      <VersionPanel v-if="courseId" :course-id="courseId" @forbidden="leaveForbidden" />
     </template>
-  </section>
+  </PageSheet>
 </template>
-
-<style scoped>
-.review__course,
-.review__hint,
-.review__meta {
-  color: #595959;
-  font-size: 0.875rem;
-}
-.review__summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin: 0.5rem 0 1rem;
-}
-.review__column {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 0.5rem;
-}
-.review__list {
-  list-style: none;
-  padding: 0;
-}
-.review__list > li {
-  border: 1px solid #f0f0f0;
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
-}
-.review__actions button + button,
-.review__merge button + button {
-  margin-left: 0.5rem;
-}
-.review__merge label {
-  display: block;
-}
-.review__more {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-[data-tone='error'] {
-  color: #cf1322;
-}
-</style>
