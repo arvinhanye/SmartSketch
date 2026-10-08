@@ -3,11 +3,17 @@ import type { ModelConfig, ModelConfigApi } from '../api/modelConfig'
 import { useRuntimeStore } from '../stores/runtime'
 
 export const MODEL_PROVIDERS = [
-  { id: 'deepseek', name: 'DeepSeek', url: 'https://api.deepseek.com' },
-  { id: 'openai', name: 'OpenAI', url: 'https://api.openai.com/v1' },
-  { id: 'siliconflow', name: '硅基流动', url: 'https://api.siliconflow.cn/v1' },
-  { id: 'qwen', name: '阿里云百炼', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { id: 'custom', name: '自定义（OpenAI 兼容）', url: '' },
+  { id: 'deepseek', name: 'DeepSeek', url: 'https://api.deepseek.com', embedding: false },
+  { id: 'openai', name: 'OpenAI', url: 'https://api.openai.com/v1', embedding: true },
+  { id: 'siliconflow', name: '硅基流动', url: 'https://api.siliconflow.cn/v1', embedding: true },
+  { id: 'qwen', name: '阿里云百炼', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', embedding: true },
+  { id: 'moonshot', name: 'Kimi（月之暗面）', url: 'https://api.moonshot.cn/v1', embedding: false },
+  { id: 'zhipu', name: '智谱 GLM', url: 'https://open.bigmodel.cn/api/paas/v4', embedding: true },
+  { id: 'volcengine', name: '豆包 / 火山方舟', url: 'https://ark.cn-beijing.volces.com/api/v3', embedding: true },
+  { id: 'minimax', name: 'MiniMax', url: 'https://api.minimax.cn/v1', embedding: false },
+  { id: 'qianfan', name: '百度千帆', url: 'https://qianfan.baidubce.com/v2', embedding: false },
+  { id: 'hunyuan', name: '腾讯混元', url: 'https://api.hunyuan.cloud.tencent.com/v1', embedding: false },
+  { id: 'custom', name: '自定义（OpenAI 兼容）', url: '', embedding: true },
 ] as const
 const TEXT: Record<string, string> = {
  auth: '密钥被拒绝，请检查 API Key 和账户权限。', unsupported: '该服务未提供兼容的模型列表。',

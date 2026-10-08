@@ -38,7 +38,7 @@ const {status,saved,form,configured,keyRequired,busy,saving,testing,error,notice
 const {models,loading:discovering,message:discoveryMessage,provider,canDiscover,chooseProvider,refresh}=useModelDiscovery(bridge,form,saved)
 const savedDimensions=computed(()=>(saved.value as (ModelConfig & {dimensions:number})|null)?.dimensions??1024)
 watch(savedDimensions,value=>{dimensions.value=value;customDimension.value=!dimensionOptions.includes(value)})
-const providers=MODEL_PROVIDERS.filter(p=>p.id!=='deepseek')
+const providers=MODEL_PROVIDERS.filter(p=>p.embedding)
 const selectedProvider=computed(()=>providers.some(p=>p.id===provider.value)?provider.value:'custom')
 watch(dimensions,()=>{testResult.value=null})
 </script>

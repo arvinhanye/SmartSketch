@@ -1973,5 +1973,7 @@ STUDENT-WORKSPACE 验收：DONE。H11/外壳 52 PASS；图谱工作区/组件/�
 
 ## 2026-10-08 教师向量模型配置
 
+- API-PROVIDER-PRESETS：DONE；负责人 Codex。通用 API 增加 Kimi、智谱 GLM、豆包/火山方舟、MiniMax、百度千帆、腾讯混元；向量栏按能力标记筛选并增加智谱/方舟。已核对官方常规兼容地址。前端32项、type-check/build、verify.sh basic（退出0）通过；真实教师/学生页面验证六个地址带入、密钥/模型清空、通用11选项及向量6选项含自定义。未保存真实设置、未调用真实供应商；后端不改。交接 docs/handoffs/codex-provider-presets.md；仅本地提交，不推送。
+
 - API-SETTINGS-COMPACT：DONE；负责人 Codex。用户要求通用/向量 API 左右并列、桌面一页展示，并把列表/手输合并成可输入模型选择框。两张独立卡片，帮助折叠，短屏紧凑间距；模型输入匹配列表、按钮展开全部、未知名称保留、键盘及焦点关闭。1366×768、1440×900、1920×1080常规/目录加载/自定义维度检查通过；390px自动上下排列、不裁切。前端32项、type-check/build、verify.sh basic通过；后端/接口/库不改。交接 docs/handoffs/codex-api-settings-compact.md；本地保存，不推送。
 - TEACHER-EMBEDDING：DONE；负责人 Codex。用户确认按教师课程生效、学生不增加设置。独立加密配置接口、教师表单、维度选择、课程发布/回滚/问答适配与安全重建已实现。相关后端84项及新增提交空间检查通过（向量专项19项），前端30项、type-check、build、verify.sh basic通过；教师/学生宽屏及390px浏览器检查、真实设置页检查通过，既有示例图谱保持63节点70关系。独立复审发现的通用状态污染与发布竞态已修复并复核。迁移019已先备份再应用；真实供应商激活留给用户在页面测试。ADR-092、规格/计划与交接 docs/handoffs/codex-teacher-embedding.md 已更新；仅本地保存，不推送。
