@@ -43,8 +43,9 @@ describe('详情关闭入口按使用场景保留', () => {
 })
 
 describe('用户确认的自适应详情布局规则', () => {
-  it('并置面板按工作区 35% 分配，而非固定 320px', () => {
-    expect(rule('.graph-workspace.gw')).toMatch(/grid-template-columns:\s*35%\s+minmax\(0,\s*1fr\)/)
+  it('并置面板按工作区比例分配（默认 25%，由拖动/键盘分隔条写入 --gw-panel-width），而非固定 320px', () => {
+    expect(rule('.graph-workspace.gw')).toMatch(/grid-template-columns:\s*var\(--gw-panel-width,\s*25%\)\s+minmax\(0,\s*1fr\)/)
+    expect(rule('.graph-workspace .gw-divider')).toMatch(/left:\s*calc\(var\(--gw-panel-width,\s*25%\)\s*-\s*5px\)/)
   })
   it('窄屏打开的覆盖面板占工作区 90%，参与页面高度计算', () => {
     expect(rule('.graph-workspace.gw.is-overlay .gw-panel')).toMatch(/width:\s*90%/)

@@ -218,6 +218,9 @@ test.describe('个人模式（L11）', () => {
       expect(Number(/(\d+) 个知识点/.exec(label)?.[1] ?? 0)).toBeGreaterThanOrEqual(20)
       await student.getByPlaceholder('搜索知识点').fill(edited)
       await student.getByPlaceholder('搜索知识点').press('Enter')
+      // 新版图谱页：搜索回车只定位并预览（侧栏不变）；“查看详情”才打开详情
+      await expect(student.locator('[data-test=gw-preview] .gw-preview__name')).toHaveText(edited)
+      await student.locator('[data-test=gw-preview-open]').click()
       await expect(student.locator('[data-test=kd-title]')).toHaveText(edited)
 
       // L14：把推荐第 1 项标为已掌握 → 推荐与路径行更新、刷新保留；另一个学生不受影响；取消后恢复

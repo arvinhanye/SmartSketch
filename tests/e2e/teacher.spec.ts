@@ -11,6 +11,8 @@ test('教师上传四格式资料、编辑并审核图谱、拒绝成环关系�
   const courseName = `K05 栈与队列 ${Date.now()}`
 
   await login(page, teacherUsername, teacherPassword)
+  // 新版课程页把创建表单收进弹层：先点「新建课程」再填写
+  await page.locator('[data-test=course-create-open]').click()
   await page.locator('[data-test=course-create] input[name=name]').fill(courseName)
   await page.locator('[data-test=course-create] button[type=submit]').click()
   await expect(page.locator('[data-test=create-success]')).toContainText(courseName)

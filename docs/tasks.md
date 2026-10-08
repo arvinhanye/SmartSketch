@@ -1998,3 +1998,7 @@ TEACHER-GRAPH-CARDS 验收：H05/H07/H14 153 PASS、type-check/build/basic退出
 - CURRENT-HANDOFF-20261009：DONE；负责人Codex。仅汇总固定代码c81f409的进度、边界、真实未测和接手顺序；本轮只读核实PR #323已含圆角改动，以及最新CI前端5项、后端3项、集成迁移与E2E登录失败。不在本轮修复代码或发真实模型请求。交接docs/handoffs/codex-to-claude-current-state-2026-10-09.md，验证引用/无密钥/基本门禁。
 
 CURRENT-HANDOFF-20261009 验收：实际查询PR #321/#322/#323、c81f409最新CI及失败日志，核实端口/本地状态；文档引用与必要事实断言、无API-token标记检查、git diff --check、verify.sh basic退出0。本轮仅文档，不修复CI、不调用真实模型；CI失败作为接手优先项如实登记。只保存本地文档提交，不推送。
+
+## 2026-10-08 Claude：前端复审与 CI 修复（基线 PR #323 head f76020f）
+
+- CLAUDE-CI-REPAIR-20261008：DONE（验证见交接 docs/handoffs/claude-ci-repair-20261008.md；全量门禁结果见下一任务验收）；负责人 Claude。输入为 Codex 交接第 3 节列出的 CI 失败；输出为区分「测试宿主/旧断言/真实缺陷」后的修复。真实缺陷仅一处：迁移 019 缺少 `-- ROLLBACK:` 步骤，使逐版回滚测试遗留 `019` 记录并触发“不能应用比已应用版本更旧的迁移”；已补回滚行并新增覆盖 007–019 的守卫测试，迁移顺序防线与测试均未放宽。其余为旧测试：B03 宿主缺 Pinia/登录页（提示已移入 LoginView）、旧 35% 固定侧栏断言（改为 25% 默认的可调宽比例）、C02b 期望仅应用 018、E2E 的 `getByLabel('密码')` 命中显隐按钮（改为 exact）、E2E 的课程创建弹层与“搜索回车只预览”两处过时步骤。

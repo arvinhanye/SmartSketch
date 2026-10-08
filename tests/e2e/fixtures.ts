@@ -12,7 +12,8 @@ export const studentPassword = process.env.E2E_STUDENT_PASSWORD ?? ''
 export async function login(page: Page, username: string, password: string): Promise<void> {
   await page.goto(appUrl)
   await page.getByLabel('用户名').fill(username)
-  await page.getByLabel('密码').fill(password)
+  // 密码显隐按钮的无障碍名称是“显示密码/隐藏密码”，子串匹配会同时命中它，所以要求完整匹配输入框的标签
+  await page.getByLabel('密码', { exact: true }).fill(password)
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible()
 }

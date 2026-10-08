@@ -1,5 +1,10 @@
 -- Teacher course embedding overrides. Additive; rollback by restoring the migrator backup
 -- with API and worker stopped. Never delete Neo4j vector properties during rollback.
+-- Manual rollback (drops only the SQLite override table; teachers must re-enter their embedding settings):
+-- ROLLBACK: DROP TRIGGER teacher_embedding_role_update;
+-- ROLLBACK: DROP TRIGGER teacher_embedding_role_insert;
+-- ROLLBACK: DROP TABLE teacher_embedding_configs;
+-- ROLLBACK: DELETE FROM schema_migrations WHERE filename LIKE '%_teacher_embedding_configs.sql';
 CREATE TABLE teacher_embedding_configs (
  user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id),
  base_url TEXT NOT NULL, model TEXT NOT NULL,
