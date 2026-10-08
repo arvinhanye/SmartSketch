@@ -146,6 +146,33 @@ class GraphDriver:
         if not self.committed:
             self.rollbacks += 1
 
+    def async_factory(self):
+        graph = self
+        class Driver:
+            def session(self, **kwargs):
+                return Session()
+            async def close(self):
+                graph.closed = True
+        class Session:
+            async def begin_transaction(self, **kwargs):
+                return Tx()
+            def cancel(self):
+                graph.closed = True
+            async def close(self):
+                pass
+        class Tx:
+            async def run(self, query, params):
+                rows = graph.run(query, params)
+                class Result:
+                    async def data(self):
+                        return rows
+                return Result()
+            async def commit(self):
+                graph.commit()
+            async def close(self):
+                graph.close()
+        return Driver()
+
 
 @pytest.fixture
 def worker_graph(monkeypatch):
@@ -156,7 +183,7 @@ def worker_graph(monkeypatch):
         return SimpleNamespace(nodes=(), relations=(), downgraded=())
 
     monkeypatch.setattr(persist_graph, '_write_draft', write)
-    return graph, Neo4jRepository(graph)
+    return graph, Neo4jRepository(graph, persist_driver_factory=graph.async_factory)
 
 
 def run_worker(task, repo, **kwargs):
@@ -245,7 +272,8 @@ def test_lost_commit_ack_is_not_replayed(task, worker_graph):
     graph.after_commit = lost_ack
     outcome = run_worker(task, repo)
     assert graph.commits == graph.runs == 1
-    assert outcome.status is persist_graph.PersistStatus.RELEASED
+    assert outcome.status is persist_graph.PersistStatus.LOST
+    assert task_state(task)[1] == task[1].token
     assert task_state(task)[0] == 'persisting' and task_state(task)[2] is None
 
 
@@ -264,8 +292,8 @@ def test_sqlite_commit_ack_loss_is_read_back_not_replayed(task, worker_graph, mo
     original = persist_graph.persist_transaction
 
     @contextmanager
-    def lost_ack(*args):
-        with original(*args) as db:
+    def lost_ack(*args, **kwargs):
+        with original(*args, **kwargs) as db:
             yield db
         if readback_fails:
             monkeypatch.setattr(persist_graph, 'connect', lambda *a: (_ for _ in ()).throw(sqlite3.OperationalError()))
@@ -308,18 +336,18 @@ def test_normal_t6_loss_signal_is_not_retroactive(task, worker_graph, monkeypatc
 
 def test_cutoff_after_fence_validation_before_dispatch_rolls_back(task, worker_graph, monkeypatch):
     from app.repositories.lease_guard import LeaseGuard
-    from app.repositories.neo4j import ExplicitTransaction
+    from app.repositories.neo4j import PersistTransaction
     now = [0.0]
     guard = LeaseGuard(60, last_success=0, clock=lambda: now[0])
-    original_commit = ExplicitTransaction.commit
+    original_commit = PersistTransaction.commit
 
-    def paused_before_dispatch(tx):
+    def paused_before_dispatch(tx, *, started_at):
         # Both the DB fence and outer worker check passed, but the thread is
         # paused just before the transaction's own final dispatch check.
         now[0] = 40
-        return original_commit(tx)
+        return original_commit(tx, started_at=started_at)
 
-    monkeypatch.setattr(ExplicitTransaction, 'commit', paused_before_dispatch)
+    monkeypatch.setattr(PersistTransaction, 'commit', paused_before_dispatch)
     graph, repo = worker_graph
     outcome = run_worker(task, repo, task_guard=guard)
     assert outcome.status is persist_graph.PersistStatus.LOST
@@ -416,3 +444,141 @@ def test_fence_acquired_clock_precedes_validation_and_callback_error_rolls_back(
         db.execute('PRAGMA busy_timeout=0')
         db.execute('BEGIN IMMEDIATE')
         db.execute('ROLLBACK')
+
+
+def _transport_worker_repo(fake, *, timeout=.02):
+    return Neo4jRepository(SimpleNamespace(), persist_driver_factory=fake.factory,
+                           persist_commit_timeout=timeout, persist_cleanup_timeout=.03)
+
+
+def test_commit_timeout_releases_fence_before_transport_close(task, worker_graph, monkeypatch):
+    from test_worker_persist_transport import FakeDriver
+    fake = FakeDriver(commit_delay=10)
+    url, lease = task
+    events = []
+    original = sqlite3.connect
+    class Recording(sqlite3.Connection):
+        def execute(self, query, *args):
+            result = super().execute(query, *args)
+            if query == 'ROLLBACK':
+                events.append('fence_released')
+            return result
+    monkeypatch.setattr(sqlite3, 'connect', lambda *a, **kw: original(*a, **kw, factory=Recording))
+    record = fake.record
+    def recording(name):
+        if name == 'tx_close':
+            events.append('transport_close')
+            with connect(url) as writer:
+                writer.execute('PRAGMA busy_timeout=0')
+                writer.execute('BEGIN IMMEDIATE')
+                writer.execute('ROLLBACK')
+        record(name)
+    fake.record = recording
+    t6_calls = []
+    monkeypatch.setattr(persist_graph, '_t6_in', lambda *a: t6_calls.append(1))
+    outcome = run_worker(task, _transport_worker_repo(fake))
+    assert outcome.status is persist_graph.PersistStatus.LOST
+    assert events.index('fence_released') < events.index('transport_close')
+    assert t6_calls == []
+    assert not fake.pending_tasks and not fake.open_resources
+
+
+def test_uncertain_commit_keeps_token_and_stops_new_renewals(task, worker_graph, monkeypatch):
+    from test_worker_persist_transport import FakeDriver
+    from app.repositories.lease_guard import LeaseGuard
+    fake = FakeDriver(commit_delay=10)
+    guard = LeaseGuard(60, last_success=0, clock=lambda: 0)
+    monkeypatch.setattr(persist_graph, '_release', lambda *a, **k: pytest.fail('unknown commit release'))
+    monkeypatch.setattr(persist_graph, 'cleanup_failed_task', lambda *a, **k: pytest.fail('unknown commit cleanup'))
+    outcome = run_worker(task, _transport_worker_repo(fake), task_guard=guard)
+    assert outcome.status is persist_graph.PersistStatus.LOST
+    assert guard.lost.is_set()
+    assert task_state(task) == ('persisting', task[1].token, None)
+    assert fake.commit_calls == 1
+    assert fake.cancel_calls == 1
+
+
+def test_precommit_last_attempt_timeout_defers_cleanup(task, worker_graph, monkeypatch):
+    from app.repositories.neo4j import RepositoryTransportTimeout
+    class BeforeCommit:
+        @contextmanager
+        def persist_write_transaction(self, *a, **k):
+            raise RepositoryTransportTimeout('open', False)
+            yield
+    url, lease = task
+    with connect(url) as db:
+        db.execute('UPDATE processing_tasks SET attempt=3 WHERE id=?', (lease.task_id,))
+    monkeypatch.setattr(persist_graph, 'cleanup_failed_task', lambda *a, **k: pytest.fail('inline cleanup'))
+    outcome = run_worker(task, BeforeCommit())
+    assert outcome.status is persist_graph.PersistStatus.FAILED
+    with connect(url) as db:
+        assert db.execute('SELECT stage, cleanup_pending FROM processing_tasks WHERE id=?',
+                          (lease.task_id,)).fetchone() == ('failed', 1)
+
+
+def test_confirmed_t6_survives_transport_exit_failure(task, worker_graph):
+    from test_worker_persist_transport import FakeDriver
+    fake = FakeDriver(session_close_delay=10)
+    outcome = run_worker(task, _transport_worker_repo(fake))
+    assert outcome.status is persist_graph.PersistStatus.ADVANCED
+    assert task_state(task) == ('awaiting_review', None, 1)
+    with connect(task[0]) as db:
+        assert db.execute('SELECT draft_revision FROM courses WHERE id=?', (task[1].course_id,)).fetchone() == (1,)
+    assert fake.commit_calls == 1
+
+
+@pytest.mark.parametrize('owner', ['task', 'course'])
+@pytest.mark.parametrize('fault', ['delayed', 'sqlite', 'zero'])
+def test_real_heartbeat_callers_stop_without_reviving_guard(task, monkeypatch, owner, fault):
+    import threading
+    from app.repositories.lease_guard import LeaseGuard
+    from app.workers import parse_task
+    now = [0.0]
+    guard = LeaseGuard(60, last_success=0, clock=lambda: now[0])
+    calls = []
+    threads = []
+    class Stop:
+        def __init__(self):
+            self.stopped = False
+            self.waits = 0
+        def set(self):
+            self.stopped = True
+        def wait(self, interval):
+            if self.stopped:
+                return True
+            self.waits += 1
+            if self.waits > 2:
+                now[0] = 40
+            return False
+    def renew(*args, **kwargs):
+        assert kwargs['require_live'] is True
+        calls.append(1)
+        if fault == 'delayed':
+            now[0] = 40  # reply past old cutoff
+            return 9999999999 if owner == 'task' else True
+        if fault == 'sqlite':
+            raise sqlite3.OperationalError('locked')
+        return None if owner == 'task' else False
+    if owner == 'task':
+        heartbeat = parse_task.LeaseHeartbeat(task[0], task[1], lease_seconds=60)
+        heartbeat.guard, heartbeat.lost, heartbeat._stop = guard, guard.lost, Stop()
+        monkeypatch.setattr(parse_task, 'renew_lease', renew)
+        with heartbeat:
+            heartbeat._thread.join(timeout=1)
+            assert not heartbeat._thread.is_alive()
+    else:
+        lock = course_locks.try_acquire(task[0], task[1].course_id, holder='w', lease_seconds=60)
+        def make_thread(**kw):
+            thread = threading.Thread(**kw)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(course_locks, 'threading', SimpleNamespace(Event=Stop, Thread=make_thread))
+        monkeypatch.setattr(course_locks, 'renew', renew)
+        with course_locks.held(task[0], lock, lease_seconds=60, guard=guard):
+            threads[0].join(timeout=1)
+            assert not threads[0].is_alive()
+    assert len(calls) == (2 if fault == 'sqlite' else 1)
+    assert guard.lost.is_set()
+    guard.renewed(100)
+    with pytest.raises(task_leases.LeaseLost):
+        guard.check()

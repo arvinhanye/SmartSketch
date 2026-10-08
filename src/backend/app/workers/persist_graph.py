@@ -396,22 +396,22 @@ def run_merge_stage(sqlite_url: str, lease: Lease) -> PersistOutcome:
 
 def _after_failure(sqlite_url: str, repo: Neo4jRepository, lease: Lease, *, code: str,
                    details: Mapping[str, object] | None, holder: str, lock_seconds: int,
-                   lock_wait_seconds: float) -> PersistOutcome:
+                   lock_wait_seconds: float, defer_cleanup: bool = False) -> PersistOutcome:
     if not _fail(sqlite_url, lease, code, details):
         return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
-    cleaned = cleanup_failed_task(sqlite_url, repo, course_id=lease.course_id, task_id=lease.task_id,
+    cleaned = False if defer_cleanup else cleanup_failed_task(sqlite_url, repo, course_id=lease.course_id, task_id=lease.task_id,
                                   holder=holder, lock_seconds=lock_seconds, lock_wait_seconds=lock_wait_seconds)
     return PersistOutcome(PersistStatus.FAILED, lease.task_id, "failed", error_code=code, cleanup_pending=not cleaned)
 
 
 def _release(sqlite_url: str, repo: Neo4jRepository, lease: Lease, *, max_attempts: int, holder: str,
-             lock_seconds: int, lock_wait_seconds: float) -> PersistOutcome:
+             lock_seconds: int, lock_wait_seconds: float, defer_cleanup: bool = False) -> PersistOutcome:
     released = release_after_transient_failure(sqlite_url, lease.task_id, lease.token, code=STORAGE_CODE,
                                                max_attempts=max_attempts)
     if released.status == "released":
         return PersistOutcome(PersistStatus.RELEASED, lease.task_id, STAGE, not_before=released.not_before)
     if released.status == "failed":  # 已置 cleanup_pending
-        cleaned = cleanup_failed_task(sqlite_url, repo, course_id=lease.course_id, task_id=lease.task_id,
+        cleaned = False if defer_cleanup else cleanup_failed_task(sqlite_url, repo, course_id=lease.course_id, task_id=lease.task_id,
                                       holder=holder, lock_seconds=lock_seconds, lock_wait_seconds=lock_wait_seconds)
         return PersistOutcome(PersistStatus.FAILED, lease.task_id, "failed", error_code=STORAGE_CODE,
                               cleanup_pending=not cleaned)
@@ -506,9 +506,10 @@ def _persist_stage(
     owner = holder or lease.owner
     common = dict(holder=owner, lock_seconds=lock_seconds, lock_wait_seconds=lock_wait_seconds)
 
-    def release() -> PersistOutcome:
+    def release(*, defer_cleanup: bool = False) -> PersistOutcome:
         with steps.step("task_release"):
-            return _release(sqlite_url, repo, lease, max_attempts=max_attempts, **common)
+            return _release(sqlite_url, repo, lease, max_attempts=max_attempts,
+                            defer_cleanup=defer_cleanup, **common)
 
     def after_failure(**kwargs: Any) -> PersistOutcome:
         with steps.step("task_release"):
@@ -545,6 +546,8 @@ def _persist_stage(
 
     lock_release_started = False
     t6_seq: int | None = None
+    tx = None
+    dedicated_started = False
 
     def completed_after_error() -> bool | None:
         # Only recognize OUR T6 result, not a new owner's completed task. If a
@@ -576,14 +579,23 @@ def _persist_stage(
                         scope = GraphScope(lease.course_id, DRAFT_VERSION,
                                            effective_task_ids=_effective(sqlite_url, lease.course_id))
                     with steps.step("neo4j"):
-                        timeout = min(task_guard.remaining(), course_guard.remaining())
-                        with repo.explicit_write_transaction(scope, check=check, timeout=timeout) as tx:
+                        dedicated_started = True
+                        with repo.persist_write_transaction(scope, check=check,
+                                remaining=lambda: min(task_guard.remaining(), course_guard.remaining())) as tx:
                             written = work(tx)  # Graph draft guard is acquired here, before SQLite.
                             with steps.step("t6"):
-                                with persist_transaction(sqlite_url, lease, lock.token) as database:
+                                acquired = []
+                                with persist_transaction(sqlite_url, lease, lock.token,
+                                        deadline=tx.deadline, on_acquired=acquired.append) as database:
                                     check()
-                                    tx.commit()
-                                    t6_seq = _t6_in(database, lease)
+                                    try:
+                                        tx.commit(started_at=acquired[0])
+                                        t6_seq = _t6_in(database, lease)
+                                    except BaseException:
+                                        if tx.commit_started:
+                                            task_guard.lose()
+                                            course_guard.lose()
+                                        raise  # SQLite unwinds before transport cleanup waits.
                 finally:
                     steps.start("lock_release")
                     lock_release_started = True
@@ -596,7 +608,8 @@ def _persist_stage(
             return success()
         return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
     except UnresolvableCycleError as exc:
-        return after_failure(code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)})
+        return after_failure(code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)},
+                             defer_cleanup=dedicated_started)
     except (RepositoryError, sqlite3.Error):
         completed = completed_after_error()
         if completed:
@@ -604,15 +617,24 @@ def _persist_stage(
         if completed is None:
             logger.warning('persisting T6 outcome uncertain task_id=%s', lease.task_id)
             return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
-        return release()
+        if tx is not None and tx.commit_started:
+            task_guard.lose()
+            course_guard.lose()
+            logger.warning('persisting graph outcome uncertain task_id=%s', lease.task_id)
+            return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
+        return release(defer_cleanup=dedicated_started)
     except (RelationWriteError, RuntimeError, ValueError) as exc:
         completed = completed_after_error()
         if completed:
             return success()
         if completed is None:
             return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
+        if tx is not None and tx.commit_started:
+            task_guard.lose()
+            course_guard.lose()
+            return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
         logger.exception("persisting task %s failed (%s)", lease.task_id, type(exc).__name__)
-        return after_failure(code="INTERNAL_ERROR", details=None)
+        return after_failure(code="INTERNAL_ERROR", details=None, defer_cleanup=dedicated_started)
     return success()
 
 

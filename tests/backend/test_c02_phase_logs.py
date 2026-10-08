@@ -164,11 +164,11 @@ class _Repo:
         self.exc = exc
 
     @contextmanager
-    def explicit_write_transaction(self, scope, *, check, timeout):
-        def commit():
+    def persist_write_transaction(self, scope, *, check, remaining):
+        def commit(*, started_at):
             if self.exc is not None:
                 raise self.exc
-        yield SimpleNamespace(commit=commit)
+        yield SimpleNamespace(commit=commit, deadline=time.monotonic()+remaining(), commit_started=False, committed=False)
 
 
 SENTINEL_NAME = "绝不应出现在日志里的知识点名"
@@ -198,7 +198,9 @@ def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None,
     monkeypatch.setattr(persist_graph, "_t6_in", _Sleep(8, 1))
 
     @contextmanager
-    def database(*args):
+    def database(*args, **kwargs):
+        if kwargs.get("on_acquired"):
+            kwargs["on_acquired"](time.monotonic())
         yield SimpleNamespace(execute=lambda *a: SimpleNamespace(fetchone=lambda: ('awaiting_review', 1, None)))
 
     monkeypatch.setattr(persist_graph, "persist_transaction", database)
