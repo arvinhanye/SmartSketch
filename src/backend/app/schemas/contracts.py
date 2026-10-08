@@ -32,6 +32,9 @@ KnowledgePoint = _module.KnowledgePoint
 KnowledgePointDetail = _module.KnowledgePointDetail
 # 手工新建、读取时没有任何可定位来源的节点详情：显式空态（ADR-072）。
 KnowledgePointDetailWithoutSource = _module.KnowledgePointDetailWithoutSource
+# F09 级联删除的影响报告与其中的节点（ADR-092）。
+KnowledgePointDeletion = _module.KnowledgePointDeletion
+KnowledgePointDeletionNode = _module.KnowledgePointDeletionNode
 # F08 teacher knowledge-point writes.
 KnowledgePointCreate = _module.KnowledgePointCreate
 KnowledgePointStatus = _module.KnowledgePointStatus

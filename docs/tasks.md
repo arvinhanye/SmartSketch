@@ -1910,3 +1910,21 @@ C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整�
 C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCESS，merge commit 3d696158；#319（头d03b5e7，本轮修复）全部8检查SUCCESS，先合入claude/plan-c-acceptance，merge commit bbc8fbea；#318基线改为main、纳入修复后头bbc8fbea全部8检查SUCCESS，merge commit 0436ff34，已进入main。merge commit保留作者/历史，不force-push、不删除分支；没有合并测量分支88f9f6f。验证origin/main包含d03b5e7且完整代码树与已验修复提交一致。仓库当时开放PR列表为空；发布交接与启动说明的文档同步另由后续PR承载，不冒充新的业务修复或冻结。
 
 上述PR状态、头/合并提交与CI链接存evaluation/raw/codex-c-acc-fixes/publication-verification.json。当前代码入口scripts/start.sh已在GitHub main；本地主目录代码未自动pull/切换，本机.env/业务库未改。说明文档不存真实Key，向量仍.env全局online、生成API仍个人网页配置；网页向量配置计划保持CANCELLED_BY_USER。真实测量与人工签收口径不变，三项不补测仍未测，历史慢段根因OPEN；stage_c_status OPEN、technical_freeze NOT_PERFORMED。用户手工检查与冻结决定仍等待用户，不因GitHub合并自动签收。
+
+
+## 2026-10-08 F09 扩展：删除知识点支持级联（Claude，新增任务）
+
+基线 `pr-321@ab60183`（PR #321 图谱工作台）；分支 `pr-321` 就地开发。由用户在会话中提出「添加功能：可以删除单个知识点，并自动删除后续节点及关系」，两处取舍由用户逐项选择：**级联与否每次由教师在确认弹窗选择**、**只跟随有向向下关系（最终限定为只跟 `CONTAINS`）**。
+
+| ID | 状态 | 任务 | 负责人 | 文件锁（本轮唯一写入者） | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| F09-CASCADE | IN_PROGRESS（后端 DONE，前端待做） | 删除知识点支持「连带删除会变成孤儿的后代」并新增只读影响预览 | Claude | `src/backend/app/services/graph/delete_node_cascade.py`、`tests/backend/test_f09_cascade.py`；与 F09 同一执行者顺序修改 `repositories/graph_edit.py`、`api/graph_nodes.py`、`schemas/contracts.py`、`src/contracts/api.v1.yaml` | 契约与四类生成物同步（`gen-contracts.sh --check` 等价比对通过）；`tests/backend/test_f09_cascade.py` **14 passed**；真实演示课程上预览「栈」→ 删除 19 个知识点 / 21 条关系，且「采」因仍挂「链队列」而保留；`check_contracts.py` PASS（33 路径 / 131 schema）；ADR-092 |
+
+**输入**：演示课程实测结构（`CONTAINS` 65 条、`PREREQUISITE` 1 条；59 个单父节点、2 个双父节点与 1 个三父节点；根为「栈与队列」「递归工作栈」）。**输出**：`DELETE /kp/{kid}?cascade=`（缺省行为与 204 响应完全不变）、`GET /kp/{kid}/delete-impact`（只读预览）、DTO `KnowledgePointDeletion` / `KnowledgePointDeletionNode`、服务层孤儿安全闭包、仓储层 5 条 Cypher。
+
+**关键设计**：① 只沿 `CONTAINS` 递归——`PREREQUISITE` 是学习顺序而非归属，删「递归」不应连带删除「二叉树遍历」；② 只删「原有 `CONTAINS` 父节点全部在待删集合里」的节点，共享节点保留并在 `retained_parents` 说明原因（实测「栈」的 19 个后代里「采」被保留）；③ 预览与删除共用同一计划函数 `_plan`，不会出现「预览 3 个、实际删 30 个」。
+
+**踩到并修掉的仓库约定/缺陷**：① 每条草稿 Cypher 必须**字面引用** `$effective_task_ids`，否则 `Neo4jRepository._parameters` 抛 `GraphScopeError`（既有的 `WHERE $effective_task_ids IS NOT NULL` 即为此）；② 按 ID 读节点的语句必须返回 `p` 字段形状（`_TX_NODE_FIELDS`），否则读取函数 `KeyError: 'p'`；③ 关系计数从「逐节点汇总再扣内部边」改为「删除集内部边 + 删除集到外部的边」两个语义明确的函数。
+
+**待决**：前端删除入口与二次确认弹窗（两个选项 + 展示预览）尚未实现，因此浏览器里还点不到该功能；`verify.sh full` 与 `tests/tooling` 门禁未跑；集成测试 `tests/integration/test_f09_cascade.py`（真 Neo4j 上的 `CONTAINS` 遍历与批量删除）未写，真图验证目前只有只读预览与 404/401 路径；`docs/handoffs/claude-f09-cascade.md` 交接待写。
+

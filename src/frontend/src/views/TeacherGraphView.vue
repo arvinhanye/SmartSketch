@@ -11,10 +11,12 @@ import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
+import NodeDeletionConfirm from '../components/NodeDeletionConfirm.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
 import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
+import { useNodeDeletion } from '../composables/useNodeDeletion'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
 import {
@@ -148,6 +150,26 @@ function onDeleted(kpId: string): void {
   justDeleted = kpId
   notice.value = '知识点已删除，与它相连的关系已一并删除。'
   filters.select(null)
+}
+
+// F09 扩展（ADR-092）：详情面板的删除入口走确认弹窗，教师每次选择是否连带删除会变成孤儿的后代。
+// 打开弹窗时先取只读影响预览，弹窗里显示的数量就是即将删除的数量。
+const deletion = useNodeDeletion({
+  api: detailApi,
+  courseId,
+  onCourseForbidden: leaveForbidden,
+  onDeleted: async (kpId, impact) => {
+    justDeleted = kpId
+    notice.value = impact !== null && impact.deleted_count > 1
+      ? `已删除「${impact.root_name}」及 ${impact.deleted_count - 1} 个下级知识点，相关关系一并删除。`
+      : '知识点已删除，与它相连的关系已一并删除。'
+    await teacher.refresh()
+    filters.select(null)
+  },
+})
+
+function openDeletion(kpId: string): void {
+  void deletion.open(kpId)
 }
 
 // 该侦听在面板收到新的 kpId 之前运行，此时 isDirty 仍反映被移除节点的表单
@@ -320,11 +342,23 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             <KnowledgeDetail
               v-if="selected !== null"
               :kp-id="selected"
+              allow-delete
               @select-knowledge-point="guard.request"
+              @delete="openDeletion"
               @close="guard.request(null)"
               @course-forbidden="leaveForbidden"
             />
             <p v-else data-test="tg-detail-empty" role="status">在图谱中点击一个知识点查看详情。</p>
+
+            <NodeDeletionConfirm
+              v-if="deletion.kpId.value !== null"
+              :status="deletion.status.value"
+              :impact="deletion.impact.value"
+              :error="deletion.error.value"
+              :name="currentName ?? deletion.impact.value?.root_name ?? '该知识点'"
+              @confirm="(cascade) => deletion.confirm(cascade)"
+              @cancel="deletion.close"
+            />
           </template>
 
           <!-- 切到其他页签时保留编辑面板，未保存的修改不丢 -->

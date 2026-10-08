@@ -462,9 +462,16 @@ export interface paths {
         /**
          * 删除知识点及其关系（教师）
          * @description 从草稿删除知识点、与它相连的全部草稿关系（含关系身份）及其来源关联；共享文本块、已发布版本的副本与快照
-         *     不变（ADR-048）。节点不存在、不可见或属于他课 → 404 `NOT_FOUND`；并发删除同一节点恰有一次 204，
+         *     不变（ADR-048）。节点不存在、不可见或属于他课 → 404 `NOT_FOUND`；并发删除同一节点恰有一次成功，
          *     其余 404。可选 `expected_revision` 与当前修订号不一致时 409 `REVISION_CONFLICT`，不删除。
          *     草稿写入须持课程写锁；超时返回 409 `COURSE_BUSY`。
+         *
+         *     `cascade=false`（缺省）只删该节点，保留原来的 204 无响应体，既有客户端不受影响。
+         *     `cascade=true` 额外删除「因本次删除而失去全部 `CONTAINS` 父节点」的节点——即孤儿安全的
+         *     后代闭包：只沿 `CONTAINS` 出边递归，遇到仍有其它 `CONTAINS` 父节点留在图上的节点即停，
+         *     因此不会误删同时挂在别的章节下的共享节点；`PREREQUISITE` 是学习顺序约束而非归属，
+         *     一律不跟随（删除前置知识不会连带删除依赖它的后续知识点）。此时返回 200 与
+         *     `KnowledgePointDeletion`（ADR-092）。删除前的影响可用 `GET .../kp/{kid}/delete-impact` 预览。
          *
          */
         delete: operations["deleteKnowledgePoint"];
@@ -479,6 +486,34 @@ export interface paths {
          *
          */
         patch: operations["updateKnowledgePoint"];
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/kp/{kid}/delete-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                kid: components["parameters"]["KnowledgePointId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 预览删除一个知识点的影响（教师）
+         * @description 只读的删除预览（ADR-092）：返回本次删除会移除哪些知识点与多少条关系，供前端在确认前展示。
+         *     报告内容与 `DELETE ...?cascade=true` 实际删除的对象一致（同一次读取、同一套规则），
+         *     因此教师按下确认前就能看到完整影响，不会出现「说删 3 个、实际删了 30 个」。
+         *     只读、不写任何数据，也不加课程草稿修订号。节点不存在、不可见或属于他课 → 404 `NOT_FOUND`。
+         *
+         */
+        get: operations["getKnowledgePointDeleteImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/courses/{cid}/kp/{kid}/unlock": {
@@ -1320,6 +1355,38 @@ export interface components {
             /** @description 节点级乐观并发修订号；不同于课程 draft_revision。 */
             revision: number;
             source_refs?: components["schemas"]["SourceRef"][];
+        };
+        /** @description 一次删除中会被移除的一个知识点（ADR-092） */
+        KnowledgePointDeletionNode: {
+            /** @description 知识点 ID */
+            id: string;
+            /** @description 知识点名称，供确认弹窗直接展示 */
+            name: string;
+            /** @description 沿 `CONTAINS` 到被删根节点的最短距离；0 表示就是被点名的那个节点 */
+            depth: number;
+            /** @description 该节点在本次删除后仍保留的 `CONTAINS` 父节点名。仅当它还有子树外的父节点时才非空——
+             *     有值时该节点**不会**被删除，列出原因供教师理解「为什么这个子节点留下了」。
+             *      */
+            retained_parents?: string[];
+        };
+        /** @description 删除影响报告（ADR-092） */
+        KnowledgePointDeletion: {
+            /** @description 被点名的知识点 ID */
+            root_id: string;
+            /** @description 被点名的知识点名称 */
+            root_name: string;
+            /** @description 是否连带删除孤儿后代；预览接口始终按 true 计算 */
+            cascade: boolean;
+            /** @description 会被删除的知识点总数，含根节点 */
+            deleted_count: number;
+            /** @description 会一并删除的草稿关系条数，含与保留节点相连的那些 */
+            relation_count: number;
+            /** @description 会被删除的知识点，按 `depth` 再按 `name` 升序 */
+            nodes: components["schemas"]["KnowledgePointDeletionNode"][];
+            /** @description 位于根节点可达范围内、但因仍有子树外 `CONTAINS` 父节点而**保留**的节点；
+             *     与 `nodes[].retained_parents` 呼应，用于向教师解释级联边界。
+             *      */
+            retained: components["schemas"]["KnowledgePointDeletionNode"][];
         };
         KnowledgePointDetail: components["schemas"]["KnowledgePoint"] & {
             source_refs: components["schemas"]["SourceRef"][];
@@ -2954,6 +3021,10 @@ export interface operations {
             query?: {
                 /** @description 节点级乐观并发：读到的 `revision`；省略时不核对（ADR-048） */
                 expected_revision?: number;
+                /** @description `true` 时连同因本次删除而失去全部 `CONTAINS` 父节点的节点一起删除，并返回删除报告；
+                 *     缺省 `false` 只删该节点（ADR-092）。
+                 *      */
+                cascade?: boolean;
             };
             header?: never;
             path: {
@@ -2965,7 +3036,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 已删除 */
+            /** @description 已删除，附删除报告（`cascade=true`） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgePointDeletion"];
+                };
+            };
+            /** @description 已删除（`cascade` 缺省或为 false，只删了该节点） */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -3010,6 +3090,33 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    getKnowledgePointDeleteImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                kid: components["parameters"]["KnowledgePointId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除影响报告 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgePointDeletion"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     unlockKnowledgePoint: {

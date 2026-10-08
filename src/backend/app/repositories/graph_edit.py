@@ -33,13 +33,22 @@ from app.repositories.neo4j import GraphScope, GraphScopeError, Neo4jRepository,
 from app.repositories.sqlite import connect
 
 __all__ = [
+    "CASCADE_MAX_DEPTH",
     "DRAFT_VERSION",
+    "CascadeNode",
+    "CascadePlan",
     "DraftNodeStore",
     "IncidentRelation",
     "add_evidence",
     "bump_draft_revision",
+    "count_draft_relations_among",
+    "count_draft_relations_to_outside",
     "delete_draft_node",
+    "delete_draft_nodes",
     "delete_merged_nodes",
+    "read_contains_parents",
+    "read_contains_reachable",
+    "read_draft_nodes_by_id",
     "read_evidence",
     "read_incident_relations",
     "read_nodes",
@@ -49,6 +58,10 @@ __all__ = [
 ]
 
 DRAFT_VERSION: Final = "draft"
+
+#: 级联删除沿 ``CONTAINS`` 递归的深度上限（ADR-092）：正常课程远小于此值，
+#: 设上限只是防止异常数据（例如误建出的环）让遍历无界。
+CASCADE_MAX_DEPTH: Final = 12
 T = TypeVar("T")
 
 
@@ -277,6 +290,70 @@ DETACH DELETE n
 RETURN size(rel_ids) AS relations
 """
 
+# ── ADR-092 级联删除 ─────────────────────────────────────────────────────────
+# 只沿 CONTAINS 递归：PREREQUISITE 是学习顺序约束而非归属，删掉前置知识不应连带删除依赖它的知识点。
+# 逐层展开（而不是一条变长路径）便于给每个节点带上到根的最短深度，用于删除报告的排序与展示。
+
+_TX_CONTAINS_REACHABLE = f"""
+MATCH (root:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: $kp_id}})
+WHERE $effective_task_ids IS NULL OR size($effective_task_ids) >= 0
+MATCH path = (root)-[:CONTAINS*1..{CASCADE_MAX_DEPTH}]->
+      (d:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
+RETURN DISTINCT d.kp_id AS kp_id, min(length(path)) AS depth
+"""
+
+_TX_CONTAINS_PARENTS = """
+UNWIND $kp_ids AS id
+MATCH (p:KnowledgePoint {course_id: $course_id, version_id: $version_id})-[:CONTAINS]->
+      (n:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: id})
+WHERE $effective_task_ids IS NULL OR size($effective_task_ids) >= 0
+RETURN n.kp_id AS kp_id, p.kp_id AS parent_id, p.name AS parent_name
+"""
+
+_TX_NODES_ANY_VISIBILITY = f"""
+UNWIND $kp_ids AS id
+MATCH (n:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: id}})
+WHERE $effective_task_ids IS NULL OR size($effective_task_ids) >= 0
+RETURN {_TX_NODE_FIELDS}
+"""
+
+# 级联删除：草稿关系与关系身份一律清理（不论可见与否），否则会留下悬空边。
+_TX_DELETE_NODES_DRAFT = f"""
+UNWIND $kp_ids AS id
+MATCH (n:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: id}})
+WHERE $effective_task_ids IS NULL OR size($effective_task_ids) >= 0
+OPTIONAL MATCH (n)-[r]-(:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
+WHERE r.course_id = $course_id AND r.version_id = $version_id AND type(r) IN $types
+WITH n, collect(DISTINCT r.rel_id) AS rel_ids
+CALL (rel_ids) {{
+    UNWIND rel_ids AS rel_id
+    MATCH (ri:RelationIdentity {{course_id: $course_id, version_id: $version_id, rel_id: rel_id}})
+    DELETE ri
+}}
+DETACH DELETE n
+RETURN count(*) AS deleted
+"""
+
+_TX_COUNT_INTERNAL_DRAFT_RELATIONS = """
+UNWIND $kp_ids AS id
+MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: id})
+      -[r]-(b:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+WHERE r.course_id = $course_id AND r.version_id = $version_id AND type(r) IN $types
+  AND b.kp_id IN $kp_ids
+  AND ($effective_task_ids IS NULL OR size($effective_task_ids) >= 0)
+RETURN count(DISTINCT r.rel_id) AS relations
+"""
+
+_TX_COUNT_EXTERNAL_DRAFT_RELATIONS = """
+UNWIND $kp_ids AS id
+MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: id})
+      -[r]-(b:KnowledgePoint {course_id: $course_id, version_id: $version_id})
+WHERE r.course_id = $course_id AND r.version_id = $version_id AND type(r) IN $types
+  AND NOT b.kp_id IN $kp_ids
+  AND ($effective_task_ids IS NULL OR size($effective_task_ids) >= 0)
+RETURN count(DISTINCT r.rel_id) AS relations
+"""
+
 
 @dataclass(frozen=True)
 class IncidentRelation:
@@ -361,6 +438,84 @@ def delete_draft_node(tx: ScopedTransaction, kp_id: str, expected_revision: int)
     rows = tx.run(_TX_DELETE_NODE, {"kp_id": kp_id, "expected_revision": expected_revision,
                                     "types": list(RELATION_TYPES)})
     return int(rows[0]["relations"]) if rows else None
+
+
+# ---------------------------------------------------------------- 级联删除（ADR-092）
+
+
+@dataclass(frozen=True)
+class CascadeNode:
+    """级联范围里的一个节点：``depth`` 为沿 ``CONTAINS`` 到根的最短距离。
+
+    ``retained_parents`` 只对**保留**的节点有意义：列出它保留下来的那些 ``CONTAINS`` 父节点名，
+    用来回答教师「为什么这个子节点没跟着删」（ADR-092）。
+    """
+
+    kp_id: str
+    name: str
+    depth: int
+    retained_parents: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CascadePlan:
+    """孤儿安全的级联删除计划。``retained`` 是可达但仍有子树外父节点、因而**保留**的节点。"""
+
+    deletable: tuple[CascadeNode, ...]
+    retained: tuple[CascadeNode, ...]
+
+
+def read_contains_parents(tx: ScopedTransaction, kp_ids: Sequence[str]) -> dict[str, list[tuple[str, str]]]:
+    """每个节点在草稿里的 ``CONTAINS`` 父节点 ``[(父 kp_id, 父名)]``；无父节点的不出现在结果里。
+
+    只统计 ``CONTAINS``：``PREREQUISITE`` 是学习顺序约束而非归属，不参与孤儿判定（ADR-092）。
+    """
+    if not kp_ids:
+        return {}
+    rows = tx.run(_TX_CONTAINS_PARENTS, {"kp_ids": list(kp_ids)})
+    parents: dict[str, list[tuple[str, str]]] = {}
+    for row in rows:
+        parents.setdefault(str(row["kp_id"]), []).append((str(row["parent_id"]), str(row["parent_name"])))
+    return parents
+
+
+def read_contains_reachable(tx: ScopedTransaction, kp_id: str) -> list[str]:
+    """从 ``kp_id`` 沿 ``CONTAINS`` 出边可达的全部草稿节点 ID（不含自身），带深度上限兜底。"""
+    rows = tx.run(_TX_CONTAINS_REACHABLE, {"kp_id": kp_id, "max_depth": CASCADE_MAX_DEPTH})
+    return [str(r["kp_id"]) for r in rows]
+
+
+def read_draft_nodes_by_id(tx: ScopedTransaction, kp_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
+    """按 ID 读草稿节点（**不按 V 过滤**）：级联范围内不可见的节点同样要删，否则会留下悬空边。"""
+    if not kp_ids:
+        return {}
+    return {str(r["p"]["kp_id"]): r["p"] for r in tx.run(_TX_NODES_ANY_VISIBILITY, {"kp_ids": list(kp_ids)})}
+
+
+def delete_draft_nodes(tx: ScopedTransaction, kp_ids: Sequence[str]) -> int:
+    """在一个事务里删除多个草稿节点及其全部草稿关系、关系身份与来源关联；返回删除的节点数。"""
+    if not kp_ids:
+        return 0
+    [row] = tx.run(_TX_DELETE_NODES_DRAFT, {"kp_ids": list(kp_ids), "types": list(RELATION_TYPES)})
+    return int(row["deleted"])
+
+
+def count_draft_relations_among(tx: ScopedTransaction, kp_ids: Sequence[str]) -> int:
+    """这些节点**内部**两个端点都在集合里的草稿关系去重条数。"""
+    if not kp_ids:
+        return 0
+    [row] = tx.run(_TX_COUNT_INTERNAL_DRAFT_RELATIONS,
+                   {"kp_ids": list(kp_ids), "types": list(RELATION_TYPES)})
+    return int(row["relations"])
+
+
+def count_draft_relations_to_outside(tx: ScopedTransaction, kp_ids: Sequence[str]) -> int:
+    """集合内节点与集合外节点之间的草稿关系去重条数（这些边在删除时同样会消失）。"""
+    if not kp_ids:
+        return 0
+    [row] = tx.run(_TX_COUNT_EXTERNAL_DRAFT_RELATIONS,
+                   {"kp_ids": list(kp_ids), "types": list(RELATION_TYPES)})
+    return int(row["relations"])
 
 
 # ---------------------------------------------------------------- SQLite

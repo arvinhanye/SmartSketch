@@ -599,6 +599,48 @@ class KnowledgePoint(BaseModel):
     source_refs: Optional[list[SourceRef]] = None
 
 
+class KnowledgePointDeletionNode(BaseModel):
+    id: Annotated[str, Field(description='知识点 ID')]
+    name: Annotated[str, Field(description='知识点名称，供确认弹窗直接展示')]
+    depth: Annotated[
+        int,
+        Field(
+            description='沿 `CONTAINS` 到被删根节点的最短距离；0 表示就是被点名的那个节点',
+            ge=0,
+        ),
+    ]
+    retained_parents: Annotated[
+        Optional[list[str]],
+        Field(
+            description='该节点在本次删除后仍保留的 `CONTAINS` 父节点名。仅当它还有子树外的父节点时才非空——\n有值时该节点**不会**被删除，列出原因供教师理解「为什么这个子节点留下了」。\n'
+        ),
+    ] = None
+
+
+class KnowledgePointDeletion(BaseModel):
+    root_id: Annotated[str, Field(description='被点名的知识点 ID')]
+    root_name: Annotated[str, Field(description='被点名的知识点名称')]
+    cascade: Annotated[
+        bool, Field(description='是否连带删除孤儿后代；预览接口始终按 true 计算')
+    ]
+    deleted_count: Annotated[
+        int, Field(description='会被删除的知识点总数，含根节点', ge=1)
+    ]
+    relation_count: Annotated[
+        int, Field(description='会一并删除的草稿关系条数，含与保留节点相连的那些', ge=0)
+    ]
+    nodes: Annotated[
+        list[KnowledgePointDeletionNode],
+        Field(description='会被删除的知识点，按 `depth` 再按 `name` 升序'),
+    ]
+    retained: Annotated[
+        list[KnowledgePointDeletionNode],
+        Field(
+            description='位于根节点可达范围内、但因仍有子树外 `CONTAINS` 父节点而**保留**的节点；\n与 `nodes[].retained_parents` 呼应，用于向教师解释级联边界。\n'
+        ),
+    ]
+
+
 class KnowledgePointRef(BaseModel):
     id: str
     name: str

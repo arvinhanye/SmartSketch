@@ -33,6 +33,8 @@ from app.repositories.neo4j import Neo4jRepository, RepositoryError
 from app.schemas.contracts import (
     KnowledgePoint,
     KnowledgePointCreate,
+    KnowledgePointDeletion,
+    KnowledgePointDeletionNode,
     KnowledgePointStatus,
     KnowledgePointType,
     KnowledgePointUnlock,
@@ -51,6 +53,11 @@ from app.services.graph.edit_node import (
     update_node,
 )
 from app.services.graph.delete_node import delete_node
+from app.services.graph.delete_node_cascade import (
+    DeletionImpact,
+    delete_node_cascade,
+    preview_deletion,
+)
 from app.services.graph.merge_nodes import merge_nodes
 from app.services.graph.relations import CycleDetectedError
 
@@ -113,8 +120,25 @@ def _run(request: Request, access: CourseAccess, operation: Any, status: int = 2
     return JSONResponse(status_code=status, content=node.model_dump(mode="json", exclude_none=True))
 
 
-# ---------------------------------------------------------------- PATCH body
+def _deletion_node(node: Any) -> KnowledgePointDeletionNode:
+    return KnowledgePointDeletionNode(id=node.kp_id, name=node.name, depth=node.depth,
+                                      retained_parents=list(node.retained_parents) or None)
 
+
+def _deletion_payload(impact: DeletionImpact) -> KnowledgePointDeletion:
+    """服务层的 ``DeletionImpact`` → 契约 DTO（ADR-092）。"""
+    return KnowledgePointDeletion(
+        root_id=impact.root_id,
+        root_name=impact.root_name,
+        cascade=impact.cascade,
+        deleted_count=impact.deleted_count,
+        relation_count=impact.relation_count,
+        nodes=[_deletion_node(node) for node in impact.nodes],
+        retained=[_deletion_node(node) for node in impact.retained],
+    )
+
+
+# ---------------------------------------------------------------- PATCH body
 
 def _is_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
@@ -222,14 +246,41 @@ def merge_knowledge_points(
 
 
 @router.delete("/kp/{kid}", operation_id="deleteKnowledgePoint", status_code=204, response_class=Response,
-               responses={**_ERRORS, 404: {"model": Error}})
+               responses={**_ERRORS, 404: {"model": Error}, 200: {"model": KnowledgePointDeletion,
+                                                                  "description": "`cascade=true` 时返回删除报告"}})
 def delete_knowledge_point(
     request: Request,
     kid: str,
     expected_revision: int | None = Query(None, ge=1),
+    cascade: bool = Query(False),
     access: CourseAccess = Depends(course_teacher),
 ) -> Response:
-    def operation(ctx: EditContext) -> None:
-        delete_node(ctx, access.course.id, kid, expected_revision)
+    """F09 删除（ADR-048）；`cascade=true` 时连同会变成孤儿的后代一起删（ADR-092）。
 
-    return _run(request, access, operation, status=204)
+    缺省 `cascade=false` 保持原样：只删该节点，204 无响应体，既有客户端不受影响。
+    `cascade=true` 返回 200 与删除报告，报告内容与 `getKnowledgePointDeleteImpact` 的预览一致。
+    """
+    if not cascade:
+        def operation(ctx: EditContext) -> None:
+            delete_node(ctx, access.course.id, kid, expected_revision)
+
+        return _run(request, access, operation, status=204)
+
+    def cascading(ctx: EditContext) -> KnowledgePointDeletion:
+        return _deletion_payload(delete_node_cascade(ctx, access.course.id, kid, expected_revision))
+
+    return _run(request, access, cascading)
+
+
+@router.get("/kp/{kid}/delete-impact", operation_id="getKnowledgePointDeleteImpact",
+            response_model=KnowledgePointDeletion, responses={**_ERRORS, 404: {"model": Error}})
+def get_knowledge_point_delete_impact(
+    request: Request,
+    kid: str,
+    access: CourseAccess = Depends(course_teacher),
+) -> Response:
+    """只读预览 `cascade=true` 的删除影响（ADR-092），供前端在确认前展示。"""
+    def operation(ctx: EditContext) -> KnowledgePointDeletion:
+        return _deletion_payload(preview_deletion(ctx, access.course.id, kid))
+
+    return _run(request, access, operation)

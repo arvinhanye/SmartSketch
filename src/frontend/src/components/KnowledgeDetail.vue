@@ -28,13 +28,17 @@ const props = withDefaults(
     documentNames?: Record<string, string>
     /** 工作台已有「返回课程」时隐藏重复关闭入口；其他调用保持原行为 */
     showClose?: boolean
+    /** 教师端才为 true：渲染「删除此知识点」入口（F09 扩展，ADR-092） */
+    allowDelete?: boolean
   }>(),
-  { documentNames: () => ({}), showClose: true },
+  { documentNames: () => ({}), showClose: true, allowDelete: false },
 )
 
 const emit = defineEmits<{
   locateSource: [location: SourceLocation]
   selectKnowledgePoint: [kpId: string]
+  /** 教师点击删除：由页面打开确认弹窗并取删除影响预览（ADR-092） */
+  delete: [kpId: string]
   close: []
   courseForbidden: []
 }>()
@@ -121,6 +125,17 @@ watch(detail, async (next) => {
           <span> · 层级 {{ detail.level }}</span>
         </p>
         <p v-if="detail.aliases.length" data-test="kd-aliases">别名：{{ detail.aliases.join('、') }}</p>
+        <!-- 删除入口只在教师端出现（allowDelete）；学生端不渲染，避免给出无法完成的动作 -->
+        <button
+          v-if="allowDelete"
+          type="button"
+          class="knowledge-detail__danger"
+          data-test="kd-delete"
+          :disabled="busy"
+          @click="emit('delete', detail.id)"
+        >
+          删除此知识点
+        </button>
       </header>
 
       <section :aria-labelledby="`${titleId}-definition`">
@@ -193,6 +208,12 @@ watch(detail, async (next) => {
   position: absolute;
   top: 8px;
   right: 8px;
+}
+
+.knowledge-detail__danger {
+  align-self: flex-start;
+  margin-top: 4px;
+  color: var(--ss-danger, #c62828);
 }
 
 .knowledge-detail__meta {
