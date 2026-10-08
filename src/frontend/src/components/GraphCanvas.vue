@@ -235,12 +235,12 @@ onBeforeUnmount(() => {
     <div v-if="enhanced" ref="controls" class="gw-map" role="group" aria-label="地图与缩放">
       <div v-show="miniOpen" ref="mini" class="gw-mini" aria-hidden="true" />
       <div class="gw-map__ctl">
-        <button type="button" class="gw-tool" :aria-label="miniOpen ? '收起小地图' : '展开小地图'" :aria-pressed="miniOpen" @click="miniOpen = !miniOpen">
+        <button type="button" class="gw-tool" :aria-label="miniOpen ? '收起小地图' : '展开小地图'" :title="audience === 'student' ? (miniOpen ? '收起小地图' : '展开小地图') : undefined" :aria-pressed="miniOpen" @click="miniOpen = !miniOpen">
           <AppIcon name="map" />
         </button>
-        <button type="button" class="gw-tool" aria-label="放大" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
-        <button type="button" class="gw-tool" aria-label="缩小" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
-        <button type="button" class="gw-tool" aria-label="适应画布" @click="fitAll"><AppIcon name="fit" /></button>
+        <button type="button" class="gw-tool" aria-label="放大" :title="audience === 'student' ? '放大' : undefined" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
+        <button type="button" class="gw-tool" aria-label="缩小" :title="audience === 'student' ? '缩小' : undefined" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
+        <button type="button" class="gw-tool" aria-label="适应画布" :title="audience === 'student' ? '适应画布' : undefined" @click="fitAll"><AppIcon name="fit" /></button>
       </div>
     </div>
     <div v-if="tip" class="gw-tip" role="tooltip" :style="{ left: `${tip.x + 14}px`, top: `${tip.y + 14}px` }">{{ tip.text }}</div>

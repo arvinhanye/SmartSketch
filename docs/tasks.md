@@ -1964,3 +1964,9 @@ LOGIN-EDITORIAL 验收：密码显隐先 RED（缺少按钮）后 GREEN；H13/AD
 - LOGIN-NOTICE：DONE；负责人 Codex；用户要求未登录提示浮动在欢迎回来上方，不挤压下方内容。根因是 App 主容器的正常流提示占据高度；输入为守卫提示码，输出为仅登录表单的可关闭绝对定位提示。其他页面提示保持；不改后端。验收为显示/关闭前后标题坐标相同、宽屏与窄矮屏提示可见可关闭、H13/ADR079、类型/构建/basic。
 
 LOGIN-NOTICE 验收：浏览器先 RED（关闭提示标题上移 21.59px），后 GREEN。六种桌面/平板/手机/矮窗口显示与关闭前后标题和输入框位移均 0px，提示可见可关闭、在标题上方且无横向溢出；H13/ADR079 44 PASS、type-check/build/basic PASS。交接 docs/handoffs/codex-login-notice.md；后端未改，本地保存不推送。
+
+## 2026-10-08 Codex：学生图谱与问答体验
+- STUDENT-WORKSPACE：DONE；负责人 Codex。输入为用户三项学生端调整及教师端预览要求；输出为按钮悬停说明、可拖动/键盘调宽分隔条、浅色问答页、独立教师图谱预览图片。教师图谱实际页面和后端不修改。
+- 默认侧栏 25%，最小 280px，画布至少 640px；窄屏沿用抽屉。依赖现有 G6 resize 与路由/API；风险为拖动越界、窄屏、聊天文本对比度。验证 H11/图谱工作区/问答相关测试、type-check/build/basic、浏览器拖动与主题检查。
+
+STUDENT-WORKSPACE 验收：DONE。H11/外壳 52 PASS；图谱工作区/组件/问答 32 PASS（一次并发超时后独立重跑通过）；type-check/build/basic PASS。实际学生课程三个宽度拖动/键盘/恢复/抽屉与浅色问答检查 PASS；假问答两个宽度引用、代码对比度、未覆盖/故障检查 PASS。教师实际页面、后端和数据未改；交接 docs/handoffs/codex-student-workspace.md。

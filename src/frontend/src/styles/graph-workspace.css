@@ -17,7 +17,7 @@
 .graph-workspace :focus-visible { outline: 2px solid var(--gw-accent); outline-offset: 2px; }
 
 /* ---------- 工作区 */
-.graph-workspace.gw { position: relative; flex: 1; min-width: 0; display: grid; grid-template-columns: 35% minmax(0, 1fr); background: var(--gw-canvas); border-radius: var(--ss-radius-md); overflow: visible; box-shadow: 0 1px 2px rgb(0 0 0 / 24%); animation: gw-in 180ms var(--ss-ease); font-size: 14px; }
+.graph-workspace.gw { position: relative; flex: 1; min-width: 0; display: grid; grid-template-columns: var(--gw-panel-width, 25%) minmax(0, 1fr); background: var(--gw-canvas); border-radius: var(--ss-radius-md); overflow: visible; box-shadow: 0 1px 2px rgb(0 0 0 / 24%); animation: gw-in 180ms var(--ss-ease); font-size: 14px; }
 .graph-workspace.gw.is-collapsed { grid-template-columns: minmax(0, 1fr); }
 .graph-workspace.gw.is-overlay { grid-template-columns: minmax(0, 1fr); }
 .graph-workspace .gw-panel { background: var(--gw-panel); border-right: 1px solid var(--gw-line); display: flex; flex-direction: column; min-width: 0; overflow: visible;  align-self: start; min-height: calc(100dvh - 68px);}
@@ -291,3 +291,9 @@
 .graph-workspace .knowledge-detail li, .graph-workspace .knowledge-detail li > button { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 
 .graph-workspace .student-graph__learning, .graph-workspace .student-graph__mastery { grid-template-columns: minmax(0, 1fr); }
+
+/* 学生并置面板的可访问调宽手柄，不占用第三个网格列。 */
+.graph-workspace .gw-divider { position: absolute; z-index: 12; top: 0; bottom: 0; left: calc(var(--gw-panel-width, 25%) - 5px); width: 10px; cursor: col-resize; touch-action: none; user-select: none; }
+.graph-workspace .gw-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; transition: background 120ms; }
+.graph-workspace .gw-divider:is(:hover,:focus-visible,.is-dragging)::after { background: var(--gw-accent); }
+.graph-workspace .gw-divider:focus-visible { outline-offset: -2px; }

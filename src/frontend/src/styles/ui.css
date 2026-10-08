@@ -218,7 +218,14 @@
 .light-surface .teacher-graph__panel :is(.node-editor__field,.node-creator__field) { display: grid; gap: 8px; margin-top: 16px; }
 .light-surface .teacher-graph__panel label { font-size: 13px; color: var(--gw-text-2); }
 .light-surface .teacher-graph__panel textarea { resize: vertical; }
-/* Course Q&A retains its distinct dark conversation workspace. */
+/* Course Q&A uses the same light content palette as the course pages. */
+.ui-chat-workspace {
+ --ss-bg: #f8f9fb; --ss-panel: #fff; --ss-raised: #f4f5f7;
+ --ss-hover: #eaecf1; --ss-line: #d2d5de; --ss-edge: #747a87;
+ --ss-text: #20232a; --ss-text-2: #4e5665; --ss-text-3: #636c7b;
+ --ss-link: #5145cd; --ss-selected: #e9e6fa;
+ --ss-warn: #8a5a10; --ss-warn-bg: #fdf4e3; --ss-danger: #8f2323; --ss-ok: #1f6b3a;
+}
 .app--graph .ui-chat-workspace { flex: 1; min-width: 0; border: 1px solid var(--ss-line); border-radius: 10px; background: var(--ss-panel); color: var(--ss-text); padding: 32px; --color-text: var(--ss-text); --color-text-muted: var(--ss-text-2); --color-primary: var(--ss-primary); --color-primary-hover: var(--ss-link); --color-primary-soft: var(--ss-selected); --color-surface: var(--ss-raised); --color-surface-muted: var(--ss-raised); --color-border: var(--ss-edge); --color-warning-bg: var(--ss-warn-bg); --color-warning-border: var(--ss-warn); --color-warning-text: var(--ss-warn); }
 .ui-chat-workspace .chat__header { border-bottom: 1px solid var(--ss-line); padding-bottom: 24px; margin-bottom: 16px; }
 .ui-chat-workspace .chat__header h2 { color: var(--ss-text); font-size: 24px; }
