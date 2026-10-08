@@ -33,9 +33,17 @@ const state = useVersions({
     <p v-if="state.status.value === 'not_teacher'" data-test="vp-not-teacher" role="status">只有本课程教师可以发布或回滚。</p>
     <p v-if="state.status.value === 'error' && !state.course.value" role="alert">{{ state.error.value }}</p>
     <template v-if="state.course.value">
+      <div class="version-panel__summary">
       <p data-test="vp-current">
         {{ state.currentVersion.value === null ? '学生当前尚无可见的发布版本。' : `学生当前看到 v${state.currentVersion.value}。` }}
       </p>
+      <div class="version-panel__actions">
+        <button type="button" data-test="vp-publish" :disabled="state.busy.value !== null || state.stale.value" @click="state.publish">
+          {{ state.busy.value === 'publish' ? '正在发布…' : '发布当前草稿' }}
+        </button>
+        <button type="button" data-test="vp-refresh" :disabled="state.busy.value !== null || state.refreshing.value" @click="state.reload">刷新状态</button>
+      </div>
+      </div>
       <p v-if="state.course.value.status === 'revising' && state.currentVersion.value !== null" data-test="vp-revising" role="status">
         草稿修订中，学生仍看到 v{{ state.currentVersion.value }}，直到新版本发布成功。
       </p>
@@ -45,12 +53,6 @@ const state = useVersions({
         <li v-for="line in state.blockedReasons.value" :key="line">{{ line }}</li>
       </ul>
       <p v-if="state.refreshing.value" role="status">正在核对发布状态…</p>
-      <div class="version-panel__actions">
-        <button type="button" data-test="vp-publish" :disabled="state.busy.value !== null || state.stale.value" @click="state.publish">
-          {{ state.busy.value === 'publish' ? '正在发布…' : '发布当前草稿' }}
-        </button>
-        <button type="button" data-test="vp-refresh" :disabled="state.busy.value !== null || state.refreshing.value" @click="state.reload">刷新状态</button>
-      </div>
       <p v-if="state.history.value.length === 0" data-test="vp-empty" role="status">尚无历史发布版本。</p>
       <ol v-else class="version-panel__history">
         <li v-for="item in state.history.value" :key="item.version" data-test="vp-version">

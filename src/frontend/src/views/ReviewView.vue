@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
@@ -71,9 +72,9 @@ const {
 } = review
 
 const EMPTY_TEXT: Record<ReviewItemKind, string> = {
-  low_confidence_relation: '没有低置信度关系。AI 抽取的关系都已达到置信度要求或已处理。',
-  suspected_duplicate: '没有疑似重复的知识点。',
-  isolated_node: '没有孤立知识点，每个知识点都至少有一条关系。',
+  low_confidence_relation: '当前没有待审核的关系。',
+  suspected_duplicate: '未发现需要合并的重复条目。',
+  isolated_node: '没有待处理的孤立条目。',
 }
 
 const RELATION_TYPE_LABELS: Record<string, string> = {
@@ -122,15 +123,12 @@ function otherName(pair: SuspectedDuplicate): string {
 
 <template>
   <PageSheet class="review ui-management" data-test="review-page" labelledby="review-title" :aria-busy="status === 'loading'">
-    <PageHeader id="review-title" title="审核与发布" description="检查待处理条目，整理草稿，再发布给学生。" />
-    <p v-if="courseName" class="review__course">课程：{{ courseName }}<span v-if="status === 'ready'"> · 处理的是草稿，发布后学生才看到</span></p>
-    <p v-if="courseId">
-      <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
-      <template v-if="hasGraphRoute">
-        ·
-        <RouterLink data-test="rv-graph-link" :to="{ name: TEACHER_GRAPH_ROUTE, params: { cid: courseId } }">编辑图谱</RouterLink>
+    <PageHeader id="review-title" title="审核与发布" :description="courseName ? `${courseName} · 检查草稿后发布给学生。` : '检查待处理条目，整理草稿，再发布给学生。'">
+      <template #actions>
+        <RouterLink v-if="courseId" class="ui-btn" :to="{ name: COURSE_ROUTE, params: { cid: courseId } }"><AppIcon name="back" :size="16" />返回课程</RouterLink>
+        <RouterLink v-if="courseId && hasGraphRoute" class="ui-btn" data-test="rv-graph-link" :to="{ name: TEACHER_GRAPH_ROUTE, params: { cid: courseId } }"><AppIcon name="graph" :size="16" />编辑图谱</RouterLink>
       </template>
-    </p>
+    </PageHeader>
 
     <p v-if="status === 'loading'" data-test="rv-loading" role="status">正在加载审核队列…</p>
 
@@ -155,18 +153,11 @@ function otherName(pair: SuspectedDuplicate): string {
         {{ refreshError }}
         <button type="button" data-test="rv-refresh-retry" @click="review.refresh">重新加载</button>
       </p>
-      <p v-if="allEmpty" data-test="rv-all-empty" role="status">审核队列已清空，可以直接发布。</p>
+      <p v-if="allEmpty" class="review__ready" data-test="rv-all-empty" role="status"><AppIcon name="check" :size="18" />审核队列已清空，可以直接发布。</p>
       <p v-else class="review__hint">队列不阻塞发布：发布时只排除低置信度关系，疑似重复与孤立知识点仅作提示。</p>
 
 
       <div class="ui-review-inbox">
-      <nav class="review__summary" aria-label="审核栏目">
-        <a v-for="kind in REVIEW_KINDS" :key="kind" :href="`#rv-${kind}`" :data-test="`rv-total-${kind}`">
-          {{ KIND_LABELS[kind] }}（{{ count(kind) }}）
-        </a>
-      </nav>
-      <div class="ui-review-content">
-
       <section
         v-for="kind in REVIEW_KINDS"
         :id="`rv-${kind}`"
@@ -175,7 +166,7 @@ function otherName(pair: SuspectedDuplicate): string {
         :data-test="`rv-column-${kind}`"
         :aria-labelledby="`rv-heading-${kind}`"
       >
-        <h3 :id="`rv-heading-${kind}`">{{ KIND_LABELS[kind] }}（{{ count(kind) }}）</h3>
+        <h3 :id="`rv-heading-${kind}`" :data-test="`rv-total-${kind}`"><span>{{ KIND_LABELS[kind] }}</span><span class="review__count">（{{ count(kind) }}）</span></h3>
 
         <p v-if="count(kind) === 0 && loadedCount(kind) === 0" :data-test="`rv-empty-${kind}`" role="status">
           {{ EMPTY_TEXT[kind] }}
@@ -306,7 +297,6 @@ function otherName(pair: SuspectedDuplicate): string {
         </div>
         <p v-if="moreError?.kind === kind" :data-test="`rv-more-error-${kind}`" role="alert">{{ moreError.message }}</p>
       </section>
-      </div>
       </div>
       <VersionPanel v-if="courseId" :course-id="courseId" @forbidden="leaveForbidden" />
     </template>

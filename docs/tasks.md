@@ -1939,3 +1939,9 @@ MODEL-DISCOVERY 验收：后端发现/原配置/出站回归 74 PASS；全量前
 MATERIALS-LAYOUT 验收：H02/H09/H14 共 173 PASS，type-check/build PASS；2559/1440/1280/768/390 五宽度 × 空态/有资料十组浏览器检查通过，包含文件选择键盘焦点与超长文件名；git diff --check PASS。修改前快照 c89b0df，当前排版修改保留为可审查工作树，交接 `docs/handoffs/codex-materials-layout.md`。
 
 MATERIALS-LAYOUT 后续调整：依用户要求删掉右侧说明和分隔线，上传区域使用全宽单栏；清理对应样式。五宽度十组浏览器检查与 type-check PASS。
+## 2026-10-08 Codex：审核页面去重与排版
+
+- REVIEW-LAYOUT：DONE；负责人 Codex；用户指出三类审核标题显示两次。根因是栏目导航与内容标题重复。输出为一次展示的三类卡片、紧凑页头与发布区；沿用审核/合并/发布/回滚接口与逻辑。
+- 先写重复标题回归（RED：每类出现两次）；验收 H09/H10/H14、类型/构建、宽屏/手机空态和非空页面。沿用户要求保存修改前上传布局为本地版本，再修改审核页面。
+
+REVIEW-LAYOUT 验收：去重回归先 RED（两次）后 GREEN（一次）；H09/H10/H14 共 98 PASS；type-check/build PASS；五宽度 × 空/非空十组浏览器 PASS，含合并面板、回滚确认和无溢出检查。修改前版本 4d9db5b；交接 `docs/handoffs/codex-review-layout.md`，当前排版修改保留工作树，未推送。
