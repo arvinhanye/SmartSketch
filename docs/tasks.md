@@ -1988,3 +1988,8 @@ TEACHER-GRAPH-VIEWPORT 验收：实际1440×900浏览器先复现页面1052→14
 - GRAPH-CONTROL-HINTS：DONE；负责人 Codex。教师右下角四个按钮补齐浏览器原生延迟悬停说明，小地图名称随展开状态更新；学生既有提示与按钮行为保留，无后端修改。验证增强画布现有测试及真实教师/学生页面的四个提示和地图切换。
 
 GRAPH-CONTROL-HINTS 验收：增强画布12项、type-check/build及verify.sh basic通过（退出0）；真实教师与学生页面四个原生title及小地图状态文字检查通过。交接docs/handoffs/codex-graph-control-hints.md；与此前改动一起推送并开PR。
+
+## 2026-10-08 教师图谱圆角卡片
+- TEACHER-GRAPH-CARDS：DONE；负责人 Codex。按用户三张参考图改独立圆角左侧卡片、搜索图标/分段布局切换和工具栏新建入口，保留面板调宽、有限视口、全部编辑字段与守卫。不改学生或后端。验证H05/H07/H14、类型/构建/basic和五尺寸浏览器回归。
+
+TEACHER-GRAPH-CARDS 验收：H05/H07/H14 153 PASS、type-check/build/basic退出0；真实课程与独立假API浏览器五尺寸通过，最终紧凑字段样式后长表单回归再次五尺寸通过。真实页面验证圆角三卡片、工具栏唯一新建入口与原有表单可打开。手机固定页签遮挡关闭问题已修复并复核；后端与学生未修改。交接docs/handoffs/codex-teacher-graph-cards.md；只保存本地提交，暂未推送本次改动。

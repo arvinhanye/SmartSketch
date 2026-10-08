@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PageSheet from '../components/PageSheet.vue'
+import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRouter } from 'vue-router'
@@ -311,7 +312,13 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             compact
             @clear="filters.clear"
             @locate="onLocate"
-          />
+          >
+            <template #actions>
+              <button type="button" class="teacher-graph__create" data-test="tg-create-open" :aria-pressed="tab === 'create'" @click="openCreator">
+                <AppIcon name="plus" /> 新建知识点
+              </button>
+            </template>
+          </GraphToolbar>
           <p v-if="searchNotice" data-test="tg-search-notice" role="status">{{ searchNotice }}</p>
         </aside>
 
@@ -361,14 +368,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             >
               {{ item.label }}
             </button>
-            <button
-              type="button"
-              data-test="tg-create-open"
-              :aria-pressed="tab === 'create' ? 'true' : 'false'"
-              @click="openCreator"
-            >
-              新建知识点
-            </button>
+
           </div>
 
           <div

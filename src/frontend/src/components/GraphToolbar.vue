@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
+import AppIcon from './AppIcon.vue'
 import {
   NODE_TYPE_LABELS,
   RELATION_TYPE_ORDER,
@@ -128,6 +129,8 @@ const summaryText = computed(() => {
     aria-label="图谱筛选"
     :aria-orientation="vertical ? 'vertical' : 'horizontal'"
   >
+    <div class="graph-toolbar__search-wrap" :class="{ 'graph-toolbar__search-wrap--icon': compact }">
+    <AppIcon v-if="compact" name="search" :size="16" />
     <input
       class="graph-toolbar__search"
       type="search"
@@ -137,6 +140,7 @@ const summaryText = computed(() => {
       @keydown.enter.prevent="emit('locate', ($event.target as HTMLInputElement).value)"
       @input="onQuery"
     />
+    </div>
 
     <fieldset class="graph-toolbar__group" data-test="relation-legend">
       <legend>关系</legend>
@@ -164,7 +168,7 @@ const summaryText = computed(() => {
 
     <!-- L13-3：不常用的筛选默认收起，给画布留出空间；关系图例与按关系筛选常显（验收要求） -->
     <details class="graph-toolbar__advanced" data-test="gt-advanced">
-      <summary>{{ compact ? '筛选' : '更多筛选（类型、状态、章节）' }}</summary>
+      <summary><AppIcon v-if="compact" name="filter" :size="16" />{{ compact ? '筛选' : '更多筛选（类型、状态、章节）' }}</summary>
     <div class="graph-toolbar__advanced-content">
     <fieldset class="graph-toolbar__group">
       <legend>知识点类型</legend>
@@ -221,6 +225,8 @@ const summaryText = computed(() => {
 
     <button type="button" data-test="clear" :disabled="!canClear" @click="emit('clear')">清空筛选</button>
 
+    <slot name="actions" />
+
     <p class="graph-toolbar__summary" data-test="summary" aria-live="polite">
       {{ summaryText }}
       <span v-if="selectedHidden">选中的知识点已被筛选隐藏。</span>
@@ -238,6 +244,9 @@ const summaryText = computed(() => {
 }
 
 .graph-toolbar__advanced-content { display: contents; }
+.graph-toolbar__search-wrap { min-width: 0; }
+.graph-toolbar__search-wrap--icon { position: relative; }
+.graph-toolbar__search-wrap--icon > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--color-text-muted); }
 
 .graph-toolbar__advanced summary {
   cursor: pointer;
