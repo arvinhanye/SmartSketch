@@ -561,12 +561,13 @@ def _persist_stage(
         try:
             with connect(sqlite_url) as database:
                 row = database.execute(
-                    "SELECT stage, t6_seq, lease_token FROM processing_tasks WHERE id=? AND course_id=?",
+                    "SELECT stage, t6_seq, lease_token, attempt FROM processing_tasks WHERE id=? AND course_id=?",
                     (lease.task_id, lease.course_id),
                 ).fetchone()
         except sqlite3.Error:
             return None
-        return row is not None and row[0] in ('awaiting_review', 'completed') and row[1] == t6_seq and row[2] is None
+        return (row is not None and row[0] in ('awaiting_review', 'completed')
+                and row[1] == t6_seq and row[2] is None and row[3] == lease.attempt)
 
     def success() -> PersistOutcome:
         return PersistOutcome(PersistStatus.ADVANCED, lease.task_id, 'awaiting_review', nodes=written.nodes,

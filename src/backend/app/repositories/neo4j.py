@@ -21,6 +21,7 @@ from neo4j.exceptions import AuthError, DriverError, Neo4jError, ServiceUnavaila
 
 from app.config import Settings
 from app.repositories.persist_transport import AsyncDriverFactory, PersistTransport, TransportTimeout
+from app.repositories.task_leases import LeaseLost
 
 
 class GraphScopeError(ValueError):
@@ -299,7 +300,15 @@ class Neo4jRepository:
             cleanup_timeout=self._persist_cleanup_timeout)
         primary = False
         try:
-            transport.open()
+            try:
+                transport.open()
+            except (LeaseLost, TransportTimeout):
+                raise
+            except Exception:
+                # Driver startup may raise ValueError for DNS resolution. Keep
+                # addresses out of logs and classify startup as retryable without
+                # changing business exceptions raised by the yielded body.
+                raise RepositoryConnectionError() from None
             yield PersistTransaction(transport, scope)
         except BaseException as exc:
             primary = True

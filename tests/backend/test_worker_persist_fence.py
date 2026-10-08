@@ -582,3 +582,44 @@ def test_real_heartbeat_callers_stop_without_reviving_guard(task, monkeypatch, o
     guard.renewed(100)
     with pytest.raises(task_leases.LeaseLost):
         guard.check()
+
+
+def test_real_dns_start_failure_releases_for_retry_without_address_logging(task, worker_graph, monkeypatch, caplog):
+    import socket
+    from neo4j import AsyncGraphDatabase
+    def fail_dns(*args, **kwargs):
+        raise socket.gaierror(socket.EAI_NONAME, 'fixture lookup failed')
+    monkeypatch.setattr(socket, 'getaddrinfo', fail_dns)
+    repo = Neo4jRepository(SimpleNamespace(), persist_driver_factory=lambda: AsyncGraphDatabase.driver(
+        'bolt://private-host-fixture.invalid:7687', auth=('fixture-user', 'private-token')))
+    outcome = run_worker(task, repo)
+    assert outcome.status is persist_graph.PersistStatus.RELEASED
+    assert task_state(task) == ('persisting', None, None)
+    assert 'private-host' not in caplog.text and 'private-token' not in caplog.text
+
+
+def test_rolled_back_t6_does_not_recognize_new_attempt_same_sequence(task, worker_graph, monkeypatch):
+    url, lease = task
+    graph, repo = worker_graph
+    original_fence = persist_graph.persist_transaction
+    @contextmanager
+    def rollback_before_commit(*args, **kwargs):
+        with original_fence(*args, **kwargs) as db:
+            yield db
+            raise sqlite3.OperationalError('fixture rollback before SQLite COMMIT')
+    monkeypatch.setattr(persist_graph, 'persist_transaction', rollback_before_commit)
+    original_release = course_locks.release
+    new_attempts = []
+    def finish_new_owner(*args):
+        original_release(*args)
+        with connect(url) as db:
+            db.execute('UPDATE processing_tasks SET lease_expires_at=unixepoch()-1 WHERE id=?', (lease.task_id,))
+        successor = task_leases.claim_next(url, owner='next-worker', lease_seconds=60, max_attempts=3)
+        assert successor and successor.attempt == lease.attempt + 1
+        new_attempts.append(successor)
+        assert persist_graph._t6(url, successor) == 1
+    monkeypatch.setattr(course_locks, 'release', finish_new_owner)
+    outcome = run_worker(task, repo)
+    assert new_attempts and graph.commits == 1
+    assert outcome.status is persist_graph.PersistStatus.LOST
+    assert task_state(task) == ('awaiting_review', None, 1)

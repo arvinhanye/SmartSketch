@@ -181,3 +181,18 @@ def test_exit_error_preserves_primary_lease_loss():
         with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1):
             raise LeaseLost('lost')
     assert not fake.open_resources
+
+
+def test_real_driver_dns_start_failure_is_redacted(monkeypatch):
+    import socket
+    from neo4j import AsyncGraphDatabase
+    def fail_dns(*args, **kwargs):
+        raise socket.gaierror(socket.EAI_NONAME, 'fixture lookup failed')
+    monkeypatch.setattr(socket, 'getaddrinfo', fail_dns)
+    repo = Neo4jRepository(SimpleNamespace(), persist_driver_factory=lambda: AsyncGraphDatabase.driver(
+        'bolt://private-host-fixture.invalid:7687', auth=('fixture-user', 'private-token')))
+    with pytest.raises(RepositoryConnectionError) as caught:
+        with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1):
+            pass
+    assert str(caught.value) == 'NEO4J_CONNECTION_FAILED'
+    assert 'private-host' not in str(caught.value) and 'private-token' not in str(caught.value)

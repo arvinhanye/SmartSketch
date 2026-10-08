@@ -201,7 +201,7 @@ def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None,
     def database(*args, **kwargs):
         if kwargs.get("on_acquired"):
             kwargs["on_acquired"](time.monotonic())
-        yield SimpleNamespace(execute=lambda *a: SimpleNamespace(fetchone=lambda: ('awaiting_review', 1, None)))
+        yield SimpleNamespace(execute=lambda *a: SimpleNamespace(fetchone=lambda: ('awaiting_review', 1, None, 1)))
 
     monkeypatch.setattr(persist_graph, "persist_transaction", database)
     monkeypatch.setattr(persist_graph, "connect", database)
