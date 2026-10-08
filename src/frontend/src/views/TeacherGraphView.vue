@@ -116,7 +116,12 @@ function onLocate(query: string): void {
 const pickerOptions = computed(() => nodePickerOptions(graph.value))
 function onPick(event: Event): void {
   const value = (event.target as HTMLSelectElement).value
-  guard.request(value === '' ? null : value)
+  // 选中后画布聚焦到该知识点（与搜索定位一致），否则下拉选择与画布不同步；有未保存修改时确认后才聚焦
+  guard.request(value === '' ? null : value, { then: (target) => target !== null && canvas.value?.focus(target) })
+}
+// 详情里的关联知识点链接同样要让画布跟随
+function onSelectRelated(kpId: string | null): void {
+  guard.request(kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
 }
 
 // L11：新建知识点（ADR-035：必带来源，来源取自当前选中知识点）
@@ -137,6 +142,10 @@ function openCreator(): void {
 }
 watch(selected, () => {
   if (tab.value === 'create' && creator.success.value === null) void creator.open()
+})
+// 进入「编辑关系」时，已选中的知识点直接作为起点（不必在图上或下拉里再选一遍）
+watch(tab, (next) => {
+  if (next === 'relations' && relations.fromId.value === null && selected.value !== null) relations.pickNode(selected.value)
 })
 
 /** 画布点击：关系页签下用于依次点选起点、终点；其余页签切换当前知识点 */
@@ -323,16 +332,18 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         </aside>
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
-          <p class="teacher-graph__hint">
-            {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
-          </p>
-          <label class="teacher-graph__picker">
-            选择知识点
-            <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
-              <option value="">（未选择）</option>
-              <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
-          </label>
+          <div class="teacher-graph__canvas-bar">
+            <p class="teacher-graph__hint">
+              {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
+            </p>
+            <label class="teacher-graph__picker">
+              选择知识点
+              <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
+                <option value="">（未选择）</option>
+                <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+              </select>
+            </label>
+          </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
           <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" :enhanced="!layoutError" :positions="positions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
@@ -392,7 +403,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             <KnowledgeDetail
               v-if="selected !== null"
               :kp-id="selected"
-              @select-knowledge-point="guard.request"
+              @select-knowledge-point="onSelectRelated"
               @close="guard.request(null)"
               @course-forbidden="leaveForbidden"
             />

@@ -158,7 +158,7 @@ const entryLinks = computed(() => {
    <CourseOverview v-else-if="current" :current="current" :next-step="nextStep?.text ?? null" :next-link="nextLink" :links="entryLinks" />
   </section>
   <section class="ui-list-region" data-test="course-list-region" aria-labelledby="course-list-title" :aria-busy="listStatus === 'loading'">
-   <div class="ui-section-heading"><h3 id="course-list-title">{{ courseId ? '其他课程' : '课程列表' }}</h3><span v-if="listStatus === 'ready'" class="ui-muted">{{ courses.length }} 门课程</span></div>
+   <div class="ui-section-heading"><h3 id="course-list-title">{{ courseId ? '全部课程' : '课程列表' }}</h3><span v-if="listStatus === 'ready'" class="ui-muted">{{ courses.length }} 门课程</span></div>
    <div v-if="listStatus === 'loading'" data-test="courses-loading" class="ui-state" role="status"><p>正在加载课程…</p><div v-for="i in 3" :key="i" class="ui-skeleton" aria-hidden="true" /></div>
    <p v-else-if="listStatus === 'forbidden'" data-test="courses-forbidden" class="ui-notice ui-notice--danger" role="alert">{{ listError }}</p>
    <div v-else-if="listStatus === 'error'" class="ui-state"><p data-test="courses-error" role="alert">{{ listError }}</p><button type="button" class="ui-btn" data-test="courses-retry" @click="loadCourses">重试</button></div>

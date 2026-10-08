@@ -41,3 +41,25 @@ describe('模型设置分区与可访问性',()=>{
   resolve();await flushPromises();expect(wrapper.get('[data-test="mc-status"]').text()).toContain('尚未配置')
  })
 })
+
+describe('模型设置文案随角色变化（学生不能上传资料，也没有向量设置）',()=>{
+ async function viewAs(role:'student'|'teacher'){
+  const pinia=createPinia();setActivePinia(pinia)
+  useSessionStore(pinia).signIn({access_token:'test-token',token_type:'bearer',expires_in:3600,user:{id:'u1',username:role,role}})
+  const api:ModelConfigApi={get:async()=>({runtime_mode:'personal',configured:false}),save:async()=>SAVED,clear:async()=>undefined,test:async()=>({ok:true,latency_ms:1})}
+  const wrapper=mount(ModelSettingsView,{global:{plugins:[pinia],provide:{[MODEL_CONFIG_API_KEY as symbol]:api}}});await flushPromises();return wrapper
+ }
+ it('学生只看到课程问答用途，没有上传/图谱生成措辞',async()=>{
+  const wrapper=await viewAs('student')
+  const text=wrapper.text()
+  expect(text).toContain('用于课程问答')
+  expect(wrapper.get('[data-test="mc-status"]').text()).toContain('向课程助教提问')
+  expect(text).not.toContain('上传资料')
+  expect(text).not.toContain('图谱生成')
+ })
+ it('教师保留图谱生成与问答用途',async()=>{
+  const wrapper=await viewAs('teacher')
+  expect(wrapper.text()).toContain('用于知识图谱生成与课程问答')
+  expect(wrapper.get('[data-test="mc-status"]').text()).toContain('上传资料生成图谱或提问')
+ })
+})

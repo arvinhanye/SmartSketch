@@ -21,6 +21,13 @@ async function nodeNames(cid: string): Promise<ReadonlyMap<string, string>> {
   const draft = await draftApi.getDraft(cid)
   return new Map(draft.nodes.map((node) => [node.id, node.name] as const))
 }
+// 发布时间按本地时区显示；无法解析时原样显示，避免丢信息
+function publishedLabel(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime())
+    ? iso
+    : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
+}
 const state = useVersions({
   courseId: computed(() => props.courseId), coursesApi, versionsApi: api, onCourseForbidden: () => emit('forbidden'), nodeNames,
 })
@@ -59,7 +66,7 @@ const state = useVersions({
           <strong>v{{ item.version }}</strong>
           <span v-if="item.kind === 'rollback'"> · 回滚自 v{{ item.source_version }}</span>
           <span v-else> · 发布</span>
-          <span> · {{ item.published_at }}</span>
+          <span> · <time :datetime="item.published_at">{{ publishedLabel(item.published_at) }}</time></span>
           <span v-if="item.version === state.currentVersion.value"> · 当前学生可见</span>
           <button v-else type="button" data-test="vp-rollback" :data-version="item.version"
             :disabled="state.busy.value !== null || state.stale.value" @click="state.chooseRollback(item.version)">

@@ -579,3 +579,12 @@
 .light-surface.ui-teacher-workspace .teacher-graph__panel [data-test=ne-aliases] { height: 54px; }
 .light-surface.ui-teacher-workspace .teacher-graph__panel [data-test=ne-definition] { height: 88px; }
 .light-surface.ui-teacher-workspace .teacher-graph__tabs button { border-radius: 6px 6px 0 0; }
+
+/* 教师图谱：标题行并入「返回课程」，画布提示与键盘选择器合为一行，把竖向空间还给画布 */
+.light-surface.ui-teacher-workspace .teacher-graph__header { gap: 4px 12px; }
+.light-surface.ui-teacher-workspace .teacher-graph__header .teacher-graph__back { order: 2; margin-left: auto; }
+.light-surface.ui-teacher-workspace .teacher-graph__header .teacher-graph__course { order: 3; margin: 0; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px; border-bottom: 1px solid var(--gw-line); background: var(--gw-panel); }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__hint { padding: 0; flex: 1 1 220px; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { display: flex; align-items: center; gap: 8px; padding: 0; max-width: none; flex: 0 1 340px; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker select { flex: 1; min-width: 0; min-height: 32px; padding: 4px 8px; }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onActivated, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
+import { computed, inject, nextTick, onActivated, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { useReducedMotion } from '../composables/useReducedMotion'
 import type { Positions } from '../graph/chapterLayout'
 import {
@@ -54,6 +54,11 @@ const zoom = ref<number | null>(null)
 /** 小地图默认展开；<1024px 默认收起（规格 §5.1） */
 const miniOpen = ref(typeof window === 'undefined' || window.innerWidth >= 1024)
 const tip = ref<{ text: string; x: number; y: number } | null>(null)
+/**
+ * G6 的小地图插件销毁时会把传给它的容器从 DOM 摘掉；画布重建（换布局、换位置）后必须换一个新容器，
+ * 否则小地图消失而开关仍显示「收起小地图」。key 变化让 Vue 重新创建 `.gw-mini`。
+ */
+const miniKey = ref(0)
 let lifecycle: GraphLifecycle | null = null
 let tipTimer: ReturnType<typeof setTimeout> | null = null
 let stopObstacles: (() => void) | null = null
@@ -97,8 +102,14 @@ function showTip(info: { kpId: string; clientX: number; clientY: number } | null
   }, 300)
 }
 
-function start(): void {
+function start(attempt = 0): void {
   if (stage.value === null || props.graph === null || !ready.value) return
+  // 小地图容器被 G6 摘掉、新容器还没挂上（组件本身在文档里）：等 DOM 更新后再建。
+  // 组件在 KeepAlive 或未挂到文档时 isConnected 恒为 false，所以只在根节点已连接时等待，且最多重试几次
+  if (attempt < 3 && props.enhanced && mini.value !== null && root.value?.isConnected === true && !mini.value.isConnected) {
+    void nextTick(() => start(attempt + 1))
+    return
+  }
   drawnOnce.value = false
   // 适配图可能是响应式代理；生命周期会复制一份交给 G6
   lifecycle = createGraphLifecycle(stage.value, {
@@ -150,11 +161,12 @@ function stop(): void {
   showTip(null)
   lifecycle?.destroy()
   lifecycle = null
+  miniKey.value += 1
 }
 
 function retry(): void {
   stop()
-  start()
+  void nextTick(() => start())
 }
 
 onMounted(() => {
@@ -233,7 +245,7 @@ onBeforeUnmount(() => {
 
     <!-- 小地图与缩放控件：缩略图只画节点，遮罩框是当前视口；装饰性，键盘等价路径是搜索、章节跳转与列表 -->
     <div v-if="enhanced" ref="controls" class="gw-map" role="group" aria-label="地图与缩放">
-      <div v-show="miniOpen" ref="mini" class="gw-mini" aria-hidden="true" />
+      <div v-show="miniOpen" ref="mini" :key="miniKey" class="gw-mini" aria-hidden="true" />
       <div class="gw-map__ctl">
         <button type="button" class="gw-tool" :aria-label="miniOpen ? '收起小地图' : '展开小地图'" :title="miniOpen ? '收起小地图' : '展开小地图'" :aria-pressed="miniOpen" @click="miniOpen = !miniOpen">
           <AppIcon name="map" />

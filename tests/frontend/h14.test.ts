@@ -817,10 +817,11 @@ describe('审查补充', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     f.relations.create.mockRejectedValueOnce(apiError(403, 'COURSE_FORBIDDEN'))
     await openTab(wrapper, 'relations')
-    await clickNode(wrapper, 'k2')
+    // 已选中的 k1 在进入关系页时成为起点，所以只需再点终点
     await clickNode(wrapper, 'k3')
     await wrapper.find('.relation-editor__form').trigger('submit')
     await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledWith('c1', expect.objectContaining({ from_id: 'k1', to_id: 'k3' }), expect.anything())
     expect(confirm).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('teacher-home')
   })
@@ -858,6 +859,53 @@ describe('教师图谱新版界面',()=>{
   expect(wrapper.find('[data-test="tg-node-picker"]').exists()).toBe(true)
   expect(wrapper.find('.ui-sheet').exists()).toBe(true)
  })
+})
+
+describe('教师图谱：面板选择与画布、关系页保持同步', () => {
+  beforeEach(() => {
+    focused.length = 0
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+  })
+
+  async function pick(wrapper: VueWrapper, kid: string) {
+    await wrapper.find('[data-test="tg-node-picker"]').setValue(kid)
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  }
+
+  it('下拉选择知识点：详情切换，画布同时聚焦到该节点', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await pick(wrapper, 'k3')
+    expect(focused.at(-1)).toBe('kp:k3')
+    expect(wrapper.find('[data-test="tg-detail-empty"]').exists()).toBe(false)
+  })
+
+  it('有未保存修改时下拉选择先确认；继续编辑则画布不动，放弃后才聚焦', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    await clickNode(wrapper, 'k1')
+    await openTab(wrapper, 'edit')
+    await editName(wrapper, '未保存的名字')
+    await pick(wrapper, 'k2')
+    expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(true)
+    expect(focused).not.toContain('kp:k2')
+    await wrapper.find('[data-test="tg-discard-yes"]').trigger('click')
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(focused.at(-1)).toBe('kp:k2')
+  })
+
+  it('已选中知识点时进入「编辑关系」：它直接成为起点；没选中则仍为空', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await openTab(wrapper, 'relations')
+    const fromSelect = () => wrapper.find('select[name="from"]').element as HTMLSelectElement
+    expect(fromSelect().selectedOptions[0]?.textContent).toBe('请选择')
+    await openTab(wrapper, 'detail')
+    await clickNode(wrapper, 'k2')
+    await openTab(wrapper, 'relations')
+    expect(fromSelect().value).toBe('k2')
+  })
 })
 
 describe('教师知识点面板调宽', () => {

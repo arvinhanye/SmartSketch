@@ -57,10 +57,18 @@ class NoopResizeObserver {
   disconnect(): void {}
 }
 
-function setup(props: { enhanced?: boolean | Ref<boolean>; positions?: Ref<Positions | null>; layout?: Ref<GraphLayoutName>; scope?: Ref<string[] | null> } = {}) {
+function setup(props: { enhanced?: boolean | Ref<boolean>; positions?: Ref<Positions | null>; layout?: Ref<GraphLayoutName>; scope?: Ref<string[] | null>; g6RemovesMinimap?: boolean } = {}) {
   const graphs: FakeEnhancedGraph[] = []
   const factory: CanvasGraphFactory = (init) => {
     const g = new FakeEnhancedGraph({}, init)
+    if (props.g6RemovesMinimap === true) {
+      // 真实 G6 的小地图插件销毁时会把容器从 DOM 摘掉
+      const destroy = g.destroy.bind(g)
+      g.destroy = () => {
+        destroy()
+        init.minimap?.container.remove()
+      }
+    }
     graphs.push(g)
     return g
   }
@@ -183,6 +191,27 @@ describe('GraphCanvas 增强模式', () => {
     await settle()
     expect(graphs).toHaveLength(3)
     expect(graphs[2]!.init!.positions).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('切换布局重建画布后，小地图容器是新挂载的（G6 销毁插件会摘掉旧容器），开关状态与小地图一致', async () => {
+    const layout = ref<GraphLayoutName>('hierarchical')
+    const { wrapper, graphs } = setup({ layout, g6RemovesMinimap: true })
+    await settle()
+    const first = wrapper.get('.gw-mini').element
+    expect(graphs[0]!.init!.minimap?.container).toBe(first)
+    layout.value = 'force'
+    await settle()
+    expect(graphs).toHaveLength(2)
+    const second = wrapper.get('.gw-mini').element
+    expect(second).not.toBe(first)
+    expect(second.isConnected).toBe(true)
+    expect(graphs[1]!.init!.minimap?.container).toBe(second)
+    layout.value = 'hierarchical'
+    await settle()
+    expect(graphs).toHaveLength(3)
+    expect(wrapper.get('.gw-mini').element.isConnected).toBe(true)
+    expect(graphs[2]!.init!.minimap?.container).toBe(wrapper.get('.gw-mini').element)
     wrapper.unmount()
   })
 

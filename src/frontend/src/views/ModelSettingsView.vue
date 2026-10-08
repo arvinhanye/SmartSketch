@@ -16,6 +16,7 @@ if (api === null) throw new Error('ModelSettingsView 需要注入 MODEL_CONFIG_A
 
 const runtime = useRuntimeStore()
 const session = useSessionStore()
+const isTeacher = computed(() => session.role === 'teacher')
 const { status, saved, form, configured, keyRequired, busy, saving, testing, error, notice, testResult, load, save, test, clear } =
   useModelConfig({ api })
 const discovery = useModelDiscovery(api, form, saved)
@@ -37,18 +38,18 @@ async function confirmClear(): Promise<void> {
 </script>
 
 <template>
- <PageSheet labelledby="mc-title" compact class="model-settings" :class="{ 'model-settings--teacher': session.role === 'teacher' }" data-test="model-settings">
-  <PageHeader id="mc-title" title="模型 API 设置" description="管理用于图谱生成与课程问答的个人模型连接。" />
+ <PageSheet labelledby="mc-title" compact class="model-settings" :class="{ 'model-settings--teacher': isTeacher }" data-test="model-settings">
+  <PageHeader id="mc-title" title="模型 API 设置" :description="isTeacher ? '管理用于图谱生成与课程问答的个人模型连接。' : '管理用于课程问答的个人模型连接。'" />
   <p v-if="runtime.isDemo" class="ui-notice" data-test="mc-demo" role="status">当前为演示模式：系统使用内置的演示模型，个人配置不生效。</p>
   <div class="model-settings__grid">
   <section class="model-settings__card" aria-labelledby="mc-card-title">
-   <header class="model-settings__card-heading"><h3 id="mc-card-title">通用模型 API</h3><p>用于知识图谱生成与课程问答</p></header>
+   <header class="model-settings__card-heading"><h3 id="mc-card-title">通用模型 API</h3><p>{{ isTeacher ? '用于知识图谱生成与课程问答' : '用于课程问答' }}</p></header>
   <div v-if="status === 'loading'" class="ui-state" data-test="mc-loading" role="status" aria-busy="true"><p>正在加载配置…</p><div class="ui-skeleton" aria-hidden="true" /></div>
   <div v-else-if="status === 'error'" class="ui-state"><p class="ui-notice ui-notice--danger" data-test="mc-error" role="alert">{{ error }}</p><button class="ui-btn" type="button" data-test="mc-retry" @click="load">重试</button></div>
   <template v-else>
    <section class="ui-config-status" aria-labelledby="mc-status-title">
     <span class="ui-config-status__icon" :class="{ 'is-configured': configured }"><AppIcon :name="configured ? 'check' : 'key'" :size="22" /></span>
-    <div class="ui-config-status__body"><h3 id="mc-status-title">{{ configured ? '连接已配置' : '连接尚未配置' }}</h3><p data-test="mc-status"><template v-if="configured">已配置：{{ saved?.model }} · 密钥 ••••{{ saved?.key_hint }}</template><template v-else>尚未配置。保存后才能上传资料生成图谱或提问。</template></p><p v-if="saved?.last_test" data-test="mc-last-tested" :class="saved.last_test.ok ? 'ui-text-success' : 'ui-text-danger'">最近测试{{ saved.last_test.ok ? '成功' : '失败' }}<template v-if="lastTestTime"> · <time :datetime="saved.last_test.tested_at">{{ lastTestTime }}</time></template></p></div>
+    <div class="ui-config-status__body"><h3 id="mc-status-title">{{ configured ? '连接已配置' : '连接尚未配置' }}</h3><p data-test="mc-status"><template v-if="configured">已配置：{{ saved?.model }} · 密钥 ••••{{ saved?.key_hint }}</template><template v-else>{{ isTeacher ? '尚未配置。保存后才能上传资料生成图谱或提问。' : '尚未配置。保存后才能向课程助教提问。' }}</template></p><p v-if="saved?.last_test" data-test="mc-last-tested" :class="saved.last_test.ok ? 'ui-text-success' : 'ui-text-danger'">最近测试{{ saved.last_test.ok ? '成功' : '失败' }}<template v-if="lastTestTime"> · <time :datetime="saved.last_test.tested_at">{{ lastTestTime }}</time></template></p></div>
     <button v-if="!configured" type="button" class="ui-btn" data-test="mc-configure" @click="baseInput?.focus()">去配置<AppIcon name="chevron" :size="14" /></button>
    </section>
    <form class="ui-config-form" data-test="mc-form" novalidate :aria-busy="busy !== null" @submit.prevent="save">
@@ -72,7 +73,7 @@ async function confirmClear(): Promise<void> {
    </form>
   </template>
   </section>
-  <EmbeddingSettings v-if="session.role === 'teacher'" />
+  <EmbeddingSettings v-if="isTeacher" />
   </div>
   <details class="model-settings__help"><summary>密钥安全与接口说明</summary><p>使用供应商提供的 HTTPS 地址。输入 API Key 后自动获取模型，也可手动输入。密钥加密保存，不提供给其他用户。模型目录可能包含其他类型，请先测试确认模型能力与向量维度。</p><p>关闭思考适用于支持 thinking 字段的接口（如 DeepSeek），通常更快、更省 token，但复杂问题质量可能下降；其他接口可能不支持，请先测试。</p></details>
  </PageSheet>
