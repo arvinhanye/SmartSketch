@@ -29,8 +29,10 @@ const props = withDefaults(
     showStatuses?: boolean
     /** 竖排：放在工作台左侧筛选栏（教师图谱编辑页） */
     vertical?: boolean
+    /** 教师编辑区使用紧凑栏；其他页面保持原样。 */
+    compact?: boolean
   }>(),
-  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false },
+  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false, compact: false },
 )
 
 const emit = defineEmits<{
@@ -162,7 +164,8 @@ const summaryText = computed(() => {
 
     <!-- L13-3：不常用的筛选默认收起，给画布留出空间；关系图例与按关系筛选常显（验收要求） -->
     <details class="graph-toolbar__advanced" data-test="gt-advanced">
-      <summary>更多筛选（类型、状态、章节）</summary>
+      <summary>{{ compact ? '筛选' : '更多筛选（类型、状态、章节）' }}</summary>
+    <div class="graph-toolbar__advanced-content">
     <fieldset class="graph-toolbar__group">
       <legend>知识点类型</legend>
       <label v-for="item in nodeTypeItems" :key="item.type" :data-node-type="item.type">
@@ -200,6 +203,7 @@ const summaryText = computed(() => {
         <option v-for="(option, index) in chapters" :key="index" :value="String(index)">{{ option.label }}</option>
       </select>
     </label>
+    </div>
     </details>
 
     <div class="graph-toolbar__group" role="radiogroup" aria-label="布局">
@@ -232,6 +236,8 @@ const summaryText = computed(() => {
   gap: 8px 16px;
   padding: 8px 0;
 }
+
+.graph-toolbar__advanced-content { display: contents; }
 
 .graph-toolbar__advanced summary {
   cursor: pointer;

@@ -292,7 +292,6 @@
 .app:has(.auth-layout) .app-header h1 { color: var(--ss-text); }
 .app:has(.auth-layout) .app-tagline { color: var(--ss-text-2); }
 .app:has(.auth-layout) .app-logo { background: var(--ss-primary); }
-.light-surface .teacher-graph__canvas .graph-canvas, .light-surface .teacher-graph__canvas .graph-canvas__stage { min-height: 480px; }
 .light-surface .teacher-graph__canvas .gw-tool { width: 36px; height: 36px; min-height: 36px; padding: 0; border-color: var(--gw-edge); }
 @media(max-width:767px) { .light-surface .teacher-graph__canvas .gw-tool { width: 44px; height: 44px; min-height: 44px; } }
 
@@ -302,8 +301,6 @@
 .ui-chat-workspace .chat-markdown pre { padding: 16px; border: 1px solid var(--ss-line); }
 .ui-chat-workspace .chat-markdown .citation { color: var(--ss-link); background: transparent; border: 0; min-height: 32px; padding: 2px 5px; }
 
-/* Enhanced stage has a scoped min-height reset; retain a measurable stage on stacked screens. */
-.light-surface.ui-teacher-workspace .teacher-graph__canvas .graph-canvas.graph-canvas--enhanced .graph-canvas__stage { min-height: 480px; }
 
 .light-surface .ui-field select { width:100%; min-height:44px; padding:10px 12px; color:var(--gw-text); background:var(--gw-panel); border:1px solid var(--gw-edge); border-radius:8px; font:inherit; }
 .light-surface .ui-field select:focus-visible { outline:2px solid var(--gw-accent); outline-offset:2px; }
@@ -488,3 +485,54 @@
 .app.app--login:has(.auth-layout--editorial) .app-header{min-height:84px;padding:20px 52px;border:0;background:var(--ss-bg)}
 .app.app--login:has(.auth-layout--editorial) .app-tagline{margin-left:auto;font-size:12px}
 @media(max-width:760px){.app.app--login:has(.auth-layout--editorial) .app-header{min-height:72px;padding:18px 24px}.app.app--login:has(.auth-layout--editorial) .app-tagline{display:none}}
+
+/* Teacher-only bounded workspace: G6 must never inherit the form's content height. */
+.app--graph:has(.ui-teacher-workspace) { height: 100dvh; min-height: 0; overflow: hidden; }
+.app--graph .app-main > .ui-teacher-workspace { flex: 1; min-height: 0; overflow: hidden; }
+.light-surface.ui-teacher-workspace .ui-sheet__inner { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; }
+.light-surface.ui-teacher-workspace .teacher-graph__header { flex-shrink: 0; }
+.light-surface.ui-teacher-workspace .teacher-graph__body { flex: 1; min-height: 0; grid-template-columns: var(--teacher-panel-width,360px) 8px minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); margin-top: 20px; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas { grid-column: 3; min-height: 0; overflow: hidden; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas .graph-canvas { flex: 1 1 0; height: 0; min-height: 0; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas .graph-canvas .graph-canvas__stage,
+.light-surface.ui-teacher-workspace .teacher-graph__canvas .graph-canvas.graph-canvas--enhanced .graph-canvas__stage { height: 100%; min-height: 0; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 16px; border-right: 0; }
+.light-surface.ui-teacher-workspace .teacher-graph__tabs { position: sticky; top: -16px; z-index: 4; background: var(--gw-panel); padding: 10px 0; margin: -6px 0 18px; gap: 2px; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel :is(.node-editor,.knowledge-detail) { overflow: visible; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel .node-editor__form { gap: 10px; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel .node-editor__field { margin-top: 8px; gap: 6px; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel :is(input:not([type=checkbox]),select,textarea) { width: 100%; box-sizing: border-box; border-radius: 6px; padding: 8px 10px; font-size: 13px; min-height: 36px; }
+.light-surface.ui-teacher-workspace .teacher-graph__divider { grid-column: 2; grid-row: 2; position: relative; cursor: col-resize; touch-action: none; background: var(--gw-panel); border-inline: 1px solid var(--gw-line); }
+.teacher-graph__divider::after { content: ''; position: absolute; width: 3px; height: 36px; border-radius: 3px; background: var(--gw-line); top: 50%; left: 2px; }
+.teacher-graph__divider:hover::after,.teacher-graph__divider:focus-visible::after,.is-resizing .teacher-graph__divider::after { background: var(--gw-accent); }
+.teacher-graph__divider:focus-visible { outline: 2px solid var(--gw-accent); outline-offset: -2px; }
+.teacher-graph__body.is-resizing { user-select: none; cursor: col-resize; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters { padding: 10px 14px; position: relative; z-index: 10; overflow: visible; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar { gap: 8px 16px; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters [data-test=relation-legend] legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.light-surface.ui-teacher-workspace .teacher-graph__filters [data-test=relation-legend] { order: 2; gap: 8px 12px; background: transparent; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar__advanced { order: 1; position: relative; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar__advanced summary { border: 1px solid var(--gw-line); border-radius: 6px; padding: 7px 12px; color: var(--gw-text); }
+.light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar__advanced[open] { display: block; width: auto; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar__advanced-content { position: absolute; top: calc(100% + 8px); left: 0; z-index: 12; display: flex; flex-direction: column; gap: 16px; width: 280px; max-width: calc(100vw - 64px); max-height: 45dvh; overflow-y: auto; padding: 16px; background: var(--gw-panel); border: 1px solid var(--gw-line); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 12%); }
+.light-surface.ui-teacher-workspace .teacher-graph__filters [role=radiogroup] { order: 3; margin-left: auto; background: transparent; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters [data-test=clear] { order: 4; min-height: 34px; padding: 6px 10px; font-size: 12px; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar__summary { order: 5; }
+.light-surface.ui-teacher-workspace .teacher-graph__filters input[type=search] { min-height: 36px; padding: 8px 10px; width: 220px; font-size: 13px; }
+@media(max-width:767px) {
+ .light-surface.ui-teacher-workspace .ui-sheet__inner { padding: 12px; }
+ .light-surface.ui-teacher-workspace .teacher-graph__body { display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr) minmax(0,1fr); margin-top: 12px; }
+ .light-surface.ui-teacher-workspace .teacher-graph__canvas { grid-column: 1; grid-row: 2; min-height: 0; }
+ .light-surface.ui-teacher-workspace .teacher-graph__panel { grid-column: 1; grid-row: 3; min-height: 0; }
+ .light-surface.ui-teacher-workspace .teacher-graph__divider { display: none; }
+ .light-surface.ui-teacher-workspace .teacher-graph__filters { padding: 8px; }
+ .light-surface.ui-teacher-workspace .teacher-graph__filters .graph-toolbar { gap: 6px 8px; }
+ .light-surface.ui-teacher-workspace .teacher-graph__filters input[type=search] { width: 180px; }
+ .light-surface.ui-teacher-workspace .teacher-graph__filters [role=radiogroup] { margin-left: 0; }
+}
+.light-surface.ui-teacher-workspace .teacher-graph__panel :is(.node-editor,.knowledge-detail) h2 { padding-right: 44px; overflow-wrap: anywhere; }
+.light-surface.ui-teacher-workspace .teacher-graph__tabs button { border-radius: 0; border-bottom: 2px solid transparent; }
+.light-surface.ui-teacher-workspace .teacher-graph__tabs button[aria-pressed=true] { background: transparent; border-bottom-color: var(--gw-accent); font-weight: 600; }
+@media(max-width:767px) and (min-height:760px) {
+ .light-surface.ui-teacher-workspace .teacher-graph__body { grid-template-rows: auto minmax(340px,1fr) minmax(0,1fr); }
+}

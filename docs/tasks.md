@@ -1977,3 +1977,9 @@ STUDENT-WORKSPACE 验收：DONE。H11/外壳 52 PASS；图谱工作区/组件/�
 
 - API-SETTINGS-COMPACT：DONE；负责人 Codex。用户要求通用/向量 API 左右并列、桌面一页展示，并把列表/手输合并成可输入模型选择框。两张独立卡片，帮助折叠，短屏紧凑间距；模型输入匹配列表、按钮展开全部、未知名称保留、键盘及焦点关闭。1366×768、1440×900、1920×1080常规/目录加载/自定义维度检查通过；390px自动上下排列、不裁切。前端32项、type-check/build、verify.sh basic通过；后端/接口/库不改。交接 docs/handoffs/codex-api-settings-compact.md；本地保存，不推送。
 - TEACHER-EMBEDDING：DONE；负责人 Codex。用户确认按教师课程生效、学生不增加设置。独立加密配置接口、教师表单、维度选择、课程发布/回滚/问答适配与安全重建已实现。相关后端84项及新增提交空间检查通过（向量专项19项），前端30项、type-check、build、verify.sh basic通过；教师/学生宽屏及390px浏览器检查、真实设置页检查通过，既有示例图谱保持63节点70关系。独立复审发现的通用状态污染与发布竞态已修复并复核。迁移019已先备份再应用；真实供应商激活留给用户在页面测试。ADR-092、规格/计划与交接 docs/handoffs/codex-teacher-embedding.md 已更新；仅本地保存，不推送。
+
+## 2026-10-08 教师图谱视口修复
+- TEACHER-GRAPH-VIEWPORT：DONE；负责人 Codex。输入为长编辑表单撑高页面的截图；输出为固定可用视口、左侧独立滚动与可调宽面板、扁平搜索筛选栏。保留节点编辑守卫、全部字段、画布和其他页面，不改后端/接口。
+- 依赖现有 G6 容器 ResizeObserver。风险为容器尺寸反馈、窄屏、拖动边界与未保存修改。验证实际浏览器打开/关闭长表单、右下角工具始终可见、拖动/键盘调宽、H05/H07/H14、type-check/build、verify.sh basic。
+
+TEACHER-GRAPH-VIEWPORT 验收：实际1440×900浏览器先复现页面1052→1438→1437px（关闭不恢复），修复后打开/关闭均900px且画布高度不变。真实课程和独立假API回归均通过1920/1440/1366/1024/390五尺寸，覆盖长表单、拖动/键盘边界、窗口改变、筛选浮层及未保存确认；无真实图数据写入。H05/H07/H14 153 PASS（初次并发一项加载态超时，独立及最终组合重跑全部通过），type-check/build/basic退出0；构建保留既有大chunk提示。交接 docs/handoffs/codex-teacher-graph-viewport.md，本地保存不推送。

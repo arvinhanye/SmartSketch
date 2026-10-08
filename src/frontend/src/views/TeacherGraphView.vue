@@ -32,7 +32,7 @@ import {
 import { useSessionStore } from '../stores/session'
 
 /**
- * 教师图谱编辑页（H14，ADR-067）：草稿画布 + 右侧面板（H06 详情 / H07 节点编辑 / H08 关系编辑）。
+ * 教师图谱编辑页（H14，ADR-067）：草稿画布 + 左侧可调宽面板（H06 详情 / H07 节点编辑 / H08 关系编辑）。
  * 草稿读取与课程教师校验在 `useTeacherGraph`；筛选在 `useGraphFilters`；连边在 `useRelationEditor`；本页只做组装。
  * 三个编辑器共用课程 store 里的草稿，保存/删除/连边成功后画布随之更新，失败时草稿不变。
  */
@@ -214,6 +214,44 @@ const layoutSource = computed(() => {
   }
 })
 const { positions, error: layoutError } = useGraphLayout(() => layoutSource.value)
+// 面板只在有限高度内滚动；宽度调整不会改变草稿或选择状态。
+const workspace = ref<HTMLElement | null>(null)
+const workspaceWidth = ref(0)
+const preferredWidth = ref(360)
+const minWidth = computed(() => Math.min(280, workspaceWidth.value * .4))
+const maxWidth = computed(() => Math.max(minWidth.value, Math.min(640, workspaceWidth.value - 360)))
+const panelWidth = computed(() => Math.min(maxWidth.value, Math.max(minWidth.value, preferredWidth.value)))
+function setWidth(value: number): void {
+  preferredWidth.value = Math.min(maxWidth.value, Math.max(minWidth.value, value))
+}
+const resizing = ref(false)
+function startResize(event: PointerEvent): void {
+  if (event.button !== 0) return
+  event.preventDefault()
+  resizing.value = true
+  const handle = event.currentTarget as HTMLElement
+  handle.focus()
+  handle.setPointerCapture(event.pointerId)
+}
+function moveResize(event: PointerEvent): void {
+  if (resizing.value && workspace.value) setWidth(event.clientX - workspace.value.getBoundingClientRect().left)
+}
+function endResize(): void { resizing.value = false }
+function resizeKey(event: KeyboardEvent): void {
+  const values: Record<string, number> = { ArrowLeft: panelWidth.value - 20, ArrowRight: panelWidth.value + 20, Home: minWidth.value, End: maxWidth.value }
+  if (values[event.key] === undefined) return
+  event.preventDefault()
+  setWidth(values[event.key]!)
+}
+let workspaceObserver: ResizeObserver | null = null
+watch(workspace, (element) => {
+  workspaceObserver?.disconnect()
+  workspaceWidth.value = element?.clientWidth ?? 0
+  if (!element || typeof ResizeObserver !== 'function') return
+  workspaceObserver = new ResizeObserver(() => { workspaceWidth.value = element.clientWidth })
+  workspaceObserver.observe(element)
+}, { flush: 'post' })
+onBeforeUnmount(() => workspaceObserver?.disconnect())
 const empty = computed(() => status.value === 'ready' && graph.value !== null && graph.value.nodes.length === 0)
 </script>
 
@@ -261,7 +299,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         <button type="button" data-test="tg-refresh-retry" @click="teacher.refresh">重新刷新</button>
       </p>
 
-      <div class="teacher-graph__body">
+      <div ref="workspace" class="teacher-graph__body" :class="{ 'is-resizing': resizing }" :style="{ '--teacher-panel-width': `${panelWidth}px` }">
         <aside class="teacher-graph__filters" aria-label="筛选">
           <GraphToolbar
             v-model="filters.state.value"
@@ -270,7 +308,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             :summary="summary"
             :can-clear="!isDefault"
             :selected-hidden="selectedHidden"
-            vertical
+            compact
             @clear="filters.clear"
             @locate="onLocate"
           />
@@ -292,7 +330,25 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
           <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" :enhanced="!layoutError" :positions="positions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
-        <div class="teacher-graph__panel">
+        <div
+          class="teacher-graph__divider"
+          data-test="tg-panel-divider"
+          role="separator"
+          tabindex="0"
+          aria-label="调整知识点面板宽度"
+          aria-controls="teacher-knowledge-panel"
+          aria-orientation="vertical"
+          :aria-valuemin="Math.round(minWidth)"
+          :aria-valuemax="Math.round(maxWidth)"
+          :aria-valuenow="Math.round(panelWidth)"
+          @pointerdown="startResize"
+          @pointermove="moveResize"
+          @pointerup="endResize"
+          @pointercancel="endResize"
+          @lostpointercapture="endResize"
+          @keydown="resizeKey"
+        />
+        <div class="teacher-graph__panel" id="teacher-knowledge-panel">
           <p v-if="nodeEditor?.dirty" class="ui-unsaved" role="status">未保存</p>
           <div class="teacher-graph__tabs" role="group" aria-label="面板切换">
             <button
