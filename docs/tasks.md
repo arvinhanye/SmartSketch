@@ -1958,3 +1958,9 @@ MEMBERS-LAYOUT 验收：H12/H14 共 81 PASS；type-check/build PASS；五宽度 
 - 依赖现有登录 API、路由和会话；风险为密码显隐、错误后的口令清空、窄矮屏按钮可达和样式污染。验证 H13/ADR079/装饰运动、type-check/build、basic 门禁及五宽度浏览器检查。
 
 LOGIN-EDITORIAL 验收：密码显隐先 RED（缺少按钮）后 GREEN；H13/ADR079/auth-graph-motion 共 47 PASS，type-check/build PASS，scripts/verify.sh basic PASS（契约生成、25 项门禁负向与契约回归）。浏览器 2559/1440/1280/768/390 五宽度及 390×460、1024×500 矮窗口共七组 PASS，包含装饰读屏隐藏、窄屏隐藏、无横向溢出、密码显隐无提交、401 口令清空/恢复隐藏、错误提示、注册保留八组装饰图。交接 docs/handoffs/codex-login-editorial.md；只保存本地提交，不推送。
+
+## 2026-10-08 Codex：登录提示浮动
+
+- LOGIN-NOTICE：DONE；负责人 Codex；用户要求未登录提示浮动在欢迎回来上方，不挤压下方内容。根因是 App 主容器的正常流提示占据高度；输入为守卫提示码，输出为仅登录表单的可关闭绝对定位提示。其他页面提示保持；不改后端。验收为显示/关闭前后标题坐标相同、宽屏与窄矮屏提示可见可关闭、H13/ADR079、类型/构建/basic。
+
+LOGIN-NOTICE 验收：浏览器先 RED（关闭提示标题上移 21.59px），后 GREEN。六种桌面/平板/手机/矮窗口显示与关闭前后标题和输入框位移均 0px，提示可见可关闭、在标题上方且无横向溢出；H13/ADR079 44 PASS、type-check/build/basic PASS。交接 docs/handoffs/codex-login-notice.md；后端未改，本地保存不推送。

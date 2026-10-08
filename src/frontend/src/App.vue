@@ -242,12 +242,13 @@ function signOut(): void {
       </div>
     </header>
     <main class="app-main" :class="{ 'app-main--graph': graphShell, 'app-main--sheet': graphShell && upgradedPage }">
-      <div v-if="notice" class="app-notice" role="alert">
+      <div v-if="notice && !onLoginPage" class="app-notice" role="alert">
         <span>{{ notice }}</span>
         <button type="button" class="app-notice__close" aria-label="关闭提示" @click="dismissedNotice = true">×</button>
       </div>
       <p v-if="graphShell && runtime?.isDemo" class="app-mode ui-mode" data-test="mode-demo" role="status">演示模式 · 使用内置演示模型，不调用个人 API</p>
-      <RouterView v-if="route" />
+      <RouterView v-if="route && onLoginPage" :login-notice="notice" @dismiss-login-notice="dismissedNotice = true" />
+      <RouterView v-else-if="route" />
     </main>
     <!-- 侧栏在 DOM 中位于主内容之后，读屏与键盘先到页面内容；视觉上由网格放在左侧 -->
     <nav v-if="graphShell && railVisible" class="app-rail" :class="{ 'is-expanded': railExpanded }" aria-label="主导航">

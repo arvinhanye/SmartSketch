@@ -300,6 +300,8 @@ describe('H13 登录页', () => {
 
   it('未登录提示可关闭，关闭后登录表单仍可使用', async () => {
     const { wrapper } = await mountApp({ path: '/teacher' })
+    expect(wrapper.find('.app-main > .app-notice').exists()).toBe(false)
+    expect(wrapper.get('.login [data-test="login-notice"]').attributes('role')).toBe('alert')
     const close = wrapper.get('button[aria-label="关闭提示"]')
     expect(wrapper.get('[role="alert"]').text()).toContain('未登录')
 

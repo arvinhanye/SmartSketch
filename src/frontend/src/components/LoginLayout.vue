@@ -139,7 +139,7 @@
 .auth-layout__form {
   min-width:0;
   width:100%;
-  padding:16px 0;
+  padding:96px 0;
   max-height:100%;
   overscroll-behavior:contain
 }
@@ -165,7 +165,7 @@
     align-self:stretch;
     display:flex;
     align-items:safe center;
-    padding:28px 0
+    padding:110px 0
   }
   .auth-layout__form :deep(.login) {
     width:min(100%,380px);
@@ -185,5 +185,9 @@
   .login-brand__art svg {
     max-height:210px
   }
+}
+
+@media(min-width:761px) and (max-height:700px) {
+  .auth-layout__form { padding-top:96px; }
 }
 </style>

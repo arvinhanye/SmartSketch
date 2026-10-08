@@ -7,6 +7,9 @@ import LoginLayout from '../components/LoginLayout.vue'
 import { homeRouteFor, REGISTER_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
 
+const props = withDefaults(defineProps<{ loginNotice?: string | null }>(), { loginNotice: null })
+const emit = defineEmits<{ 'dismiss-login-notice': [] }>()
+
 const auth = inject(AUTH_API_KEY, null)
 if (auth === null) throw new Error('LoginView 需要注入 AUTH_API_KEY')
 
@@ -62,6 +65,10 @@ async function submit(): Promise<void> {
 <template>
   <LoginLayout>
     <form class="login" novalidate :aria-busy="pending" aria-label="登录智绘学途" @submit.prevent="submit">
+      <div v-if="props.loginNotice" class="login__notice" role="alert" data-test="login-notice">
+        <span>{{ props.loginNotice }}</span>
+        <button type="button" aria-label="关闭提示" @click="emit('dismiss-login-notice')">×</button>
+      </div>
       <p class="login__eyebrow">开始你的学途</p>
       <h2>欢迎回来</h2>
       <p class="login__description">登录智绘学途，继续你的课程与学习。</p>
@@ -93,6 +100,7 @@ async function submit(): Promise<void> {
 </template>
 <style scoped>
 .login {
+  position:relative;
   width:100%;
   color:var(--ss-text)
 }
@@ -253,4 +261,35 @@ async function submit(): Promise<void> {
     margin-bottom:25px
   }
 }
+
+.login__notice {
+  position:absolute;
+  bottom:calc(100% + 18px);
+  left:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  border:1px solid #794a57;
+  border-radius:8px;
+  padding:8px 8px 8px 12px;
+  background:#32202a;
+  color:#f2a7b1;
+  font-size:13px;
+  line-height:1.7;
+}
+.login__notice span { flex:1; min-width:0; }
+.login .login__notice button {
+  flex:none;
+  width:36px;
+  height:44px;
+  padding:0;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:inherit;
+  font-size:20px;
+}
+.login .login__notice button:hover { background:#492d38; }
 </style>
