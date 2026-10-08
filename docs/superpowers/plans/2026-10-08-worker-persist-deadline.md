@@ -10,7 +10,7 @@
 
 **Spec:** [已批准补充规格](../specs/2026-10-08-worker-persist-deadline-design.md)，补充 [R1 核心规格](../specs/2026-10-08-worker-persist-fence-design.md)。
 
-**State:** 规格已获用户「确认实施」；计划待书面审阅，所有实施步骤未执行。复用当前受管 worktree；保留本会话顺序执行方式。代码基线 `e111315`，文档基线 `e41e951`。
+**State:** 规格已获用户「确认实施」；计划已获用户「确认计划，开始实施」；当前按任务顺序实施，未验证步骤保持未勾选。复用当前受管 worktree；保留本会话顺序执行方式。代码基线 `e111315`，文档基线 `e41e951`。
 
 ## Global Constraints
 

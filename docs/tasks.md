@@ -1930,7 +1930,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PERSIST-DEADLINE | PLAN_WRITTEN_PENDING_REVIEW（规格已批准，发布准入 OPEN） | Codex | 七任务实施计划已写入；覆盖传输、门面、围栏、状态恢复、清理、真实故障与全量验收，35 项实施步骤均未执行；计划确认后在本会话顺序实施。 |
+| R1-PERSIST-DEADLINE | IN_PROGRESS（计划已确认，发布准入 OPEN） | Codex | 用户已确认书面计划并要求开始实施；Codex 在本会话依七任务顺序进行测试先行实现，网络及全量验收通过前保留 OPEN。 |
 
 - 输入：`e41e951` 书面规格与用户「确认实施」；输出：`docs/superpowers/plans/2026-10-08-worker-persist-deadline.md` 和 Codex 计划交接。
 - 依赖：复用当前受管 worktree、既有临时 Python 3.11 测试 venv；未来实测需一次性 Neo4j、回环 TCP 代理与项目声明的前端/E2E 依赖。
@@ -1938,3 +1938,5 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 - 本轮验证：计划/规格覆盖、接口与路径自审、`git diff --check`、basic 门禁；产品测试及真实故障只在获批实施后运行。
 - 审批/执行方式：用户确认时书面计划尚未存在，只确认已交付规格与实施意图；计划现已写入待审阅，不能把此前确认外推为已审阅计划。保留先前本会话顺序执行方式，等待书面计划确认；不推送、不创建 PR、不合并、不冻结。
 - 计划验收：规格 §1～§9 映射七任务；五项 Review Focus 各有断言；接口/具体文件/类型核对，增加只记录 BEGIN 完成时刻的可选 on_acquired 回调以精确计量围栏。9 个文档文件、24 条本地链接通过，35 项实施步骤未勾选，产品树/运行配置未变。`git diff --check` exit 0，本轮 basic exit 0，契约 237 passed、门禁负向测试 25 项通过。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-plan-verify.log`，校验/哈希 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-plan-check.json`；仅计划与既有门禁验证，无产品/网络新验收，风险 OPEN。
+
+- 2026-10-08 最新审批：用户「确认计划，开始实施」；书面计划与当前会话顺序执行均获确认。实施输入/依赖/风险/命令沿用已批准计划，不再等待重复确认。

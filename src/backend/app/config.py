@@ -82,6 +82,8 @@ class Settings(BaseModel):
     TASK_MAX_FAILED_CHUNK_RATIO: float = Field(default=0.2, ge=0, lt=1, allow_inf_nan=False)
     WORKER_PROCESSES: int = Field(default=1, ge=1)
     TASK_LEASE_SECONDS: int = Field(default=60, ge=15)
+    TASK_PERSIST_COMMIT_TIMEOUT_SECONDS: float = Field(default=2.0, gt=0, le=3.0, allow_inf_nan=False)
+    TASK_PERSIST_CLEANUP_TIMEOUT_SECONDS: float = Field(default=1.0, gt=0, le=5.0, allow_inf_nan=False)
     TASK_MAX_ATTEMPTS: int = Field(default=3, ge=1)
     TASK_CHUNK_MAX_ATTEMPTS: int = Field(default=2, ge=1)
     TASK_ARTIFACT_RETENTION_DAYS: int = Field(default=7, ge=0)
