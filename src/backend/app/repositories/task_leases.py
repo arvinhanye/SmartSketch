@@ -19,11 +19,13 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
+import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Iterator
 
-from app.repositories.sqlite import connect
+from app.repositories.sqlite import acquisition_timeout, check_deadline, connect
 from app.services.task_state import failure_code_allowed
 
 PROCESSING_STAGES = ("parsing", "extracting", "merging", "persisting")
@@ -100,10 +102,16 @@ def _non_empty(name: str, value: object) -> str:
 
 
 @contextmanager
-def _immediate(sqlite_url: str) -> Iterator[sqlite3.Connection]:
-    with connect(sqlite_url) as database:
-        database.execute("BEGIN IMMEDIATE")
+def _immediate(sqlite_url: str, *, deadline: float | None = None,
+               on_acquired: Callable[[float], None] | None = None) -> Iterator[sqlite3.Connection]:
+    with connect(sqlite_url, deadline=deadline) as database:
         try:
+            acquisition_timeout(database, deadline)
+            database.execute("BEGIN IMMEDIATE")
+            acquired_at = time.monotonic()
+            if on_acquired is not None:
+                on_acquired(acquired_at)
+            check_deadline(deadline)
             yield database
             database.execute("COMMIT")
         except BaseException:
@@ -203,14 +211,16 @@ def leased_transaction(sqlite_url: str, task_id: str, token: str) -> Iterator[sq
 
 
 @contextmanager
-def persist_transaction(sqlite_url: str, lease: Lease, course_token: str) -> Iterator[sqlite3.Connection]:
+def persist_transaction(sqlite_url: str, lease: Lease, course_token: str, *,
+                        deadline: float | None = None,
+                        on_acquired: Callable[[float], None] | None = None) -> Iterator[sqlite3.Connection]:
     """Final commit fence: serialize graph COMMIT/T6 against both takeovers.
 
     Acquire the graph draft guard BEFORE entering; perform T6 using the yielded
     connection, never a nested SQLite transaction. No graph construction here.
     """
     _non_empty('course_token', course_token)
-    with _immediate(sqlite_url) as database:
+    with _immediate(sqlite_url, deadline=deadline, on_acquired=on_acquired) as database:
         row = database.execute(
             """SELECT 1 FROM processing_tasks AS t
                JOIN course_locks AS c ON c.course_id = t.course_id

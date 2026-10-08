@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import re
 import sqlite3
+import time
+import math
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +22,30 @@ class MigrationError(RuntimeError):
     """A migration was refused or failed without applying its schema changes."""
 
 
+class SQLiteDeadlineExceeded(sqlite3.OperationalError):
+    """The caller's absolute acquisition budget is exhausted."""
+
+
+def check_deadline(deadline: float | None) -> None:
+    if deadline is not None and time.monotonic() >= deadline:
+        raise SQLiteDeadlineExceeded('SQLITE_ACQUISITION_DEADLINE')
+
+
+def busy_timeout_ms(deadline: float | None) -> int:
+    if deadline is None:
+        return BUSY_TIMEOUT_MS
+    if not math.isfinite(deadline):
+        raise ValueError('SQLite deadline must be finite')
+    milliseconds = min(BUSY_TIMEOUT_MS, math.floor((deadline - time.monotonic()) * 1000))
+    if milliseconds < 1:
+        raise SQLiteDeadlineExceeded('SQLITE_ACQUISITION_DEADLINE')
+    return milliseconds
+
+
+def acquisition_timeout(database: sqlite3.Connection, deadline: float | None) -> None:
+    database.execute(f'PRAGMA busy_timeout = {busy_timeout_ms(deadline)}')
+
+
 def database_path(sqlite_url: str) -> Path:
     """Resolve the project SQLite URL relative to the current process directory."""
     if not sqlite_url.startswith("sqlite:///"):
@@ -31,15 +57,16 @@ def database_path(sqlite_url: str) -> Path:
 
 
 @contextmanager
-def connect(sqlite_url: str) -> Iterator[sqlite3.Connection]:
+def connect(sqlite_url: str, *, deadline: float | None = None) -> Iterator[sqlite3.Connection]:
     """Open one short-lived connection with the API/worker SQLite invariants."""
     path = database_path(sqlite_url)
     path.parent.mkdir(parents=True, exist_ok=True)
-    database = sqlite3.connect(path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
+    database = sqlite3.connect(path, timeout=busy_timeout_ms(deadline) / 1000, isolation_level=None)
     try:
-        database.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
-        database.execute("PRAGMA journal_mode = WAL")
-        database.execute("PRAGMA foreign_keys = ON")
+        for statement in ('PRAGMA journal_mode = WAL', 'PRAGMA foreign_keys = ON'):
+            acquisition_timeout(database, deadline)
+            database.execute(statement)
+            check_deadline(deadline)
         yield database
     finally:
         database.close()

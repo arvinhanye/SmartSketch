@@ -353,3 +353,66 @@ def test_cutoff_after_commit_dispatch_keeps_fence_and_finishes_t6(task, worker_g
     assert task_state(task) == ('awaiting_review', None, 1)
     with connect(url) as db:
         assert db.execute('SELECT draft_revision FROM courses WHERE id=?', (lease.course_id,)).fetchone() == (1,)
+
+
+def test_fence_wait_uses_remaining_absolute_budget(task):
+    import time
+    url, lease = task
+    lock = course_locks.try_acquire(url, lease.course_id, holder='worker', lease_seconds=60)
+    with connect(url) as writer:
+        writer.execute('BEGIN IMMEDIATE')
+        started = time.monotonic()
+        with pytest.raises(sqlite3.OperationalError):
+            with task_leases.persist_transaction(url, lease, lock.token, deadline=started + .1):
+                pytest.fail('lock must not be acquired')
+        assert time.monotonic() - started < 1
+        writer.execute('ROLLBACK')
+    with connect(url) as db:
+        assert db.execute('SELECT lease_token, stage FROM processing_tasks WHERE id=?',
+                          (lease.task_id,)).fetchone() == (lease.token, 'persisting')
+
+
+def test_expired_fence_deadline_sends_no_begin(task, monkeypatch):
+    import time
+    from app.repositories.sqlite import SQLiteDeadlineExceeded
+    url, lease = task
+    statements = []
+    original = sqlite3.connect
+    class Recording(sqlite3.Connection):
+        def execute(self, query, *args):
+            statements.append(query)
+            return super().execute(query, *args)
+    monkeypatch.setattr(sqlite3, 'connect', lambda *a, **kw: original(*a, **kw, factory=Recording))
+    with pytest.raises(SQLiteDeadlineExceeded):
+        with task_leases.persist_transaction(url, lease, 'token', deadline=time.monotonic() - 1):
+            pass
+    assert 'BEGIN IMMEDIATE' not in statements
+
+
+def test_fence_acquired_clock_precedes_validation_and_callback_error_rolls_back(task, monkeypatch):
+    url, lease = task
+    lock = course_locks.try_acquire(url, lease.course_id, holder='worker', lease_seconds=60)
+    events = []
+    original = sqlite3.connect
+    class Recording(sqlite3.Connection):
+        def execute(self, query, *args):
+            events.append(query)
+            return super().execute(query, *args)
+    monkeypatch.setattr(sqlite3, 'connect', lambda *a, **kw: original(*a, **kw, factory=Recording))
+    def acquired(timestamp):
+        assert isinstance(timestamp, float)
+        events.append('acquired')
+    with task_leases.persist_transaction(url, lease, lock.token, on_acquired=acquired):
+        pass
+    validation = next(i for i, q in enumerate(events) if 'SELECT 1 FROM processing_tasks AS t' in q)
+    assert events.index('BEGIN IMMEDIATE') < events.index('acquired') < validation
+    def bad_callback(timestamp):
+        raise ValueError('callback error')
+    with pytest.raises(ValueError, match='callback error'):
+        with task_leases.persist_transaction(url, lease, lock.token, on_acquired=bad_callback):
+            pass
+    assert 'ROLLBACK' in events
+    with connect(url) as db:
+        db.execute('PRAGMA busy_timeout=0')
+        db.execute('BEGIN IMMEDIATE')
+        db.execute('ROLLBACK')
