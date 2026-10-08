@@ -1970,3 +1970,6 @@ LOGIN-NOTICE 验收：浏览器先 RED（关闭提示标题上移 21.59px），�
 - 默认侧栏 25%，最小 280px，画布至少 640px；窄屏沿用抽屉。依赖现有 G6 resize 与路由/API；风险为拖动越界、窄屏、聊天文本对比度。验证 H11/图谱工作区/问答相关测试、type-check/build/basic、浏览器拖动与主题检查。
 
 STUDENT-WORKSPACE 验收：DONE。H11/外壳 52 PASS；图谱工作区/组件/问答 32 PASS（一次并发超时后独立重跑通过）；type-check/build/basic PASS。实际学生课程三个宽度拖动/键盘/恢复/抽屉与浅色问答检查 PASS；假问答两个宽度引用、代码对比度、未覆盖/故障检查 PASS。教师实际页面、后端和数据未改；交接 docs/handoffs/codex-student-workspace.md。
+
+## 2026-10-08 教师向量模型配置
+- TEACHER-EMBEDDING：DONE；负责人 Codex。用户确认按教师课程生效、学生不增加设置。独立加密配置接口、教师表单、维度选择、课程发布/回滚/问答适配与安全重建已实现。相关后端84项及新增提交空间检查通过（向量专项19项），前端30项、type-check、build、verify.sh basic通过；教师/学生宽屏及390px浏览器检查、真实设置页检查通过，既有示例图谱保持63节点70关系。独立复审发现的通用状态污染与发布竞态已修复并复核。迁移019已先备份再应用；真实供应商激活留给用户在页面测试。ADR-092、规格/计划与交接 docs/handoffs/codex-teacher-embedding.md 已更新；仅本地保存，不推送。

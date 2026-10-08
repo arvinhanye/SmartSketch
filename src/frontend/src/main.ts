@@ -28,6 +28,7 @@ import TeacherGraphView from './views/TeacherGraphView.vue'
 import ChatView from './views/ChatView.vue'
 import RegisterView from './views/RegisterView.vue'
 import ModelSettingsView from './views/ModelSettingsView.vue'
+import { EMBEDDING_CONFIG_API_KEY, createEmbeddingConfigApi } from './api/embeddingConfig'
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
@@ -70,6 +71,7 @@ createApp(App)
   .provide(COURSES_API_KEY, createCoursesApi(http))
   .provide(MEMBERS_API_KEY, createMembersApi(http))
   .provide(MODEL_CONFIG_API_KEY, createModelConfigApi(http))
+  .provide(EMBEDDING_CONFIG_API_KEY, createEmbeddingConfigApi(http))
   .provide(MATERIALS_API_KEY, createMaterialsApi(http))
   .provide(PUBLISHED_GRAPH_API_KEY, createPublishedGraphApi(http))
   .provide(DRAFT_GRAPH_API_KEY, createDraftGraphApi(http))

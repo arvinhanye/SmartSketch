@@ -58,7 +58,7 @@ function failureText(cause: unknown, fallback: string): string {
 
 type Busy = 'loading' | 'saving' | 'testing' | 'clearing'
 
-export function useModelConfig({ api }: { api: ModelConfigApi }) {
+export function useModelConfig({ api, syncRuntime = true }: { api: ModelConfigApi; syncRuntime?: boolean }) {
   const runtime = useRuntimeStore()
   const controller = new AbortController()
   let disposed = false
@@ -110,7 +110,7 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
     try {
       const config = await api.get({ signal: controller.signal })
       if (!current(ticket)) return
-      runtime.commitRead(ticket, config)
+      if (syncRuntime) runtime.commitRead(ticket, config)
       adopt(config)
       status.value = 'ready'
     } catch (cause) {
@@ -142,7 +142,7 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
         ? { base_url: baseUrl, model, ...thinkingChange() }
         : { base_url: baseUrl, model, api_key: form.apiKey, ...thinkingChange() }
       const config = await api.save(body, { signal: controller.signal })
-      if (!current(ticket) || !runtime.commitWrite(ticket, config)) return
+      if (!current(ticket) || (syncRuntime && !runtime.commitWrite(ticket, config))) return
       adopt(config)
       testResult.value = null
       notice.value = '已保存。已创建的任务仍使用保存前的配置。'
@@ -213,7 +213,7 @@ export function useModelConfig({ api }: { api: ModelConfigApi }) {
     try {
       await api.clear({ signal: controller.signal })
       const cleared: ModelConfig = { runtime_mode: saved.value?.runtime_mode ?? 'personal', configured: false }
-      if (!current(ticket) || !runtime.commitWrite(ticket, cleared)) return
+      if (!current(ticket) || (syncRuntime && !runtime.commitWrite(ticket, cleared))) return
       adopt(cleared)
       testResult.value = null
       notice.value = '已清除。尚未结束的任务会终止，需要重新上传。'

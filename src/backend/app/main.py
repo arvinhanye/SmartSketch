@@ -28,6 +28,7 @@ from app.api.materials import policy_router as upload_policy_router
 from app.api.materials import router as materials_router
 from app.api.members import router as members_router
 from app.api.model_config import router as model_config_router
+from app.api.embedding_config import router as embedding_config_router
 from app.config import check_auth_settings, load_settings
 from app.schemas.errors import Error
 from app.services.auth import (
@@ -108,6 +109,7 @@ def create_app() -> FastAPI:
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(model_config_router)
+    application.include_router(embedding_config_router)
     application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)

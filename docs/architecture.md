@@ -228,3 +228,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ### 个人生成模型的思考开关（ADR-090，2026-10-04）
 
 `disable_thinking` 默认 false；保存时省略保留现值，新配置默认 false。配置与任务快照各增加一个 0/1 非空列（迁移018）。开启时，连接测试、问答改写/流式或非流式回答、抽取及 repair 仅追加 `thinking: {type: disabled}`；向量服务不变。学生模型缓存以配置 revision 刷新，教师任务使用创建时快照；中途改配置不追溯已有任务。关闭时不追加字段。供应商是否接受/忽略与性能质量效果由实测确认，不以连接成功代表已生效。测试未保存表单使用表单值，测试已存配置使用已存值；旧客户端可省略可选字段。输出上限、截止、出处与取消/撤销语义不变。
+
+## ADR-092 course-owned embedding overrides (2026-10-08)
+
+`teacher_embedding_configs` (migration 019) stores encrypted teacher credentials separately from generation credentials. Course adapters resolve `courses.teacher_id`; students share the course embedding space while keeping their own generation API. Spaces use teacher ID, endpoint/model hash and dimensions; default global space remains the fallback. Additive rebuilding verifies all owned draft/published knowledge points and document chunks before atomically switching the teacher row and committed version metadata. Owner/course locks and active-attempt checks serialize switches with publication/rollback; attempt insertion checks owner lock and commit checks space. Old properties remain intact. Global reembed refuses teacher overrides. This supersedes the single-runtime-space statements above for configured courses; environment bootstrap validation still covers the global fallback.

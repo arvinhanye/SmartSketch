@@ -3,6 +3,8 @@ import { computed, inject, ref } from 'vue'
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
+import EmbeddingSettings from '../components/EmbeddingSettings.vue'
+import { useSessionStore } from '../stores/session'
 import { MODEL_CONFIG_API_KEY } from '../api/modelConfig'
 import { MODEL_PROVIDERS, useModelDiscovery } from '../composables/useModelDiscovery'
 import { useModelConfig } from '../composables/useModelConfig'
@@ -12,6 +14,7 @@ const api = inject(MODEL_CONFIG_API_KEY, null)
 if (api === null) throw new Error('ModelSettingsView 需要注入 MODEL_CONFIG_API_KEY')
 
 const runtime = useRuntimeStore()
+const session = useSessionStore()
 const { status, saved, form, configured, keyRequired, busy, saving, testing, error, notice, testResult, load, save, test, clear } =
   useModelConfig({ api })
 const discovery = useModelDiscovery(api, form, saved)
@@ -67,5 +70,6 @@ async function confirmClear(): Promise<void> {
    </form>
    <aside class="ui-config-security" aria-labelledby="mc-security-title"><AppIcon name="key" :size="16" /><div><h3 id="mc-security-title">安全说明</h3><p>教师生成知识图谱、学生提问都使用你自己填写的模型 API。密钥加密保存在服务端，保存后不再显示，也不会提供给其他用户。目前支持 OpenAI 兼容的对话接口（已验证：DeepSeek）。</p></div></aside>
   </template>
+  <EmbeddingSettings v-if="session.role === 'teacher'" />
  </PageSheet>
 </template>
