@@ -1898,13 +1898,15 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PERSIST-FENCE | DESIGN_READY（聊天方案已确认；书面规格待评审，修复未实施） | Codex | 仅修复旧 worker 在租约丢失后提交 Neo4j 的高严重程度发现；双租约守卫、显式图事务、SQLite 提交围栏与同连接 T6；旧 worker 零提交、异常恢复和锁释放回归。其余四项中严重程度发现不纳入本任务。 |
+| R1-PERSIST-FENCE | IMPLEMENTED_LOCAL（核心接管回归已验证；发布准入 OPEN） | Codex | 仅修复旧 worker 在租约丢失后提交 Neo4j 的高严重程度发现；双租约守卫、显式图事务、SQLite 提交围栏与同连接 T6；旧 worker 零提交、异常恢复和锁释放回归。其余四项中严重程度发现不纳入本任务。 |
 
 - 输入：`bdb89c4` 基线的只读审查与真实 SQLite/图调度替身复现；用户确认「双租约守卫＋显式图事务＋提交围栏」方案。
-- 当前输出：`docs/superpowers/specs/2026-10-08-worker-persist-fence-design.md`、ADR-091、任务协议/架构同步与 `docs/handoffs/codex-r1-persist-fence-design.md`。当前不改产品代码、测试、契约、迁移、依赖或运行环境。
-- 后续实现范围：worker 持久化与心跳、任务租约/课程锁仓储、Neo4j 显式事务入口、新增定向回归；保留其他调用者的托管事务入口和公共 API。
+- 当前输出：双租约守卫、显式图事务、SQLite 最终围栏、同连接 T6、完成结果读回及定向/真实 Neo4j 回归；实施计划 `docs/superpowers/plans/2026-10-08-worker-persist-fence.md`，实施交接 `docs/handoffs/codex-r1-persist-fence.md`。用户在书面规格交付后明确要求「实施修改」，本会话顺序执行。无公共契约、迁移或项目依赖变化；测试依赖仅在 `/private/tmp/smartsketch-r1-testdeps`。
+- 已实施范围：worker 持久化与心跳、任务租约/课程锁仓储、Neo4j 显式事务入口、新增定向回归；保留其他调用者的托管事务入口和公共 API。
 - 依赖：现有单机 worker、SQLite WAL 和 Neo4j 5.28.2 同步驱动；复用 §8.4 的贡献可见性与接管重建，不引入跨库原子提交。
 - 风险/需评审：SQLite 提交围栏是全库单写者；Neo4j 提交应答阻塞会延长持锁时间，服务端事务 timeout 不等于客户端提交应答截止。书面规格区分一致性保证与可用性限制；实现阶段必须用故障注入证明退出/恢复行为，未解决的无界等待不作为已闭环发布。
 - 验证命令：`git diff --check`、`PATH="/opt/anaconda3/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS="-p no:cacheprovider" ./scripts/verify.sh`（basic）；实现时再执行规格中的 worker 回归和独立 Neo4j 集成。
 - 本轮设计验收证据：上述 basic 门禁 exit 0，契约回归 237 passed、门禁负向测试 25 项通过；文档链接解析及 TODO/TBD 扫描通过，`git diff --check` exit 0。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-design-verify.log`。仅验证文档/既有基础门禁，不是 R1 修复验收；新 worker 回归与真实 Neo4j 故障验收尚未运行。
-- 下一步：用户评审书面规格；通过后编写实施计划并确定执行方式。设计交付不等于漏洞已修复，不推送、不创建 PR、不操作用户业务库。
+- 实施验收证据：最终定向 214 passed（F02/C09/D11/清理/计时及新增回归）、真实 Neo4j F13/R1 34 passed，两个 XML 零失败/错误/skip；旧 worker 在相同真实回归遗留节点而失败。独立审查后新增提交前/后截止测试，故障变异各失败、正常版本通过。最终 basic exit 0，`git diff --check` 通过。日志与 XML 在 `/private/tmp/smartsketch-ocr-46o1tbcy/`，详见实施交接。
+- 全量限制：backend full 3945 passed/27 skip/1 failed/6 errors，七项失败均是工具子进程丢失临时依赖；独立临时 venv 复验该模块与新回归 45 passed，但完整 full 未重跑。frontend full 因缺 node_modules 失败，完整 integration/E2E 未跑，不宣称全量门禁通过。实际应用环境未改，临时 Neo4j 已移除。
+- 下一步：保留本地修改/提交；网络级总截止及真实断连时资源释放/全库写阻塞上限仍需准入验证，暂不发布、不推送、不创建 PR、不操作用户业务库。独立审查未发现新确定性运行时缺陷，Important 提交前/后截止测试缺口已补；Minor 两个实际心跳调用者的延迟/连续失败故障测试暂缓。

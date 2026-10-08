@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -377,6 +378,12 @@ class _BrokenRepo:
         self.calls += 1
         raise RepositoryError()
 
+    @contextmanager
+    def explicit_write_transaction(self, scope, **kwargs):
+        self.calls += 1
+        raise RepositoryError()
+        yield
+
     def write_transaction(self, scope, work):
         self.calls += 1
         raise RepositoryError()
@@ -457,7 +464,7 @@ def test_live_lease3_rerun_after_neo4j_commit_matches_a_single_run(db_url, stora
     def crash(*_a, **_k):
         raise Crash()
 
-    monkeypatch.setattr(persist_graph, "_t6", crash)
+    monkeypatch.setattr(persist_graph, "_t6_in", crash)
     with pytest.raises(Crash):
         _persist(db_url, lease, graph.repo)
     monkeypatch.undo()
@@ -478,7 +485,7 @@ def test_live_lease3_rerun_after_neo4j_commit_matches_a_single_run(db_url, stora
 @live
 def test_live_lease21_rerun_revokes_elements_the_new_attempt_does_not_write(db_url, storage, graph, monkeypatch):
     lease = _persisting(db_url, storage, graph, [("概念12", "概念11")], ["概念11", "概念12"])
-    monkeypatch.setattr(persist_graph, "_t6", lambda *_a, **_k: (_ for _ in ()).throw(persist_graph.LeaseLost("x")))
+    monkeypatch.setattr(persist_graph, "_t6_in", lambda *_a, **_k: (_ for _ in ()).throw(persist_graph.LeaseLost("x")))
     assert _persist(db_url, lease, graph.repo).status is PersistStatus.LOST
     monkeypatch.undo()
     assert _counts(graph)["nodes"] == 2

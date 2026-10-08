@@ -14,13 +14,15 @@
 3. **一个 Neo4j 写事务**：锁课程守卫节点 → 撤销本任务此前尝试的全部贡献（删除因此无贡献的元素）→
    写节点（F04）→ 读「可见草稿 + 本任务」的前置边，按 ADR-009 逐环降级（可能降级其他任务的未确认 AI 边）
    → 写关系（F06）。环上无可降级边（DAG-10）→ 回滚，T9 ``CYCLE_DETECTED``。
-4. Neo4j 提交后，在带令牌的 SQLite 事务里执行 T6、分配本课程下一个 T6 提交序号并递增
-   ``courses.draft_revision``（草稿内容此刻变为可见），然后释放课程写锁。
+4. 图构建后进入 SQLite 最终提交围栏，复核任务/课程锁双令牌、阶段、有效期和本地截止；
+   围栏内提交显式图事务，再用同一 SQLite 连接执行 T6、分配提交序号并递增
+   ``courses.draft_revision``，提交 SQLite 后释放课程写锁（ADR-091）。
 
 失败：Neo4j/SQLite 存储故障或课程写锁等不到 → 主动释放并退避（``STORAGE_UNAVAILABLE``，尝试耗尽则 T9）；
 其他错误 → T9 ``INTERNAL_ERROR``。``persisting`` 的每一种失败都置 ``cleanup_pending``，随后尝试清理
 （撤销本任务贡献）；清理成功才清除标记，否则由下次回收重试（``cleanup_failed_task``）。
-租约在 Neo4j 写入前复核；租约丢失时不再写任何数据（本次已写内容不在 V 中，接管者会先撤销再写）。
+双租约守卫在每条图语句发送前/返回后复核；最终围栏排斥接管。不透明重跑回调。
+COMMIT 发出后的故障不作为回滚证明，T6 应答/退出故障先读回确认结果。
 """
 
 from __future__ import annotations
@@ -52,6 +54,7 @@ from app.repositories.graph_relations import (
     task_has_contributions,
 )
 from app.repositories.neo4j import GraphScope, Neo4jRepository, RepositoryError, ScopedTransaction
+from app.repositories.lease_guard import LeaseGuard
 from app.repositories.sqlite import connect
 from app.repositories.task_leases import (
     Lease,
@@ -60,6 +63,7 @@ from app.repositories.task_leases import (
     claim_next,
     clear_cleanup_pending,
     leased_transaction,
+    persist_transaction,
     reclaim_expired,
     release_after_transient_failure,
     release_on_shutdown,
@@ -267,25 +271,30 @@ def _check_lease(sqlite_url: str, lease: Lease) -> None:
             raise RuntimeError(f"task {lease.task_id} left the {STAGE} stage under this lease")
 
 
+def _t6_in(database: sqlite3.Connection, lease: Lease) -> int:
+    """T6 on the final fence's existing connection; never acquire another writer."""
+    decision = apply_event(_state_in(database, lease), TransitionEvent("persisted"))
+    if not isinstance(decision, Applied):
+        raise RuntimeError(f"persisted rejected for task {lease.task_id}: {decision.reason}")
+    row = database.execute(
+        f"""UPDATE processing_tasks
+            SET stage = 'awaiting_review', progress = ?,
+                t6_seq = (SELECT coalesce(max(t6_seq), 0) + 1 FROM processing_tasks WHERE course_id = ?),
+                lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = {_NOW_TEXT}
+            WHERE id = ? AND lease_token = ? AND stage = ?
+            RETURNING t6_seq""",
+        (decision.state.progress, lease.course_id, lease.task_id, lease.token, STAGE),
+    ).fetchone()
+    if row is None:
+        raise LeaseLost(f"lease on task {lease.task_id} is no longer held by this token")
+    # 草稿内容在 T6 变为可见：课程状态据此从 published 变为 revising（V4 draft_revision）。
+    database.execute("UPDATE courses SET draft_revision = draft_revision + 1 WHERE id = ?", (lease.course_id,))
+    return int(row[0])
+
+
 def _t6(sqlite_url: str, lease: Lease) -> int:
     with leased_transaction(sqlite_url, lease.task_id, lease.token) as database:
-        decision = apply_event(_state_in(database, lease), TransitionEvent("persisted"))
-        if not isinstance(decision, Applied):
-            raise RuntimeError(f"persisted rejected for task {lease.task_id}: {decision.reason}")
-        row = database.execute(
-            f"""UPDATE processing_tasks
-                SET stage = 'awaiting_review', progress = ?,
-                    t6_seq = (SELECT coalesce(max(t6_seq), 0) + 1 FROM processing_tasks WHERE course_id = ?),
-                    lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = {_NOW_TEXT}
-                WHERE id = ? AND lease_token = ? AND stage = ?
-                RETURNING t6_seq""",
-            (decision.state.progress, lease.course_id, lease.task_id, lease.token, STAGE),
-        ).fetchone()
-        if row is None:
-            raise LeaseLost(f"lease on task {lease.task_id} is no longer held by this token")
-        # 草稿内容在 T6 变为可见：课程状态据此从 published 变为 revising（V4 draft_revision）。
-        database.execute("UPDATE courses SET draft_revision = draft_revision + 1 WHERE id = ?", (lease.course_id,))
-    return int(row[0])
+        return _t6_in(database, lease)
 
 
 def _fail(sqlite_url: str, lease: Lease, code: str, details: Mapping[str, object] | None) -> bool:
@@ -412,8 +421,10 @@ def _release(sqlite_url: str, repo: Neo4jRepository, lease: Lease, *, max_attemp
 class _PersistSteps:
     """C-ACC-B：入库阶段子步骤耗时，结束时写一行 INFO（只有任务编号、结果、毫秒数与次数）。
 
-    只计时、不改控制流：锁、事务、重试、预算与业务语义不变。每个已开始的步骤都计时（含抛错的那一步），
-    没走到的步骤不出现；``neo4j_attempts`` 是驱动执行写事务工作函数的次数（瞬态故障重跑时大于 1）。
+    每个已开始的步骤都计时（含抛错步骤），未开始的步骤不出现。
+    ADR-091 后每次显式事务的 ``neo4j_attempts`` 为 1，不含透明回调重跑。
+    ``neo4j_ms`` 覆盖显式事务作用域（含最终围栏和退出），``t6_ms`` 是其中的
+    跨库提交子区间；两个重叠字段不相加，``total_ms`` 才是阶段墙钟时间。
     """
 
     def __init__(self, task_id: str) -> None:
@@ -454,15 +465,23 @@ def run_persist_stage(
     lock_seconds: int,
     lock_wait_seconds: float,
     holder: str | None = None,
+    task_guard: LeaseGuard | None = None,
 ) -> PersistOutcome:
     """见模块说明。``lease.stage`` 须为 ``persisting``。"""
     if lease.stage != STAGE:
         raise ValueError(f"lease is on stage {lease.stage}, not {STAGE}")
+    if task_guard is None:
+        # Direct stage callers need the same lease horizon/heartbeat as pipeline
+        # callers; seed it from the confirmed claim, never a new object-time TTL.
+        with LeaseHeartbeat(sqlite_url, lease, lease_seconds=lock_seconds) as heartbeat:
+            return run_persist_stage(sqlite_url, lease, repo=repo, max_attempts=max_attempts,
+                                     lock_seconds=lock_seconds, lock_wait_seconds=lock_wait_seconds,
+                                     holder=holder, task_guard=heartbeat.guard)
     steps = _PersistSteps(lease.task_id)
     outcome = "error"
     try:
         result = _persist_stage(sqlite_url, lease, repo=repo, max_attempts=max_attempts, lock_seconds=lock_seconds,
-                                lock_wait_seconds=lock_wait_seconds, holder=holder, steps=steps)
+                                lock_wait_seconds=lock_wait_seconds, holder=holder, steps=steps, task_guard=task_guard)
         outcome = result.status.value
         return result
     except BaseException as error:
@@ -482,6 +501,7 @@ def _persist_stage(
     lock_wait_seconds: float,
     holder: str | None,
     steps: _PersistSteps,
+    task_guard: LeaseGuard,
 ) -> PersistOutcome:
     owner = holder or lease.owner
     common = dict(holder=owner, lock_seconds=lock_seconds, lock_wait_seconds=lock_wait_seconds)
@@ -495,12 +515,15 @@ def _persist_stage(
             return _after_failure(sqlite_url, repo, lease, **kwargs, **common)
 
     try:
+        task_guard.check()
         with steps.step("candidates"):
             candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id)
         with steps.step("plan"):
             plan = build_plan(lease.course_id, lease.task_id, candidates)
         with steps.step("chunks"):
             chunks = get_chunks(sqlite_url, course_id=lease.course_id, chunk_ids=_source_chunk_ids(plan))
+    except LeaseLost:
+        return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
     except sqlite3.Error:
         return release()
 
@@ -510,23 +533,57 @@ def _persist_stage(
     if lock is None:  # 发布或教师编辑持锁：退避后重试
         return release()
 
+    course_guard = LeaseGuard.from_expiry(lock_seconds, lock.expires_at)
+
+    def check() -> None:
+        task_guard.check()
+        course_guard.check()
+
     def work(tx: ScopedTransaction) -> _Written:
         steps.neo4j_attempts += 1
         return _write_draft(tx, lease.task_id, plan, chunks)
 
     lock_release_started = False
+    t6_seq: int | None = None
+
+    def completed_after_error() -> bool | None:
+        # Only recognize OUR T6 result, not a new owner's completed task. If a
+        # SQLite COMMIT ack or resource exit failed, never blindly fail/release a
+        # completed task. Failed read-back leaves the outcome uncertain.
+        if t6_seq is None:
+            return False
+        try:
+            with connect(sqlite_url) as database:
+                row = database.execute(
+                    "SELECT stage, t6_seq, lease_token FROM processing_tasks WHERE id=? AND course_id=?",
+                    (lease.task_id, lease.course_id),
+                ).fetchone()
+        except sqlite3.Error:
+            return None
+        return row is not None and row[0] in ('awaiting_review', 'completed') and row[1] == t6_seq and row[2] is None
+
+    def success() -> PersistOutcome:
+        return PersistOutcome(PersistStatus.ADVANCED, lease.task_id, 'awaiting_review', nodes=written.nodes,
+                              relations=written.relations, downgraded=written.downgraded)
+
     try:
         try:
-            with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds):
+            with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds, guard=course_guard):
                 try:
                     with steps.step("lease_check"):
+                        check()
                         _check_lease(sqlite_url, lease)  # 租约已丢则不写 Neo4j
                         scope = GraphScope(lease.course_id, DRAFT_VERSION,
                                            effective_task_ids=_effective(sqlite_url, lease.course_id))
                     with steps.step("neo4j"):
-                        written = repo.write_transaction(scope, work)
-                    with steps.step("t6"):
-                        _t6(sqlite_url, lease)
+                        timeout = min(task_guard.remaining(), course_guard.remaining())
+                        with repo.explicit_write_transaction(scope, check=check, timeout=timeout) as tx:
+                            written = work(tx)  # Graph draft guard is acquired here, before SQLite.
+                            with steps.step("t6"):
+                                with persist_transaction(sqlite_url, lease, lock.token) as database:
+                                    check()
+                                    tx.commit()
+                                    t6_seq = _t6_in(database, lease)
                 finally:
                     steps.start("lock_release")
                     lock_release_started = True
@@ -535,16 +592,28 @@ def _persist_stage(
             if lock_release_started:
                 steps.stop("lock_release")
     except LeaseLost:
+        if completed_after_error():
+            return success()
         return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
     except UnresolvableCycleError as exc:
         return after_failure(code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)})
     except (RepositoryError, sqlite3.Error):
+        completed = completed_after_error()
+        if completed:
+            return success()
+        if completed is None:
+            logger.warning('persisting T6 outcome uncertain task_id=%s', lease.task_id)
+            return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
         return release()
     except (RelationWriteError, RuntimeError, ValueError) as exc:
+        completed = completed_after_error()
+        if completed:
+            return success()
+        if completed is None:
+            return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
         logger.exception("persisting task %s failed (%s)", lease.task_id, type(exc).__name__)
         return after_failure(code="INTERNAL_ERROR", details=None)
-    return PersistOutcome(PersistStatus.ADVANCED, lease.task_id, "awaiting_review", nodes=written.nodes,
-                          relations=written.relations, downgraded=written.downgraded)
+    return success()
 
 
 # ---------------------------------------------------------------- 运行一次
@@ -605,7 +674,7 @@ def run_pipeline_once(
         return PipelineResult(reclaimed, cleaned, None, ())
     stages: list[tuple[str, str]] = []
     timer = _StageTimer(lease.task_id)
-    with LeaseHeartbeat(url, lease, lease_seconds=settings.TASK_LEASE_SECONDS):
+    with LeaseHeartbeat(url, lease, lease_seconds=settings.TASK_LEASE_SECONDS) as heartbeat:
         stage = lease.stage
         if stage == "parsing":
             timer.start()
@@ -632,7 +701,8 @@ def run_pipeline_once(
         if stage == STAGE:
             timer.start()
             persisted = run_persist_stage(url, replace(lease, stage=stage), repo=repo,
-                                          max_attempts=settings.TASK_MAX_ATTEMPTS, holder=holder, **lock)
+                                          max_attempts=settings.TASK_MAX_ATTEMPTS, holder=holder,
+                                          task_guard=heartbeat.guard, **lock)
             stages.append(timer.done(STAGE, persisted.status.value))
     if not stages:  # 领到了本入口不处理的阶段（不应出现）
         release_on_shutdown(url, lease.task_id, lease.token)

@@ -208,7 +208,7 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 关键质量边界
 
-- **worker 提交围栏设计（R1-PERSIST-FENCE，ADR-091，2026-10-08；尚未实现）**：任务/课程锁双租约守卫约束 `persisting` 的显式图事务；最终按「Neo4j 草稿守卫 → SQLite `BEGIN IMMEDIATE` 校验双令牌 → 图 COMMIT → 同连接 T6 → SQLite COMMIT」排序。仓储提供事务原语，worker 编排跨库恢复；其他图写调用者保持原入口，无契约/模型/迁移变化。SQLite 围栏只覆盖最终提交阶段，全库写者等待及提交应答不确定是独立风险，不宣称跨库原子性或客户端硬取消。详见 [R1 书面设计](superpowers/specs/2026-10-08-worker-persist-fence-design.md)；当前高严重程度发现仍待实施验收。
+- **worker 提交围栏（R1-PERSIST-FENCE，ADR-091，2026-10-08；本地已实施，发布准入 OPEN）**：任务/课程锁双租约守卫约束 `persisting` 的显式图事务；最终按「Neo4j 草稿守卫 → SQLite `BEGIN IMMEDIATE` 校验双令牌 → 图 COMMIT → 同连接 T6 → SQLite COMMIT」排序。仓储提供事务原语，worker 编排跨库恢复；其他图写调用者保持原入口，无契约/模型/迁移变化。SQLite 围栏只覆盖最终提交阶段，全库写者等待及提交应答不确定是独立风险，不宣称跨库原子性或客户端硬取消。详见 [R1 书面设计](superpowers/specs/2026-10-08-worker-persist-fence-design.md)；旧 worker 接管竞态已通过真实 Neo4j 回归；网络级提交应答截止未证明，暂不发布。
 
 - API 响应、任务事件、图谱导入/导出格式先在 `src/contracts/` 版本化。
 - LLM 是可替换适配器。`live`/`demo`/`fake` 模式下基础 URL、模型和密钥来自环境变量；`personal` 模式（ADR-080）下来自用户本人加密保存的配置：教师任务使用建任务时的密钥快照，学生问答按「用户 + 配置版本」隔离调用策略，用户填写的地址经出站校验并钉住已校验的 IP。向量为系统级在线服务（ADR-081），与用户所选生成模型无关。

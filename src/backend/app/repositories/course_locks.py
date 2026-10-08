@@ -19,6 +19,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from app.repositories.sqlite import connect
+from app.repositories.lease_guard import LeaseGuard
+from app.repositories.task_leases import LeaseLost
 
 __all__ = ["CourseLock", "acquire", "current_holder", "held", "release", "renew", "try_acquire"]
 
@@ -94,12 +96,13 @@ def current_holder(sqlite_url: str, course_id: str) -> str | None:
     return None if row is None else str(row[0])
 
 
-def renew(sqlite_url: str, lock: CourseLock, *, lease_seconds: int) -> bool:
+def renew(sqlite_url: str, lock: CourseLock, *, lease_seconds: int, require_live: bool = False) -> bool:
     _seconds("lease_seconds", lease_seconds)
     with connect(sqlite_url) as database:
         changed = database.execute(
-            "UPDATE course_locks SET expires_at = unixepoch() + ? WHERE course_id = ? AND token = ?",
-            (lease_seconds, lock.course_id, lock.token),
+            "UPDATE course_locks SET expires_at = unixepoch() + ? WHERE course_id = ? AND token = ? "
+            "AND (? = 0 OR expires_at > unixepoch())",
+            (lease_seconds, lock.course_id, lock.token, int(require_live)),
         ).rowcount
     return changed == 1
 
@@ -113,7 +116,8 @@ def release(sqlite_url: str, lock: CourseLock) -> bool:
 
 
 @contextmanager
-def held(sqlite_url: str, lock: CourseLock, *, lease_seconds: int | None = None) -> Iterator[CourseLock]:
+def held(sqlite_url: str, lock: CourseLock, *, lease_seconds: int | None = None,
+         guard: LeaseGuard | None = None) -> Iterator[CourseLock]:
     """持有已取得的锁直到块结束，无论成功与否都释放。给出 ``lease_seconds`` 时每 ``L/3`` 续约一次（§8.5）。"""
     stop = threading.Event()
     thread = None
@@ -123,8 +127,17 @@ def held(sqlite_url: str, lock: CourseLock, *, lease_seconds: int | None = None)
         def beat() -> None:
             while not stop.wait(lease_seconds / 3):
                 try:
-                    if not renew(sqlite_url, lock, lease_seconds=lease_seconds):
-                        return  # 已被他人取走：写入方的令牌条件与守卫节点仍保证正确性
+                    if guard is not None:
+                        guard.check()
+                    started = time.monotonic()
+                    if not renew(sqlite_url, lock, lease_seconds=lease_seconds, require_live=guard is not None):
+                        if guard is not None:
+                            guard.lose()
+                        return
+                    if guard is not None:
+                        guard.renewed(started)
+                except LeaseLost:
+                    return
                 except Exception:  # SQLite 暂时不可用：下个周期再试
                     continue
 

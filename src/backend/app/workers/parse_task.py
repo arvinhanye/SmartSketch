@@ -38,6 +38,7 @@ import secrets
 import socket
 import sqlite3
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -46,6 +47,7 @@ from app.config import Settings
 from app.repositories.chunks import put_chunks, record_revision
 from app.repositories.materials import get_material
 from app.repositories.sqlite import connect
+from app.repositories.lease_guard import LeaseGuard
 from app.repositories.tasks import read_leased_task
 from app.repositories.task_leases import (
     Lease,
@@ -379,7 +381,7 @@ class LeaseHeartbeat:
     """持有租约期间每 ``interval``（默认 ``L/3``）续约一次（§8.2 续约）。
 
     续约影响 0 行即租约已丢，置 ``lost`` 并停止；SQLite 暂时不可用时下个周期重试。
-    心跳只延长租约，不能代替写入时的令牌条件。
+    心跳提供终态单调截止守卫；持久化仍在最终围栏校验数据库双令牌。
     """
 
     def __init__(
@@ -390,7 +392,8 @@ class LeaseHeartbeat:
         self.interval = lease_seconds / 3 if interval is None else interval
         if not self.interval > 0:
             raise ValueError("interval must be positive")
-        self.lost = threading.Event()
+        self.guard = LeaseGuard.from_expiry(lease_seconds, lease.expires_at)
+        self.lost = self.guard.lost
         self.renewals = 0
         self._url = sqlite_url
         self._lease = lease
@@ -413,15 +416,21 @@ class LeaseHeartbeat:
     def _run(self) -> None:
         while not self._stop.wait(self.interval):
             try:
+                self.guard.check()
+                started = time.monotonic()
                 expires = renew_lease(
-                    self._url, self._lease.task_id, self._lease.token, lease_seconds=self._lease_seconds
+                    self._url, self._lease.task_id, self._lease.token, lease_seconds=self._lease_seconds,
+                    require_live=True,
                 )
+            except LeaseLost:
+                return
             except sqlite3.Error:
                 continue
             if expires is None:
                 self.lost.set()
                 return
             self.renewals += 1
+            self.guard.renewed(started)
 
 
 @dataclass(frozen=True)

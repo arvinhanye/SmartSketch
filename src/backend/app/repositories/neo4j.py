@@ -8,6 +8,7 @@ predicates, including relationship endpoints and evidence visibility (§8.4).
 
 import re
 import time
+import math
 from contextlib import contextmanager
 from contextvars import ContextVar
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -104,6 +105,34 @@ class ScopedTransaction:
     def run(self, query: str, parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
         bound = _parameters(query, self.scope, parameters)
         return [dict(record) for record in self._tx.run(query, bound)]
+
+
+class ExplicitTransaction(ScopedTransaction):
+    """Worker-only transaction: guarded statements and an explicit commit.
+
+    A dispatched commit can have an uncertain outcome. Neither a lost heartbeat
+    nor cleanup may then be interpreted as proof that the graph rolled back.
+    """
+
+    def __init__(self, tx: Any, scope: GraphScope, check: Callable[[], None]) -> None:
+        super().__init__(tx, scope)
+        self._check = check
+        self.commit_started = False
+        self.committed = False
+
+    def run(self, query: str, parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+        self._check()
+        rows = super().run(query, parameters)
+        self._check()
+        return rows
+
+    def commit(self) -> None:
+        if self.commit_started:
+            raise RuntimeError('explicit transaction commit already dispatched')
+        self._check()
+        self.commit_started = True
+        self._tx.commit()
+        self.committed = True
 
 
 # Consume quoted strings/identifiers and comments BEFORE considering parameters.
@@ -229,6 +258,34 @@ class Neo4jRepository:
         try:
             with self._driver.session(database="neo4j") as session:
                 return session.execute_write(lambda tx: work(ScopedTransaction(tx, scope)))
+        except _CONNECTION_ERRORS:
+            raise RepositoryConnectionError() from None
+        except (Neo4jError, DriverError):
+            raise RepositoryError() from None
+
+    @contextmanager
+    def explicit_write_transaction(
+        self, scope: GraphScope, *, check: Callable[[], None], timeout: float,
+    ) -> Iterator[ExplicitTransaction]:
+        """One attempt, never auto-commit/replay the worker's callback.
+
+        ``timeout`` is a server transaction timeout, NOT a client commit-reply
+        deadline. All Session/Transaction operations stay on the caller thread.
+        """
+        if not isinstance(scope, GraphScope):
+            raise GraphScopeError('A GraphScope is required')
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError('transaction timeout must be positive and finite')
+        check()
+        try:
+            with self._driver.session(database='neo4j') as session:
+                raw = session.begin_transaction(timeout=timeout)
+                try:
+                    yield ExplicitTransaction(raw, scope, check)
+                finally:
+                    # close() rolls back an open uncommitted transaction. Unlike
+                    # Transaction.__exit__, it never commits on a normal return.
+                    raw.close()
         except _CONNECTION_ERRORS:
             raise RepositoryConnectionError() from None
         except (Neo4jError, DriverError):

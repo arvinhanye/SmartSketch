@@ -162,16 +162,17 @@ def claim_next(
     )
 
 
-def renew_lease(sqlite_url: str, task_id: str, token: str, *, lease_seconds: int) -> int | None:
+def renew_lease(sqlite_url: str, task_id: str, token: str, *, lease_seconds: int,
+                require_live: bool = False) -> int | None:
     """Heartbeat: extend the lease to now + ``lease_seconds``; ``None`` means the lease is lost."""
     _non_empty("token", token)
     _positive_int("lease_seconds", lease_seconds)
     with connect(sqlite_url) as database:
         row = database.execute(
             """UPDATE processing_tasks SET lease_expires_at = unixepoch() + ?
-               WHERE id = ? AND lease_token = ?
+               WHERE id = ? AND lease_token = ? AND (? = 0 OR lease_expires_at > unixepoch())
                RETURNING lease_expires_at""",
-            (lease_seconds, task_id, token),
+            (lease_seconds, task_id, token, int(require_live)),
         ).fetchone()
     return row[0] if row else None
 
@@ -198,6 +199,28 @@ def leased_transaction(sqlite_url: str, task_id: str, token: str) -> Iterator[sq
     """Open ``BEGIN IMMEDIATE``, fence the lease, yield, then commit; roll back on any error."""
     with _immediate(sqlite_url) as database:
         fence(database, task_id, token)
+        yield database
+
+
+@contextmanager
+def persist_transaction(sqlite_url: str, lease: Lease, course_token: str) -> Iterator[sqlite3.Connection]:
+    """Final commit fence: serialize graph COMMIT/T6 against both takeovers.
+
+    Acquire the graph draft guard BEFORE entering; perform T6 using the yielded
+    connection, never a nested SQLite transaction. No graph construction here.
+    """
+    _non_empty('course_token', course_token)
+    with _immediate(sqlite_url) as database:
+        row = database.execute(
+            """SELECT 1 FROM processing_tasks AS t
+               JOIN course_locks AS c ON c.course_id = t.course_id
+               WHERE t.id = ? AND t.course_id = ? AND t.lease_token = ?
+                 AND t.stage = 'persisting' AND t.lease_expires_at > unixepoch()
+                 AND c.token = ? AND c.expires_at > unixepoch()""",
+            (lease.task_id, lease.course_id, lease.token, course_token),
+        ).fetchone()
+        if row is None:
+            raise LeaseLost('persisting task or course lock is no longer live')
         yield database
 
 
