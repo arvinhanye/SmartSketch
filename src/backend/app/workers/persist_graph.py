@@ -330,34 +330,37 @@ def cleanup_failed_task(
     sqlite_url: str, repo: Neo4jRepository, *, course_id: str, task_id: str, holder: str,
     lock_seconds: int, lock_wait_seconds: float,
 ) -> bool:
-    """§8.4 第 4 步：在课程写锁下撤销失败任务的全部贡献，成功后清除 ``cleanup_pending``。
+    """ADR-092: order even empty cleanup after every prior graph decision.
 
-    先判断本任务在草稿里是否还有需要撤销的贡献（ADR-072）。**没有工作时直接清 ``cleanup_pending``，
-    不取课程写锁、不等待**：任务已进入终态 ``failed``，只有 ``persisting`` 会写它的贡献，而终态任务不再被
-    领取，所以这次读到的「无工作」是最终结论——把判断与撤销分开不会漏掉工作。有工作时照旧取锁 → 撤销 →
-    清标记，锁保护不变。
+    A pre-read cannot exclude a cancelled client's late server COMMIT. Clear
+    the marker only after the guarded revocation commit and transport exit.
     """
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ValueError('task_id is required')
     try:
-        scope = GraphScope(course_id, DRAFT_VERSION, effective_task_ids=_effective(sqlite_url, course_id))
-        pending_work = task_has_contributions(repo, scope, task_id)
-    except (RepositoryError, sqlite3.Error) as exc:
-        logger.warning("could not check cleanup work for task %s (%s)", task_id,
-                       getattr(exc, "code", type(exc).__name__))
-        return False
-    if not pending_work:
-        return clear_cleanup_pending(sqlite_url, task_id, course_id=course_id)
-
-    lock = course_locks.acquire(sqlite_url, course_id, holder=holder, lease_seconds=lock_seconds,
-                                wait_seconds=lock_wait_seconds)
-    if lock is None:
-        return False
-    with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds):
-        try:
-            repo.write_transaction(scope, lambda tx: (lock_draft(tx), revoke_task(tx, task_id)))
-        except (RepositoryError, sqlite3.Error) as exc:
-            logger.warning("cleanup of task %s failed (%s)", task_id, getattr(exc, "code", type(exc).__name__))
+        lock = course_locks.acquire(sqlite_url, course_id, holder=holder, lease_seconds=lock_seconds,
+                                    wait_seconds=lock_wait_seconds)
+        if lock is None:
             return False
-    return clear_cleanup_pending(sqlite_url, task_id, course_id=course_id)
+        guard = LeaseGuard.from_expiry(lock_seconds, lock.expires_at)
+        with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds, guard=guard):
+            guard.check()
+            scope = GraphScope(course_id, DRAFT_VERSION,
+                               effective_task_ids=_effective(sqlite_url, course_id))
+            with repo.persist_write_transaction(scope, check=guard.check, remaining=guard.remaining) as tx:
+                lock_draft(tx)
+                revoke_task(tx, task_id)
+                try:
+                    tx.commit(started_at=time.monotonic())
+                except BaseException:
+                    if tx.commit_started:
+                        guard.lose()
+                    raise
+        return clear_cleanup_pending(sqlite_url, task_id, course_id=course_id)
+    except (RepositoryError, sqlite3.Error, LeaseLost, RuntimeError, ValueError) as exc:
+        logger.warning('cleanup of task %s failed (%s)', task_id,
+                       getattr(exc, 'code', type(exc).__name__))
+        return False
 
 
 # ---------------------------------------------------------------- 阶段入口
@@ -608,8 +611,7 @@ def _persist_stage(
             return success()
         return PersistOutcome(PersistStatus.LOST, lease.task_id, None)
     except UnresolvableCycleError as exc:
-        return after_failure(code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)},
-                             defer_cleanup=dedicated_started)
+        return after_failure(code="CYCLE_DETECTED", details={"cycle": list(exc.cycle)})
     except (RepositoryError, sqlite3.Error):
         completed = completed_after_error()
         if completed:

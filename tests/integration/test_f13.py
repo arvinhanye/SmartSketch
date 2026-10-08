@@ -362,7 +362,8 @@ def graph():
                                                       database_="neo4j").records]
 
     try:
-        yield SimpleNamespace(course=course, repo=Neo4jRepository(driver), q=q)
+        yield SimpleNamespace(course=course, repo=Neo4jRepository(driver, persist_driver_factory=lambda: neo4j.AsyncGraphDatabase.driver(
+            os.environ[_ENV[0]], auth=(os.environ[_ENV[1]], os.environ[_ENV[2]]))), q=q)
     finally:
         q("MATCH (n {course_id: $c}) DETACH DELETE n", c=course)
         driver.close()
@@ -379,7 +380,7 @@ class _BrokenRepo:
         raise RepositoryError()
 
     @contextmanager
-    def explicit_write_transaction(self, scope, **kwargs):
+    def persist_write_transaction(self, scope, **kwargs):
         self.calls += 1
         raise RepositoryError()
         yield
