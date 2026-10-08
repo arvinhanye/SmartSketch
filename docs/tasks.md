@@ -1993,3 +1993,8 @@ GRAPH-CONTROL-HINTS 验收：增强画布12项、type-check/build及verify.sh ba
 - TEACHER-GRAPH-CARDS：DONE；负责人 Codex。按用户三张参考图改独立圆角左侧卡片、搜索图标/分段布局切换和工具栏新建入口，保留面板调宽、有限视口、全部编辑字段与守卫。不改学生或后端。验证H05/H07/H14、类型/构建/basic和五尺寸浏览器回归。
 
 TEACHER-GRAPH-CARDS 验收：H05/H07/H14 153 PASS、type-check/build/basic退出0；真实课程与独立假API浏览器五尺寸通过，最终紧凑字段样式后长表单回归再次五尺寸通过。真实页面验证圆角三卡片、工具栏唯一新建入口与原有表单可打开。手机固定页签遮挡关闭问题已修复并复核；后端与学生未修改。交接docs/handoffs/codex-teacher-graph-cards.md；只保存本地提交，暂未推送本次改动。
+
+## 2026-10-09 当前状态移交Claude
+- CURRENT-HANDOFF-20261009：DONE；负责人Codex。仅汇总固定代码c81f409的进度、边界、真实未测和接手顺序；本轮只读核实PR #323已含圆角改动，以及最新CI前端5项、后端3项、集成迁移与E2E登录失败。不在本轮修复代码或发真实模型请求。交接docs/handoffs/codex-to-claude-current-state-2026-10-09.md，验证引用/无密钥/基本门禁。
+
+CURRENT-HANDOFF-20261009 验收：实际查询PR #321/#322/#323、c81f409最新CI及失败日志，核实端口/本地状态；文档引用与必要事实断言、无API-token标记检查、git diff --check、verify.sh basic退出0。本轮仅文档，不修复CI、不调用真实模型；CI失败作为接手优先项如实登记。只保存本地文档提交，不推送。
