@@ -365,3 +365,52 @@
  .light-surface.review .ui-page-header__actions { flex-wrap:wrap; }
  .light-surface.review .review__column { padding:18px; }
 }
+
+/* Members: compact add form and a calm, consistently aligned list. */
+.light-surface.members .ui-sheet__inner { max-width:1200px; padding-top:32px; }
+.light-surface.members .ui-page-header { align-items:center; margin-bottom:24px; }
+.light-surface.members .ui-add-member { margin:0 0 24px; padding:20px 24px; background:#fff; border-radius:12px; }
+.light-surface.members .ui-add-member fieldset { display:block; background:transparent; }
+.light-surface.members .ui-add-member legend { padding:0; margin-bottom:16px; color:var(--gw-text); font-size:15px; }
+.members-add-fields { display:flex; align-items:flex-end; gap:12px; max-width:780px; }
+.light-surface.members .ui-add-member label { flex:1; min-width:0; max-width:none; color:var(--gw-text-2); font-size:12px; }
+.light-surface.members .members-add-fields button { flex:none; min-height:40px; padding:9px 16px; }
+.light-surface.members .members-add-hint { margin:10px 0 0; color:var(--gw-text-2); font-size:12px; }
+.light-surface.members .ui-add-member [role] { margin-top:12px; padding:10px 12px; border-radius:6px; background:var(--gw-panel); }
+.members-list-card { padding:0 24px 8px; border:1px solid var(--gw-line); border-radius:12px; background:#fff; min-width:0; }
+.members-list-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:20px 0; }
+.members-count { padding:3px 9px; font-size:12px; border-radius:6px; color:var(--gw-text-2); background:var(--gw-hover); }
+.light-surface.members .ui-member-table { table-layout:fixed; }
+.light-surface.members .ui-member-table caption { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; padding:0; }
+.light-surface.members .ui-member-table thead th { padding:12px 14px; background:var(--gw-panel); font-size:12px; }
+.light-surface.members .ui-member-table thead th:nth-child(1) { width:34%; }
+.light-surface.members .ui-member-table thead th:nth-child(2) { width:16%; }
+.light-surface.members .ui-member-table thead th:nth-child(3) { width:30%; }
+.light-surface.members .ui-member-table thead th:nth-child(4) { width:20%; }
+.light-surface.members .ui-member-table tbody :is(th,td) { padding:16px 14px; background:transparent; font-size:13px; }
+.light-surface.members .ui-member-table tbody tr:last-child :is(th,td) { border-bottom:0; }
+.light-surface.members .ui-member-table :is(th,td):last-child { text-align:right; }
+.members-user { display:flex; align-items:center; gap:10px; min-width:0; }
+.members-user > span:last-child { flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; }
+.members-avatar { display:grid; place-items:center; flex:none; width:34px; height:34px; border:1px solid var(--gw-line); border-radius:10px; background:var(--gw-panel); color:var(--gw-text-2); font-size:13px; font-weight:500; }
+.members-avatar.is-teacher { border-color:transparent; color:var(--gw-accent); background:var(--gw-selected); }
+.members-role { display:inline-flex; padding:4px 9px; border-radius:5px; color:var(--gw-text-2); background:var(--gw-hover); font-size:12px; white-space:nowrap; }
+.members-role.is-teacher { color:var(--gw-accent); background:var(--gw-selected); }
+.members-protected { color:var(--gw-text-3); font-size:12px; }
+.light-surface.members .ui-member-table time { color:var(--gw-text-2); font-size:12px; }
+.light-surface.members .members-empty { display:flex; flex-direction:column; align-items:center; gap:12px; padding:32px 12px; margin:0; border-top:1px solid var(--gw-line); text-align:center; color:var(--gw-text-2); font-size:13px; }
+@media(max-width:767px) {
+ .light-surface.members .ui-member-table tbody :is(th,td) { padding:8px 0; }
+ .light-surface.members .ui-member-table :is(th,td):last-child { justify-content:flex-end; }
+ .light-surface.members .ui-member-table td:last-child::before { margin-right:auto; }
+ .light-surface.members .ui-member-table tr:last-child { border-bottom:0; }
+ .members-user { flex:0 1 auto; justify-content:flex-end; text-align:right; }
+ .members-user > span:last-child { flex:0 1 auto; }
+}
+@media(max-width:600px) {
+ .light-surface.members .ui-page-header { align-items:flex-start; flex-direction:column; gap:16px; }
+ .light-surface.members .ui-add-member { padding:18px; }
+ .members-add-fields { align-items:stretch; flex-direction:column; }
+ .light-surface.members .members-add-fields button { align-self:flex-start; min-height:44px; }
+ .members-list-card { padding:0 18px 8px; }
+}

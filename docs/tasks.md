@@ -1945,3 +1945,9 @@ MATERIALS-LAYOUT 后续调整：依用户要求删掉右侧说明和分隔线，
 - 先写重复标题回归（RED：每类出现两次）；验收 H09/H10/H14、类型/构建、宽屏/手机空态和非空页面。沿用户要求保存修改前上传布局为本地版本，再修改审核页面。
 
 REVIEW-LAYOUT 验收：去重回归先 RED（两次）后 GREEN（一次）；H09/H10/H14 共 98 PASS；type-check/build PASS；五宽度 × 空/非空十组浏览器 PASS，含合并面板、回滚确认和无溢出检查。修改前版本 4d9db5b；交接 `docs/handoffs/codex-review-layout.md`，当前排版修改保留工作树，未推送。
+## 2026-10-08 Codex：课程成员排版
+
+- MEMBERS-LAYOUT：DONE；负责人 Codex；用户要求优化成员页面并在完成后保存。输出为紧凑添加表单、统一成员卡片/身份/操作排版、响应式布局；沿用现有成员接口与权限。
+- 风险：用户名超长、窄屏表格、添加/移除反馈和教师不可移除。验收 H12/H14、type-check/build、五宽度浏览器及 scoped 本地提交。运行文件/密钥/日志不入提交，不推送。
+
+MEMBERS-LAYOUT 验收：H12/H14 共 81 PASS；type-check/build PASS；五宽度 × 列表/无学生/错误十五组浏览器 PASS，包含长用户名不跨列、教师无移除按钮、假 API 添加/移除与反馈。局部文件保存为本地 Git 提交，未推送。交接 `docs/handoffs/codex-members-layout.md`。

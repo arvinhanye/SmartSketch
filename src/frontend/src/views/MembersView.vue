@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { MEMBERS_API_KEY } from '../api/members'
@@ -50,10 +51,9 @@ const {
 
 <template>
   <PageSheet class="members ui-management" data-test="members" labelledby="members-title">
-    <PageHeader id="members-title" title="课程成员管理" description="按用户名添加学生，管理本课程的学习成员。" />
-    <p v-if="courseId">
-      <RouterLink data-test="members-back" :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
-    </p>
+    <PageHeader id="members-title" title="课程成员" description="添加学生，管理本课程的学习成员。">
+      <template #actions><RouterLink v-if="courseId" class="ui-btn" data-test="members-back" :to="{ name: COURSE_ROUTE, params: { cid: courseId } }"><AppIcon name="back" :size="16" />返回课程</RouterLink></template>
+    </PageHeader>
 
     <form
       v-if="status !== 'forbidden'"
@@ -65,23 +65,23 @@ const {
     >
       <fieldset :disabled="adding">
         <legend>添加学生</legend>
-        <label>
-          学生用户名
-          <input v-model="username" name="username" type="text" autocomplete="off" required />
-        </label>
+        <div class="members-add-fields">
+          <label for="member-username">学生用户名<input id="member-username" v-model="username" name="username" type="text" autocomplete="off" placeholder="输入学生已注册的用户名" aria-describedby="member-username-hint" required /></label>
+          <button type="submit" :disabled="adding"><AppIcon name="plus" :size="16" />{{ adding ? '添加中…' : '添加学生' }}</button>
+        </div>
+        <p id="member-username-hint" class="members-add-hint">使用学生注册时的用户名，将其加入当前课程。</p>
         <p v-if="addError" data-test="member-add-error" role="alert">{{ addError }}</p>
         <p v-if="addNotice" data-test="member-add-success" role="status">{{ addNotice }}</p>
-        <button type="submit" :disabled="adding">{{ adding ? '添加中…' : '添加' }}</button>
       </fieldset>
     </form>
 
     <section
-      class="list"
+      class="list members-list-card"
       data-test="members-region"
       aria-labelledby="members-list-title"
       :aria-busy="status === 'loading'"
     >
-      <h3 id="members-list-title">成员列表</h3>
+      <div class="members-list-heading"><h3 id="members-list-title">成员列表</h3><span v-if="status === 'ready'" class="members-count">{{ members.length }} 人</span></div>
       <p v-if="status === 'loading'" data-test="members-loading" role="status">正在加载成员…</p>
       <p v-else-if="status === 'forbidden'" data-test="members-forbidden" role="alert">{{ listError }}</p>
       <div v-else-if="status === 'error'">
@@ -89,12 +89,12 @@ const {
         <button type="button" data-test="members-retry" @click="loadMembers">重试</button>
       </div>
       <template v-else>
-        <p v-if="isEmpty" data-test="members-empty">暂无学生成员。可在上方按用户名添加学生。</p>
+        <p v-if="isEmpty" class="members-empty" data-test="members-empty"><AppIcon name="members" :size="28" />暂无学生成员。可在上方按用户名添加学生。</p>
         <p v-if="removeError" data-test="member-remove-error" role="alert">{{ removeError }}</p>
         <p v-if="removeNotice" data-test="member-remove-status" role="status">{{ removeNotice }}</p>
         <table class="ui-table ui-member-table" v-if="members.length > 0" data-test="members-table">
           <caption>
-            本课程成员（{{ members.length }} 人）；教师成员只能由管理员通过命令行调整
+            本课程成员（{{ members.length }} 人）
           </caption>
           <thead>
             <tr>
@@ -106,8 +106,8 @@ const {
           </thead>
           <tbody>
             <tr v-for="row in members" :key="row.userId" data-test="member-row">
-              <th scope="row" data-label="用户名">{{ row.username }}</th>
-              <td data-label="课程内身份"><span class="ui-badge">{{ row.roleLabel }}</span></td>
+              <th scope="row" data-label="用户名"><span class="members-user"><span class="members-avatar" :class="{ 'is-teacher': row.role === 'teacher' }" aria-hidden="true">{{ row.username.slice(0,1).toUpperCase() }}</span><span>{{ row.username }}</span></span></th>
+              <td data-label="课程内身份"><span class="members-role" :class="{ 'is-teacher': row.role === 'teacher' }">{{ row.roleLabel }}</span></td>
               <td data-label="加入时间"><time :datetime="row.joinedAt">{{ row.joinedLabel }}</time></td>
               <td data-label="操作">
                 <button
@@ -121,7 +121,7 @@ const {
                 >
                   {{ removing.has(row.userId) ? '移除中…' : '移除' }}
                 </button>
-                <span v-else class="muted">—</span>
+                <span v-else class="members-protected">由管理员维护</span>
               </td>
             </tr>
           </tbody>
