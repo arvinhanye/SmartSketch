@@ -1893,3 +1893,18 @@ C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整�
 C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCESS，merge commit 3d696158；#319（头d03b5e7，本轮修复）全部8检查SUCCESS，先合入claude/plan-c-acceptance，merge commit bbc8fbea；#318基线改为main、纳入修复后头bbc8fbea全部8检查SUCCESS，merge commit 0436ff34，已进入main。merge commit保留作者/历史，不force-push、不删除分支；没有合并测量分支88f9f6f。验证origin/main包含d03b5e7且完整代码树与已验修复提交一致。仓库当时开放PR列表为空；发布交接与启动说明的文档同步另由后续PR承载，不冒充新的业务修复或冻结。
 
 上述PR状态、头/合并提交与CI链接存evaluation/raw/codex-c-acc-fixes/publication-verification.json。当前代码入口scripts/start.sh已在GitHub main；本地主目录代码未自动pull/切换，本机.env/业务库未改。说明文档不存真实Key，向量仍.env全局online、生成API仍个人网页配置；网页向量配置计划保持CANCELLED_BY_USER。真实测量与人工签收口径不变，三项不补测仍未测，历史慢段根因OPEN；stage_c_status OPEN、technical_freeze NOT_PERFORMED。用户手工检查与冻结决定仍等待用户，不因GitHub合并自动签收。
+
+## 2026-10-08 Codex 认领：R1 worker 旧租约图提交防护
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PERSIST-FENCE | DESIGN_READY（聊天方案已确认；书面规格待评审，修复未实施） | Codex | 仅修复旧 worker 在租约丢失后提交 Neo4j 的高严重程度发现；双租约守卫、显式图事务、SQLite 提交围栏与同连接 T6；旧 worker 零提交、异常恢复和锁释放回归。其余四项中严重程度发现不纳入本任务。 |
+
+- 输入：`bdb89c4` 基线的只读审查与真实 SQLite/图调度替身复现；用户确认「双租约守卫＋显式图事务＋提交围栏」方案。
+- 当前输出：`docs/superpowers/specs/2026-10-08-worker-persist-fence-design.md`、ADR-091、任务协议/架构同步与 `docs/handoffs/codex-r1-persist-fence-design.md`。当前不改产品代码、测试、契约、迁移、依赖或运行环境。
+- 后续实现范围：worker 持久化与心跳、任务租约/课程锁仓储、Neo4j 显式事务入口、新增定向回归；保留其他调用者的托管事务入口和公共 API。
+- 依赖：现有单机 worker、SQLite WAL 和 Neo4j 5.28.2 同步驱动；复用 §8.4 的贡献可见性与接管重建，不引入跨库原子提交。
+- 风险/需评审：SQLite 提交围栏是全库单写者；Neo4j 提交应答阻塞会延长持锁时间，服务端事务 timeout 不等于客户端提交应答截止。书面规格区分一致性保证与可用性限制；实现阶段必须用故障注入证明退出/恢复行为，未解决的无界等待不作为已闭环发布。
+- 验证命令：`git diff --check`、`PATH="/opt/anaconda3/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS="-p no:cacheprovider" ./scripts/verify.sh`（basic）；实现时再执行规格中的 worker 回归和独立 Neo4j 集成。
+- 本轮设计验收证据：上述 basic 门禁 exit 0，契约回归 237 passed、门禁负向测试 25 项通过；文档链接解析及 TODO/TBD 扫描通过，`git diff --check` exit 0。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-design-verify.log`。仅验证文档/既有基础门禁，不是 R1 修复验收；新 worker 回归与真实 Neo4j 故障验收尚未运行。
+- 下一步：用户评审书面规格；通过后编写实施计划并确定执行方式。设计交付不等于漏洞已修复，不推送、不创建 PR、不操作用户业务库。
