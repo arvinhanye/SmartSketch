@@ -310,6 +310,68 @@
 .ui-model-directory { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
 .ui-model-directory p { flex:1; min-width:180px; margin:0; }
 
+/* API settings: two independent, compact cards fit desktop viewports. */
+.light-surface.model-settings .ui-sheet__inner { max-width: 800px; padding: 22px 28px 20px; }
+.light-surface.model-settings--teacher .ui-sheet__inner { max-width: 1400px; }
+.model-settings .ui-page-header { margin-bottom: 18px; }
+.model-settings .ui-page-header__text p { margin-top: 4px; font-size: 13px; line-height: 20px; }
+.model-settings__grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; }
+.model-settings--teacher .model-settings__grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.model-settings__card { min-width: 0; padding: 20px; border: 1px solid var(--gw-line); border-radius: 12px; background: #fff; }
+.model-settings__card-heading { margin-bottom: 14px; }
+.model-settings .model-settings__card-heading h3 { font-size: 18px; line-height: 26px; }
+.model-settings__card-heading p { margin: 3px 0 0; font-size: 12px; line-height: 18px; color: var(--gw-text-2); }
+.model-settings .ui-config-status { gap: 10px; padding: 10px 12px; margin-bottom: 16px; min-height: 78px; box-sizing: border-box; background: var(--gw-panel); border: 0; border-radius: 8px; align-items: center; }
+.model-settings .ui-config-status__icon { width: 32px; height: 32px; border-radius: 8px; }
+.model-settings .ui-config-status__body h3 { font-size: 13px; line-height: 18px; }
+.model-settings .ui-config-status__body p { margin-top: 2px; font-size: 12px; line-height: 18px; }
+.model-settings .ui-config-status > .ui-btn { min-height: 30px; padding: 3px 8px; margin: 0; font-size: 12px; }
+.model-settings .ui-config-section { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.model-settings .ui-config-section > * { grid-column: 1 / -1; min-width: 0; }
+.model-settings .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.model-settings .ui-field:has(#mc-provider, #em-provider) { grid-column: 1; }
+.model-settings .ui-field:has(#mc-base-url, #em-base-url) { grid-column: 2; }
+.model-settings .ui-field { gap: 5px; }
+.model-settings .ui-field label { font-size: 12px; line-height: 18px; }
+.model-settings .ui-field :is(input, select) { min-height: 36px; height: 36px; padding: 7px 10px; font-size: 13px; }
+.model-settings .ui-field:has([data-test=em-custom-dimensions]) { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.model-settings .ui-field:has([data-test=em-custom-dimensions]) label { grid-column: 1 / -1; }
+.model-settings .ui-field:has([data-test=em-custom-dimensions]) .ui-text-danger { grid-column: 1 / -1; }
+.model-settings .ui-field > p:not(.ui-text-danger) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.model-settings .ui-model-directory { gap: 8px; }
+.model-settings .ui-model-directory .ui-btn { min-height: 28px; padding: 2px 8px; font-size: 12px; }
+.model-settings .ui-model-directory p { font-size: 12px; line-height: 18px; }
+.model-settings .ui-thinking { padding-top: 10px; }
+.model-settings .ui-switch { min-height: 32px; font-size: 13px; }
+.model-settings .ui-thinking > p { margin-top: 2px; line-height: 18px; }
+.model-settings .ui-config-actions { margin-top: 14px; padding-top: 14px; }
+.model-settings .ui-config-actions .ui-btn { min-height: 36px; padding: 6px 12px; }
+.model-settings .ui-notice { margin: 8px 0; padding: 8px 10px; font-size: 12px; line-height: 18px; }
+.model-settings .ui-cost-hint { margin-top: 8px; font-size: 11px; line-height: 18px; }
+.model-settings__help { margin-top: 12px; color: var(--gw-text-2); font-size: 12px; line-height: 20px; }
+.model-settings__help summary { cursor: pointer; width: fit-content; }
+.model-settings__help p { margin: 6px 0 0; }
+@media(min-width:1051px) and (max-height:850px) {
+ .light-surface.model-settings .ui-sheet__inner { padding-top: 16px; padding-bottom: 16px; }
+ .model-settings .ui-page-header { margin-bottom: 12px; }
+ .model-settings__card { padding: 14px 16px; }
+ .model-settings__card-heading { margin-bottom: 10px; }
+ .model-settings .ui-config-status { margin-bottom: 10px; min-height: 64px; }
+ .model-settings .ui-config-section { gap: 6px 12px; }
+ .model-settings .ui-config-actions { margin-top: 10px; padding-top: 10px; }
+}
+@media(max-width:1050px) {
+ .model-settings--teacher .model-settings__grid { grid-template-columns: minmax(0,1fr); }
+ .light-surface.model-settings .ui-sheet__inner { max-width: 800px; padding: 20px; }
+}
+@media(max-width:480px) {
+ .light-surface.model-settings .ui-sheet__inner { padding: 16px 12px; }
+ .model-settings__card { padding: 16px; }
+ .model-settings .ui-config-section { grid-template-columns: minmax(0,1fr); }
+ .model-settings .ui-config-section > .ui-field { grid-column: 1 / -1 !important; }
+ .model-settings .ui-config-status { display: flex; flex-wrap: wrap; }
+}
+
 /* Materials: compact page heading and single-column upload card. */
 .light-surface.materials .ui-sheet__inner { max-width:1200px; padding-top:32px; }
 .light-surface.materials .ui-page-header { margin-bottom:24px; align-items:center; }

@@ -60,7 +60,7 @@ describe('教师向量表单',()=>{
   const api=embeddingApi();const w=await view('teacher',api)
   await w.get('[data-test=em-api-key]').setValue('test-vector-key-1234')
   await w.get('[data-test=em-refresh-models]').trigger('click');await flushPromises()
-  await w.get('[data-test=em-model-select]').setValue('custom-vector')
+  await w.get('[data-test=em-model-toggle]').trigger('click');await w.findAll('[role=option]')[1]!.trigger('click')
   expect((w.get('[data-test=em-model]').element as HTMLInputElement).value).toBe('custom-vector')
   await w.get('[data-test=em-model]').setValue('manual-vector')
   expect((w.get('[data-test=em-model]').element as HTMLInputElement).value).toBe('manual-vector');w.unmount()

@@ -3,6 +3,7 @@ import { computed, inject, ref } from 'vue'
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
+import ModelPicker from '../components/ModelPicker.vue'
 import EmbeddingSettings from '../components/EmbeddingSettings.vue'
 import { useSessionStore } from '../stores/session'
 import { MODEL_CONFIG_API_KEY } from '../api/modelConfig'
@@ -20,7 +21,6 @@ const { status, saved, form, configured, keyRequired, busy, saving, testing, err
 const discovery = useModelDiscovery(api, form, saved)
 const {models,loading:discovering,message:discoveryMessage,provider,canDiscover,chooseProvider,refresh} = discovery
 function changeProvider(event:Event) { chooseProvider((event.target as HTMLSelectElement).value) }
-function selectModel(event:Event) { form.model = (event.target as HTMLSelectElement).value }
 const confirmingClear = ref(false)
 const baseInput = ref<HTMLInputElement | null>(null)
 const lastTestTime = computed(() => {
@@ -37,9 +37,12 @@ async function confirmClear(): Promise<void> {
 </script>
 
 <template>
- <PageSheet labelledby="mc-title" compact class="model-settings" data-test="model-settings">
+ <PageSheet labelledby="mc-title" compact class="model-settings" :class="{ 'model-settings--teacher': session.role === 'teacher' }" data-test="model-settings">
   <PageHeader id="mc-title" title="模型 API 设置" description="管理用于图谱生成与课程问答的个人模型连接。" />
   <p v-if="runtime.isDemo" class="ui-notice" data-test="mc-demo" role="status">当前为演示模式：系统使用内置的演示模型，个人配置不生效。</p>
+  <div class="model-settings__grid">
+  <section class="model-settings__card" aria-labelledby="mc-card-title">
+   <header class="model-settings__card-heading"><h3 id="mc-card-title">通用模型 API</h3><p>用于知识图谱生成与课程问答</p></header>
   <div v-if="status === 'loading'" class="ui-state" data-test="mc-loading" role="status" aria-busy="true"><p>正在加载配置…</p><div class="ui-skeleton" aria-hidden="true" /></div>
   <div v-else-if="status === 'error'" class="ui-state"><p class="ui-notice ui-notice--danger" data-test="mc-error" role="alert">{{ error }}</p><button class="ui-btn" type="button" data-test="mc-retry" @click="load">重试</button></div>
   <template v-else>
@@ -50,14 +53,13 @@ async function confirmClear(): Promise<void> {
    </section>
    <form class="ui-config-form" data-test="mc-form" novalidate :aria-busy="busy !== null" @submit.prevent="save">
     <section class="ui-config-section" aria-labelledby="mc-connection-title">
-     <div class="ui-config-section__heading"><h3 id="mc-connection-title">连接配置</h3><p>选择模型供应商，填写 API Key 后自动获取可用模型。</p></div>
+     <h3 id="mc-connection-title" class="sr-only">通用模型连接配置</h3>
      <div class="ui-field"><label for="mc-provider">模型供应商</label><select id="mc-provider" data-test="mc-provider" :value="provider" :disabled="busy !== null" @change="changeProvider"><option v-for="item in MODEL_PROVIDERS" :key="item.id" :value="item.id">{{ item.name }}</option></select><p>选择后带入默认地址，也可按所在地域或代理服务修改。</p></div>
      <div class="ui-field"><label for="mc-base-url">服务地址</label><input ref="baseInput" id="mc-base-url" v-model="form.baseUrl" data-test="mc-base-url" type="url" inputmode="url" placeholder="https://api.deepseek.com" autocomplete="off" spellcheck="false" aria-describedby="mc-base-hint" :disabled="busy !== null" /><p id="mc-base-hint">使用服务商提供的 HTTPS API 地址。</p></div>
      <div class="ui-field"><label for="mc-api-key">API Key{{ keyRequired ? '' : '（不改可留空）' }}</label><input id="mc-api-key" v-model="form.apiKey" data-test="mc-api-key" type="password" autocomplete="off" spellcheck="false" :aria-required="keyRequired" aria-describedby="mc-key-hint" :disabled="busy !== null" /><p id="mc-key-hint">填写后自动获取模型。密钥加密保存在服务端，保存后不再显示。</p></div>
      <div class="ui-model-directory"><button type="button" class="ui-btn" data-test="mc-refresh-models" :disabled="!canDiscover || discovering || busy !== null" @click="refresh">{{ discovering ? '正在获取模型…' : '刷新模型列表' }}</button><p v-if="discovering || discoveryMessage" class="ui-muted" data-test="mc-discovery-status" role="status" :aria-busy="discovering">{{ discovering ? '正在查询供应商可用模型…' : discoveryMessage }}</p></div>
-     <div v-if="models.length" class="ui-field"><label for="mc-model-select">可用模型</label><select id="mc-model-select" data-test="mc-model-select" :value="models.includes(form.model) ? form.model : ''" :disabled="busy !== null" @change="selectModel"><option value="" disabled>请选择模型</option><option v-for="name in models" :key="name" :value="name">{{ name }}</option></select></div>
-     <div class="ui-field"><label for="mc-model">模型名称（可手动输入）</label><input id="mc-model" v-model="form.model" data-test="mc-model" type="text" placeholder="选择上方模型，或输入供应商提供的模型名称" autocomplete="off" spellcheck="false" aria-describedby="mc-model-hint" :disabled="busy !== null" /><p id="mc-model-hint">列表可能包含非对话模型，保存前可测试连接。未提供列表的服务可直接手动填写。</p></div>
-     <div class="ui-thinking"><div class="ui-thinking__row"><label class="ui-switch" for="mc-thinking"><input id="mc-thinking" v-model="form.disableThinking" data-test="mc-disable-thinking" type="checkbox" role="switch" :aria-checked="form.disableThinking" aria-describedby="mc-disable-thinking-hint" :disabled="busy !== null" /><span class="ui-switch__track" aria-hidden="true" /><span>关闭模型思考</span></label></div><p id="mc-disable-thinking-hint">适用于支持 <code>thinking</code> 字段的接口（如 DeepSeek）。开启后抽取与问答不再先做长篇推理，通常明显更快、更省 token；复杂问题的回答质量可能下降。其他接口可能不认这个字段，保存前请先测试连接。</p></div>
+     <div class="ui-field"><label for="mc-model">&#27169;&#22411;&#21517;&#31216;</label><ModelPicker id="mc-model" v-model="form.model" :models="models" :disabled="busy !== null" test-prefix="mc" /></div>
+     <div class="ui-thinking"><div class="ui-thinking__row"><label class="ui-switch" for="mc-thinking"><input id="mc-thinking" v-model="form.disableThinking" data-test="mc-disable-thinking" type="checkbox" role="switch" :aria-checked="form.disableThinking" aria-describedby="mc-disable-thinking-hint" :disabled="busy !== null" /><span class="ui-switch__track" aria-hidden="true" /><span>关闭模型思考</span></label></div><p id="mc-disable-thinking-hint">仅适用于支持 thinking 的接口，请先测试连接。</p></div>
     </section>
     <section class="ui-config-actions" aria-label="配置操作">
      <p v-if="error" class="ui-notice ui-notice--danger" data-test="mc-error" role="alert">{{ error }}</p>
@@ -68,8 +70,10 @@ async function confirmClear(): Promise<void> {
      <div v-if="confirmingClear" class="ui-config-confirm" role="alertdialog" aria-labelledby="mc-clear-title"><p id="mc-clear-title">清除后，你尚未结束的图谱生成任务会终止，需要重新上传。确定清除？</p><div class="ui-actions"><button type="button" class="ui-btn ui-btn--danger" data-test="mc-clear-confirm" :disabled="busy !== null" @click="confirmClear">确定清除</button><button type="button" class="ui-btn" data-test="mc-clear-cancel" :disabled="busy !== null" @click="confirmingClear = false">取消</button></div></div>
     </section>
    </form>
-   <aside class="ui-config-security" aria-labelledby="mc-security-title"><AppIcon name="key" :size="16" /><div><h3 id="mc-security-title">安全说明</h3><p>教师生成知识图谱、学生提问都使用你自己填写的模型 API。密钥加密保存在服务端，保存后不再显示，也不会提供给其他用户。目前支持 OpenAI 兼容的对话接口（已验证：DeepSeek）。</p></div></aside>
   </template>
+  </section>
   <EmbeddingSettings v-if="session.role === 'teacher'" />
+  </div>
+  <details class="model-settings__help"><summary>密钥安全与接口说明</summary><p>使用供应商提供的 HTTPS 地址。输入 API Key 后自动获取模型，也可手动输入。密钥加密保存，不提供给其他用户。模型目录可能包含其他类型，请先测试确认模型能力与向量维度。</p><p>关闭思考适用于支持 thinking 字段的接口（如 DeepSeek），通常更快、更省 token，但复杂问题质量可能下降；其他接口可能不支持，请先测试。</p></details>
  </PageSheet>
 </template>

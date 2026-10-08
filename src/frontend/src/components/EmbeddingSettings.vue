@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
+import ModelPicker from './ModelPicker.vue'
 import { EMBEDDING_CONFIG_API_KEY, type EmbeddingConfig } from '../api/embeddingConfig'
 import type { ModelConfig, ModelConfigApi } from '../api/modelConfig'
 import { MODEL_PROVIDERS, useModelDiscovery } from '../composables/useModelDiscovery'
@@ -43,8 +44,8 @@ watch(dimensions,()=>{testResult.value=null})
 </script>
 
 <template>
- <section class="embedding-settings" data-test="embedding-settings" aria-labelledby="em-title">
-  <div class="ui-config-section__heading"><h2 id="em-title">向量模型</h2><p>用于课程资料检索，仅作用于你创建的课程；学生自动使用课程配置。</p></div>
+ <section class="embedding-settings model-settings__card" data-test="embedding-settings" aria-labelledby="em-title">
+  <header class="model-settings__card-heading"><h3 id="em-title">向量模型 API</h3><p>用于本人课程检索，学生自动使用</p></header>
   <p v-if="status==='loading'" class="ui-muted" role="status">正在加载向量配置…</p>
   <div v-else-if="status==='error'" class="ui-notice ui-notice--danger" role="alert"><p>向量配置加载失败，请重试。</p><button type="button" class="ui-btn" @click="load">重新加载</button></div>
   <template v-else>
@@ -54,13 +55,12 @@ watch(dimensions,()=>{testResult.value=null})
    </section>
    <form class="ui-config-form" data-test="em-form" novalidate :aria-busy="busy!==null" @submit.prevent="save">
     <section class="ui-config-section" aria-labelledby="em-connection-title">
-     <div class="ui-config-section__heading"><h3 id="em-connection-title">连接配置</h3><p>选择向量服务，填写 API Key 后获取模型，也可手动填写。</p></div>
+     <h3 id="em-connection-title" class="sr-only">向量模型连接配置</h3>
      <div class="ui-field"><label for="em-provider">模型供应商</label><select id="em-provider" data-test="em-provider" :value="selectedProvider" :disabled="busy!==null" @change="chooseProvider(($event.target as HTMLSelectElement).value)"><option v-for="p in providers" :key="p.id" :value="p.id">{{p.name}}</option></select></div>
      <div class="ui-field"><label for="em-base-url">服务地址</label><input id="em-base-url" v-model="form.baseUrl" data-test="em-base-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" :disabled="busy!==null" /><p>使用提供 embeddings 接口的 HTTPS 服务地址。</p></div>
      <div class="ui-field"><label for="em-api-key">API Key{{keyRequired?'':'（不改可留空）'}}</label><input id="em-api-key" v-model="form.apiKey" data-test="em-api-key" type="password" autocomplete="off" spellcheck="false" :aria-required="keyRequired" :disabled="busy!==null" /><p>密钥加密保存在服务端，保存后不再显示。</p></div>
      <div class="ui-model-directory"><button type="button" class="ui-btn" data-test="em-refresh-models" :disabled="!canDiscover||discovering||busy!==null" @click="refresh">{{discovering?'正在获取模型…':'刷新模型列表'}}</button><p v-if="discovering||discoveryMessage" class="ui-muted" role="status">{{discovering?'正在查询可用模型…':discoveryMessage}}</p></div>
-     <div v-if="models.length" class="ui-field"><label for="em-model-select">可用模型</label><select id="em-model-select" data-test="em-model-select" :value="models.includes(form.model)?form.model:''" :disabled="busy!==null" @change="form.model=($event.target as HTMLSelectElement).value"><option value="" disabled>请选择向量模型</option><option v-for="name in models" :key="name" :value="name">{{name}}</option></select><p>供应商目录可能包含其他类型模型，请选择向量模型。</p></div>
-     <div class="ui-field"><label for="em-model">模型名称（可手动输入）</label><input id="em-model" v-model="form.model" data-test="em-model" type="text" autocomplete="off" spellcheck="false" placeholder="例如 text-embedding-v4" :disabled="busy!==null" /></div>
+     <div class="ui-field"><label for="em-model">&#27169;&#22411;&#21517;&#31216;</label><ModelPicker id="em-model" v-model="form.model" :models="models" :disabled="busy !== null" test-prefix="em" /></div>
      <div class="ui-field"><label for="em-dimensions">向量维度</label><select id="em-dimensions" data-test="em-dimensions" :value="dimensionChoice" :disabled="busy!==null" @change="changeDimension"><option v-for="d in dimensionOptions" :key="d" :value="String(d)">{{d}} 维</option><option value="custom">自定义维度</option></select><input v-if="customDimension" v-model.number="dimensions" data-test="em-custom-dimensions" type="number" min="1" max="4096" step="1" aria-label="自定义向量维度" :disabled="busy!==null" /><p>以模型支持的维度为准。测试会检查实际返回维度。</p><p v-if="!validDimension" class="ui-text-danger" role="alert">请输入 1–4096 的整数维度。</p></div>
     </section>
     <section class="ui-config-actions" aria-label="向量配置操作">
@@ -74,8 +74,3 @@ watch(dimensions,()=>{testResult.value=null})
   </template>
  </section>
 </template>
-<style scoped>
-.embedding-settings { margin-top:40px; padding-top:32px; border-top:1px solid var(--gw-line); }
-.embedding-settings h2 { font-size:20px; margin:0; }
-.embedding-settings > .ui-config-section__heading { margin-bottom:24px; }
-</style>
