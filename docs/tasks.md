@@ -1910,3 +1910,18 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 - 实施验收证据：最终定向 214 passed（F02/C09/D11/清理/计时及新增回归）、真实 Neo4j F13/R1 34 passed，两个 XML 零失败/错误/skip；旧 worker 在相同真实回归遗留节点而失败。独立审查后新增提交前/后截止测试，故障变异各失败、正常版本通过。最终 basic exit 0，`git diff --check` 通过。日志与 XML 在 `/private/tmp/smartsketch-ocr-46o1tbcy/`，详见实施交接。
 - 全量限制：backend full 3945 passed/27 skip/1 failed/6 errors，七项失败均是工具子进程丢失临时依赖；独立临时 venv 复验该模块与新回归 45 passed，但完整 full 未重跑。frontend full 因缺 node_modules 失败，完整 integration/E2E 未跑，不宣称全量门禁通过。实际应用环境未改，临时 Neo4j 已移除。
 - 下一步：保留本地修改/提交；网络级总截止及真实断连时资源释放/全库写阻塞上限仍需准入验证，暂不发布、不推送、不创建 PR、不操作用户业务库。独立审查未发现新确定性运行时缺陷，Important 提交前/后截止测试缺口已补；Minor 两个实际心跳调用者的延迟/连续失败故障测试暂缓。
+
+## 2026-10-08 Codex 认领：R1 提交传输截止补充设计
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PERSIST-DEADLINE-DESIGN | WRITTEN_PENDING_REVIEW（仅补充设计，发布准入 OPEN） | Codex | 用户选择 worker 专用可取消异步传输；书面规格覆盖截止、取消、SQLite 围栏退出、提交不确定恢复和真实网络故障验收；不实施产品代码、不关闭发布准入。 |
+
+- 输入：本地 R1 修复 `e111315`、现有设计 §7 与实施交接；用户明确要求「按首选方向编写补充设计」。
+- 输出：`docs/superpowers/specs/2026-10-08-worker-persist-deadline-design.md`、架构/任务协议/决策同步及 Codex 设计交接。
+- 依赖：现有 Neo4j 5.28.2 的 AsyncSession 公开取消能力、Python 3.11+ asyncio、同步 worker 与 SQLite 同线程围栏；不升级项目依赖、不操作共享库。
+- 风险：取消仅证明连接退出，不证明服务端图未提交；截止预算不能因心跳或分步等待重置；退出清理与重建路径不能再次引入无界等待；全库写者仍可能遇到 busy timeout。
+- 验证：文档链接/状态/预算自审、`git diff --check`、`PATH="/opt/anaconda3/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS="-p no:cacheprovider" ./scripts/verify.sh`。产品/网络故障测试留至获批实施；发布准入仍 OPEN。
+- 审批边界：本轮确认仅批准写补充设计；书面规格获批后才编写实施计划，计划与执行方式获批后实施。
+- 设计要点（详细取值待书面批准）：COMMIT 默认 2 s/上限 3 s；资源清理默认 1 s/上限 5 s，等待型清理置于围栏外；取消不证明图未提交。恢复清理经 DraftWriteGuard 幂等撤销后才清标记，拟修订 ADR-072 的此入口无贡献快路径。默认围栏 ≤3 s 是待真实故障验证的阈值，不是当前保证。
+- 设计验收：8 个文档文件、17 条本地链接解析通过；新规格无未填占位、代码围栏配对、状态/预算/范围核对通过；Settings 与 `.env.example` 未加入候选配置。`git diff --check` exit 0；本轮 basic 门禁 exit 0，契约测试 237 passed、门禁负向测试 25 项通过。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-design-verify.log`，设计校验/哈希 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-design-check.json`。仅验证设计文档与既有基础门禁；没有新产品/网络故障验收或全量结果，不关闭风险。

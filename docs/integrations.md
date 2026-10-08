@@ -14,6 +14,19 @@
 
 ## 运行时环境变量
 
+### R1 提交截止候选配置（2026-10-08；仅设计，尚未生效）
+
+用户已选择 worker 专用可取消异步传输；[补充规格](superpowers/specs/2026-10-08-worker-persist-deadline-design.md) 待书面评审。以下名称/默认值是候选项，不属于当前 Settings 或 `.env.example` 的有效运行配置；实施审批后才同步增加两处声明与校验。复用现有 `NEO4J_URI/USER/PASSWORD`，无新增密钥/外部服务。
+
+| 候选变量 | 类型与拟议默认值 | 用途/边界 |
+| --- | --- | --- |
+| `TASK_PERSIST_COMMIT_TIMEOUT_SECONDS` | 有限正数，默认 2.0，最大 3.0 | worker 最终图 COMMIT 总预算，与图尝试/双守卫剩余预算取小；不是服务器事务 timeout。 |
+| `TASK_PERSIST_CLEANUP_TIMEOUT_SECONDS` | 有限正数，默认 1.0，最大 5.0 | SQLite 围栏退出后异步事务/Session/Driver 清理共享预算，不能逐层重置或延长提交。 |
+
+配置来源：仅环境变量；零、负数、NaN/Inf 或超范围拒绝启动。调用方：worker 持久化和失败贡献清理专用传输；API/其他图入口不变。真实测试只使用一次性本机 Neo4j/SQLite 与回环 TCP 代理，记录计时/状态不记录认证包。代码回滚至 `e111315` 后删除本轮新增配置声明，既有地址/凭据不动；无数据迁移，但可用性风险重新 OPEN。
+
+### 已有配置说明
+
 变量名和无敏感样例维护在根目录 `.env.example`，本节各表与之逐项对齐；真实值只放本机 `.env` 或密钥管理系统。「样例」列即 `.env.example` 中的值。「状态」列只说明**取值**的决定状态：
 
 - **已约定**：main 既有的变量与取值。
