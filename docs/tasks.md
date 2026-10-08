@@ -1931,3 +1931,11 @@ UI-ROLLOUT-REMAINING 最终：前端 60 文件 / 1166 测试 PASS，type-check/b
 - 无库表迁移；接口先更新契约与身份规格再生成。风险是 Key 跨供应商、DNS/重定向绕过、晚到模型列表与上游响应泄露；验收为服务/接口安全回归、前端状态隔离、真实浏览器假供应商、契约生成检查及相关/全量前端。
 
 MODEL-DISCOVERY 验收：后端发现/原配置/出站回归 74 PASS；全量前端 61 文件 / 1169 PASS，新增发现回归最终 6 PASS；type-check/build PASS；basic 门禁 PASS（已定位现有用户目录生成器并加入检查 PATH）；桌面/手机浏览器 PASS。交接 `docs/handoffs/codex-model-discovery.md`；本地 5322/8321 已运行新接口，未提交或推送。
+## 2026-10-08 Codex：资料上传排版优化
+
+- MATERIALS-LAYOUT：DONE；负责人 Codex；输入为用户上传页截图与现有页面。先按用户要求保存当前版本为本地提交 c89b0df，再调整页头、双栏上传卡片、资料列表与空态。只调整展示，沿用上传验证、SSE、取消/重试/删除。
+- 验收：H02/H09/H14 回归、type-check/build、桌面/手机空态/已选择/资料列表浏览器检查；风险为原生文件选择键盘可访问性、长文件名与窄屏溢出。无接口与数据变更。
+
+MATERIALS-LAYOUT 验收：H02/H09/H14 共 173 PASS，type-check/build PASS；2559/1440/1280/768/390 五宽度 × 空态/有资料十组浏览器检查通过，包含文件选择键盘焦点与超长文件名；git diff --check PASS。修改前快照 c89b0df，当前排版修改保留为可审查工作树，交接 `docs/handoffs/codex-materials-layout.md`。
+
+MATERIALS-LAYOUT 后续调整：依用户要求删掉右侧说明和分隔线，上传区域使用全宽单栏；清理对应样式。五宽度十组浏览器检查与 type-check PASS。
