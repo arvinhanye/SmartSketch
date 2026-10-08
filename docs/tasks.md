@@ -1983,3 +1983,8 @@ STUDENT-WORKSPACE 验收：DONE。H11/外壳 52 PASS；图谱工作区/组件/�
 - 依赖现有 G6 容器 ResizeObserver。风险为容器尺寸反馈、窄屏、拖动边界与未保存修改。验证实际浏览器打开/关闭长表单、右下角工具始终可见、拖动/键盘调宽、H05/H07/H14、type-check/build、verify.sh basic。
 
 TEACHER-GRAPH-VIEWPORT 验收：实际1440×900浏览器先复现页面1052→1438→1437px（关闭不恢复），修复后打开/关闭均900px且画布高度不变。真实课程和独立假API回归均通过1920/1440/1366/1024/390五尺寸，覆盖长表单、拖动/键盘边界、窗口改变、筛选浮层及未保存确认；无真实图数据写入。H05/H07/H14 153 PASS（初次并发一项加载态超时，独立及最终组合重跑全部通过），type-check/build/basic退出0；构建保留既有大chunk提示。交接 docs/handoffs/codex-teacher-graph-viewport.md，本地保存不推送。
+
+## 2026-10-08 图谱右下角按钮说明
+- GRAPH-CONTROL-HINTS：DONE；负责人 Codex。教师右下角四个按钮补齐浏览器原生延迟悬停说明，小地图名称随展开状态更新；学生既有提示与按钮行为保留，无后端修改。验证增强画布现有测试及真实教师/学生页面的四个提示和地图切换。
+
+GRAPH-CONTROL-HINTS 验收：增强画布12项、type-check/build及verify.sh basic通过（退出0）；真实教师与学生页面四个原生title及小地图状态文字检查通过。交接docs/handoffs/codex-graph-control-hints.md；与此前改动一起推送并开PR。
