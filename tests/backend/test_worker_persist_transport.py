@@ -68,6 +68,7 @@ class FakeDriver:
         class Tx:
             async def run(self, query, parameters):
                 driver.record('run')
+                driver.parameters = parameters
                 await asyncio.sleep(driver.delays['run_delay'])
                 return Result()
 

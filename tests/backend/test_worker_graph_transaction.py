@@ -114,3 +114,70 @@ def test_scope_validation_precedes_graph_statement(graph):
         with repo.explicit_write_transaction(SCOPE, check=lambda: None, timeout=10) as tx:
             tx.run('RETURN 1')
     assert raw.runs == 0 and raw.commits == 0
+
+
+def test_persist_factory_missing_never_falls_back():
+    calls = []
+    repo = Neo4jRepository(SimpleNamespace(session=lambda **kw: calls.append(kw)))
+    from app.repositories.neo4j import RepositoryError
+    with pytest.raises(RepositoryError):
+        with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1):
+            pass
+    assert calls == []
+
+
+def _async_repo(fake, **kwargs):
+    return Neo4jRepository(SimpleNamespace(), persist_driver_factory=fake.factory, **kwargs)
+
+
+def test_persist_scope_and_reserved_parameters():
+    from test_worker_persist_transport import FakeDriver
+    from app.repositories.neo4j import GraphScopeError
+    fake = FakeDriver()
+    repo = _async_repo(fake)
+    with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1) as tx:
+        with pytest.raises(GraphScopeError):
+            tx.run('RETURN 1')
+        assert not any(name == 'run' for name, _ in fake.calls)
+        tx.run(QUERY, {'course_id': 'foreign', 'version_id': 'foreign',
+                       'effective_task_ids': ['foreign']})
+        assert fake.parameters == {'course_id': 'course', 'version_id': 'draft',
+                                   'effective_task_ids': []}
+
+
+def test_persist_repeat_commit_after_uncertain_result_is_rejected():
+    from test_worker_persist_transport import FakeDriver
+    from app.repositories.neo4j import RepositoryTransportTimeout
+    import time
+    fake = FakeDriver(commit_delay=10)
+    repo = _async_repo(fake, persist_commit_timeout=.02)
+    with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1) as tx:
+        with pytest.raises(RepositoryTransportTimeout):
+            tx.commit(started_at=time.monotonic())
+        assert tx.commit_started and not tx.committed
+        with pytest.raises(RuntimeError):
+            tx.commit(started_at=time.monotonic())
+    assert fake.commit_calls == 1
+    assert not fake.open_resources
+
+
+def test_persist_partial_start_error_is_redacted():
+    from test_worker_persist_transport import FakeDriver
+    fake = FakeDriver(begin_error=True)
+    repo = _async_repo(fake)
+    with pytest.raises(RepositoryConnectionError) as caught:
+        with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1):
+            pass
+    assert 'private-host' not in str(caught.value)
+    assert 'private-token' not in str(caught.value)
+    assert not fake.open_resources
+
+
+def test_exit_error_preserves_primary_lease_loss():
+    from test_worker_persist_transport import FakeDriver
+    fake = FakeDriver(tx_close_delay=10)
+    repo = _async_repo(fake, persist_cleanup_timeout=.02)
+    with pytest.raises(LeaseLost):
+        with repo.persist_write_transaction(SCOPE, check=lambda: None, remaining=lambda: 1):
+            raise LeaseLost('lost')
+    assert not fake.open_resources

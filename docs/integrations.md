@@ -14,11 +14,11 @@
 
 ## 运行时环境变量
 
-### R1 提交截止待实施配置（2026-10-08；规格已批准，尚未生效）
+### R1 提交截止配置（2026-10-08；配置/传输已实现，准入 OPEN）
 
-用户已确认 worker 专用可取消异步传输的 [补充规格](superpowers/specs/2026-10-08-worker-persist-deadline-design.md)，[实施计划](superpowers/plans/2026-10-08-worker-persist-deadline.md) 待书面审阅。以下名称/默认值已随规格批准，但尚不属于当前 Settings 或 `.env.example` 的有效运行配置；实施时才同步增加两处声明与校验。复用现有 `NEO4J_URI/USER/PASSWORD`，无新增密钥/外部服务。
+用户已确认 worker 专用可取消异步传输的 [补充规格](superpowers/specs/2026-10-08-worker-persist-deadline-design.md)，[实施计划](superpowers/plans/2026-10-08-worker-persist-deadline.md) 已确认并正在顺序实施。以下名称/默认值已加入 Settings 和 `.env.example`；worker 接入及真实故障准入仍在后续任务验证。复用现有 `NEO4J_URI/USER/PASSWORD`，无新增密钥/外部服务。
 
-| 待实施变量 | 类型与已批准默认值 | 用途/边界 |
+| 运行变量 | 类型与已批准默认值 | 用途/边界 |
 | --- | --- | --- |
 | `TASK_PERSIST_COMMIT_TIMEOUT_SECONDS` | 有限正数，默认 2.0，最大 3.0 | worker 最终图 COMMIT 总预算，与图尝试/双守卫剩余预算取小；不是服务器事务 timeout。 |
 | `TASK_PERSIST_CLEANUP_TIMEOUT_SECONDS` | 有限正数，默认 1.0，最大 5.0 | SQLite 围栏退出后异步事务/Session/Driver 清理共享预算，不能逐层重置或延长提交。 |
