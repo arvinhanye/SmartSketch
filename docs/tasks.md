@@ -1,6 +1,6 @@
 # 任务看板
 
-> **R1 最新状态（2026-10-09）**：旧受测分支的 worker 越权提交及网络 COMMIT 围栏风险限定范围 **CLOSED** 证据保留。PR #324 正整合最新主线并修复 CI 可移植性/清理计时；合并结果完整门禁与远程 CI 待验证，不将旧分支通过外推为新结果。不自动合并、发布或技术冻结；当前进展见末节及 `docs/handoffs/codex-pr324-conflict-ci-repair.md`。
+> **R1 最新状态（2026-10-09）**：PR #324 已整合 main 并消除文档/ADR 冲突；代码 head `36b421e` 的 push/pull_request 两轮 8 项 CI 全部 SUCCESS，含真实网络/恢复和 E2E。worker 围栏限定风险 **CLOSED**；用户已授权「CI通过就合并PR」，按最终 head 全绿门禁合入 main，最终合并结局以 PR 状态/提交为准。不部署或技术冻结；全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。验收见末节及 `docs/handoffs/codex-pr324-conflict-ci-repair.md`。
 
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
 
@@ -2121,7 +2121,7 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PR324-REPAIR | IN_PROGRESS | Codex | 用户要求检查并修复 #324 冲突及失败；读取原始 CI 日志，整合最新 main，保留双方文档/代码与历史证据，协调 worker ADR 编号，复现失败后最小修复，完整门禁及远程 CI 验证后更新现有 PR。 |
+| R1-PR324-REPAIR | DONE_CI_VERIFIED | Codex | 用户要求检查并修复 #324 冲突及失败；读取原始 CI 日志，整合最新 main，保留双方文档/代码与历史证据，协调 worker ADR 编号，复现失败后最小修复，完整门禁及远程 CI 验证后更新现有 PR。 |
 
 - 输入：PR head `350d7c6`、最新抓取 main `5398a1f0`、失败 CI run `37878331607`；GitHub 原 head scaffold/frontend/backend SUCCESS，Integration and E2E FAILURE。原修复分支限定风险 CLOSED 证据保留，不外推为整合结果通过。
 - 输出：原 #324 分支上的可追溯 merge/修复提交、冲突/失败原因与验证交接；不新建替代 PR、不强推、不合并 PR、不部署或冻结。
@@ -2132,3 +2132,14 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - 原始失败已定位：run `37878331607` Integration 为 63 failed/399 passed/4 既有登记 skip；62 项在记录真实网络证据时写入 Linux 不存在的 `/private/tmp`，1 项因浅克隆缺少旧版本归档基线。backend-live 44、演示 E2E 2、个人 E2E 4 均通过；本轮不是 E2E 产品失败。
 - 主线 `5398a1f0` 已整合到工作树：保留双方追加任务/决定，worker ADR 重编号为 093/094，主线 091/092 不变。原失败的三项回归先实际 RED（目录、历史配置、编号重复），最小修复后 3 passed；当前合并结果全量/远程 CI 仍待验证，原风险 CLOSED 仅为旧受测分支结论。
 - 合并后定向实测发现主线 `_stop-procs.sh` 的整数 `SECONDS` 会将 2 秒宽限缩短至约 1.3 秒。新增在秒边界附近启动的真实子进程回归先 RED，随后以完成的 0.2 秒等待次数计满宽限，保留提前正常退出和宽限后强杀，不放宽原断言；此项限 E2E 清理脚本，不改 worker 产品截止。
+
+
+### PR #324 修复验收与条件合并授权（2026-10-09）
+
+- 用户最新指示「CI通过就合并PR」覆盖前述仅更新草稿、不合并的历史边界；仅当最终 PR head 所有检查成功时转 ready 并合入 `main`，不绕过门禁、不使用管理员覆盖、不强推、不删除修复分支或受管工作区、不部署/冻结。
+- 修复代码 `36b421e` 已通过 push run `37904046120` 和 pull_request run `37904049198`：每轮 scaffold/frontend/backend/integration 全 SUCCESS，共 8 项。GitHub 实测 base `5398a1f0`、MERGEABLE/CLEAN。backend+tooling 4064 passed/27 既有登记 skip；frontend 1227 passed（66 文件）、type-check/build；integration 462 passed/4 既有登记 skip；backend-live 44；演示 E2E 2、个人 E2E 4。无新增 skip/删除用例/放宽预算。
+- CI 网络 artifact 73 行与当前 6 产品源码拼接 SHA、测试 SHA 一致；默认/上限围栏最大 2.002760/3.003735s，独立写者最大 2.031202/3.031960s，均在 3/4s 原阈值；退出 1/5s 最大 1.170164/5.176260s，均在预算+1s。取消后实际迟到提交 takeover 5/5、failed_cleanup 3/5，两路恢复均收敛；旧基线 10s watchdog 围栏仍占用的真实负向证据保留。
+- 独立只读审阅未发现本轮阻塞；3 项可移植性/编号回归 RED→GREEN，秒边界计时回归 RED→GREEN，定向合计 78 passed。
+- 本地整次 `./scripts/verify.sh integration` 在用户中断时停止于 backend 未结束，缺少退出码，明确登记 INTERRUPTED，不称为通过；验收以同源码最新 Ubuntu CI 的全部实际门禁为准，保留本地未完成日志，不拼接为整次 exit 0。最终文档提交再运行本地 basic，并等其最新 head CI 全绿后条件合并。
+- 采用 GitHub merge commit（非 squash）保留 pinned `e111315ffabdc5ce980afdf525b8321ef572dc8e` 历史祖先，使 main 的真实旧 worker 对照不依赖保留远程分支。合并使用精确 head 匹配，不删除分支/工作区。最终合并记录随 PR 保存；此验收关闭范围仍仅 worker 网络 COMMIT 无界占用 SQLite 围栏，其他审查发现/全项目冻结状态不变。
+- 最终文档版本地 `./scripts/verify.sh` exit 0；可移植性/ADR 三项回归 3 passed，diff-check 通过。仅三份文档更新，无产品/测试/脚本变更；提交并推送原分支后仍按其最终 head 独立 CI 全绿执行用户的条件合并。
