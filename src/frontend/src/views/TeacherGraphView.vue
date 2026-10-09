@@ -17,6 +17,7 @@ import NodeCreator from '../components/NodeCreator.vue'
 import NodeTypeLegend from '../components/NodeTypeLegend.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
+import { readArrangement, writeArrangement, type Arrangement } from '../composables/useArrangementPreference'
 import { useGraphLayout } from '../composables/useGraphLayout'
 import { kpIdFromElementId } from '../graph/adapter'
 import type { GraphLayoutName } from '../graph/lifecycle'
@@ -243,14 +244,22 @@ const layoutSource = computed(() => {
 })
 const { positions, radialPositions, recommended, error: layoutError } = useGraphLayout(() => layoutSource.value, undefined, true)
 
-// 排布：层次（章节分区）/ 径向 / 力导向。层次布局把单章大树拉成长条时，默认用径向；教师手动选择后不再自动改
-type Arrangement = 'hierarchical' | 'radial' | 'force'
-const arrangement = ref<Arrangement>('hierarchical')
-let arrangementChosen = false
+// 排布：层次（章节分区）/ 径向 / 力导向。层次布局把单章大树拉成长条时，默认用径向；教师手动选择后不再自动改，并按课程记住
+// 教师在本课程选过的布局记在本浏览器里，下次进入直接使用（不再按推荐值重选）
+const storedArrangement = readArrangement(courseId.value)
+const arrangement = ref<Arrangement>(storedArrangement ?? 'hierarchical')
+let arrangementChosen = storedArrangement !== null
 function chooseArrangement(next: GraphLayoutName | 'radial'): void {
   arrangementChosen = true
   arrangement.value = next
+  writeArrangement(courseId.value, next)
 }
+// 同一页面实例里换课程（路由参数变化）：改用新课程记住的布局，没有就回到推荐值
+watch(courseId, (cid) => {
+  const stored = readArrangement(cid)
+  arrangementChosen = stored !== null
+  arrangement.value = stored ?? recommended.value ?? 'hierarchical'
+})
 watch(recommended, (next) => {
   if (next !== null && !arrangementChosen) arrangement.value = next
 })

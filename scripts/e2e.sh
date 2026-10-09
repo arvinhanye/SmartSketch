@@ -15,6 +15,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+. "$REPO_ROOT/scripts/_stop-procs.sh"
 die() { echo "错误：$*" >&2; exit 1; }
 PY="${E2E_PYTHON:-$REPO_ROOT/.venv/bin/python}"
 PY="$(command -v -- "$PY" || true)"   # 允许传 PATH 上的名字（CI 用 python）
@@ -55,9 +56,9 @@ set -m  # 后台任务各自成组，便于清理
 pids=()
 neo4j_container=""
 cleanup() {
-  # 每个服务在自己的进程组里（set -m），整组结束，避免 npx 的子进程残留占用端口
-  for pid in ${pids[@]+"${pids[@]}"}; do kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; done
-  wait 2>/dev/null || true
+  # 每个服务在自己的进程组里（set -m），整组结束，避免 npx 的子进程残留占用端口；
+  # 10 秒内没退出的强制结束，不能无限 wait（CI 上曾因某个服务不响应 SIGTERM 而卡到作业超时）
+  ((${#pids[@]})) && stop_process_groups 10 "${pids[@]}"
   [[ -z $neo4j_container ]] || docker rm -f "$neo4j_container" >> "$RUN_DIR/cleanup.log" 2>&1 \
     || echo "未能删除一次性 Neo4j 容器 ${neo4j_container}，请手动 docker rm -f" >&2
 }

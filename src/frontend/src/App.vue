@@ -17,6 +17,7 @@ import {
   TEACHER_GRAPH_ROUTE,
 } from './router'
 import AppIcon from './components/AppIcon.vue'
+import { DESTINATION_ICONS } from './components/navIcons'
 import AppTopbar, { type Crumb } from './components/AppTopbar.vue'
 import { readCourseDetail } from './composables/courseDetailRequest'
 import { COURSES_API_KEY } from './api/courses'
@@ -159,21 +160,21 @@ const settingsActive = computed(() => route?.name === SETTINGS_ROUTE)
 const upgradedPage = computed(() => homeActive.value || [COURSE_ROUTE, SETTINGS_ROUTE, MATERIALS_ROUTE, COURSE_MEMBERS_ROUTE, REVIEW_ROUTE, CHAT_ROUTE, TEACHER_GRAPH_ROUTE].includes(route?.name as string))
 const graphShell = computed(() => withSidebar.value && (route?.name === STUDENT_GRAPH_ROUTE || upgradedPage.value))
 const NAV_ICONS: Record<string, string> = {
-  我的课程: 'home',
-  教学资料: 'chapters',
-  图谱编辑: 'graph',
-  审核队列: 'check',
-  成员: 'members',
-  课程概览: 'overview',
-  知识图谱与学习路径: 'graph',
-  课程问答: 'chat',
-  '模型 API 设置': 'key',
+  我的课程: DESTINATION_ICONS.courses,
+  教学资料: DESTINATION_ICONS.materials,
+  图谱编辑: DESTINATION_ICONS.graph,
+  审核队列: DESTINATION_ICONS.review,
+  成员: DESTINATION_ICONS.members,
+  课程概览: DESTINATION_ICONS.overview,
+  知识图谱与学习路径: DESTINATION_ICONS.graph,
+  课程问答: DESTINATION_ICONS.chat,
+  '模型 API 设置': DESTINATION_ICONS.settings,
 }
 const railItems = computed(() => {
   const items: Array<{ label: string; to: RouteLocationRaw; active: boolean; icon: string }> = []
-  if (homeLink.value !== null) items.push({ label: '我的课程', to: homeLink.value, active: homeActive.value, icon: 'home' })
-  for (const item of courseNav.value) items.push({ ...item, icon: NAV_ICONS[item.label] ?? 'overview' })
-  if (settingsLink.value !== null) items.push({ label: '模型 API 设置', to: settingsLink.value, active: settingsActive.value, icon: 'key' })
+  if (homeLink.value !== null) items.push({ label: '我的课程', to: homeLink.value, active: homeActive.value, icon: DESTINATION_ICONS.courses })
+  for (const item of courseNav.value) items.push({ ...item, icon: NAV_ICONS[item.label] ?? DESTINATION_ICONS.overview })
+  if (settingsLink.value !== null) items.push({ label: '模型 API 设置', to: settingsLink.value, active: settingsActive.value, icon: DESTINATION_ICONS.settings })
   return items
 })
 const crumbs = computed<Crumb[]>(() => {
