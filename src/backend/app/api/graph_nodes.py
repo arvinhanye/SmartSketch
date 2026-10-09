@@ -128,9 +128,9 @@ def _field_error(key: str, value: object) -> str | None:
             return "list_type"
         return None if all(isinstance(a, str) for a in value) else "string_type"
     if key == "type":
-        return None if value in _TYPES else "enum"
+        return None if isinstance(value, str) and value in _TYPES else "enum"
     if key == "status":
-        return None if value in _STATUSES else "enum"
+        return None if isinstance(value, str) and value in _STATUSES else "enum"
     if not _is_number(value):
         return "float_type"
     return None if 0 <= value <= 1 else "out_of_range"  # type: ignore[operator]
