@@ -187,6 +187,19 @@ export function useMembers({ api, courseId, onCourseForbidden }: UseMembersOptio
   const removeError = ref<string | null>(null)
   const removeNotice = ref<string | null>(null)
   const removeInFlight = new Set<string>()
+  /** 正在“确认移除”的成员（UI-BATCH2-01）：移除先在本行确认，同一时间只有一行 */
+  const confirmingId = ref<string | null>(null)
+
+  function requestRemove(row: MemberRow): void {
+    if (!row.removable || removeInFlight.has(row.userId)) return
+    removeError.value = null
+    removeNotice.value = null
+    confirmingId.value = row.userId
+  }
+
+  function cancelRemove(): void {
+    confirmingId.value = null
+  }
 
   function setRemoving(userId: string, on: boolean): void {
     const next = new Set(removing.value)
@@ -235,6 +248,7 @@ export function useMembers({ api, courseId, onCourseForbidden }: UseMembersOptio
     } finally {
       removeInFlight.delete(row.userId)
       setRemoving(row.userId, false)
+      if (confirmingId.value === row.userId) confirmingId.value = null
     }
   }
 
@@ -251,6 +265,7 @@ export function useMembers({ api, courseId, onCourseForbidden }: UseMembersOptio
       removeNotice.value = null
       removeInFlight.clear()
       removing.value = new Set()
+      confirmingId.value = null
       void loadMembers()
     },
     { immediate: true },
@@ -274,6 +289,9 @@ export function useMembers({ api, courseId, onCourseForbidden }: UseMembersOptio
     removing,
     removeError,
     removeNotice,
+    confirmingId,
+    requestRemove,
+    cancelRemove,
     removeMember,
   }
 }

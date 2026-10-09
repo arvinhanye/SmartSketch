@@ -525,6 +525,72 @@ describe('H02 上传', () => {
 
 // ---------------------------------------------------------------- 上传上限（ADR-022）
 
+// UI-BATCH2-01：虚线上传框真的可以拖放；原生英文文件按钮改为中文按钮（输入框保留，供键盘与自动化使用）
+describe('H02 拖放选择文件', () => {
+  const zone = (wrapper: VueWrapper) => wrapper.get('[data-test="material-drop-zone"]')
+  async function dropFiles(wrapper: VueWrapper, files: File[]) {
+    await zone(wrapper).trigger('drop', { dataTransfer: { files } })
+    await flushPromises()
+  }
+
+  it('拖入文件等同于选择：显示文件名，提交时上传的就是它', async () => {
+    const { wrapper, materials } = await mountPage()
+    await dropFiles(wrapper, [file('第二章.pdf')])
+    expect(wrapper.get('.materials-file-description').text()).toContain('第二章.pdf')
+    expect(wrapper.get('label[for="material-file"]').text()).toContain('选择资料')
+    await submitUpload(wrapper)
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+    expect((materials.upload.mock.calls[0]![1] as File).name).toBe('第二章.pdf')
+  })
+
+  it('拖入非法格式：与选择文件同样本地提示，不发请求', async () => {
+    const { wrapper, materials } = await mountPage()
+    await dropFiles(wrapper, [file('slides.pptx')])
+    expect(wrapper.get('[data-test="upload-error"]').text()).toMatch(/PDF.*DOCX.*TXT.*Markdown/)
+    await submitUpload(wrapper)
+    expect(materials.upload).not.toHaveBeenCalled()
+  })
+
+  it('一次拖入多个文件：只选第一个并说明', async () => {
+    const { wrapper } = await mountPage()
+    await dropFiles(wrapper, [file('a.pdf'), file('b.pdf')])
+    expect(wrapper.get('.materials-file-description').text()).toContain('a.pdf')
+    expect(wrapper.get('[data-test="upload-drop-notice"]').text()).toContain('一次只能上传一个文件')
+    expect(wrapper.get('[data-test="upload-drop-notice"]').attributes('role')).toBe('status')
+  })
+
+  it('拖到框上时高亮，离开或放下后取消高亮', async () => {
+    const { wrapper } = await mountPage()
+    await zone(wrapper).trigger('dragover')
+    expect(zone(wrapper).classes()).toContain('is-dragging')
+    await zone(wrapper).trigger('dragleave')
+    expect(zone(wrapper).classes()).not.toContain('is-dragging')
+    await zone(wrapper).trigger('dragover')
+    await dropFiles(wrapper, [file('a.pdf')])
+    expect(zone(wrapper).classes()).not.toContain('is-dragging')
+  })
+
+  it('上传进行中拖入文件被忽略：不换文件、不重复上传', async () => {
+    const pending = deferred<{ task_id: string; document_id: string }>()
+    const materials = fakeMaterialsApi({ upload: () => pending.promise })
+    const { wrapper } = await mountPage({ materials })
+    await chooseFile(wrapper, file('a.pdf'))
+    await submitUpload(wrapper)
+    await dropFiles(wrapper, [file('b.pdf')])
+    expect(wrapper.get('.materials-file-description').text()).toContain('a.pdf')
+    expect(materials.upload).toHaveBeenCalledTimes(1)
+    pending.resolve({ task_id: 't1', document_id: 'd_t1' })
+    await flushPromises()
+  })
+
+  it('中文按钮：标签「选择资料文件」；已选后改为「重新选择资料文件」', async () => {
+    const { wrapper } = await mountPage()
+    expect(wrapper.get('label[for="material-file"]').text()).toBe('选择资料文件')
+    await chooseFile(wrapper, file('a.pdf'))
+    expect(wrapper.get('label[for="material-file"]').text()).toBe('重新选择资料文件')
+  })
+})
+
 describe('H02 上传上限取自服务端 UPLOAD_MAX_BYTES（ADR-022）', () => {
   it('按课程读取上传策略，提示与本地校验都用服务端上限', async () => {
     const materials = fakeMaterialsApi({ uploadPolicy: async () => ({ max_bytes: 2048 }) })

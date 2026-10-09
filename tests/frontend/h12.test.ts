@@ -124,6 +124,12 @@ async function mountApp({
 
 const rows = (wrapper: Awaited<ReturnType<typeof mountApp>>['wrapper']) => wrapper.findAll('[data-test="member-row"]')
 
+/** UI-BATCH2-01：移除先在本行展开确认，再点“确认移除”才发请求 */
+async function removeRow(wrapper: Awaited<ReturnType<typeof mountApp>>['wrapper'], index: number) {
+  await rows(wrapper)[index]!.get('[data-test="member-remove"]').trigger('click')
+  await rows(wrapper)[index]!.get('[data-test="member-remove-confirm"]').trigger('click')
+}
+
 async function submitAdd(wrapper: Awaited<ReturnType<typeof mountApp>>['wrapper'], username: string) {
   await wrapper.get('[data-test="member-add"] input[name="username"]').setValue(username)
   await wrapper.get('[data-test="member-add"]').trigger('submit')
@@ -436,7 +442,7 @@ describe('H12 添加学生成员', () => {
 describe('H12 移除学生成员', () => {
   it('移除成功：调用 DELETE、行消失、以 role=status 提示', async () => {
     const { wrapper, api } = await mountApp()
-    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    await removeRow(wrapper, 1)
     await flushPromises()
     expect(api.remove).toHaveBeenCalledTimes(1)
     expect(api.remove.mock.calls[0]![0]).toBe('c1')
@@ -452,7 +458,8 @@ describe('H12 移除学生成员', () => {
     const pending = deferred<undefined>()
     const api = fakeMembersApi({ remove: () => pending.promise })
     const { wrapper } = await mountApp({ api })
-    const button = rows(wrapper)[1]!.get('[data-test="member-remove"]')
+    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    const button = rows(wrapper)[1]!.get('[data-test="member-remove-confirm"]')
     // 两次点击在按钮禁用渲染之前连续到达：只能靠同步防重入
     void button.trigger('click')
     await button.trigger('click')
@@ -468,7 +475,7 @@ describe('H12 移除学生成员', () => {
   it('移除 403 ROLE_FORBIDDEN：明确提示无权限，行保留', async () => {
     const api = fakeMembersApi({ remove: async () => Promise.reject(apiError(403, 'ROLE_FORBIDDEN')) })
     const { wrapper } = await mountApp({ api })
-    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    await removeRow(wrapper, 1)
     await flushPromises()
     const alert = wrapper.get('[data-test="member-remove-error"]')
     expect(alert.attributes('role')).toBe('alert')
@@ -481,7 +488,7 @@ describe('H12 移除学生成员', () => {
   it('移除 404（已不是成员）：从列表去掉并说明', async () => {
     const api = fakeMembersApi({ remove: async () => Promise.reject(apiError(404, 'NOT_FOUND')) })
     const { wrapper } = await mountApp({ api })
-    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    await removeRow(wrapper, 1)
     await flushPromises()
     expect(rows(wrapper)).toHaveLength(1)
     expect(wrapper.get('[data-test="member-remove-status"]').text()).toContain('已不是课程成员')
@@ -490,10 +497,52 @@ describe('H12 移除学生成员', () => {
   it('移除时 COURSE_FORBIDDEN：回课程列表', async () => {
     const api = fakeMembersApi({ remove: async () => Promise.reject(apiError(403, 'COURSE_FORBIDDEN')) })
     const { wrapper, router } = await mountApp({ api })
-    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    await removeRow(wrapper, 1)
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('teacher-home')
     expect(router.currentRoute.value.query.notice).toBe(NOTICE_COURSE_FORBIDDEN)
+  })
+
+  it('点“移除”只在本行展开确认，不发请求；确认区写明后果并带操作对象', async () => {
+    const { wrapper, api } = await mountApp()
+    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    expect(api.remove).not.toHaveBeenCalled()
+    const confirm = rows(wrapper)[1]!.get('[data-test="member-remove-confirm"]')
+    expect(confirm.attributes('aria-label')).toBe('确认移除学生 alice')
+    expect(rows(wrapper)[1]!.text()).toContain('移出课程后')
+    expect(rows(wrapper)[1]!.find('[data-test="member-remove"]').exists()).toBe(false)
+    expect(rows(wrapper)).toHaveLength(2)
+  })
+
+  it('“不移除”收起确认并恢复“移除”按钮，不发请求', async () => {
+    const { wrapper, api } = await mountApp()
+    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    await rows(wrapper)[1]!.get('[data-test="member-remove-cancel"]').trigger('click')
+    expect(api.remove).not.toHaveBeenCalled()
+    expect(rows(wrapper)[1]!.find('[data-test="member-remove-confirm"]').exists()).toBe(false)
+    expect(rows(wrapper)[1]!.find('[data-test="member-remove"]').exists()).toBe(true)
+  })
+
+  it('Esc 收起确认；同一时间只有一行处于确认中', async () => {
+    const api = fakeMembersApi({ list: async () => [TEACHER, ALICE, member('u_bob', 'bob')] })
+    const { wrapper } = await mountApp({ api })
+    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    await rows(wrapper)[2]!.get('[data-test="member-remove"]').trigger('click')
+    expect(wrapper.findAll('[data-test="member-remove-confirm"]')).toHaveLength(1)
+    expect(rows(wrapper)[1]!.find('[data-test="member-remove"]').exists()).toBe(true)
+    await rows(wrapper)[2]!.get('[data-test="member-remove-confirm"]').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.findAll('[data-test="member-remove-confirm"]')).toHaveLength(0)
+  })
+
+  it('确认后失败：行保留并回到“移除”，错误就近提示；再点可重新确认', async () => {
+    const api = fakeMembersApi({ remove: async () => Promise.reject(apiError(403, 'ROLE_FORBIDDEN')) })
+    const { wrapper } = await mountApp({ api })
+    await removeRow(wrapper, 1)
+    await flushPromises()
+    expect(rows(wrapper)).toHaveLength(2)
+    expect(rows(wrapper)[1]!.find('[data-test="member-remove-confirm"]').exists()).toBe(false)
+    await rows(wrapper)[1]!.get('[data-test="member-remove"]').trigger('click')
+    expect(rows(wrapper)[1]!.find('[data-test="member-remove-confirm"]').exists()).toBe(true)
   })
 
   it('成员页有返回课程页的链接', async () => {

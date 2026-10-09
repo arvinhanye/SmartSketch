@@ -406,13 +406,20 @@
 .light-surface.members .ui-member-table { table-layout:fixed; }
 .light-surface.members .ui-member-table caption { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; padding:0; }
 .light-surface.members .ui-member-table thead th { padding:12px 14px; background:var(--gw-panel); font-size:12px; }
-.light-surface.members .ui-member-table thead th:nth-child(1) { width:34%; }
-.light-surface.members .ui-member-table thead th:nth-child(2) { width:16%; }
-.light-surface.members .ui-member-table thead th:nth-child(3) { width:30%; }
-.light-surface.members .ui-member-table thead th:nth-child(4) { width:20%; }
+.light-surface.members .ui-member-table thead th:nth-child(1) { width:26%; }
+.light-surface.members .ui-member-table thead th:nth-child(2) { width:12%; }
+.light-surface.members .ui-member-table thead th:nth-child(3) { width:24%; }
+.light-surface.members .ui-member-table thead th:nth-child(4) { width:38%; }
 .light-surface.members .ui-member-table tbody :is(th,td) { padding:16px 14px; background:transparent; font-size:13px; }
 .light-surface.members .ui-member-table tbody tr:last-child :is(th,td) { border-bottom:0; }
 .light-surface.members .ui-member-table :is(th,td):last-child { text-align:right; }
+/* UI-BATCH2-01：移除前在本行确认 */
+.light-surface .members-confirm { display:grid; gap:10px; justify-items:end; text-align:right; }
+.light-surface .members-confirm p { margin:0; max-width:300px; color:var(--gw-text-2); font-size:12px; line-height:20px; }
+.light-surface .members-confirm__actions { display:flex; gap:8px; }
+.light-surface.ui-management .members-confirm__danger { color:#fff; background:var(--gw-danger); border-color:var(--gw-danger); }
+.light-surface.ui-management .members-confirm__danger:hover:not(:disabled) { color:#fff; background:#721c1c; }
+.light-surface.ui-management .members-confirm__danger:disabled { color:var(--gw-text-3); background:var(--gw-hover); border-color:var(--gw-edge); }
 .members-user { display:flex; align-items:center; gap:10px; min-width:0; }
 .members-user > span:last-child { flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; }
 .members-avatar { display:grid; place-items:center; flex:none; width:34px; height:34px; border:1px solid var(--gw-line); border-radius:10px; background:var(--gw-panel); color:var(--gw-text-2); font-size:13px; font-weight:500; }
@@ -551,3 +558,17 @@
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .node-legend { flex: none; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__hint { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { flex: 0 0 260px; }
+
+/* UI-BATCH2-01：教师图谱详情的来源行与标题焦点 */
+.light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail h2[tabindex='-1']:focus { outline: none; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail ol > li > button { display: block; width: 100%; min-height: 44px; padding: 8px 10px; text-align: left; white-space: normal; overflow-wrap: anywhere; font-size: 13px; line-height: 20px; font-weight: 400; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail ol > li > button > span:first-child { font-weight: 600; }
+.light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail blockquote { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--gw-line); color: var(--gw-text-2); font-size: 13px; line-height: 22px; }
+
+/* UI-BATCH2-01：资料上传框——可拖放，中文按钮取代浏览器原生英文控件 */
+.materials-file-zone { position: relative; }
+.light-surface.materials .ui-upload-card .materials-file-zone input.materials-file-input { position: absolute; width: 1px; height: 1px; min-height: 0; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.light-surface.materials .materials-file-zone .materials-pick { color: var(--gw-text); font-size: 13px; font-weight: 500; min-height: 40px; }
+.light-surface.materials .materials-file-zone:has(.materials-file-input:focus-visible) .materials-pick { outline: 2px solid var(--gw-accent); outline-offset: 3px; }
+.materials-file-zone.is-dragging { border-style: solid; border-color: var(--gw-accent); background: var(--gw-selected); }

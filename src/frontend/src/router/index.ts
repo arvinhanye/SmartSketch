@@ -174,6 +174,8 @@ export function createAppRouter({
     if (to.meta.guestOnly) return role === null ? true : { name: HOME_ROUTE[role] }
     if (role === null) {
       if (to.name === ROOT_ROUTE && to.query.notice === NOTICE_UNAUTHENTICATED) return true
+      // 直接打开首页（登录页）不是被拦下，不带提示；提示只给被重定向来的访问（受保护页、未知路径）
+      if (to.name === ROOT_ROUTE && to.redirectedFrom === undefined) return true
       return { name: ROOT_ROUTE, query: { notice: NOTICE_UNAUTHENTICATED } }
     }
     if (to.meta.anyAccountRole) return true
