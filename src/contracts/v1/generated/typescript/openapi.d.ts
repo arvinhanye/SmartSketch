@@ -61,6 +61,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/embedding-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 教师个人向量模型配置 getEmbeddingConfig */
+        get: operations["getEmbeddingConfig"];
+        /** 教师个人向量模型配置 saveEmbeddingConfig */
+        put: operations["saveEmbeddingConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/embedding-config/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 教师个人向量模型配置 testEmbeddingConfig */
+        post: operations["testEmbeddingConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/embedding-config/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 教师个人向量模型配置 discoverEmbeddingModels */
+        post: operations["discoverEmbeddingModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/model-config": {
         parameters: {
             query?: never;
@@ -110,6 +162,29 @@ export interface paths {
          *
          */
         post: operations["testModelConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/model-config/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 查询本人可用的模型名称
+         * @description 后端对 base_url/models 发一次带 Bearer Key 的 GET，返回去重模型 ID，不保存表单配置、不调用生成。
+         *     api_key 留空时只能使用本人已保存且地址一致的密钥；地址变更必须重新输入密钥。
+         *     仅 HTTPS 公网，DNS 固定与禁止重定向规则同测试接口；每用户每分钟 10 次；限时 15 秒、响应最多 1 MiB/1000 项。
+         *
+         */
+        post: operations["discoverModels"];
         delete?: never;
         options?: never;
         head?: never;
@@ -847,6 +922,23 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        EmbeddingConfig: {
+            configured: boolean;
+            base_url: string;
+            model: string;
+            dimensions: number;
+            key_hint?: string;
+            version?: number;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EmbeddingConfigUpdate: {
+            base_url: string;
+            model: string;
+            dimensions: number;
+            /** Format: password */
+            api_key?: string;
+        };
         /**
          * @description 服务端大模型运行模式（ADR-080）。`personal` 才使用个人配置；其余模式下个人配置不生效。
          * @enum {string}
@@ -896,6 +988,17 @@ export interface components {
             api_key?: string;
             /** @description 测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。 */
             disable_thinking?: boolean;
+        };
+        ModelDiscoveryRequest: {
+            base_url?: string;
+            /** Format: password */
+            api_key?: string;
+        };
+        ModelDiscoveryResult: {
+            ok: boolean;
+            models: string[];
+            /** @enum {string} */
+            error_class?: "auth" | "timeout" | "rate_limited" | "connection" | "unsupported" | "server" | "malformed_response" | "blocked_address";
         };
         ModelConfigTestResult: {
             ok: boolean;
@@ -2261,6 +2364,250 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    getEmbeddingConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 教师向量配置操作结果，不含密钥 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingConfig"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 配置无效、课程忙或服务不可用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    saveEmbeddingConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description 教师向量配置操作结果，不含密钥 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingConfig"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 配置无效、课程忙或服务不可用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    testEmbeddingConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description 教师向量配置操作结果，不含密钥 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelConfigTestResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 配置无效、课程忙或服务不可用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    discoverEmbeddingModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description 教师向量配置操作结果，不含密钥 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDiscoveryResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 配置无效、课程忙或服务不可用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 配置无效、课程忙或服务不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getModelConfig: {
         parameters: {
             query?: never;
@@ -2397,6 +2744,67 @@ export interface operations {
                 };
             };
             /** @description 服务端未配置凭据根密钥（`STORAGE_UNAVAILABLE`，`details.reason = credential_store_disabled`） */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    discoverModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ModelDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description 查询结果；供应商失败以 ok=false 和固定错误分类返回，永不回显原始响应或密钥 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDiscoveryResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description 本人尚无已保存配置（MODEL_CONFIG_REQUIRED） */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 地址变更但未给新密钥、缺地址或密钥格式不合法（VALIDATION_ERROR） */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 查询过于频繁（RATE_LIMITED），带 Retry-After */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 服务端未配置凭据根密钥（STORAGE_UNAVAILABLE） */
             503: {
                 headers: {
                     [name: string]: unknown;

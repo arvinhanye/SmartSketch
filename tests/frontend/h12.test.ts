@@ -501,3 +501,14 @@ describe('H12 移除学生成员', () => {
     expect(wrapper.get('[data-test="members-back"]').attributes('href')).toBe('/courses/c1')
   })
 })
+
+describe('成员页新版布局',()=>{
+ it('添加学生表单在成员列表之前，移动端保留单元格标签',async()=>{
+  const {wrapper}=await mountApp()
+  expect(wrapper.find('.ui-sheet').exists()).toBe(true)
+  const form=wrapper.get('[data-test="member-add"]').element
+  const table=wrapper.get('[data-test="members-table"]').element
+  expect(form.compareDocumentPosition(table)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(wrapper.find('td[data-label="课程内身份"]').exists()).toBe(true)
+ })
+})

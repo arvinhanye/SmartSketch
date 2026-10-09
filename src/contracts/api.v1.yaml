@@ -122,6 +122,184 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /api/v1/me/embedding-config:
+    get:
+      tags: [settings]
+      summary: 教师个人向量模型配置 getEmbeddingConfig
+      operationId: getEmbeddingConfig
+      responses:
+        '200':
+          description: 教师向量配置操作结果，不含密钥
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingConfig'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [settings]
+      summary: 教师个人向量模型配置 saveEmbeddingConfig
+      operationId: saveEmbeddingConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingConfigUpdate'
+      responses:
+        '200':
+          description: 教师向量配置操作结果，不含密钥
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingConfig'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/embedding-config/test:
+    post:
+      tags: [settings]
+      summary: 教师个人向量模型配置 testEmbeddingConfig
+      operationId: testEmbeddingConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingConfigUpdate'
+      responses:
+        '200':
+          description: 教师向量配置操作结果，不含密钥
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelConfigTestResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/embedding-config/models:
+    post:
+      tags: [settings]
+      summary: 教师个人向量模型配置 discoverEmbeddingModels
+      operationId: discoverEmbeddingModels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelDiscoveryRequest'
+      responses:
+        '200':
+          description: 教师向量配置操作结果，不含密钥
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelDiscoveryResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 配置无效、课程忙或服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/me/model-config:
     get:
       tags: [settings]
@@ -230,6 +408,55 @@ paths:
                 $ref: '#/components/schemas/Error'
         '503':
           description: 服务端未配置凭据根密钥（`STORAGE_UNAVAILABLE`，`details.reason = credential_store_disabled`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/me/model-config/models:
+    post:
+      tags: [settings]
+      summary: 查询本人可用的模型名称
+      description: |
+        后端对 base_url/models 发一次带 Bearer Key 的 GET，返回去重模型 ID，不保存表单配置、不调用生成。
+        api_key 留空时只能使用本人已保存且地址一致的密钥；地址变更必须重新输入密钥。
+        仅 HTTPS 公网，DNS 固定与禁止重定向规则同测试接口；每用户每分钟 10 次；限时 15 秒、响应最多 1 MiB/1000 项。
+      operationId: discoverModels
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelDiscoveryRequest'
+      responses:
+        '200':
+          description: 查询结果；供应商失败以 ok=false 和固定错误分类返回，永不回显原始响应或密钥
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelDiscoveryResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '409':
+          description: 本人尚无已保存配置（MODEL_CONFIG_REQUIRED）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 地址变更但未给新密钥、缺地址或密钥格式不合法（VALIDATION_ERROR）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 查询过于频繁（RATE_LIMITED），带 Retry-After
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 服务端未配置凭据根密钥（STORAGE_UNAVAILABLE）
           content:
             application/json:
               schema:
@@ -1507,6 +1734,52 @@ components:
             $ref: '#/components/schemas/Error'
 
   schemas:
+    EmbeddingConfig:
+      type: object
+      additionalProperties: false
+      required: [configured, base_url, model, dimensions]
+      properties:
+        configured:
+          type: boolean
+        base_url:
+          type: string
+        model:
+          type: string
+        dimensions:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        key_hint:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        updated_at:
+          type: string
+          format: date-time
+    EmbeddingConfigUpdate:
+      type: object
+      additionalProperties: false
+      required: [base_url, model, dimensions]
+      properties:
+        base_url:
+          type: string
+          minLength: 9
+          maxLength: 512
+        model:
+          type: string
+          minLength: 1
+          maxLength: 128
+        dimensions:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        api_key:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 512
+
     RuntimeMode:
       type: string
       description: 服务端大模型运行模式（ADR-080）。`personal` 才使用个人配置；其余模式下个人配置不生效。
@@ -1604,6 +1877,39 @@ components:
         disable_thinking:
           type: boolean
           description: 测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。
+
+    ModelDiscoveryRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        base_url:
+          type: string
+          minLength: 9
+          maxLength: 512
+        api_key:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 512
+
+    ModelDiscoveryResult:
+      type: object
+      required: [ok, models]
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+        models:
+          type: array
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+        error_class:
+          type: string
+          enum: [auth, timeout, rate_limited, connection, unsupported, server, malformed_response, blocked_address]
 
     ModelConfigTestResult:
       type: object

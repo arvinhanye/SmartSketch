@@ -400,8 +400,44 @@ const ws = ref<HTMLElement | null>(null)
 const panel = ref<InstanceType<typeof GraphSidePanel> | null>(null)
 const panelToggle = ref<HTMLButtonElement | null>(null)
 const wsWidth = ref(0)
-/** 用户确认：并置面板占工作区 35%；剩余 65% 至少 640px，否则用 90% 覆盖面板 */
-const docked = computed(() => wsWidth.value * 0.65 >= 640)
+/** 可调并置面板；窄屏仍使用覆盖抽屉。 */
+const docked = computed(() => wsWidth.value >= 960)
+const preferredPanelWidth = ref(25)
+const minPanelWidth = computed(() => Math.max(20, 280 / Math.max(wsWidth.value, 1) * 100))
+const maxPanelWidth = computed(() => Math.min(45, (wsWidth.value - 640) / Math.max(wsWidth.value, 1) * 100))
+const panelWidth = computed(() => Math.min(maxPanelWidth.value, Math.max(minPanelWidth.value, preferredPanelWidth.value)))
+const resizingPanel = ref(false)
+function setPanelWidth(value: number): void {
+  preferredPanelWidth.value = Math.min(maxPanelWidth.value, Math.max(minPanelWidth.value, value))
+}
+function moveDivider(event: PointerEvent): void {
+  if (!resizingPanel.value || ws.value === null) return
+  const rect = ws.value.getBoundingClientRect()
+  if (rect.width > 0) setPanelWidth((event.clientX - rect.left) / rect.width * 100)
+}
+function startDivider(event: PointerEvent): void {
+  if (event.button !== 0) return
+  event.preventDefault()
+  resizingPanel.value = true
+  const handle = event.currentTarget as HTMLElement
+  handle.focus()
+  handle.setPointerCapture(event.pointerId)
+}
+function endDivider(event: PointerEvent): void {
+  resizingPanel.value = false
+  const handle = event.currentTarget as HTMLElement
+  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId)
+}
+function keyDivider(event: KeyboardEvent): void {
+  const values: Record<string, number> = {
+    ArrowLeft: panelWidth.value - 2, ArrowRight: panelWidth.value + 2,
+    Home: minPanelWidth.value, End: maxPanelWidth.value,
+  }
+  const value = values[event.key]
+  if (value === undefined) return
+  event.preventDefault()
+  setPanelWidth(value)
+}
 const dockedOpen = ref(true)
 const overlayOpen = ref(false)
 const panelVisible = computed(() => (docked.value ? dockedOpen.value : overlayOpen.value))
@@ -474,6 +510,7 @@ const ready = computed(() => status.value === 'ready' && graph.value !== null &&
     <div
       ref="ws"
       class="graph-workspace gw"
+      :style="{ '--gw-panel-width': `${panelWidth}%` }"
       :class="{ 'is-docked': docked, 'is-overlay': !docked, 'is-collapsed': docked && !dockedOpen, 'is-state': !ready }"
     >
       <div v-if="!ready" class="gw-state-wrap">
@@ -496,6 +533,14 @@ const ready = computed(() => status.value === 'ready' && graph.value !== null &&
       </div>
 
       <template v-else>
+        <div v-if="docked && dockedOpen" class="gw-divider" :class="{ 'is-dragging': resizingPanel }"
+          role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整知识面板宽度"
+          :aria-valuenow="Math.round(panelWidth)" :aria-valuemin="Math.round(minPanelWidth)"
+          :aria-valuemax="Math.round(maxPanelWidth)" :aria-valuetext="`知识面板占 ${Math.round(panelWidth)}%`"
+          title="左右拖动调整宽度；双击恢复默认；方向键微调"
+          @pointerdown="startDivider" @pointermove="moveDivider" @pointerup="endDivider"
+          @pointercancel="endDivider" @lostpointercapture="resizingPanel = false"
+          @keydown="keyDivider" @dblclick="setPanelWidth(25)" />
         <!-- 左面板：未选中显示课程说明，选中后原位切换为知识点详情（保留可折叠的「下一步推荐」） -->
         <GraphSidePanel
           ref="panel"
@@ -611,7 +656,7 @@ const ready = computed(() => status.value === 'ready' && graph.value !== null &&
         <div class="gw-stage">
           <div class="gw-tl">
             <div class="gw-tl__row">
-              <button v-if="!panelVisible" ref="panelToggle" type="button" class="gw-tool" aria-label="显示说明面板" data-test="gw-panel-open" @click="openPanel">
+              <button v-if="!panelVisible" ref="panelToggle" type="button" class="gw-tool" aria-label="显示说明面板" title="显示说明面板" data-test="gw-panel-open" @click="openPanel">
                 <AppIcon name="panel" />
               </button>
               <GraphOverlay as="form" class="gw-search" role="search" @submit.prevent="onLocate">
@@ -644,18 +689,18 @@ const ready = computed(() => status.value === 'ready' && graph.value !== null &&
           </div>
 
           <GraphOverlay class="gw-tr" role="toolbar" aria-label="画布工具">
-            <button type="button" class="gw-tool" aria-label="图例与筛选" :aria-pressed="legendOpen" :disabled="mode !== 'graph'" @click="setLegendOpen(!legendOpen)">
+            <button type="button" class="gw-tool" aria-label="图例与筛选" title="展开图例，筛选关系与知识点类型" :aria-pressed="legendOpen" :disabled="mode !== 'graph'" @click="setLegendOpen(!legendOpen)">
               <AppIcon name="filter" />
             </button>
-            <button type="button" class="gw-tool" :aria-label="`切换布局，当前：${layoutLabel}`" :disabled="mode !== 'graph'" data-test="gw-layout-toggle" @click="toggleLayout">
+            <button type="button" class="gw-tool" :aria-label="`切换布局，当前：${layoutLabel}`" :title="`切换章节分区 / 力导向布局（当前：${layoutLabel}）`" :disabled="mode !== 'graph'" data-test="gw-layout-toggle" @click="toggleLayout">
               <AppIcon name="overview" />
             </button>
             <div class="gw-tr__sep" aria-hidden="true" />
             <div role="group" aria-label="视图切换" class="gw-tr__modes">
-              <button type="button" class="gw-tool" aria-label="图谱视图" data-test="sg-mode-graph" :aria-pressed="mode === 'graph' ? 'true' : 'false'" @click="mode = 'graph'">
+              <button type="button" class="gw-tool" aria-label="图谱视图" title="以图谱查看知识关系" data-test="sg-mode-graph" :aria-pressed="mode === 'graph' ? 'true' : 'false'" @click="mode = 'graph'">
                 <AppIcon name="graph" />
               </button>
-              <button type="button" class="gw-tool" aria-label="卡片视图" data-test="sg-mode-cards" :aria-pressed="mode === 'cards' ? 'true' : 'false'" @click="mode = 'cards'">
+              <button type="button" class="gw-tool" aria-label="卡片视图" title="以卡片列表查看知识点" data-test="sg-mode-cards" :aria-pressed="mode === 'cards' ? 'true' : 'false'" @click="mode = 'cards'">
                 <AppIcon name="list" />
               </button>
             </div>

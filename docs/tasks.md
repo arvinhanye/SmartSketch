@@ -1911,3 +1911,106 @@ C-INTEGRATE-20261004 发布前门禁：新无.env验证worktree独立运行整�
 C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCESS，merge commit 3d696158；#319（头d03b5e7，本轮修复）全部8检查SUCCESS，先合入claude/plan-c-acceptance，merge commit bbc8fbea；#318基线改为main、纳入修复后头bbc8fbea全部8检查SUCCESS，merge commit 0436ff34，已进入main。merge commit保留作者/历史，不force-push、不删除分支；没有合并测量分支88f9f6f。验证origin/main包含d03b5e7且完整代码树与已验修复提交一致。仓库当时开放PR列表为空；发布交接与启动说明的文档同步另由后续PR承载，不冒充新的业务修复或冻结。
 
 上述PR状态、头/合并提交与CI链接存evaluation/raw/codex-c-acc-fixes/publication-verification.json。当前代码入口scripts/start.sh已在GitHub main；本地主目录代码未自动pull/切换，本机.env/业务库未改。说明文档不存真实Key，向量仍.env全局online、生成API仍个人网页配置；网页向量配置计划保持CANCELLED_BY_USER。真实测量与人工签收口径不变，三项不补测仍未测，历史慢段根因OPEN；stage_c_status OPEN、technical_freeze NOT_PERFORMED。用户手工检查与冻结决定仍等待用户，不因GitHub合并自动签收。
+
+## 2026-10-08 Codex：课程列表与模型设置 UI
+
+- UI-ROLLOUT-R2-R3：IMPLEMENTED（基础门禁环境阻塞）；负责人 Codex；范围为批准计划 `docs/superpowers/plans/2026-10-08-courses-model-settings-ui.md`。保留业务/API/密钥安全；验收为相关与全量测试、类型、构建、基础门禁、四宽度页面。
+
+## 2026-10-08 Codex：剩余页面 UI 统一
+
+- UI-ROLLOUT-REMAINING：IMPLEMENTED（基础门禁环境阻塞）；负责人 Codex；输入为用户继续修改其他页面的指示与 PR #322 已确认设计；输出为资料、审核/发布、成员、问答、教师图谱视觉升级及认证样式对齐。沿用本地分支，不覆盖已完成两页。
+- 依赖现有 API、组合式逻辑及共享 tokens；不新增接口、权限、统计数据。主要风险为编辑确认、SSE 进度、问答引用状态与窄屏溢出；验证为 H02/H09/H10/H12/H14、问答与认证相关回归、全量前端、type-check/build、基础门禁及四宽度浏览器。
+
+UI-ROLLOUT-REMAINING：28 个浏览器页面/宽度组合通过，复审生命周期恢复问题已补 RED/GREEN 回归；交接 `docs/handoffs/codex-remaining-pages-ui.md`。基础门禁因缺少 datamodel-codegen 失败，未记录为全绿；修改仅本地，未提交/推送。
+
+UI-ROLLOUT-REMAINING 最终：前端 60 文件 / 1166 测试 PASS，type-check/build PASS；git diff --check PASS（移除五处末尾空行后）；本地预览保持 5322。
+
+## 2026-10-08 Codex：模型供应商与自动发现
+
+- MODEL-DISCOVERY：DONE；负责人 Codex；用户要求供应商选择、输入 Key 后获取模型列表并允许手填。输入为现有 L10 配置接口与公网出站守卫；输出为供应商预设、自动/手动查询及鉴权只读模型发现接口。
+- 无库表迁移；接口先更新契约与身份规格再生成。风险是 Key 跨供应商、DNS/重定向绕过、晚到模型列表与上游响应泄露；验收为服务/接口安全回归、前端状态隔离、真实浏览器假供应商、契约生成检查及相关/全量前端。
+
+MODEL-DISCOVERY 验收：后端发现/原配置/出站回归 74 PASS；全量前端 61 文件 / 1169 PASS，新增发现回归最终 6 PASS；type-check/build PASS；basic 门禁 PASS（已定位现有用户目录生成器并加入检查 PATH）；桌面/手机浏览器 PASS。交接 `docs/handoffs/codex-model-discovery.md`；本地 5322/8321 已运行新接口，未提交或推送。
+## 2026-10-08 Codex：资料上传排版优化
+
+- MATERIALS-LAYOUT：DONE；负责人 Codex；输入为用户上传页截图与现有页面。先按用户要求保存当前版本为本地提交 c89b0df，再调整页头、双栏上传卡片、资料列表与空态。只调整展示，沿用上传验证、SSE、取消/重试/删除。
+- 验收：H02/H09/H14 回归、type-check/build、桌面/手机空态/已选择/资料列表浏览器检查；风险为原生文件选择键盘可访问性、长文件名与窄屏溢出。无接口与数据变更。
+
+MATERIALS-LAYOUT 验收：H02/H09/H14 共 173 PASS，type-check/build PASS；2559/1440/1280/768/390 五宽度 × 空态/有资料十组浏览器检查通过，包含文件选择键盘焦点与超长文件名；git diff --check PASS。修改前快照 c89b0df，当前排版修改保留为可审查工作树，交接 `docs/handoffs/codex-materials-layout.md`。
+
+MATERIALS-LAYOUT 后续调整：依用户要求删掉右侧说明和分隔线，上传区域使用全宽单栏；清理对应样式。五宽度十组浏览器检查与 type-check PASS。
+## 2026-10-08 Codex：审核页面去重与排版
+
+- REVIEW-LAYOUT：DONE；负责人 Codex；用户指出三类审核标题显示两次。根因是栏目导航与内容标题重复。输出为一次展示的三类卡片、紧凑页头与发布区；沿用审核/合并/发布/回滚接口与逻辑。
+- 先写重复标题回归（RED：每类出现两次）；验收 H09/H10/H14、类型/构建、宽屏/手机空态和非空页面。沿用户要求保存修改前上传布局为本地版本，再修改审核页面。
+
+REVIEW-LAYOUT 验收：去重回归先 RED（两次）后 GREEN（一次）；H09/H10/H14 共 98 PASS；type-check/build PASS；五宽度 × 空/非空十组浏览器 PASS，含合并面板、回滚确认和无溢出检查。修改前版本 4d9db5b；交接 `docs/handoffs/codex-review-layout.md`，当前排版修改保留工作树，未推送。
+## 2026-10-08 Codex：课程成员排版
+
+- MEMBERS-LAYOUT：DONE；负责人 Codex；用户要求优化成员页面并在完成后保存。输出为紧凑添加表单、统一成员卡片/身份/操作排版、响应式布局；沿用现有成员接口与权限。
+- 风险：用户名超长、窄屏表格、添加/移除反馈和教师不可移除。验收 H12/H14、type-check/build、五宽度浏览器及 scoped 本地提交。运行文件/密钥/日志不入提交，不推送。
+
+MEMBERS-LAYOUT 验收：H12/H14 共 81 PASS；type-check/build PASS；五宽度 × 列表/无学生/错误十五组浏览器 PASS，包含长用户名不跨列、教师无移除按钮、假 API 添加/移除与反馈。局部文件保存为本地 Git 提交，未推送。交接 `docs/handoffs/codex-members-layout.md`。
+
+## 2026-10-08 Codex：登录页书页与知识插画
+
+- LOGIN-EDITORIAL：DONE；负责人 Codex；用户已确认方案 D 并要求先做前端。输入为已确认登录页预览；输出为独立登录布局、资料/书页/知识/路径 SVG 插画及密码显隐。仅前端与交接文档，无后端/API/数据库修改；注册页保持原版。当前版本以备份分支 codex/login-before-redesign-f54abfd 保存。
+- 依赖现有登录 API、路由和会话；风险为密码显隐、错误后的口令清空、窄矮屏按钮可达和样式污染。验证 H13/ADR079/装饰运动、type-check/build、basic 门禁及五宽度浏览器检查。
+
+LOGIN-EDITORIAL 验收：密码显隐先 RED（缺少按钮）后 GREEN；H13/ADR079/auth-graph-motion 共 47 PASS，type-check/build PASS，scripts/verify.sh basic PASS（契约生成、25 项门禁负向与契约回归）。浏览器 2559/1440/1280/768/390 五宽度及 390×460、1024×500 矮窗口共七组 PASS，包含装饰读屏隐藏、窄屏隐藏、无横向溢出、密码显隐无提交、401 口令清空/恢复隐藏、错误提示、注册保留八组装饰图。交接 docs/handoffs/codex-login-editorial.md；只保存本地提交，不推送。
+
+## 2026-10-08 Codex：登录提示浮动
+
+- LOGIN-NOTICE：DONE；负责人 Codex；用户要求未登录提示浮动在欢迎回来上方，不挤压下方内容。根因是 App 主容器的正常流提示占据高度；输入为守卫提示码，输出为仅登录表单的可关闭绝对定位提示。其他页面提示保持；不改后端。验收为显示/关闭前后标题坐标相同、宽屏与窄矮屏提示可见可关闭、H13/ADR079、类型/构建/basic。
+
+LOGIN-NOTICE 验收：浏览器先 RED（关闭提示标题上移 21.59px），后 GREEN。六种桌面/平板/手机/矮窗口显示与关闭前后标题和输入框位移均 0px，提示可见可关闭、在标题上方且无横向溢出；H13/ADR079 44 PASS、type-check/build/basic PASS。交接 docs/handoffs/codex-login-notice.md；后端未改，本地保存不推送。
+
+## 2026-10-08 Codex：学生图谱与问答体验
+- STUDENT-WORKSPACE：DONE；负责人 Codex。输入为用户三项学生端调整及教师端预览要求；输出为按钮悬停说明、可拖动/键盘调宽分隔条、浅色问答页、独立教师图谱预览图片。教师图谱实际页面和后端不修改。
+- 默认侧栏 25%，最小 280px，画布至少 640px；窄屏沿用抽屉。依赖现有 G6 resize 与路由/API；风险为拖动越界、窄屏、聊天文本对比度。验证 H11/图谱工作区/问答相关测试、type-check/build/basic、浏览器拖动与主题检查。
+
+STUDENT-WORKSPACE 验收：DONE。H11/外壳 52 PASS；图谱工作区/组件/问答 32 PASS（一次并发超时后独立重跑通过）；type-check/build/basic PASS。实际学生课程三个宽度拖动/键盘/恢复/抽屉与浅色问答检查 PASS；假问答两个宽度引用、代码对比度、未覆盖/故障检查 PASS。教师实际页面、后端和数据未改；交接 docs/handoffs/codex-student-workspace.md。
+
+## 2026-10-08 教师向量模型配置
+
+- API-PROVIDER-PRESETS：DONE；负责人 Codex。通用 API 增加 Kimi、智谱 GLM、豆包/火山方舟、MiniMax、百度千帆、腾讯混元；向量栏按能力标记筛选并增加智谱/方舟。已核对官方常规兼容地址。前端32项、type-check/build、verify.sh basic（退出0）通过；真实教师/学生页面验证六个地址带入、密钥/模型清空、通用11选项及向量6选项含自定义。未保存真实设置、未调用真实供应商；后端不改。交接 docs/handoffs/codex-provider-presets.md；仅本地提交，不推送。
+
+- API-SETTINGS-COMPACT：DONE；负责人 Codex。用户要求通用/向量 API 左右并列、桌面一页展示，并把列表/手输合并成可输入模型选择框。两张独立卡片，帮助折叠，短屏紧凑间距；模型输入匹配列表、按钮展开全部、未知名称保留、键盘及焦点关闭。1366×768、1440×900、1920×1080常规/目录加载/自定义维度检查通过；390px自动上下排列、不裁切。前端32项、type-check/build、verify.sh basic通过；后端/接口/库不改。交接 docs/handoffs/codex-api-settings-compact.md；本地保存，不推送。
+- TEACHER-EMBEDDING：DONE；负责人 Codex。用户确认按教师课程生效、学生不增加设置。独立加密配置接口、教师表单、维度选择、课程发布/回滚/问答适配与安全重建已实现。相关后端84项及新增提交空间检查通过（向量专项19项），前端30项、type-check、build、verify.sh basic通过；教师/学生宽屏及390px浏览器检查、真实设置页检查通过，既有示例图谱保持63节点70关系。独立复审发现的通用状态污染与发布竞态已修复并复核。迁移019已先备份再应用；真实供应商激活留给用户在页面测试。ADR-092、规格/计划与交接 docs/handoffs/codex-teacher-embedding.md 已更新；仅本地保存，不推送。
+
+## 2026-10-08 教师图谱视口修复
+- TEACHER-GRAPH-VIEWPORT：DONE；负责人 Codex。输入为长编辑表单撑高页面的截图；输出为固定可用视口、左侧独立滚动与可调宽面板、扁平搜索筛选栏。保留节点编辑守卫、全部字段、画布和其他页面，不改后端/接口。
+- 依赖现有 G6 容器 ResizeObserver。风险为容器尺寸反馈、窄屏、拖动边界与未保存修改。验证实际浏览器打开/关闭长表单、右下角工具始终可见、拖动/键盘调宽、H05/H07/H14、type-check/build、verify.sh basic。
+
+TEACHER-GRAPH-VIEWPORT 验收：实际1440×900浏览器先复现页面1052→1438→1437px（关闭不恢复），修复后打开/关闭均900px且画布高度不变。真实课程和独立假API回归均通过1920/1440/1366/1024/390五尺寸，覆盖长表单、拖动/键盘边界、窗口改变、筛选浮层及未保存确认；无真实图数据写入。H05/H07/H14 153 PASS（初次并发一项加载态超时，独立及最终组合重跑全部通过），type-check/build/basic退出0；构建保留既有大chunk提示。交接 docs/handoffs/codex-teacher-graph-viewport.md，本地保存不推送。
+
+## 2026-10-08 图谱右下角按钮说明
+- GRAPH-CONTROL-HINTS：DONE；负责人 Codex。教师右下角四个按钮补齐浏览器原生延迟悬停说明，小地图名称随展开状态更新；学生既有提示与按钮行为保留，无后端修改。验证增强画布现有测试及真实教师/学生页面的四个提示和地图切换。
+
+GRAPH-CONTROL-HINTS 验收：增强画布12项、type-check/build及verify.sh basic通过（退出0）；真实教师与学生页面四个原生title及小地图状态文字检查通过。交接docs/handoffs/codex-graph-control-hints.md；与此前改动一起推送并开PR。
+
+## 2026-10-08 教师图谱圆角卡片
+- TEACHER-GRAPH-CARDS：DONE；负责人 Codex。按用户三张参考图改独立圆角左侧卡片、搜索图标/分段布局切换和工具栏新建入口，保留面板调宽、有限视口、全部编辑字段与守卫。不改学生或后端。验证H05/H07/H14、类型/构建/basic和五尺寸浏览器回归。
+
+TEACHER-GRAPH-CARDS 验收：H05/H07/H14 153 PASS、type-check/build/basic退出0；真实课程与独立假API浏览器五尺寸通过，最终紧凑字段样式后长表单回归再次五尺寸通过。真实页面验证圆角三卡片、工具栏唯一新建入口与原有表单可打开。手机固定页签遮挡关闭问题已修复并复核；后端与学生未修改。交接docs/handoffs/codex-teacher-graph-cards.md；只保存本地提交，暂未推送本次改动。
+
+## 2026-10-09 当前状态移交Claude
+- CURRENT-HANDOFF-20261009：DONE；负责人Codex。仅汇总固定代码c81f409的进度、边界、真实未测和接手顺序；本轮只读核实PR #323已含圆角改动，以及最新CI前端5项、后端3项、集成迁移与E2E登录失败。不在本轮修复代码或发真实模型请求。交接docs/handoffs/codex-to-claude-current-state-2026-10-09.md，验证引用/无密钥/基本门禁。
+
+CURRENT-HANDOFF-20261009 验收：实际查询PR #321/#322/#323、c81f409最新CI及失败日志，核实端口/本地状态；文档引用与必要事实断言、无API-token标记检查、git diff --check、verify.sh basic退出0。本轮仅文档，不修复CI、不调用真实模型；CI失败作为接手优先项如实登记。只保存本地文档提交，不推送。
+
+## 2026-10-08 Claude：前端复审与 CI 修复（基线 PR #323 head f76020f）
+
+- CLAUDE-CI-REPAIR-20261008：DONE（验证见交接 docs/handoffs/claude-ci-repair-20261008.md；全量门禁结果见下一任务验收）；负责人 Claude。输入为 Codex 交接第 3 节列出的 CI 失败；输出为区分「测试宿主/旧断言/真实缺陷」后的修复。真实缺陷仅一处：迁移 019 缺少 `-- ROLLBACK:` 步骤，使逐版回滚测试遗留 `019` 记录并触发“不能应用比已应用版本更旧的迁移”；已补回滚行并新增覆盖 007–019 的守卫测试，迁移顺序防线与测试均未放宽。其余为旧测试：B03 宿主缺 Pinia/登录页（提示已移入 LoginView）、旧 35% 固定侧栏断言（改为 25% 默认的可调宽比例）、C02b 期望仅应用 018、E2E 的 `getByLabel('密码')` 命中显隐按钮（改为 exact）、E2E 的课程创建弹层与“搜索回车只预览”两处过时步骤。
+- CLAUDE-UI-REVIEW-20261008：DONE（见验收）；负责人 Claude。输入为教师/学生页面实际操作复审；输出见交接 `docs/handoffs/claude-ui-review-20261008.md`：教师下拉选择不带动画布、小地图在切换布局后消失、窄屏学生图谱下方大片空白、演示横幅使学生图谱底部控件落出视口、发布历史显示原始 ISO 时间、课程页“其他课程”误导、学生设置页出现教师措辞、关系编辑未以已选节点为起点、教师标题/画布条占用竖向空间。不改后端接口、数据和权限。
+
+CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
+- 前端全量 `scripts/verify/frontend.sh full`：62 文件 / 1194 条通过，type-check 与 build 通过；后端全量 `scripts/verify/backend.sh full`：3975 通过、27 登记跳过，gate PASS；`scripts/verify.sh basic` 退出 0。
+- E2E（演示模式）教师 + 学生用例通过；个人模式 4/4 通过（首次与全量门禁并发时 3 项失败：1 项旧搜索断言、2 项负载超时，隔离重跑通过）。
+- 最终门禁（提交 c8c33fb 上单独运行）：`./scripts/verify.sh integration` PASS 退出 0：后端 3975 passed/27 登记 skipped，前端 1194 passed + build，集成 393 passed/4 skipped，图库专项 44 passed，E2E 教师+学生 2 passed、个人模式 4 passed；`verify.sh basic` PASS。详见 `docs/handoffs/claude-ui-review-20261008.md`。
+- 未验证：真实供应商、付费模型、历史“暂不补测”三项；教师页首屏缩放策略（见交接建议）未改。
+
+## 2026-10-08 Claude：教师图谱首屏总览与径向布局（用户确认方案）
+
+- CLAUDE-TEACHER-OVERVIEW-20261008：DONE；负责人 Claude。输入为复审建议第 1 项经用户确认：教师页首屏改“整图适应”，并为单章大树增加径向布局。输出：`radialEngine` + `prefersRadial`（`graph/chapterLayout.ts`）、生命周期 `initialView/edgeStyle`、增强器 `fitPads`、画布 `arrangement/initialView/fitPads` 属性、教师工具栏“径向”选项与默认推荐、总览模式下定位自动放大到可读缩放。不改后端、接口、数据与学生图谱页。
+- 验收：新增径向引擎 7 项、生命周期 6 项、教师页 3 项单测；浏览器中首屏整图可见且默认径向（64 节点）、层次/径向/力导向切换小地图保持、选中定位放大到 0.9、适应画布回到总览；教师视口回归与教师 E2E 通过。最终门禁（`25cae93`）：`./scripts/verify.sh integration` PASS 退出 0：后端 3975 passed/27 登记 skipped，前端 63 文件/1210 passed + 类型检查 + build，集成 393 passed/4 skipped，图库专项 44 passed，E2E 教师+学生 2、个人模式 4 passed；首次运行因 h05 测试类型标注失败，修复后整条重跑通过。详见 `docs/handoffs/claude-teacher-overview-20261008.md`。

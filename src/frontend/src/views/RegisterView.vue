@@ -155,7 +155,7 @@ async function submit(): Promise<void> {
 .register legend {
   font-size: 1.4rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--ss-text);
   margin-bottom: 0.5rem;
   padding: 0;
 }
@@ -164,12 +164,12 @@ async function submit(): Promise<void> {
   gap: 0.3rem;
 }
 .register__help {
-  color: var(--color-text-muted);
+  color: var(--ss-text-2);
   font-size: 0.82rem;
   margin: -0.4rem 0 0;
 }
 .register__field-error {
-  color: var(--color-danger-text);
+  color: var(--ss-danger);
   font-size: 0.82rem;
   margin: -0.4rem 0 0;
 }

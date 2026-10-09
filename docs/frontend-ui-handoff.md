@@ -4,6 +4,8 @@
 >
 > 状态截至 **2026-10-07**。分支 `claude/smartsketch-frontend-init-0d2af9`，基线 `main@bdb89c4`，对应 [Draft PR #321](https://github.com/arvinhanye/SmartSketch/pull/321)（未合并，HEAD `ab60183`）。
 
+> **2026-10-08 本地实施补充**：`codex/courses-model-settings-ui` 已完成课程/模型设置及剩余业务页面视觉改版，尚未提交/推送。以下 2026-10-07 状态为历史基线；当前交付和未完成路线图项见 [课程与设置交接](handoffs/codex-courses-model-settings-ui.md)、[剩余页面交接](handoffs/codex-remaining-pages-ui.md)。
+
 ## 1. 一页概览
 
 - **在做什么**：把前端的视觉与交互整体升级为「Linear 式暗色应用外壳 + Kumu 式浅色图谱画布」。原因：原界面信息层级松散、入口多、有「AI 味」、部分文字没有样式，约 100 个节点时图谱标签不可读。
@@ -213,3 +215,7 @@ Node 22.22+ 或 24.15+；后端与运行手册见 [`docs/runbook.md`](runbook.md
 | `docs/handoffs/claude-ui-graph-pilot-01*.md`、`codex-ui-graph-pilot-01.md` | 样板页的设计过程、实施记录、踩坑与验收证据 |
 | `docs/handoffs/codex-ui-login-01.md`、`codex-ui-auth-art-02.md`、`codex-ui-auth-motion-03.md` | 认证页既有 UI 工作（第二批不得回退） |
 | [`docs/runbook.md`](runbook.md) | 运行与验收手册 |
+
+## 2026-10-08 用户确认：登录页方案 D
+
+用户经过四版预览确认“资料 → 展开书页 → 知识关联 → 学习路径”的原创 SVG 插画与左右分栏布局，并要求先做前端、不改后端。此指示覆盖 R7 对登录页八组旧装饰图的保留限制；注册页沿用 AuthLayout，旧运动逻辑和减少动态/窄屏行为保持。登录页使用独立 LoginLayout，不启用装饰动画，窄屏隐藏插画并保留表单滚动。详见 `docs/handoffs/codex-login-editorial.md`。

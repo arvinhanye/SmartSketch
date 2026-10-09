@@ -99,7 +99,7 @@ function onKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <section class="chat" aria-labelledby="chat-title">
+  <section class="chat ui-chat-workspace" aria-labelledby="chat-title">
     <header class="chat__header">
       <h2 id="chat-title">课程问答</h2>
       <span class="chat__badge">仅依据已发布资料回答</span>
@@ -157,7 +157,7 @@ function onKeydown(event: KeyboardEvent): void {
           提问前需要先配置你的模型 API，回答会使用你自己的模型。
           <RouterLink :to="{ name: SETTINGS_ROUTE }" data-test="model-config-link">去设置</RouterLink>
         </p>
-        <form class="compose" @submit.prevent="submitQuestion">
+        <form class="compose ui-chat-compose" @submit.prevent="submitQuestion">
           <label for="chat-question" class="sr-only">向课程助教提问</label>
           <textarea
             id="chat-question"

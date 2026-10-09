@@ -700,7 +700,7 @@ describe('H05 工具栏、筛选与画布联动', () => {
               modelValue: state.value,
               'onUpdate:modelValue': (next: GraphFilterState) => (state.value = next),
               layout: layout.value,
-              'onUpdate:layout': (next: 'hierarchical' | 'force') => (layout.value = next),
+              'onUpdate:layout': (next: 'hierarchical' | 'force' | 'radial') => { if (next !== 'radial') layout.value = next },
               chapters,
               summary: summary.value,
               canClear: !isDefault.value,

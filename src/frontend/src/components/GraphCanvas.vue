@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onActivated, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
+import { computed, inject, nextTick, onActivated, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { useReducedMotion } from '../composables/useReducedMotion'
 import type { Positions } from '../graph/chapterLayout'
 import {
@@ -30,12 +30,19 @@ const props = withDefaults(
     label?: string
     layout?: GraphLayoutName
     enhanced?: boolean
+    audience?: 'student' | 'teacher'
     /** 章节分区布局的位置（知识点 ID → 坐标）；增强模式下 null 表示还在计算，画布等它 */
     positions?: Positions | null
     /** 章节外框成员（知识点 ID）；null 为没有 */
     scope?: readonly string[] | null
+    /** 给了位置时的排布形态：层次/章节（竖向曲线边，缺省）或径向（直线边） */
+    arrangement?: 'layered' | 'radial'
+    /** 首屏：`readable` 按可读缩放聚焦入口节点（学生页）；`overview` 先整图适应进视口（教师页） */
+    initialView?: 'readable' | 'overview'
+    /** 整组适应时四周留白（像素），缺省按学生页的浮层 */
+    fitPads?: Partial<{ left: number; right: number; top: number; bottom: number }>
   }>(),
-  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, positions: null, scope: null },
+  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined },
 )
 
 const emit = defineEmits<{ nodeClick: [kpId: string]; blankClick: [] }>()
@@ -53,6 +60,11 @@ const zoom = ref<number | null>(null)
 /** 小地图默认展开；<1024px 默认收起（规格 §5.1） */
 const miniOpen = ref(typeof window === 'undefined' || window.innerWidth >= 1024)
 const tip = ref<{ text: string; x: number; y: number } | null>(null)
+/**
+ * G6 的小地图插件销毁时会把传给它的容器从 DOM 摘掉；画布重建（换布局、换位置）后必须换一个新容器，
+ * 否则小地图消失而开关仍显示「收起小地图」。key 变化让 Vue 重新创建 `.gw-mini`。
+ */
+const miniKey = ref(0)
 let lifecycle: GraphLifecycle | null = null
 let tipTimer: ReturnType<typeof setTimeout> | null = null
 let stopObstacles: (() => void) | null = null
@@ -87,21 +99,31 @@ function showTip(info: { kpId: string; clientX: number; clientY: number } | null
     const node = props.graph?.nodes.find((n) => n.data.kpId === info.kpId)
     if (node === undefined) return
     tip.value = {
-      text: `${node.data.name}（${MASTERY_TEXT[masteryOfStates(node.states)]}）`,
+      text: props.audience === 'teacher'
+        ? `${node.data.name}（${({draft:'待审核',approved:'已通过',rejected:'已驳回'} as Record<string,string>)[node.data.status] ?? node.data.status}${node.data.locked ? ' · 已锁定' : ''}${node.data.source === 'manual' ? ' · 人工来源' : ''}）`
+        : `${node.data.name}（${MASTERY_TEXT[masteryOfStates(node.states)]}）`,
       x: info.clientX - box.left,
       y: info.clientY - box.top,
     }
   }, 300)
 }
 
-function start(): void {
-  if (stage.value === null || props.graph === null || !ready.value) return
+function start(attempt = 0): void {
+  if (stage.value === null || props.graph === null || !ready.value || lifecycle !== null) return
+  // 小地图容器被 G6 摘掉、新容器还没挂上（组件本身在文档里）：等 DOM 更新后再建。
+  // 组件在 KeepAlive 或未挂到文档时 isConnected 恒为 false，所以只在根节点已连接时等待，且最多重试几次
+  if (attempt < 3 && props.enhanced && mini.value !== null && root.value?.isConnected === true && !mini.value.isConnected) {
+    void nextTick(() => start(attempt + 1))
+    return
+  }
   drawnOnce.value = false
   // 适配图可能是响应式代理；生命周期会复制一份交给 G6
   lifecycle = createGraphLifecycle(stage.value, {
     data: toRaw(props.graph),
     layout: props.layout,
     positions: props.enhanced && props.positions !== null ? toRaw(props.positions) : null,
+    edgeStyle: props.arrangement === 'radial' ? 'straight' : 'vertical',
+    initialView: props.initialView,
     enhance: props.enhanced
       ? {
           obstacles: () => (stage.value !== null && registry !== null ? registry.boxes(stage.value) : { hard: [], soft: [] }),
@@ -109,6 +131,7 @@ function start(): void {
           reduceMotion: () => reduced.value,
           onBlankClick: () => emit('blankClick'),
           onHover: showTip,
+          fitPads: props.fitPads,
         }
       : undefined,
     factory,
@@ -147,11 +170,12 @@ function stop(): void {
   showTip(null)
   lifecycle?.destroy()
   lifecycle = null
+  miniKey.value += 1
 }
 
 function retry(): void {
   stop()
-  start()
+  void nextTick(() => start())
 }
 
 onMounted(() => {
@@ -168,6 +192,9 @@ watch(
     else lifecycle.update(toRaw(graph))
   },
 )
+
+// 布局降级或恢复时重建，等待 DOM 更新后取得增强模式的小地图容器。
+watch(() => props.enhanced, retry, { flush: 'post' })
 
 // 位置就绪（章节布局算完）后建图
 watch(ready, (now) => {
@@ -192,6 +219,14 @@ watch(
     if (props.enhanced) {
       if (lifecycle !== null) retry()
     } else lifecycle?.setLayout(layout)
+  },
+)
+
+// 排布形态变了（边的画法不同）：增强模式下重建；位置同时变化时由位置侦听负责，start() 对重复调用是幂等的
+watch(
+  () => props.arrangement,
+  () => {
+    if (props.enhanced && lifecycle !== null) retry()
   },
 )
 
@@ -227,14 +262,14 @@ onBeforeUnmount(() => {
 
     <!-- 小地图与缩放控件：缩略图只画节点，遮罩框是当前视口；装饰性，键盘等价路径是搜索、章节跳转与列表 -->
     <div v-if="enhanced" ref="controls" class="gw-map" role="group" aria-label="地图与缩放">
-      <div v-show="miniOpen" ref="mini" class="gw-mini" aria-hidden="true" />
+      <div v-show="miniOpen" ref="mini" :key="miniKey" class="gw-mini" aria-hidden="true" />
       <div class="gw-map__ctl">
-        <button type="button" class="gw-tool" :aria-label="miniOpen ? '收起小地图' : '展开小地图'" :aria-pressed="miniOpen" @click="miniOpen = !miniOpen">
+        <button type="button" class="gw-tool" :aria-label="miniOpen ? '收起小地图' : '展开小地图'" :title="miniOpen ? '收起小地图' : '展开小地图'" :aria-pressed="miniOpen" @click="miniOpen = !miniOpen">
           <AppIcon name="map" />
         </button>
-        <button type="button" class="gw-tool" aria-label="放大" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
-        <button type="button" class="gw-tool" aria-label="缩小" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
-        <button type="button" class="gw-tool" aria-label="适应画布" @click="fitAll"><AppIcon name="fit" /></button>
+        <button type="button" class="gw-tool" aria-label="放大" title="放大" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
+        <button type="button" class="gw-tool" aria-label="缩小" title="缩小" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
+        <button type="button" class="gw-tool" aria-label="适应画布" title="适应画布" @click="fitAll"><AppIcon name="fit" /></button>
       </div>
     </div>
     <div v-if="tip" class="gw-tip" role="tooltip" :style="{ left: `${tip.x + 14}px`, top: `${tip.y + 14}px` }">{{ tip.text }}</div>

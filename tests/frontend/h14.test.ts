@@ -817,10 +817,11 @@ describe('审查补充', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     f.relations.create.mockRejectedValueOnce(apiError(403, 'COURSE_FORBIDDEN'))
     await openTab(wrapper, 'relations')
-    await clickNode(wrapper, 'k2')
+    // 已选中的 k1 在进入关系页时成为起点，所以只需再点终点
     await clickNode(wrapper, 'k3')
     await wrapper.find('.relation-editor__form').trigger('submit')
     await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledWith('c1', expect.objectContaining({ from_id: 'k1', to_id: 'k3' }), expect.anything())
     expect(confirm).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('teacher-home')
   })
@@ -845,5 +846,135 @@ describe('审查补充', () => {
     const described = box.attributes('aria-describedby')!
     expect(document.getElementById(described)?.textContent).toContain('未保存')
     expect(document.activeElement).toBe(box.element)
+  })
+})
+
+describe('教师图谱新版界面',()=>{
+ it('增强画布使用完整草稿章节位置且保留审核筛选和键盘选择',async()=>{
+  const {wrapper}=await mountPage(fakes())
+  const canvas=wrapper.findComponent(GraphCanvas)
+  expect(canvas.props('enhanced')).toBe(true)
+  await vi.waitFor(()=>expect(canvas.props('positions')).not.toBeNull())
+  expect(wrapper.find('[data-test="status-filter"]').exists()).toBe(true)
+  expect(wrapper.find('[data-test="tg-node-picker"]').exists()).toBe(true)
+  expect(wrapper.find('.ui-sheet').exists()).toBe(true)
+ })
+})
+
+describe('教师图谱：面板选择与画布、关系页保持同步', () => {
+  beforeEach(() => {
+    focused.length = 0
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+  })
+
+  async function pick(wrapper: VueWrapper, kid: string) {
+    await wrapper.find('[data-test="tg-node-picker"]').setValue(kid)
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  }
+
+  it('下拉选择知识点：详情切换，画布同时聚焦到该节点', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await pick(wrapper, 'k3')
+    expect(focused.at(-1)).toBe('kp:k3')
+    expect(wrapper.find('[data-test="tg-detail-empty"]').exists()).toBe(false)
+  })
+
+  it('有未保存修改时下拉选择先确认；继续编辑则画布不动，放弃后才聚焦', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    await clickNode(wrapper, 'k1')
+    await openTab(wrapper, 'edit')
+    await editName(wrapper, '未保存的名字')
+    await pick(wrapper, 'k2')
+    expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(true)
+    expect(focused).not.toContain('kp:k2')
+    await wrapper.find('[data-test="tg-discard-yes"]').trigger('click')
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(focused.at(-1)).toBe('kp:k2')
+  })
+
+  it('已选中知识点时进入「编辑关系」：它直接成为起点；没选中则仍为空', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await openTab(wrapper, 'relations')
+    const fromSelect = () => wrapper.find('select[name="from"]').element as HTMLSelectElement
+    expect(fromSelect().selectedOptions[0]?.textContent).toBe('请选择')
+    await openTab(wrapper, 'detail')
+    await clickNode(wrapper, 'k2')
+    await openTab(wrapper, 'relations')
+    expect(fromSelect().value).toBe('k2')
+  })
+})
+
+describe('教师图谱：首屏总览与径向布局', () => {
+  const radios = (wrapper: VueWrapper) => wrapper.findAll('[role="radiogroup"][aria-label="布局"] label').map((l) => l.text())
+  const checked = (wrapper: VueWrapper) =>
+    wrapper.findAll('[role="radiogroup"][aria-label="布局"] input').findIndex((i) => (i.element as HTMLInputElement).checked)
+
+  it('首屏总览整张图（initial-view=overview），布局选项含径向', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const canvas = wrapper.findComponent(GraphCanvas)
+    expect(canvas.props('initialView')).toBe('overview')
+    expect(radios(wrapper)).toEqual(['层次', '径向', '力导向'])
+  })
+
+  it('节点少、层次布局形状正常时默认层次；手动切到径向后画布换用径向位置与直线边', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const canvas = wrapper.findComponent(GraphCanvas)
+    await vi.waitFor(() => expect(canvas.props('positions')).not.toBeNull())
+    expect(checked(wrapper)).toBe(0)
+    expect(canvas.props('arrangement')).toBe('layered')
+    const layered = canvas.props('positions')
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[1]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('arrangement')).toBe('radial')
+    expect(canvas.props('layout')).toBe('hierarchical')
+    expect(canvas.props('positions')).not.toBe(layered)
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[2]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('layout')).toBe('force')
+    expect(canvas.props('arrangement')).toBe('layered')
+  })
+
+  it('一章里几十个节点挂在同一个根下（层次布局会被拉成长条）：默认选径向；教师手动选过之后不再被自动改回', async () => {
+    const nodes = [kp('root'), ...Array.from({ length: 40 }, (_, i) => kp(`n${i}`))]
+    const edges = Array.from({ length: 40 }, (_, i) => ({ ...rel(`r${i}`, 'root', `n${i}`), type: 'CONTAINS' }) as Relation)
+    const { wrapper } = await mountPage(fakes({ nodes, edges }))
+    const canvas = wrapper.findComponent(GraphCanvas)
+    await vi.waitFor(() => expect(canvas.props('arrangement')).toBe('radial'))
+    expect(checked(wrapper)).toBe(1)
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[0]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('arrangement')).toBe('layered')
+    expect(checked(wrapper)).toBe(0)
+  })
+})
+
+describe('教师知识点面板调宽', () => {
+  it('键盘可调整并限制宽度，切换详情/编辑后保留选择和宽度', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200)
+    const { wrapper } = await mountPage(fakes())
+    await clickNode(wrapper, 'k1')
+    const divider = wrapper.get('[data-test="tg-panel-divider"]')
+    const width = () => Number(divider.attributes('aria-valuenow'))
+    expect(width()).toBe(360)
+    await divider.trigger('keydown', { key: 'ArrowRight' })
+    expect(width()).toBe(380)
+    await openTab(wrapper, 'edit')
+    expect(width()).toBe(380)
+    expect(wrapper.find('[data-test="ne-name"]').exists()).toBe(true)
+    await divider.trigger('keydown', { key: 'End' })
+    expect(width()).toBe(640)
+    await divider.trigger('keydown', { key: 'ArrowRight' })
+    expect(width()).toBe(640)
+    await divider.trigger('keydown', { key: 'Home' })
+    expect(width()).toBe(280)
+    await divider.trigger('keydown', { key: 'ArrowLeft' })
+    expect(width()).toBe(280)
+    await openTab(wrapper, 'detail')
+    expect(width()).toBe(280)
+    vi.restoreAllMocks()
   })
 })

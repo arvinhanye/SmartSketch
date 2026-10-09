@@ -36,7 +36,8 @@
 }
 
 /* 图谱工作区：说明面板、画布、浮动工具条、tooltip、菜单都显式用浅色 tokens */
-.graph-workspace {
+.graph-workspace,
+.light-surface {
   --gw-canvas: #f4f5f7;
   --gw-panel: #f8f9fb;
   --gw-hover: #eaecf1;

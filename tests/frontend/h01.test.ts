@@ -93,6 +93,8 @@ async function mountApp({
     global: { plugins: [pinia, router], provide: { [COURSES_API_KEY as symbol]: api } },
   })
   await flushPromises()
+  // 本次设计将创建面板默认收起；旧业务用例显式打开后继续检查原校验。
+  if (role === 'teacher') await wrapper.get('[data-test="course-create-open"]').trigger('click')
   return { wrapper, router, api, store: useCourseStore(pinia) }
 }
 
@@ -263,6 +265,8 @@ describe('H01 创建课程表单', () => {
     const names = wrapper.findAll('[data-test="course-card"]').map((c) => c.text())
     expect(names[0]).toContain('编译原理')
     expect(names).toHaveLength(2)
+    expect(wrapper.find('form[data-test="course-create"]').exists()).toBe(false)
+    await wrapper.get('[data-test="course-create-open"]').trigger('click')
     expect((wrapper.get('input[name="name"]').element as HTMLInputElement).value).toBe('')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('[data-test="create-success"]').attributes('role')).toBe('status')

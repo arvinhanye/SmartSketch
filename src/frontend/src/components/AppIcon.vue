@@ -3,6 +3,8 @@
 defineProps<{ name: string; size?: number }>()
 
 const PATHS: Record<string, string> = {
+  members: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 4v2"/>',
+  upload: '<path d="M12 16V4m-5 5 5-5 5 5M4 15v5h16v-5"/>',
   home: '<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10"/>',
   overview: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
   graph: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="9" cy="18" r="2.5"/><path d="m8 7 8 .8M7.2 8.2 8.4 15.6M16.6 10l-5.8 6.4"/>',

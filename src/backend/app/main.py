@@ -28,6 +28,7 @@ from app.api.materials import policy_router as upload_policy_router
 from app.api.materials import router as materials_router
 from app.api.members import router as members_router
 from app.api.model_config import router as model_config_router
+from app.api.embedding_config import router as embedding_config_router
 from app.config import check_auth_settings, load_settings
 from app.schemas.errors import Error
 from app.services.auth import (
@@ -98,6 +99,8 @@ def create_app() -> FastAPI:
     application.state.registration_limiter = RegistrationRateLimiter()
     # ADR-080：个人模型配置的测试连接限流；model_transport 为 None 时按设置构建出站校验传输（测试可注入）
     application.state.config_test_limiter = ConfigTestLimiter()
+    application.state.model_discovery_limiter = ConfigTestLimiter(limit=10)
+    application.state.model_discovery_transport = None
     application.state.model_transport = None
     application.state.auth_clock = time.time
     prepare_timing_dummy_hash()  # never let the first unknown-user login take twice as long
@@ -106,6 +109,7 @@ def create_app() -> FastAPI:
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(model_config_router)
+    application.include_router(embedding_config_router)
     application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)

@@ -121,6 +121,7 @@ class EmbeddingAdapter:
         *,
         cache: EmbeddingCache | None = None,
         store: CallStore | None = None,
+        space: str | None = None,
     ) -> None:
         self._client = client
         self._store = store
@@ -132,7 +133,7 @@ class EmbeddingAdapter:
             raise ValueError("EMBEDDING_MODEL is required for online/local embedding")
         self._dimensions = settings.EMBEDDING_DIMENSIONS
         self._batch_size = settings.EMBEDDING_BATCH_SIZE
-        self.space = (
+        self.space = space or (
             f"fake/{self._dimensions}" if is_fake else f"real/{self._model}/{self._dimensions}"
         )
 

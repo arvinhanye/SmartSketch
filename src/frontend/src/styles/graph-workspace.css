@@ -17,13 +17,13 @@
 .graph-workspace :focus-visible { outline: 2px solid var(--gw-accent); outline-offset: 2px; }
 
 /* ---------- 工作区 */
-.graph-workspace.gw { position: relative; flex: 1; min-width: 0; display: grid; grid-template-columns: 35% minmax(0, 1fr); background: var(--gw-canvas); border-radius: var(--ss-radius-md); overflow: visible; box-shadow: 0 1px 2px rgb(0 0 0 / 24%); animation: gw-in 180ms var(--ss-ease); font-size: 14px; }
+.graph-workspace.gw { position: relative; flex: 1; min-width: 0; display: grid; grid-template-columns: var(--gw-panel-width, 25%) minmax(0, 1fr); background: var(--gw-canvas); border-radius: var(--ss-radius-md); overflow: visible; box-shadow: 0 1px 2px rgb(0 0 0 / 24%); animation: gw-in 180ms var(--ss-ease); font-size: 14px; }
 .graph-workspace.gw.is-collapsed { grid-template-columns: minmax(0, 1fr); }
 .graph-workspace.gw.is-overlay { grid-template-columns: minmax(0, 1fr); }
-.graph-workspace .gw-panel { background: var(--gw-panel); border-right: 1px solid var(--gw-line); display: flex; flex-direction: column; min-width: 0; overflow: visible;  align-self: start; min-height: calc(100dvh - 68px);}
+.graph-workspace .gw-panel { background: var(--gw-panel); border-right: 1px solid var(--gw-line); display: flex; flex-direction: column; min-width: 0; overflow: visible;  align-self: start; min-height: calc(100dvh - 68px - var(--gw-banner, 0px));}
 .graph-workspace.gw.is-collapsed .gw-panel { display: none; border: 0; }
-.graph-workspace.gw.is-overlay .gw-panel { position: absolute; z-index: 20; inset: 0 auto 0 0; width: 90%; box-shadow: var(--ss-shadow-pop-light); opacity: 0; transform: translateX(-16px); visibility: hidden; transition: transform 220ms var(--ss-ease), opacity 220ms var(--ss-ease), visibility 0s linear 220ms; }
-.graph-workspace.gw.is-overlay .gw-panel.is-open { position: relative; grid-area: 1 / 1; inset: auto; opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
+.graph-workspace.gw.is-overlay .gw-panel { position: absolute; z-index: 20; inset: 0 auto 0 0; width: 90%; min-height: 0; max-height: 100%; overflow: hidden; box-shadow: var(--ss-shadow-pop-light); opacity: 0; transform: translateX(-16px); visibility: hidden; transition: transform 220ms var(--ss-ease), opacity 220ms var(--ss-ease), visibility 0s linear 220ms; }
+.graph-workspace.gw.is-overlay .gw-panel.is-open { position: relative; grid-area: 1 / 1; inset: auto; min-height: calc(100dvh - 68px - var(--gw-banner, 0px)); max-height: none; overflow: visible; opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
 .graph-workspace .gw-scrim { position: absolute; inset: 0; z-index: 19; background: rgb(32 35 42 / 28%); animation: gw-fade 160ms var(--ss-ease); }
 .graph-workspace .gw-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 0 20px; min-height: 48px; }
 .graph-workspace .gw-panel__tag { color: var(--gw-text-3); font-size: 12px; line-height: 18px; }
@@ -92,7 +92,7 @@
 .graph-workspace .gw-rec__name { font-weight: 500; overflow-wrap: anywhere; }
 
 /* ---------- 画布与浮层 */
-.graph-workspace .gw-stage { position: sticky; min-width: 0; min-height: 0; background: var(--gw-canvas);  top: 0; height: calc(100dvh - 68px); align-self: start;}
+.graph-workspace .gw-stage { position: sticky; min-width: 0; min-height: 0; background: var(--gw-canvas);  top: 0; height: calc(100dvh - 68px - var(--gw-banner, 0px)); align-self: start;}
 .graph-workspace .gw-tl { position: absolute; z-index: 6; top: 16px; left: 16px; right: 72px; display: grid; gap: 8px; justify-items: start; }
 .graph-workspace .gw-tl__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 100%; }
 .graph-workspace .gw-tool.gw-tool--text { width: auto; min-width: 36px; height: 40px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; white-space: nowrap; }
@@ -279,7 +279,7 @@
 .app-rail__item.is-wide { padding: 0 12px; }
 .app--graph .app-main { grid-area: main; max-width: none; margin: 0; padding: 0 12px 12px 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
 .app--graph .app-main > .student-graph { flex: 1; min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;  height: auto;}  /* 覆盖全站 `.app-main > section` 的卡片外观 */
-.app--graph .student-graph > .graph-workspace { height: auto; min-height: calc(100dvh - 68px); }
+.app--graph .student-graph > .graph-workspace { height: auto; min-height: calc(100dvh - 68px - var(--gw-banner, 0px)); }
 @media (max-width: 1023px) { .app--graph { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'main'; } .app--graph .app-main { padding: 0 16px 12px; } }
 @media (max-width: 767px) { .app-topbar { padding: 0 12px; } .app-topbar__name { display: none; } .app-topbar__crumb a, .app-topbar__crumb > span[aria-hidden] { display: none; } .app--graph .app-main { padding: 0 8px 8px; } }
 @keyframes gw-slide-l { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
@@ -291,3 +291,12 @@
 .graph-workspace .knowledge-detail li, .graph-workspace .knowledge-detail li > button { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 
 .graph-workspace .student-graph__learning, .graph-workspace .student-graph__mastery { grid-template-columns: minmax(0, 1fr); }
+
+/* 学生并置面板的可访问调宽手柄，不占用第三个网格列。 */
+.graph-workspace .gw-divider { position: absolute; z-index: 12; top: 0; bottom: 0; left: calc(var(--gw-panel-width, 25%) - 5px); width: 10px; cursor: col-resize; touch-action: none; user-select: none; }
+.graph-workspace .gw-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; transition: background 120ms; }
+.graph-workspace .gw-divider:is(:hover,:focus-visible,.is-dragging)::after { background: var(--gw-accent); }
+.graph-workspace .gw-divider:focus-visible { outline-offset: -2px; }
+
+/* 演示模式横幅占用画布上方一行：舞台高度要扣掉它，否则底部的小地图、缩放和计数条落到视口之外 */
+.app--graph .app-main:has(> .app-mode) { --gw-banner: 45px; }

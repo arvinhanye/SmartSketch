@@ -42,7 +42,7 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
 }
 
 
-def publish_context(request: Request) -> PublishContext:
+def publish_context(request: Request, course_id: str | None = None) -> PublishContext:
     """One context per app, built on first use so the app still starts without Neo4j."""
     ctx = getattr(request.app.state, "publish_context", None)
     if ctx is None:
@@ -56,6 +56,12 @@ def publish_context(request: Request) -> PublishContext:
             lock_wait_seconds=settings.COURSE_LOCK_WAIT_SECONDS,
         )
         request.app.state.publish_context = ctx
+    if course_id is not None:
+        from dataclasses import replace
+        from app.services.embedding_configs import for_course, course_space
+        embedding = for_course(request.app.state.settings, course_id)
+        if embedding is not None:
+            return replace(ctx, embedder=embedding, current_space=course_space(request.app.state.settings, course_id))
     return ctx
 
 
@@ -108,7 +114,7 @@ def _run(action: Any) -> JSONResponse:
 @router.post("/publish", operation_id="publishGraph", response_model=PublishResult, responses=_ERRORS)
 def publish_graph(request: Request, access: CourseAccess = Depends(course_teacher)) -> JSONResponse:
     try:
-        ctx = publish_context(request)
+        ctx = publish_context(request, access.course.id)
     except RepositoryError:
         return _error(503, "STORAGE_UNAVAILABLE", "图数据库暂不可用，请稍后重试")
     return _run(lambda: publish(ctx, access.course.id, created_by=access.user.id))
@@ -124,7 +130,7 @@ def rollback_version(
     if versions.get_committed(request.app.state.settings.SQLITE_URL, access.course.id, version) is None:
         return _error(404, "NOT_FOUND", "版本不存在")  # R2 在连 Neo4j 之前：他课或失败版本同样 404
     try:
-        ctx = publish_context(request)
+        ctx = publish_context(request, access.course.id)
     except RepositoryError:
         return _error(503, "STORAGE_UNAVAILABLE", "图数据库暂不可用，请稍后重试")
     return _run(lambda: rollback(ctx, access.course.id, version, created_by=access.user.id))

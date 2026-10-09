@@ -293,3 +293,80 @@ describe('销毁', () => {
     expect(m.graphs[0]!.destroyed).toBe(true)
   })
 })
+
+describe('首屏总览与径向布局的边', () => {
+  /** 画布一开始处于很小的缩放：可读策略会把它放大到 READABLE_ZOOM；总览策略应改为整图适应 */
+  function lowZoom() {
+    const graphs: FakeEnhancedGraph[] = []
+    const factory: CanvasGraphFactory = (init) => {
+      const g = new FakeEnhancedGraph({}, init)
+      g.zoom = 0.3
+      graphs.push(g)
+      return g
+    }
+    return { graphs, factory }
+  }
+
+  it('缺省（readable）：缩放过小时放大到可读缩放', async () => {
+    const m = lowZoom()
+    createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance, positions })
+    await settle()
+    expect(m.graphs[0]!.calls).toContain('zoomTo 0.9')
+  })
+
+  it('overview：首屏整图适应进视口，不再放大到可读缩放去聚焦入口节点', async () => {
+    const m = lowZoom()
+    createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance, positions, initialView: 'overview' })
+    await settle()
+    const calls = m.graphs[0]!.calls
+    expect(calls).not.toContain('zoomTo 0.9')
+    expect(calls).toContain('translateBy')
+    expect(calls.some((c) => c.startsWith('zoomTo '))).toBe(true)
+  })
+
+  it('overview 下有待聚焦目标（搜索/跳转）时仍然聚焦目标', async () => {
+    const m = lowZoom()
+    const life = createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance, positions, initialView: 'overview' })
+    life.focus('b')
+    await settle()
+    expect(m.graphs[0]!.calls).toContain('zoomTo 0.9')
+  })
+
+  it('overview 下定位到知识点：先放大到可读缩放再居中；可读模式的定位不改缩放', async () => {
+    const m = lowZoom()
+    const life = createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance, positions, initialView: 'overview' })
+    await settle()
+    const g = m.graphs[0]!
+    g.calls.length = 0
+    life.focus('b')
+    await settle()
+    expect(g.calls).toContain('zoomTo 0.9')
+    const readable = lowZoom()
+    const life2 = createGraphLifecycle(box(), { data: sample(), factory: readable.factory, enhance, positions })
+    await settle()
+    const g2 = readable.graphs[0]!
+    g2.zoom = 0.3
+    g2.calls.length = 0
+    life2.focus('b')
+    await settle()
+    expect(g2.calls.some((c) => c.startsWith('zoomTo '))).toBe(false)
+  })
+
+  it('整组适应的留白可由页面收紧（教师页没有顶部浮层）', async () => {
+    const wide = lowZoom()
+    createGraphLifecycle(box(), { data: sample(), factory: wide.factory, enhance, positions, initialView: 'overview' })
+    const tight = lowZoom()
+    createGraphLifecycle(box(), { data: sample(), factory: tight.factory, enhance: { ...enhance, fitPads: { top: 0, left: 0, right: 0, bottom: 0 } }, positions, initialView: 'overview' })
+    await settle()
+    const zoomOf = (g: FakeEnhancedGraph) => Number(g.calls.filter((c) => c.startsWith('zoomTo ')).at(-1)!.split(' ')[1])
+    expect(zoomOf(tight.graphs[0]!)).toBeGreaterThanOrEqual(zoomOf(wide.graphs[0]!))
+  })
+
+  it('径向布局给了位置时边画直线，层次布局仍是竖向曲线', async () => {
+    const { graphs } = start({ positions, edgeStyle: 'straight' })
+    await settle()
+    const init = graphs[0]!.init!
+    const options = buildGraphOptions({ ...init, container: document.createElement('div') }) as unknown as { edge: { type?: string } }
+    expect(options.edge.type).toBe('line')
+  })
+})

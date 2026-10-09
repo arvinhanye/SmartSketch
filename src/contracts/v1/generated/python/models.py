@@ -10,6 +10,29 @@ from typing import Annotated, Any, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, RootModel, SecretStr
 
 
+class EmbeddingConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    configured: bool
+    base_url: str
+    model: str
+    dimensions: Annotated[int, Field(ge=1, le=4096)]
+    key_hint: Optional[str] = None
+    version: Annotated[Optional[int], Field(ge=1)] = None
+    updated_at: Optional[datetime] = None
+
+
+class EmbeddingConfigUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    base_url: Annotated[str, Field(max_length=512, min_length=9)]
+    model: Annotated[str, Field(max_length=128, min_length=1)]
+    dimensions: Annotated[int, Field(ge=1, le=4096)]
+    api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+
+
 class RuntimeMode(Enum):
     personal = 'personal'
     demo = 'demo'
@@ -102,6 +125,38 @@ class ModelConfigTestRequest(BaseModel):
             description='测试未保存的表单时按表单值发送（省略即 false）；测试已存配置时忽略本字段、使用已存值（ADR-090）。'
         ),
     ] = None
+
+
+class ModelDiscoveryRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    base_url: Annotated[Optional[str], Field(max_length=512, min_length=9)] = None
+    api_key: Annotated[Optional[SecretStr], Field(max_length=512, min_length=1)] = None
+
+
+class Model(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1)]
+
+
+class ErrorClass(Enum):
+    auth = 'auth'
+    timeout = 'timeout'
+    rate_limited = 'rate_limited'
+    connection = 'connection'
+    unsupported = 'unsupported'
+    server = 'server'
+    malformed_response = 'malformed_response'
+    blocked_address = 'blocked_address'
+
+
+class ModelDiscoveryResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ok: bool
+    models: Annotated[list[Model], Field(max_length=1000)]
+    error_class: Optional[ErrorClass] = None
 
 
 class ModelConfigTestResult(BaseModel):

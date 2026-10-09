@@ -247,8 +247,8 @@ def _connect_within(addresses: list[str], port: int, limit: ExchangeDeadline, co
 
 def exchange(*, scheme: str, host: str, port: int, path: str, body: bytes, headers: Mapping[str, str],
              timeout: float, addresses: Callable[[ExchangeDeadline], list[str]],
-             connector: Connector, ssl_context: ssl.SSLContext | None) -> HttpResponse:
-    """POST once with ``timeout`` as the hard budget of the whole exchange (see ``HttpTransport``)."""
+             connector: Connector, ssl_context: ssl.SSLContext | None, method: str = "POST") -> HttpResponse:
+    """Exchange once with ``timeout`` as the hard budget; callers select POST or GET."""
     limit = ExchangeDeadline(timeout)
     connection: http.client.HTTPConnection | None = None
     sock: socket.socket | None = None
@@ -264,7 +264,7 @@ def exchange(*, scheme: str, host: str, port: int, path: str, body: bytes, heade
             connection = http.client.HTTPConnection(host, port, timeout=limit.remaining())
         connection.sock = sock          # already connected (and verified); http.client never reconnects
         sock.settimeout(limit.remaining())
-        connection.request("POST", path or "/", body=body, headers=dict(headers))
+        connection.request(method, path or "/", body=body, headers=dict(headers))
         sock.settimeout(limit.remaining())
         response = connection.getresponse()
         if limit.expired:               # headers cut short by the watchdog are not a response

@@ -14,6 +14,7 @@ import { ApiError, NetworkError, TimeoutError, type FetchLike } from '../../src/
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from '../../src/frontend/src/router/index.ts'
 import { useCourseStore } from '../../src/frontend/src/stores/course'
 import { SESSION_STORAGE_KEY, useSessionStore } from '../../src/frontend/src/stores/session'
+import AuthLayout from '../../src/frontend/src/components/AuthLayout.vue'
 import LoginView from '../../src/frontend/src/views/LoginView.vue'
 
 type LoginResponse = components['schemas']['LoginResponse']
@@ -221,8 +222,25 @@ function failWith(error: Error): AuthApi['login'] {
 }
 
 describe('H13 登录页', () => {
-  it('品牌区展示多组不同结构的装饰知识图谱并对读屏隐藏', async () => {
-    const { wrapper } = await mountApp()
+  it('密码可显隐且不提交，登录失败后清空并恢复隐藏', async () => {
+    const { wrapper, login } = await mountApp({ login: failWith(apiError(401, 'UNAUTHENTICATED')) })
+    const password = wrapper.get('input[name="password"]')
+    await password.setValue(PASSWORD)
+    await wrapper.get('button[aria-label="显示密码"]').trigger('click')
+    expect(password.attributes('type')).toBe('text')
+    expect((password.element as HTMLInputElement).value).toBe(PASSWORD)
+    expect(login).not.toHaveBeenCalled()
+    await wrapper.get('button[aria-label="隐藏密码"]').trigger('click')
+    expect(password.attributes('type')).toBe('password')
+    await wrapper.get('button[aria-label="显示密码"]').trigger('click')
+    await fillAndSubmit(wrapper)
+    expect(password.attributes('type')).toBe('password')
+    expect((password.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.get('[data-test="login-error"]').attributes('role')).toBe('alert')
+  })
+
+  it('注册页沿用的品牌区展示多组不同结构图谱并对读屏隐藏', async () => {
+    const wrapper = mount(AuthLayout)
     const artwork = wrapper.get('.auth-layout__art')
     const graphs = artwork.findAll('[data-test="auth-graph"]')
 
@@ -232,19 +250,19 @@ describe('H13 登录页', () => {
     expect(new Set(graphs.map((graph) => `${graph.findAll('rect').length}:${graph.findAll('circle').length}`)).size)
       .toBeGreaterThanOrEqual(3)
 
-    const second = await mountApp()
-    expect(second.wrapper.get('[data-test="auth-graph"]').attributes('transform'))
+    const second = mount(AuthLayout)
+    expect(second.get('[data-test="auth-graph"]').attributes('transform'))
       .not.toBe(graphs[0].attributes('transform'))
   })
 
-  it('品牌区图谱在动画帧中改变位置', async () => {
+  it('注册页沿用的品牌区图谱在动画帧中改变位置', async () => {
     let nextFrame: FrameRequestCallback | undefined
     vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
       nextFrame = callback
       return 1
     }))
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const { wrapper } = await mountApp()
+    const wrapper = mount(AuthLayout)
     const graph = wrapper.get('[data-test="auth-graph"]')
     const before = graph.attributes('transform')
 
@@ -255,7 +273,7 @@ describe('H13 登录页', () => {
     expect(graph.attributes('transform')).not.toBe(before)
   })
 
-  it('用户启用减少动态效果时不启动品牌区动画', async () => {
+  it('注册页沿用的品牌区在减少动态效果时不启动动画', async () => {
     const requestFrame = vi.fn()
     vi.stubGlobal('requestAnimationFrame', requestFrame)
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
@@ -264,7 +282,7 @@ describe('H13 登录页', () => {
       removeEventListener: vi.fn(),
     })))
 
-    const { wrapper } = await mountApp()
+    const wrapper = mount(AuthLayout)
 
     expect(wrapper.findAll('[data-test="auth-graph"]')).toHaveLength(8)
     expect(requestFrame).not.toHaveBeenCalled()
@@ -282,6 +300,8 @@ describe('H13 登录页', () => {
 
   it('未登录提示可关闭，关闭后登录表单仍可使用', async () => {
     const { wrapper } = await mountApp({ path: '/teacher' })
+    expect(wrapper.find('.app-main > .app-notice').exists()).toBe(false)
+    expect(wrapper.get('.login [data-test="login-notice"]').attributes('role')).toBe('alert')
     const close = wrapper.get('button[aria-label="关闭提示"]')
     expect(wrapper.get('[role="alert"]').text()).toContain('未登录')
 

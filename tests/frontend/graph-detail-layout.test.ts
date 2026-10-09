@@ -43,12 +43,22 @@ describe('详情关闭入口按使用场景保留', () => {
 })
 
 describe('用户确认的自适应详情布局规则', () => {
-  it('并置面板按工作区 35% 分配，而非固定 320px', () => {
-    expect(rule('.graph-workspace.gw')).toMatch(/grid-template-columns:\s*35%\s+minmax\(0,\s*1fr\)/)
+  it('并置面板按工作区比例分配（默认 25%，由拖动/键盘分隔条写入 --gw-panel-width），而非固定 320px', () => {
+    expect(rule('.graph-workspace.gw')).toMatch(/grid-template-columns:\s*var\(--gw-panel-width,\s*25%\)\s+minmax\(0,\s*1fr\)/)
+    expect(rule('.graph-workspace .gw-divider')).toMatch(/left:\s*calc\(var\(--gw-panel-width,\s*25%\)\s*-\s*5px\)/)
   })
   it('窄屏打开的覆盖面板占工作区 90%，参与页面高度计算', () => {
     expect(rule('.graph-workspace.gw.is-overlay .gw-panel')).toMatch(/width:\s*90%/)
     expect(rule('.graph-workspace.gw.is-overlay .gw-panel.is-open')).toMatch(/position:\s*relative/)
+  })
+  it('窄屏收起的覆盖面板不参与页面高度（否则学生图谱页下方出现大片空白滚动区）', () => {
+    const closed = rule('.graph-workspace.gw.is-overlay .gw-panel')
+    expect(closed).toMatch(/max-height:\s*100%/)
+    expect(closed).toMatch(/overflow:\s*hidden/)
+    expect(closed).toMatch(/min-height:\s*0/)
+    const open = rule('.graph-workspace.gw.is-overlay .gw-panel.is-open')
+    expect(open).toMatch(/overflow:\s*visible/)
+    expect(open).toMatch(/max-height:\s*none/)
   })
   it('面板内容不再使用内部滚动容器，也不以 hidden 截断', () => {
     expect(rule('.graph-workspace .gw-panel__scroll')).toMatch(/overflow:\s*visible/)
@@ -71,6 +81,10 @@ describe('用户确认的自适应详情布局规则', () => {
   it('并置面板收起后移出布局，隐藏的长详情不撑高页面', () => {
     expect(rule('.graph-workspace.gw.is-collapsed .gw-panel')).toMatch(/display:\s*none/)
     expect(rule('.graph-workspace.gw.is-collapsed')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/)
+  })
+  it('演示模式横幅占位被计入舞台高度，底部控件不落到视口外', () => {
+    expect(rule('.graph-workspace .gw-stage')).toMatch(/height:\s*calc\(100dvh\s*-\s*68px\s*-\s*var\(--gw-banner,\s*0px\)\)/)
+    expect(rule('.app--graph .app-main:has(> .app-mode)')).toMatch(/--gw-banner:\s*45px/)
   })
   it('长内容撑开页面；画布保留视口高度，不由侧栏滚动或裁切', () => {
     const app = rule('.app--graph')

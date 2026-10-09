@@ -57,7 +57,7 @@ describe('图谱主题：CSS tokens 与画布字面量一致', () => {
     const code = tokensCss.replace(/\/\*[\s\S]*?\*\//g, '')
     expect(code).not.toMatch(/--color-/)
     expect(code).toMatch(/--ss-bg:/)
-    expect(code).toMatch(/\.graph-workspace\s*\{/)
+    expect(code).toMatch(/\.graph-workspace,\s*\.light-surface\s*\{/)
   })
 })
 

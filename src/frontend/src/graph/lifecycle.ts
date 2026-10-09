@@ -127,6 +127,8 @@ export interface CanvasGraphInit {
   layout?: GraphLayoutName
   /** 预先算好的位置（章节分区布局）：给了就不再让 G6 布局，边画成竖向曲线；只对层次布局生效 */
   positions?: Positions | null
+  /** 给了位置时边的画法：竖向曲线（层次/章节布局，缺省）或直线（径向布局） */
+  edgeStyle?: 'vertical' | 'straight'
   /** 小地图（增强模式）：外部容器与节点点的着色回调 */
   minimap?: { container: HTMLElement; color: (elementId: string) => string }
 }
@@ -151,6 +153,13 @@ export interface GraphLifecycleOptions {
    * 力导向布局下忽略。位置变了（换图、换布局）由调用方重建生命周期。
    */
   positions?: Positions | null
+  /** 给了位置时边的画法（径向布局用直线）；缺省竖向曲线 */
+  edgeStyle?: 'vertical' | 'straight'
+  /**
+   * 首屏视图：`readable`（缺省）按可读缩放聚焦入口节点；`overview` 先把整张图适应进视口（增强模式）。
+   * 已有待聚焦目标（搜索/跳转）时仍聚焦目标。换布局与窗口缩放后的重新适配沿用同一策略。
+   */
+  initialView?: 'readable' | 'overview'
   /**
    * 增强模式（语义缩放、标签排布、悬停强淡化、章节外框、小地图、整组适应）。缺省关闭，行为与 H04 完全一致。
    * 开启后容器尺寸变化（面板开合）只 `setSize`、保持镜头；窗口缩放与 `refreshSize()` 仍整图重新适配。
@@ -311,7 +320,7 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
     },
     edge: {
       // 章节分区布局下画竖向曲线；其余不指定 type（平行边转换会把成组的边改为曲线）
-      ...(withPositions ? { type: 'cubic-vertical' } : {}),
+      ...(withPositions ? { type: init.edgeStyle === 'straight' ? 'line' : 'cubic-vertical' } : {}),
       style: {
         endArrowSize: (d: unknown) => 9 * (ed(d).ak ?? 1),
         labelFontSize: 12,
@@ -476,6 +485,16 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     if (alive()) reportZoom(g)
   }
 
+  /** 整图适配之后的视图：总览模式把整图放进视口，否则按可读缩放聚焦（有待聚焦目标时总是聚焦它） */
+  async function settleView(g: CanvasGraph): Promise<void> {
+    if (options.initialView === 'overview' && enhancer !== null && pendingFocus === null && anchor === null) {
+      await enhancer.fitTo()
+      if (alive()) reportZoom(g)
+      return
+    }
+    await ensureReadable(g)
+  }
+
   function create(): void {
     creating = true
     enqueue(async () => {
@@ -487,7 +506,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
         enhancer !== null && options.enhance?.minimap != null
           ? { container: options.enhance.minimap, color: (id: string) => enhancer.minimapColor(id) }
           : undefined
-      const created = await factory({ container, width, height, data, layout, positions, minimap })
+      const created = await factory({ container, width, height, data, layout, positions, edgeStyle: options.edgeStyle, minimap })
       if (!alive()) {
         created.destroy()
         return
@@ -504,7 +523,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (!alive()) return
       // 之后的数据更新保持学生正在看的位置，不再回到整图适配（见 `CanvasGraph.setOptions`）
       graph.setOptions?.({ autoFit: undefined })
-      await ensureReadable(graph)
+      await settleView(graph)
       if (!alive()) return
       await enhancer?.afterRender()
       if (!alive()) return
@@ -528,7 +547,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (!alive()) return
       await g.fitView()
       if (!alive()) return
-      await ensureReadable(g)
+      await settleView(g)
       if (!alive()) return
       await enhancer?.afterRender()
       if (!alive()) return
@@ -576,7 +595,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       graph!.setSize(w, h)
       if (refit) {
         await graph!.fitView()
-        if (alive()) await ensureReadable(graph!)
+        if (alive()) await settleView(graph!)
       }
       // 画布尺寸变了：标签排布依赖视口，章节外框与小地图随之重算
       if (alive()) await enhancer?.afterRender()
@@ -639,7 +658,14 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
         const g = graph
         const target = nodeElementId(kpId)
         if (g === null || g.focusElement === undefined || !drawn.has(target)) return
+        // 总览模式下镜头可能缩得很小：定位到某个知识点时放大到可读缩放，否则只看到一个看不清的小点
+        const overview = options.initialView === 'overview' && g.getZoom !== undefined && g.zoomTo !== undefined && g.getZoom() < READABLE_ZOOM
+        if (overview) await g.zoomTo!(READABLE_ZOOM)
         await g.focusElement(target)
+        if (overview && alive()) {
+          reportZoom(g)
+          await enhancer?.afterRender()
+        }
       })
     },
     fitTo(kpIds) {

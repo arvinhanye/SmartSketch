@@ -72,10 +72,19 @@ def chat_service(request: Request) -> ChatService:
     return service
 
 
-def user_chat_service(request: Request, user_id: str) -> ChatService:
+def user_chat_service(request: Request, user_id: str, course_id: str | None = None) -> ChatService:
     """当前用户可用的问答服务；personal 模式下换上本人的模型（ADR-080 决定 4）。"""
     base = chat_service(request)
     settings = request.app.state.settings
+    if course_id is not None:
+        import copy
+        from app.services.embedding_configs import for_course
+        embedding = for_course(settings, course_id)
+        if embedding is not None:
+            base = copy.copy(base)
+            base.embedding = embedding
+            # Bind a space for this request; old properties survive later config switches.
+            base.current_space = lambda: embedding.space
     # 既有测试用只带 SQLITE_URL 的替身设置并替换 chat_service（test_j10）：缺属性按非 personal 处理。
     if getattr(settings, "LLM_MODE", "") != "personal":
         return base
@@ -218,7 +227,7 @@ def chat(
         return JSONResponse(status_code=failure.status_code, content=body)
 
     try:
-        service = user_chat_service(request, access.user.id)
+        service = user_chat_service(request, access.user.id, access.course.id)
         prepared = service.prepare(
             version=version, request_id=request_id, started=started,
             question=payload.question, history=payload.history, kp_id=payload.kp_id,

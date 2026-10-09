@@ -21,21 +21,36 @@ async function nodeNames(cid: string): Promise<ReadonlyMap<string, string>> {
   const draft = await draftApi.getDraft(cid)
   return new Map(draft.nodes.map((node) => [node.id, node.name] as const))
 }
+// 发布时间按本地时区显示；无法解析时原样显示，避免丢信息
+function publishedLabel(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime())
+    ? iso
+    : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
+}
 const state = useVersions({
   courseId: computed(() => props.courseId), coursesApi, versionsApi: api, onCourseForbidden: () => emit('forbidden'), nodeNames,
 })
 </script>
 
 <template>
-  <section class="version-panel" data-test="version-panel" aria-labelledby="version-panel-title">
+  <section class="version-panel ui-version-section" data-test="version-panel" aria-labelledby="version-panel-title">
     <h3 id="version-panel-title">发布与版本历史</h3>
     <p v-if="state.status.value === 'loading'" data-test="vp-loading" role="status">正在加载版本历史…</p>
     <p v-if="state.status.value === 'not_teacher'" data-test="vp-not-teacher" role="status">只有本课程教师可以发布或回滚。</p>
     <p v-if="state.status.value === 'error' && !state.course.value" role="alert">{{ state.error.value }}</p>
     <template v-if="state.course.value">
+      <div class="version-panel__summary">
       <p data-test="vp-current">
         {{ state.currentVersion.value === null ? '学生当前尚无可见的发布版本。' : `学生当前看到 v${state.currentVersion.value}。` }}
       </p>
+      <div class="version-panel__actions">
+        <button type="button" data-test="vp-publish" :disabled="state.busy.value !== null || state.stale.value" @click="state.publish">
+          {{ state.busy.value === 'publish' ? '正在发布…' : '发布当前草稿' }}
+        </button>
+        <button type="button" data-test="vp-refresh" :disabled="state.busy.value !== null || state.refreshing.value" @click="state.reload">刷新状态</button>
+      </div>
+      </div>
       <p v-if="state.course.value.status === 'revising' && state.currentVersion.value !== null" data-test="vp-revising" role="status">
         草稿修订中，学生仍看到 v{{ state.currentVersion.value }}，直到新版本发布成功。
       </p>
@@ -45,19 +60,13 @@ const state = useVersions({
         <li v-for="line in state.blockedReasons.value" :key="line">{{ line }}</li>
       </ul>
       <p v-if="state.refreshing.value" role="status">正在核对发布状态…</p>
-      <div class="version-panel__actions">
-        <button type="button" data-test="vp-publish" :disabled="state.busy.value !== null || state.stale.value" @click="state.publish">
-          {{ state.busy.value === 'publish' ? '正在发布…' : '发布当前草稿' }}
-        </button>
-        <button type="button" data-test="vp-refresh" :disabled="state.busy.value !== null || state.refreshing.value" @click="state.reload">刷新状态</button>
-      </div>
       <p v-if="state.history.value.length === 0" data-test="vp-empty" role="status">尚无历史发布版本。</p>
       <ol v-else class="version-panel__history">
         <li v-for="item in state.history.value" :key="item.version" data-test="vp-version">
           <strong>v{{ item.version }}</strong>
           <span v-if="item.kind === 'rollback'"> · 回滚自 v{{ item.source_version }}</span>
           <span v-else> · 发布</span>
-          <span> · {{ item.published_at }}</span>
+          <span> · <time :datetime="item.published_at">{{ publishedLabel(item.published_at) }}</time></span>
           <span v-if="item.version === state.currentVersion.value"> · 当前学生可见</span>
           <button v-else type="button" data-test="vp-rollback" :data-version="item.version"
             :disabled="state.busy.value !== null || state.stale.value" @click="state.chooseRollback(item.version)">
@@ -74,11 +83,3 @@ const state = useVersions({
     <button v-if="state.status.value === 'error' && !state.course.value" type="button" data-test="vp-retry" @click="state.reload">重试</button>
   </section>
 </template>
-
-<style scoped>
-.version-panel { border: 1px solid #d9d9d9; border-radius: 6px; padding: 0.75rem; margin: 1rem 0; }
-.version-panel__actions { display: flex; gap: 0.5rem; }
-.version-panel__history { padding-left: 1.5rem; }
-.version-panel__history li { margin: 0.5rem 0; }
-.version-panel__confirm { border: 1px solid #d48806; border-radius: 4px; padding: 0.5rem; }
-</style>
