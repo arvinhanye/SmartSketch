@@ -135,6 +135,9 @@ def target_space(settings: Any) -> str:
 def check_offline(sqlite_url: str) -> None:
     """Refuse while anything could still write (A06 §8.7)."""
     with connect(sqlite_url) as database:
+        if database.execute("SELECT 1 FROM sqlite_master WHERE name='teacher_embedding_configs'").fetchone() and database.execute('SELECT 1 FROM teacher_embedding_configs LIMIT 1').fetchone():
+            raise OfflineCheckError('Teacher course embedding overrides exist; use teacher-scoped settings instead of global reembed')
+
         if database.execute(
             "SELECT 1 FROM processing_tasks WHERE lease_expires_at >= unixepoch() LIMIT 1"
         ).fetchone():

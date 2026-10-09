@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import json
+import http.client
 import threading
 import time
 from collections import OrderedDict, deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Protocol
 from dataclasses import dataclass
 
 from app.config import Settings
 from app.repositories import model_configs as repo
 from app.repositories.model_configs import KeyRequired, ModelConfigRow
 from app.services.ai.client import Message, ModelCallError, ModelRequest
-from app.services.ai.compatible import CompatibleModelClient, HttpTransport, thinking_body
-from app.services.ai.outbound import EndpointBlocked, Resolver, check_endpoint, system_resolver
+from app.services.ai.compatible import CompatibleModelClient, HttpResponse, HttpTransport, thinking_body
+from app.services.ai.outbound import EndpointBlocked, Resolver, check_endpoint, check_endpoint_url, system_resolver
 from app.services.credentials import CredentialCipher, CredentialError, ModelConfigRequired
 
 TEST_TIMEOUT_SECONDS = 15.0
@@ -171,3 +174,83 @@ class ConfigTestLimiter:
             while len(self._hits) > self._capacity:
                 self._hits.popitem(last=False)
             return 0
+
+
+class ModelDirectoryTransport(Protocol):
+    def get(self, url: str, headers: Mapping[str, str], timeout: float) -> HttpResponse: ...
+
+
+@dataclass(frozen=True)
+class ModelDirectory:
+    ok: bool
+    models: list[str]
+    error_class: str | None = None
+
+
+def discover_models(settings: Settings, user_id: str, *, base_url: str | None, api_key: str | None,
+                    transport: ModelDirectoryTransport) -> ModelDirectory:
+    """Read a bounded OpenAI-compatible directory without changing credentials or test state."""
+    cipher = _cipher(settings)
+    if api_key is None:
+        row = repo.get_config(settings.SQLITE_URL, user_id)
+        if row is None:
+            raise ModelConfigRequired()
+        if base_url is not None and base_url != row.base_url:
+            raise KeyRequired()
+        base_url = row.base_url
+        try:
+            api_key = cipher.open(user_id, row.sealed)
+        except CredentialError:
+            raise CredentialStoreDisabled() from None
+    elif not base_url:
+        raise KeyRequired()
+    _check_key(api_key)
+    response = None
+    started = time.monotonic()
+    def failed(reason: str) -> ModelDirectory:
+        return ModelDirectory(False, [], reason)
+    try:
+        check_endpoint_url(base_url or "", allow_private=settings.MODEL_ENDPOINT_ALLOW_PRIVATE)
+        # GuardedTransport.get resolves and pins public addresses within the same deadline.
+        response = transport.get((base_url or "").rstrip("/") + "/models",
+                                 {"Authorization": "Bearer " + api_key, "Accept": "application/json"},
+                                 TEST_TIMEOUT_SECONDS)
+        code = response.status
+        if code != 200:
+            reason = ("auth" if code in (401, 403) else "unsupported" if code in (404, 405, 501)
+                      else "rate_limited" if code == 429 else "server" if code >= 500 else "malformed_response")
+            return failed(reason)
+        data = bytearray()
+        while True:
+            remaining = TEST_TIMEOUT_SECONDS - (time.monotonic() - started)
+            if remaining <= 0:
+                raise TimeoutError()
+            chunk = response.read(min(65536, 1048577 - len(data)), remaining)
+            if not chunk:
+                break
+            data.extend(chunk)
+            if len(data) > 1048576:
+                return failed("malformed_response")
+        payload = json.loads(data)
+        entries = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(entries, list) or len(entries) > 1000:
+            return failed("malformed_response")
+        models = set()
+        for entry in entries:
+            name = entry.get("id") if isinstance(entry, dict) else None
+            if (not isinstance(name, str) or not name.strip() or len(name) > MODEL_MAX_LENGTH
+                    or any(ord(c) < 32 or ord(c) == 127 for c in name) or api_key in name):
+                return failed("malformed_response")
+            models.add(name)
+        return ModelDirectory(True, sorted(models))
+    except EndpointBlocked:
+        return failed("blocked_address")
+    except TimeoutError:
+        return failed("timeout")
+    except (OSError, http.client.HTTPException):
+        return failed("connection")
+    except (ValueError, UnicodeError):
+        return failed("malformed_response")
+    finally:
+        if response is not None:
+            response.close()

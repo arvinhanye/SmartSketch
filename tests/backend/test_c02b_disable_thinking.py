@@ -194,7 +194,10 @@ def test_upgrade_from_017_preserves_existing_config_and_task(tmp_path):
     with connect(url) as db:
         db.execute("INSERT INTO task_model_bindings (task_id,user_id,config_version,base_url,model,key_ciphertext,key_nonce)"
                    " VALUES (?,?,?,?,?,?,?)", (task.id,teacher.id,3,"https://a.example/v1","m1",sealed.ciphertext,sealed.nonce))
-    assert migrate(url) == ["018"]
+    # Later migrations (019 teacher embedding configs, ...) are pending too; 018 must come first and apply cleanly.
+    later = sorted(path.name[:3] for path in MIGRATIONS_DIR.glob("*.sql") if path.name[:3] > "017")
+    assert later[0] == "018"
+    assert migrate(url) == later
     assert migrate(url) == []
     config = repo.get_config(url, teacher.id)
     binding = repo.get_binding(url, task.id)

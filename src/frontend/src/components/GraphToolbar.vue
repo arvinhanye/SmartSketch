@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
+import AppIcon from './AppIcon.vue'
 import {
   NODE_TYPE_LABELS,
   RELATION_TYPE_ORDER,
@@ -20,7 +21,9 @@ import type { GraphLayoutName } from '../graph/lifecycle'
 const props = withDefaults(
   defineProps<{
     modelValue: GraphFilterState
-    layout: GraphLayoutName
+    layout: GraphLayoutName | 'radial'
+    /** 提供“径向”布局选项（教师图谱页；单章大树用层次布局会被拉成长条） */
+    radial?: boolean
     chapters?: ChapterOption[]
     summary?: GraphSummary | null
     canClear?: boolean
@@ -29,15 +32,17 @@ const props = withDefaults(
     showStatuses?: boolean
     /** 竖排：放在工作台左侧筛选栏（教师图谱编辑页） */
     vertical?: boolean
+    /** 教师编辑区使用紧凑栏；其他页面保持原样。 */
+    compact?: boolean
   }>(),
-  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false },
+  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false, compact: false, radial: false },
 )
 
 const emit = defineEmits<{
   /** 搜索框按回车：页面据此定位并选中匹配的知识点（L13-2） */
   locate: [query: string]
   'update:modelValue': [state: GraphFilterState]
-  'update:layout': [layout: GraphLayoutName]
+  'update:layout': [layout: GraphLayoutName | 'radial']
   clear: []
 }>()
 
@@ -52,10 +57,11 @@ const statusItems = (Object.keys(STATUS_LABELS) as ReviewStatus[]).map((status) 
   status,
   label: STATUS_LABELS[status],
 }))
-const layoutItems: Array<{ value: GraphLayoutName; label: string }> = [
+const layoutItems = computed<Array<{ value: GraphLayoutName | 'radial'; label: string }>>(() => [
   { value: 'hierarchical', label: '层次' },
+  ...(props.radial ? [{ value: 'radial' as const, label: '径向' }] : []),
   { value: 'force', label: '力导向' },
-]
+])
 
 function patch(change: Partial<GraphFilterState>): void {
   emit('update:modelValue', { ...props.modelValue, ...change })
@@ -106,7 +112,7 @@ function onChapter(event: Event): void {
   patch({ chapter: option === undefined ? { kind: 'all' } : { ...option.value } })
 }
 
-function onLayout(layout: GraphLayoutName): void {
+function onLayout(layout: GraphLayoutName | 'radial'): void {
   if (layout !== props.layout) emit('update:layout', layout)
 }
 
@@ -126,6 +132,8 @@ const summaryText = computed(() => {
     aria-label="图谱筛选"
     :aria-orientation="vertical ? 'vertical' : 'horizontal'"
   >
+    <div class="graph-toolbar__search-wrap" :class="{ 'graph-toolbar__search-wrap--icon': compact }">
+    <AppIcon v-if="compact" name="search" :size="16" />
     <input
       class="graph-toolbar__search"
       type="search"
@@ -135,6 +143,7 @@ const summaryText = computed(() => {
       @keydown.enter.prevent="emit('locate', ($event.target as HTMLInputElement).value)"
       @input="onQuery"
     />
+    </div>
 
     <fieldset class="graph-toolbar__group" data-test="relation-legend">
       <legend>关系</legend>
@@ -162,7 +171,8 @@ const summaryText = computed(() => {
 
     <!-- L13-3：不常用的筛选默认收起，给画布留出空间；关系图例与按关系筛选常显（验收要求） -->
     <details class="graph-toolbar__advanced" data-test="gt-advanced">
-      <summary>更多筛选（类型、状态、章节）</summary>
+      <summary><AppIcon v-if="compact" name="filter" :size="16" />{{ compact ? '筛选' : '更多筛选（类型、状态、章节）' }}</summary>
+    <div class="graph-toolbar__advanced-content">
     <fieldset class="graph-toolbar__group">
       <legend>知识点类型</legend>
       <label v-for="item in nodeTypeItems" :key="item.type" :data-node-type="item.type">
@@ -200,6 +210,7 @@ const summaryText = computed(() => {
         <option v-for="(option, index) in chapters" :key="index" :value="String(index)">{{ option.label }}</option>
       </select>
     </label>
+    </div>
     </details>
 
     <div class="graph-toolbar__group" role="radiogroup" aria-label="布局">
@@ -217,6 +228,8 @@ const summaryText = computed(() => {
 
     <button type="button" data-test="clear" :disabled="!canClear" @click="emit('clear')">清空筛选</button>
 
+    <slot name="actions" />
+
     <p class="graph-toolbar__summary" data-test="summary" aria-live="polite">
       {{ summaryText }}
       <span v-if="selectedHidden">选中的知识点已被筛选隐藏。</span>
@@ -232,6 +245,11 @@ const summaryText = computed(() => {
   gap: 8px 16px;
   padding: 8px 0;
 }
+
+.graph-toolbar__advanced-content { display: contents; }
+.graph-toolbar__search-wrap { min-width: 0; }
+.graph-toolbar__search-wrap--icon { position: relative; }
+.graph-toolbar__search-wrap--icon > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--color-text-muted); }
 
 .graph-toolbar__advanced summary {
   cursor: pointer;

@@ -1,0 +1,58 @@
+/*
+ * 图谱工作台 tokens（UI-GRAPH-PILOT-01，设计规格 §3）。
+ *
+ * --ss-*：暗色应用外壳；--gw-*：图谱浅色工作区。独立命名空间，不改现有 --color-*，
+ * 其他页面推广前保持原样。G6 画布读不到 CSS 变量，画布里的字面量在 `graph/theme.ts`，
+ * 两处数值必须一致（tests/frontend/graph-theme.test.ts 会比对）。
+ */
+:root {
+  --ss-bg: #101114;
+  --ss-panel: #18191d;
+  --ss-raised: #222329;
+  --ss-hover: #2c2d35;
+  --ss-line: #35363f; /* 装饰分隔线，不承担识别功能 */
+  --ss-edge: #7a7c8a; /* 输入框等需独立识别的边界 */
+  --ss-text: #f1f2f4;
+  --ss-text-2: #b2b4bf;
+  --ss-text-3: #9c9faa;
+  --ss-primary: #5b5bd6;
+  --ss-primary-hover: #6262da;
+  --ss-primary-press: #4b4bc0;
+  --ss-link: #b1acff; /* 暗底链接与焦点 */
+  --ss-selected: #282742;
+  --ss-ok: #92d3af;
+  --ss-ok-bg: #1f322b;
+  --ss-warn: #f2c46d;
+  --ss-warn-bg: #342a1d;
+  --ss-danger: #f0a3a3;
+  --ss-danger-bg: #3b2227;
+
+  --ss-radius-sm: 6px;
+  --ss-radius-md: 10px;
+  --ss-radius-lg: 14px;
+  --ss-ease: cubic-bezier(0.2, 0, 0, 1);
+  --ss-shadow-pop-dark: 0 8px 24px rgb(0 0 0 / 28%);
+  --ss-shadow-pop-light: 0 8px 24px rgb(29 36 51 / 12%);
+}
+
+/* 图谱工作区：说明面板、画布、浮动工具条、tooltip、菜单都显式用浅色 tokens */
+.graph-workspace,
+.light-surface {
+  --gw-canvas: #f4f5f7;
+  --gw-panel: #f8f9fb;
+  --gw-hover: #eaecf1;
+  --gw-line: #d2d5de;
+  --gw-edge: #747a87; /* 控件边界 */
+  --gw-text: #20232a;
+  --gw-text-2: #545967;
+  --gw-text-3: #626876;
+  --gw-accent: #5145cd; /* 浅底链接、选中、先修强调、焦点 */
+  --gw-selected: #e9e6fa;
+  --gw-ok: #1f6b3a;
+  --gw-ok-bg: #eaf6ee;
+  --gw-warn: #8a5a10;
+  --gw-warn-bg: #fdf4e3;
+  --gw-danger: #8f2323;
+  --gw-danger-bg: #fdecec;
+  color: var(--gw-text);
+}

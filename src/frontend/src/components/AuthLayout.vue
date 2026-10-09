@@ -295,8 +295,8 @@ onUnmounted(() => {
   min-height: calc(100vh - 3.5rem);
 }
 .auth-layout__brand {
-  background: var(--color-brand-deep);
-  color: #d7e9f0;
+  background: var(--ss-panel);
+  color: var(--ss-text-2);
   padding: 3rem;
   display: flex;
   flex-direction: column;
@@ -349,7 +349,7 @@ onUnmounted(() => {
   -webkit-user-select: none;
 }
 .auth-layout__form {
-  background: var(--color-surface);
+  background: var(--ss-bg);
   display: grid;
   place-items: center;
   padding: 2rem 1rem;

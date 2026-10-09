@@ -101,7 +101,7 @@
 
 **Interfaces:** cleanup_failed_task 参数/返回 bool 不变；course_guard 提供 Task 2 check/remaining，专用事务内 `lock_draft` 后无条件幂等 `revoke_task`，commit(started_at=单调现在)，确认退出后才 clear_cleanup_pending；任何不确定/失效返回 False 保留标记。
 
-- [x] Step 1：保留无贡献、有贡献、图故障、空 task_id 用例；将旧“无工作 0 次取锁”政策断言改成批准新顺序：取锁→图守卫→撤销→确认提交→清标记，注明 ADR-092 替代此 ADR-072 快路径，不能删除这些用例。
+- [x] Step 1：保留无贡献、有贡献、图故障、空 task_id 用例；将旧“无工作 0 次取锁”政策断言改成批准新顺序：取锁→图守卫→撤销→确认提交→清标记，注明 ADR-094 替代此 ADR-072 快路径，不能删除这些用例。
 - [x] Step 2：新增 `test_empty_cleanup_waits_for_old_graph_guard`：旧事务持守卫、贡献尚不可见，清理开始后 `assert cleanup_pending == 1`；旧事务结局后 `assert late_contributions == 0`、`assert cleanup_pending == 0`。`test_cleanup_uncertain_ack_keeps_marker_and_preserves_other_contributions`：`assert cleanup_pending == 1`、`assert other_contributions == before`，后续幂等成功才 0。运行 Task 5 用例保留 RED。
 - [x] Step 3：移除该入口的无贡献预读快路径，接 Task 2 单课程守卫、非延长图预算及有截止 COMMIT；不在 SQLite 写事务中做撤销图网络请求。
 - [x] Step 4：Task 5、F13、现有失败清理回归 GREEN；提交 `fix(worker): serialize failed cleanup after uncertain graph outcomes`。

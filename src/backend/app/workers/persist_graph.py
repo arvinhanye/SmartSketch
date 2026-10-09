@@ -16,7 +16,7 @@
    → 写关系（F06）。环上无可降级边（DAG-10）→ 回滚，T9 ``CYCLE_DETECTED``。
 4. 图构建后进入 SQLite 最终提交围栏，复核任务/课程锁双令牌、阶段、有效期和本地截止；
    围栏内提交显式图事务，再用同一 SQLite 连接执行 T6、分配提交序号并递增
-   ``courses.draft_revision``，提交 SQLite 后释放课程写锁（ADR-091）。
+   ``courses.draft_revision``，提交 SQLite 后释放课程写锁（ADR-093）。
 
 失败：Neo4j/SQLite 存储故障或课程写锁等不到 → 主动释放并退避（``STORAGE_UNAVAILABLE``，尝试耗尽则 T9）；
 其他错误 → T9 ``INTERNAL_ERROR``。``persisting`` 的每一种失败都置 ``cleanup_pending``，随后尝试清理
@@ -330,7 +330,7 @@ def cleanup_failed_task(
     sqlite_url: str, repo: Neo4jRepository, *, course_id: str, task_id: str, holder: str,
     lock_seconds: int, lock_wait_seconds: float,
 ) -> bool:
-    """ADR-092: order even empty cleanup after every prior graph decision.
+    """ADR-094: order even empty cleanup after every prior graph decision.
 
     A pre-read cannot exclude a cancelled client's late server COMMIT. Clear
     the marker only after the guarded revocation commit and transport exit.
@@ -425,7 +425,7 @@ class _PersistSteps:
     """C-ACC-B：入库阶段子步骤耗时，结束时写一行 INFO（只有任务编号、结果、毫秒数与次数）。
 
     每个已开始的步骤都计时（含抛错步骤），未开始的步骤不出现。
-    ADR-091 后每次显式事务的 ``neo4j_attempts`` 为 1，不含透明回调重跑。
+    ADR-093 后每次显式事务的 ``neo4j_attempts`` 为 1，不含透明回调重跑。
     ``neo4j_ms`` 覆盖显式事务作用域（含最终围栏和退出），``t6_ms`` 是其中的
     跨库提交子区间；两个重叠字段不相加，``total_ms`` 才是阶段墙钟时间。
     """

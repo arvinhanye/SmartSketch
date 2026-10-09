@@ -22,25 +22,28 @@ function graph(version: number): GraphExchange {
   } as unknown as GraphExchange
 }
 
-const chatClient: ChatStreamClient = {
+function clientWith(related: string[]): ChatStreamClient {
+  return {
   send: async () => ({
     kind: 'done',
     final: {
       status: 'answered',
       answer: '栈是只允许在一端插入和删除的线性表[1]。',
       citations: [{ index: 1, chunk_id: 'ch1', document_id: 'doc_a92d011b8b', section_path: '第3章 栈与队列 > 3.2 栈', page: 46, text: '栈（stack）是只允许在一端进行插入和删除操作的线性表。' }],
-      related_kp_ids: [KP_STACK, KP_MISSING],
+      related_kp_ids: related,
       graph_version: 3,
       request_id: 'r1',
     },
   }),
+  }
 }
+const chatClient = clientWith([KP_STACK, KP_MISSING])
 
 beforeEach(() => {
   setActivePinia(createPinia())
 })
 
-async function mountChat(graphApi: PublishedGraphApi) {
+async function mountChat(graphApi: PublishedGraphApi, client: ChatStreamClient = chatClient) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -53,7 +56,7 @@ async function mountChat(graphApi: PublishedGraphApi) {
   const wrapper = mount(ChatView, {
     global: {
       plugins: [router],
-      provide: { [CHAT_STREAM_CLIENT_KEY as symbol]: chatClient, [PUBLISHED_GRAPH_API_KEY as symbol]: graphApi },
+      provide: { [CHAT_STREAM_CLIENT_KEY as symbol]: client, [PUBLISHED_GRAPH_API_KEY as symbol]: graphApi },
     },
   })
   await wrapper.get('textarea').setValue('什么是栈？')
@@ -69,6 +72,22 @@ describe('问答页改版', () => {
     expect(getPublished).toHaveBeenCalledWith('c1', 3, expect.anything())
     const chips = wrapper.findAll('[data-test="chat-kp"]').map((chip) => chip.text())
     expect(chips).toEqual(['栈', KP_MISSING])
+  })
+
+  it('涉及的知识点超过 8 个时默认只显示前 8 个，可展开全部再收起；不超过 8 个没有展开按钮', async () => {
+    const many = Array.from({ length: 25 }, (_, i) => `kp_extra_${i}`)
+    const wrapper = await mountChat({ getPublished: async (_cid, version) => graph(version) }, clientWith(many))
+    expect(wrapper.findAll('[data-test="chat-kp"]')).toHaveLength(8)
+    const toggle = wrapper.get('[data-test="chat-kp-toggle"]')
+    expect(toggle.text()).toBe('展开全部 25 个')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    await toggle.trigger('click')
+    expect(wrapper.findAll('[data-test="chat-kp"]')).toHaveLength(25)
+    expect(wrapper.get('[data-test="chat-kp-toggle"]').text()).toBe('收起')
+    await wrapper.get('[data-test="chat-kp-toggle"]').trigger('click')
+    expect(wrapper.findAll('[data-test="chat-kp"]')).toHaveLength(8)
+    const few = await mountChat({ getPublished: async (_cid, version) => graph(version) })
+    expect(few.find('[data-test="chat-kp-toggle"]').exists()).toBe(false)
   })
 
   it('图谱读取失败时仍显示回答，知识点退回标识', async () => {

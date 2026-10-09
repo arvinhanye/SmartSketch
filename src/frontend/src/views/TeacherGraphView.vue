@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import PageSheet from '../components/PageSheet.vue'
+import AppIcon from '../components/AppIcon.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
@@ -11,9 +14,14 @@ import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
+import NodeTypeLegend from '../components/NodeTypeLegend.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
-import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
+import { readArrangement, writeArrangement, type Arrangement } from '../composables/useArrangementPreference'
+import { useGraphLayout } from '../composables/useGraphLayout'
+import { kpIdFromElementId } from '../graph/adapter'
+import type { GraphLayoutName } from '../graph/lifecycle'
+import { chapterOptions, locateNode, NODE_TYPE_LABELS, useGraphFilters, type KnowledgePointType } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
@@ -28,7 +36,7 @@ import {
 import { useSessionStore } from '../stores/session'
 
 /**
- * 教师图谱编辑页（H14，ADR-067）：草稿画布 + 右侧面板（H06 详情 / H07 节点编辑 / H08 关系编辑）。
+ * 教师图谱编辑页（H14，ADR-067）：草稿画布 + 左侧可调宽面板（H06 详情 / H07 节点编辑 / H08 关系编辑）。
  * 草稿读取与课程教师校验在 `useTeacherGraph`；筛选在 `useGraphFilters`；连边在 `useRelationEditor`；本页只做组装。
  * 三个编辑器共用课程 store 里的草稿，保存/删除/连边成功后画布随之更新，失败时草稿不变。
  */
@@ -76,6 +84,22 @@ const relations = useRelationEditor({
 const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value))
 const { selected, visible, summary, isDefault, selectedHidden } = filters
 
+// 节点类型图例：计数取整张草稿图；点击与工具栏“筛选”里的知识点类型是同一份状态
+const allTypes = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
+const typeCounts = computed(() => {
+  const counts = Object.fromEntries(allTypes.map((t) => [t, 0])) as Record<KnowledgePointType, number>
+  for (const node of relations.canvasData.value?.nodes ?? []) counts[node.data.type] += 1
+  return counts
+})
+const hiddenTypes = computed(() => allTypes.filter((t) => !filters.state.value.nodeTypes.includes(t)))
+function toggleType(type: KnowledgePointType): void {
+  const current = filters.state.value.nodeTypes
+  filters.state.value = { ...filters.state.value, nodeTypes: allTypes.filter((t) => (t === type) !== current.includes(t)) }
+}
+function restoreTypes(): void {
+  filters.state.value = { ...filters.state.value, nodeTypes: [...allTypes] }
+}
+
 type PanelTab = 'detail' | 'edit' | 'relations' | 'create'
 const tab = ref<PanelTab>('detail')
 const tabs: Array<{ value: PanelTab; label: string }> = [
@@ -111,7 +135,12 @@ function onLocate(query: string): void {
 const pickerOptions = computed(() => nodePickerOptions(graph.value))
 function onPick(event: Event): void {
   const value = (event.target as HTMLSelectElement).value
-  guard.request(value === '' ? null : value)
+  // 选中后画布聚焦到该知识点（与搜索定位一致），否则下拉选择与画布不同步；有未保存修改时确认后才聚焦
+  guard.request(value === '' ? null : value, { then: (target) => target !== null && canvas.value?.focus(target) })
+}
+// 详情里的关联知识点链接同样要让画布跟随
+function onSelectRelated(kpId: string | null): void {
+  guard.request(kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
 }
 
 // L11：新建知识点（ADR-035：必带来源，来源取自当前选中知识点）
@@ -132,6 +161,10 @@ function openCreator(): void {
 }
 watch(selected, () => {
   if (tab.value === 'create' && creator.success.value === null) void creator.open()
+})
+// 进入「编辑关系」时，已选中的知识点直接作为起点（不必在图上或下拉里再选一遍）
+watch(tab, (next) => {
+  if (next === 'relations' && relations.fromId.value === null && selected.value !== null) relations.pickNode(selected.value)
 })
 
 /** 画布点击：关系页签下用于依次点选起点、终点；其余页签切换当前知识点 */
@@ -200,18 +233,90 @@ const chapterList = computed(() => {
   const full = graph.value === null ? null : relations.canvasData.value
   return full === null ? [] : chapterOptions(full, chapters.value)
 })
+const layoutSource = computed(() => {
+  const g = graph.value === null ? null : relations.canvasData.value
+  if (g === null) return null
+  return {
+    nodes: g.nodes.map(n => ({ id: n.data.kpId, chapter: n.data.chapterId })),
+    edges: g.edges.map(e => ({ id: e.data.relationId, source: kpIdFromElementId(e.source), target: kpIdFromElementId(e.target), type: e.data.type })),
+    chapterOrder: [...chapters.value].sort((a,b) => a.order - b.order || a.id.localeCompare(b.id)).map(c => c.id),
+  }
+})
+const { positions, radialPositions, recommended, error: layoutError } = useGraphLayout(() => layoutSource.value, undefined, true)
+
+// 排布：层次（章节分区）/ 径向 / 力导向。层次布局把单章大树拉成长条时，默认用径向；教师手动选择后不再自动改，并按课程记住
+// 教师在本课程选过的布局记在本浏览器里，下次进入直接使用（不再按推荐值重选）
+const storedArrangement = readArrangement(courseId.value)
+const arrangement = ref<Arrangement>(storedArrangement ?? 'hierarchical')
+let arrangementChosen = storedArrangement !== null
+function chooseArrangement(next: GraphLayoutName | 'radial'): void {
+  arrangementChosen = true
+  arrangement.value = next
+  writeArrangement(courseId.value, next)
+}
+// 同一页面实例里换课程（路由参数变化）：改用新课程记住的布局，没有就回到推荐值
+watch(courseId, (cid) => {
+  const stored = readArrangement(cid)
+  arrangementChosen = stored !== null
+  arrangement.value = stored ?? recommended.value ?? 'hierarchical'
+})
+watch(recommended, (next) => {
+  if (next !== null && !arrangementChosen) arrangement.value = next
+})
+const canvasLayout = computed<GraphLayoutName>(() => (arrangement.value === 'force' ? 'force' : 'hierarchical'))
+const canvasPositions = computed(() => (arrangement.value === 'radial' && radialPositions.value !== null ? radialPositions.value : positions.value))
+// 教师页没有顶部浮层：整图适应时上、左留白收紧；右侧与底部仍避开缩放工具与小地图
+const TEACHER_FIT_PADS = { left: 40, top: 40, right: 96 }
+// 面板只在有限高度内滚动；宽度调整不会改变草稿或选择状态。
+const workspace = ref<HTMLElement | null>(null)
+const workspaceWidth = ref(0)
+const preferredWidth = ref(360)
+const minWidth = computed(() => Math.min(280, workspaceWidth.value * .4))
+const maxWidth = computed(() => Math.max(minWidth.value, Math.min(640, workspaceWidth.value - 360)))
+const panelWidth = computed(() => Math.min(maxWidth.value, Math.max(minWidth.value, preferredWidth.value)))
+function setWidth(value: number): void {
+  preferredWidth.value = Math.min(maxWidth.value, Math.max(minWidth.value, value))
+}
+const resizing = ref(false)
+function startResize(event: PointerEvent): void {
+  if (event.button !== 0) return
+  event.preventDefault()
+  resizing.value = true
+  const handle = event.currentTarget as HTMLElement
+  handle.focus()
+  handle.setPointerCapture(event.pointerId)
+}
+function moveResize(event: PointerEvent): void {
+  if (resizing.value && workspace.value) setWidth(event.clientX - workspace.value.getBoundingClientRect().left)
+}
+function endResize(): void { resizing.value = false }
+function resizeKey(event: KeyboardEvent): void {
+  const values: Record<string, number> = { ArrowLeft: panelWidth.value - 20, ArrowRight: panelWidth.value + 20, Home: minWidth.value, End: maxWidth.value }
+  if (values[event.key] === undefined) return
+  event.preventDefault()
+  setWidth(values[event.key]!)
+}
+let workspaceObserver: ResizeObserver | null = null
+watch(workspace, (element) => {
+  workspaceObserver?.disconnect()
+  workspaceWidth.value = element?.clientWidth ?? 0
+  if (!element || typeof ResizeObserver !== 'function') return
+  workspaceObserver = new ResizeObserver(() => { workspaceWidth.value = element.clientWidth })
+  workspaceObserver.observe(element)
+}, { flush: 'post' })
+onBeforeUnmount(() => workspaceObserver?.disconnect())
 const empty = computed(() => status.value === 'ready' && graph.value !== null && graph.value.nodes.length === 0)
 </script>
 
 <template>
-  <section
-    class="teacher-graph"
+  <PageSheet
+    labelledby="teacher-graph-title"
+    class="teacher-graph ui-management ui-teacher-workspace"
     data-test="teacher-graph-page"
-    aria-labelledby="teacher-graph-title"
     :aria-busy="status === 'loading' ? 'true' : 'false'"
   >
     <header class="teacher-graph__header">
-      <h2 id="teacher-graph-title">编辑课程知识图谱（草稿）</h2>
+      <PageHeader id="teacher-graph-title" title="编辑课程知识图谱（草稿）" />
       <span v-if="status === 'ready'" class="teacher-graph__badge">草稿</span>
       <p v-if="courseName" class="teacher-graph__course">
         课程：{{ courseName }}<span v-if="status === 'ready'" data-test="tg-draft"> · 草稿，学生在发布前看不到这些修改</span>
@@ -247,37 +352,68 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         <button type="button" data-test="tg-refresh-retry" @click="teacher.refresh">重新刷新</button>
       </p>
 
-      <div class="teacher-graph__body">
+      <div ref="workspace" class="teacher-graph__body" :class="{ 'is-resizing': resizing }" :style="{ '--teacher-panel-width': `${panelWidth}px` }">
         <aside class="teacher-graph__filters" aria-label="筛选">
           <GraphToolbar
             v-model="filters.state.value"
-            v-model:layout="filters.layout.value"
+            :layout="arrangement"
             :chapters="chapterList"
             :summary="summary"
             :can-clear="!isDefault"
             :selected-hidden="selectedHidden"
-            vertical
+            compact
+            radial
+            @update:layout="chooseArrangement"
             @clear="filters.clear"
             @locate="onLocate"
-          />
+          >
+            <template #actions>
+              <button type="button" class="teacher-graph__create" data-test="tg-create-open" :aria-pressed="tab === 'create'" @click="openCreator">
+                <AppIcon name="plus" /> 新建知识点
+              </button>
+            </template>
+          </GraphToolbar>
           <p v-if="searchNotice" data-test="tg-search-notice" role="status">{{ searchNotice }}</p>
         </aside>
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
-          <p class="teacher-graph__hint">
-            {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
-          </p>
-          <label class="teacher-graph__picker">
-            选择知识点
-            <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
-              <option value="">（未选择）</option>
-              <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
-          </label>
-          <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <div class="teacher-graph__canvas-bar">
+            <NodeTypeLegend :counts="typeCounts" :hidden="hiddenTypes" @toggle="toggleType" @restore="restoreTypes" />
+            <p class="teacher-graph__hint" :title="tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。'">
+              {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
+            </p>
+            <label class="teacher-graph__picker">
+              选择知识点
+              <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
+                <option value="">（未选择）</option>
+                <option v-for="option in pickerOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+              </select>
+            </label>
+          </div>
+          <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
+          <GraphCanvas ref="canvas" :graph="visible" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
-        <div class="teacher-graph__panel">
+        <div
+          class="teacher-graph__divider"
+          data-test="tg-panel-divider"
+          role="separator"
+          tabindex="0"
+          aria-label="调整知识点面板宽度"
+          aria-controls="teacher-knowledge-panel"
+          aria-orientation="vertical"
+          :aria-valuemin="Math.round(minWidth)"
+          :aria-valuemax="Math.round(maxWidth)"
+          :aria-valuenow="Math.round(panelWidth)"
+          @pointerdown="startResize"
+          @pointermove="moveResize"
+          @pointerup="endResize"
+          @pointercancel="endResize"
+          @lostpointercapture="endResize"
+          @keydown="resizeKey"
+        />
+        <div class="teacher-graph__panel" id="teacher-knowledge-panel">
+          <p v-if="nodeEditor?.dirty" class="ui-unsaved" role="status">未保存</p>
           <div class="teacher-graph__tabs" role="group" aria-label="面板切换">
             <button
               v-for="item in tabs"
@@ -289,14 +425,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             >
               {{ item.label }}
             </button>
-            <button
-              type="button"
-              data-test="tg-create-open"
-              :aria-pressed="tab === 'create' ? 'true' : 'false'"
-              @click="openCreator"
-            >
-              新建知识点
-            </button>
+
           </div>
 
           <div
@@ -320,7 +449,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             <KnowledgeDetail
               v-if="selected !== null"
               :kp-id="selected"
-              @select-knowledge-point="guard.request"
+              @select-knowledge-point="onSelectRelated"
               @close="guard.request(null)"
               @course-forbidden="leaveForbidden"
             />
@@ -343,125 +472,5 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         </div>
       </div>
     </template>
-  </section>
+  </PageSheet>
 </template>
-
-<style scoped>
-.teacher-graph {
-  display: grid;
-  gap: 0.75rem;
-}
-.teacher-graph__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.75rem;
-}
-.teacher-graph__picker {
-  display: inline-flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.teacher-graph__header h2 {
-  margin: 0;
-}
-.teacher-graph__badge {
-  font-size: 0.75rem;
-  border-radius: 4px;
-  padding: 0.05rem 0.5rem;
-  background: var(--color-warning-bg);
-  color: var(--color-warning-text);
-}
-.teacher-graph__course {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-  flex-basis: 100%;
-}
-.teacher-graph__back {
-  margin: 0;
-  font-size: 0.875rem;
-}
-/* 工作台三栏：筛选 | 画布 | 详情与编辑 */
-.teacher-graph__body {
-  display: grid;
-  grid-template-columns: 13.5rem minmax(0, 1fr) minmax(280px, 22rem);
-  gap: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  min-height: 560px;
-}
-.teacher-graph__filters {
-  background: var(--color-surface-muted);
-  border-right: 1px solid var(--color-border);
-  padding: 0.85rem;
-}
-.teacher-graph__canvas {
-  min-height: 560px;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-surface);
-  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
-  background-size: 18px 18px;
-}
-.teacher-graph__canvas > :last-child {
-  flex: 1;
-}
-.teacher-graph__hint {
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  margin: 0;
-  padding: 0.5rem 0.75rem 0;
-}
-.teacher-graph__panel {
-  border-left: 1px solid var(--color-border);
-  padding: 0.85rem;
-  background: var(--color-surface);
-  min-width: 0;
-}
-.teacher-graph__tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-}
-.teacher-graph__tabs button {
-  background: none;
-  color: var(--color-text-muted);
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 0.4rem 0.6rem;
-  margin-bottom: -1px;
-}
-.teacher-graph__tabs button:hover:not(:disabled) {
-  background: none;
-  color: var(--color-text);
-}
-.teacher-graph__tabs button[aria-pressed='true'] {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  font-weight: 600;
-}
-.teacher-graph__confirm {
-  border: 1px solid var(--color-warning-border);
-  background: var(--color-warning-bg);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
-}
-.teacher-graph__confirm button + button {
-  margin-left: 0.5rem;
-}
-@media (max-width: 1100px) {
-  .teacher-graph__body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .teacher-graph__filters,
-  .teacher-graph__panel {
-    border: none;
-  }
-}
-</style>

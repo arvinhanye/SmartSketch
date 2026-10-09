@@ -6,6 +6,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 import ipaddress
 import json
+import os
+from pathlib import Path
 import select
 import shutil
 import socket
@@ -292,7 +294,7 @@ class BoltFaultProxy:
 
 
 @pytest.fixture(scope='module')
-def owned_neo4j():
+def owned_neo4j(tmp_path_factory):
     docker = shutil.which('docker') or '/Users/arvinhan/.docker/bin/docker'
     def command(*args):
         result = subprocess.run([docker, *args], capture_output=True, text=True, timeout=30)
@@ -300,6 +302,9 @@ def owned_neo4j():
             raise AssertionError(f'owned fixture Docker command failed: {args[0]}')
         return result.stdout.strip()
     nonce = uuid.uuid4().hex
+    configured_evidence = os.environ.get('SMARTSKETCH_NETWORK_EVIDENCE_DIR')
+    evidence_root = (Path(configured_evidence) if configured_evidence
+                     else tmp_path_factory.mktemp('worker-network-evidence'))
     password = 'fixture-' + nonce
     cid = command('run', '-d', '--rm', '--name', 'smartsketch-bolt-' + nonce,
                   '--label', 'smartsketch.fixture=' + nonce, '-p', '127.0.0.1::7687',
@@ -324,7 +329,8 @@ def owned_neo4j():
                     raise AssertionError('owned Neo4j did not start') from None
                 time.sleep(.5)
         yield {'uri': uri, 'host': '127.0.0.1', 'port': port,
-               'auth': ('neo4j', password), 'id': cid, 'docker': docker}
+               'auth': ('neo4j', password), 'id': cid, 'docker': docker,
+               'evidence_path': evidence_root / (nonce + '.jsonl')}
     finally:
         info = json.loads(command('inspect', cid))[0]
         if info['Config']['Labels'].get('smartsketch.fixture') != nonce:

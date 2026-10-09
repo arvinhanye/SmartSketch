@@ -40,7 +40,6 @@ def task(tmp_path):
     return url, replace(lease, stage='persisting', progress=0.8)
 
 
-EVIDENCE = Path('/private/tmp/smartsketch-r1-network-evidence.jsonl')
 QUERY = 'MERGE (n:KnowledgePoint {course_id:$course_id, version_id:$version_id, kp_id:$id}) SET n.contrib_tasks=[$task], n.fixture=true RETURN $effective_task_ids'
 
 
@@ -52,7 +51,9 @@ def record_evidence(fixture, **record):
     record.update(run_id=fixture['id'],
                   product_sha256=hashlib.sha256(b''.join((root / p).read_bytes() for p in files)).hexdigest(),
                   test_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
-    with EVIDENCE.open('a') as stream:
+    evidence = Path(fixture['evidence_path'])
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    with evidence.open('a', encoding='utf-8') as stream:
         stream.write(json.dumps(record) + '\n')
 
 
@@ -352,7 +353,7 @@ def test_original_worker_blackhole_requires_external_watchdog(task, owned_neo4j,
     import io
     f = owned_neo4j
     root = Path(__file__).resolve().parents[2]
-    archive = subprocess.run(['git', 'archive', 'e111315', 'src/backend'], cwd=root,
+    archive = subprocess.run(['git', 'archive', 'e111315ffabdc5ce980afdf525b8321ef572dc8e', 'src/backend'], cwd=root,
                              check=True, capture_output=True).stdout
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         tar.extractall(tmp_path)

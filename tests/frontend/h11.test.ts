@@ -463,6 +463,8 @@ describe('H11 学生图谱页：图/卡片切换', () => {
   it('图上选中后切到卡片：跳到选中项所在页并标记', async () => {
     const f = fakes({ graph: async (cid, v) => exchange(cid, v, manyKps(30, cid)) })
     const { wrapper } = await mountPage(f)
+    // UI-GRAPH-PILOT-01：单击只预览，再次单击同一节点才打开详情（选中）
+    wrapper.findComponent(GraphCanvas).vm.$emit('nodeClick', 'k27')
     wrapper.findComponent(GraphCanvas).vm.$emit('nodeClick', 'k27')
     await flushPromises()
     await toCards(wrapper)
@@ -476,7 +478,7 @@ describe('H11 学生图谱页：图/卡片切换', () => {
     await toCards(wrapper)
     await wrapper.findAll('[data-test="kc-card"]')[0]!.trigger('click')
     await flushPromises()
-    await wrapper.get('[data-test="kd-close"]').trigger('click')
+    await wrapper.get('[data-test="gw-back"]').trigger('click')
     expect(wrapper.find('[data-test="knowledge-detail"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-test="kc-card"][aria-pressed="true"]')).toHaveLength(0)
   })
@@ -647,5 +649,24 @@ describe('H11 卡片键盘操作', () => {
     const card = wrapper.get('[data-kp-id="k1"]')
     expect(card.element.tagName).toBe('BUTTON')
     expect(card.attributes('type')).toBe('button')
+  })
+})
+
+// 用户要求：图谱说明面板可调宽，默认让画布获得更多空间。
+describe('学生图谱可调面板', () => {
+  it('键盘调宽并限制画布最小宽度，关闭面板后分隔条消失', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200)
+    const { wrapper } = await mountPage(fakes())
+    const splitter = wrapper.get('[role="separator"]')
+    expect(splitter.attributes('aria-valuenow')).toBe('25')
+    await splitter.trigger('keydown', { key: 'ArrowRight' })
+    expect(splitter.attributes('aria-valuenow')).toBe('27')
+    await splitter.trigger('keydown', { key: 'End' })
+    expect(Number(splitter.attributes('aria-valuenow'))).toBeLessThanOrEqual(47)
+    await splitter.trigger('keydown', { key: 'Home' })
+    expect(Number(splitter.attributes('aria-valuenow'))).toBeGreaterThanOrEqual(23)
+    await wrapper.get('[data-test="gw-panel-close"]').trigger('click')
+    expect(wrapper.find('[role="separator"]').exists()).toBe(false)
+    wrapper.unmount()
   })
 })

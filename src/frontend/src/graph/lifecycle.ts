@@ -1,6 +1,14 @@
 import type { GraphData, GraphOptions } from '@antv/g6'
 import type { InjectionKey } from 'vue'
-import { nodeElementId, type G6Edge, type G6Node } from './adapter'
+import { nodeElementId, type G6Edge, type G6EdgeData, type G6Node, type G6NodeData } from './adapter'
+import type { Positions } from './chapterLayout'
+import { createEnhancer, type EnhanceOptions, type Enhancer } from './enhancer'
+import { badgesFor, nodeLabel } from './presentation'
+import { NODE_BASE_PX, READABLE_ZOOM } from './scale'
+import { GRAPH_COLORS, GRAPH_FONT, NODE_TYPE_FILL, NODE_TYPE_GLYPH } from './theme'
+
+/** 可读缩放见 `graph/scale.ts`（0.9：新标签 13px，0.7 时只有约 9px）；这里再导出，保持既有导入路径有效 */
+export { READABLE_ZOOM }
 
 /**
  * G6 画布生命周期（H04）。
@@ -35,13 +43,19 @@ export type CanvasElementState =
   | 'pathUnlock'
   | 'dimmed'
   | 'pathEdge'
+  // UI-GRAPH-PILOT-01 聚焦与悬停状态（`graph/focusStates.ts` 计算；颜色只在 `buildGraphOptions` 定义一处）
+  | 'neighbor'
+  | 'match'
+  | 'faded'
+  | 'hovered'
+  | 'hoverRelated'
+  | 'hoverFaded'
+  | 'active'
+  | 'scoped'
 
-/** 节点标签：推荐项前加序号「1. 」（L14），其余为名称 */
-export function nodeLabel(data: Pick<G6Node['data'], 'name' | 'pathOrder'>): string {
-  return data.pathOrder === undefined ? data.name : `${data.pathOrder}. ${data.name}`
-}
+export { nodeLabel }
 
-export type CanvasNode = G6Node & { states?: CanvasElementState[] }
+export type CanvasNode = G6Node & { states?: CanvasElementState[]; style?: { x: number; y: number } }
 export type CanvasEdge = G6Edge & { states?: CanvasElementState[] }
 
 /** 适配图（H03 `AdaptedGraph` 的节点与边）可直接传入；筛选层可附加 `states` */
@@ -57,6 +71,15 @@ export interface NodeClickEvent {
   target?: { id?: string }
 }
 
+/** 画布事件的公共子集（点击、悬停；`client` 是页面坐标） */
+export interface GraphEvent extends NodeClickEvent {
+  pointerType?: string
+  client?: { x: number; y: number }
+}
+
+/** 画布坐标 / 视口坐标（G6 的 `Point` 可带第三维，这里只用前两维） */
+export type Point2 = readonly number[]
+
 /** 生命周期用到的 G6 `Graph` 子集 */
 export interface CanvasGraph {
   readonly destroyed: boolean
@@ -64,27 +87,36 @@ export interface CanvasGraph {
   setData(data: GraphCanvasData): void
   setSize(width: number, height: number): void
   fitView(): Promise<void>
-  on(event: 'node:click', handler: (event: NodeClickEvent) => void): unknown
+  on(event: string, handler: (event: GraphEvent) => void): unknown
   destroy(): void
   /** G6 `Graph` 均有；测试替身可不实现，此时布局切换不生效（H05） */
   setLayout?(layout: NonNullable<GraphOptions['layout']>): void
   layout?(): Promise<void>
   /** 视口（L13）：G6 `Graph` 均有；测试替身可不实现，此时保持整图适配、不做聚焦 */
   getZoom?(): number
-  zoomTo?(zoom: number): Promise<void>
-  focusElement?(id: string): Promise<void>
+  zoomTo?(zoom: number, animation?: unknown): Promise<void>
+  focusElement?(id: string, animation?: unknown): Promise<void>
   /**
    * L14：G6 5.x 的 `render()` 每次都按 `autoFit` 重新整图适配，掌握状态、选中、路径高亮引起的数据更新
    * 因此会把视口拉回整图。首次渲染后用它关掉 `autoFit`；之后的适配只在尺寸变化与切换布局时显式 `fitView`。
    */
   setOptions?(options: Partial<GraphOptions>): void
+  /**
+   * 增强模式（UI-GRAPH-PILOT-01）用到的视口、数据与插件接口：G6 `Graph` 均有；测试替身可不实现，
+   * 此时对应能力静默跳过。
+   */
+  getElementPosition?(id: string): Point2
+  getViewportByCanvas?(point: Point2): Point2
+  translateBy?(offset: Point2, animation?: unknown): Promise<void>
+  zoomBy?(ratio: number, animation?: unknown): Promise<void>
+  updateNodeData?(data: ReadonlyArray<Record<string, unknown>>): void
+  updateEdgeData?(data: ReadonlyArray<Record<string, unknown>>): void
+  draw?(): Promise<void>
+  setElementState?(state: Record<string, string[]>, animation?: boolean): Promise<void>
+  setPlugins?(update: (plugins: unknown[]) => unknown[]): void
+  updatePlugin?(option: Record<string, unknown>): void
+  getPluginInstance?(key: string): unknown
 }
-
-/**
- * 可读缩放（L13-1，R06）：整图适配后低于此值时放大到此值并聚焦入口节点，
- * 避免节点多时整图缩成一条不可读的细线（L11 走查：129 个节点）。
- */
-export const READABLE_ZOOM = 0.7
 
 export interface CanvasGraphInit {
   container: HTMLElement
@@ -93,6 +125,12 @@ export interface CanvasGraphInit {
   data: GraphCanvasData
   /** 缺省为层次布局 */
   layout?: GraphLayoutName
+  /** 预先算好的位置（章节分区布局）：给了就不再让 G6 布局，边画成竖向曲线；只对层次布局生效 */
+  positions?: Positions | null
+  /** 给了位置时边的画法：竖向曲线（层次/章节布局，缺省）或直线（径向布局） */
+  edgeStyle?: 'vertical' | 'straight'
+  /** 小地图（增强模式）：外部容器与节点点的着色回调 */
+  minimap?: { container: HTMLElement; color: (elementId: string) => string }
 }
 
 export type CanvasGraphFactory = (init: CanvasGraphInit) => CanvasGraph | Promise<CanvasGraph>
@@ -110,6 +148,23 @@ export interface GraphLifecycleOptions {
   data: GraphCanvasData
   /** 缺省为层次布局 */
   layout?: GraphLayoutName
+  /**
+   * 章节分区布局算好的位置（知识点 ID → 画布坐标），建图时一次性给定；缺省沿用 G6 布局。
+   * 力导向布局下忽略。位置变了（换图、换布局）由调用方重建生命周期。
+   */
+  positions?: Positions | null
+  /** 给了位置时边的画法（径向布局用直线）；缺省竖向曲线 */
+  edgeStyle?: 'vertical' | 'straight'
+  /**
+   * 首屏视图：`readable`（缺省）按可读缩放聚焦入口节点；`overview` 先把整张图适应进视口（增强模式）。
+   * 已有待聚焦目标（搜索/跳转）时仍聚焦目标。换布局与窗口缩放后的重新适配沿用同一策略。
+   */
+  initialView?: 'readable' | 'overview'
+  /**
+   * 增强模式（语义缩放、标签排布、悬停强淡化、章节外框、小地图、整组适应）。缺省关闭，行为与 H04 完全一致。
+   * 开启后容器尺寸变化（面板开合）只 `setSize`、保持镜头；窗口缩放与 `refreshSize()` 仍整图重新适配。
+   */
+  enhance?: EnhanceOptions
   factory?: CanvasGraphFactory
   /** 参数是知识点 ID（契约 ID，不带 `kp:` 前缀） */
   onNodeClick?: (kpId: string) => void
@@ -127,6 +182,20 @@ export interface GraphLifecycle {
   refreshSize(): void
   /** 把视口移到该知识点（搜索定位、问答跳转）；尚未建图时在首次渲染后执行；不在图中的知识点忽略 */
   focus(kpId: string): void
+  /** 增强模式：把一组知识点（缺省为当前全部）整体放进视口；未开启增强或尚未建图时忽略 */
+  fitTo(kpIds?: readonly string[]): void
+  /** 增强模式：章节外框的成员（知识点 ID）；null 隐藏外框 */
+  setScope(kpIds: readonly string[] | null): void
+  /** 增强模式：按比例缩放（工具栏的放大、缩小） */
+  zoomBy(ratio: number): void
+  /** 增强模式：节点在视口外时才把镜头移过去（面板里的显式选择） */
+  ensureVisible(kpId: string): void
+  /** 缩放低于可读缩放时放大到可读缩放（以视口中心为准），已经够大则不动 */
+  zoomToReadable(): void
+  /** 增强模式：浮层出现、消失、展开收起后重新排布标签 */
+  relayoutLabels(): void
+  /** 增强模式：指针离开整个画布容器时结束悬停淡化 */
+  leaveHover(): void
   destroy(): void
 }
 
@@ -141,60 +210,150 @@ export function layoutOptions(layout: GraphLayoutName): NonNullable<GraphOptions
   return { type: 'antv-dagre', rankdir: 'TB', nodesep: 40, ranksep: 70 }
 }
 
-/** 默认建图参数：层次布局（可选力导向），缩放、拖拽画布、拖拽节点，平行边分开画；边样式由适配层逐条给出 */
+/**
+ * 小地图：只画节点，克隆节点主形状并重新着色（已掌握绿、学习中琥珀、当前高亮靛紫、其余石板灰），
+ * 缩略图同时是学习进度总览。装饰性，键盘等价路径是搜索、章节跳转与列表。
+ */
+function minimapPlugin(minimap: NonNullable<CanvasGraphInit['minimap']>): Record<string, unknown> {
+  return {
+    type: 'minimap',
+    key: 'minimap',
+    container: minimap.container,
+    size: [180, 120],
+    padding: 8,
+    filter: (_id: string, kind: string) => kind === 'node',
+    shape: (id: string, _kind: string, element: { getShape(name: string): { cloneNode(): { style: Record<string, unknown> } } }) => {
+      const dot = element.getShape('key').cloneNode()
+      dot.style.fill = minimap.color(id)
+      dot.style.lineWidth = 0
+      return dot
+    },
+    maskStyle: { border: `2px solid ${GRAPH_COLORS.accent}`, background: 'rgb(81 69 205 / 12%)' },
+    delay: 100,
+  }
+}
+
+const nd = (d: unknown): G6NodeData => (d as G6Node).data
+const ed = (d: unknown): G6EdgeData => (d as G6Edge).data
+const labelK = (d: unknown): number => nd(d).k ?? 1
+const nodeK = (d: unknown): number => nd(d).nk ?? 1
+const lwMin = (d: unknown): number => nd(d).lw ?? 0
+
+/** 默认建图参数：新主题（浅色画布、类型填充 + 单字标记、掌握角标）；布局、缩放、拖拽与平行边处理沿用 H04/H05 */
 export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
+  const C = GRAPH_COLORS
+  const withPositions = init.positions != null && (init.layout ?? 'hierarchical') === 'hierarchical'
   return {
     container: init.container,
     width: init.width,
     height: init.height,
     data: init.data as unknown as GraphData,
     autoFit: 'view',
-    padding: 32,
+    padding: 40,
     animation: false,
     zoomRange: [0.2, 4],
     node: {
       type: 'circle',
       style: {
-        size: 28,
-        fill: '#ffffff',
-        stroke: '#1677ff',
-        lineWidth: 1.5,
-        labelText: (datum: unknown) => nodeLabel((datum as G6Node).data),
+        size: (d: unknown) => NODE_BASE_PX * nodeK(d),
+        fill: (d: unknown) => NODE_TYPE_FILL[nd(d).type],
+        stroke: C.nodeStroke,
+        lineWidth: (d: unknown) => Math.max(1.5, lwMin(d)),
+        iconText: (d: unknown) => NODE_TYPE_GLYPH[nd(d).type],
+        iconFontSize: (d: unknown) => 14 * nodeK(d),
+        iconFontWeight: 500,
+        iconFill: C.text,
+        iconFontFamily: GRAPH_FONT,
+        labelText: (d: unknown) => nodeLabel(nd(d)),
         labelPlacement: 'bottom',
-        labelFontSize: 12,
+        // G6 节点的 label 是布尔开关：false 时整个标签不绘制（`labelVisibility` 无效）
+        label: (d: unknown) => nd(d).labelOn !== false,
+        labelFontSize: (d: unknown) => 13 * labelK(d),
+        // 字号随缩放放大时行高必须同步，否则多行标签的两行会叠在一起
+        labelLineHeight: (d: unknown) => Math.round(13 * labelK(d) * 1.3),
+        labelFontWeight: 500,
+        labelFill: C.text,
+        labelFontFamily: GRAPH_FONT,
+        labelWordWrap: true,
+        labelWordWrapWidth: (d: unknown) => 112 * labelK(d),
+        labelMaxLines: 2,
+        labelTextOverflow: 'ellipsis',
+        labelOffsetY: (d: unknown) => 4 * labelK(d),
+        // 关系线从标签下方穿过时不应像删除线：标签带与画布同色的不透明底
+        labelBackground: true,
+        labelBackgroundFill: C.canvas,
+        labelBackgroundOpacity: 0.94,
+        labelPadding: [1, 3],
+        badges: (d: unknown) => badgesFor(nd(d).mastery, nodeK(d)),
       },
-      // 多个状态按 states 数组顺序叠加：学习状态在前、审核状态居中，选中/推荐在后
+      // 多个状态按 states 数组顺序叠加：审核/学习状态在前，聚焦状态居中，选中在后，悬停瞬时状态最后
       state: {
-        rejected: { opacity: 0.4, stroke: '#bfbfbf', lineDash: [4, 3] },
-        lowConfidence: { stroke: '#fa8c16', lineDash: [4, 3] },
-        // I06：掌握状态色只在这里定义；元素只带状态名
-        mastered: { fill: '#f6ffed', stroke: '#52c41a', lineWidth: 2 },
-        learning: { fill: '#fffbe6', stroke: '#faad14', lineWidth: 2 },
-        notStarted: { fill: '#ffffff', stroke: '#bfbfbf' },
-        recommended: { stroke: '#722ed1', lineWidth: 3, halo: true, haloStroke: '#9254de', haloLineWidth: 10 },
-        // L14：学习路径。淡化在推荐/选中之前叠加，选中的节点不会被淡化（`applyLearningStates`）
-        pathPrereq: { stroke: '#fa541c', lineWidth: 2.5, lineDash: [4, 3] },
-        pathUnlock: { stroke: '#13c2c2', lineWidth: 2.5 },
-        dimmed: { opacity: 0.25 },
-        selected: { stroke: '#0958d9', lineWidth: 3, halo: true, haloStroke: '#1677ff', haloLineWidth: 10 },
+        rejected: { opacity: 0.4, stroke: '#7F8695', lineDash: [4, 3] },
+        lowConfidence: { stroke: C.warn, lineDash: [4, 3] },
+        // I06：掌握状态色只在这里定义；元素只带状态名，角标由 `badgesFor` 画（颜色之外还有 ✓/◐ 与文字）
+        mastered: { stroke: C.ok, lineWidth: 2 },
+        learning: { stroke: C.warn, lineWidth: 2 },
+        notStarted: { stroke: C.nodeStroke },
+        recommended: { stroke: C.accent, lineWidth: 3 },
+        // L14 学习路径：未满足的前置（虚线）、之后解锁（点线）；与当前路径无关用 dimmed（标准淡化）
+        pathPrereq: { stroke: C.warn, lineWidth: 2.5, lineDash: [4, 3] },
+        pathUnlock: { stroke: C.accent, lineWidth: 2, lineDash: [2, 3] },
+        // 标准淡化：降填充饱和度，边框 ≥3:1、标签保留（不使用整体 opacity）
+        dimmed: { fill: C.dimmedFill, stroke: C.dimmedStroke, labelFill: '#545967', iconFill: '#545967' },
+        // 强淡化（Obsidian 式，仅供对比）：近底色小点；标签由排布函数直接隐藏
+        faded: { fill: C.fadedFill, stroke: C.fadedStroke, lineWidth: 1, iconFill: C.fadedIcon, halo: false },
+        neighbor: { stroke: C.accent, lineWidth: (d: unknown) => Math.max(2, lwMin(d) * 1.5) },
+        selected: {
+          stroke: C.accent,
+          lineWidth: (d: unknown) => Math.max(2.5, lwMin(d) * 2),
+          halo: true,
+          haloStroke: C.accent,
+          haloLineWidth: (d: unknown) => Math.max(5, lwMin(d) * 3),
+          haloStrokeOpacity: 0.22,
+          labelFontWeight: 700,
+        },
+        // 搜索命中 / 章节定位：靛紫外环 + 标签加粗改靛紫，不用淡紫色底块
+        match: { stroke: C.accent, lineWidth: (d: unknown) => Math.max(2.5, lwMin(d) * 2), labelFill: C.accent, labelFontWeight: 700 },
+        // 悬停（瞬时，强淡化）：悬停节点与其直接相邻保持清楚，其余退成近底色小点并隐去标签与角标
+        hovered: { stroke: C.accent, lineWidth: (d: unknown) => Math.max(2.5, lwMin(d) * 2), labelFontWeight: 700 },
+        hoverRelated: { stroke: C.accent, lineWidth: (d: unknown) => Math.max(2, lwMin(d) * 1.5) },
+        hoverFaded: { fill: C.fadedFill, stroke: C.fadedStroke, lineWidth: 1, iconFill: C.fadedIcon, halo: false, label: false, badge: false },
       },
     },
     edge: {
-      // 不指定 type：平行边转换会把成组的边改为曲线
-      style: { labelFontSize: 10, labelBackground: true },
+      // 章节分区布局下画竖向曲线；其余不指定 type（平行边转换会把成组的边改为曲线）
+      ...(withPositions ? { type: init.edgeStyle === 'straight' ? 'line' : 'cubic-vertical' } : {}),
+      style: {
+        endArrowSize: (d: unknown) => 9 * (ed(d).ak ?? 1),
+        labelFontSize: 12,
+        labelFill: C.text,
+        labelFontFamily: GRAPH_FONT,
+        labelBackground: true,
+        labelBackgroundFill: C.panel,
+        labelBackgroundOpacity: 1,
+        labelPadding: [1, 5],
+      },
       state: {
         rejected: { opacity: 0.3 },
         lowConfidence: { opacity: 0.6 },
-        pathEdge: { stroke: '#722ed1', lineWidth: 3.5, opacity: 1 },
-        dimmed: { opacity: 0.2 },
+        pathEdge: { stroke: C.accent, lineWidth: 3.5, halo: false },
+        // 与关系线重合的状态不再用 opacity；G6 内置 active 状态自带灰色光晕，必须显式关闭
+        active: { lineWidth: (d: unknown) => Math.max(3, (ed(d).lw ?? 0) * 2.5), halo: false },
+        scoped: { lineWidth: (d: unknown) => Math.max(2, ed(d).lw ?? 0), halo: false },
+        dimmed: { stroke: C.fadedEdge, lineWidth: 1, halo: false },
+        faded: { stroke: C.fadedEdge, lineWidth: 1, halo: false },
+        hoverFaded: { stroke: C.fadedEdge, lineWidth: 1, halo: false, label: false },
       },
     },
-    layout: layoutOptions(init.layout ?? 'hierarchical'),
+    // 有预先算好的位置时不再让 G6 布局（位置稳定，且可以按章节聚拢）
+    ...(withPositions ? {} : { layout: layoutOptions(init.layout ?? 'hierarchical') }),
     behaviors: ['zoom-canvas', 'drag-canvas', 'drag-element'],
     // 同一对知识点间可同时有前置与相关等多条关系，分开画避免重叠
     transforms: ['process-parallel-edges'],
+    ...(init.minimap === undefined ? {} : { plugins: [minimapPlugin(init.minimap)] as unknown as GraphOptions['plugins'] }),
   }
 }
+
 
 /** 按需加载 G6，让未打开图谱的页面不下载它 */
 export const loadG6Graph: CanvasGraphFactory = async (init) => {
@@ -202,9 +361,11 @@ export const loadG6Graph: CanvasGraphFactory = async (init) => {
   return new Graph(buildGraphOptions(init)) as unknown as CanvasGraph
 }
 
-function copyNode(node: CanvasNode): CanvasNode {
+function copyNode(node: CanvasNode, positions: Positions | null): CanvasNode {
   const copy: CanvasNode = { id: node.id, data: { ...node.data } }
   if (node.states !== undefined) copy.states = [...node.states]
+  const at = positions?.get(node.data.kpId)
+  if (at !== undefined) copy.style = { x: at.x, y: at.y }
   return copy
 }
 
@@ -220,8 +381,8 @@ function copyEdge(edge: CanvasEdge): CanvasEdge {
   return copy
 }
 
-function copyData(data: GraphCanvasData): GraphCanvasData {
-  return { nodes: data.nodes.map(copyNode), edges: data.edges.map(copyEdge) }
+function copyData(data: GraphCanvasData, positions: Positions | null): GraphCanvasData {
+  return { nodes: data.nodes.map((node) => copyNode(node, positions)), edges: data.edges.map(copyEdge) }
 }
 
 function kpIndex(data: GraphCanvasData): Map<string, string> {
@@ -230,11 +391,13 @@ function kpIndex(data: GraphCanvasData): Map<string, string> {
 
 export function createGraphLifecycle(container: HTMLElement, options: GraphLifecycleOptions): GraphLifecycle {
   const factory = options.factory ?? loadG6Graph
+  /** 章节分区布局的位置，只对层次布局生效（力导向由 G6 自己布局） */
+  const positions: Positions | null = (options.layout ?? 'hierarchical') === 'hierarchical' ? (options.positions ?? null) : null
   let status: LifecycleStatus = 'waiting'
   let graph: CanvasGraph | null = null
   let creating = false
   /** 尚未交给 G6 的最新数据；null 表示已同步 */
-  let pending: GraphCanvasData | null = copyData(options.data)
+  let pending: GraphCanvasData | null = copyData(options.data, positions)
   /** 当前画布上的元素 ID → 知识点 ID */
   let drawn = new Map<string, string>()
   /** 当前画布上的边（入口节点判定用） */
@@ -275,6 +438,23 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     })
   }
 
+  const enhancer: Enhancer | null =
+    options.enhance === undefined
+      ? null
+      : createEnhancer({
+          graph: () => graph,
+          size: () => [width, height],
+          enqueue,
+          alive,
+          onZoom: (zoom) => options.onZoom?.(zoom),
+          options: options.enhance,
+        })
+
+  /** 交给 G6 的数据：增强模式下附上缩放档位、标签开关、掌握角标等展示字段 */
+  function prepare(data: GraphCanvasData): GraphCanvasData {
+    return enhancer === null ? data : enhancer.decorate(data)
+  }
+
   function measure(): [number, number] {
     return [container.clientWidth, container.clientHeight]
   }
@@ -307,14 +487,28 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     if (alive()) reportZoom(g)
   }
 
+  /** 整图适配之后的视图：总览模式把整图放进视口，否则按可读缩放聚焦（有待聚焦目标时总是聚焦它） */
+  async function settleView(g: CanvasGraph): Promise<void> {
+    if (options.initialView === 'overview' && enhancer !== null && pendingFocus === null && anchor === null) {
+      await enhancer.fitTo()
+      if (alive()) reportZoom(g)
+      return
+    }
+    await ensureReadable(g)
+  }
+
   function create(): void {
     creating = true
     enqueue(async () => {
       setStatus('rendering')
-      const data = pending ?? { nodes: [], edges: [] }
+      const data = prepare(pending ?? { nodes: [], edges: [] })
       pending = null
       appliedLayout = layout
-      const created = await factory({ container, width, height, data, layout })
+      const minimap =
+        enhancer !== null && options.enhance?.minimap != null
+          ? { container: options.enhance.minimap, color: (id: string) => enhancer.minimapColor(id) }
+          : undefined
+      const created = await factory({ container, width, height, data, layout, positions, edgeStyle: options.edgeStyle, minimap })
       if (!alive()) {
         created.destroy()
         return
@@ -326,11 +520,14 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
         const kpId = event.target?.id === undefined ? undefined : drawn.get(event.target.id)
         if (kpId !== undefined && alive()) options.onNodeClick?.(kpId)
       })
+      enhancer?.attach()
       await graph.render()
       if (!alive()) return
       // 之后的数据更新保持学生正在看的位置，不再回到整图适配（见 `CanvasGraph.setOptions`）
       graph.setOptions?.({ autoFit: undefined })
-      await ensureReadable(graph)
+      await settleView(graph)
+      if (!alive()) return
+      await enhancer?.afterRender()
       if (!alive()) return
       if (pending !== null) flush()
       else setStatus('ready')
@@ -352,7 +549,9 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (!alive()) return
       await g.fitView()
       if (!alive()) return
-      await ensureReadable(g)
+      await settleView(g)
+      if (!alive()) return
+      await enhancer?.afterRender()
       if (!alive()) return
       // 期间又有更新或切换时，已排队的 flush / relayout 负责收尾
       if (pending === null && appliedLayout === layout) setStatus('ready')
@@ -363,7 +562,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   function flush(): void {
     enqueue(async () => {
       if (graph === null || pending === null) return
-      const data = pending
+      const data = prepare(pending)
       pending = null
       setStatus('rendering')
       graph.setData(data)
@@ -371,14 +570,21 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       lastEdges = data.edges
       await graph.render()
       if (!alive()) return
+      await enhancer?.afterRender()
+      if (!alive()) return
       if (pending !== null) flush()
       else setStatus('ready')
     })
   }
 
+  /** 下一次尺寸变化是否整图重新适配：窗口缩放与 `refreshSize()` 为真；增强模式下的面板开合为假 */
+  let refitNext = enhancer === null
+
   function applySize(): void {
     frame = null
     if (!alive()) return
+    const refit = refitNext || enhancer === null
+    refitNext = enhancer === null
     const [w, h] = measure()
     if (w <= 0 || h <= 0 || (w === width && h === height)) return
     width = w
@@ -389,8 +595,12 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     }
     enqueue(async () => {
       graph!.setSize(w, h)
-      await graph!.fitView()
-      if (alive()) await ensureReadable(graph!)
+      if (refit) {
+        await graph!.fitView()
+        if (alive()) await settleView(graph!)
+      }
+      // 画布尺寸变了：标签排布依赖视口，章节外框与小地图随之重算
+      if (alive()) await enhancer?.afterRender()
     })
   }
 
@@ -403,7 +613,15 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(scheduleSize)
     observer.observe(container)
-    stopObserving = () => observer.disconnect()
+    // 增强模式：容器尺寸变化多半是面板开合（只 setSize）；窗口缩放才整图重新适配
+    const onWindowResize = () => {
+      refitNext = true
+    }
+    if (enhancer !== null) window.addEventListener('resize', onWindowResize)
+    stopObserving = () => {
+      observer.disconnect()
+      if (enhancer !== null) window.removeEventListener('resize', onWindowResize)
+    }
   } else {
     window.addEventListener('resize', scheduleSize)
     stopObserving = () => window.removeEventListener('resize', scheduleSize)
@@ -419,7 +637,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     },
     update(data) {
       if (!alive()) return
-      pending = copyData(data)
+      pending = copyData(data, positions)
       if (graph !== null) flush()
     },
     setLayout(next) {
@@ -428,6 +646,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (graph !== null) relayout()
     },
     refreshSize() {
+      refitNext = true
       scheduleSize()
     },
     focus(kpId) {
@@ -441,8 +660,50 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
         const g = graph
         const target = nodeElementId(kpId)
         if (g === null || g.focusElement === undefined || !drawn.has(target)) return
+        // 总览模式下镜头可能缩得很小：定位到某个知识点时放大到可读缩放，否则只看到一个看不清的小点
+        const overview = options.initialView === 'overview' && g.getZoom !== undefined && g.zoomTo !== undefined && g.getZoom() < READABLE_ZOOM
+        if (overview) await g.zoomTo!(READABLE_ZOOM)
         await g.focusElement(target)
+        if (overview && alive()) {
+          reportZoom(g)
+          await enhancer?.afterRender()
+        }
       })
+    },
+    fitTo(kpIds) {
+      if (!alive() || enhancer === null || graph === null) return
+      enqueue(() => enhancer.fitTo(kpIds))
+    },
+    setScope(kpIds) {
+      if (!alive() || enhancer === null) return
+      // 建图前先记下，渲染后由 `afterRender` 画出；建图后排在当前渲染之后
+      if (graph === null) enhancer.setScope(kpIds)
+      else enqueue(async () => enhancer.setScope(kpIds))
+    },
+    zoomBy(ratio) {
+      if (!alive() || enhancer === null || graph === null) return
+      enqueue(() => enhancer.zoomBy(ratio))
+    },
+    zoomToReadable() {
+      if (!alive() || graph === null) return
+      enqueue(async () => {
+        const g = graph
+        if (g === null || g.getZoom === undefined || g.zoomTo === undefined || g.getZoom() >= READABLE_ZOOM) return
+        await g.zoomTo(READABLE_ZOOM, false)
+        if (!alive()) return
+        reportZoom(g)
+        await enhancer?.afterRender()
+      })
+    },
+    ensureVisible(kpId) {
+      if (!alive() || enhancer === null || graph === null) return
+      enqueue(() => enhancer.ensureVisible(kpId))
+    },
+    relayoutLabels() {
+      if (alive()) enhancer?.relayoutLabels()
+    },
+    leaveHover() {
+      if (alive()) enhancer?.leaveHover()
     },
     destroy() {
       if (status === 'destroyed') return
@@ -450,7 +711,22 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       if (frame !== null) cancelAnimationFrame(frame)
       frame = null
       setStatus('destroyed')
-      if (graph !== null && !graph.destroyed) graph.destroy()
+      enhancer?.detach()
+      const g = graph
+      if (g !== null && !g.destroyed) {
+        if (enhancer === null) g.destroy()
+        else {
+          // 小地图、章节外框插件在视口变化后有延迟回调：立刻销毁会让它们在销毁后读取已清空的数据而抛错。
+          // 延后一点再销毁；销毁本身可能返回会拒绝的 Promise，一并吞掉
+          setTimeout(() => {
+            try {
+              void Promise.resolve(g.destroy()).catch(() => undefined)
+            } catch {
+              /* 已销毁 */
+            }
+          }, 400)
+        }
+      }
       graph = null
       drawn = new Map()
     },

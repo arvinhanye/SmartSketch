@@ -1,4 +1,4 @@
-"""ADR-092 replaces the ADR-072 empty pre-read shortcut; all cleanup is ordered."""
+"""ADR-094 replaces the ADR-072 empty pre-read shortcut; all cleanup is ordered."""
 
 from __future__ import annotations
 

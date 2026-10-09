@@ -8,12 +8,12 @@
 
 ## 交付与关键决定
 
-- 规格 `docs/superpowers/specs/2026-10-08-worker-persist-deadline-design.md`；同步 `docs/architecture.md`、`specs/task-processing.md`、原 R1 设计 §7、`docs/decisions.md` 候选 ADR-092、`docs/integrations.md` 候选环境项及 `docs/tasks.md`。
+- 规格 `docs/superpowers/specs/2026-10-08-worker-persist-deadline-design.md`；同步 `docs/architecture.md`、`specs/task-processing.md`、原 R1 设计 §7、`docs/decisions.md` 候选 ADR-094、`docs/integrations.md` 候选环境项及 `docs/tasks.md`。
 - 保留双租约、SQLite 最终围栏与同连接 T6；worker 专用同步门面驱动独占异步 loop/pool，使用公开取消，不改其他图入口或依赖。
 - 图尝试绝对截止不因续约/分步应答重置；候选提交默认 2 s、最大 3 s，清理默认 1 s、最大 5 s。默认围栏 ≤3 s 为真实故障准入阈值，不是已验证结果。
 - 取消不证明服务器未提交；SQLite 围栏先退出，网络等待型清理在外；无后台提交、跨线程 Session 操作或无界 finally。
 - 发现必须处理的恢复排序：旧服务器 COMMIT 可迟到，无贡献预读不能提前清 failed 任务的清理标记；拟改为在课程锁与同一 DraftWriteGuard 后幂等撤销，确认提交再清标记。仅扩展必要 R1 恢复入口，不修其他四项中严重程度问题。
-- 文档自审纠正 ADR-091 旧回滚段“当前只有文档”与其本地已实施状态的矛盾；既有核心回退仍暴露 R1，补充回退至 `e111315` 仅重新暴露可用性风险。
+- 文档自审纠正 ADR-093 旧回滚段“当前只有文档”与其本地已实施状态的矛盾；既有核心回退仍暴露 R1，补充回退至 `e111315` 仅重新暴露可用性风险。
 
 ## API、数据与配置
 

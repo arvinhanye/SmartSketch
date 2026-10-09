@@ -1,4 +1,4 @@
-"""R1: deterministic lease cutoff and cross-store commit fencing (ADR-091)."""
+"""R1: deterministic lease cutoff and cross-store commit fencing (ADR-093)."""
 
 from dataclasses import replace
 import sqlite3

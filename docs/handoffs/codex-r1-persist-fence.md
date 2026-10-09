@@ -19,7 +19,7 @@
 | `tests/backend/test_worker_persist_fence.py`、`test_worker_graph_transaction.py` | 确定性接管、截止、围栏互斥、正常 T6、提交应答丢失与资源退出回归 |
 | `tests/integration/test_worker_persist_fence.py` | 实际 Neo4j 守卫排队后接管回滚、真实提交后注入丢失应答并重建一次、提交边界阻塞/断连注入 |
 | `tests/backend/test_c02_phase_logs.py`、`test_d11.py`、`tests/integration/test_f13.py` | 内部显式事务/同连接 T6 注入点适配；保留原业务断言，D11 续约样例避整数秒等号竞态 |
-| 设计、计划、任务协议、架构、ADR-091、任务状态 | 同步实际实施与未闭环发布条件 |
+| 设计、计划、任务协议、架构、ADR-093、任务状态 | 同步实际实施与未闭环发布条件 |
 
 `neo4j_ms` 是显式事务作用域（含最终围栏），`t6_ms` 是嵌套跨库提交子区间，两者不相加；`neo4j_attempts` 为每次显式尝试的回调次数 1，失败重领是新尝试。阶段墙钟使用 `total_ms`。
 

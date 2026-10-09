@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import PageSheet from '../components/PageSheet.vue'
+import PageHeader from '../components/PageHeader.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { computed, inject } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
@@ -58,12 +61,10 @@ function onFileChange(event: Event): void {
 </script>
 
 <template>
-  <section class="materials" data-test="materials-page" aria-labelledby="materials-title" :aria-busy="pageStatus === 'loading'">
-    <h2 id="materials-title">资料上传与处理进度</h2>
-    <p v-if="courseName" class="course">课程：{{ courseName }}</p>
-    <p v-if="courseId">
-      <RouterLink :to="{ name: COURSE_ROUTE, params: { cid: courseId } }">返回课程</RouterLink>
-    </p>
+  <PageSheet class="materials ui-management" data-test="materials-page" labelledby="materials-title" :aria-busy="pageStatus === 'loading'">
+    <PageHeader id="materials-title" title="教学资料" :description="courseName ? `${courseName} · 上传资料，跟踪解析与图谱生成进度。` : '上传课程资料，跟踪解析与图谱生成进度。'">
+      <template #actions><RouterLink v-if="courseId" class="ui-btn" :to="{ name: COURSE_ROUTE, params: { cid: courseId } }"><AppIcon name="back" :size="16" />返回课程</RouterLink></template>
+    </PageHeader>
 
     <p v-if="pageStatus === 'loading'" data-test="materials-loading" role="status">正在加载资料…</p>
     <p v-else-if="pageStatus === 'forbidden'" data-test="materials-forbidden" role="alert">{{ pageError }}</p>
@@ -73,20 +74,25 @@ function onFileChange(event: Event): void {
     </div>
 
     <template v-else>
-      <p v-if="runtime.needsConfig" class="model-required" data-test="model-config-required" role="alert">
+      <p v-if="runtime.needsConfig" class="model-required ui-notice" data-test="model-config-required" role="alert">
         上传前需要先配置你的模型 API，图谱生成会使用你自己的模型。
         <RouterLink :to="{ name: SETTINGS_ROUTE }" data-test="model-config-link">去设置</RouterLink>
       </p>
       <form
-        class="upload"
+        class="upload ui-upload-card"
         data-test="material-upload-form"
         novalidate
         :aria-busy="uploading"
         @submit.prevent="submitUpload"
       >
         <fieldset :disabled="uploading">
-          <legend>上传资料</legend>
-          <label for="material-file">选择资料文件</label>
+          <legend>上传课程资料</legend>
+          <div class="materials-upload-layout">
+          <div class="materials-upload-main">
+          <div class="materials-file-zone" :class="{'has-file': selectedName, 'has-error': fileInvalid}">
+          <span class="materials-upload-icon"><AppIcon name="upload" :size="28" /></span>
+          <label for="material-file">{{ selectedName ? '已选择资料文件' : '选择资料文件' }}</label>
+          <p class="materials-file-description">{{ selectedName || '讲义、教材或课堂笔记，让知识图谱从资料开始。' }}</p>
           <input
             id="material-file"
             :key="selectionVersion"
@@ -98,6 +104,8 @@ function onFileChange(event: Event): void {
             aria-describedby="material-upload-hint material-upload-feedback"
             @change="onFileChange"
           />
+          <div class="materials-format-tags" aria-hidden="true"><span>PDF</span><span>DOCX</span><span>TXT</span><span>Markdown</span></div>
+          </div>
           <p id="material-upload-hint" data-test="upload-hint" class="hint">
             支持 {{ SUPPORTED_FORMATS_TEXT }}，<template v-if="limitText">单个文件不超过 {{ limitText }}。</template
             ><template v-else>文件大小上限以服务器为准。</template>
@@ -113,17 +121,19 @@ function onFileChange(event: Event): void {
           </div>
           <div class="actions">
             <button type="submit" data-test="upload-submit" :disabled="uploading || runtime.needsConfig">
-              {{ uploading ? '上传中…' : selectedName ? `上传「${selectedName}」` : '上传' }}
+              <AppIcon name="upload" :size="16" />{{ uploading ? '上传中…' : '开始上传' }}
             </button>
             <button v-if="canRetryUpload" type="button" data-test="upload-retry" @click="retryUpload">重试上传</button>
+          </div>
+          </div>
           </div>
         </fieldset>
       </form>
 
-      <section class="list" aria-labelledby="materials-list-title">
-        <h3 id="materials-list-title">已上传资料</h3>
-        <p v-if="isEmpty" data-test="materials-empty">尚未上传资料。上传后可在这里查看处理进度。</p>
-        <ul v-else class="rows">
+      <section class="list materials-list-card" aria-labelledby="materials-list-title">
+        <div class="ui-section-heading"><h3 id="materials-list-title">已上传资料</h3><span class="ui-muted">{{ rows.length }} 份资料</span></div>
+        <div v-if="isEmpty" data-test="materials-empty" class="materials-empty"><span class="materials-empty-icon"><AppIcon name="list" :size="26" /></span><h4>尚未上传资料</h4><p>从上方选择第一份资料，上传后可在这里查看处理进度。</p></div>
+        <ul v-else class="rows ui-material-rows">
           <li v-for="row in rows" :key="row.documentId" data-test="material-row" :data-document-id="row.documentId">
             <p class="name">
               <span>{{ row.filename }}</span>
@@ -213,66 +223,5 @@ function onFileChange(event: Event): void {
         </ul>
       </section>
     </template>
-  </section>
+  </PageSheet>
 </template>
-
-<style scoped>
-.materials {
-  display: grid;
-  gap: 1.25rem;
-}
-
-.upload fieldset {
-  display: grid;
-  gap: 0.5rem;
-  max-width: 32rem;
-  border: none;
-  padding: 0;
-}
-
-.hint,
-.meta {
-  font-size: 0.875rem;
-  color: #57606a;
-}
-
-.meta {
-  margin-left: 0.75rem;
-}
-
-.rows {
-  display: grid;
-  gap: 0.75rem;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.rows li {
-  border: 1px solid #d0d7de;
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-}
-
-.rows p {
-  margin: 0.25rem 0;
-}
-
-progress {
-  width: 100%;
-}
-
-.actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.status-failed {
-  color: #cf222e;
-}
-
-.status-cancelling,
-.status-cancelled {
-  color: #9a6700;
-}
-</style>

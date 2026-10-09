@@ -338,3 +338,9 @@ docker compose --profile app down        # 保留 app-data 卷
 | Neo4j | 课程知识图谱、向量索引、前置关系遍历 | 本地容器已由 F01 落地（见「本地依赖环境（F01）」）；备份策略未定；向量索引维度须等于签收后的 `EMBEDDING_DIMENSIONS` |
 | OpenAI 兼容 LLM API | 抽取、问答、改写、裁决 | 配置形状与切换/预算规则见「模型接入规则（A07）」；取值待 D-02a、D-02b、D-02d、D-02e 签收；脱敏策略未定 |
 | 向量模型 API / 本地模型 | 知识点融合与来源片段检索 | 方案、模型与维度待 D-02c 签收；维度定稿后才能建 Neo4j 向量索引 |
+
+## Worker 网络验收证据（PR #324，2026-10-09）
+
+- `SMARTSKETCH_NETWORK_EVIDENCE_DIR` 是仅供测试的可选输出目录；不进入应用配置、用户模型凭据或生产服务。未设置时由 pytest `tmp_path_factory` 创建独立临时目录；设置时在该目录下按自建图库随机身份生成独立 JSONL 文件，写入前创建父目录，不依赖 macOS `/private/tmp`。
+- CI 将目录设为 `${{ runner.temp }}/worker-network-evidence`，无论测试成功/失败都保存 `worker-network-evidence` artifact（7 天）。证据仅含测试身份、计时、状态和源码 SHA256，不含认证包、课程正文或密钥；写入失败仍判失败，不吞异常。
+- 真实旧版本对照实验固定归档历史提交 `e111315ffabdc5ce980afdf525b8321ef572dc8e`，Integration checkout 使用 `fetch-depth: 0`，保留完整历史及 `persist-credentials: false`。该改动不跳过对照实验、不放宽网络预算、不改变应用依赖。

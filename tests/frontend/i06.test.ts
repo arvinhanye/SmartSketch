@@ -1,3 +1,4 @@
+import { GRAPH_COLORS } from '../../src/frontend/src/graph/theme'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -270,8 +271,9 @@ async function mountPage(f: Fakes, path = '/courses/c1/graph', accountRole: 'stu
   return { wrapper, router }
 }
 
-/** 选中一个知识点（图上点选），掌握标记按钮随之出现 */
+/** 选中一个知识点（图上点选），掌握标记按钮随之出现。UI-GRAPH-PILOT-01：单击只预览，再次单击才打开详情 */
 async function selectNode(wrapper: VueWrapper, kpId: string): Promise<void> {
+  wrapper.findComponent(GraphCanvas).vm.$emit('nodeClick', kpId)
   wrapper.findComponent(GraphCanvas).vm.$emit('nodeClick', kpId)
   await flushPromises()
 }
@@ -374,17 +376,18 @@ describe('I06 掌握状态到节点视觉属性（纯函数）', () => {
     expect(masteryElementStates('unknown', false)).toEqual(['notStarted'])
     expect(masteryElementStates('mastered', true)).toEqual(['mastered', 'recommended'])
     expect(masteryElementStates('learning', false)).toEqual(['learning'])
-    expect(MASTERY_LABELS).toEqual({ unknown: '未开始', learning: '学习中', mastered: '已掌握' })
+    expect(MASTERY_LABELS).toEqual({ unknown: '未学习', learning: '学习中', mastered: '已掌握' })
   })
 
   it('画布为四个学习状态定义了样式（状态色真实接线，不是测试里的硬编码）', () => {
     const options = buildGraphOptions({ container: document.createElement('div'), width: 100, height: 100, data: graph })
     const nodeState = (options.node as { state: Record<string, unknown> }).state
-    // L14 追加的学习路径状态（dimmed/pathPrereq/pathUnlock）另见 l14.test.ts
-    expect(Object.keys(nodeState).sort()).toEqual(
-      ['dimmed', 'learning', 'lowConfidence', 'mastered', 'notStarted', 'pathPrereq', 'pathUnlock', 'recommended', 'rejected', 'selected'],
-    )
-    expect(nodeState.mastered).toMatchObject({ stroke: '#52c41a' })
+    // 状态名清单随 UI-GRAPH-PILOT-01 追加；掌握状态色改用图谱主题的成功色（并有 ✓ 角标，见 graph-options.test.ts）
+    expect(Object.keys(nodeState).sort()).toEqual([
+      'dimmed', 'faded', 'hoverFaded', 'hoverRelated', 'hovered', 'learning', 'lowConfidence', 'mastered', 'match',
+      'neighbor', 'notStarted', 'pathPrereq', 'pathUnlock', 'recommended', 'rejected', 'selected',
+    ])
+    expect(nodeState.mastered).toMatchObject({ stroke: GRAPH_COLORS.ok })
   })
 })
 
@@ -689,7 +692,7 @@ describe('I06 学生图谱页：乐观掌握标记', () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)
     await selectNode(wrapper, 'k1')
-    expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('未开始')
+    expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('未学习')
     await wrapper.get('[data-test="sg-mastery-mastered"]').trigger('click')
     await flushPromises()
     expect(f.progress.update).toHaveBeenCalledWith('c1', [{ kp_id: 'k1', status: 'mastered' }], expect.anything())
@@ -718,7 +721,7 @@ describe('I06 学生图谱页：乐观掌握标记', () => {
     await wrapper.get('[data-test="sg-mastery-mastered"]').trigger('click')
     expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('已掌握')
     await flushPromises()
-    expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('未开始')
+    expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('未学习')
     expect(nodeStates(wrapper).get('k1')).toEqual(['notStarted', 'selected'])
     expect(wrapper.get('[data-test="sg-learning-notice"]').attributes('data-tone')).toBe('error')
     expect(wrapper.get('[data-test="sg-learning-notice"]').text()).toContain('已撤销')
@@ -731,7 +734,7 @@ describe('I06 学生图谱页：乐观掌握标记', () => {
     await selectNode(wrapper, 'k2')
     await wrapper.get('[data-test="sg-mastery-learning"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('未开始')
+    expect(wrapper.get('[data-test="sg-mastery-target"]').text()).toContain('未学习')
     expect(wrapper.get('[data-test="sg-learning-notice"]').text()).toContain('已撤销')
     expect(wrapper.text()).not.toContain('服务端原文')
   })

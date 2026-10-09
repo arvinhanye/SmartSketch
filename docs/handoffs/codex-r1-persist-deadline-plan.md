@@ -8,7 +8,7 @@
 
 ## 交付与范围
 
-计划 `docs/superpowers/plans/2026-10-08-worker-persist-deadline.md`；同步规格已批准/计划待审阅状态到 tasks、架构、ADR-092、集成说明、原 R1 规格和任务协议。不改产品代码、测试、有效配置、依赖或数据库；不创建新 worktree、不派发实施 Agent、不推送/PR/合并/冻结。
+计划 `docs/superpowers/plans/2026-10-08-worker-persist-deadline.md`；同步规格已批准/计划待审阅状态到 tasks、架构、ADR-094、集成说明、原 R1 规格和任务协议。不改产品代码、测试、有效配置、依赖或数据库；不创建新 worktree、不派发实施 Agent、不推送/PR/合并/冻结。
 
 计划按七个可独立验收任务：传输/配置、仓储门面、SQLite 围栏预算、worker 状态恢复、failed 清理排序、真实 TCP 故障、完整门禁/独立审查/交接。每任务 RED→GREEN 后本地提交，共享文件串行修改。
 

@@ -187,6 +187,13 @@ def begin_attempt(
         _count("source_version", source_version, 1)
     version_id = new_version_id() if version_id is None else _text("version_id", version_id)
     with immediate(sqlite_url) as database:
+        # Atomic with attempt insertion: vector switches hold this owner lock
+        # until their configuration and version-space metadata commit together.
+        if database.execute("""SELECT 1 FROM course_locks l JOIN courses c
+            ON l.course_id = 'embedding-teacher:' || c.teacher_id
+            WHERE c.id=? AND l.holder='embedding-config' AND l.expires_at>=unixepoch()""",
+            (course_id,)).fetchone():
+            raise PublishInProgress()
         copied: tuple[Any, ...] = (None,) * 6
         if kind == "rollback":
             source = database.execute(
@@ -322,6 +329,10 @@ def commit_attempt(
     ).fetchone()
     if not live:
         raise CommitRejected("attempt is not materialized or its lease expired")
+    target = database.execute("""SELECT e.space FROM teacher_embedding_configs e
+        JOIN courses c ON c.teacher_id=e.user_id WHERE c.id=?""", (attempt.course_id,)).fetchone()
+    if target is not None and attempt.embedding_space != target[0]:
+        raise CommitRejected("course embedding configuration changed")
     [number] = database.execute(
         "SELECT coalesce(max(version), 0) + 1 FROM graph_versions WHERE course_id = ? AND state = 'committed'",
         (attempt.course_id,),

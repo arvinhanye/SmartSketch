@@ -10,7 +10,7 @@
 
 - `docs/superpowers/specs/2026-10-08-worker-persist-fence-design.md`：意图、双租约截止、显式事务、最终围栏、故障恢复、文件边界、九项验收。
 - `specs/task-processing.md`、`docs/architecture.md`：增加有明确「尚未实现」状态的设计引用。
-- `docs/decisions.md`：ADR-091，区分聊天确认、书面评审与实现验收。
+- `docs/decisions.md`：ADR-093，区分聊天确认、书面评审与实现验收。
 - `docs/tasks.md`：认领与状态、输入输出、依赖、风险和下一步。
 
 最终顺序：图守卫 → SQLite 提交围栏 → 验证两个数据库令牌/有效期 → 图提交 → 同连接 T6 → SQLite 提交。围栏不覆盖图构建，不做透明回调重试。没有数据库迁移/公共接口/依赖/配置变化。

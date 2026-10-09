@@ -1,18 +1,26 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it } from 'vitest'
 import type { components } from '../../src/contracts/v1/generated/typescript/openapi'
+import { AUTH_API_KEY, type AuthApi } from '../../src/frontend/src/api/auth'
 import App from '../../src/frontend/src/App.vue'
+import LoginView from '../../src/frontend/src/views/LoginView.vue'
 import { createAppRouter } from '../../src/frontend/src/router/index.ts'
 
 type Role = components['schemas']['Role']
 
-// 按给定账号类型建路由、导航到 path，再把路由装进 App 挂载
+// B03 只测路由守卫与提示，登录页不会提交；认证接口用空桩
+const AUTH_STUB: AuthApi = { login: async () => { throw new Error('B03 不应提交登录') }, register: async () => { throw new Error('B03 不应提交注册') } }
+
+// 按给定账号类型建路由、导航到 path，再把路由装进 App 挂载。
+// 未登录提示现在由登录页（main.ts 注入的 LoginView）浮动承载，所以宿主与生产一致：
+// 注入 LoginView 并安装 Pinia（登录页使用会话 store）。
 async function visit(path: string, role: Role | null) {
-  const router = createAppRouter({ history: createMemoryHistory(), getAccountRole: () => role })
+  const router = createAppRouter({ history: createMemoryHistory(), getAccountRole: () => role, loginComponent: LoginView })
   await router.push(path)
   await router.isReady()
-  const wrapper = mount(App, { global: { plugins: [router] } })
+  const wrapper = mount(App, { global: { plugins: [router, createPinia()], provide: { [AUTH_API_KEY]: AUTH_STUB } } })
   return { router, wrapper }
 }
 
@@ -74,7 +82,8 @@ describe('B03 路由壳与角色入口', () => {
       const { router, wrapper } = await visit(path, null)
       expect(router.currentRoute.value.path).toBe('/')
       expect(wrapper.get('[role="alert"]').text()).toContain('未登录')
-      expect(headings(wrapper)).toEqual([])
+      expect(headings(wrapper)).not.toContain(TEACHER_TITLE)
+      expect(headings(wrapper)).not.toContain(STUDENT_TITLE)
     },
   )
 

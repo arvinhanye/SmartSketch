@@ -17,17 +17,22 @@ import { createVersionsApi, VERSIONS_API_KEY } from './api/versions'
 import { createTaskEventsClient } from './api/taskEvents'
 import { CHAT_STREAM_CLIENT_KEY, createChatStreamClient } from './api/chatStream'
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from './router'
+import { lazyView } from './router/lazyView'
 import { useSessionStore } from './stores/session'
-import CoursesView from './views/CoursesView.vue'
 import LoginView from './views/LoginView.vue'
-import MembersView from './views/MembersView.vue'
-import MaterialsView from './views/MaterialsView.vue'
-import StudentGraphView from './views/StudentGraphView.vue'
-import ReviewView from './views/ReviewView.vue'
-import TeacherGraphView from './views/TeacherGraphView.vue'
-import ChatView from './views/ChatView.vue'
-import RegisterView from './views/RegisterView.vue'
-import ModelSettingsView from './views/ModelSettingsView.vue'
+import { EMBEDDING_CONFIG_API_KEY, createEmbeddingConfigApi } from './api/embeddingConfig'
+
+// 登录页是首屏，随入口包加载；其余页面按路由需要时才下载（失败重试与错误提示见 lazyView）。
+const lazy = lazyView
+const CoursesView = lazy(() => import('./views/CoursesView.vue'))
+const MembersView = lazy(() => import('./views/MembersView.vue'))
+const MaterialsView = lazy(() => import('./views/MaterialsView.vue'))
+const StudentGraphView = lazy(() => import('./views/StudentGraphView.vue'))
+const ReviewView = lazy(() => import('./views/ReviewView.vue'))
+const TeacherGraphView = lazy(() => import('./views/TeacherGraphView.vue'))
+const ChatView = lazy(() => import('./views/ChatView.vue'))
+const RegisterView = lazy(() => import('./views/RegisterView.vue'))
+const ModelSettingsView = lazy(() => import('./views/ModelSettingsView.vue'))
 
 const pinia = createPinia()
 const session = useSessionStore(pinia)
@@ -70,6 +75,7 @@ createApp(App)
   .provide(COURSES_API_KEY, createCoursesApi(http))
   .provide(MEMBERS_API_KEY, createMembersApi(http))
   .provide(MODEL_CONFIG_API_KEY, createModelConfigApi(http))
+  .provide(EMBEDDING_CONFIG_API_KEY, createEmbeddingConfigApi(http))
   .provide(MATERIALS_API_KEY, createMaterialsApi(http))
   .provide(PUBLISHED_GRAPH_API_KEY, createPublishedGraphApi(http))
   .provide(DRAFT_GRAPH_API_KEY, createDraftGraphApi(http))

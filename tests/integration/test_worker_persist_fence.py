@@ -1,4 +1,4 @@
-"""ADR-091: actual Neo4j rollback/commit and injected commit-boundary faults.
+"""ADR-093: actual Neo4j rollback/commit and injected commit-boundary faults.
 
 Only SMARTSKETCH_TEST_NEO4J_* fixtures; never use the application's database.
 Faults are injected around the public transaction boundary, not a claim of a

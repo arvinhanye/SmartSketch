@@ -682,3 +682,13 @@ describe('审核队列页：迟到响应', () => {
     expect(totalText(wrapper, 'low_confidence_relation')).toBe('低置信度关系（2）')
   })
 })
+
+
+describe('审核页面栏目去重', () => {
+  it('每类审核标题只出现一次，避免导航和内容重复显示', async () => {
+    const { wrapper } = await mountPage(fakes({ relations: [], duplicates: [], isolated: [] }))
+    for (const label of ['低置信度关系（0）', '疑似重复知识点（0）', '孤立知识点（0）']) {
+      expect(wrapper.findAll('a,h3').filter(node => node.text() === label)).toHaveLength(1)
+    }
+  })
+})

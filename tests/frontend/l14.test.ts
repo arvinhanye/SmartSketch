@@ -319,10 +319,10 @@ describe('L14-2 学生图谱页路径焦点', () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
     const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
     await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(focused.at(-1)).toBe(nodeElementId('C'))
+    // 章节分区布局是异步计算的，算完才建图并聚焦
+    await vi.waitFor(() => expect(focused.at(-1)).toBe(nodeElementId('C')))
     await wrapper.get('[data-test="rc-select-G"]').trigger('click')
-    await flushPromises()
-    expect(focused.at(-1)).toBe(nodeElementId('G'))
+    await vi.waitFor(() => expect(focused.at(-1)).toBe(nodeElementId('G')))
     wrapper.unmount()
     vi.restoreAllMocks()
   })
@@ -383,7 +383,8 @@ describe('L14-3 推荐解释：先修事实优先，缺省值不冒充测量', (
 
 // ---------------------------------------------------------------- 数据更新不重置视口
 
-import { createGraphLifecycle, type CanvasGraphInit } from '../../src/frontend/src/graph/lifecycle'
+// UI-GRAPH-PILOT-01：可读缩放常量按计划由 0.7 调为 0.9。
+import { createGraphLifecycle, READABLE_ZOOM, type CanvasGraphInit } from '../../src/frontend/src/graph/lifecycle'
 
 /** 模拟 G6 5.x：设置了 `autoFit` 时每次 render 都把视口重置为整图适配（缩放 0.2、原点 [0,0]） */
 class AutoFitGraph {
@@ -417,12 +418,12 @@ describe('L14-2 数据更新保留视口', () => {
     await flushPromises()
     life.focus('C')
     await flushPromises()
-    expect(graph.zoom).toBe(0.7)
+    expect(graph.zoom).toBe(READABLE_ZOOM)
     expect(graph.position).toEqual([123, 45])
     life.update({ ...data, nodes: data.nodes.map((n) => ({ ...n, states: ['dimmed'] })) })
     await new Promise((resolve) => setTimeout(resolve, 10))
     await flushPromises()
-    expect(graph.zoom).toBe(0.7)
+    expect(graph.zoom).toBe(READABLE_ZOOM)
     expect(graph.position).toEqual([123, 45])
   })
 })
@@ -444,7 +445,7 @@ describe('L14-2 尺寸变化后仍聚焦最近一次请求的节点', () => {
     life.refreshSize()
     await new Promise((resolve) => setTimeout(resolve, 30))
     await flushPromises()
-    expect(graph.zoom).toBe(0.7)
+    expect(graph.zoom).toBe(READABLE_ZOOM)
     expect(graph.focused.at(-1)).toBe(nodeElementId('C'))
   })
 })
