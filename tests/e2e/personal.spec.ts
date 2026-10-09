@@ -226,13 +226,21 @@ test.describe('个人模式（L11）', () => {
       const pathLine = student.locator('[data-test=rc-path-line]')
       await expect(pathLine).toContainText('下一步：')
       const firstId = (await items.first().getAttribute('data-kp-id'))!
-      const firstLine = ((await pathLine.textContent()) ?? '').trim()
+      // PDF/MD 可产生同名但不同 ID 的推荐及后继；文字不变不代表路径未更新。
+      // 连同可点击解锁目标验证路径身份，取消掌握时也核对完整恢复。
+      const pathState = () => pathLine.evaluate((element) => ({
+        text: (element.textContent ?? '').trim(),
+        unlockIds: Array.from(element.querySelectorAll('[data-test^="rc-unlock-"]'))
+          .map((link) => link.getAttribute('data-test')),
+      }))
+      const firstPath = await pathState()
       await expect(items.first().locator('[data-test=rc-order]')).toHaveText('1.')
       await student.locator(`[data-test="rc-select-${firstId}"]`).click()
       await student.locator('[data-test=sg-mastery-mastered]').click()
       await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为已掌握')
       await expect(student.locator(`[data-test="rc-select-${firstId}"]`)).toHaveCount(0)
-      await expect(pathLine).not.toHaveText(firstLine)
+      await expect(items.first()).not.toHaveAttribute('data-kp-id', firstId)
+      await expect.poll(pathState).not.toEqual(firstPath)
       await student.reload()
       await expect(items.first()).toBeVisible()
       await expect(student.locator(`[data-test="rc-select-${firstId}"]`)).toHaveCount(0)
@@ -256,7 +264,7 @@ test.describe('个人模式（L11）', () => {
       await student.locator('[data-test=sg-mastery-unknown]').click()
       await expect(student.locator('[data-test=sg-learning-notice]')).toContainText('已标记为未开始')
       await expect(items.first()).toHaveAttribute('data-kp-id', firstId)
-      await expect(pathLine).toHaveText(firstLine)
+      await expect.poll(pathState).toEqual(firstPath)
 
       // 8. 教师发布后再改草稿：学生看到的仍是发布版的定义
       await page.goto(`${appUrl}/courses/${courseId}/graph/edit`)
