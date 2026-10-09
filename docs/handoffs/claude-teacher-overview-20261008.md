@@ -17,7 +17,10 @@ task_id: CLAUDE-TEACHER-OVERVIEW-20261008
 - 最终门禁：见下节。
 
 ## 最终门禁
-（由最后一次 `scripts/verify.sh integration` 填写）
+在提交 `25cae93` 上单独运行（无并发重任务）：`./scripts/verify.sh integration`（含 basic + full）**PASS，退出 0**：后端 3975 passed / 27 登记 skipped；前端 63 文件 / 1210 passed，type-check（两个 tsconfig）与 build 通过；集成 393 passed / 4 skipped；图库专项 44 passed；E2E 教师+学生 2 passed、个人模式 4 passed。
+- 过程如实记录：同一命令在 `2a6375a` 上第一次退出 1，原因是 `tests/frontend/h05.test.ts` 的回调类型没随工具栏 `layout` 类型放宽（第二个 tsconfig 的类型检查失败；我先前只跑了第一个 tsconfig）。修复提交 `25cae93` 后整条命令重跑通过，上面是重跑的结果。
+- `scripts/verify.sh basic` 为该命令第一步，已 PASS。
+- 3 项历史“暂不补测”仍为未测；无真实供应商/付费调用。
 
 ## 风险与限制
 - 缩放下限 0.2：390px 手机上总览略有裁切，可用“适应画布”/缩放；手机端教师编辑非主场景。
