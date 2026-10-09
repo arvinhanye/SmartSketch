@@ -31,7 +31,7 @@ def course(url, cid):
 
 
 class BoundaryRepo:
-    def __init__(self, repo, *, before_run=lambda: None, commit=lambda tx: tx.commit()):
+    def __init__(self, repo, *, before_run=lambda: None, commit=None):
         self.repo = repo
         self.before_run = before_run
         self.commit_action = commit
@@ -48,14 +48,30 @@ class BoundaryRepo:
                     owner.before_run()
                 return tx.run(query, parameters)
 
-            def commit(self):
-                return owner.commit_action(tx)
+            @property
+            def deadline(self):
+                return tx.deadline
+            @property
+            def commit_started(self):
+                return tx.commit_started
+            @property
+            def committed(self):
+                return tx.committed
+            def commit(self, *, started_at):
+                if owner.commit_action is None:
+                    return tx.commit(started_at=started_at)
+                class Bound:
+                    def commit(self):
+                        return tx.commit(started_at=started_at)
+                    def __getattr__(self, name):
+                        return getattr(tx, name)
+                return owner.commit_action(Bound())
 
         return Boundary()
 
     @contextmanager
-    def explicit_write_transaction(self, scope, **kwargs):
-        with self.repo.explicit_write_transaction(scope, **kwargs) as tx:
+    def persist_write_transaction(self, scope, **kwargs):
+        with self.repo.persist_write_transaction(scope, **kwargs) as tx:
             yield self.wrap(tx)
 
     def read(self, *args, **kwargs):
@@ -116,11 +132,11 @@ def test_live_lost_ack_after_actual_commit_recovers_once(db_url, storage, graph)
         raise RepositoryConnectionError()
 
     result = _persist(db_url, lease, BoundaryRepo(graph.repo, commit=lost_ack))
-    assert result.status is persist_graph.PersistStatus.RELEASED
+    assert result.status is persist_graph.PersistStatus.LOST
     assert calls == ['commit'] and _counts(graph)['nodes'] == 1
     assert _visible_to_teacher(graph, db_url) == []
     with connect(db_url) as db:
-        db.execute('UPDATE processing_tasks SET not_before=unixepoch() WHERE id=?', (lease.task_id,))
+        db.execute('UPDATE processing_tasks SET lease_expires_at=unixepoch()-1, not_before=unixepoch() WHERE id=?', (lease.task_id,))
     again = task_leases.claim_next(db_url, owner='new', lease_seconds=60, max_attempts=3)
     assert again is not None and again.task_id == lease.task_id
     assert _persist(db_url, again, graph.repo).status is persist_graph.PersistStatus.ADVANCED
