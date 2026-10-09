@@ -2148,7 +2148,7 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| ENUM-INPUT-422 | DONE_LOCAL | Codex | 用户要求修复非法枚举输入导致 500；节点/关系 PATCH 的 type/status 与审核 POST 的 item 先校验字符串，再查闭集；回归数组、对象、布尔、数字、null 与未知字符串，断言 422/VALIDATION_ERROR、字段准确、零图上下文进入及零业务写入；保留合法枚举、鉴权与现有错误语义。 |
+| ENUM-INPUT-422 | DONE_PR_OPEN | Codex | 用户要求修复非法枚举输入导致 500；节点/关系 PATCH 的 type/status 与审核 POST 的 item 先校验字符串，再查闭集；回归数组、对象、布尔、数字、null 与未知字符串，断言 422/VALIDATION_ERROR、字段准确、零图上下文进入及零业务写入；保留合法枚举、鉴权与现有错误语义。 |
 
 - 输入：已合并 #324 的主线 `2e4d1c20`，当前干净工作区，原审查第 2 项；新分支 `codex/enum-input-validation`，复用受管工作区。
 - 输出：三份路由最小校验修复、真实 HTTP 回归、规格验收补充与交接；本轮仅本地修改，无新 PR/推送/合并/部署授权。
@@ -2163,8 +2163,9 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| ENUM-INPUT-422-PUBLISH | IN_PROGRESS | Codex | 用户最新要求「提交并开PR」；核对最终文件与远程 main、复验门禁，提交本任务七份文件，正常推送 codex/enum-input-validation 并向 main 创建/附加 PR；记录实际提交与 PR 状态，不合并/部署/冻结，保留受管工作区。 |
+| ENUM-INPUT-422-PUBLISH | DONE_PR_OPEN | Codex | 用户最新要求「提交并开PR」；核对最终文件与远程 main、复验门禁，提交本任务七份文件，正常推送 codex/enum-input-validation 并向 main 创建/附加 PR；记录实际提交与 PR 状态，不合并/部署/冻结，保留受管工作区。 |
 
 - 输入为上一节已验收的本地修复与源码 manifest；输出为可追溯提交和 PR。依赖远程仓库访问及既有锁定测试运行时；风险为远程主线前进、夹杂非本轮变更或将本地验收外推为远程 CI 通过。验收核对精确文件列表、diff-check、basic/后端门禁及 GitHub PR head/base；无新增接口/模型变化。
 - 本节用户授权覆盖上文仅本地不提交/不推送/不开 PR 的历史边界；只授权本修复发布，先前 #324 的条件合并授权不外推到新 PR。远程 CI 与后续合并保持待完成。
 - 发布前复验：最新抓取 `origin/main=2e4d1c20`，与修复分叉相同，无待整合主线提交/同分支已有 PR；basic **exit 0**，后端 **4149 passed/27 既有登记 skip，exit 0**（708.00s）。三 API 与新测试前后 SHA256 一致、diff-check 通过；日志与机读汇总 `/private/tmp/smartsketch-enum-pr-publish-20261009/`。下一步提交、正常推送并创建 PR，尚未将远程 CI 记为通过。
+- 发布完成：修复提交 `7e03526f25110f9798c29b5b09abebd1834354d0` 正常推送，[PR #329](https://github.com/arvinhanye/SmartSketch/pull/329) 已创建并附加本任务，`codex/enum-input-validation` → `main`，OPEN/非草稿。GitHub 核对七份文件与本轮范围一致，初始 mergeable=MERGEABLE；push/pull_request 的八项 CI 已排队/运行，尚未记为通过。本状态补充仅改任务与交接文档，产品/测试继续使用已验收 SHA；不合并、部署、冻结或清理工作区，后续先检查最终 head CI。

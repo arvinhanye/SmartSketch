@@ -45,3 +45,7 @@
 用户最新要求「提交并开PR」，覆盖本记录前述仅本地修改的历史边界。此次提交/正常推送仅包含三份 API、85 项新测试、规格、任务状态与本交接共七份文件，目标 `main`，保留分支与受管工作区。不合并/部署/冻结；先前 #324 条件合并授权不外推到新 PR，远程 CI 结果仍以 GitHub 实测为准。发布前复验与远程基线核对结果将在完成后补充。
 
 发布前已抓取 `main=2e4d1c20`（仍为修复分叉），没有同名分支的既有 PR。再次完整执行 basic **exit 0**、backend+tooling **4149 passed/27 既有登记 skip/1 既有 warning，exit 0**（708.00s）；三 API 与新测试 SHA256 前后相同，diff-check 通过。证据 `/private/tmp/smartsketch-enum-pr-publish-20261009/` 的 `basic.log`、`backend-full.log`、前后 manifest 与 `verification-summary.json`；未归档临时全量 XML。提交仅上述七份文件，下一步正常推送与 PR 创建，不将此本地结果外推为远程 CI 通过。
+
+发布已完成：修复提交 `7e03526f25110f9798c29b5b09abebd1834354d0` 已正常推送，[PR #329](https://github.com/arvinhanye/SmartSketch/pull/329) 已创建并附加，OPEN/非草稿，`codex/enum-input-validation` → `main`。GitHub 初始实测 MERGEABLE，七份文件符合范围，八项 push/pull_request CI 排队/运行；不将其记为通过。后续这两份状态文档补充不改产品/测试 SHA，分支和工作区保留，未合并/部署/冻结。下一位首个动作：检查该 PR 最终 head 的全部 CI 与审阅结论，再取得针对新 PR 的合并指示。
+
+最终发布状态文档版再次运行 `./scripts/verify.sh`，实际 exit 0，日志 `final-basic.log`；diff-check 通过，产品/新测试仍匹配全量后端验收 manifest。
