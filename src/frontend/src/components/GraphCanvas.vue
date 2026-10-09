@@ -6,6 +6,7 @@ import {
   createGraphLifecycle,
   GRAPH_FACTORY_KEY,
   loadG6Graph,
+  READABLE_ZOOM,
   type GraphCanvasData,
   type GraphLayoutName,
   type GraphLifecycle,
@@ -39,10 +40,12 @@ const props = withDefaults(
     arrangement?: 'layered' | 'radial'
     /** 首屏：`readable` 按可读缩放聚焦入口节点（学生页）；`overview` 先整图适应进视口（教师页） */
     initialView?: 'readable' | 'overview'
+    /** 总览下标签只显示一部分时，在画布左下角提示“显示 n/m 个标签”（教师页） */
+    showLabelStat?: boolean
     /** 整组适应时四周留白（像素），缺省按学生页的浮层 */
     fitPads?: Partial<{ left: number; right: number; top: number; bottom: number }>
   }>(),
-  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined },
+  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined, showLabelStat: false },
 )
 
 const emit = defineEmits<{ nodeClick: [kpId: string]; blankClick: [] }>()
@@ -57,6 +60,8 @@ const controls = ref<HTMLElement | null>(null)
 const status = ref<LifecycleStatus | 'idle'>('idle')
 const drawnOnce = ref(false)
 const zoom = ref<number | null>(null)
+/** 最近一次标签排布：显示几个、共几个节点 */
+const labelStat = ref<{ shown: number; total: number } | null>(null)
 /** 小地图默认展开；<1024px 默认收起（规格 §5.1） */
 const miniOpen = ref(typeof window === 'undefined' || window.innerWidth >= 1024)
 const tip = ref<{ text: string; x: number; y: number } | null>(null)
@@ -132,6 +137,9 @@ function start(attempt = 0): void {
           onBlankClick: () => emit('blankClick'),
           onHover: showTip,
           fitPads: props.fitPads,
+          onLabels: (shown, total) => {
+            labelStat.value = { shown, total }
+          },
         }
       : undefined,
     factory,
@@ -164,6 +172,7 @@ defineExpose({
 
 const zoomBy = (ratio: number): void => lifecycle?.zoomBy(ratio)
 const fitAll = (): void => lifecycle?.fitTo()
+const toReadable = (): void => lifecycle?.zoomToReadable()
 const leaveHover = (): void => lifecycle?.leaveHover()
 
 function stop(): void {
@@ -270,8 +279,12 @@ onBeforeUnmount(() => {
         <button type="button" class="gw-tool" aria-label="放大" title="放大" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
         <button type="button" class="gw-tool" aria-label="缩小" title="缩小" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
         <button type="button" class="gw-tool" aria-label="适应画布" title="适应画布" @click="fitAll"><AppIcon name="fit" /></button>
+        <button type="button" class="gw-tool" aria-label="放大到可读大小" title="放大到可读大小（标签字号舒适的缩放）" data-test="zoom-readable" @click="toReadable"><AppIcon name="readable" /></button>
       </div>
     </div>
+    <p v-if="showLabelStat && enhanced && labelStat !== null && labelStat.shown < labelStat.total && (zoom ?? 0) < READABLE_ZOOM && !loading" class="gw-labelstat" data-test="label-stat" role="status">
+      显示 {{ labelStat.shown }} / {{ labelStat.total }} 个标签 · 放大可看到更多
+    </p>
     <div v-if="tip" class="gw-tip" role="tooltip" :style="{ left: `${tip.x + 14}px`, top: `${tip.y + 14}px` }">{{ tip.text }}</div>
   </section>
 </template>
@@ -335,6 +348,21 @@ onBeforeUnmount(() => {
 .gw-map__ctl {
   display: grid;
   gap: 6px;
+}
+.gw-labelstat {
+  position: absolute;
+  z-index: 5;
+  left: 12px;
+  bottom: 12px;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--gw-line);
+  border-radius: 999px;
+  background: var(--gw-panel);
+  color: var(--gw-text-2);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
 }
 .gw-tip {
   position: absolute;

@@ -952,6 +952,29 @@ describe('教师图谱：首屏总览与径向布局', () => {
   })
 })
 
+describe('教师图谱：节点类型图例与筛选同步', () => {
+  const legend = (wrapper: VueWrapper, type: string) => wrapper.get(`[data-test="node-legend-${type}"]`)
+  const canvasNodeCount = (wrapper: VueWrapper) => (wrapper.findComponent(GraphCanvas).props('graph') as GraphCanvasData).nodes.length
+
+  it('图例显示整张草稿图各类型个数；点击隐藏该类，画布节点随之减少，再点或“恢复全部类型”还原', async () => {
+    const nodes = [kp('a'), kp('b'), kp('c', { type: 'theorem' } as Partial<KnowledgePoint>)]
+    const { wrapper } = await mountPage(fakes({ nodes, edges: [] }))
+    expect(legend(wrapper, 'concept').text()).toContain('2')
+    expect(legend(wrapper, 'theorem').text()).toContain('1')
+    expect(canvasNodeCount(wrapper)).toBe(3)
+    await legend(wrapper, 'concept').trigger('click')
+    await flushPromises()
+    expect(canvasNodeCount(wrapper)).toBe(1)
+    // 计数取整张图，不随筛选变化
+    expect(legend(wrapper, 'concept').text()).toContain('2')
+    expect(legend(wrapper, 'concept').attributes('aria-pressed')).toBe('false')
+    await wrapper.get('[data-test="node-legend-restore"]').trigger('click')
+    await flushPromises()
+    expect(canvasNodeCount(wrapper)).toBe(3)
+    expect(wrapper.find('[data-test="node-legend-restore"]').exists()).toBe(false)
+  })
+})
+
 describe('教师知识点面板调宽', () => {
   it('键盘可调整并限制宽度，切换详情/编辑后保留选择和宽度', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200)

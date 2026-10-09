@@ -41,13 +41,13 @@ describe('径向布局引擎', () => {
     expect([...again]).toEqual([...pos])
   })
 
-  it('任意两个节点不重叠（中心距不小于节点直径 36），整体是接近宽画布的椭圆（约 1.5:1）而不是 10:1 的长条', async () => {
+  it('任意两个节点不重叠（中心距不小于节点直径 36），整体是接近宽画布的椭圆（约 1.9:1）而不是 10:1 的长条', async () => {
     const { nodes, edges } = bigTree()
     const pos = await computeLayout(nodes, edges, 'chapter', ['c1'], {}, radialEngine)
     const m = layoutMetrics(pos, nodes, edges)
     expect(m.minNodeDist).toBeGreaterThanOrEqual(36)
     expect(m.aspect).toBeGreaterThan(1.0)
-    expect(m.aspect).toBeLessThan(2.2)
+    expect(m.aspect).toBeLessThan(2.6)
   })
 
   it('子树占据连续的扇区：同一父节点的孩子比别的小节的孩子彼此更近', async () => {

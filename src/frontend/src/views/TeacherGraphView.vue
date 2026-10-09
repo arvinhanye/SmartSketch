@@ -14,12 +14,13 @@ import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
+import NodeTypeLegend from '../components/NodeTypeLegend.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
 import { useGraphLayout } from '../composables/useGraphLayout'
 import { kpIdFromElementId } from '../graph/adapter'
 import type { GraphLayoutName } from '../graph/lifecycle'
-import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
+import { chapterOptions, locateNode, NODE_TYPE_LABELS, useGraphFilters, type KnowledgePointType } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
@@ -81,6 +82,22 @@ const relations = useRelationEditor({
 // 画布取连边编辑器的派生图：含保存中的临时边与成环冲突标色
 const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value))
 const { selected, visible, summary, isDefault, selectedHidden } = filters
+
+// 节点类型图例：计数取整张草稿图；点击与工具栏“筛选”里的知识点类型是同一份状态
+const allTypes = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
+const typeCounts = computed(() => {
+  const counts = Object.fromEntries(allTypes.map((t) => [t, 0])) as Record<KnowledgePointType, number>
+  for (const node of relations.canvasData.value?.nodes ?? []) counts[node.data.type] += 1
+  return counts
+})
+const hiddenTypes = computed(() => allTypes.filter((t) => !filters.state.value.nodeTypes.includes(t)))
+function toggleType(type: KnowledgePointType): void {
+  const current = filters.state.value.nodeTypes
+  filters.state.value = { ...filters.state.value, nodeTypes: allTypes.filter((t) => (t === type) !== current.includes(t)) }
+}
+function restoreTypes(): void {
+  filters.state.value = { ...filters.state.value, nodeTypes: [...allTypes] }
+}
 
 type PanelTab = 'detail' | 'edit' | 'relations' | 'create'
 const tab = ref<PanelTab>('detail')
@@ -352,7 +369,8 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
           <div class="teacher-graph__canvas-bar">
-            <p class="teacher-graph__hint">
+            <NodeTypeLegend :counts="typeCounts" :hidden="hiddenTypes" @toggle="toggleType" @restore="restoreTypes" />
+            <p class="teacher-graph__hint" :title="tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。'">
               {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
             </p>
             <label class="teacher-graph__picker">
@@ -364,7 +382,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="visible" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <GraphCanvas ref="canvas" :graph="visible" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div

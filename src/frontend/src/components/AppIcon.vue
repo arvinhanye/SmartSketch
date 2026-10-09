@@ -18,6 +18,7 @@ const PATHS: Record<string, string> = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  readable: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8.5 9h7M12 9v6.5"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.8" cy="6" r=".6"/><circle cx="4.8" cy="12" r=".6"/><circle cx="4.8" cy="18" r=".6"/>',
   back: '<path d="m14.5 6-6 6 6 6"/>',
   chevron: '<path d="m9.5 6 6 6-6 6"/>',

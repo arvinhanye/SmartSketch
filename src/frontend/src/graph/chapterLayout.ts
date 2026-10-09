@@ -166,8 +166,8 @@ export const radialEngine: DagreEngine = async (ids, edges) => {
   // 半径：每圈至少比上一圈远一个间距，并且该圈上相邻节点的弧长不小于最小间距
   const SPACING = 66
   const RING_GAP = 96
-  // 教师画布是宽画布（约 1.8:1）：横向拉伸成椭圆，适应视口时缩放更大；只拉伸 x，节点间距不会变小
-  const STRETCH_X = 1.5
+  // 教师画布是宽画布（约 1.8:1）：横向拉伸成椭圆（宽画布约 1.9:1），适应视口时缩放更大；只拉伸 x，节点间距不会变小
+  const STRETCH_X = 1.9
   const rings = new Map<number, string[]>()
   for (const id of order) rings.set(ring(id), [...(rings.get(ring(id)) ?? []), id])
   const radius = new Map<number, number>()

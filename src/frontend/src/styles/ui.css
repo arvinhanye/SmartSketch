@@ -588,3 +588,9 @@
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__hint { padding: 0; flex: 1 1 220px; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { display: flex; align-items: center; gap: 8px; padding: 0; max-width: none; flex: 0 1 340px; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker select { flex: 1; min-width: 0; min-height: 32px; padding: 4px 8px; }
+
+/* 画布上方一行：节点类型图例 | 提示（放不下时省略号） | 键盘选择器 */
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar { flex-wrap: nowrap; gap: 10px 14px; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .node-legend { flex: none; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__hint { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { flex: 0 0 260px; }
