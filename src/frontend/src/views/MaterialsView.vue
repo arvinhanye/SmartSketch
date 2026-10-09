@@ -2,7 +2,7 @@
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
 import { MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from '../api/materials'
@@ -56,7 +56,31 @@ const {
 
 function onFileChange(event: Event): void {
   const input = event.target as HTMLInputElement
+  dropNotice.value = ''
   selectFile(input.files?.[0] ?? null)
+}
+
+// 拖放选择（UI-BATCH2-01）：与点击选择走同一条 selectFile（同样的格式与大小校验）；上传中忽略
+const dragging = ref(false)
+const dropNotice = ref('')
+function onDragOver(event: DragEvent): void {
+  if (uploading.value) return
+  dragging.value = true
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+}
+function onDragLeave(event: DragEvent): void {
+  const zone = event.currentTarget as HTMLElement
+  if (!zone.contains(event.relatedTarget as Node | null)) dragging.value = false
+}
+function onDrop(event: DragEvent): void {
+  dragging.value = false
+  dropNotice.value = ''
+  if (uploading.value) return
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  const first = files[0]
+  if (first === undefined) return
+  selectFile(first)
+  if (files.length > 1) dropNotice.value = `一次只能上传一个文件，已选择第一个「${first.name}」。`
 }
 </script>
 
@@ -89,12 +113,21 @@ function onFileChange(event: Event): void {
           <legend>上传课程资料</legend>
           <div class="materials-upload-layout">
           <div class="materials-upload-main">
-          <div class="materials-file-zone" :class="{'has-file': selectedName, 'has-error': fileInvalid}">
+          <div
+            class="materials-file-zone"
+            :class="{'has-file': selectedName, 'has-error': fileInvalid, 'is-dragging': dragging}"
+            data-test="material-drop-zone"
+            @dragenter.prevent="onDragOver"
+            @dragover.prevent="onDragOver"
+            @dragleave="onDragLeave"
+            @drop.prevent="onDrop"
+          >
           <span class="materials-upload-icon"><AppIcon name="upload" :size="28" /></span>
-          <label for="material-file">{{ selectedName ? '已选择资料文件' : '选择资料文件' }}</label>
-          <p class="materials-file-description">{{ selectedName || '讲义、教材或课堂笔记，让知识图谱从资料开始。' }}</p>
+          <p class="materials-file-description">{{ selectedName || '把文件拖到这里，或点下面的按钮选择。讲义、教材或课堂笔记都可以。' }}</p>
+          <label for="material-file" class="ui-btn materials-pick">{{ selectedName ? '重新选择资料文件' : '选择资料文件' }}</label>
           <input
             id="material-file"
+            class="materials-file-input"
             :key="selectionVersion"
             data-test="material-file-input"
             name="file"
@@ -115,6 +148,7 @@ function onFileChange(event: Event): void {
             <p v-if="duplicateOf" data-test="upload-duplicate-hint" role="status" class="hint">
               已上传同一章的另一种格式「{{ duplicateOf }}」。两种格式都处理会抽出大量同名知识点（跨资料去重不在本期），建议只保留一种格式；仍可继续上传。
             </p>
+            <p v-if="dropNotice" data-test="upload-drop-notice" role="status" class="hint">{{ dropNotice }}</p>
             <p v-if="uploadSuccess" data-test="upload-success" role="status">
               已上传「{{ uploadSuccess }}」，正在处理。
             </p>

@@ -22,6 +22,18 @@ async function mountView(options: { role?: 'teacher'|'student'; path?: string; o
  return {wrapper,router}
 }
 describe('课程页面的行列表与创建面板',()=>{
+ // UI-BATCH2-01：一个页面只有一个主按钮——课程列表页的主操作是“新建课程”；课程概览页的主操作是“下一步”
+ it('课程列表页“新建课程”是主按钮；课程概览页它降为次按钮，主按钮只剩“下一步”',async()=>{
+  const list=await mountView()
+  expect(list.wrapper.get('[data-test="course-create-open"]').classes()).toContain('ui-btn--primary')
+  list.wrapper.unmount()
+  const overview=await mountView({path:'/courses/c1'})
+  const create=overview.wrapper.get('[data-test="course-create-open"]')
+  expect(create.classes()).toContain('ui-btn');expect(create.classes()).not.toContain('ui-btn--primary')
+  const primaries=overview.wrapper.findAll('.ui-btn--primary')
+  expect(primaries).toHaveLength(1)
+  expect(primaries[0]!.attributes('data-test')).toBe('course-next-action')
+ })
  it('教师展开与取消面板，并将焦点还给开关',async()=>{
   const {wrapper}=await mountView()
   expect(wrapper.find('[data-test="course-create"]').exists()).toBe(false)

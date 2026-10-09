@@ -2,7 +2,7 @@
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
-import { computed, inject } from 'vue'
+import { computed, inject, nextTick, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { MEMBERS_API_KEY } from '../api/members'
 import { useMembers } from '../composables/useMembers'
@@ -35,6 +35,9 @@ const {
   removing,
   removeError,
   removeNotice,
+  confirmingId,
+  requestRemove,
+  cancelRemove,
   removeMember,
 } = useMembers({
   api,
@@ -47,6 +50,25 @@ const {
     )
   },
 })
+
+// 焦点：展开确认后落在“不移除”（默认安全）；收起后回到该行的“移除”；移除成功后落在结果提示上
+function focusIn(selector: string): void {
+  void nextTick(() => document.querySelector<HTMLElement>(selector)?.focus())
+}
+function askRemove(row: (typeof members.value)[number]): void {
+  requestRemove(row)
+  focusIn(`[data-remove-cancel="${row.userId}"]`)
+}
+function dismissRemove(userId: string): void {
+  cancelRemove()
+  focusIn(`[data-remove-for="${userId}"]`)
+}
+watch(
+  () => removeNotice.value,
+  (text) => {
+    if (text !== null) focusIn('[data-test="member-remove-status"]')
+  },
+)
 </script>
 
 <template>
@@ -91,7 +113,7 @@ const {
       <template v-else>
         <p v-if="isEmpty" class="members-empty" data-test="members-empty"><AppIcon name="members" :size="28" />暂无学生成员。可在上方按用户名添加学生。</p>
         <p v-if="removeError" data-test="member-remove-error" role="alert">{{ removeError }}</p>
-        <p v-if="removeNotice" data-test="member-remove-status" role="status">{{ removeNotice }}</p>
+        <p v-if="removeNotice" data-test="member-remove-status" role="status" tabindex="-1">{{ removeNotice }}</p>
         <table class="ui-table ui-member-table" v-if="members.length > 0" data-test="members-table">
           <caption>
             本课程成员（{{ members.length }} 人）
@@ -110,17 +132,49 @@ const {
               <td data-label="课程内身份"><span class="members-role" :class="{ 'is-teacher': row.role === 'teacher' }">{{ row.roleLabel }}</span></td>
               <td data-label="加入时间"><time :datetime="row.joinedAt">{{ row.joinedLabel }}</time></td>
               <td data-label="操作">
-                <button
-                  v-if="row.removable"
-                  type="button"
-                  data-test="member-remove"
-                  :aria-label="`移除学生 ${row.username}`"
-                  :disabled="removing.has(row.userId)"
-                  :aria-busy="removing.has(row.userId)"
-                  @click="removeMember(row)"
-                >
-                  {{ removing.has(row.userId) ? '移除中…' : '移除' }}
-                </button>
+                <template v-if="row.removable">
+                  <div
+                    v-if="confirmingId === row.userId || removing.has(row.userId)"
+                    class="members-confirm"
+                    role="group"
+                    :aria-label="`确认移除学生 ${row.username}`"
+                    @keydown.esc="dismissRemove(row.userId)"
+                  >
+                    <p>移出课程后，该学生将无法访问本课程；之后可以按用户名重新添加。</p>
+                    <div class="members-confirm__actions">
+                      <button
+                        type="button"
+                        class="members-confirm__danger"
+                        data-test="member-remove-confirm"
+                        :aria-label="`确认移除学生 ${row.username}`"
+                        :disabled="removing.has(row.userId)"
+                        :aria-busy="removing.has(row.userId)"
+                        @click="removeMember(row)"
+                      >
+                        {{ removing.has(row.userId) ? '移除中…' : '确认移除' }}
+                      </button>
+                      <button
+                        type="button"
+                        data-test="member-remove-cancel"
+                        :data-remove-cancel="row.userId"
+                        :disabled="removing.has(row.userId)"
+                        @click="dismissRemove(row.userId)"
+                      >
+                        不移除
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    data-test="member-remove"
+                    :data-remove-for="row.userId"
+                    :aria-label="`移除学生 ${row.username}`"
+                    @click="askRemove(row)"
+                  >
+                    移除
+                  </button>
+                </template>
                 <span v-else class="members-protected">由管理员维护</span>
               </td>
             </tr>

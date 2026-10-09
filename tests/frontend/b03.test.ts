@@ -76,7 +76,7 @@ describe('B03 路由壳与角色入口', () => {
     expect(alert.text()).toContain('教师')
   })
 
-  it.each(['/', '/teacher', '/student', '/no-such-page'])(
+  it.each(['/teacher', '/student', '/no-such-page'])(
     '未登录访问 %s：显示未登录提示，不渲染任何角色首页',
     async (path) => {
       const { router, wrapper } = await visit(path, null)
@@ -86,6 +86,17 @@ describe('B03 路由壳与角色入口', () => {
       expect(headings(wrapper)).not.toContain(STUDENT_TITLE)
     },
   )
+
+  // UI-BATCH2-01：直接打开首页（登录页）不是“被拦下”，不显示未登录提示；提示只给被重定向来的访问
+  it('未登录直接打开 /：停在登录页，不显示未登录提示，也不渲染任何角色首页', async () => {
+    const { router, wrapper } = await visit('/', null)
+    expect(router.currentRoute.value.path).toBe('/')
+    expect(router.currentRoute.value.query.notice).toBeUndefined()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('form').exists()).toBe(true)
+    expect(headings(wrapper)).not.toContain(TEACHER_TITLE)
+    expect(headings(wrapper)).not.toContain(STUDENT_TITLE)
+  })
 
   it('未知路径回到 / 再按账号类型进入首页', async () => {
     const { router, wrapper } = await visit('/no-such-page', 'student')

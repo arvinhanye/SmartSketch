@@ -652,6 +652,18 @@ describe('有未保存修改时切换节点先确认', () => {
     })
   })
 
+  it('有未保存修改时关闭标签页或刷新由浏览器拦下提示；放弃修改后不再拦（既有行为的回归保护）', async () => {
+    const { wrapper } = await dirtyOn('k1')
+    const dirtyEvent = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(dirtyEvent)
+    expect(dirtyEvent.defaultPrevented).toBe(true)
+    await wrapper.find('[data-test="ne-discard"]').trigger('click')
+    await flushPromises()
+    const cleanEvent = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(cleanEvent)
+    expect(cleanEvent.defaultPrevented).toBe(false)
+  })
+
   it('有修改时离开页面先确认，取消则留下', async () => {
     const { wrapper, router } = await dirtyOn('k1')
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)

@@ -148,7 +148,7 @@ const entryLinks = computed(() => {
 <template>
  <PageSheet labelledby="courses-title" class="courses">
   <PageHeader id="courses-title" :title="courseId ? '课程概览' : '我的课程'" :description="courseId ? undefined : canCreate ? '管理课程资料、图谱与成员。' : '从课程图谱开始，查看知识点与学习路径。'">
-   <template v-if="canCreate" #actions><button ref="createButton" type="button" class="ui-btn ui-btn--primary" data-test="course-create-open" :aria-expanded="createOpen" aria-controls="course-create-panel" :disabled="creating" @click="createOpen ? closeCreate() : createOpen = true"><AppIcon name="plus" :size="16" />新建课程</button></template>
+   <template v-if="canCreate" #actions><button ref="createButton" type="button" class="ui-btn" :class="{ 'ui-btn--primary': !courseId }" data-test="course-create-open" :aria-expanded="createOpen" aria-controls="course-create-panel" :disabled="creating" @click="createOpen ? closeCreate() : createOpen = true"><AppIcon name="plus" :size="16" />新建课程</button></template>
   </PageHeader>
   <p v-if="courseForbidden" data-test="course-forbidden" class="ui-notice ui-notice--danger" role="alert">你无权访问该课程（可能已被移出课程），已返回课程列表。</p>
   <p v-if="createdName" data-test="create-success" class="ui-notice ui-notice--success" role="status">已创建课程「{{ createdName }}」。</p>
