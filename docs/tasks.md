@@ -1985,3 +1985,15 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 - PR 发布结果：[修复草稿 PR #324](https://github.com/arvinhanye/SmartSketch/pull/324) 已创建并附加当前任务，`codex/r1-persist-deadline` → `main`，OPEN/DRAFT；GitHub 实测 mergeable=CONFLICTING，与本地两文档冲突预检一致。创建后远程 CI 四项启动中，不记远程通过。状态更新与修复提交已推送；未合并、部署或技术冻结。待主线整合、ADR 编号协调、合并结果门禁及审阅后转 ready；本任务交付已完成。
 
 - Task 7 最终收尾：`task-done` 实际 exit 0，范围 `2ea6319..7d266ae`；再次核对最终整次 exit 0、四份完整 XML、16 源码哈希，最终 basic 和 diff-check 全通过。七任务 complete；草稿 PR 交付不替代后续主线整合验收。
+
+## 2026-10-09 Codex 认领：PR #324 冲突与 CI 失败修复
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PR324-REPAIR | IN_PROGRESS | Codex | 用户要求检查并修复 #324 冲突及失败；读取原始 CI 日志，整合最新 main，保留双方文档/代码与历史证据，协调 worker ADR 编号，复现失败后最小修复，完整门禁及远程 CI 验证后更新现有 PR。 |
+
+- 输入：PR head `350d7c6`、最新抓取 main `5398a1f0`、失败 CI run `37878331607`；GitHub 原 head scaffold/frontend/backend SUCCESS，Integration and E2E FAILURE。原修复分支限定风险 CLOSED 证据保留，不外推为整合结果通过。
+- 输出：原 #324 分支上的可追溯 merge/修复提交、冲突/失败原因与验证交接；不新建替代 PR、不强推、不合并 PR、不部署或冻结。
+- 依赖：GitHub 原始日志，锁定 Python/前端/浏览器依赖，自有临时 Neo4j/SQLite；不读本机 .env/业务数据，不操作他人服务。
+- 风险：两份共享文档同位置追加造成文本冲突，ADR-091/092 撞号；新主线 UI/模型/迁移行为必须保留；旧分支通过不等于合并结果通过。未知 CI 失败先定位，不放宽断言或网络截止、不新增 skip。
+- 验证：原失败选择 RED→GREEN、worker 网络/恢复回归、ADR 引用与冲突标记检查、`./scripts/verify.sh integration`、最新 PR head 的远程 CI、`git diff --check`。回退整合前代码可恢复 `350d7c6` 的已验分支但会重新存在主线冲突；无本轮新增迁移或依赖升级。
