@@ -60,19 +60,21 @@ func secureACL(p string) error {
 	if ok == 0 || control&0x1000 == 0 {
 		return fail("PERMISSION", "acl-audit")
 	}
-	var actualACL, expectedACL uintptr
+	// The DACL pointers come back from Windows (into buf, and into the LocalAlloc'd descriptor): receive them as
+	// unsafe.Pointer so no uintptr is converted back, which go vet flags as possible misuse.
+	var actualACL, expectedACL unsafe.Pointer
 	var present, defaulted int32
 	ok, _, _ = getDACL.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&present)), uintptr(unsafe.Pointer(&actualACL)), uintptr(unsafe.Pointer(&defaulted)))
-	if ok == 0 || present == 0 || actualACL == 0 {
+	if ok == 0 || present == 0 || actualACL == nil {
 		return fail("PERMISSION", "acl-audit")
 	}
 	ok, _, _ = getDACL.Call(sd, uintptr(unsafe.Pointer(&present)), uintptr(unsafe.Pointer(&expectedACL)), uintptr(unsafe.Pointer(&defaulted)))
-	if ok == 0 || expectedACL == 0 {
+	if ok == 0 || expectedACL == nil {
 		return fail("PERMISSION", "acl-audit")
 	}
-	actualSize := *(*uint16)(unsafe.Pointer(actualACL + 2))
-	expectedSize := *(*uint16)(unsafe.Pointer(expectedACL + 2))
-	if actualSize != expectedSize || !bytes.Equal(unsafe.Slice((*byte)(unsafe.Pointer(actualACL)), int(actualSize)), unsafe.Slice((*byte)(unsafe.Pointer(expectedACL)), int(expectedSize))) {
+	actualSize := *(*uint16)(unsafe.Add(actualACL, 2))
+	expectedSize := *(*uint16)(unsafe.Add(expectedACL, 2))
+	if actualSize != expectedSize || !bytes.Equal(unsafe.Slice((*byte)(actualACL), int(actualSize)), unsafe.Slice((*byte)(expectedACL), int(expectedSize))) {
 		return fail("PERMISSION", "acl-audit")
 	}
 	return nil

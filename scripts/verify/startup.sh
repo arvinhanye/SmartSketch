@@ -8,4 +8,6 @@ export GOTOOLCHAIN=local
 # macOS /var is an OS alias; security tests need a canonical temporary path.
 if [[ $(uname -s) == Darwin ]]; then export TMPDIR=/private/tmp; fi
 (cd launcher && go test ./... -count=1 && go vet ./...)
+# The Windows-only ACL code is not compiled on other hosts, so vet it explicitly: the Windows CI runner vets it natively.
+(cd launcher && GOOS=windows GOARCH=amd64 go vet ./...)
 echo 'Startup unit and vet gate passed (not platform/release acceptance).'
