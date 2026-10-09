@@ -1,5 +1,7 @@
 # 任务看板
 
+> **R1 最新状态（2026-10-09）**：PR #324 已整合 main 并消除文档/ADR 冲突；代码 head `36b421e` 的 push/pull_request 两轮 8 项 CI 全部 SUCCESS，含真实网络/恢复和 E2E。worker 围栏限定风险 **CLOSED**；用户已授权「CI通过就合并PR」，按最终 head 全绿门禁合入 main，最终合并结局以 PR 状态/提交为准。不部署或技术冻结；全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。验收见末节及 `docs/handoffs/codex-pr324-conflict-ci-repair.md`。
+
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
 
 
@@ -2051,3 +2053,120 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - 既有测试的调整（行为随设计变化，业务断言未放宽）：`h12`（移除先确认，五条移除用例改为经 `removeRow` 辅助函数：点“移除”再点“确认移除”，另增 4 条确认用例）；`b03`（直接打开 `/` 不再带未登录提示，另增 1 条；受保护页与未知路径仍显示提示）。
 - 验收证据（2026-10-09，详见 `docs/handoffs/claude-ui-batch2-01.md`）：新增/调整测试先 RED 后 GREEN；`type-check` exit 0；前端 73 文件 / 1279 条通过；`build` exit 0；`scripts/verify/frontend.sh full` exit 0；`./scripts/verify.sh`（basic）exit 0；E2E 教师 + 学生 2 passed、个人模式 4 passed。浏览器（一次性演示栈）：直接打开登录页无提示、受保护页重定向仍有提示；课程概览主按钮只剩“维护课程图谱”；成员确认展开后焦点在“不移除”、Esc 收起且焦点回到“移除”、行数不变、390 宽无溢出；教师详情标题无焦点框、来源行整块左对齐；资料框拖到上方高亮、放下后显示文件名且按钮变“重新选择资料文件”、Tab 能到隐藏输入并显示按钮焦点环。**未运行** `verify.sh full/integration` 后端与集成部分（后端未改）；**未验证** 真实浏览器的原生拖放手势（用脚本派发拖放事件）、读屏、`prefers-reduced-motion`、用户视觉签收。
 - 回滚：各项独立，`git revert` 对应差异；无数据与接口变化。
+
+## 2026-10-08 Codex 认领：R1 worker 旧租约图提交防护
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PERSIST-FENCE | VERIFIED_LOCAL（核心及截止补充已验证；限定风险 CLOSED） | Codex | 仅修复旧 worker 在租约丢失后提交 Neo4j 的高严重程度发现；双租约守卫、显式图事务、SQLite 提交围栏与同连接 T6；旧 worker 零提交、异常恢复和锁释放回归。其余四项中严重程度发现不纳入本任务。 |
+
+- 输入：`bdb89c4` 基线的只读审查与真实 SQLite/图调度替身复现；用户确认「双租约守卫＋显式图事务＋提交围栏」方案。
+- 当前输出：双租约守卫、显式图事务、SQLite 最终围栏、同连接 T6、完成结果读回及定向/真实 Neo4j 回归；实施计划 `docs/superpowers/plans/2026-10-08-worker-persist-fence.md`，实施交接 `docs/handoffs/codex-r1-persist-fence.md`。用户在书面规格交付后明确要求「实施修改」，本会话顺序执行。无公共契约、迁移或项目依赖变化；测试依赖仅在 `/private/tmp/smartsketch-r1-testdeps`。
+- 已实施范围：worker 持久化与心跳、任务租约/课程锁仓储、Neo4j 显式事务入口、新增定向回归；保留其他调用者的托管事务入口和公共 API。
+- 依赖：现有单机 worker、SQLite WAL 和 Neo4j 5.28.2 同步驱动；复用 §8.4 的贡献可见性与接管重建，不引入跨库原子提交。
+- 风险/需评审：SQLite 提交围栏是全库单写者；Neo4j 提交应答阻塞会延长持锁时间，服务端事务 timeout 不等于客户端提交应答截止。书面规格区分一致性保证与可用性限制；实现阶段必须用故障注入证明退出/恢复行为，未解决的无界等待不作为已闭环发布。
+- 验证命令：`git diff --check`、`PATH="/opt/anaconda3/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS="-p no:cacheprovider" ./scripts/verify.sh`（basic）；实现时再执行规格中的 worker 回归和独立 Neo4j 集成。
+- 本轮设计验收证据：上述 basic 门禁 exit 0，契约回归 237 passed、门禁负向测试 25 项通过；文档链接解析及 TODO/TBD 扫描通过，`git diff --check` exit 0。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-design-verify.log`。仅验证文档/既有基础门禁，不是 R1 修复验收；新 worker 回归与真实 Neo4j 故障验收尚未运行。
+- 实施验收证据：最终定向 214 passed（F02/C09/D11/清理/计时及新增回归）、真实 Neo4j F13/R1 34 passed，两个 XML 零失败/错误/skip；旧 worker 在相同真实回归遗留节点而失败。独立审查后新增提交前/后截止测试，故障变异各失败、正常版本通过。最终 basic exit 0，`git diff --check` 通过。日志与 XML 在 `/private/tmp/smartsketch-ocr-46o1tbcy/`，详见实施交接。
+- 全量限制：backend full 3945 passed/27 skip/1 failed/6 errors，七项失败均是工具子进程丢失临时依赖；独立临时 venv 复验该模块与新回归 45 passed，但完整 full 未重跑。frontend full 因缺 node_modules 失败，完整 integration/E2E 未跑，不宣称全量门禁通过。实际应用环境未改，临时 Neo4j 已移除。
+- 下一步：保留本地修改/提交；网络级总截止及真实断连时资源释放/全库写阻塞上限仍需准入验证，暂不发布、不推送、不创建 PR、不操作用户业务库。独立审查未发现新确定性运行时缺陷，Important 提交前/后截止测试缺口已补；Minor 两个实际心跳调用者的延迟/连续失败故障测试暂缓。
+
+## 2026-10-08 Codex 认领：R1 提交传输截止补充设计
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PERSIST-DEADLINE-DESIGN | DONE（已批准、实施及完整验证） | Codex | 补充书面规格及七任务计划已确认；七任务已完成；最终代码整次门禁 exit 0，限定风险 CLOSED。 |
+
+- 输入：本地 R1 修复 `e111315`、现有设计 §7 与实施交接；用户明确要求「按首选方向编写补充设计」。
+- 输出：`docs/superpowers/specs/2026-10-08-worker-persist-deadline-design.md`、架构/任务协议/决策同步及 Codex 设计交接。
+- 依赖：现有 Neo4j 5.28.2 的 AsyncSession 公开取消能力、Python 3.11+ asyncio、同步 worker 与 SQLite 同线程围栏；不升级项目依赖、不操作共享库。
+- 风险：取消仅证明连接退出，不证明服务端图未提交；截止预算不能因心跳或分步等待重置；退出清理与重建路径不能再次引入无界等待；全库写者仍可能遇到 busy timeout。
+- 验证：文档链接/状态/预算自审、`git diff --check`、`PATH="/opt/anaconda3/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS="-p no:cacheprovider" ./scripts/verify.sh`。产品/网络故障测试留至获批实施；发布准入仍 OPEN。
+- 审批边界：本轮确认仅批准写补充设计；书面规格获批后才编写实施计划，计划与执行方式获批后实施。
+- 设计要点（详细取值待书面批准）：COMMIT 默认 2 s/上限 3 s；资源清理默认 1 s/上限 5 s，等待型清理置于围栏外；取消不证明图未提交。恢复清理经 DraftWriteGuard 幂等撤销后才清标记，拟修订 ADR-072 的此入口无贡献快路径。默认围栏 ≤3 s 是待真实故障验证的阈值，不是当前保证。
+- 设计验收：8 个文档文件、17 条本地链接解析通过；新规格无未填占位、代码围栏配对、状态/预算/范围核对通过；Settings 与 `.env.example` 未加入候选配置。`git diff --check` exit 0；本轮 basic 门禁 exit 0，契约测试 237 passed、门禁负向测试 25 项通过。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-design-verify.log`，设计校验/哈希 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-design-check.json`。仅验证设计文档与既有基础门禁；没有新产品/网络故障验收或全量结果，不关闭风险。
+
+## 2026-10-08 Codex 认领：R1 截止补充实施计划
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PERSIST-DEADLINE | DONE（限定可用性风险 CLOSED） | Codex | 用户已确认书面计划并要求开始实施；Codex 顺序测试先行实现；全部网络、恢复和最终整次门禁已通过。 |
+
+- 输入：`e41e951` 书面规格与用户「确认实施」；输出：`docs/superpowers/plans/2026-10-08-worker-persist-deadline.md` 和 Codex 计划交接。
+- 依赖：复用当前受管 worktree、既有临时 Python 3.11 测试 venv；未来实测需一次性 Neo4j、回环 TCP 代理与项目声明的前端/E2E 依赖。
+- 风险：公开取消与 Runner 清理仍需真网络证据；取消后服务器迟到结局及 failed 清理排序；环境不足不能用登记 skip 代替准入。
+- 本轮验证：计划/规格覆盖、接口与路径自审、`git diff --check`、basic 门禁；产品测试及真实故障只在获批实施后运行。
+- 审批/执行方式：用户确认时书面计划尚未存在，只确认已交付规格与实施意图；计划现已写入待审阅，不能把此前确认外推为已审阅计划。保留先前本会话顺序执行方式，等待书面计划确认；不推送、不创建 PR、不合并、不冻结。
+- 计划验收：规格 §1～§9 映射七任务；五项 Review Focus 各有断言；接口/具体文件/类型核对，增加只记录 BEGIN 完成时刻的可选 on_acquired 回调以精确计量围栏。9 个文档文件、24 条本地链接通过，35 项实施步骤未勾选，产品树/运行配置未变。`git diff --check` exit 0，本轮 basic exit 0，契约 237 passed、门禁负向测试 25 项通过。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-plan-verify.log`，校验/哈希 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-plan-check.json`；仅计划与既有门禁验证，无产品/网络新验收，风险 OPEN。
+
+- 2026-10-08 最新审批：用户「确认计划，开始实施」；书面计划与当前会话顺序执行均获确认。实施输入/依赖/风险/命令沿用已批准计划，不再等待重复确认。
+
+- R1-PERSIST-DEADLINE 最新实施进度（2026-10-08）：Tasks 1～5 已测试并本地提交；Task 6 真实故障矩阵及 Task 7 完整门禁正在验证。最终审查两项 Important 已复现 RED（3 失败）并修复 GREEN（3 通过）：DNS 启动错误脱敏/重试分类、T6 结局读回 attempt 校验。没有发布/PR 授权；准入 OPEN，完整计数和结论待整次命令结束记录。
+
+## 2026-10-08 Codex 认领：R1 后续验证失败修复
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-DEADLINE-VERIFY-REPAIR | DONE | Codex | 用户要求修复 NOOP 断连证据、F13 持久化/恢复和 E2E 解释器配置；先定位并测试先行，修复后重跑原阈值的真实矩阵及最终版本整次门禁。 |
+
+- 输入：提交 `2ea6319`、本任务现有未提交测试/文档，以及上轮失败日志。仅接续自己的 Task 6/7 文件；不覆盖其他成员改动。
+- 输出：最小修复、复现测试、真实验收日志、实施交接；无推送/PR/合并/发布授权。
+- 依赖与风险：临时 Python/锁定 npm/Playwright、自建回环 Neo4j；FIN 与 RST 必须区分，探针错误不自动等于产品回归；F13 图库就绪与 COMMIT 时延需独立实测，禁止放宽截止/跳过失败。
+- 验证：proxy/K11 工具回归、独立自有图库 F13/R1 和 65 项网络矩阵、283 项定向选择、`./scripts/verify.sh` 与最终版本 `./scripts/verify.sh integration`（E2E 使用已验证临时解释器）。
+- 上轮最终结局：整次 integration FAILED，backend 3 failed/3997 passed/27 登记 skip，integration 5 failed/457 passed/4 登记 skip；其中 backend 三项是审查修复的旧加载代码结果，当前定向已 GREEN，仍须最终版本整次复验。之前 ledger 关于 backend 导入时点的判断撤销，堆栈仍指向旧启动分支，不能把该轮当最终代码门禁。
+- 上轮 F13/最终证明：4 failed/82 passed/13 errors；增强迟到实验因自建图库就绪失败有 2 errors；未关闭准入。保留原日志，后续修复不覆盖失败证据。原 Task 5 fixture 已不存在（Docker inspect 已核实），新实验新建带随机所有权标签的临时图库，不猜测或复用旧端口。
+
+- 本轮定位证据：SO_LINGER 的真实 TCP RST 复现代理错误分支只记录异常却没有断连事件；集成脚本对隐式 PYTHON 未传 E2E_PYTHON（2 RED/显式覆盖例通过）→修复后工具回归 25 passed。新单实例图库就绪 23.358s，真实 async 连接 0.038s、健康 COMMIT 0.007s；原 F13/R1 34 项再次通过。演示/K09 失败的 fixture 仍只提供同步仓储，缺少 worker 专用工厂；补齐工厂，保留业务断言及其他同步入口，不增加产品回退。
+
+- R1-DEADLINE-VERIFY-REPAIR 本轮验收进展：真实 38 项 F13/R1/demo/K09 与 65 项网络矩阵均零 skip 全通过；304 项完整定向通过。默认/上限围栏最大 2.010052s/3.003443s（阈值 3/4s），退出预算 1/5s 最大 1.042527s/5.041602s；迟到提交 takeover 3/5、failed_cleanup 5/5 次观察并收敛。当前副本变异三项均 RED、正常版本 GREEN；整次最终 integration 在运行，准入仍 OPEN。
+
+- Task 6 结束验证已记录完成：提交 `b89844b`，顺序自建图库的 F13/R1 34 passed + 网络 65 passed，零 skip；范围内源 SHA 与整次门禁启动 manifest 相同。E2E 脚本修复提交 `b7e84a1`。本轮整次门禁首轮 backend 4003 passed/27 登记 skip、frontend 934/type-check/build 通过，但默认 17689 端口占用致整次 exit 1；占用者保持原状，第二轮使用既有端口覆盖机制从头执行，不拼接部分结果。
+
+- 第二轮实际整次 exit 1：backend 4003/27 登记 skip、frontend 934、integration 462/4 登记 skip、backend-live 44、演示 E2E 2 全通过；个人 E2E 3 passed/1 failed。失败在 `personal.spec.ts:235` 要求掌握后路径文字必变。只读 trace 已证推荐首项从 `kp_63b0…` 切换至同名 `kp_80b7…`，掌握接口 200；PDF/MD 独立抽取允许同名异 ID。下一修复只调整该 E2E 为「文字与解锁 ID 联合身份」变化/恢复，保留掌握消失、刷新持久化、学生隔离与原超时；不修改推荐/图谱产品规则。先单独复验个人 E2E，再启动最终整次门禁。
+
+
+### R1 最终验收与 PR 发布（2026-10-08）
+
+- 上文设计/实施轮的 OPEN、暂不发布及失败计数是历史阶段证据；本节是 R1 当前状态，不删除失败日志。用户最新要求「检查门禁状态，若通过则开PR，更新项目状态」，授权推送本修复分支及创建 PR，不授权合并、部署或技术冻结。
+- 最终代码 `f9c54553`（含 `2ea6319`、`b89844b`、`b7e84a1`）整次 `./scripts/verify.sh integration` 实际 **exit 0**：backend+tooling **4003 passed / 27 既有登记 skip**；frontend **934 passed**（38 文件）+type-check/build；integration **462 passed / 4 既有登记 skip**；backend-live **44 passed**；演示 E2E **2 passed**、个人假供应商 E2E **4 passed**。零 failure/error，无新增 skip、放宽超时、删用例或依赖升级。门禁执行前后 16 个相关代码/测试/脚本 SHA256 一致。
+- 定向 304 项、F13/R1/demo/K09 38 项、真实网络 65 项均通过；Task 6 结束原选择 34+65 共 99 项零 skip。新旧版本及移除截止/取消/守卫三个变异均提供 RED 证据。真实 NOOP FIN/RST 判定、资源退出、迟到结局的接管和 failed 清理均验证。
+- 最终整次网络 run `7de6155b7906…`：默认围栏最大 2.001980s、独立写者 2.115376s（≤3s）；上限围栏 3.001610s、写者 3.029492s（≤4s）；退出预算 1/5s 实测最大 1.046460/5.151670s（≤预算+1s）；迟到提交 takeover/failed_cleanup 各 4/5 次实际发生并收敛。未把 TCP 取消误作服务端回滚证明。
+- **风险状态：CLOSED，仅限 worker 网络 COMMIT 无界占用 SQLite 最终围栏**。DNS 执行器退出、一般进程停机、其他图入口、宿主暂停/存储异常仍在保证之外；原四项中严重程度发现及两个既有心跳故障测试未纳入本轮。全项目 `stage_c_status OPEN`、`technical_freeze NOT_PERFORMED` 保持原状态。
+- 原始日志/XML/manifest/292 行逐次计时及机读校验已导出到 `/private/tmp/smartsketch-r1-deadline-evidence-20261008/`；整次日志 `repair-full-final.log`、机读结果 `verification-summary.json`、哈希清单 `evidence-hashes.json`；交接 `docs/handoffs/codex-r1-persist-deadline.md`。
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PUBLISH-PR | DONE_DRAFT | Codex | 输入最终门禁、源码哈希和用户 PR 授权；核对 origin/main 与工作区基线，更新状态和交接、运行最终 basic、推送 codex/ 修复分支、创建并附加 PR；保留工作区及证据，不合并/部署/冻结。 |
+
+- PR 主线预检：最新 `origin/main=2e6acef7` 已合入 #321～#323；本修复实际分叉 `bdb89c46`。只读 Git merge-tree 确认 `docs/tasks.md`、`docs/decisions.md` 内容冲突，代码/个人 E2E 可自动合并，但未经主线整合验收。主线已占用 ADR-091/092（图谱工作台/教师向量），与本分支的历史 worker ADR 编号撞号，整合时须保留双方决定并重编号/同步引用。故创建 **草稿 PR**：本轮风险在受测修复分支上 CLOSED，主线尚未部署本修复；主线整合与远程 CI/审阅保持待完成，不将 branch 门禁外推为 merge-result 门禁。
+
+- PR 发布结果：[修复草稿 PR #324](https://github.com/arvinhanye/SmartSketch/pull/324) 已创建并附加当前任务，`codex/r1-persist-deadline` → `main`，OPEN/DRAFT；GitHub 实测 mergeable=CONFLICTING，与本地两文档冲突预检一致。创建后远程 CI 四项启动中，不记远程通过。状态更新与修复提交已推送；未合并、部署或技术冻结。待主线整合、ADR 编号协调、合并结果门禁及审阅后转 ready；本任务交付已完成。
+
+- Task 7 最终收尾：`task-done` 实际 exit 0，范围 `2ea6319..7d266ae`；再次核对最终整次 exit 0、四份完整 XML、16 源码哈希，最终 basic 和 diff-check 全通过。七任务 complete；草稿 PR 交付不替代后续主线整合验收。
+
+## 2026-10-09 Codex 认领：PR #324 冲突与 CI 失败修复
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PR324-REPAIR | DONE_CI_VERIFIED | Codex | 用户要求检查并修复 #324 冲突及失败；读取原始 CI 日志，整合最新 main，保留双方文档/代码与历史证据，协调 worker ADR 编号，复现失败后最小修复，完整门禁及远程 CI 验证后更新现有 PR。 |
+
+- 输入：PR head `350d7c6`、最新抓取 main `5398a1f0`、失败 CI run `37878331607`；GitHub 原 head scaffold/frontend/backend SUCCESS，Integration and E2E FAILURE。原修复分支限定风险 CLOSED 证据保留，不外推为整合结果通过。
+- 输出：原 #324 分支上的可追溯 merge/修复提交、冲突/失败原因与验证交接；不新建替代 PR、不强推、不合并 PR、不部署或冻结。
+- 依赖：GitHub 原始日志，锁定 Python/前端/浏览器依赖，自有临时 Neo4j/SQLite；不读本机 .env/业务数据，不操作他人服务。
+- 风险：两份共享文档同位置追加造成文本冲突，ADR-091/092 撞号；新主线 UI/模型/迁移行为必须保留；旧分支通过不等于合并结果通过。未知 CI 失败先定位，不放宽断言或网络截止、不新增 skip。
+- 验证：原失败选择 RED→GREEN、worker 网络/恢复回归、ADR 引用与冲突标记检查、`./scripts/verify.sh integration`、最新 PR head 的远程 CI、`git diff --check`。回退整合前代码可恢复 `350d7c6` 的已验分支但会重新存在主线冲突；无本轮新增迁移或依赖升级。
+
+- 原始失败已定位：run `37878331607` Integration 为 63 failed/399 passed/4 既有登记 skip；62 项在记录真实网络证据时写入 Linux 不存在的 `/private/tmp`，1 项因浅克隆缺少旧版本归档基线。backend-live 44、演示 E2E 2、个人 E2E 4 均通过；本轮不是 E2E 产品失败。
+- 主线 `5398a1f0` 已整合到工作树：保留双方追加任务/决定，worker ADR 重编号为 093/094，主线 091/092 不变。原失败的三项回归先实际 RED（目录、历史配置、编号重复），最小修复后 3 passed；当前合并结果全量/远程 CI 仍待验证，原风险 CLOSED 仅为旧受测分支结论。
+- 合并后定向实测发现主线 `_stop-procs.sh` 的整数 `SECONDS` 会将 2 秒宽限缩短至约 1.3 秒。新增在秒边界附近启动的真实子进程回归先 RED，随后以完成的 0.2 秒等待次数计满宽限，保留提前正常退出和宽限后强杀，不放宽原断言；此项限 E2E 清理脚本，不改 worker 产品截止。
+
+
+### PR #324 修复验收与条件合并授权（2026-10-09）
+
+- 用户最新指示「CI通过就合并PR」覆盖前述仅更新草稿、不合并的历史边界；仅当最终 PR head 所有检查成功时转 ready 并合入 `main`，不绕过门禁、不使用管理员覆盖、不强推、不删除修复分支或受管工作区、不部署/冻结。
+- 修复代码 `36b421e` 已通过 push run `37904046120` 和 pull_request run `37904049198`：每轮 scaffold/frontend/backend/integration 全 SUCCESS，共 8 项。GitHub 实测 base `5398a1f0`、MERGEABLE/CLEAN。backend+tooling 4064 passed/27 既有登记 skip；frontend 1227 passed（66 文件）、type-check/build；integration 462 passed/4 既有登记 skip；backend-live 44；演示 E2E 2、个人 E2E 4。无新增 skip/删除用例/放宽预算。
+- CI 网络 artifact 73 行与当前 6 产品源码拼接 SHA、测试 SHA 一致；默认/上限围栏最大 2.002760/3.003735s，独立写者最大 2.031202/3.031960s，均在 3/4s 原阈值；退出 1/5s 最大 1.170164/5.176260s，均在预算+1s。取消后实际迟到提交 takeover 5/5、failed_cleanup 3/5，两路恢复均收敛；旧基线 10s watchdog 围栏仍占用的真实负向证据保留。
+- 独立只读审阅未发现本轮阻塞；3 项可移植性/编号回归 RED→GREEN，秒边界计时回归 RED→GREEN，定向合计 78 passed。
+- 本地整次 `./scripts/verify.sh integration` 在用户中断时停止于 backend 未结束，缺少退出码，明确登记 INTERRUPTED，不称为通过；验收以同源码最新 Ubuntu CI 的全部实际门禁为准，保留本地未完成日志，不拼接为整次 exit 0。最终文档提交再运行本地 basic，并等其最新 head CI 全绿后条件合并。
+- 采用 GitHub merge commit（非 squash）保留 pinned `e111315ffabdc5ce980afdf525b8321ef572dc8e` 历史祖先，使 main 的真实旧 worker 对照不依赖保留远程分支。合并使用精确 head 匹配，不删除分支/工作区。最终合并记录随 PR 保存；此验收关闭范围仍仅 worker 网络 COMMIT 无界占用 SQLite 围栏，其他审查发现/全项目冻结状态不变。
+- 最终文档版本地 `./scripts/verify.sh` exit 0；可移植性/ADR 三项回归 3 passed，diff-check 通过。仅三份文档更新，无产品/测试/脚本变更；提交并推送原分支后仍按其最终 head 独立 CI 全绿执行用户的条件合并。

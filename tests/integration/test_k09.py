@@ -36,7 +36,8 @@ pytestmark = pytest.mark.skipif(not all(os.environ.get(n) for n in _ENV),
 @pytest.fixture
 def env(tmp_path):
     neo4j = pytest.importorskip("neo4j")
-    driver = neo4j.GraphDatabase.driver(os.environ[_ENV[0]], auth=(os.environ[_ENV[1]], os.environ[_ENV[2]]))
+    uri, auth = os.environ[_ENV[0]], (os.environ[_ENV[1]], os.environ[_ENV[2]])
+    driver = neo4j.GraphDatabase.driver(uri, auth=auth)
     apply_migrations(driver)
     url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
     migrate(url)
@@ -51,7 +52,7 @@ def env(tmp_path):
     driver.execute_query("CALL db.awaitIndexes(300)", database_="neo4j")
     for name, role in (("demo_teacher", "teacher"), ("demo_student", "student"), ("demo_student2", "student")):
         insert_account(url, account_id=uuid.uuid4().hex, username=name, password_hash=VALID_HASH, role=role)
-    repo = Neo4jRepository(driver)
+    repo = Neo4jRepository(driver, persist_driver_factory=lambda: neo4j.AsyncGraphDatabase.driver(uri, auth=auth))
     created: list[str] = []
     try:
         yield settings, url, repo, driver, created

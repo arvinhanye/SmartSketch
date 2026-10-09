@@ -6,15 +6,15 @@ stop_process_groups() {
   local grace="$1"; shift
   local pid alive
   for pid in "$@"; do kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; done
-  # 按次数计时（每次 sleep 0.2，共 grace*5 次）：不用 bash 的整数秒 SECONDS，否则调用时已过当前这一秒的大半，
-  # 实际宽限会少最多 1 秒（CI 上 grace=2 只等了 1.7 秒就强制结束）。
-  local tries=$((grace * 5)) i=0
-  while ((i < tries)); do
+  # SECONDS rounds to whole wall-clock seconds and can shorten grace by almost
+  # one second. Count completed 0.2-second waits instead (Bash 3.2 compatible).
+  local polls=$((grace * 5))
+  while ((polls > 0)); do
     alive=0
     for pid in "$@"; do kill -0 "$pid" 2>/dev/null && alive=1; done
     ((alive)) || break
     sleep 0.2
-    i=$((i + 1))
+    polls=$((polls - 1))
   done
   for pid in "$@"; do
     if kill -0 "$pid" 2>/dev/null; then
