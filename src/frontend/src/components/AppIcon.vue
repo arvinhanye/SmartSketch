@@ -33,6 +33,8 @@ const PATHS: Record<string, string> = {
   half: '<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/>',
   eyeOff: '<path d="M4 4l16 16M9.5 5.6A8.8 8.8 0 0 1 12 5.3c4.4 0 7.5 4.2 8.5 6.7a12 12 0 0 1-2.4 3.4M6.3 7.7A12.4 12.4 0 0 0 3.5 12c1 2.5 4.1 6.7 8.5 6.7 1.2 0 2.2-.3 3.2-.7"/>',
   warn: '<path d="M12 4.5 21 19.5H3z"/><path d="M12 10v4.5M12 17v.2"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.2"/>',
 }
 </script>
 
