@@ -24,7 +24,7 @@ G6（1.4 MB / gzip 404 KB）本来就是动态 `import('@antv/g6')`，只在打�
 - 门禁：见下节。
 
 ## 最终门禁
-（由最后一次运行填写）
+在提交 `5ce0a79` 上单独运行（无并发重任务）：`./scripts/verify.sh integration`（含 basic + full）**PASS，退出 0**：后端 3978 passed / 27 登记 skipped（含新增 `test_stop_procs.py` 3 项）；前端 66 文件 / 1227 passed，type-check（两个 tsconfig）与 build 通过；集成 393 passed / 4 skipped；图库专项 44 passed；E2E 教师+学生 2 passed、个人模式 4 passed。改过的 `e2e.sh` 在两轮 E2E 里都正常收尾，日志中没有触发强制结束。3 项历史“暂不补测”仍为未测；无真实供应商/付费调用。
 
 ## 风险与说明
 - 布局偏好存在浏览器里：换浏览器/清除站点数据后回到推荐值。
