@@ -208,9 +208,9 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 
 ## 关键质量边界
 
-- **worker 提交围栏（R1-PERSIST-FENCE，ADR-091，2026-10-08；本地已实施，发布准入 OPEN）**：任务/课程锁双租约守卫约束 `persisting` 的显式图事务；最终按「Neo4j 草稿守卫 → SQLite `BEGIN IMMEDIATE` 校验双令牌 → 图 COMMIT → 同连接 T6 → SQLite COMMIT」排序。仓储提供事务原语，worker 编排跨库恢复；其他图写调用者保持原入口，无契约/模型/迁移变化。SQLite 围栏只覆盖最终提交阶段，全库写者等待及提交应答不确定是独立风险，不宣称跨库原子性或客户端硬取消。详见 [R1 书面设计](superpowers/specs/2026-10-08-worker-persist-fence-design.md)；旧 worker 接管竞态已通过真实 Neo4j 回归；网络级提交应答截止未证明，暂不发布。
+- **worker 提交围栏（R1-PERSIST-FENCE，ADR-091，2026-10-08；已验证，限定风险 CLOSED）**：任务/课程锁双租约守卫约束 `persisting` 的显式图事务；最终按「Neo4j 草稿守卫 → SQLite `BEGIN IMMEDIATE` 校验双令牌 → 图 COMMIT → 同连接 T6 → SQLite COMMIT」排序。仓储提供事务原语，worker 编排跨库恢复；其他图写调用者保持原入口，无契约/模型/迁移变化。SQLite 围栏只覆盖最终提交阶段，全库写者等待及提交应答不确定是独立风险，不宣称跨库原子性或客户端硬取消。详见 [R1 书面设计](superpowers/specs/2026-10-08-worker-persist-fence-design.md)；旧 worker 接管竞态已通过真实 Neo4j 回归；网络级截止、退出及恢复经 ADR-092 真实故障矩阵与最终整次门禁验证，见 [实施交接](handoffs/codex-r1-persist-deadline.md)。
 
-- **worker 提交传输补充（ADR-092；规格已批准，实施计划待审阅，未实施）**：用户确认 worker 专用可取消异步传输，保留同步仓储门面与同线程 SQLite 围栏。每次图尝试独占 Runner/异步连接池，绝对截止不随分步应答或心跳延长；COMMIT 默认 2 s，资源等待清理在 SQLite 围栏退出后执行。取消不等于服务端未提交；接管和失败贡献清理都经同一图草稿守卫排序，清理不再凭无贡献预读提前清标记。其他图入口保留；待新增环境预算，无 wire/模型/迁移/依赖变化。默认围栏 ≤3 s 是待真实网络故障验证的准入阈值，不是当前保证。详见 [补充规格](superpowers/specs/2026-10-08-worker-persist-deadline-design.md) 与 [实施计划](superpowers/plans/2026-10-08-worker-persist-deadline.md)；R1 发布准入仍 OPEN。
+- **worker 提交传输补充（ADR-092；已验证，限定可用性风险 CLOSED）**：worker 专用同步门面在同线程驱动每次独占的 Runner/AsyncDriver。绝对图尝试截止不随收包或心跳延长，COMMIT 默认 2 s（上限 3 s），共享退出预算默认 1 s（上限 5 s），只取环境配置；取消先退出 SQLite 围栏，再等待传输清理。提交不确定保留任务令牌且不做 T6/内联重放；接管和 failed 撤销都经同一 DraftWriteGuard，无贡献不提前清标记。SQLite 完成读回还须匹配领取 attempt，避免回滚后把新所有者的同序号 T6 误认成本次成功。DNS 启动错误稳定脱敏并归可重试；系统解析器退出、其他图入口与一般进程停机 SLA 不在本次硬界保证。无 wire/模型/迁移/依赖变化。默认围栏 ≤3 s、上限 ≤4 s 已有逐次真实网络、物理退出和整次 integration exit 0 证据；限健康本机/SQLite 环境，见 [补充规格](superpowers/specs/2026-10-08-worker-persist-deadline-design.md) 与 [实施计划](superpowers/plans/2026-10-08-worker-persist-deadline.md)。
 
 - API 响应、任务事件、图谱导入/导出格式先在 `src/contracts/` 版本化。
 - LLM 是可替换适配器。`live`/`demo`/`fake` 模式下基础 URL、模型和密钥来自环境变量；`personal` 模式（ADR-080）下来自用户本人加密保存的配置：教师任务使用建任务时的密钥快照，学生问答按「用户 + 配置版本」隔离调用策略，用户填写的地址经出站校验并钉住已校验的 IP。向量为系统级在线服务（ADR-081），与用户所选生成模型无关。

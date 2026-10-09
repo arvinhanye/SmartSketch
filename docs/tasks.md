@@ -1,5 +1,7 @@
 # 任务看板
 
+> **R1 最新状态（2026-10-08）**：旧 worker 越权提交修复及 worker 网络 COMMIT 无界占 SQLite 围栏风险已验证，限定范围 **CLOSED**；最终版本整次 integration exit 0。用户已授权开 PR，正在提交；不自动合并、发布或技术冻结。验收与边界见末节及 `docs/handoffs/codex-r1-persist-deadline.md`。
+
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
 
 
@@ -1898,7 +1900,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PERSIST-FENCE | IMPLEMENTED_LOCAL（核心接管回归已验证；发布准入 OPEN） | Codex | 仅修复旧 worker 在租约丢失后提交 Neo4j 的高严重程度发现；双租约守卫、显式图事务、SQLite 提交围栏与同连接 T6；旧 worker 零提交、异常恢复和锁释放回归。其余四项中严重程度发现不纳入本任务。 |
+| R1-PERSIST-FENCE | VERIFIED_LOCAL（核心及截止补充已验证；限定风险 CLOSED） | Codex | 仅修复旧 worker 在租约丢失后提交 Neo4j 的高严重程度发现；双租约守卫、显式图事务、SQLite 提交围栏与同连接 T6；旧 worker 零提交、异常恢复和锁释放回归。其余四项中严重程度发现不纳入本任务。 |
 
 - 输入：`bdb89c4` 基线的只读审查与真实 SQLite/图调度替身复现；用户确认「双租约守卫＋显式图事务＋提交围栏」方案。
 - 当前输出：双租约守卫、显式图事务、SQLite 最终围栏、同连接 T6、完成结果读回及定向/真实 Neo4j 回归；实施计划 `docs/superpowers/plans/2026-10-08-worker-persist-fence.md`，实施交接 `docs/handoffs/codex-r1-persist-fence.md`。用户在书面规格交付后明确要求「实施修改」，本会话顺序执行。无公共契约、迁移或项目依赖变化；测试依赖仅在 `/private/tmp/smartsketch-r1-testdeps`。
@@ -1915,7 +1917,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PERSIST-DEADLINE-DESIGN | APPROVED（用户确认实施；发布准入 OPEN） | Codex | 补充书面规格已获确认；产品代码尚未实施，进入实施计划编写/审阅阶段，不关闭发布准入。 |
+| R1-PERSIST-DEADLINE-DESIGN | DONE（已批准、实施及完整验证） | Codex | 补充书面规格及七任务计划已确认；七任务已完成；最终代码整次门禁 exit 0，限定风险 CLOSED。 |
 
 - 输入：本地 R1 修复 `e111315`、现有设计 §7 与实施交接；用户明确要求「按首选方向编写补充设计」。
 - 输出：`docs/superpowers/specs/2026-10-08-worker-persist-deadline-design.md`、架构/任务协议/决策同步及 Codex 设计交接。
@@ -1930,7 +1932,7 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PERSIST-DEADLINE | IN_PROGRESS（计划已确认，发布准入 OPEN） | Codex | 用户已确认书面计划并要求开始实施；Codex 在本会话依七任务顺序进行测试先行实现，网络及全量验收通过前保留 OPEN。 |
+| R1-PERSIST-DEADLINE | DONE（限定可用性风险 CLOSED） | Codex | 用户已确认书面计划并要求开始实施；Codex 顺序测试先行实现；全部网络、恢复和最终整次门禁已通过。 |
 
 - 输入：`e41e951` 书面规格与用户「确认实施」；输出：`docs/superpowers/plans/2026-10-08-worker-persist-deadline.md` 和 Codex 计划交接。
 - 依赖：复用当前受管 worktree、既有临时 Python 3.11 测试 venv；未来实测需一次性 Neo4j、回环 TCP 代理与项目声明的前端/E2E 依赖。
@@ -1940,3 +1942,42 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 - 计划验收：规格 §1～§9 映射七任务；五项 Review Focus 各有断言；接口/具体文件/类型核对，增加只记录 BEGIN 完成时刻的可选 on_acquired 回调以精确计量围栏。9 个文档文件、24 条本地链接通过，35 项实施步骤未勾选，产品树/运行配置未变。`git diff --check` exit 0，本轮 basic exit 0，契约 237 passed、门禁负向测试 25 项通过。日志 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-plan-verify.log`，校验/哈希 `/private/tmp/smartsketch-ocr-46o1tbcy/r1-deadline-plan-check.json`；仅计划与既有门禁验证，无产品/网络新验收，风险 OPEN。
 
 - 2026-10-08 最新审批：用户「确认计划，开始实施」；书面计划与当前会话顺序执行均获确认。实施输入/依赖/风险/命令沿用已批准计划，不再等待重复确认。
+
+- R1-PERSIST-DEADLINE 最新实施进度（2026-10-08）：Tasks 1～5 已测试并本地提交；Task 6 真实故障矩阵及 Task 7 完整门禁正在验证。最终审查两项 Important 已复现 RED（3 失败）并修复 GREEN（3 通过）：DNS 启动错误脱敏/重试分类、T6 结局读回 attempt 校验。没有发布/PR 授权；准入 OPEN，完整计数和结论待整次命令结束记录。
+
+## 2026-10-08 Codex 认领：R1 后续验证失败修复
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-DEADLINE-VERIFY-REPAIR | DONE | Codex | 用户要求修复 NOOP 断连证据、F13 持久化/恢复和 E2E 解释器配置；先定位并测试先行，修复后重跑原阈值的真实矩阵及最终版本整次门禁。 |
+
+- 输入：提交 `2ea6319`、本任务现有未提交测试/文档，以及上轮失败日志。仅接续自己的 Task 6/7 文件；不覆盖其他成员改动。
+- 输出：最小修复、复现测试、真实验收日志、实施交接；无推送/PR/合并/发布授权。
+- 依赖与风险：临时 Python/锁定 npm/Playwright、自建回环 Neo4j；FIN 与 RST 必须区分，探针错误不自动等于产品回归；F13 图库就绪与 COMMIT 时延需独立实测，禁止放宽截止/跳过失败。
+- 验证：proxy/K11 工具回归、独立自有图库 F13/R1 和 65 项网络矩阵、283 项定向选择、`./scripts/verify.sh` 与最终版本 `./scripts/verify.sh integration`（E2E 使用已验证临时解释器）。
+- 上轮最终结局：整次 integration FAILED，backend 3 failed/3997 passed/27 登记 skip，integration 5 failed/457 passed/4 登记 skip；其中 backend 三项是审查修复的旧加载代码结果，当前定向已 GREEN，仍须最终版本整次复验。之前 ledger 关于 backend 导入时点的判断撤销，堆栈仍指向旧启动分支，不能把该轮当最终代码门禁。
+- 上轮 F13/最终证明：4 failed/82 passed/13 errors；增强迟到实验因自建图库就绪失败有 2 errors；未关闭准入。保留原日志，后续修复不覆盖失败证据。原 Task 5 fixture 已不存在（Docker inspect 已核实），新实验新建带随机所有权标签的临时图库，不猜测或复用旧端口。
+
+- 本轮定位证据：SO_LINGER 的真实 TCP RST 复现代理错误分支只记录异常却没有断连事件；集成脚本对隐式 PYTHON 未传 E2E_PYTHON（2 RED/显式覆盖例通过）→修复后工具回归 25 passed。新单实例图库就绪 23.358s，真实 async 连接 0.038s、健康 COMMIT 0.007s；原 F13/R1 34 项再次通过。演示/K09 失败的 fixture 仍只提供同步仓储，缺少 worker 专用工厂；补齐工厂，保留业务断言及其他同步入口，不增加产品回退。
+
+- R1-DEADLINE-VERIFY-REPAIR 本轮验收进展：真实 38 项 F13/R1/demo/K09 与 65 项网络矩阵均零 skip 全通过；304 项完整定向通过。默认/上限围栏最大 2.010052s/3.003443s（阈值 3/4s），退出预算 1/5s 最大 1.042527s/5.041602s；迟到提交 takeover 3/5、failed_cleanup 5/5 次观察并收敛。当前副本变异三项均 RED、正常版本 GREEN；整次最终 integration 在运行，准入仍 OPEN。
+
+- Task 6 结束验证已记录完成：提交 `b89844b`，顺序自建图库的 F13/R1 34 passed + 网络 65 passed，零 skip；范围内源 SHA 与整次门禁启动 manifest 相同。E2E 脚本修复提交 `b7e84a1`。本轮整次门禁首轮 backend 4003 passed/27 登记 skip、frontend 934/type-check/build 通过，但默认 17689 端口占用致整次 exit 1；占用者保持原状，第二轮使用既有端口覆盖机制从头执行，不拼接部分结果。
+
+- 第二轮实际整次 exit 1：backend 4003/27 登记 skip、frontend 934、integration 462/4 登记 skip、backend-live 44、演示 E2E 2 全通过；个人 E2E 3 passed/1 failed。失败在 `personal.spec.ts:235` 要求掌握后路径文字必变。只读 trace 已证推荐首项从 `kp_63b0…` 切换至同名 `kp_80b7…`，掌握接口 200；PDF/MD 独立抽取允许同名异 ID。下一修复只调整该 E2E 为「文字与解锁 ID 联合身份」变化/恢复，保留掌握消失、刷新持久化、学生隔离与原超时；不修改推荐/图谱产品规则。先单独复验个人 E2E，再启动最终整次门禁。
+
+
+### R1 最终验收与 PR 发布（2026-10-08）
+
+- 上文设计/实施轮的 OPEN、暂不发布及失败计数是历史阶段证据；本节是 R1 当前状态，不删除失败日志。用户最新要求「检查门禁状态，若通过则开PR，更新项目状态」，授权推送本修复分支及创建 PR，不授权合并、部署或技术冻结。
+- 最终代码 `f9c54553`（含 `2ea6319`、`b89844b`、`b7e84a1`）整次 `./scripts/verify.sh integration` 实际 **exit 0**：backend+tooling **4003 passed / 27 既有登记 skip**；frontend **934 passed**（38 文件）+type-check/build；integration **462 passed / 4 既有登记 skip**；backend-live **44 passed**；演示 E2E **2 passed**、个人假供应商 E2E **4 passed**。零 failure/error，无新增 skip、放宽超时、删用例或依赖升级。门禁执行前后 16 个相关代码/测试/脚本 SHA256 一致。
+- 定向 304 项、F13/R1/demo/K09 38 项、真实网络 65 项均通过；Task 6 结束原选择 34+65 共 99 项零 skip。新旧版本及移除截止/取消/守卫三个变异均提供 RED 证据。真实 NOOP FIN/RST 判定、资源退出、迟到结局的接管和 failed 清理均验证。
+- 最终整次网络 run `7de6155b7906…`：默认围栏最大 2.001980s、独立写者 2.115376s（≤3s）；上限围栏 3.001610s、写者 3.029492s（≤4s）；退出预算 1/5s 实测最大 1.046460/5.151670s（≤预算+1s）；迟到提交 takeover/failed_cleanup 各 4/5 次实际发生并收敛。未把 TCP 取消误作服务端回滚证明。
+- **风险状态：CLOSED，仅限 worker 网络 COMMIT 无界占用 SQLite 最终围栏**。DNS 执行器退出、一般进程停机、其他图入口、宿主暂停/存储异常仍在保证之外；原四项中严重程度发现及两个既有心跳故障测试未纳入本轮。全项目 `stage_c_status OPEN`、`technical_freeze NOT_PERFORMED` 保持原状态。
+- 原始日志/XML/manifest/292 行逐次计时及机读校验已导出到 `/private/tmp/smartsketch-r1-deadline-evidence-20261008/`；整次日志 `repair-full-final.log`、机读结果 `verification-summary.json`、哈希清单 `evidence-hashes.json`；交接 `docs/handoffs/codex-r1-persist-deadline.md`。
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| R1-PUBLISH-PR | IN_PROGRESS | Codex | 输入最终门禁、源码哈希和用户 PR 授权；核对 origin/main 与工作区基线，更新状态和交接、运行最终 basic、推送 codex/ 修复分支、创建并附加 PR；保留工作区及证据，不合并/部署/冻结。 |
+
+- PR 主线预检：最新 `origin/main=2e6acef7` 已合入 #321～#323；本修复实际分叉 `bdb89c46`。只读 Git merge-tree 确认 `docs/tasks.md`、`docs/decisions.md` 内容冲突，代码/个人 E2E 可自动合并，但未经主线整合验收。主线已占用 ADR-091/092（图谱工作台/教师向量），与本分支的历史 worker ADR 编号撞号，整合时须保留双方决定并重编号/同步引用。故创建 **草稿 PR**：本轮风险在受测修复分支上 CLOSED，主线尚未部署本修复；主线整合与远程 CI/审阅保持待完成，不将 branch 门禁外推为 merge-result 门禁。
