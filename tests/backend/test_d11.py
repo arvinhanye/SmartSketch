@@ -482,7 +482,7 @@ def test_report_progress_after_lease_loss_raises_and_writes_nothing(db_url, stor
 def test_heartbeat_renews_and_detects_a_lost_lease(db_url, storage):
     _, task_id = _add_material(db_url, storage, TXT, "txt")
     lease = _claim(db_url)
-    _sql(db_url, "UPDATE processing_tasks SET lease_expires_at = unixepoch() + 1 WHERE id = ?", task_id)
+    _sql(db_url, "UPDATE processing_tasks SET lease_expires_at = unixepoch() + 5 WHERE id = ?", task_id)
 
     with LeaseHeartbeat(db_url, lease, lease_seconds=LEASE_SECONDS, interval=0.02) as beat:
         deadline = time.monotonic() + 5

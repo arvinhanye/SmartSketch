@@ -367,3 +367,27 @@ def test_space_gate_reads_and_writes_the_row_but_never_creates_the_table(tmp_pat
 
     migrate(_url(path))
     assert read_or_initialize_space(_url(path), "model-a", 768, 0) == ("model-a", 768, 0)
+
+
+def test_connection_and_begin_share_absolute_budget(tmp_path, monkeypatch):
+    from app.repositories import sqlite as module, task_leases
+    now = [100.0]
+    monkeypatch.setattr(module.time, 'monotonic', lambda: now[0])
+    recorded = []
+    original = sqlite3.connect
+    class Recording(sqlite3.Connection):
+        def execute(self, query, *args):
+            recorded.append(query)
+            result = super().execute(query, *args)
+            if query == 'PRAGMA journal_mode = WAL':
+                now[0] += .04
+            if query == 'PRAGMA foreign_keys = ON':
+                now[0] += .03
+            return result
+    monkeypatch.setattr(sqlite3, 'connect', lambda *a, **kw: original(*a, **kw, factory=Recording))
+    with task_leases._immediate(_url(tmp_path / 'budget.sqlite'), deadline=100.1):
+        pass
+    timeouts = [int(q.rsplit(' ', 1)[1]) for q in recorded if q.startswith('PRAGMA busy_timeout =')]
+    assert 1 <= timeouts[-1] <= 30
+    assert 90 <= timeouts[0] <= 100
+    assert timeouts[-1] < timeouts[0]

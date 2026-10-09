@@ -14,6 +14,23 @@
 
 ## 运行时环境变量
 
+### R1 提交截止配置（2026-10-08；配置/传输已实现并验证，限定风险 CLOSED）
+
+用户已确认 worker 专用可取消异步传输的 [补充规格](superpowers/specs/2026-10-08-worker-persist-deadline-design.md)，[实施计划](superpowers/plans/2026-10-08-worker-persist-deadline.md) 已确认并完成顺序实施。以下名称/默认值已加入 Settings 和 `.env.example`；worker 接入及 99 项真实网络/恢复结束验证已通过；最终版本整次 integration exit 0，限定 worker COMMIT 围栏风险 CLOSED；环境边界见实施交接。复用现有 `NEO4J_URI/USER/PASSWORD`，无新增密钥/外部服务。
+
+| 运行变量 | 类型与已批准默认值 | 用途/边界 |
+| --- | --- | --- |
+| `TASK_PERSIST_COMMIT_TIMEOUT_SECONDS` | 有限正数，默认 2.0，最大 3.0 | worker 最终图 COMMIT 总预算，与图尝试/双守卫剩余预算取小；不是服务器事务 timeout。 |
+| `TASK_PERSIST_CLEANUP_TIMEOUT_SECONDS` | 有限正数，默认 1.0，最大 5.0 | SQLite 围栏退出后异步事务/Session/Driver 清理共享预算，不能逐层重置或延长提交。 |
+
+配置来源：仅环境变量；零、负数、NaN/Inf 或超范围拒绝启动。调用方：worker 持久化和失败贡献清理专用传输；API/其他图入口不变。真实测试只使用一次性本机 Neo4j/SQLite 与回环 TCP 代理，记录计时/状态不记录认证包。代码回滚至 `e111315` 后删除本轮新增配置声明，既有地址/凭据不动；无数据迁移，但可用性风险重新 OPEN。
+
+### 本轮隔离验证运行约定（2026-10-08）
+
+不修改应用 venv 或依赖锁文件；临时测试 Python 安装项目声明的 test extra。`verify.sh integration` 选定的 `PYTHON` 现在传给两种 E2E；若显式设 `E2E_PYTHON`，覆盖保持优先。门禁默认图库端口被占用时，使用既有 `VERIFY_NEO4J_PORT` 与 `E2E_NEO4J_PORT/E2E_API_PORT/E2E_WEB_PORT/E2E_PROVIDER_PORT` 环境覆盖，选择互异回环端口，不停止占用者。浏览器用 `PLAYWRIGHT_BROWSERS_PATH` 指向临时匹配版本。所有图库仅为本轮自建、退出核对身份清理；不复用默认端口上的实例、不复制本机 .env，不发真实模型请求。
+
+### 已有配置说明
+
 变量名和无敏感样例维护在根目录 `.env.example`，本节各表与之逐项对齐；真实值只放本机 `.env` 或密钥管理系统。「样例」列即 `.env.example` 中的值。「状态」列只说明**取值**的决定状态：
 
 - **已约定**：main 既有的变量与取值。
@@ -321,3 +338,9 @@ docker compose --profile app down        # 保留 app-data 卷
 | Neo4j | 课程知识图谱、向量索引、前置关系遍历 | 本地容器已由 F01 落地（见「本地依赖环境（F01）」）；备份策略未定；向量索引维度须等于签收后的 `EMBEDDING_DIMENSIONS` |
 | OpenAI 兼容 LLM API | 抽取、问答、改写、裁决 | 配置形状与切换/预算规则见「模型接入规则（A07）」；取值待 D-02a、D-02b、D-02d、D-02e 签收；脱敏策略未定 |
 | 向量模型 API / 本地模型 | 知识点融合与来源片段检索 | 方案、模型与维度待 D-02c 签收；维度定稿后才能建 Neo4j 向量索引 |
+
+## Worker 网络验收证据（PR #324，2026-10-09）
+
+- `SMARTSKETCH_NETWORK_EVIDENCE_DIR` 是仅供测试的可选输出目录；不进入应用配置、用户模型凭据或生产服务。未设置时由 pytest `tmp_path_factory` 创建独立临时目录；设置时在该目录下按自建图库随机身份生成独立 JSONL 文件，写入前创建父目录，不依赖 macOS `/private/tmp`。
+- CI 将目录设为 `${{ runner.temp }}/worker-network-evidence`，无论测试成功/失败都保存 `worker-network-evidence` artifact（7 天）。证据仅含测试身份、计时、状态和源码 SHA256，不含认证包、课程正文或密钥；写入失败仍判失败，不吞异常。
+- 真实旧版本对照实验固定归档历史提交 `e111315ffabdc5ce980afdf525b8321ef572dc8e`，Integration checkout 使用 `fetch-depth: 0`，保留完整历史及 `persist-credentials: false`。该改动不跳过对照实验、不放宽网络预算、不改变应用依赖。
