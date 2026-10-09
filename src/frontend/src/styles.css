@@ -396,6 +396,10 @@ tr:last-child td {
 .app.app--login .auth-layout__form {
   min-height: 0;
   overflow-y: auto;
+  /* 滚动条与深色页面协调：细、深色，而不是系统默认的浅色宽条 */
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-edge, #7a7c8a) transparent;
 }
 
 /* 组件里的 <section> 直接落在 .app-main 的网格里，统一卡片外观 */

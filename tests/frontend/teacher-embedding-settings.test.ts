@@ -74,3 +74,19 @@ it('embedding save preserves missing generation configuration',async()=>{
  await w.get('[data-test=em-form]').trigger('submit');await flushPromises()
  expect(useRuntimeStore().needsConfig).toBe(true);w.unmount()
 })
+
+// 装包前修复：教师设置页有两组同名按钮（测试连接、刷新模型列表）；读屏与自动化需要能区分。
+// 可见文字不变，可访问名称在其后加括号说明所属区块（可访问名称仍包含可见文字）。
+describe('教师设置页重名按钮可区分',()=>{
+ it('两个“测试连接”和两个“刷新模型列表”的可访问名称各不相同且包含可见文字',async()=>{
+  const w=await view('teacher',embeddingApi())
+  const label=(sel:string)=>w.get(sel).attributes('aria-label')
+  expect(label('[data-test=mc-test]')).toBe('测试连接（通用模型）')
+  expect(label('[data-test=em-test]')).toBe('测试连接（向量模型）')
+  expect(label('[data-test=mc-refresh-models]')).toBe('刷新模型列表（通用模型）')
+  expect(label('[data-test=em-refresh-models]')).toBe('刷新模型列表（向量模型）')
+  expect(w.get('[data-test=mc-test]').text()).toContain('测试连接')
+  expect(w.get('[data-test=em-test]').text()).toContain('测试连接')
+  w.unmount()
+ })
+})
