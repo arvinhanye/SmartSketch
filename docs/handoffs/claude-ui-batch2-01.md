@@ -41,6 +41,12 @@ task_id: UI-BATCH2-01
 - 资料：派发 dragover 后出现高亮类，drop 后描述显示文件名、按钮变“重新选择资料文件”、高亮清除；Tab 可到达隐藏输入且按钮显示焦点环。
 - **未验证**：真实浏览器里的原生拖放手势（脚本派发的是拖放事件）、读屏、`prefers-reduced-motion`、成员确认的真实“确认移除”走查（避免改动演示数据，由单测与 E2E 覆盖请求路径）、用户视觉签收。
 
+## CI 修复（PR #328 的 Backend 检查）
+- 失败：`tests/tooling/test_stop_procs.py::test_a_service_that_ignores_sigterm_is_force_killed_after_the_grace_period`（`assert 2 <= 1.71`），与本批前端改动无关；#327 的同一检查通过。
+- 根因：`scripts/_stop-procs.sh`（#326 引入）用 `deadline=$((SECONDS + grace))`，bash 的 `SECONDS` 是整数秒，调用时若已过当前这一秒的大半，实际宽限会少最多 1 秒，测试因此随时刻波动。
+- 修复：宽限改为按次数计时（每次 `sleep 0.2`，共 `grace*5` 次）；新增确定性回归测试 `test_the_grace_period_is_not_shortened_by_whole_second_clock_granularity`（把 `SECONDS` 重置到“一秒过去 0.9 秒”处，旧写法稳定少等约 0.9 秒）。修复前该测试与原测试在本机均稳定失败，修复后三次连跑 4 passed。
+- 说明：同一缺陷也在 main 与 #327 上（只是碰巧没撞上），#328 合并后一并修复；若希望先修 #327，可把这个提交 cherry-pick 过去。
+
 ## 风险
 - 资料输入框视觉隐藏依赖 `clip-path`，若以后重构上传框需保留它在 DOM 中且可聚焦（e2e 与键盘依赖）。
 - 守卫用 `to.redirectedFrom` 区分“直接打开”和“被重定向”；若以后新增会重定向到首页的路由，也会带提示（符合预期）。
