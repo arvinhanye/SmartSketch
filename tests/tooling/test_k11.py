@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,33 @@ ROOT = Path(__file__).resolve().parents[2]
 GATE = ROOT / "scripts" / "verify" / "gate.py"
 sys.path.insert(0, str(GATE.parent))
 import gate  # noqa: E402
+
+
+@pytest.mark.parametrize('explicit', [False, True])
+def test_integration_passes_selected_python_to_both_e2e_runs(tmp_path, explicit):
+    """Run the real orchestration with inert runner endpoints, not source grep."""
+    stage = tmp_path / 'scripts' / 'verify'
+    stage.mkdir(parents=True)
+    script = stage / 'integration.sh'
+    script.write_bytes((ROOT / 'scripts/verify/integration.sh').read_bytes())
+    python = tmp_path / 'selected python'
+    python.write_text('#!/usr/bin/env bash\nexit 0\n')
+    python.chmod(0o755)
+    e2e = tmp_path / 'scripts/e2e.sh'
+    e2e.write_text('#!/usr/bin/env bash\nprintf "%s|%s\\n" "${E2E_PYTHON:-unset}" "${E2E_LLM_MODE:-demo}" >> "$CAPTURE"\n')
+    e2e.chmod(0o755)
+    capture = tmp_path / 'calls'
+    env = dict(os.environ, PYTHON=str(python), VERIFY_NEO4J_URI='bolt://fixture:7687',
+               VERIFY_NEO4J_PASSWORD='fixture-only', CAPTURE=str(capture))
+    env.pop('E2E_PYTHON', None)
+    env.pop('E2E_LLM_MODE', None)
+    override = str(tmp_path / 'explicit python')
+    if explicit:
+        env['E2E_PYTHON'] = override
+    result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    chosen = override if explicit else str(python)
+    assert capture.read_text().splitlines() == [f'{chosen}|demo', f'{chosen}|personal']
 
 
 def report(tmp_path: Path, *cases: str) -> Path:
