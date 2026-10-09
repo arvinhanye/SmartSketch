@@ -45,6 +45,24 @@ def test_a_well_behaved_service_stops_immediately_without_waiting_for_the_grace_
     assert not alive(int(result.stdout.strip().split("=")[1]))
 
 
+def test_grace_period_is_not_shortened_by_shell_seconds_rounding():
+    result, _ = run(
+        '(trap "" TERM; exec python3 -c "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(120)") & pid=$!; '
+        'sleep 0.3; '
+        # Start close to a wall-clock tick: Bash SECONDS has integer precision.
+        'python3 -c "import time; time.sleep((0.85-time.time()%1)%1)"; '
+        'started=$(python3 -c "import time; print(time.monotonic())"); '
+        'stop_process_groups 2 "$pid"; '
+        'python3 -c "import time; print(time.monotonic()-float(\'$started\'))"; '
+        'echo "pid=$pid"'
+    )
+    assert result.returncode == 0, result.stderr
+    assert "强制结束" in result.stderr
+    elapsed, pid = result.stdout.strip().splitlines()
+    assert 2 <= float(elapsed) < 15
+    assert not alive(int(pid.split("=")[1]))
+
+
 def test_services_that_already_exited_are_fine():
     result, elapsed = run('true & pid=$!; wait "$pid" || true; stop_process_groups 5 "$pid"')
     assert result.returncode == 0, result.stderr

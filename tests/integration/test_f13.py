@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -361,7 +362,8 @@ def graph():
                                                       database_="neo4j").records]
 
     try:
-        yield SimpleNamespace(course=course, repo=Neo4jRepository(driver), q=q)
+        yield SimpleNamespace(course=course, repo=Neo4jRepository(driver, persist_driver_factory=lambda: neo4j.AsyncGraphDatabase.driver(
+            os.environ[_ENV[0]], auth=(os.environ[_ENV[1]], os.environ[_ENV[2]]))), q=q)
     finally:
         q("MATCH (n {course_id: $c}) DETACH DELETE n", c=course)
         driver.close()
@@ -376,6 +378,12 @@ class _BrokenRepo:
     def read(self, query, scope, *, reader, parameters):
         self.calls += 1
         raise RepositoryError()
+
+    @contextmanager
+    def persist_write_transaction(self, scope, **kwargs):
+        self.calls += 1
+        raise RepositoryError()
+        yield
 
     def write_transaction(self, scope, work):
         self.calls += 1
@@ -457,7 +465,7 @@ def test_live_lease3_rerun_after_neo4j_commit_matches_a_single_run(db_url, stora
     def crash(*_a, **_k):
         raise Crash()
 
-    monkeypatch.setattr(persist_graph, "_t6", crash)
+    monkeypatch.setattr(persist_graph, "_t6_in", crash)
     with pytest.raises(Crash):
         _persist(db_url, lease, graph.repo)
     monkeypatch.undo()
@@ -478,7 +486,7 @@ def test_live_lease3_rerun_after_neo4j_commit_matches_a_single_run(db_url, stora
 @live
 def test_live_lease21_rerun_revokes_elements_the_new_attempt_does_not_write(db_url, storage, graph, monkeypatch):
     lease = _persisting(db_url, storage, graph, [("概念12", "概念11")], ["概念11", "概念12"])
-    monkeypatch.setattr(persist_graph, "_t6", lambda *_a, **_k: (_ for _ in ()).throw(persist_graph.LeaseLost("x")))
+    monkeypatch.setattr(persist_graph, "_t6_in", lambda *_a, **_k: (_ for _ in ()).throw(persist_graph.LeaseLost("x")))
     assert _persist(db_url, lease, graph.repo).status is PersistStatus.LOST
     monkeypatch.undo()
     assert _counts(graph)["nodes"] == 2

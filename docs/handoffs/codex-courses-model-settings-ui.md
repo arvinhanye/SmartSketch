@@ -32,4 +32,3 @@
 - 基线测试导入失败：Windows testsDir 与 Vite importer 分隔符不一致，根目录 node_modules junction 复用同一锁定依赖恢复导入；未改产品配置或新增依赖。
 - `./scripts/verify.sh` 基础门禁未通过：初次 GBK 输出 UnicodeEncodeError；启用 PYTHONUTF8 后契约生成仍因缺少 datamodel-codegen 失败。契约形状及 B08/B09/B10/B12/B13 均通过，B14 24/25；不可将此记为全部门禁通过。
 - 本地服务沿用既有课程库；学生当前空课程属于未发布数据状态，本次未擅自发布。未完成全站 UI 推广或学生图谱遗留人工验收。
-

@@ -8,16 +8,20 @@ predicates, including relationship endpoints and evidence visibility (§8.4).
 
 import re
 import time
+import math
+import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeVar
 
-from neo4j import GraphDatabase, Query
+from neo4j import AsyncGraphDatabase, GraphDatabase, Query
 from neo4j.exceptions import AuthError, DriverError, Neo4jError, ServiceUnavailable, SessionExpired
 
 from app.config import Settings
+from app.repositories.persist_transport import AsyncDriverFactory, PersistTransport, TransportTimeout
+from app.repositories.task_leases import LeaseLost
 
 
 class GraphScopeError(ValueError):
@@ -40,6 +44,55 @@ class RepositoryConnectionError(RepositoryError):
 
 
 _CONNECTION_ERRORS = (ServiceUnavailable, SessionExpired, AuthError, OSError)
+
+
+class RepositoryTransportTimeout(RepositoryError):
+    code = 'NEO4J_TRANSPORT_TIMEOUT'
+
+    def __init__(self, phase: str, commit_started: bool) -> None:
+        self.phase = phase
+        self.commit_started = commit_started
+        super().__init__()
+
+
+class PersistTransaction:
+    """Scoped facade for one bounded transport attempt."""
+    def __init__(self, transport: PersistTransport, scope: 'GraphScope') -> None:
+        self._transport = transport
+        self.scope = scope
+
+    @property
+    def deadline(self) -> float:
+        return self._transport.deadline
+
+    @property
+    def commit_started(self) -> bool:
+        return self._transport.commit_started
+
+    @property
+    def committed(self) -> bool:
+        return self._transport.committed
+
+    def run(self, query: str, parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+        bound = _parameters(query, self.scope, parameters)
+        try:
+            return self._transport.run(query, bound)
+        except TransportTimeout as exc:
+            raise RepositoryTransportTimeout(exc.phase, exc.commit_started) from None
+        except _CONNECTION_ERRORS:
+            raise RepositoryConnectionError() from None
+        except (Neo4jError, DriverError):
+            raise RepositoryError() from None
+
+    def commit(self, *, started_at: float) -> None:
+        try:
+            self._transport.commit(started_at=started_at)
+        except TransportTimeout as exc:
+            raise RepositoryTransportTimeout(exc.phase, exc.commit_started) from None
+        except _CONNECTION_ERRORS:
+            raise RepositoryConnectionError() from None
+        except (Neo4jError, DriverError):
+            raise RepositoryError() from None
 
 
 @dataclass(frozen=True)
@@ -104,6 +157,34 @@ class ScopedTransaction:
     def run(self, query: str, parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
         bound = _parameters(query, self.scope, parameters)
         return [dict(record) for record in self._tx.run(query, bound)]
+
+
+class ExplicitTransaction(ScopedTransaction):
+    """Worker-only transaction: guarded statements and an explicit commit.
+
+    A dispatched commit can have an uncertain outcome. Neither a lost heartbeat
+    nor cleanup may then be interpreted as proof that the graph rolled back.
+    """
+
+    def __init__(self, tx: Any, scope: GraphScope, check: Callable[[], None]) -> None:
+        super().__init__(tx, scope)
+        self._check = check
+        self.commit_started = False
+        self.committed = False
+
+    def run(self, query: str, parameters: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+        self._check()
+        rows = super().run(query, parameters)
+        self._check()
+        return rows
+
+    def commit(self) -> None:
+        if self.commit_started:
+            raise RuntimeError('explicit transaction commit already dispatched')
+        self._check()
+        self.commit_started = True
+        self._tx.commit()
+        self.committed = True
 
 
 # Consume quoted strings/identifiers and comments BEFORE considering parameters.
@@ -171,8 +252,14 @@ class Neo4jRepository:
     ``write_transaction`` runs several scoped statements atomically (F06).
     """
 
-    def __init__(self, driver: GraphDriver) -> None:
+    def __init__(self, driver: GraphDriver, *,
+                 persist_driver_factory: AsyncDriverFactory | None = None,
+                 persist_commit_timeout: float = 2.0,
+                 persist_cleanup_timeout: float = 1.0) -> None:
         self._driver = driver
+        self._persist_factory = persist_driver_factory
+        self._persist_commit_timeout = persist_commit_timeout
+        self._persist_cleanup_timeout = persist_cleanup_timeout
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Neo4jRepository":
@@ -191,7 +278,57 @@ class Neo4jRepository:
                 except Exception:
                     pass  # Preserve the original stable connection failure.
             raise RepositoryConnectionError() from None
-        return cls(driver)
+        return cls(driver, persist_driver_factory=lambda: AsyncGraphDatabase.driver(
+            settings.NEO4J_URI,
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD.get_secret_value()),
+        ), persist_commit_timeout=settings.TASK_PERSIST_COMMIT_TIMEOUT_SECONDS,
+            persist_cleanup_timeout=settings.TASK_PERSIST_CLEANUP_TIMEOUT_SECONDS)
+
+    @contextmanager
+    def persist_write_transaction(self, scope: GraphScope, *, check: Callable[[], None],
+                                  remaining: Callable[[], float]) -> Iterator[PersistTransaction]:
+        if not isinstance(scope, GraphScope):
+            raise GraphScopeError('A GraphScope is required')
+        if self._persist_factory is None:
+            raise RepositoryConnectionError()
+        check()
+        budget = remaining()
+        if not math.isfinite(budget) or budget <= 0:
+            raise RepositoryTransportTimeout('open', False)
+        transport = PersistTransport(self._persist_factory, deadline=time.monotonic() + budget,
+            remaining=remaining, check=check, commit_timeout=self._persist_commit_timeout,
+            cleanup_timeout=self._persist_cleanup_timeout)
+        primary = False
+        try:
+            try:
+                transport.open()
+            except (LeaseLost, TransportTimeout):
+                raise
+            except Exception:
+                # Driver startup may raise ValueError for DNS resolution. Keep
+                # addresses out of logs and classify startup as retryable without
+                # changing business exceptions raised by the yielded body.
+                raise RepositoryConnectionError() from None
+            yield PersistTransaction(transport, scope)
+        except BaseException as exc:
+            primary = True
+            if isinstance(exc, TransportTimeout):
+                raise RepositoryTransportTimeout(exc.phase, exc.commit_started) from None
+            if isinstance(exc, _CONNECTION_ERRORS):
+                raise RepositoryConnectionError() from None
+            if isinstance(exc, (Neo4jError, DriverError)):
+                raise RepositoryError() from None
+            raise
+        finally:
+            try:
+                transport.close()
+            except BaseException as exc:
+                if primary:
+                    logging.getLogger(__name__).warning('persist transport exit failed: NEO4J_QUERY_FAILED')
+                elif isinstance(exc, TransportTimeout):
+                    raise RepositoryTransportTimeout(exc.phase, exc.commit_started) from None
+                else:
+                    raise RepositoryError() from None
 
     def read(
         self,
@@ -229,6 +366,34 @@ class Neo4jRepository:
         try:
             with self._driver.session(database="neo4j") as session:
                 return session.execute_write(lambda tx: work(ScopedTransaction(tx, scope)))
+        except _CONNECTION_ERRORS:
+            raise RepositoryConnectionError() from None
+        except (Neo4jError, DriverError):
+            raise RepositoryError() from None
+
+    @contextmanager
+    def explicit_write_transaction(
+        self, scope: GraphScope, *, check: Callable[[], None], timeout: float,
+    ) -> Iterator[ExplicitTransaction]:
+        """One attempt, never auto-commit/replay the worker's callback.
+
+        ``timeout`` is a server transaction timeout, NOT a client commit-reply
+        deadline. All Session/Transaction operations stay on the caller thread.
+        """
+        if not isinstance(scope, GraphScope):
+            raise GraphScopeError('A GraphScope is required')
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError('transaction timeout must be positive and finite')
+        check()
+        try:
+            with self._driver.session(database='neo4j') as session:
+                raw = session.begin_transaction(timeout=timeout)
+                try:
+                    yield ExplicitTransaction(raw, scope, check)
+                finally:
+                    # close() rolls back an open uncommitted transaction. Unlike
+                    # Transaction.__exit__, it never commits on a normal return.
+                    raw.close()
         except _CONNECTION_ERRORS:
             raise RepositoryConnectionError() from None
         except (Neo4jError, DriverError):

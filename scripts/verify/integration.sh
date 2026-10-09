@@ -59,7 +59,7 @@ PYTHONPATH="$PWD/src/backend${PYTHONPATH:+:$PYTHONPATH}" "$py" -m pytest tests/b
 "$py" scripts/verify/gate.py backend-live integration "$out/backend-live.xml" --min-tests 10 || status=1
 
 if ((run_e2e)); then
-  scripts/e2e.sh tests/e2e/teacher.spec.ts tests/e2e/student.spec.ts || status=$?
-  E2E_LLM_MODE=personal scripts/e2e.sh tests/e2e/personal.spec.ts || status=$?
+  E2E_PYTHON="${E2E_PYTHON:-$py}" scripts/e2e.sh tests/e2e/teacher.spec.ts tests/e2e/student.spec.ts || status=$?
+  E2E_PYTHON="${E2E_PYTHON:-$py}" E2E_LLM_MODE=personal scripts/e2e.sh tests/e2e/personal.spec.ts || status=$?
 fi
 exit "$status"

@@ -90,6 +90,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The real worker baseline experiment archives a pinned historical commit.
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
@@ -113,7 +115,16 @@ jobs:
         env:
           PYTHON: python
           E2E_PYTHON: python
+          SMARTSKETCH_NETWORK_EVIDENCE_DIR: ${{ runner.temp }}/worker-network-evidence
         run: scripts/verify/integration.sh
+      - name: Keep worker network evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-network-evidence
+          path: ${{ runner.temp }}/worker-network-evidence/*.jsonl
+          retention-days: 7
+          if-no-files-found: error
       - name: Keep E2E evidence
         if: failure()
         uses: actions/upload-artifact@v4

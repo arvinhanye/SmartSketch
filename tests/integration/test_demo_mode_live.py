@@ -51,7 +51,8 @@ pytestmark = pytest.mark.skipif(not _LIVE, reason="isolated Neo4j fixture not co
 def graph():
     neo4j = pytest.importorskip("neo4j")
     course = "demo-" + uuid.uuid4().hex
-    driver = neo4j.GraphDatabase.driver(os.environ[_ENV[0]], auth=(os.environ[_ENV[1]], os.environ[_ENV[2]]))
+    uri, auth = os.environ[_ENV[0]], (os.environ[_ENV[1]], os.environ[_ENV[2]])
+    driver = neo4j.GraphDatabase.driver(uri, auth=auth)
     apply_migrations(driver)
 
     def q(query: str, **params):
@@ -59,7 +60,8 @@ def graph():
                                                       database_="neo4j").records]
 
     try:
-        yield SimpleNamespace(course=course, repo=Neo4jRepository(driver), q=q, driver=driver)
+        yield SimpleNamespace(course=course, repo=Neo4jRepository(driver,
+            persist_driver_factory=lambda: neo4j.AsyncGraphDatabase.driver(uri, auth=auth)), q=q, driver=driver)
     finally:
         q("MATCH (n {course_id: $c}) DETACH DELETE n", c=course)
         driver.close()

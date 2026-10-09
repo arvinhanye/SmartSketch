@@ -6,12 +6,15 @@ stop_process_groups() {
   local grace="$1"; shift
   local pid alive
   for pid in "$@"; do kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true; done
-  local deadline=$((SECONDS + grace))
-  while ((SECONDS < deadline)); do
+  # SECONDS rounds to whole wall-clock seconds and can shorten grace by almost
+  # one second. Count completed 0.2-second waits instead (Bash 3.2 compatible).
+  local polls=$((grace * 5))
+  while ((polls > 0)); do
     alive=0
     for pid in "$@"; do kill -0 "$pid" 2>/dev/null && alive=1; done
     ((alive)) || break
     sleep 0.2
+    polls=$((polls - 1))
   done
   for pid in "$@"; do
     if kill -0 "$pid" 2>/dev/null; then
