@@ -49,3 +49,11 @@
 发布已完成：修复提交 `7e03526f25110f9798c29b5b09abebd1834354d0` 已正常推送，[PR #329](https://github.com/arvinhanye/SmartSketch/pull/329) 已创建并附加，OPEN/非草稿，`codex/enum-input-validation` → `main`。GitHub 初始实测 MERGEABLE，七份文件符合范围，八项 push/pull_request CI 排队/运行；不将其记为通过。后续这两份状态文档补充不改产品/测试 SHA，分支和工作区保留，未合并/部署/冻结。下一位首个动作：检查该 PR 最终 head 的全部 CI 与审阅结论，再取得针对新 PR 的合并指示。
 
 最终发布状态文档版再次运行 `./scripts/verify.sh`，实际 exit 0，日志 `final-basic.log`；diff-check 通过，产品/新测试仍匹配全量后端验收 manifest。
+
+## PR #329 条件合并授权（2026-10-09）
+
+用户最新要求「CI通过就合并」，覆盖前述发布但不合并的历史边界，仅限 #329。核对精确 head/base 与所有 CI，包含最终状态文档 head；全部 SUCCESS 且合并条件满足后正常执行 GitHub merge commit，精确匹配受测 head，保留 pinned worker 历史祖先、分支与受管工作区。不绕过保护、不强推、不部署/冻结；实际合并提交和时间以 GitHub PR 记录为准。
+
+已发布 `b835c456` 的 push `37916694886` 与 pull_request `37916702362` 八项检查均 SUCCESS；实测 base `2e4d1c20`，MERGEABLE/CLEAN。实际 CI：后端 4149 passed/27 原登记 skip、前端 1227 passed/66 文件及 type-check/build、integration 462 passed/4 原登记 skip、backend-live 44、演示 E2E 2、个人 E2E 4。原「本地未跑图库/E2E」记录仍为本地范围，最终远程 CI 已补足这部分证据；产品/新测试与已验收 SHA 相同。证据 `/private/tmp/smartsketch-enum-merge-20261009/` 的两份完整 CI 日志与 PR 精确 head/base/check 快照。
+
+本授权/证据补充只有两份文档变化，提交前 basic 与 diff-check 再验证，推送后仍等待最终 head 的全部 CI 独立成功，精确匹配合并，最终合并记录保留在 GitHub PR；不因旧 head 全绿绕过最终文档 head 检查。

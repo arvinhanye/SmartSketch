@@ -2169,3 +2169,13 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - 本节用户授权覆盖上文仅本地不提交/不推送/不开 PR 的历史边界；只授权本修复发布，先前 #324 的条件合并授权不外推到新 PR。远程 CI 与后续合并保持待完成。
 - 发布前复验：最新抓取 `origin/main=2e4d1c20`，与修复分叉相同，无待整合主线提交/同分支已有 PR；basic **exit 0**，后端 **4149 passed/27 既有登记 skip，exit 0**（708.00s）。三 API 与新测试前后 SHA256 一致、diff-check 通过；日志与机读汇总 `/private/tmp/smartsketch-enum-pr-publish-20261009/`。下一步提交、正常推送并创建 PR，尚未将远程 CI 记为通过。
 - 发布完成：修复提交 `7e03526f25110f9798c29b5b09abebd1834354d0` 正常推送，[PR #329](https://github.com/arvinhanye/SmartSketch/pull/329) 已创建并附加本任务，`codex/enum-input-validation` → `main`，OPEN/非草稿。GitHub 核对七份文件与本轮范围一致，初始 mergeable=MERGEABLE；push/pull_request 的八项 CI 已排队/运行，尚未记为通过。本状态补充仅改任务与交接文档，产品/测试继续使用已验收 SHA；不合并、部署、冻结或清理工作区，后续先检查最终 head CI。
+
+### PR #329 条件合并（2026-10-09）
+
+| ID | 状态 | 负责人 | 范围与验收 |
+| --- | --- | --- | --- |
+| ENUM-INPUT-422-MERGE | DONE_CI_VERIFIED | Codex | 用户最新指示「CI通过就合并」；核对 PR #329 精确 head/base、全部 CI 与合并条件，最终 head 全部 SUCCESS 后以 GitHub merge commit 正常合入 main；不使用管理员覆盖、不强推、不删除分支/受管工作区、不部署/冻结。 |
+
+- 本节授权覆盖上文「仅发布、不合并」的历史边界，仅针对 #329。输入为已发布修复及 GitHub CI；输出为实际合并记录，合并时精确匹配已通过 head，主线变更/冲突或检查失败时停止合并，不把局部门禁/旧 head 结果当作最终通过。
+- 使用 merge commit 保留 main 上 `e111315ffabdc5ce980afdf525b8321ef572dc8e` 真实旧 worker 实验的 pinned 历史祖先；无产品/测试/数据模型改动。最终文档提交同样等待其全部 CI；GitHub PR 保留最终合并提交与时间，工作区保留。
+- 当前已发布 head `b835c456` 的 push run `37916694886` 与 pull_request run `37916702362` 全部八项 SUCCESS。实测 base `2e4d1c20`、MERGEABLE/CLEAN；backend+tooling 4149 passed/27 既有登记 skip，frontend 1227 passed（66 文件）及 type-check/build，integration 462 passed/4 既有登记 skip，backend-live 44，演示 E2E 2、个人 E2E 4；无新增 skip。日志及精确 head/base/check 快照 `/private/tmp/smartsketch-enum-merge-20261009/`。本最终授权/证据补充只改任务与交接文档；重新运行 basic，正常推送后仍等新 head 全部 CI 成功再执行条件合并，不把 b835c456 的检查外推到新 head。
