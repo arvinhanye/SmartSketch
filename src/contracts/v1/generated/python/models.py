@@ -1255,7 +1255,14 @@ class ChatTurn(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    question: Annotated[str, Field(min_length=1)]
+    question: Annotated[
+        str,
+        Field(
+            description='问题文本，最多 2000 字；超出返回 422 `VALIDATION_ERROR`，不会触发任何模型或向量调用。',
+            max_length=2000,
+            min_length=1,
+        ),
+    ]
     history: Annotated[
         Optional[list[ChatTurn]], Field(description='多轮上下文，供问题改写补全指代')
     ] = None

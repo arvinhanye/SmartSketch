@@ -64,4 +64,4 @@ def build_embedding_adapter(settings: Settings) -> EmbeddingAdapter:
     from app.services.ai.embeddings import EmbeddingAdapter
 
     store = SqliteCallStore(settings.SQLITE_URL) if settings.EMBEDDING_MODE == "online" else None
-    return EmbeddingAdapter(settings, build_embedding_client(settings), store=store)
+    return EmbeddingAdapter(settings, build_embedding_client(settings), store=store, max_retries=2)

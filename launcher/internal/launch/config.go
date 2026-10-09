@@ -31,10 +31,39 @@ func validURL(raw string) bool {
 	return true
 }
 func cleanValue(s string) bool { return !strings.ContainsAny(s, "\r\n\x00") && utf8.ValidString(s) }
+
+// knownEmbeddingDimensions lists the output sizes a provider documents for a model. The dimension cannot change
+// after the vector index exists, and a typo (1021 for 1024) only failed later, at the first publish.
+// Models not listed keep a free dimension: the launcher does not guess for providers it has not verified.
+var knownEmbeddingDimensions = map[string][]int{
+	"text-embedding-v4": {64, 128, 256, 512, 768, 1024, 1536, 2048},
+}
+
+func checkKnownDimensions(model string, dimensions int) error {
+	key := strings.ToLower(strings.TrimSpace(model))
+	allowed, known := knownEmbeddingDimensions[key]
+	if !known {
+		return nil
+	}
+	for _, d := range allowed {
+		if d == dimensions {
+			return nil
+		}
+	}
+	names := make([]string, len(allowed))
+	for i, d := range allowed {
+		names[i] = strconv.Itoa(d)
+	}
+	return &Failure{"FIELD", "dimensions", fmt.Sprintf("%s 不支持 %d 维。该模型只支持：%s；推荐 1024。建立索引后维度不能更改，请在列表中选择。", key, dimensions, strings.Join(names, "、")), true}
+}
+
 func ValidateSetup(in SetupInput) error {
 	n := utf8.RuneCountInString(in.TeacherPassword.value)
 	if !validURL(in.Embedding.BaseURL) || !userPattern.MatchString(strings.ToLower(in.TeacherUsername)) || n < 8 || n > 128 || in.TeacherPassword.value != in.ConfirmPassword.value || in.Embedding.Dimensions < 1 || strings.TrimSpace(in.Embedding.Model) == "" || strings.TrimSpace(in.Embedding.APIKey.value) == "" || in.WebPort < 1024 || in.WebPort > 65535 {
 		return fail("FIELD", "config")
+	}
+	if e := checkKnownDimensions(in.Embedding.Model, in.Embedding.Dimensions); e != nil {
+		return e
 	}
 	for _, s := range []string{in.Embedding.BaseURL, in.Embedding.APIKey.value, in.Embedding.Model, in.TeacherPassword.value} {
 		if !cleanValue(s) {

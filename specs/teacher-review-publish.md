@@ -237,6 +237,8 @@ A06 §8.5 的课程写锁原定只在两处持有：`persisting` 的「Neo4j 写
 
 先改 SQLite 再删 Neo4j，是为了与 P11 的条件互斥：两者都以同一行的条件更新为准，恰有一方成功。**发布指针在 C1 中从不改变，学生继续读旧版本。** 发布失败不改变任何任务状态（A03 §3）。
 
+**V5.1 P8 向量化失败与重试（FORMAL-RELEASE-01，ADR-095）**：发布期向量化（`EmbeddingAdapter`，无截止时间的调用方）对**瞬时故障**（`timeout`、`connection`、`rate_limited`、`server`）最多重试 2 次，退避 1 秒、3 秒；`auth`、`invalid_request` 等永久错误不重试。每次重试是真实的新调用，各记一条 `model_calls`。问答查询向量带截止时间，不重试，延迟上界不变。耗尽后发布失败、当前版本保持不变，API 返回 **503 `LLM_UNAVAILABLE`**（不再是 500 `INTERNAL_ERROR`），`details.reason`：`vector_unavailable`（瞬时故障，稍后重试）或 `vector_rejected`（地址、密钥、模型或维度被供应商拒绝，需先修正向量配置）。前端按该原因显示固定可行动文案，不回显服务端 message。
+
 ### V6 回滚步骤
 
 `POST /api/v1/courses/{cid}/versions/{version}/rollback`，以版本 k 的内容**前滚**为新版本：

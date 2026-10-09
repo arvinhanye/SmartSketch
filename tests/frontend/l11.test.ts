@@ -188,4 +188,25 @@ describe('L11-4 发布阻断原因', () => {
     expect(state.blockedReasons.value).toEqual(['先修关系成环：栈 → 队列 → 栈', '图谱为空，没有可发布的知识点'])
     scope.stop()
   })
+
+  it.each([
+    ['vector_unavailable', '向量服务暂时不可用'],
+    ['vector_rejected', '向量服务拒绝了请求'],
+  ])('发布 503 LLM_UNAVAILABLE（%s）：给出可行动的固定文案，不回显服务端 message', async (reason, expected) => {
+    const course = { id: 'c1', name: '课', status: 'draft', my_role: 'teacher', published_version: null, created_at: 'x' }
+    const coursesApi = { get: vi.fn(async () => course) } as unknown as Pick<CoursesApi, 'get'>
+    const versionsApi: VersionsApi = {
+      list: vi.fn(async () => []),
+      publish: vi.fn(async () => { throw new ApiError(503, { code: 'LLM_UNAVAILABLE', message: '服务端原文', details: { reason } }) }),
+      rollback: vi.fn(),
+    }
+    const scope = effectScope()
+    const state = scope.run(() => useVersions({ courseId: ref('c1'), coursesApi, versionsApi, nodeNames: () => names }))!
+    await flushPromises()
+    await state.publish()
+    expect(state.error.value).toContain(expected)
+    expect(state.error.value).toContain('当前发布版本不变')
+    expect(state.error.value).not.toContain('服务端原文')
+    scope.stop()
+  })
 })

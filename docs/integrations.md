@@ -111,6 +111,9 @@
 | `EMBEDDING_DIMENSIONS` | 整数 ≥ 1 | `1024` | 向量维度；`online` 调用时作为 `dimensions` 参数发送；与返回长度或 Neo4j 索引不一致即报错 | 已签收（ADR-081） |
 | `EMBEDDING_BATCH_SIZE` | 整数 ≥ 1 | `10` | 单次向量请求的文本条数上限，不得超过供应商限制 | 已签收（ADR-081） |
 
+> 向量请求重试（ADR-095，非环境变量）：发布与建索引（无截止时间的调用方）对 `timeout`/`connection`/`rate_limited`/`server` 最多重试 2 次，退避 1 秒与 3 秒；问答查询向量带截止时间，不重试。
+
+
 ### 任务处理（只登记，不改语义）
 
 类型、默认值与语义以 `specs/task-processing.md` §5、§8.8 为准；本表与之冲突时以规格为准并回改本表。

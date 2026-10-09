@@ -180,6 +180,7 @@ function onKeydown(event: KeyboardEvent): void {
               v-model="question"
               rows="3"
               required
+              maxlength="2000"
               placeholder="向课程助教提问，比如「为什么循环队列要空出一个位置？」（Ctrl/⌘ + Enter 发送）"
               @keydown="onKeydown"
             />

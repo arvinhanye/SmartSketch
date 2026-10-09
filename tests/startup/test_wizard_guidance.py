@@ -66,12 +66,32 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
   // 7. The key field stays a password field and is never prefilled.
   assert.equal(await page.locator('#setup [name=api_key]').getAttribute('type'),'password');
   assert.equal(await val('api_key'),'');
+
+  // 8. A mistyped dimension (1021 for 1024) is refused in the page, in plain words, and never sent:
+  //    it used to pass the wizard and only fail at the first publish.
+  await page.locator('#vector-preset').selectOption('bailian');
+  assert.equal(await page.locator('#setup [name=dimensions]').getAttribute('list'),'dimension-options');
+  assert.deepEqual(await page.locator('#dimension-options option').evaluateAll(o=>o.map(x=>x.value)),['64','128','256','512','768','1024','1536','2048']);
+  await page.locator('#setup [name=dimensions]').fill('1021');
+  await page.locator('#setup [name=api_key]').fill('fixture-key-not-real');
+  await page.locator('#setup [name=teacher_username]').fill('teacher_one');
+  await page.locator('#setup [name=teacher_password]').fill('fixture-pass-one');
+  await page.locator('#setup [name=confirm_password]').fill('fixture-pass-one');
+  await page.locator('#setup button[type=submit]').click();
+  await page.locator('#message').filter({hasText:'1021'}).waitFor();
+  const refusal=await page.locator('#message').innerText();
+  assert.match(refusal,/text-embedding-v4/);
+  assert.match(refusal,/1024/);
+  assert.equal(await page.evaluate(()=>document.activeElement&&document.activeElement.name),'dimensions');
+  const sent=await (await fetch(process.env.WIZARD_URL+'/__setup_count')).json();
+  assert.equal(sent.count,0,'a refused dimension must not be sent to the launcher');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
 '''
 
 
 def test_wizard_explains_vector_fields_and_offers_a_verified_preset():
+    requests = {'setup': 0}
     state = {'phase': 'NEW', 'busy': False, 'actions': ['setup'], 'stage': '', 'needs_teacher': False}
 
     class Handler(BaseHTTPRequestHandler):
@@ -81,6 +101,8 @@ def test_wizard_explains_vector_fields_and_offers_a_verified_preset():
         def do_GET(self):
             if self.path == '/control/status':
                 data, content = json.dumps(state).encode(), 'application/json'
+            elif self.path == '/__setup_count':
+                data, content = json.dumps({'count': requests['setup']}).encode(), 'application/json'
             else:
                 name = {'/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css'}.get(self.path)
                 if name is None:
@@ -95,7 +117,9 @@ def test_wizard_explains_vector_fields_and_offers_a_verified_preset():
 
         def do_POST(self):
             self.rfile.read(int(self.headers.get('Content-Length', 0)))
-            assert self.path == '/control/exchange', 'unexpected operation'
+            if self.path == '/control/setup':
+                requests['setup'] += 1
+            assert self.path in ('/control/exchange', '/control/setup'), 'unexpected operation'
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()

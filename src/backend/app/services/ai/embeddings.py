@@ -9,7 +9,7 @@ import threading
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 
 from contextvars import ContextVar
@@ -17,9 +17,12 @@ from contextvars import ContextVar
 from app.config import Settings, embedding_model_id
 from app.repositories.model_calls import EMBEDDING_PURPOSE, CallOutcome, CallRecord
 from app.services.ai.client import EmbeddingClient, EmbeddingRequest, ModelCallError
-from app.services.ai.policy import CallStore, new_call_id
+from app.services.ai.policy import TRANSIENT_ERROR_CLASSES, CallStore, new_call_id
 
 logger = logging.getLogger(__name__)
+
+#: 无截止时间的调用方（发布、建索引）对瞬时故障的退避秒数；长度即最多重试次数的上限。
+RETRY_BACKOFF_SECONDS = (1.0, 3.0)
 
 
 @dataclass(frozen=True)
@@ -122,7 +125,13 @@ class EmbeddingAdapter:
         cache: EmbeddingCache | None = None,
         store: CallStore | None = None,
         space: str | None = None,
+        max_retries: int = 0,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        if not 0 <= max_retries <= len(RETRY_BACKOFF_SECONDS):
+            raise ValueError(f"max_retries must be between 0 and {len(RETRY_BACKOFF_SECONDS)}")
+        self._max_retries = max_retries
+        self._sleep = sleep
         self._client = client
         self._store = store
         self._cache = cache if cache is not None else EmbeddingCache()
@@ -218,23 +227,37 @@ class EmbeddingAdapter:
             if remaining is not None and remaining <= 0:
                 raise EmbeddingDeadlineExceeded("deadline reached", batch_index, completed)
             batch_texts = tuple(text for _, text in batch)
-            call_id = self._prewrite(batch_texts, batch_index, completed)   # 预写失败则不发请求
-            started = time.monotonic()
-            try:
-                response = self._client.embed(
-                    EmbeddingRequest(
-                        model=self._model,
-                        texts=batch_texts,
-                        dimensions=self._dimensions,
-                        timeout_seconds=remaining,
+            attempt = 0
+            while True:
+                call_id = self._prewrite(batch_texts, batch_index, completed)   # 预写失败则不发请求
+                started = time.monotonic()
+                try:
+                    response = self._client.embed(
+                        EmbeddingRequest(
+                            model=self._model,
+                            texts=batch_texts,
+                            dimensions=self._dimensions,
+                            timeout_seconds=remaining,
+                        )
                     )
-                )
-            except Exception as exc:
-                self._finish(call_id, started, model=None, usage=getattr(exc, "usage", None), error=exc)
-                if deadline is not None and time.monotonic() >= deadline:
-                    raise EmbeddingDeadlineExceeded("deadline reached", batch_index, completed) from exc
-                raise EmbeddingBatchError("client call", batch_index, completed) from exc
-            self._finish(call_id, started, model=response.model_responded, usage=response.usage, error=None)
+                except Exception as exc:
+                    self._finish(call_id, started, model=None, usage=getattr(exc, "usage", None), error=exc)
+                    if deadline is not None and time.monotonic() >= deadline:
+                        raise EmbeddingDeadlineExceeded("deadline reached", batch_index, completed) from exc
+                    # 只有无截止时间的调用方（发布、建索引）才重试，且只重试瞬时故障；
+                    # 每次重试都是真实的新调用，各记一条 model_calls。
+                    if (
+                        deadline is None
+                        and attempt < self._max_retries
+                        and isinstance(exc, ModelCallError)
+                        and exc.error_class in TRANSIENT_ERROR_CLASSES
+                    ):
+                        self._sleep(RETRY_BACKOFF_SECONDS[attempt])
+                        attempt += 1
+                        continue
+                    raise EmbeddingBatchError("client call", batch_index, completed) from exc
+                self._finish(call_id, started, model=response.model_responded, usage=response.usage, error=None)
+                break
 
             if response.model_requested != self._model or response.model_responded not in (None, self._model):
                 raise EmbeddingBatchError("model mismatch", batch_index, completed)

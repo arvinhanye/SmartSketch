@@ -161,6 +161,33 @@ def test_frontend_proxy_keeps_sse_unbuffered() -> None:
     assert "try_files $uri $uri/ /index.html;" in conf
 
 
+def test_frontend_proxy_lets_the_api_reject_oversize_uploads_in_the_contract_shape() -> None:
+    """Formal-mode failure path M5: nginx used to cut the body at exactly the file limit, so the user saw an
+    English HTML 413 instead of the API's ``FILE_TOO_LARGE`` JSON. The proxy limit must leave room for the
+    multipart overhead, and anything beyond even that must still answer in the contract shape."""
+    import json
+    import re
+
+    from app.api.materials import MULTIPART_OVERHEAD_BYTES
+    from app.config import Settings
+
+    conf = (ROOT / "src/frontend/nginx.conf").read_text(encoding="utf-8")
+    limit = re.search(r"client_max_body_size\s+(\d+)([km]);", conf)
+    assert limit is not None
+    proxy_bytes = int(limit.group(1)) * (1024 if limit.group(2) == "k" else 1024 * 1024)
+    file_limit = Settings().UPLOAD_MAX_BYTES
+    assert proxy_bytes >= file_limit + MULTIPART_OVERHEAD_BYTES
+    assert "error_page 413 = @file_too_large;" in conf
+    named = conf[conf.index("location @file_too_large"):]
+    named = named[: named.index("\n    }")]   # the JSON body itself contains braces
+    assert "default_type application/json;" in named
+    body = re.search(r"return 413 '(.*)';", named)
+    assert body is not None
+    payload = json.loads(body.group(1))
+    assert payload["code"] == "FILE_TOO_LARGE" and payload["message"]
+    assert payload["details"]["limit_bytes"] == file_limit
+
+
 # ---------------------------------------------------------------- image layout
 
 

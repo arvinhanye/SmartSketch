@@ -57,6 +57,11 @@ function message(cause: unknown, operation: 'load' | 'publish' | 'rollback'): st
     if (cause.code === 'PUBLISH_BLOCKED') return '发布校验未通过，请检查图谱中的环路、来源和空图问题。'
     if (cause.code === 'PUBLISH_IN_PROGRESS') return '本课程已有发布或回滚进行中，请稍后重试。'
     if (cause.code === 'COURSE_BUSY') return '课程正在写入，请稍后重试。'
+    if (cause.code === 'LLM_UNAVAILABLE') {
+      return cause.details?.reason === 'vector_rejected'
+        ? '向量服务拒绝了请求：请到「模型 API 设置」检查向量地址、密钥、模型与维度，修正后再发布。当前发布版本不变。'
+        : '向量服务暂时不可用（网络波动或服务繁忙），请稍后重试发布。当前发布版本不变。'
+    }
     if (cause.status === 404 && operation === 'rollback') return '目标版本不存在或不可用，请刷新版本历史。'
   }
   if (cause instanceof NetworkError || cause instanceof TimeoutError) return '请求结果未确认，请重新加载以核对当前发布版本。'

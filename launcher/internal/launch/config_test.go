@@ -3,6 +3,7 @@ package launch
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,6 +94,41 @@ func TestSetupRejectsBadFields(t *testing.T) {
 	in.Embedding.APIKey = NewSecret("")
 	if ValidateSetup(in) == nil {
 		t.Fatal("blank API key")
+	}
+}
+
+// Formal-mode failure path: a typo such as 1021 passed the wizard and only failed at the first publish (HTTP 500).
+// For models whose supported dimensions are known, the launcher refuses the typo up front and says what is valid.
+func TestSetupRejectsUnsupportedDimensionsForKnownModels(t *testing.T) {
+	for _, model := range []string{"text-embedding-v4", " Text-Embedding-V4 "} {
+		in := setupFixture()
+		in.Embedding.Model = model
+		in.Embedding.Dimensions = 1021
+		err := ValidateSetup(in)
+		var f *Failure
+		if !errors.As(err, &f) || f.Code != "FIELD" || f.Stage != "dimensions" {
+			t.Fatalf("%q/1021 not refused as a dimensions error: %v", model, err)
+		}
+		for _, want := range []string{"text-embedding-v4", "1024", "2048", "64"} {
+			if !strings.Contains(f.Message, want) {
+				t.Fatalf("message %q lacks %q", f.Message, want)
+			}
+		}
+		for _, d := range []int{64, 128, 256, 512, 768, 1024, 1536, 2048} {
+			in.Embedding.Dimensions = d
+			if err := ValidateSetup(in); err != nil {
+				t.Fatalf("%q/%d refused: %v", model, d, err)
+			}
+		}
+	}
+}
+
+func TestSetupDoesNotGuessDimensionsForUnknownModels(t *testing.T) {
+	in := setupFixture()
+	in.Embedding.Model = "some-other-embedding"
+	in.Embedding.Dimensions = 1021
+	if err := ValidateSetup(in); err != nil {
+		t.Fatalf("unknown model must keep the free dimension: %v", err)
 	}
 }
 

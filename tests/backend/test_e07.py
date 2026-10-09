@@ -5,7 +5,12 @@ import math
 import pytest
 
 from app.config import Settings
-from app.services.ai.client import ModelRateLimitedError
+from app.services.ai.client import (
+    ModelAuthError,
+    ModelConnectionError,
+    ModelInvalidRequestError,
+    ModelRateLimitedError,
+)
 from app.services.ai.embeddings import (
     EmbeddingAdapter,
     EmbeddingBatchError,
@@ -22,6 +27,8 @@ def adapter(
     dimensions: int = 4,
     batch_size: int = 2,
     cache: EmbeddingCache | None = None,
+    max_retries: int = 0,
+    sleeps: list[float] | None = None,
 ) -> EmbeddingAdapter:
     settings = Settings(
         EMBEDDING_MODE=mode,
@@ -29,7 +36,10 @@ def adapter(
         EMBEDDING_DIMENSIONS=dimensions,
         EMBEDDING_BATCH_SIZE=batch_size,
     )
-    return EmbeddingAdapter(settings, client, cache=cache)
+    return EmbeddingAdapter(
+        settings, client, cache=cache, max_retries=max_retries,
+        sleep=(sleeps.append if sleeps is not None else (lambda _seconds: None)),
+    )
 
 
 def test_empty_batch_makes_no_client_call() -> None:
@@ -183,3 +193,50 @@ def test_non_string_input_is_rejected_before_client_call() -> None:
     with pytest.raises(ValueError, match="texts"):
         service.embed(["a", 4])
     assert client.calls == ()
+
+
+# --- transient-failure retries (formal-mode failure paths M7): only deadline-less callers (publish, indexing)
+
+
+def test_transient_failure_is_retried_for_callers_without_a_deadline() -> None:
+    client = FakeEmbeddingClient()
+    client.script(ModelConnectionError("emb-v1"), ModelRateLimitedError("emb-v1"))
+    sleeps: list[float] = []
+    service = adapter(client, mode="online", model="emb-v1", max_retries=2, sleeps=sleeps)
+    vectors = service.embed(["a"])
+    assert len(vectors) == 1
+    assert [call.request.texts for call in client.calls] == [("a",), ("a",), ("a",)]
+    assert len(sleeps) == 2 and all(delay > 0 for delay in sleeps) and sleeps[1] > sleeps[0]
+
+
+def test_retries_are_bounded_and_the_last_error_is_the_cause() -> None:
+    client = FakeEmbeddingClient()
+    client.script(*(ModelConnectionError("emb-v1") for _ in range(5)))
+    service = adapter(client, mode="online", model="emb-v1", max_retries=2)
+    with pytest.raises(EmbeddingBatchError) as info:
+        service.embed(["a"])
+    assert len(client.calls) == 3
+    assert isinstance(info.value.__cause__, ModelConnectionError)
+
+
+@pytest.mark.parametrize("error", [ModelAuthError("emb-v1"), ModelInvalidRequestError("emb-v1")])
+def test_permanent_failures_are_never_retried(error) -> None:
+    client = FakeEmbeddingClient()
+    client.script(error)
+    sleeps: list[float] = []
+    service = adapter(client, mode="online", model="emb-v1", max_retries=2, sleeps=sleeps)
+    with pytest.raises(EmbeddingBatchError):
+        service.embed(["a"])
+    assert len(client.calls) == 1 and sleeps == []
+
+
+def test_a_deadline_disables_retries_so_qa_latency_stays_bounded() -> None:
+    import time
+
+    client = FakeEmbeddingClient()
+    client.script(ModelConnectionError("emb-v1"))
+    sleeps: list[float] = []
+    service = adapter(client, mode="online", model="emb-v1", max_retries=2, sleeps=sleeps)
+    with pytest.raises(EmbeddingBatchError):
+        service.embed(["a"], deadline=time.monotonic() + 30)
+    assert len(client.calls) == 1 and sleeps == []

@@ -1954,6 +1954,7 @@ export interface components {
             content: string;
         };
         ChatRequest: {
+            /** @description 问题文本，最多 2000 字；超出返回 422 `VALIDATION_ERROR`，不会触发任何模型或向量调用。 */
             question: string;
             /** @description 多轮上下文，供问题改写补全指代 */
             history?: components["schemas"]["ChatTurn"][];
@@ -3697,6 +3698,18 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublishBlockedError"] | components["schemas"]["PublishConflictError"];
+                };
+            };
+            /** @description 存储不可用（`STORAGE_UNAVAILABLE`），或发布期向量化失败（`LLM_UNAVAILABLE`）：
+             *     `details.reason = vector_unavailable`（网络波动、限流、服务繁忙；已自动重试，稍后重试即可）或
+             *     `vector_rejected`（向量地址、密钥、模型或维度被供应商拒绝，需先修正向量配置）。两种情况当前已发布版本均保持不变。
+             *      */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
