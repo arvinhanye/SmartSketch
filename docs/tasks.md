@@ -2009,3 +2009,8 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - E2E（演示模式）教师 + 学生用例通过；个人模式 4/4 通过（首次与全量门禁并发时 3 项失败：1 项旧搜索断言、2 项负载超时，隔离重跑通过）。
 - 最终门禁（提交 c8c33fb 上单独运行）：`./scripts/verify.sh integration` PASS 退出 0：后端 3975 passed/27 登记 skipped，前端 1194 passed + build，集成 393 passed/4 skipped，图库专项 44 passed，E2E 教师+学生 2 passed、个人模式 4 passed；`verify.sh basic` PASS。详见 `docs/handoffs/claude-ui-review-20261008.md`。
 - 未验证：真实供应商、付费模型、历史“暂不补测”三项；教师页首屏缩放策略（见交接建议）未改。
+
+## 2026-10-08 Claude：教师图谱首屏总览与径向布局（用户确认方案）
+
+- CLAUDE-TEACHER-OVERVIEW-20261008：DONE；负责人 Claude。输入为复审建议第 1 项经用户确认：教师页首屏改“整图适应”，并为单章大树增加径向布局。输出：`radialEngine` + `prefersRadial`（`graph/chapterLayout.ts`）、生命周期 `initialView/edgeStyle`、增强器 `fitPads`、画布 `arrangement/initialView/fitPads` 属性、教师工具栏“径向”选项与默认推荐、总览模式下定位自动放大到可读缩放。不改后端、接口、数据与学生图谱页。
+- 验收：新增径向引擎 7 项、生命周期 6 项、教师页 3 项单测；浏览器中首屏整图可见且默认径向（64 节点）、层次/径向/力导向切换小地图保持、选中定位放大到 0.9、适应画布回到总览；教师视口回归与教师 E2E 通过。最终门禁见交接 `docs/handoffs/claude-teacher-overview-20261008.md`。

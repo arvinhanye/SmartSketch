@@ -35,8 +35,14 @@ const props = withDefaults(
     positions?: Positions | null
     /** 章节外框成员（知识点 ID）；null 为没有 */
     scope?: readonly string[] | null
+    /** 给了位置时的排布形态：层次/章节（竖向曲线边，缺省）或径向（直线边） */
+    arrangement?: 'layered' | 'radial'
+    /** 首屏：`readable` 按可读缩放聚焦入口节点（学生页）；`overview` 先整图适应进视口（教师页） */
+    initialView?: 'readable' | 'overview'
+    /** 整组适应时四周留白（像素），缺省按学生页的浮层 */
+    fitPads?: Partial<{ left: number; right: number; top: number; bottom: number }>
   }>(),
-  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null },
+  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined },
 )
 
 const emit = defineEmits<{ nodeClick: [kpId: string]; blankClick: [] }>()
@@ -103,7 +109,7 @@ function showTip(info: { kpId: string; clientX: number; clientY: number } | null
 }
 
 function start(attempt = 0): void {
-  if (stage.value === null || props.graph === null || !ready.value) return
+  if (stage.value === null || props.graph === null || !ready.value || lifecycle !== null) return
   // 小地图容器被 G6 摘掉、新容器还没挂上（组件本身在文档里）：等 DOM 更新后再建。
   // 组件在 KeepAlive 或未挂到文档时 isConnected 恒为 false，所以只在根节点已连接时等待，且最多重试几次
   if (attempt < 3 && props.enhanced && mini.value !== null && root.value?.isConnected === true && !mini.value.isConnected) {
@@ -116,6 +122,8 @@ function start(attempt = 0): void {
     data: toRaw(props.graph),
     layout: props.layout,
     positions: props.enhanced && props.positions !== null ? toRaw(props.positions) : null,
+    edgeStyle: props.arrangement === 'radial' ? 'straight' : 'vertical',
+    initialView: props.initialView,
     enhance: props.enhanced
       ? {
           obstacles: () => (stage.value !== null && registry !== null ? registry.boxes(stage.value) : { hard: [], soft: [] }),
@@ -123,6 +131,7 @@ function start(attempt = 0): void {
           reduceMotion: () => reduced.value,
           onBlankClick: () => emit('blankClick'),
           onHover: showTip,
+          fitPads: props.fitPads,
         }
       : undefined,
     factory,
@@ -210,6 +219,14 @@ watch(
     if (props.enhanced) {
       if (lifecycle !== null) retry()
     } else lifecycle?.setLayout(layout)
+  },
+)
+
+// 排布形态变了（边的画法不同）：增强模式下重建；位置同时变化时由位置侦听负责，start() 对重复调用是幂等的
+watch(
+  () => props.arrangement,
+  () => {
+    if (props.enhanced && lifecycle !== null) retry()
   },
 )
 

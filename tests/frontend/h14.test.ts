@@ -908,6 +908,50 @@ describe('教师图谱：面板选择与画布、关系页保持同步', () => {
   })
 })
 
+describe('教师图谱：首屏总览与径向布局', () => {
+  const radios = (wrapper: VueWrapper) => wrapper.findAll('[role="radiogroup"][aria-label="布局"] label').map((l) => l.text())
+  const checked = (wrapper: VueWrapper) =>
+    wrapper.findAll('[role="radiogroup"][aria-label="布局"] input').findIndex((i) => (i.element as HTMLInputElement).checked)
+
+  it('首屏总览整张图（initial-view=overview），布局选项含径向', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const canvas = wrapper.findComponent(GraphCanvas)
+    expect(canvas.props('initialView')).toBe('overview')
+    expect(radios(wrapper)).toEqual(['层次', '径向', '力导向'])
+  })
+
+  it('节点少、层次布局形状正常时默认层次；手动切到径向后画布换用径向位置与直线边', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const canvas = wrapper.findComponent(GraphCanvas)
+    await vi.waitFor(() => expect(canvas.props('positions')).not.toBeNull())
+    expect(checked(wrapper)).toBe(0)
+    expect(canvas.props('arrangement')).toBe('layered')
+    const layered = canvas.props('positions')
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[1]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('arrangement')).toBe('radial')
+    expect(canvas.props('layout')).toBe('hierarchical')
+    expect(canvas.props('positions')).not.toBe(layered)
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[2]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('layout')).toBe('force')
+    expect(canvas.props('arrangement')).toBe('layered')
+  })
+
+  it('一章里几十个节点挂在同一个根下（层次布局会被拉成长条）：默认选径向；教师手动选过之后不再被自动改回', async () => {
+    const nodes = [kp('root'), ...Array.from({ length: 40 }, (_, i) => kp(`n${i}`))]
+    const edges = Array.from({ length: 40 }, (_, i) => ({ ...rel(`r${i}`, 'root', `n${i}`), type: 'CONTAINS' }) as Relation)
+    const { wrapper } = await mountPage(fakes({ nodes, edges }))
+    const canvas = wrapper.findComponent(GraphCanvas)
+    await vi.waitFor(() => expect(canvas.props('arrangement')).toBe('radial'))
+    expect(checked(wrapper)).toBe(1)
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[0]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('arrangement')).toBe('layered')
+    expect(checked(wrapper)).toBe(0)
+  })
+})
+
 describe('教师知识点面板调宽', () => {
   it('键盘可调整并限制宽度，切换详情/编辑后保留选择和宽度', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200)

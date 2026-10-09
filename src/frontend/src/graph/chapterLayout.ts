@@ -80,6 +80,134 @@ export const g6DagreEngine: DagreEngine = async (ids, edges, o) => {
   return pos
 }
 
+/**
+ * 径向布局引擎（可替换 {@link g6DagreEngine}）：先修/包含关系按最长路径分层，每个节点取「上一层」的一个父节点形成生成树，
+ * 根在圆心（多个根时排在第一圈），子树按叶子数占据连续扇区。适合单章里一棵大树被层次布局拉成 10:1 长条的情形。
+ * 不属于生成树的边照常画，只是不参与摆位。同输入同输出。
+ */
+export const radialEngine: DagreEngine = async (ids, edges) => {
+  const pos: Positions = new Map()
+  if (ids.length === 0) return pos
+  const known = new Set(ids)
+  const typed = edges.filter((e) => known.has(e.source) && known.has(e.target) && e.source !== e.target) as Array<{
+    source: string
+    target: string
+    type?: string
+  }>
+  // 最长路径深度；迭代次数封顶，坏数据（环）不会死循环
+  const depth = new Map(ids.map((id) => [id, 0]))
+  for (let round = 0; round < ids.length; round += 1) {
+    let changed = false
+    for (const e of typed) {
+      const next = depth.get(e.source)! + 1
+      if (next > depth.get(e.target)! && next < ids.length) {
+        depth.set(e.target, next)
+        changed = true
+      }
+    }
+    if (!changed) break
+  }
+  // 父节点：深度恰好少 1 的入边来源，包含关系优先，其次按 id 排序；找不到就当根
+  const parent = new Map<string, string>()
+  for (const id of [...ids].sort()) {
+    const d = depth.get(id)!
+    if (d === 0) continue
+    const candidates = typed
+      .filter((e) => e.target === id && depth.get(e.source) === d - 1)
+      .sort((a, b) => Number(b.type === 'CONTAINS') - Number(a.type === 'CONTAINS') || a.source.localeCompare(b.source))
+    if (candidates[0] !== undefined) parent.set(id, candidates[0].source)
+  }
+  const children = new Map<string, string[]>()
+  const roots: string[] = []
+  for (const id of [...ids].sort()) {
+    const p = parent.get(id)
+    if (p === undefined) roots.push(id)
+    else children.set(p, [...(children.get(p) ?? []), id])
+  }
+  // 树内的真实层数（根为 0）
+  const level = new Map<string, number>()
+  const order: string[] = []
+  const walk = [...roots]
+  for (const r of roots) level.set(r, 0)
+  while (walk.length > 0) {
+    const id = walk.shift()!
+    order.push(id)
+    for (const c of children.get(id) ?? []) {
+      level.set(c, level.get(id)! + 1)
+      walk.push(c)
+    }
+  }
+  const weight = new Map<string, number>()
+  for (const id of [...order].reverse()) {
+    const kids = children.get(id) ?? []
+    weight.set(id, kids.length === 0 ? 1 : kids.reduce((sum, k) => sum + weight.get(k)!, 0))
+  }
+  const single = roots.length === 1
+  const ring = (id: string) => level.get(id)! + (single ? 0 : 1)
+  // 角度：子树按权重平分父节点的扇区
+  const angle = new Map<string, number>()
+  const assign = (id: string, from: number, to: number) => {
+    angle.set(id, (from + to) / 2)
+    let cursor = from
+    const total = weight.get(id)!
+    for (const c of children.get(id) ?? []) {
+      const span = ((to - from) * weight.get(c)!) / total
+      assign(c, cursor, cursor + span)
+      cursor += span
+    }
+  }
+  const totalWeight = roots.reduce((sum, r) => sum + weight.get(r)!, 0)
+  let cursor = -Math.PI / 2
+  for (const r of roots) {
+    const span = (2 * Math.PI * weight.get(r)!) / totalWeight
+    assign(r, cursor, cursor + span)
+    cursor += span
+  }
+  // 半径：每圈至少比上一圈远一个间距，并且该圈上相邻节点的弧长不小于最小间距
+  const SPACING = 66
+  const RING_GAP = 96
+  // 教师画布是宽画布（约 1.8:1）：横向拉伸成椭圆，适应视口时缩放更大；只拉伸 x，节点间距不会变小
+  const STRETCH_X = 1.5
+  const rings = new Map<number, string[]>()
+  for (const id of order) rings.set(ring(id), [...(rings.get(ring(id)) ?? []), id])
+  const radius = new Map<number, number>()
+  let previous = single ? 0 : -RING_GAP + 0
+  for (const k of [...rings.keys()].sort((a, b) => a - b)) {
+    if (single && k === 0) {
+      radius.set(0, 0)
+      previous = 0
+      continue
+    }
+    const onRing = rings.get(k)!.map((id) => angle.get(id)!).sort((a, b) => a - b)
+    let minGap = 2 * Math.PI
+    for (let i = 0; i < onRing.length; i += 1) {
+      const next = i === onRing.length - 1 ? onRing[0]! + 2 * Math.PI : onRing[i + 1]!
+      minGap = Math.min(minGap, next - onRing[i]!)
+    }
+    const needed = onRing.length > 1 ? SPACING / Math.max(minGap, 0.001) : 0
+    const r = Math.min(8000, Math.max(previous + RING_GAP, needed, single ? 0 : RING_GAP))
+    radius.set(k, r)
+    previous = r
+  }
+  for (const id of order) {
+    const r = radius.get(ring(id))!
+    const a = angle.get(id)!
+    pos.set(id, r === 0 ? { x: 0, y: 0 } : { x: Math.round(r * Math.cos(a) * STRETCH_X * 100) / 100, y: Math.round(r * Math.sin(a) * 100) / 100 })
+  }
+  return pos
+}
+
+/** 层次布局被拉成长条（宽高比 > 3）且节点不少时，推荐径向布局作为默认视图 */
+export function prefersRadial(pos: Positions): boolean {
+  if (pos.size < 24) return false
+  const pts = [...pos.values()]
+  const xs = pts.map((p) => p.x)
+  const ys = pts.map((p) => p.y)
+  const w = Math.max(...xs) - Math.min(...xs)
+  const h = Math.max(...ys) - Math.min(...ys)
+  return w / Math.max(h, 1) > 3
+}
+
 const isHierarchy = (type: RelationType): boolean => type === 'PREREQUISITE' || type === 'CONTAINS'
 
 /**

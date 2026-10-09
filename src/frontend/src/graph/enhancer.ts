@@ -1,5 +1,5 @@
 import { nodeElementId } from './adapter'
-import { bottomPad, computeFit, DEFAULT_PADS } from './fit'
+import { bottomPad, computeFit, DEFAULT_PADS, type FitPads } from './fit'
 import { hoverStateMap, isForcedLabel, labelScore } from './focusStates'
 import { planLabels, type Box, type LabelCandidate } from './labelPlan'
 import type { CanvasEdge, CanvasGraph, CanvasNode, GraphEvent } from './lifecycle'
@@ -29,6 +29,8 @@ export interface EnhanceOptions {
   onHover?: (info: { kpId: string; clientX: number; clientY: number } | null) => void
   /** 点击画布空白处（取消预览） */
   onBlankClick?: () => void
+  /** 整组适应时四周留白（像素），缺省按学生页的搜索栏与右侧工具；教师页没有顶部浮层，可收紧 */
+  fitPads?: Partial<FitPads>
 }
 
 export interface EnhancerDeps {
@@ -378,7 +380,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     const fit = computeFit({
       points,
       viewport: { width, height },
-      pads: { ...DEFAULT_PADS, bottom: bottomPad(hard, height) },
+      pads: { ...DEFAULT_PADS, ...options.fitPads, bottom: bottomPad(hard, height, options.fitPads?.bottom) },
       nodeRadius: 24 * view.floors.nodeK,
       bottomExtra: 48 * view.labelK * 0.4,
     })

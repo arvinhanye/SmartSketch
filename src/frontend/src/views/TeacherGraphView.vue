@@ -18,6 +18,7 @@ import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
 import { useGraphLayout } from '../composables/useGraphLayout'
 import { kpIdFromElementId } from '../graph/adapter'
+import type { GraphLayoutName } from '../graph/lifecycle'
 import { chapterOptions, locateNode, useGraphFilters } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
@@ -223,7 +224,23 @@ const layoutSource = computed(() => {
     chapterOrder: [...chapters.value].sort((a,b) => a.order - b.order || a.id.localeCompare(b.id)).map(c => c.id),
   }
 })
-const { positions, error: layoutError } = useGraphLayout(() => layoutSource.value)
+const { positions, radialPositions, recommended, error: layoutError } = useGraphLayout(() => layoutSource.value, undefined, true)
+
+// 排布：层次（章节分区）/ 径向 / 力导向。层次布局把单章大树拉成长条时，默认用径向；教师手动选择后不再自动改
+type Arrangement = 'hierarchical' | 'radial' | 'force'
+const arrangement = ref<Arrangement>('hierarchical')
+let arrangementChosen = false
+function chooseArrangement(next: GraphLayoutName | 'radial'): void {
+  arrangementChosen = true
+  arrangement.value = next
+}
+watch(recommended, (next) => {
+  if (next !== null && !arrangementChosen) arrangement.value = next
+})
+const canvasLayout = computed<GraphLayoutName>(() => (arrangement.value === 'force' ? 'force' : 'hierarchical'))
+const canvasPositions = computed(() => (arrangement.value === 'radial' && radialPositions.value !== null ? radialPositions.value : positions.value))
+// 教师页没有顶部浮层：整图适应时上、左留白收紧；右侧与底部仍避开缩放工具与小地图
+const TEACHER_FIT_PADS = { left: 40, top: 40, right: 96 }
 // 面板只在有限高度内滚动；宽度调整不会改变草稿或选择状态。
 const workspace = ref<HTMLElement | null>(null)
 const workspaceWidth = ref(0)
@@ -313,12 +330,14 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
         <aside class="teacher-graph__filters" aria-label="筛选">
           <GraphToolbar
             v-model="filters.state.value"
-            v-model:layout="filters.layout.value"
+            :layout="arrangement"
             :chapters="chapterList"
             :summary="summary"
             :can-clear="!isDefault"
             :selected-hidden="selectedHidden"
             compact
+            radial
+            @update:layout="chooseArrangement"
             @clear="filters.clear"
             @locate="onLocate"
           >
@@ -345,7 +364,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="visible" :layout="filters.layout.value" :enhanced="!layoutError" :positions="positions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <GraphCanvas ref="canvas" :graph="visible" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div
