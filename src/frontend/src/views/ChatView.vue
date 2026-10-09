@@ -34,6 +34,17 @@ function submitQuestion(): void {
 }
 const selectedCitation = ref<Citation | null>(null)
 const notice = ref('')
+// “涉及的知识点”一次可能有二十多个：默认只显示前 KP_COLLAPSED 个，其余按回答展开
+const KP_COLLAPSED = 8
+const expandedKps = ref<ReadonlySet<number>>(new Set())
+function visibleKpIds(entry: { id: number; relatedKpIds: readonly string[] }): readonly string[] {
+  return expandedKps.value.has(entry.id) ? entry.relatedKpIds : entry.relatedKpIds.slice(0, KP_COLLAPSED)
+}
+function toggleKps(entryId: number): void {
+  const next = new Set(expandedKps.value)
+  if (!next.delete(entryId)) next.add(entryId)
+  expandedKps.value = next
+}
 watch(courseId, () => { selectedCitation.value = null; notice.value = '' })
 
 // 回答带回 graph_version 后，按该版本读一次已发布图谱，放进课程作用域（切课即作废）
@@ -127,7 +138,7 @@ function onKeydown(event: KeyboardEvent): void {
               <p v-if="entry.status === 'error'" class="state" role="alert">本次回答未完成</p>
               <p v-if="entry.relatedKpIds.length && (entry.status === 'answered' || entry.status === 'not_covered')" class="kps">
                 <span class="kps__label">涉及的知识点：</span>
-                <template v-for="id in entry.relatedKpIds" :key="id">
+                <template v-for="id in visibleKpIds(entry)" :key="id">
                   <!-- L13-4：跳到本课程图谱并选中该知识点；带上回答所依据的图谱版本，图谱页据此提示版本差异 -->
                   <RouterLink
                     v-if="graphLinkAvailable && courseId"
@@ -141,6 +152,16 @@ function onKeydown(event: KeyboardEvent): void {
                     {{ kpLabel(id) }}
                   </button>
                 </template>
+                <button
+                  v-if="entry.relatedKpIds.length > KP_COLLAPSED"
+                  type="button"
+                  class="kps__more"
+                  data-test="chat-kp-toggle"
+                  :aria-expanded="expandedKps.has(entry.id)"
+                  @click="toggleKps(entry.id)"
+                >
+                  {{ expandedKps.has(entry.id) ? '收起' : `展开全部 ${entry.relatedKpIds.length} 个` }}
+                </button>
               </p>
               <button v-if="entry.status === 'error' || entry.status === 'aborted'" type="button" :disabled="sending" @click="ask(entry.question)">重试</button>
             </div>
@@ -243,6 +264,7 @@ function onKeydown(event: KeyboardEvent): void {
   padding: 0.1rem 0.7rem;
   font-weight: 500;
 }
+.kps__more { background: transparent; border: 0; color: var(--color-primary-hover); font-weight: 500; padding: 0.1rem 0.4rem; text-decoration: underline; cursor: pointer; }
 .kps__chip:hover:not(:disabled) { background: var(--color-primary-soft); border-color: var(--color-primary); }
 .compose { display: grid; gap: .5rem; }
 .compose textarea { font: inherit; }

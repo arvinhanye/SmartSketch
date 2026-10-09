@@ -2019,3 +2019,8 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 
 - CLAUDE-TEACHER-LEGEND-20261009：DONE；负责人 Claude。输入为用户在后续建议中选定的两项（电脑端优先，手机端暂不考虑）。输出：`NodeTypeLegend.vue`（类型图例，计数 + 点击筛选，与工具栏筛选同一状态）、总览标签统计提示（增强器 `onLabels` 回调 → 画布左下角提示）、“放大到可读大小”按钮（生命周期 `zoomToReadable`）、径向横向拉伸 1.9。不改后端、接口、数据；学生页仅多了一个共用画布按钮。
 - 验收：新增图例组件 2 项、教师页接线 1 项、生命周期 2 项、画布按钮/提示 2 项单测；浏览器 1440×900 中隐藏“概念”类 64→9 个节点、恢复后 64；“放大到可读大小”后缩放 0.9 且提示消失；教师视口回归与教师 E2E 通过。门禁：`verify.sh basic` PASS；前端门禁（类型检查+全量 64 文件/1217 条+build）PASS；后端/集成未重跑（仅前端改动）。详见 `docs/handoffs/claude-teacher-legend-20261009.md`。
+
+## 2026-10-09 Claude：前端优化批次 3（用户选定 3–7，电脑端优先）
+
+- CLAUDE-POLISH-BATCH3-20261009：DONE；负责人 Claude。输出：① 教师图谱布局按课程记入本浏览器（`useArrangementPreference`）；② 问答“涉及的知识点”默认 8 个、可展开；③ 入口图标统一（`navIcons.ts` 单一来源，新增文档/书本图标，成员不再用概览图标）；④ 除登录页外的页面路由级按需加载（`lazyView`：失败自动重试 2 次，仍失败显示提示）；⑤ `scripts/e2e.sh` 清理加强制结束保险（`scripts/_stop-procs.sh`）。不改后端、接口、数据与权限。
+- 验收：单测新增（布局记忆 3、问答折叠 1、图标 3、lazyView 3、强制结束 3）；浏览器 1440×900：刷新后仍保持所选布局、标签 8/27 可展开、7 个导航图标互不相同；E2E 教师+学生对按需加载版本通过。实测（登录页，限速约 1.5 Mbps，缓存关闭，5 次取中位）：1387 ms → 903 ms（-35%），传输 164 KB → 73 KB，入口 JS 437 → 155 KB；G6（1.4 MB）本就是动态加载，未变。门禁（`5ce0a79`）：`./scripts/verify.sh integration` PASS 退出 0：后端 3978 passed/27 登记 skipped，前端 66 文件/1227 passed + 类型检查 + build，集成 393 passed/4 skipped，图库专项 44，E2E 教师+学生 2、个人模式 4 passed。详见 `docs/handoffs/claude-polish-batch3-20261009.md`。

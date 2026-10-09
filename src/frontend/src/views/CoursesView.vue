@@ -4,6 +4,7 @@ import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
+import { DESTINATION_ICONS } from '../components/navIcons'
 import CourseList from '../components/courses/CourseList.vue'
 import CourseOverview from '../components/courses/CourseOverview.vue'
 import CourseCreate from '../components/courses/CourseCreate.vue'
@@ -134,12 +135,12 @@ const entryLinks = computed(() => {
   const add = (visible:boolean,name:string,test:string,label:string,description:string,icon:string) => {
     if (visible) entries.push({test,label,description,icon,to:{name,params:{cid:c.id}}})
   }
-  add(hasStudentGraph && c.myRole === 'student',STUDENT_GRAPH_ROUTE,'student-graph-link','浏览课程图谱','查看知识点、掌握进度与学习路径。','graph')
-  add(hasTeacherGraph && c.myRole === 'teacher',TEACHER_GRAPH_ROUTE,'teacher-graph-link','编辑课程图谱（草稿）','检查与维护知识点及其关系。','graph')
-  add(hasReview && c.myRole === 'teacher',REVIEW_ROUTE,'review-link','审核队列','审核抽取结果并发布课程图谱。','check')
-  add(hasMaterials && c.myRole === 'teacher',MATERIALS_ROUTE,'materials-link','资料上传与处理进度','上传课程资料，查看处理状态。','chapters')
-  add(hasChat && c.myRole === 'student',CHAT_ROUTE,'chat-link','课程问答','依据已发布资料提问并查看出处。','chat')
-  add(hasMembersRoute && c.myRole === 'teacher',COURSE_MEMBERS_ROUTE,'members-link','管理成员','添加课程成员并管理课程内身份。','overview')
+  add(hasStudentGraph && c.myRole === 'student',STUDENT_GRAPH_ROUTE,'student-graph-link','浏览课程图谱','查看知识点、掌握进度与学习路径。',DESTINATION_ICONS.graph)
+  add(hasTeacherGraph && c.myRole === 'teacher',TEACHER_GRAPH_ROUTE,'teacher-graph-link','编辑课程图谱（草稿）','检查与维护知识点及其关系。',DESTINATION_ICONS.graph)
+  add(hasReview && c.myRole === 'teacher',REVIEW_ROUTE,'review-link','审核队列','审核抽取结果并发布课程图谱。',DESTINATION_ICONS.review)
+  add(hasMaterials && c.myRole === 'teacher',MATERIALS_ROUTE,'materials-link','资料上传与处理进度','上传课程资料，查看处理状态。',DESTINATION_ICONS.materials)
+  add(hasChat && c.myRole === 'student',CHAT_ROUTE,'chat-link','课程问答','依据已发布资料提问并查看出处。',DESTINATION_ICONS.chat)
+  add(hasMembersRoute && c.myRole === 'teacher',COURSE_MEMBERS_ROUTE,'members-link','管理成员','添加课程成员并管理课程内身份。',DESTINATION_ICONS.members)
   return entries
 })
 </script>

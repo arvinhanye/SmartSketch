@@ -179,6 +179,8 @@ type Fakes = ReturnType<typeof fakes>
 let pinia: Pinia
 
 beforeEach(() => {
+  // 布局偏好按课程记在 localStorage：每个用例从干净状态开始，互不影响
+  window.localStorage.clear()
   sessionStorage.clear()
   pinia = createPinia()
   setActivePinia(pinia)
@@ -949,6 +951,43 @@ describe('教师图谱：首屏总览与径向布局', () => {
     await flushPromises()
     expect(canvas.props('arrangement')).toBe('layered')
     expect(checked(wrapper)).toBe(0)
+  })
+})
+
+describe('教师图谱：按课程记住布局偏好', () => {
+  const KEY = 'smartsketch.teacher-graph.arrangement.c1'
+  const radios = (wrapper: VueWrapper) => wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')
+  const checkedIndex = (wrapper: VueWrapper) => radios(wrapper).findIndex((i) => (i.element as HTMLInputElement).checked)
+  beforeEach(() => window.localStorage.removeItem(KEY))
+
+  it('手动选择布局后记入本浏览器；下次进入同一课程直接使用，即使推荐值不同', async () => {
+    const first = await mountPage(fakes())
+    expect(checkedIndex(first.wrapper)).toBe(0)
+    await radios(first.wrapper)[2]!.setValue(true)
+    await flushPromises()
+    expect(window.localStorage.getItem(KEY)).toBe('force')
+    first.wrapper.unmount()
+    const second = await mountPage(fakes())
+    expect(checkedIndex(second.wrapper)).toBe(2)
+    expect(second.wrapper.findComponent(GraphCanvas).props('layout')).toBe('force')
+  })
+
+  it('记住的值无效或被篡改时忽略，仍按推荐值', async () => {
+    window.localStorage.setItem(KEY, 'spiral')
+    const { wrapper } = await mountPage(fakes())
+    expect(checkedIndex(wrapper)).toBe(0)
+  })
+
+  it('浏览器存储不可用（读写抛异常）时页面照常工作，布局只在本次页面内生效', async () => {
+    const get = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied') })
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied') })
+    const { wrapper } = await mountPage(fakes())
+    expect(checkedIndex(wrapper)).toBe(0)
+    await radios(wrapper)[1]!.setValue(true)
+    await flushPromises()
+    expect(checkedIndex(wrapper)).toBe(1)
+    get.mockRestore()
+    set.mockRestore()
   })
 })
 

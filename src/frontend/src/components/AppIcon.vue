@@ -14,6 +14,8 @@ const PATHS: Record<string, string> = {
   map: '<path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20z"/><path d="M9 4v13.5M15 6.5V20"/>',
   filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
   chapters:'<path d="M5 6h14M5 11h14M5 16h9M5 21h6"/>',
+  file: '<path d="M7 3.5h7.5L19 8v12.5H7z"/><path d="M14.5 3.5V8H19M10 13h6M10 17h6"/>',
+  book: '<path d="M5 5.5A2 2 0 0 1 7 3.5h12v14H7a2 2 0 0 0-2 2z"/><path d="M5 19.5a2 2 0 0 0 2 2h12v-4M9.5 8h6"/>',
   search:'<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
