@@ -29,6 +29,8 @@ export interface EnhanceOptions {
   onHover?: (info: { kpId: string; clientX: number; clientY: number } | null) => void
   /** 点击画布空白处（取消预览） */
   onBlankClick?: () => void
+  /** 每次重排标签后回报“当前显示几个标签 / 共几个节点”，页面据此提示“放大可看到更多标签” */
+  onLabels?: (shown: number, total: number) => void
   /** 整组适应时四周留白（像素），缺省按学生页的搜索栏与右侧工具；教师页没有顶部浮层，可收紧 */
   fitPads?: Partial<FitPads>
 }
@@ -234,6 +236,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
       }
       const next = planNow()
       if (next === null) return
+      options.onLabels?.(next.size, nodes.length)
       const prev = view.labelShown
       if (prev !== null && prev.size === next.size && [...next].every((id) => prev.has(id))) return
       view = { ...view, labelShown: next }

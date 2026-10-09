@@ -352,6 +352,34 @@ describe('首屏总览与径向布局的边', () => {
     expect(g2.calls.some((c) => c.startsWith('zoomTo '))).toBe(false)
   })
 
+  it('标签重排后回报“显示几个 / 共几个”', async () => {
+    const onLabels = vi.fn()
+    const m = lowZoom()
+    createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance: { ...enhance, onLabels }, positions, initialView: 'overview' })
+    await settle()
+    expect(onLabels).toHaveBeenCalled()
+    const [shown, total] = onLabels.mock.calls.at(-1)!
+    expect(total).toBe(2)
+    expect(shown).toBeGreaterThanOrEqual(0)
+    expect(shown).toBeLessThanOrEqual(2)
+  })
+
+  it('zoomToReadable：低于可读缩放时放大到 0.9；已经够大则不动', async () => {
+    const m = lowZoom()
+    const life = createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance, positions, initialView: 'overview' })
+    await settle()
+    const g = m.graphs[0]!
+    g.zoom = 0.3
+    g.calls.length = 0
+    life.zoomToReadable()
+    await settle()
+    expect(g.calls).toContain('zoomTo 0.9')
+    g.calls.length = 0
+    life.zoomToReadable()
+    await settle()
+    expect(g.calls.some((c) => c.startsWith('zoomTo '))).toBe(false)
+  })
+
   it('整组适应的留白可由页面收紧（教师页没有顶部浮层）', async () => {
     const wide = lowZoom()
     createGraphLifecycle(box(), { data: sample(), factory: wide.factory, enhance, positions, initialView: 'overview' })

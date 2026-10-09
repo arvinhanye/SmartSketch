@@ -190,6 +190,8 @@ export interface GraphLifecycle {
   zoomBy(ratio: number): void
   /** 增强模式：节点在视口外时才把镜头移过去（面板里的显式选择） */
   ensureVisible(kpId: string): void
+  /** 缩放低于可读缩放时放大到可读缩放（以视口中心为准），已经够大则不动 */
+  zoomToReadable(): void
   /** 增强模式：浮层出现、消失、展开收起后重新排布标签 */
   relayoutLabels(): void
   /** 增强模式：指针离开整个画布容器时结束悬停淡化 */
@@ -681,6 +683,17 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     zoomBy(ratio) {
       if (!alive() || enhancer === null || graph === null) return
       enqueue(() => enhancer.zoomBy(ratio))
+    },
+    zoomToReadable() {
+      if (!alive() || graph === null) return
+      enqueue(async () => {
+        const g = graph
+        if (g === null || g.getZoom === undefined || g.zoomTo === undefined || g.getZoom() >= READABLE_ZOOM) return
+        await g.zoomTo(READABLE_ZOOM, false)
+        if (!alive()) return
+        reportZoom(g)
+        await enhancer?.afterRender()
+      })
     },
     ensureVisible(kpId) {
       if (!alive() || enhancer === null || graph === null) return

@@ -153,7 +153,7 @@ describe('GraphCanvas 增强模式', () => {
     await settle()
     const group = wrapper.get('[role="group"][aria-label="地图与缩放"]')
     const names = group.findAll('button').map((b) => b.attributes('aria-label'))
-    expect(names).toEqual(['收起小地图', '放大', '缩小', '适应画布'])
+    expect(names).toEqual(['收起小地图', '放大', '缩小', '适应画布', '放大到可读大小'])
     await group.get('[aria-label="放大"]').trigger('click')
     await group.get('[aria-label="缩小"]').trigger('click')
     await group.get('[aria-label="适应画布"]').trigger('click')
@@ -213,6 +213,25 @@ describe('GraphCanvas 增强模式', () => {
     expect(wrapper.get('.gw-mini').element.isConnected).toBe(true)
     expect(graphs[2]!.init!.minimap?.container).toBe(wrapper.get('.gw-mini').element)
     wrapper.unmount()
+  })
+
+  it('“放大到可读大小”按钮：缩放过小时放大到 0.9', async () => {
+    const { wrapper, graphs } = setup()
+    await settle()
+    graphs[0]!.zoom = 0.3
+    graphs[0]!.calls.length = 0
+    await wrapper.get('[data-test="zoom-readable"]').trigger('click')
+    await settle()
+    expect(graphs[0]!.calls).toContain('zoomTo 0.9')
+    wrapper.unmount()
+  })
+
+  it('标签统计提示默认不出现（学生页不传 showLabelStat）；教师页的出现条件由浏览器验证覆盖', async () => {
+    const stat = (w: ReturnType<typeof setup>['wrapper']) => w.find('[data-test="label-stat"]')
+    const student = setup()
+    await settle()
+    expect(stat(student.wrapper).exists()).toBe(false)
+    student.wrapper.unmount()
   })
 
   it('位置重新计算（位置 → null）时拆掉旧画布并显示加载，新位置到了再重建，且回到最近一次聚焦的节点', async () => {
