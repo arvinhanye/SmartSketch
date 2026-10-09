@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getActivePinia } from 'pinia'
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, routeLocationKey, routerKey, type RouteLocationRaw } from 'vue-router'
 import {
   CHAT_ROUTE,
@@ -16,6 +16,8 @@ import {
   STUDENT_GRAPH_ROUTE,
   TEACHER_GRAPH_ROUTE,
 } from './router'
+import AppIcon from './components/AppIcon.vue'
+import AppTopbar, { type Crumb } from './components/AppTopbar.vue'
 import { readCourseDetail } from './composables/courseDetailRequest'
 import { COURSES_API_KEY } from './api/courses'
 import { useCourseStore } from './stores/course'
@@ -23,6 +25,9 @@ import { MODEL_CONFIG_API_KEY } from './api/modelConfig'
 import { useRuntimeStore } from './stores/runtime'
 import { useSessionStore } from './stores/session'
 import './styles.css'
+// 图谱工作区 tokens 与组件样式（新命名空间 --ss-* / --gw-*，不改现有 --color-*）
+import './styles/tokens.css'
+import './styles/graph-workspace.css'
 
 const appName = '智绘学途'
 // 未安装路由时（如 B02 单独挂载外壳）只渲染标题，不报错
@@ -143,6 +148,63 @@ const settingsLink = computed<RouteLocationRaw | null>(() =>
 )
 const settingsActive = computed(() => route?.name === SETTINGS_ROUTE)
 
+// ---------------------------------------------------------------- 图谱页的暗色外壳（UI-GRAPH-PILOT-01）：顶栏 + 64px 图标栏
+// 只有学生图谱页用它；其他页面沿用左侧栏，推广到其他页面前保持原样。
+const graphShell = computed(() => withSidebar.value && route?.name === STUDENT_GRAPH_ROUTE)
+const NAV_ICONS: Record<string, string> = {
+  我的课程: 'home',
+  课程概览: 'overview',
+  知识图谱与学习路径: 'graph',
+  课程问答: 'chat',
+  '模型 API 设置': 'key',
+}
+const railItems = computed(() => {
+  const items: Array<{ label: string; to: RouteLocationRaw; active: boolean; icon: string }> = []
+  if (homeLink.value !== null) items.push({ label: '我的课程', to: homeLink.value, active: homeActive.value, icon: 'home' })
+  for (const item of courseNav.value) items.push({ ...item, icon: NAV_ICONS[item.label] ?? 'overview' })
+  if (settingsLink.value !== null) items.push({ label: '模型 API 设置', to: settingsLink.value, active: settingsActive.value, icon: 'key' })
+  return items
+})
+const crumbs = computed<Crumb[]>(() => {
+  const list: Crumb[] = []
+  if (homeLink.value !== null) list.push({ label: '我的课程', to: homeLink.value })
+  const cid = courseId.value
+  if (cid !== null && router !== null && router.hasRoute(COURSE_ROUTE)) list.push({ label: '课程', to: { name: COURSE_ROUTE, params: { cid } } })
+  list.push({ label: '知识图谱' })
+  return list
+})
+const railExpanded = ref(false)
+const vw = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const railVisible = computed(() => vw.value >= 1024)
+const navDrawer = ref(false)
+const drawer = ref<HTMLElement | null>(null)
+function onResize(): void {
+  vw.value = window.innerWidth
+  if (vw.value >= 1024) navDrawer.value = false
+}
+function openNav(): void {
+  navDrawer.value = true
+  void nextTick(() => drawer.value?.querySelector<HTMLElement>('a, button')?.focus())
+}
+function closeNav(): void {
+  navDrawer.value = false
+  void nextTick(() => document.querySelector<HTMLElement>('[data-test="app-menu"]')?.focus())
+}
+function onNavKey(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && navDrawer.value) {
+    event.stopPropagation()
+    closeNav()
+  }
+}
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+  window.addEventListener('keydown', onNavKey, true)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  window.removeEventListener('keydown', onNavKey, true)
+})
+
 function signOut(): void {
   session?.signOut()
   void router?.replace({ name: ROOT_ROUTE })
@@ -150,7 +212,15 @@ function signOut(): void {
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--workbench': withSidebar, 'app--login': onLoginPage }">
+  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--login': onLoginPage }">
+    <AppTopbar
+      v-if="graphShell"
+      :crumbs="crumbs"
+      :user="`${session?.user?.username ?? ''} · ${roleLabel}`"
+      :show-menu="!railVisible"
+      @menu="openNav"
+      @sign-out="signOut"
+    />
     <header v-if="!withSidebar" class="app-header">
       <div class="app-header-inner">
         <span class="app-logo" aria-hidden="true">智</span>
@@ -158,7 +228,7 @@ function signOut(): void {
         <p class="app-tagline">AIGC 课程知识图谱智能构建与学习导航</p>
       </div>
     </header>
-    <main class="app-main">
+    <main class="app-main" :class="{ 'app-main--graph': graphShell }">
       <div v-if="notice" class="app-notice" role="alert">
         <span>{{ notice }}</span>
         <button type="button" class="app-notice__close" aria-label="关闭提示" @click="dismissedNotice = true">×</button>
@@ -166,7 +236,49 @@ function signOut(): void {
       <RouterView v-if="route" />
     </main>
     <!-- 侧栏在 DOM 中位于主内容之后，读屏与键盘先到页面内容；视觉上由网格放在左侧 -->
-    <aside v-if="withSidebar" class="app-sidebar" aria-label="导航">
+    <nav v-if="graphShell && railVisible" class="app-rail" :class="{ 'is-expanded': railExpanded }" aria-label="主导航">
+      <RouterLink
+        v-for="item in railItems"
+        :key="item.label"
+        :to="item.to"
+        class="app-rail__item"
+        :class="{ 'is-current': item.active }"
+        :aria-current="item.active ? 'page' : undefined"
+        :aria-label="railExpanded ? undefined : item.label"
+        :title="item.label"
+      >
+        <AppIcon :name="item.icon" :size="18" />
+        <span v-if="railExpanded" class="app-rail__label">{{ item.label }}</span>
+      </RouterLink>
+      <button
+        type="button"
+        class="app-rail__toggle"
+        :aria-label="railExpanded ? '收起导航' : '展开导航，显示名称'"
+        :aria-expanded="railExpanded"
+        @click="railExpanded = !railExpanded"
+      >
+        <AppIcon :name="railExpanded ? 'collapse' : 'expand'" :size="18" />
+        <span v-if="railExpanded" class="app-rail__label">收起导航</span>
+      </button>
+    </nav>
+    <template v-if="graphShell && navDrawer">
+      <div class="app-scrim" aria-hidden="true" @click="closeNav" />
+      <nav ref="drawer" class="app-drawer" aria-label="主导航" role="dialog">
+        <button type="button" class="app-iconbtn app-drawer__close" aria-label="关闭导航" @click="closeNav"><AppIcon name="close" /></button>
+        <RouterLink
+          v-for="item in railItems"
+          :key="item.label"
+          :to="item.to"
+          class="app-rail__item is-wide"
+          :class="{ 'is-current': item.active }"
+          :aria-current="item.active ? 'page' : undefined"
+          @click="closeNav"
+        >
+          <AppIcon :name="item.icon" :size="18" /><span class="app-rail__label">{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+    </template>
+    <aside v-if="withSidebar && !graphShell" class="app-sidebar" aria-label="导航">
       <div class="app-sidebar__brand">
         <span class="app-logo" aria-hidden="true">智</span>
         <h1>{{ appName }}</h1>
