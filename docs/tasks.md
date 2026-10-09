@@ -2324,3 +2324,23 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - STARTUP-16 源码检查点：旧代码新回归5个顶层FAIL/1 PASS（含3个恢复输入子例失败），最小修改后Go全量PASS，最终race/vet PASS；定向Python20 PASS；真实合成Docker旧migrated混合大小写恢复1 PASS（211.26秒），保留原ID/首次密码/配置。隔离basic exit0，full仍执行中，不把检查点当作完成。
 
 - STARTUP-16最终：DONE（修复/草稿交付；用户下载/实机签收OPEN）。源码5f45a5c已推codex/startup-hotfix-20261006；最终race/vet/定向20/真实合成旧状态恢复1 PASS；无.env隔离full单次exit0，backend+tooling3952/27登记skip/1既有warning，frontend934/typecheck/build PASS。三平台包内容与SHA核对、新草稿404525654 draft/prerelease true、7附件远端SHA一致，target精准5f45a5c。保留旧运行兼容ID，不改用户配置/卷/首次密码、业务镜像或迁移；不合并/公开/冻结。P3诊断丢阶段、Mac信任及ARM/Win实机仍OPEN。报告docs/reviews/codex-startup-hotfix-release-20261006.{md,json}与自身handoff已更新。
+
+## 2026-10-09 Claude：正式交付闭环检查（FORMAL-RELEASE-01，用户指示）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| FORMAL-RELEASE-01 | IN_PROGRESS（P1 源码就绪、P2 候选镜像与包、P3 隔离安装已完成；P4 业务闭环被向量网络问题阻塞，已交接） | Claude（主）/ DeepSeek harness（向量网络定位） | 以真实启动器 + 向导 + 个人模型 API（DeepSeek）+ 在线向量（百炼）验证"要交付的软件是否可用"：安装 → 向导 → 教师登录 → 配置模型 → 上传示例章节 → 审核发布 → 学生问答，再测失败路径与生命周期；通过后才合并启动器 PR、推送正式镜像、出完整安装包 | 每步有证据（截图/日志/命令输出）；测试通过与浏览器验收分别报告；真实调用用量熔断 100 万 token；仅实测本机 Mac Intel（darwin-amd64） |
+
+- 已决（用户，2026-10-09）：生成模型默认 DeepSeek，向量沿用阿里云百炼 `text-embedding-v4`（1024 维）；启动器分支 `codex/startup-hotfix-20261006` 合入当前 main；先本地验证再推镜像；真实调用用量上限 100 万 token；材料用仓库示例章节 `datasets/demo/ch3-stack-queue.md`；实测平台仅 Mac Intel；Go 工具链用 1.26.8。
+- 进度与证据：
+  - P1：分支 `claude/release-launcher-merge`（`43939b7`，仅本地）。合并仅 5 处冲突（`ci.yml` + 4 个文档，均保留两边）；`verify.sh` basic、前端门禁 1279 条、启动包 tooling 测试 13 条通过；官方启动器门禁 `scripts/verify/startup.sh`（Go 1.26.8）通过。
+  - 冒烟：本地新镜像上 `tests/startup/test_release_smoke.py` 3 个场景（启动/登录/停止/重启、两个安装互相独立、备份恢复）通过（409 秒）；向导浏览器测试 2 条通过。此前 3 个场景因 Docker 虚拟机被三个常驻 Neo4j 占满 CPU 而超时，重启 Docker Desktop 后消失（环境问题，非代码问题）。
+  - P2：经用户批准，推送候选镜像 `ghcr.io/arvinhanye/smartsketch-backend:rc-43939b7`（`sha256:c6e2ca0d14d915651a89d4a78aa1f5f620d8a1142097f304760d4d39869fbbd6`）与 `smartsketch-frontend:rc-43939b7`（`sha256:085b0f17f60d042b51a26d982d7fb29dae27933ca5ebd0d3242edf7592cdd95b`），仅 linux/amd64，两个包均为 public；镜像自检无 `.env`/私钥/数据库文件；清单 `packaging/release-manifest.rc-43939b7.json`（未提交）；用 Go 1.26.8 交叉编译三平台启动器并打包到 `dist/packages/`（`SHA256SUMS` 已生成，`dist/` 被 Git 忽略）。
+  - P3：真实启动器在隔离 `HOME` 下启动，向导完成后 4 个容器健康、`127.0.0.1:18080` 可访问，镜像由 ghcr 匿名拉取成功。
+- 阻塞：从 API 容器到 `dashscope.aliyuncs.com:443`——DNS 0.3 秒解析正常，TCP 对 `39.96.198.249`、`39.96.213.166` 均 8 秒超时（`api.deepseek.com` 0.46 秒连通；Docker Desktop 配了代理 `http.docker.internal:3128`，容器内无代理变量）。已写交接稿 `docs/handoffs/claude-formal-embedding-network-deepseek-handoff.md` 交 DeepSeek harness 定位；在向量路径恢复前不上传资料。
+- 安装包制作时待处理（用户 2026-10-09 提出，**本轮不改**）：
+  1. 向导缺少填写指引：普通用户不知道向量 API 地址、模型名、维度怎么填；应给出说明、示例或预设（可参考「模型 API 设置」的供应商预设），并说明默认值不是对所有模型通用。
+  2. 向导里的向量配置与软件内的向量设置重复：现在教师可在「模型 API 设置」里配置课程级向量（ADR-092），与向导的系统级向量配置功能重叠；需先决定单一入口与优先级（如向导只设系统默认、软件内为课程覆盖）再改文案与流程，涉及 ADR-081/092 的修订。
+  3. 登录页出现原生滚动条：根因是 `div.auth-layout__form` 设了 `overflow-y: auto`，窗口较矮（1280×800 起就会出现，实测 1000×592 溢出 227px）时表单列装不下，浏览器在深色页上画出浅色滚动条；应让页面自然滚动或压缩间距，而不是内部滚动条。
+- 之后的出包前置：向量路径恢复并通过 P4/P5 → 修复上述待处理项（前端有改动需重建镜像并重推，换新摘要和清单）→ 启动器 PR 合入 main 且 CI 变绿 → 再打包。
+- 本机环境：Go 1.26.8（`/usr/local/go`）、Docker Desktop 重启过一次；隔离安装位于会话临时目录，用户原安装目录未触碰；用户此前误删了自己原安装的容器（数据卷未核实）。
