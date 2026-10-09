@@ -84,7 +84,7 @@ def _action(body: object) -> dict[str, Any]:
     if not isinstance(body, dict):
         raise RequestValidationError([{"type": "model_attributes_type", "loc": ("body",)}])
     item = body.get("item")
-    if item not in _ACTIONS:
+    if not isinstance(item, str) or item not in _ACTIONS:
         raise RequestValidationError([{"type": "missing" if "item" not in body else "union_tag_invalid",
                                        "loc": ("body", "item")}])
     target, actions = _ACTIONS[item]

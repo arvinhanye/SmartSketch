@@ -119,12 +119,12 @@ def _run(request: Request, access: CourseAccess, operation: Any, status: int = 2
 
 
 def _field_error(key: str, value: object) -> str | None:
-    if key == "type":
-        return None if value in _TYPES else "enum" if isinstance(value, str) else "string_type"
-    if key == "status":
-        return None if value in _STATUSES else "enum" if isinstance(value, str) else "string_type"
     if not isinstance(value, str):
         return "string_type"
+    if key == "type":
+        return None if value in _TYPES else "enum"
+    if key == "status":
+        return None if value in _STATUSES else "enum"
     return None if value else "string_too_short"
 
 
