@@ -2206,3 +2206,121 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - 本节授权覆盖上文「仅发布、不合并」的历史边界，仅针对 #329。输入为已发布修复及 GitHub CI；输出为实际合并记录，合并时精确匹配已通过 head，主线变更/冲突或检查失败时停止合并，不把局部门禁/旧 head 结果当作最终通过。
 - 使用 merge commit 保留 main 上 `e111315ffabdc5ce980afdf525b8321ef572dc8e` 真实旧 worker 实验的 pinned 历史祖先；无产品/测试/数据模型改动。最终文档提交同样等待其全部 CI；GitHub PR 保留最终合并提交与时间，工作区保留。
 - 当前已发布 head `b835c456` 的 push run `37916694886` 与 pull_request run `37916702362` 全部八项 SUCCESS。实测 base `2e4d1c20`、MERGEABLE/CLEAN；backend+tooling 4149 passed/27 既有登记 skip，frontend 1227 passed（66 文件）及 type-check/build，integration 462 passed/4 既有登记 skip，backend-live 44，演示 E2E 2、个人 E2E 4；无新增 skip。日志及精确 head/base/check 快照 `/private/tmp/smartsketch-enum-merge-20261009/`。本最终授权/证据补充只改任务与交接文档；重新运行 basic，正常推送后仍等新 head 全部 CI 成功再执行条件合并，不把 b835c456 的检查外推到新 head。
+
+
+## 2026-10-04 Codex 认领：STARTUP-01 跨平台双击入口与安装向导设计
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| STARTUP-01 | DONE（设计已获用户确认，2026-10-04；非功能完成） | Codex | docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md、当前登记、方向决策/集成边界、Codex交接 | 本机双击入口＋首次向导＋Docker的架构、状态、配置与数据保护、账号引导、平台验收明确；用户审核本文后才写实施计划 |
+
+- 用户已确认采用“双击入口＋安装向导＋Docker”，继续保留 Web 业务；没有批准尚未存在的实施计划或原生桌面应用。
+- 输入：bdb89c46、现有 Compose/Dockerfile/start.sh、ADR-080/081、身份规格；输出：正式待审核设计与交接。写入范围仅文档，未改业务代码/配置/数据。
+- 已核对：Compose完整应用基础可复用；后端镜像未打包教师引导脚本；学生注册已存在；开发启动依赖宿主Python/npm，发行入口需独立。共用Go启动核心已随规格获用户确认，当前未安装新依赖。
+- 风险：Windows/Intel Mac实机、预构建多架构镜像、镜像仓库发布权限仍需实施期落实；本期只管理新的独立安装或自身已有安装，不自动迁移当前工作区的课程库。
+- 验证：./scripts/verify.sh basic（实际命令未传参数，使用默认basic）exit 0；git diff --check exit 0；设计自审无实现占位。日志 /private/tmp/smartsketch-startup-design-basic-retry.log。首次因PATH缺/usr/local/bin的契约工具而exit 1，未计PASS；补齐既有工具路径后重跑。full/integration及启动器定向/三平台实测未执行，不计PASS。
+- 当前：规格已获用户确认；未决为实施计划审核/执行方式→发行镜像发布授权与各平台实机资源。全局向量业务设置保持CANCELLED_BY_USER；向导只生成本机环境配置，不改ADR-081。
+- 交接：docs/handoffs/codex-cross-platform-startup-design.md。stage_c_status OPEN；technical_freeze NOT_PERFORMED；本轮生成调用0、在线向量0，未操作共享或测量数据库、未推送合并。
+
+
+## 2026-10-04 Codex 认领：STARTUP-02 启动方案实施计划
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| STARTUP-02 | DONE（计划/本会话执行已获用户同意） | Codex | docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md、已确认规格的状态更新、项目文档及Codex交接 | 九项任务明确文件/接口/红绿测试/提交/隔离与实机验收；用户审核计划并选择执行方式后才进入产品实现 |
+
+- 用户本轮“确认”批准正式规格，允许编写计划；不视为已批准此前不存在的实施计划、真实调用、镜像发布或技术冻结。
+- 输入：d517eeb的正式规格、既有代码bdb89c46；输出：T1–T9实施计划与交接。规划只改文档，不新增Go/Python/脚本代码、构建依赖或运行配置。
+- T1/STARTUP-03配置/权限/锁；T2/04受控Docker；T3/05教师引导；T4/06发行编排/探测；T5/07生命周期；T6/08向导/诊断；T7/09备份恢复；T8/10打包/CI；T9/11隔离门禁/平台实测。全部PLANNED（未执行、未另认领）。
+- 验证：默认basic ./scripts/verify.sh exit 0（日志/private/tmp/smartsketch-startup-plan-basic.log；受限工作区pytest缓存写入产生警告，不影响测试退出）；git diff --check exit 0；任务/接口/规格覆盖自审。第一次基础检查权限审批超时，未执行；之后默认权限重跑完成，未规避代码测试。
+- 未验证：新启动器、三平台打包/双击、Go定向测试、发行镜像、full/integration。当前无Go；Go1.26.8按官方发布记录选择，实施获批后再准备开发工具链。
+- 风险：新增部署核心接管密码/本机Docker控制，必须完成权限/所有权/跨站门禁回归；恢复要保留原卷；Windows/Mac Intel实机和GHCR权限尚未落实，不计PASS。
+- 交接：docs/handoffs/codex-cross-platform-startup-plan.md。生成调用0、在线向量0；未读真实.env、未启动容器、未改业务/测量库、未推送合并；stage_c_status OPEN，technical_freeze NOT_PERFORMED。
+
+
+## 2026-10-04 Codex：STARTUP 实施（本会话执行已批准）
+
+- STARTUP-03（T1）IMPLEMENTED（最终本地验收见2026-10-05收尾），负责人Codex；范围launcher配置/状态/权限/锁；验收对应批准计划回归，Windows实机项单列OPEN。后续04–11按依赖执行；不发布/推送/真实调用/冻结。
+- 用户本轮“同意”确认计划并选择native执行；正式规格不变。隔离分支codex/cross-platform-startup-design，基线8b3267e，真实.env不读取/复制。测试副本通过git archive创建于/private/tmp/smartsketch-startup-exec，仅含已跟踪源码；开发SDK仅临时解压，不安装系统。
+
+## 2026-10-05 STARTUP 实现验收（Codex）
+
+| 任务 | 当前状态 | 证据 / 剩余 |
+|---|---|---|
+| STARTUP-03～08（T1～6） | IMPLEMENTED / 本地回归已测 | 私有配置、实例控制、教师引导、发行编排、就绪/停启、认证向导；实机项另列 |
+| STARTUP-09（T7） | LOCAL_VERIFIED / 实机OPEN | 真实合成卷整组/重复恢复通过；确认操作/源卷保留/根权限/WAL/完整租约回归通过，非用户业务库签收 |
+| STARTUP-10（T8） | IMPLEMENTED / 未发行 | 三平台编译和打包测试通过；Windows/ARM 实机 OPEN；真实摘要未填写 |
+| STARTUP-11（T9） | LOCAL_VERIFIED / PLATFORM_RELEASE_OPEN | 7fee1c8完整integration exit0、定向29/真实Docker3 PASS；独立复审未有完整clean结论；三平台正式包与发行验收仍OPEN |
+
+- 最新审查及交接：docs/reviews/codex-startup-platform-validation.md、docs/handoffs/codex-cross-platform-startup-implementation.md。
+- 升级/恢复控制仅属 loopback 启动层，不改变业务 API/DTO/迁移；备份含密钥，仅留本机私有目录。
+- 正式镜像、下载包发布需另行授权；不从测试本地标签或虚构摘要生成正式清单。现有 scripts/start.sh 继续适用于原开发环境。
+- stage_c_status=OPEN、technical_freeze=NOT_PERFORMED；无收费模型/在线向量请求、无 push/merge。
+
+
+## 2026-10-05 STARTUP 收尾：本地验证通过，平台／发行未签收
+
+负责人Codex。最终启动器/业务工具代码7fee1c88f870cee1af4a17bee9536bf244baf80c；后续仅文档登记。基于批准计划补齐独立复审提出的令牌权限、写入中断、候选重试、重复恢复、端口确认；真实Docker阶段另修实际挂载代际核验、WAL只读挂载与离线门禁，并复用既有完整租约检查。修复全部有失败回归／合成现场证据，原断言与用例保留。
+
+- 无.env冻结快照+env -i，最终 ./scripts/verify.sh integration exit0：backend+tooling3948 PASS/27登记SKIP；frontend934 PASS/type-check/build；integration393 PASS/4登记SKIP；backend-live44 PASS；演示E2E2、个人假供应商E2E4 PASS。
+- Go race47 PASS/3显式opt-in Docker SKIP、vet exit0；3平台CGO=0编译exit0（非实机）。安装/探测/备份/打包/浏览器定向29 PASS；真实本地镜像三场景3 PASS（641.38s），登录停启/双安装隔离/整组重复恢复。
+- 审查报告docs/reviews/codex-startup-platform-validation.md；摘要docs/reviews/startup-verification.json；交接docs/handoffs/codex-cross-platform-startup-implementation.md；用户指南docs/startup-guide.md。完整本地日志在本工作区忽略且私有的.superpowers验证目录，无个人凭据/业务正文。
+- 仍OPEN：独立整支复审完整结论（reviewer用量中断，已收到发现均处理）；Mac Intel正式包、Mac ARM、Windows11真实双击/ACL/WSL2、中文路径、拉取中断；GHCR多架构真实摘要、匿名拉取、正式包SHA与下载渠道。不得用测试adapter/跨编译冒充正式发行。
+- 本轮未推送/合并/发布、未自动迁移旧开发安装、未改共享Neo4j/测量区、真实生成/向量调用0；生成844451/900000、向量12005另计不变。当前本地分支保留，需用户另授权正式发行。
+- stage_c_status OPEN、technical_freeze NOT_PERFORMED，用户检查与冻结决定保留；不因启动器门禁通过改写计划C历史未测项、准确率签收方式或归因缺口。
+
+
+## 2026-10-05 STARTUP-12：实际安装包与配置至登录验收
+
+负责人 Codex；状态 IN_PROGRESS。用户要求继续完整“双击→配置→启动→登录”，接续 STARTUP-10/11 的发行缺口，不重复已完成源码任务。
+- 输入：e88b56a（源码7fee1c8）、批准规格/计划；输出：真实镜像摘要、版本匹配的三目标包、当前 Mac 的真实入口/向导/登录验证记录、更新用户指南与Codex交接。
+- 范围：发行构建/打包/验收资产及必要回归修复；不改旧e92f或Claude/测量工作区，不读取个人.env，不用业务库。
+- 依赖：本机 Docker Desktop、已校验 Go SDK、GitHub/GHCR发布权限；公开镜像发布单独等待用户答复。未获许可不push/发布。
+- 验收：正式摘要而非测试标签/adapter，真实启动器进入向导、隔离新安装、教师浏览器登录、重开复用；Windows/ARM无实机则OPEN，跨编译不冒充实测。
+- 风险：网络/注册表权限、冷拉取耗时、未签名系统提示。仅处理本轮新合成资源；不prune、不触及原发布、共享Neo4j；不调用真实生成/在线向量。
+- 验证：干净git archive副本，官方Dockerfiles镜像构建；scripts/package-launcher.py及SHA核对；Go race/vet与相关pytest；有代码修改则补红绿及./scripts/verify.sh integration，无代码修改至少basic；实际包入口和浏览器全链路。
+- stage_c_status OPEN；technical_freeze NOT_PERFORMED；生成844451/900000、向量12005另计不变。
+
+STARTUP-12 发布授权：用户已明确同意将后端/前端镜像发布GHCR并设公开，制作本地安装包；GitHub设备授权packages权限已完成。此授权不含合并分支或技术冻结。干净后端第一次PyPI依赖查询失败；官方PyPI与一次性容器确认固定版本存在，未降级/改版本，保持Dockerfile重跑继续。Go首次回环监听受sandbox限制，获准隔离目录重跑race/vet exit0，前端双架构官方构建exit0；均不冒充正式包登录证据。
+
+STARTUP-12当前收尾检查点（非完成）：本地源码8314092/9e8b4a1；真实GHCR双架构镜像已上传，仍Private；UI公开步骤被审批要求临近确认，已询问，未绕过。3份真实摘要包生成并SHA3 OK，dist/startup-preview-20261005保留。真实Mac入口/向导/非法口令拒绝通过，private pull401失败未到登录，0本安装运行残留。独立复审4 Important已修正/明确缩小口径，4红绿helper PASS；Minor输出canary扫描deferred。完整integration首次缺默认浏览器exit1（其他层已过），指定Chrome纠正重跑后台36170仍运行，接续先读结果。报告docs/reviews/codex-startup-delivery-20261005.md、JSON startup-delivery-verification.json、交接docs/handoffs/codex-startup-delivery-20261005.md。OPEN直到公开匿名拉取与实际登录验收；technical_freeze NOT_PERFORMED。
+
+STARTUP-12公开接续（2026-10-05）：用户临近确认“现在将两个GHCR镜像设为Public”；已在GitHub UI逐个提交并观察两包Public。空auth/无密钥助手配置匿名拉取两个固定摘要exit0（warm cache，不代表冷下载速度），未动用户原Docker配置。首次临时context自动选择osxkeychain，首次拉取不计匿名证据；纠正后通过。完整integration重跑session36170实际exit0：backend3949/27登记SKIP、frontend934、integration393/4登记SKIP、backend-live44、演示E2E2、个人fake E2E4；文档basic98359 exit0。实际公开包隔离验收session62895仍在运行，尚不签收登录/跨平台。stage_c_status OPEN；technical_freeze NOT_PERFORMED。
+
+STARTUP-12后续实际结果：匿名PASS；公开包自动验收62895整体FAIL（首次就绪及教师登录已达成，重复入口完成前失败），保留原失败。另独立系统Chrome观察：真实入口→就绪→打开软件按钮→同一教师/teacher→第二入口exit0/既有服务页面已验证；不等同Finder双击。停止确认CDP超时，按钮完成未测；标签核对只stop本fixture，0残留、卷保留，控制器已退出。public-docs-basic43928 exit0。OPEN待自动重复用例诊断、停止UI与平台补验；无冻结、推送合并或真实模型调用。
+
+## 2026-10-05 STARTUP-13：GitHub Release下载测试草稿
+
+负责人Codex；状态DONE（仅草稿和附件，不代表发行验收）。用户明确请求创建Release草稿，范围仅草稿及既有三平台安装包、SHA256SUMS、清单和启动说明附件；不发布、不推源码/合并、不冻结。输入：已校验preview-20261005-e88b56a包与公开镜像；输出：可登录下载的草稿URL/附件核验与Codex交接。无API/DTO/迁移变化。风险：构建源码尚未推送，草稿暂存已核对main SHA，并在说明中明确不代表附件源码、发布前阻断源码/Tag对齐；平台与重复验收缺口保留。验收：draft=true、prerelease=true、附件名/大小/逐个SHA与本地一致；定向打包测试与无.env副本./scripts/verify.sh basic。公开发布/源码推送另行征询用户。
+
+STARTUP-13实际交付：Release ID403670008，draft=true/prerelease=true，URL https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936；三包＋SHA256SUMS＋release-manifest.json＋START-HERE.md共6附件上传state=uploaded，远端大小及SHA均等于本地。3小附件认证回下载逐字节一致；大包可选回下载网络缓慢，02:34停止并保留部分文件，不计完整下载PASS。未创建Tag ref，不推源码/合并，不公开发布；草稿暂存已核对main SHA，不代表构建源码，正文已写发布阻断。隔离basic98260 exit0，打包/发行定向10 PASS。交接docs/handoffs/codex-startup-release-draft-20261005.md，摘要docs/reviews/startup-release-draft-20261005.json。待用户从GitHub下载Mac Intel包人工测试；STARTUP-12、stage_c_status仍OPEN，technical_freeze NOT_PERFORMED；公开发布前需另批源码同步及准确Tag绑定。
+
+## 2026-10-05 STARTUP-14：下载后Mac入口Killed:9
+
+负责人Codex；状态IN_PROGRESS/发行签收OPEN。输入：用户Downloads实际包、PID44020错误；输出：已定位的签名/隔离证据、SIGKILL诊断回归、明确启动说明及交接。只读检查确认二进制SHA9116108b...与发布一致，unsigned且有com.apple.quarantine；spctl exit3/no usable signature，syspolicyd明确Gatekeeper rejection PID44020。不是Docker或个人API故障。本机可用Developer ID Application身份数0；完整分发修复需用户提供签名条件，不读取私钥。修复范围先补入口137条件诊断，不把提示修复冒充信任修复；不自动删quarantine、不更改Gatekeeper或用户配置、数据库，不重发镜像/替换Release附件。先写SIGKILL/成功/其他错误回归，运行定向测试与无.env副本verify.sh basic。未知平台和签收状态保持OPEN。
+
+STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功/其他失败回归先2 RED/1 PASS，修后打包7 PASS、完整打包发行13 PASS，diff-check无误。basic50362仍RUNNING（B14已过，负向契约阶段在执行），未记PASS。用户答复无Apple账号/证书，选择继续测试预览版；由用户本人审阅系统单程序“仍要打开”，代理未执行信任或删隔离。下载信任/完整启动仍OPEN；原下载包、Release附件、系统安全设置和数据未改。详见Codex故障handoff/review。
+
+
+## 2026-10-06 STARTUP-15：Intel 下载包启动失败排查
+
+- 负责人：Codex；状态 IN_PROGRESS，仅定位，不改用户配置、容器、课程或发布版本。
+- 输入：用户报告 Intel 预览包启动失败；复用 STARTUP-14 与原包，不重编、不重发。输出：只读证据、原因与自身交接。
+- 依赖/风险：安装状态 ERROR，未记录失败阶段；需用户提供脱敏诊断。读取安装非敏感字段与镜像清单，不读取 .env、控制令牌或 API Key，不发模型/向量请求。
+- 验证：下载二进制 SHA-256、Docker engine 与本安装容器/卷状态、公开镜像清单探针；未知归因保持 OPEN。源码/接口/模型无变更。
+
+- 实际检查点：用户诊断 PROCESS/unknown；最小 PATH 的缓存镜像 pull exit1（凭据助手缺失），仅补 ~/.docker/bin 后 exit0。Docker正常、本安装无容器/卷；下载SHA一致。发现P2路径继承与P3诊断丢阶段，尚未采集用户实际启动 PATH，唯一归因与完整启动保持OPEN。仅文档记录，未修包/配置/源码。报告 docs/reviews/codex-intel-startup-failure-20261006.md，自身交接 docs/handoffs/codex-intel-startup-failure-20261006.md；完整门禁未跑，未冻结。
+
+- 第二次诊断接续：用户 (1).json 与截图明确失败 teacher/PROCESS，checkpoint=migrated，Neo4j healthy/三卷存在。当前根因为用户名含大写，前端允许/状态原样、后端转小写、启动器精确比较误判。固定发行后端断网临时合成库复现exit0：创建成功但比较false，重入保留ID与原密码；未读取用户库/凭据。P2及旧状态恢复回归方案已追加报告。状态仍OPEN（仅定位；尚未修包/源码/用户配置、完整启动未验）；不删库重装、不冻结。
+
+
+## 2026-10-06 STARTUP-16：启动器热修复与新版草稿 Release
+
+- 负责人 Codex；状态 IN_PROGRESS；用户明确要求修复并提交新草稿。范围：用户名规范化与旧 migrated 配置恢复、Docker子进程工具目录、已有SIGKILL入口提示一并打包。保留首次密码/InstallID/配置/卷，业务镜像/迁移/DTO不变。
+- 输入：STARTUP-15诊断与固定源码3bc7e9b；输出：先红后绿回归、启动器三平台包/摘要、新GitHub草稿及自身交接。只推自己的codex源码分支/草稿，不合并main、不公开发行、不冻结、不执行真实API。
+- 本次仅启动器热修，运行兼容标识沿用 preview-20261005-e88b56a（前后端镜像/数据版本不变），新草稿以20261006-hotfix和源码提交区分，避免未完成安装进入不必要的数据升级流程；说明文件必须明确热修源码出处。
+- 依赖/风险：锁定Go1.26.8临时恢复、GitHub写权限；三平台跨编译不等于ARM/Win实机验收；Mac未签名条件不变。验证：相关Go/打包全量、隔离 ./scripts/verify.sh full 与合成安装恢复（不挂用户库/凭据）；远端草稿/附件hash/源码commit核对。
+
+- STARTUP-16 源码检查点：旧代码新回归5个顶层FAIL/1 PASS（含3个恢复输入子例失败），最小修改后Go全量PASS，最终race/vet PASS；定向Python20 PASS；真实合成Docker旧migrated混合大小写恢复1 PASS（211.26秒），保留原ID/首次密码/配置。隔离basic exit0，full仍执行中，不把检查点当作完成。
+
+- STARTUP-16最终：DONE（修复/草稿交付；用户下载/实机签收OPEN）。源码5f45a5c已推codex/startup-hotfix-20261006；最终race/vet/定向20/真实合成旧状态恢复1 PASS；无.env隔离full单次exit0，backend+tooling3952/27登记skip/1既有warning，frontend934/typecheck/build PASS。三平台包内容与SHA核对、新草稿404525654 draft/prerelease true、7附件远端SHA一致，target精准5f45a5c。保留旧运行兼容ID，不改用户配置/卷/首次密码、业务镜像或迁移；不合并/公开/冻结。P3诊断丢阶段、Mac信任及ARM/Win实机仍OPEN。报告docs/reviews/codex-startup-hotfix-release-20261006.{md,json}与自身handoff已更新。

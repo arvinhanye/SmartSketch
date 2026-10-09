@@ -53,3 +53,7 @@ test-results/
 
 # 一键演示（scripts/start-demo.sh）的日志
 .demo/
+
+# Compiled launcher binaries are distributed only as checked release artifacts.
+launcher/bin/
+launcher/coverage.out

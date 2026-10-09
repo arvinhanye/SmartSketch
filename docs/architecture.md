@@ -236,3 +236,18 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 ## ADR-092 course-owned embedding overrides (2026-10-08)
 
 `teacher_embedding_configs` (migration 019) stores encrypted teacher credentials separately from generation credentials. Course adapters resolve `courses.teacher_id`; students share the course embedding space while keeping their own generation API. Spaces use teacher ID, endpoint/model hash and dimensions; default global space remains the fallback. Additive rebuilding verifies all owned draft/published knowledge points and document chunks before atomically switching the teacher row and committed version metadata. Owner/course locks and active-attempt checks serialize switches with publication/rollback; attempt insertion checks owner lock and commit checks space. Old properties remain intact. Global reembed refuses teacher overrides. This supersedes the single-runtime-space statements above for configured courses; environment bootstrap validation still covers the global fallback.
+
+
+## 已批准设计、尚未实现：跨平台本机启动核心（STARTUP）
+
+- 规格docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md已获用户确认；实施计划docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md仍待审核，不代表已有可用发行入口。
+- 新Go模块拟置于launcher/，仅管理本机首次环境配置、受控Docker编排和短期回环控制页面；不重写Vue业务、不把启动控制API加入业务OpenAPI、不引入系统配置数据库。基础设施仍经环境读取，个人生成模型例外继续按ADR-080。
+- 发行Compose使用稳定安装ID的私有命名卷，与原开发/测量环境分离；首个教师通过一次性容器CLI/服务/仓储完成事务建号，无教师公开注册。已有学生注册与课程授权规则不变。
+- 就绪不是/health单点成功，须确认迁移/向量空间与索引、Neo4j、API、worker及同源网页；停止保留数据。版本迁移先停机整组备份，恢复保留原卷并核验整组版本，禁止仅降级代码。
+- 此段只登记已确认架构方向；新API/DTO/迁移/依赖与启动器代码本轮均未变，技术冻结NOT_PERFORMED。
+
+## 本机启动控制层（2026-10-05，实现验收中）
+
+Go 启动核心位于 launcher/，仅管理本机独立 Docker 安装；其 loopback HTTP 控制接口不是业务 API。配置/安装 ID/发行摘要位于用户私有目录，业务数据留在 ID 对应命名卷。浏览器向导把向量基础设施配置写入本机 .env；业务后端仍仅从环境变量读取。个人生成模型设置沿用 ADR-080，不增加全站向量配置 API。
+
+发行 Compose 位于 packaging/compose.release.yaml，无 Neo4j 宿主端口，web 仅绑定 127.0.0.1。服务、schema、embedding space、索引与代理探测齐备才 READY。首位教师由容器 stdin 工具事务创建；不公开教师注册。升级先阻断、停机整组快照；恢复暂存并二次确认，保留原卷。缺真实发行摘要/三平台验收时不声明正式可用，stage_c_status 与 technical_freeze 不变。

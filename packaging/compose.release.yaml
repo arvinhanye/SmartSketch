@@ -1,0 +1,123 @@
+services:
+  neo4j:
+    image: ${NEO4J_IMAGE:?}
+    restart: unless-stopped
+    labels: &labels
+      io.smartsketch.installation: ${INSTALL_ID:?}
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512M
+    volumes: ["neo4j-data:/data", "neo4j-logs:/logs"]
+    healthcheck:
+      test: ["CMD-SHELL", "NEO4J_USERNAME=neo4j NEO4J_PASSWORD=$${NEO4J_AUTH#*/} cypher-shell 'RETURN 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  migrate:
+    image: &backend ${BACKEND_IMAGE:?}
+    profiles: [tools]
+    labels: *labels
+    env_file: &env [".env"]
+    environment: &runtime
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      NEO4J_URI: bolt://neo4j:7687
+      SQLITE_URL: sqlite:////data/smartsketch.sqlite3
+      STORAGE_DIR: /data/storage
+      WEB_ORIGIN: http://127.0.0.1:${WEB_PUBLISH_PORT:-8080}
+    volumes: &data ["app-data:/data"]
+    command: ["sh", "-c", "python -m app.repositories.sqlite && python -m app.repositories.graph_migrations"]
+    restart: "no"
+  bootstrap:
+    image: *backend
+    profiles: [tools]
+    labels: *labels
+    env_file: *env
+    environment: *runtime
+    volumes: *data
+    command: [python, -m, app.tools.bootstrap_teacher]
+    stdin_open: true
+    restart: "no"
+  probe:
+    image: *backend
+    profiles: [tools]
+    labels: *labels
+    env_file: *env
+    environment: *runtime
+    # Live SQLite WAL readers may create/lock -shm. The probe itself uses mode=ro
+    # plus query_only; immutable=1 would incorrectly ignore live WAL contents.
+    volumes: ["app-data:/data"]
+    command: [python, -m, app.tools.install_probe]
+    restart: "no"
+  backup:
+    image: *backend
+    profiles: [offline-tools]
+    labels: *labels
+    user: "0"
+    network_mode: none
+    command: [python, -m, app.tools.install_backup, backup]
+    volumes:
+      - app-data:/source/app:ro
+      - neo4j-data:/source/neo4j:ro
+      - neo4j-logs:/source/neo4j-logs:ro
+      - ${BACKUP_DIR:?}:/backup
+    restart: "no"
+  restore:
+    image: *backend
+    profiles: [offline-tools]
+    labels: *labels
+    user: "0"
+    network_mode: none
+    command: [python, -m, app.tools.install_backup, restore]
+    volumes:
+      - restore-app:/stage/app
+      - restore-neo4j:/stage/neo4j
+      - restore-neo4j-logs:/stage/neo4j-logs
+      - ${BACKUP_DIR:?}:/backup:ro
+    restart: "no"
+  api:
+    image: *backend
+    labels: *labels
+    env_file: *env
+    environment: *runtime
+    volumes: *data
+    restart: unless-stopped
+    command: [python, -m, app]
+    expose: ["8000"]
+  worker:
+    image: *backend
+    labels: *labels
+    env_file: *env
+    environment: *runtime
+    volumes: *data
+    restart: unless-stopped
+    command: [python, -m, app.workers]
+    stop_grace_period: 90s
+    healthcheck:
+      test: [CMD, python, -m, app.workers, --health]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+  web:
+    image: ${FRONTEND_IMAGE:?}
+    labels: *labels
+    restart: unless-stopped
+    ports: ["127.0.0.1:${WEB_PUBLISH_PORT:-8080}:8080"]
+volumes:
+  app-data:
+    labels: *labels
+  neo4j-data:
+    labels: *labels
+  neo4j-logs:
+    labels: *labels
+  restore-app:
+    labels: *labels
+  restore-neo4j:
+    labels: *labels
+  restore-neo4j-logs:
+    labels: *labels
