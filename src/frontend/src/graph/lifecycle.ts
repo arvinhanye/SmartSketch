@@ -1,6 +1,7 @@
 import type { GraphData, GraphOptions } from '@antv/g6'
 import type { InjectionKey } from 'vue'
 import { nodeElementId, type G6Edge, type G6EdgeData, type G6Node, type G6NodeData } from './adapter'
+import { keepCanvasOutOfTabOrder } from './a11y'
 import type { Positions } from './chapterLayout'
 import { createEnhancer, type EnhanceOptions, type Enhancer } from './enhancer'
 import { badgesFor, nodeLabel } from './presentation'
@@ -415,6 +416,8 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
   /** 最近一次页面请求聚焦的知识点（L14）：尺寸变化重新适配后回到它，而不是入口节点 */
   let anchor: string | null = null
 
+  // G6 的 canvas 自带 tabindex=1：移出 Tab 顺序（画布是指针层，见 specs/course-knowledge-graph.md）
+  const stopTabStops = keepCanvasOutOfTabOrder(container)
   const alive = () => status !== 'destroyed' && status !== 'error'
 
   function setStatus(next: LifecycleStatus, error?: unknown): void {
@@ -708,6 +711,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     destroy() {
       if (status === 'destroyed') return
       stopObserving()
+      stopTabStops()
       if (frame !== null) cancelAnimationFrame(frame)
       frame = null
       setStatus('destroyed')

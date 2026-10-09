@@ -2024,3 +2024,18 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 
 - CLAUDE-POLISH-BATCH3-20261009：DONE；负责人 Claude。输出：① 教师图谱布局按课程记入本浏览器（`useArrangementPreference`）；② 问答“涉及的知识点”默认 8 个、可展开；③ 入口图标统一（`navIcons.ts` 单一来源，新增文档/书本图标，成员不再用概览图标）；④ 除登录页外的页面路由级按需加载（`lazyView`：失败自动重试 2 次，仍失败显示提示）；⑤ `scripts/e2e.sh` 清理加强制结束保险（`scripts/_stop-procs.sh`）。不改后端、接口、数据与权限。
 - 验收：单测新增（布局记忆 3、问答折叠 1、图标 3、lazyView 3、强制结束 3）；浏览器 1440×900：刷新后仍保持所选布局、标签 8/27 可展开、7 个导航图标互不相同；E2E 教师+学生对按需加载版本通过。实测（登录页，限速约 1.5 Mbps，缓存关闭，5 次取中位）：1387 ms → 903 ms（-35%），传输 164 KB → 73 KB，入口 JS 437 → 155 KB；G6（1.4 MB）本就是动态加载，未变。门禁（`5ce0a79`）：`./scripts/verify.sh integration` PASS 退出 0：后端 3978 passed/27 登记 skipped，前端 66 文件/1227 passed + 类型检查 + build，集成 393 passed/4 skipped，图库专项 44，E2E 教师+学生 2、个人模式 4 passed。详见 `docs/handoffs/claude-polish-batch3-20261009.md`。
+
+## 2026-10-09 Claude：前端体验审计与问答链路优化（UI-QA-01，用户确认方案）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-QA-01 | 实现与自动化验收完成，待用户视觉签收（2026-10-09；review_status: ready_for_review） | Claude | 学生问答链路（提问 → 流式 → 已回答/资料未覆盖/未完成 → 出处 → 跳转图谱）与图谱画布键盘停靠点修正。文件：`src/frontend/src/views/ChatView.vue`、新增 `components/chat/AnswerCard.vue`、`composables/chatSources.ts`、`composables/useCopyFeedback.ts`、`composables/useFollowLatest.ts`、`components/ChatMarkdown.vue`、`components/SourceViewer.vue`（仅样式）、`components/AppIcon.vue`（新增 copy/info 图标）、`graph/a11y.ts` + `graph/lifecycle.ts`、`styles/ui.css`（清理问答段）、相关前端测试、`specs/grounded-qa.md`（新增「前端呈现」一节）、`specs/course-knowledge-graph.md`（画布键盘约定） | 不改后端、接口、契约、数据与权限；出处校验、`not_covered` 与服务错误分开、流式结束与撤回语义不变；既有 `data-test` 钩子保留。`type-check`、前端全量、`build`、`./scripts/verify.sh`、问答 E2E；1440×900/1280×800/768 前后对比截图，390 仅验证无溢出（用户 2026-10-09 决定：手机端不专门优化）；Tab 顺序、焦点可见、200% 缩放、减少动效；测试通过与浏览器验收分别报告 |
+
+- 审计依据：隔离演示栈（演示模型）+ Playwright，教师/学生 12 个页面 × 1440/1280/768/390，问答三种状态实走；证据与结论见 `docs/handoffs/claude-ui-qa-01.md`。
+- 已决（用户，2026-10-09）：① 问答页保持已交付的浅色内容表面，规格中“问答页是暗色页”的说法作废；② 本轮范围为问答链路 + 画布 Tab 停靠点，候选只做：出处按回答归属、复制回答（含出处）并反馈、输入区固定与滚到最新；③ 成员移除用行内二步确认（与资料删除一致），与“离开页面前提示未保存”一起放第二批；④ Playwright 检查脚本不进仓库（本地一次性，需要保留时另开任务放 `tests/`）；⑤ 手机端（390）只验证无溢出。
+- 本轮不做、待确认（C 类或需新决定）：推荐理由里的“解锁度 1.0000”“按中性值 0.5 计，易学度 0.5000”由服务端 `reason` 生成，后端测试（`test_l14_reason.py`）与 `specs/learning-path.md` §4 要求前端原样展示，前端解析句子会脆弱，若要改写须先改服务端文案与规格；对话历史跨刷新保留（持久化与隐私）；示例问题（需要内容来源）；课程主页待审核数（需要新数据）；成员批量添加（新接口）。
+- 第二批候选（审计发现，已确认可做但未排期）：成员移除行内确认；教师图谱未保存离开前提示（`beforeunload`）；首次访问登录页不应显示“未登录”红色提示；教师图谱详情来源行排版与标题焦点框；模型设置演示模式下表单提示与教师页重名控件；资料上传原生英文文件按钮与“可拖放”暗示不符；课程概览页两个主按钮。
+- 验收证据（2026-10-09，详见 `docs/handoffs/claude-ui-qa-01.md`）：新增 6 个测试文件先 RED 后 GREEN，既有测试未改；`type-check` 无错误，前端 72 文件 / 1263 条通过，`build` 成功，`scripts/verify/frontend.sh full` 与 `./scripts/verify.sh`（basic）通过；E2E 教师 + 学生 2 passed、个人模式 4 passed。浏览器（一次性演示栈，1440/1280/768/390）：48 次加载无溢出、无控制台错误；图谱页第一个 Tab 停靠点由 canvas 变为导航链接；问答已回答/未覆盖/失败、长对话固定输入区、上翻后“回到最新”、复制含出处均实走通过；问答页文字对比度 0 项不达标。**未运行** `verify.sh full/integration` 的后端与集成部分（后端未改）；**未验证** reduced-motion 实测、读屏、画布像素对比度、真实模型/真实课程、用户视觉签收。
+- 更正（审计结论）：ui.css 的问答段不是“没生效的暗色样式”，而是把 `--ss-*` 重映射成浅色，已整体替换为 `.light-surface` + `--gw-*`。
+- 回滚：各任务独立，`git revert` 对应差异即可；无数据与接口变化。
+- 本机环境：Node v26.4.0；本会话在工作区执行 `npm ci`（根目录与 `src/frontend`，仅锁文件内依赖，node_modules 被忽略）；审计用一次性 Neo4j 容器与演示栈已停止删除。无真实模型调用与账号。

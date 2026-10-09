@@ -218,38 +218,6 @@
 .light-surface .teacher-graph__panel :is(.node-editor__field,.node-creator__field) { display: grid; gap: 8px; margin-top: 16px; }
 .light-surface .teacher-graph__panel label { font-size: 13px; color: var(--gw-text-2); }
 .light-surface .teacher-graph__panel textarea { resize: vertical; }
-/* Course Q&A uses the same light content palette as the course pages. */
-.ui-chat-workspace {
- --ss-bg: #f8f9fb; --ss-panel: #fff; --ss-raised: #f4f5f7;
- --ss-hover: #eaecf1; --ss-line: #d2d5de; --ss-edge: #747a87;
- --ss-text: #20232a; --ss-text-2: #4e5665; --ss-text-3: #636c7b;
- --ss-link: #5145cd; --ss-selected: #e9e6fa;
- --ss-warn: #8a5a10; --ss-warn-bg: #fdf4e3; --ss-danger: #8f2323; --ss-ok: #1f6b3a;
-}
-.app--graph .ui-chat-workspace { flex: 1; min-width: 0; border: 1px solid var(--ss-line); border-radius: 10px; background: var(--ss-panel); color: var(--ss-text); padding: 32px; --color-text: var(--ss-text); --color-text-muted: var(--ss-text-2); --color-primary: var(--ss-primary); --color-primary-hover: var(--ss-link); --color-primary-soft: var(--ss-selected); --color-surface: var(--ss-raised); --color-surface-muted: var(--ss-raised); --color-border: var(--ss-edge); --color-warning-bg: var(--ss-warn-bg); --color-warning-border: var(--ss-warn); --color-warning-text: var(--ss-warn); }
-.ui-chat-workspace .chat__header { border-bottom: 1px solid var(--ss-line); padding-bottom: 24px; margin-bottom: 16px; }
-.ui-chat-workspace .chat__header h2 { color: var(--ss-text); font-size: 24px; }
-.ui-chat-workspace .chat__badge { padding: 5px 8px; border: 1px solid var(--ss-line); color: var(--ss-text-2); background: var(--ss-raised); }
-.ui-chat-workspace .chat__back { margin-left: auto; }
-.ui-chat-workspace a { color: var(--ss-link); }
-.ui-chat-workspace .chat__layout { gap: 28px; grid-template-columns: minmax(0,1fr) minmax(240px,300px); }
-.ui-chat-workspace .chat__empty { padding: 28px; border: 1px dashed var(--ss-edge); border-radius: 10px; line-height: 1.8; background: var(--ss-raised); }
-.ui-chat-workspace .answer { background: var(--ss-raised); border-color: var(--ss-line); padding: 20px; max-width: 100%; }
-.ui-chat-workspace .question { padding: 14px 18px; line-height: 1.7; max-width: 85%; }
-.ui-chat-workspace .answer--not-covered { background: var(--ss-warn-bg); border-color: var(--ss-warn); }
-.ui-chat-workspace .chat__sources { border: 1px solid var(--ss-line); border-radius: 8px; padding: 20px; background: var(--ss-raised); }
-.ui-chat-workspace .chat__sources h3 { color: var(--ss-text); }
-.ui-chat-workspace :is(p,li,blockquote) { overflow-wrap: anywhere; }
-.ui-chat-workspace pre { max-width: 100%; overflow-x: auto; }
-.ui-chat-workspace button { background: var(--ss-raised); color: var(--ss-text); border: 1px solid var(--ss-edge); border-radius: 6px; min-height: 36px; padding: 8px 12px; }
-.ui-chat-workspace button:hover:not(:disabled) { background: var(--ss-hover); }
-.ui-chat-workspace .ui-chat-compose { border: 1px solid var(--ss-edge); background: var(--ss-bg); border-radius: 10px; padding: 12px; }
-.ui-chat-workspace .ui-chat-compose textarea { min-width: 0; width: 100%; resize: vertical; border: 0; color: var(--ss-text); background: transparent; line-height: 1.7; padding: 8px; }
-.ui-chat-workspace .ui-chat-compose textarea::placeholder { color: var(--ss-text-3); }
-.ui-chat-workspace button[data-test=chat-send] { background: var(--ss-primary); color: white; border-color: var(--ss-primary); }
-.ui-chat-workspace button:disabled { background: var(--ss-hover); color: var(--ss-text-3); opacity: 1; }
-.ui-chat-workspace :is(button,a,textarea):focus-visible { outline: 2px solid var(--ss-link); outline-offset: 3px; }
-.ui-chat-workspace .model-required { background: var(--ss-warn-bg); color: var(--ss-warn); border-radius: 8px; padding: 12px 16px; font-size: 13px; }
 /* Authentication: align fields with the brand shell; keep existing animated art. */
 .auth-layout input { min-height: 46px; border: 1px solid var(--ss-edge); border-radius: 6px; background: var(--ss-panel); color: var(--ss-text); padding: 10px 12px; }
 .auth-layout button[type=submit] { min-height: 46px; border-radius: 6px; background: var(--ss-primary); border: 1px solid var(--ss-primary); color: white; }
@@ -260,8 +228,6 @@
 .auth-layout [role=alert] { color: var(--ss-danger); }
 @media(max-width:1100px) {
  .light-surface .teacher-graph__body { grid-template-columns: minmax(260px,35%) minmax(0,1fr); }
- .ui-chat-workspace .chat__layout { grid-template-columns: minmax(0,1fr); }
- .ui-chat-workspace .chat__sources { position: static; }
 }
 @media(max-width:767px) {
  .light-surface.ui-management button { min-height: 44px; }
@@ -280,10 +246,6 @@
  .light-surface .teacher-graph__filters { padding: 16px; }
  .light-surface .teacher-graph__canvas { order: 1; min-height: 500px; }
  .light-surface .teacher-graph__panel { order: 2; border-right: 0; border-top: 1px solid var(--gw-line); padding: 16px; }
- .app--graph .ui-chat-workspace { padding: 24px 18px; }
- .ui-chat-workspace .chat__back { margin-left: 0; flex-basis: 100%; }
- .ui-chat-workspace .chat__empty, .ui-chat-workspace .answer { padding: 16px; }
- .ui-chat-workspace .chat__sources { padding: 16px; }
 }
 
 /* Authentication header and teacher canvas controls share the current palette. */
@@ -295,11 +257,6 @@
 .light-surface .teacher-graph__canvas .gw-tool { width: 36px; height: 36px; min-height: 36px; padding: 0; border-color: var(--gw-edge); }
 @media(max-width:767px) { .light-surface .teacher-graph__canvas .gw-tool { width: 44px; height: 44px; min-height: 44px; } }
 
-.ui-chat-workspace { align-content: start; }
-.ui-chat-workspace .chat__header { min-height: 0; }
-.ui-chat-workspace .chat-markdown :is(pre,code) { color: var(--ss-text); background: var(--ss-bg); border-radius: 6px; }
-.ui-chat-workspace .chat-markdown pre { padding: 16px; border: 1px solid var(--ss-line); }
-.ui-chat-workspace .chat-markdown .citation { color: var(--ss-link); background: transparent; border: 0; min-height: 32px; padding: 2px 5px; }
 
 
 .light-surface .ui-field select { width:100%; min-height:44px; padding:10px 12px; color:var(--gw-text); background:var(--gw-panel); border:1px solid var(--gw-edge); border-radius:8px; font:inherit; }

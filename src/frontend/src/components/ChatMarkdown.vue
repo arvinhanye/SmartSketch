@@ -92,7 +92,12 @@ const blocks = computed<Block[]>(() => {
 </template>
 
 <style scoped>
-pre { overflow-x: auto; padding: .75rem; background: #f4f6f8; }
-code { background: #f4f6f8; }
-.citation { color: #175ab4; border: 0; background: none; cursor: pointer; text-decoration: underline; }
+.chat-markdown { font-size: 14px; line-height: 26px; }
+.chat-markdown :is(p, h4, li) { margin: 0 0 6px; overflow-wrap: anywhere; }
+.chat-markdown h4 { font-size: 15px; }
+pre { max-width: 100%; overflow-x: auto; margin: 0 0 8px; padding: 12px; border-radius: 6px; background: var(--gw-hover, #eaecf1); color: var(--gw-text, #20232a); }
+code { padding: 0 4px; border-radius: 4px; background: var(--gw-hover, #eaecf1); color: var(--gw-text, #20232a); }
+pre code { padding: 0; background: transparent; }
+.citation { margin: 0 1px; padding: 0 2px; border: 0; background: none; color: var(--gw-accent, #5145cd); font: inherit; text-decoration: underline; cursor: pointer; }
+.citation:focus-visible { outline: 2px solid var(--gw-accent, #5145cd); outline-offset: 2px; border-radius: 2px; }
 </style>
