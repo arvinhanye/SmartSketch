@@ -1,6 +1,6 @@
 # 任务看板
 
-> **R1 最新状态（2026-10-08）**：旧 worker 越权提交修复及 worker 网络 COMMIT 无界占 SQLite 围栏风险已验证，限定范围 **CLOSED**；最终版本整次 integration exit 0。用户已授权开 PR，正在提交；不自动合并、发布或技术冻结。验收与边界见末节及 `docs/handoffs/codex-r1-persist-deadline.md`。
+> **R1 最新状态（2026-10-08）**：旧 worker 越权提交修复及 worker 网络 COMMIT 无界占 SQLite 围栏风险已验证，限定范围 **CLOSED**；最终版本整次 integration exit 0。用户已授权，草稿 PR #324 已创建，主线整合待完成；不自动合并、发布或技术冻结。验收与边界见末节及 `docs/handoffs/codex-r1-persist-deadline.md`。
 
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
 
@@ -1978,6 +1978,10 @@ C-INTEGRATE-20261004 实际集成结果：#317（头68762e8）全部8检查SUCCE
 
 | ID | 状态 | 负责人 | 范围与验收 |
 | --- | --- | --- | --- |
-| R1-PUBLISH-PR | IN_PROGRESS | Codex | 输入最终门禁、源码哈希和用户 PR 授权；核对 origin/main 与工作区基线，更新状态和交接、运行最终 basic、推送 codex/ 修复分支、创建并附加 PR；保留工作区及证据，不合并/部署/冻结。 |
+| R1-PUBLISH-PR | DONE_DRAFT | Codex | 输入最终门禁、源码哈希和用户 PR 授权；核对 origin/main 与工作区基线，更新状态和交接、运行最终 basic、推送 codex/ 修复分支、创建并附加 PR；保留工作区及证据，不合并/部署/冻结。 |
 
 - PR 主线预检：最新 `origin/main=2e6acef7` 已合入 #321～#323；本修复实际分叉 `bdb89c46`。只读 Git merge-tree 确认 `docs/tasks.md`、`docs/decisions.md` 内容冲突，代码/个人 E2E 可自动合并，但未经主线整合验收。主线已占用 ADR-091/092（图谱工作台/教师向量），与本分支的历史 worker ADR 编号撞号，整合时须保留双方决定并重编号/同步引用。故创建 **草稿 PR**：本轮风险在受测修复分支上 CLOSED，主线尚未部署本修复；主线整合与远程 CI/审阅保持待完成，不将 branch 门禁外推为 merge-result 门禁。
+
+- PR 发布结果：[修复草稿 PR #324](https://github.com/arvinhanye/SmartSketch/pull/324) 已创建并附加当前任务，`codex/r1-persist-deadline` → `main`，OPEN/DRAFT；GitHub 实测 mergeable=CONFLICTING，与本地两文档冲突预检一致。创建后远程 CI 四项启动中，不记远程通过。状态更新与修复提交已推送；未合并、部署或技术冻结。待主线整合、ADR 编号协调、合并结果门禁及审阅后转 ready；本任务交付已完成。
+
+- Task 7 最终收尾：`task-done` 实际 exit 0，范围 `2ea6319..7d266ae`；再次核对最终整次 exit 0、四份完整 XML、16 源码哈希，最终 basic 和 diff-check 全通过。七任务 complete；草稿 PR 交付不替代后续主线整合验收。

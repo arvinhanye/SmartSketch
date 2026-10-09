@@ -3,7 +3,7 @@
 - 日期：2026-10-08；任务 `R1-PERSIST-DEADLINE`、`R1-DEADLINE-VERIFY-REPAIR`。
 - 工作区：`/Users/arvinhan/.codex/worktrees/0cf7/SmartSketch`，保留受管 detached HEAD；产品最新修复提交 `2ea6319`；测试证明 `b89844b`、门禁修复 `b7e84a1`。
 - 用户已确认七任务计划，并要求修复后续 NOOP、F13、E2E 失败；最新授权在门禁通过后推送并开 PR，不授权合并/部署/技术冻结。
-- 当前：核心产品及后续三类失败已修复并验证；最终代码 `f9c54553` 整次 integration exit 0，限定 worker COMMIT 围栏可用性风险 CLOSED；PR 创建中。全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。
+- 当前：核心产品及后续三类失败已修复并验证；最终代码 `f9c54553` 整次 integration exit 0，限定 worker COMMIT 围栏可用性风险 CLOSED；草稿 PR #324 已创建。全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。
 
 ## 交付、接口与配置
 
@@ -112,7 +112,7 @@ JSON 只含测试 run_id、计时、状态和源码 SHA，不含认证包；完�
 
 ## PR 交付
 
-- 状态：PR 创建中；最终文档 basic/任务完成记录和 PR 地址在创建后补充。
+- 状态：[PR #324](https://github.com/arvinhanye/SmartSketch/pull/324) OPEN/DRAFT，`codex/r1-persist-deadline` → `main`；已附加当前任务。最终 basic 已通过；Task 7 结束证据校验/basic 已再次 exit 0，ledger 已记录 complete（`2ea6319..7d266ae`）；命令 `bash /private/tmp/smartsketch-r1-task7-verify.sh` 检查整次 exit、四份 XML、16 源码哈希并执行 basic/diff-check。
 - 不合并/部署/冻结，远程 CI 与代码审阅继续独立把关。
 
 
@@ -124,3 +124,5 @@ JSON 只含测试 run_id、计时、状态和源码 SHA，不含认证包；完�
 
 - Ruling: create a draft PR without merging newly advanced main into the verified repair tree — user asked for a PR, not unverified integration of unrelated UI/model/migration changes; preflight shows shared status-document conflicts and ADR identifier collisions — cost if wrong: draft is not directly mergeable and requires explicit main integration, identifier coordination and fresh merge-result gates before merge.
 - 自有资源检查：最终门禁自建 `smartsketch-verify-neo4j-27956`、`smartsketch-e2e-neo4j-35300`、`smartsketch-e2e-neo4j-41641` 已不存在；默认端口占用者未动，工作区和临时证据保留。
+
+- GitHub 开 PR 后实测：head `7d266ae7`、base `2e6acef7`，OPEN、isDraft=true、mergeable=CONFLICTING；四项 CI 当时 IN_PROGRESS。后续仅本交接/任务/决策的 PR 链接和状态提交，不将旧 head 的 CI 当新 head 成功。当前本地证据证明受测代码，不证明主线合并结果。

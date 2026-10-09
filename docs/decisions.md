@@ -1904,3 +1904,5 @@
 - **实施补充（2026-10-08）**：最终审查复现两项 Important 缺陷并测试先行修复：仅传输启动阶段将 DNS ValueError 脱敏归连接失败，保留 LeaseLost/TransportTimeout 与业务体异常；T6 结局读回匹配持久化 attempt，避免旧 SQLite 回滚后误认新尝试的同一序号。DNS 默认执行器等待仍是围栏之前的显式边界，不宣称整个 worker 停机硬截止。
 
 - **PR 决定（2026-10-08）**：用户要求门禁通过则开 PR；最终整次门禁已通过且 16 文件源码 manifest 匹配，使用 `codex/` 新修复分支向已核对的 `main` 创建 PR；不复用其他前端任务分支、不强推、不合并或部署，工作区与验证证据保留。
+
+- **PR 交付**：[草稿 PR #324](https://github.com/arvinhanye/SmartSketch/pull/324) 已创建，修复分支 `codex/r1-persist-deadline` 向 `main`；主线已推进且存在状态文档冲突/ADR 编号碰撞，保持草稿，后续主线整合与 CI/审阅独立完成。受测分支的限定风险 CLOSED，不代表主线已部署修复或项目冻结。
