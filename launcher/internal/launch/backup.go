@@ -383,6 +383,19 @@ func (c *Controller) LoadBackup(id string) (BackupSet, error) {
 	}
 	return set, nil
 }
+
+// pendingUpgradeMatches reports whether upgrade.json names this backup and the release this launcher carries.
+func (c *Controller) pendingUpgradeMatches(set BackupSet) bool {
+	b, e := os.ReadFile(filepath.Join(c.store.Root, "upgrade.json"))
+	if e != nil {
+		return false
+	}
+	var pending struct {
+		ID     string `json:"backup_id"`
+		Target string `json:"target_version"`
+	}
+	return strictJSON(b, &pending) == nil && pending.ID == set.ID && pending.Target == c.docker.Manifest.Version
+}
 func (c *Controller) ApplyUpgrade(ctx context.Context, set BackupSet, confirmed bool) error {
 	if !confirmed {
 		return fail("VERSION", "confirmation")
@@ -404,7 +417,11 @@ func (c *Controller) ApplyUpgrade(ctx context.Context, set BackupSet, confirmed 
 	if e != nil {
 		return e
 	}
-	if current.InstallID != original.InstallID || current.Phase != STOPPED || current.ReleaseVersion != set.ReleaseVersion || current.ReleaseVersion == c.docker.Manifest.Version {
+	// After the backup step the installation is STOPPED, but any failed action (for example a click on "start", which the
+	// version guard refuses) persists Phase=ERROR. That must not strand a verified backup: ERROR is accepted only when
+	// upgrade.json records exactly this backup and this target release.
+	phaseOK := current.Phase == STOPPED || current.Phase == ERROR && c.pendingUpgradeMatches(set)
+	if current.InstallID != original.InstallID || !phaseOK || current.ReleaseVersion != set.ReleaseVersion || current.ReleaseVersion == c.docker.Manifest.Version {
 		return fail("VERSION", "upgrade")
 	}
 	if c.docker.Manifest.VerifyCompose(c.docker.ComposePath) != nil {
