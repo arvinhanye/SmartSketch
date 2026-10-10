@@ -10,6 +10,7 @@ import {
   MATERIALS_ROUTE,
   NOTICE_UNAUTHENTICATED,
   NOTICE_WRONG_ROLE,
+  REGISTER_ROUTE,
   REVIEW_ROUTE,
   ROOT_ROUTE,
   SETTINGS_ROUTE,
@@ -64,6 +65,8 @@ const role = computed(() => session?.role ?? null)
 // 方向 A「工作台」：登录后左侧常驻导航；未登录（登录、注册页）只留顶栏
 const withSidebar = computed(() => route !== null && role.value !== null)
 const onLoginPage = computed(() => route?.name === ROOT_ROUTE && role.value === null)
+// 登录页与注册页共用同一套未登录外壳：锁在视口内，窗口矮时只有表单栏内部滚动
+const onAuthShell = computed(() => (route?.name === ROOT_ROUTE || route?.name === REGISTER_ROUTE) && role.value === null)
 
 interface NavItem {
   label: string
@@ -226,7 +229,7 @@ function signOut(): void {
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--login': onLoginPage }">
+  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--login': onAuthShell }">
     <AppTopbar
       v-if="graphShell"
       :crumbs="crumbs"
