@@ -4,7 +4,7 @@
 
 ## 交付状态
 
-> **当前候选版本：`rc-b59869d`（release candidate，不是稳定版）。** 安装包通过 [GitHub Releases](https://github.com/arvinhanye/SmartSketch/releases) 分发。该版本的 Release 目前是**草稿**，由维护者检查后才会公开；公开之前没有可下载的包，请以 Releases 页面的实际状态为准。
+> **当前候选版本：`rc-7f8a0cd`（release candidate，不是稳定版），已作为预发布公开。** 安装包在 [GitHub Releases 的 `rc-7f8a0cd` 页面](https://github.com/arvinhanye/SmartSketch/releases/tag/rc-7f8a0cd) 下载（因为是预发布，GitHub 的「最新版本」入口不会指向它，请直接用这个链接）。附件为 `SmartSketch-rc-7f8a0cd-darwin-amd64.tar.gz`、`SmartSketch-rc-7f8a0cd-windows-amd64.zip` 与 `SHA256SUMS`，下载后先核对校验和。
 
 | 平台 | 状态 |
 | --- | --- |
