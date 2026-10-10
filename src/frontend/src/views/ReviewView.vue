@@ -2,6 +2,7 @@
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
+import ToastNotice from '../components/ToastNotice.vue'
 import { computed, inject } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
@@ -9,6 +10,7 @@ import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createReviewApi, REVIEW_API_KEY, type Relation, type ReviewItemKind, type SuspectedDuplicate } from '../api/review'
 import VersionPanel from '../components/VersionPanel.vue'
+import { useAutoDismiss } from '../composables/useAutoDismiss'
 import {
   DUPLICATE_REASON_LABELS,
   duplicateKey,
@@ -70,6 +72,9 @@ const {
   mergeDraft,
   nameOf,
 } = review
+
+// 成功/信息提示 4.5 秒后自动收起；错误提示留着，由用户关闭（快速连点时每条都会重新计时）。
+useAutoDismiss(notice, review.dismissNotice, { ms: 4500, keep: (value) => value.tone === 'error' })
 
 const EMPTY_TEXT: Record<ReviewItemKind, string> = {
   low_confidence_relation: '当前没有待审核的关系。',
@@ -140,14 +145,7 @@ function otherName(pair: SuspectedDuplicate): string {
     </div>
 
     <template v-else-if="status === 'ready'">
-      <p
-        v-if="notice"
-        data-test="rv-notice"
-        :data-tone="notice.tone"
-        :role="notice.tone === 'error' ? 'alert' : 'status'"
-      >
-        {{ notice.text }}
-      </p>
+      <ToastNotice v-if="notice" data-test="rv-notice" :tone="notice.tone" :text="notice.text" @dismiss="review.dismissNotice" />
       <p v-if="refreshing" data-test="rv-refreshing" role="status">正在刷新审核队列…</p>
       <p v-if="refreshError" data-test="rv-refresh-error" role="alert">
         {{ refreshError }}

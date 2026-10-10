@@ -572,3 +572,20 @@
 .light-surface.materials .materials-file-zone .materials-pick { color: var(--gw-text); font-size: 13px; font-weight: 500; min-height: 40px; }
 .light-surface.materials .materials-file-zone:has(.materials-file-input:focus-visible) .materials-pick { outline: 2px solid var(--gw-accent); outline-offset: 3px; }
 .materials-file-zone.is-dragging { border-style: solid; border-color: var(--gw-accent); background: var(--gw-selected); }
+
+/* 右下角弹窗提示：固定定位、不占文档流，出现和消失都不会把页面内容顶得上下跳动。 */
+/* 容器本身不产生盒子，弹窗不再是 .ui-sheet__inner 的直接子元素。 */
+.ui-toast-host { display: contents; }
+/* 选择器重复 .ui-toast 并带元素名：页面里有 `[role=alert] { color: 红 }`（styles.css、.ui-management）和
+   `.ui-sheet__inner > [role=status] { padding; background }` 这类通用规则，优先级更高，会把弹窗画成灰底红字。 */
+div.ui-toast.ui-toast.ui-toast { position: fixed; right: 24px; bottom: 24px; z-index: 40; display: flex; align-items: flex-start; gap: 12px; box-sizing: border-box; max-width: min(420px, calc(100vw - 48px)); margin: 0; padding: 12px 14px 12px 16px; border: 0; border-left: 4px solid var(--gw-accent, #5b5bd6); border-radius: 8px; background: #1d2029; color: #f2f3f7; font-size: 14px; line-height: 22px; box-shadow: 0 8px 24px rgb(0 0 0 / 28%); animation: ui-toast-in 160ms ease-out; }
+.ui-toast.ui-toast[data-tone='success'] { border-left-color: #35a96b; }
+.ui-toast.ui-toast[data-tone='error'] { border-left-color: #e5534b; }
+.ui-toast__text { min-width: 0; overflow-wrap: anywhere; }
+/* 带元素名的选择器：审核/管理页有 `.light-surface.ui-management button` 等通用按钮样式，优先级更高，会把关闭按钮画成白底带边框。 */
+div.ui-toast button.ui-toast__close { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; min-height: 0; margin: -1px -4px 0 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #c5c8d3; font-size: 18px; line-height: 22px; cursor: pointer; }
+div.ui-toast button.ui-toast__close:hover:not(:disabled) { background: rgb(255 255 255 / 12%); border: 0; color: #fff; }
+div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+@keyframes ui-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { div.ui-toast.ui-toast.ui-toast { animation: none; } }
+
