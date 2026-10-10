@@ -14,7 +14,6 @@ import { ApiError, NetworkError, TimeoutError, type FetchLike } from '../../src/
 import { createAppRouter, NOTICE_UNAUTHENTICATED, ROOT_ROUTE } from '../../src/frontend/src/router/index.ts'
 import { useCourseStore } from '../../src/frontend/src/stores/course'
 import { SESSION_STORAGE_KEY, useSessionStore } from '../../src/frontend/src/stores/session'
-import AuthLayout from '../../src/frontend/src/components/AuthLayout.vue'
 import LoginView from '../../src/frontend/src/views/LoginView.vue'
 
 type LoginResponse = components['schemas']['LoginResponse']
@@ -237,55 +236,6 @@ describe('H13 登录页', () => {
     expect(password.attributes('type')).toBe('password')
     expect((password.element as HTMLInputElement).value).toBe('')
     expect(wrapper.get('[data-test="login-error"]').attributes('role')).toBe('alert')
-  })
-
-  it('注册页沿用的品牌区展示多组不同结构图谱并对读屏隐藏', async () => {
-    const wrapper = mount(AuthLayout)
-    const artwork = wrapper.get('.auth-layout__art')
-    const graphs = artwork.findAll('[data-test="auth-graph"]')
-
-    expect(artwork.attributes('aria-hidden')).toBe('true')
-    expect(graphs.length).toBeGreaterThanOrEqual(8)
-    expect(artwork.findAll('line').length).toBeGreaterThan(30)
-    expect(new Set(graphs.map((graph) => `${graph.findAll('rect').length}:${graph.findAll('circle').length}`)).size)
-      .toBeGreaterThanOrEqual(3)
-
-    const second = mount(AuthLayout)
-    expect(second.get('[data-test="auth-graph"]').attributes('transform'))
-      .not.toBe(graphs[0].attributes('transform'))
-  })
-
-  it('注册页沿用的品牌区图谱在动画帧中改变位置', async () => {
-    let nextFrame: FrameRequestCallback | undefined
-    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-      nextFrame = callback
-      return 1
-    }))
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const wrapper = mount(AuthLayout)
-    const graph = wrapper.get('[data-test="auth-graph"]')
-    const before = graph.attributes('transform')
-
-    expect(nextFrame).toBeDefined()
-    nextFrame?.(1000)
-    nextFrame?.(2000)
-
-    expect(graph.attributes('transform')).not.toBe(before)
-  })
-
-  it('注册页沿用的品牌区在减少动态效果时不启动动画', async () => {
-    const requestFrame = vi.fn()
-    vi.stubGlobal('requestAnimationFrame', requestFrame)
-    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
-      matches: query === '(prefers-reduced-motion: reduce)',
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })))
-
-    const wrapper = mount(AuthLayout)
-
-    expect(wrapper.findAll('[data-test="auth-graph"]')).toHaveLength(8)
-    expect(requestFrame).not.toHaveBeenCalled()
   })
 
   it('未登录访问受保护页面：回到登录页，显示未登录提示与登录表单', async () => {

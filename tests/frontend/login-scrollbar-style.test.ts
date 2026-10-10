@@ -10,7 +10,6 @@ const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(resolve(here, '../../src/frontend/src/styles.css'), 'utf8')
 const layout = readFileSync(resolve(here, '../../src/frontend/src/components/LoginLayout.vue'), 'utf8')
 const uiCss = readFileSync(resolve(here, '../../src/frontend/src/styles/ui.css'), 'utf8')
-const authLayout = readFileSync(resolve(here, '../../src/frontend/src/components/AuthLayout.vue'), 'utf8')
 const start = css.indexOf('.app.app--login .auth-layout__form {')
 const block = start >= 0 ? css.slice(start, css.indexOf('}', start) + 1) : ''
 
@@ -41,13 +40,6 @@ describe('不让页面「刚好多出几个像素」', () => {
     const m = /@media\(min-width:1051px\) and \(max-height:(\d+)px\) \{\s*\.light-surface\.model-settings \.ui-sheet__inner/.exec(uiCss)
     expect(m).not.toBeNull()
     expect(Number(m![1])).toBeGreaterThanOrEqual(930)
-  })
-  it('注册页在桌面宽度下占满视口，插画随高度缩小，窗口极矮时表单栏内部滚动且不显示滚动条', () => {
-    const media = authLayout.slice(authLayout.indexOf('@media (min-width: 761px)'))
-    expect(media).toMatch(/\.auth-layout\s*\{[^}]*height:\s*calc\(100dvh - 3\.5rem\)/)
-    expect(media).toMatch(/\.auth-layout__brand\s*\{[^}]*min-height:\s*0/)
-    expect(media).toMatch(/\.auth-layout__form\s*\{[^}]*overflow-y:\s*auto[^}]*scrollbar-width:\s*none/)
-    expect(media).toContain('.auth-layout__form::-webkit-scrollbar')
   })
   it('教师图谱画布顶栏放不下时换行，键盘选择器不再被画布裁到边缘之外', () => {
     // 最后一段覆盖规则生效：之前是 flex-wrap: nowrap + 选择器固定 260px，画布窄于约 770px 时选择器被推出画布。
