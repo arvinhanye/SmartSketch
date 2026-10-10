@@ -255,7 +255,7 @@
 .app--graph :focus-visible { outline: 2px solid var(--ss-link); outline-offset: 2px; }
 .app--graph :where(button) { padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; justify-self: auto; cursor: pointer; }
 .app--graph :where(button):hover:not(:disabled) { background: transparent; }
-.app-topbar { grid-area: top; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 24px; }
+.app-topbar { grid-area: top; position: sticky; top: 0; z-index: 20; background: var(--ss-bg); display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 24px; }
 .app-topbar__logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--ss-radius-sm); background: var(--ss-primary); color: #fff; font-weight: 600; }
 .app-topbar__crumb { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ss-text-2); }
 .app-topbar__crumb a { padding: 2px 4px; border-radius: var(--ss-radius-sm); color: var(--ss-text-2); text-decoration: none; transition: background-color 120ms var(--ss-ease); }
@@ -266,7 +266,8 @@
 .app--graph .app-topbar__out:hover:not(:disabled) { background: var(--ss-hover); color: var(--ss-text); }
 .app--graph .app-iconbtn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--ss-radius-sm); color: var(--ss-text-2); transition: background-color 120ms var(--ss-ease); }
 .app--graph .app-iconbtn:hover:not(:disabled) { background: var(--ss-hover); color: var(--ss-text); }
-.app-rail { grid-area: rail; width: 64px; display: flex; flex-direction: column; gap: 4px; padding: 4px 12px; }
+/* 顶栏与功能栏固定：页面向下滚动时只有正文滚动，功能栏不会消失。 */
+.app-rail { grid-area: rail; position: sticky; top: 56px; align-self: start; height: calc(100dvh - 56px); overflow-y: auto; z-index: 10; width: 64px; display: flex; flex-direction: column; gap: 4px; padding: 4px 12px; }
 .app-rail.is-expanded { width: 224px; }
 .app--graph .app-rail__item, .app--graph .app-rail__toggle { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 11px; border-radius: 6px; color: var(--ss-text-2); text-decoration: none; text-align: left; transition: background-color 120ms var(--ss-ease), color 120ms var(--ss-ease); }
 .app--graph .app-rail__item:hover, .app--graph .app-rail__toggle:hover:not(:disabled) { background: var(--ss-hover); color: var(--ss-text); }

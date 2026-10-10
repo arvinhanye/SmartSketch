@@ -624,6 +624,7 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     busyKey,
     itemError,
     notice,
+    dismissNotice: () => { notice.value = null },
     mergeDraft,
     nameOf,
     reload: () => void load(courseId.value),
