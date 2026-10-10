@@ -1,0 +1,12 @@
+{
+  "version": "preview-20261005-e88b56a",
+  "backend_image": "ghcr.io/arvinhanye/smartsketch-backend@sha256:fa9cff4449a32f9245a0bd1c658dcb92f83030aeb41318f4c7e596ab321ae784",
+  "frontend_image": "ghcr.io/arvinhanye/smartsketch-frontend@sha256:126ada210c9a275316f5de33bd8c5f7feb86a26033a36c1403643e77315053a9",
+  "neo4j_image": "neo4j@sha256:ab3aafb0020e6fed65bb2b59f7db1fabd7ee0568c4da46f3cc3b8fad77801d61",
+  "compose_sha256": "a468d27a535e73c6198d31d2688619416327ec4888629002b6f172f750981eab",
+  "targets": [
+    "darwin-amd64",
+    "darwin-arm64",
+    "windows-amd64"
+  ]
+}

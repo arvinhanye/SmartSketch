@@ -27,6 +27,8 @@ from app.repositories.neo4j import RepositoryConnectionError
 from app.repositories.sqlite import migrate
 from app.repositories.versions import PublishInProgress
 from app.services.auth import issue_access_token
+from app.services.ai.client import ModelAuthError, ModelConnectionError, ModelInvalidRequestError
+from app.services.ai.embeddings import EmbeddingBatchError
 from app.services.versions.publish import CourseBusy, PublishFailed, PublishOutcome
 from app.services.versions.snapshot import BlockReason, SnapshotBlocked
 
@@ -208,6 +210,19 @@ def _failed_with(cause):
     return error
 
 
+def _embedding_failed(model_error):
+    batch = EmbeddingBatchError("client call", 0, 0)
+    batch.__cause__ = model_error
+    return _failed_with(batch)
+
+
+_VECTOR_REASON = {
+    "connection": "vector_unavailable",
+    "auth": "vector_rejected",
+    "invalid_request": "vector_rejected",
+}
+
+
 @pytest.mark.parametrize("error,status,code,schema", [
     (SnapshotBlocked([BlockReason("cycle", cycle=("a", "b", "a")), BlockReason("empty_graph")]), 409,
      "PUBLISH_BLOCKED", "PublishBlockedError"),
@@ -215,6 +230,9 @@ def _failed_with(cause):
     (CourseBusy("persisting"), 409, "COURSE_BUSY", "PublishConflictError"),
     (_failed_with(RepositoryConnectionError()), 503, "STORAGE_UNAVAILABLE", "Error"),
     (_failed_with(RuntimeError("boom")), 500, "INTERNAL_ERROR", "Error"),
+    (_embedding_failed(ModelConnectionError("emb-v1")), 503, "LLM_UNAVAILABLE", "Error"),
+    (_embedding_failed(ModelAuthError("emb-v1")), 503, "LLM_UNAVAILABLE", "Error"),
+    (_embedding_failed(ModelInvalidRequestError("emb-v1")), 503, "LLM_UNAVAILABLE", "Error"),
 ])
 def test_publish_errors_map_to_the_contract(s, monkeypatch, error, status, code, schema):
     monkeypatch.setattr(api, "publish", _raise(error))
@@ -225,6 +243,10 @@ def test_publish_errors_map_to_the_contract(s, monkeypatch, error, status, code,
         assert response.json()["details"] == {"holder": "persisting"}
     if code == "PUBLISH_BLOCKED":
         assert [r["kind"] for r in response.json()["details"]["reasons"]] == ["cycle", "empty_graph"]
+    if code == "LLM_UNAVAILABLE":
+        reason = response.json()["details"]["reason"]
+        assert reason == _VECTOR_REASON[error.__cause__.__cause__.error_class.value]
+        assert "向量" in response.json()["message"] and "当前版本保持不变" in response.json()["message"]
     assert "boom" not in response.text
 
 

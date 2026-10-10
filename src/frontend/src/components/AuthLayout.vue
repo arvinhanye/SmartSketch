@@ -357,6 +357,28 @@ onUnmounted(() => {
 .auth-layout__form > :deep(*) {
   width: min(100%, 24rem);
 }
+/* 桌面宽度：布局正好占满顶栏以下的视口，插画随高度缩小，不再因为左栏内容约 600px 高而把整页撑出滚动条。
+   窗口极矮时只有表单栏内部滚动（滚轮、触控板、键盘可用），不显示滚动条本身。 */
+@media (min-width: 761px) {
+  .auth-layout {
+    height: calc(100dvh - 3.5rem);
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .auth-layout__brand {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .auth-layout__form {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    align-items: safe center;
+  }
+  .auth-layout__form::-webkit-scrollbar {
+    display: none;
+  }
+}
 @media (max-width: 760px) {
   .auth-layout {
     grid-template-columns: 1fr;

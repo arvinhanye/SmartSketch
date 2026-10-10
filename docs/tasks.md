@@ -2206,3 +2206,181 @@ CLAUDE-CI-REPAIR-20261008 / CLAUDE-UI-REVIEW-20261008 验收：
 - 本节授权覆盖上文「仅发布、不合并」的历史边界，仅针对 #329。输入为已发布修复及 GitHub CI；输出为实际合并记录，合并时精确匹配已通过 head，主线变更/冲突或检查失败时停止合并，不把局部门禁/旧 head 结果当作最终通过。
 - 使用 merge commit 保留 main 上 `e111315ffabdc5ce980afdf525b8321ef572dc8e` 真实旧 worker 实验的 pinned 历史祖先；无产品/测试/数据模型改动。最终文档提交同样等待其全部 CI；GitHub PR 保留最终合并提交与时间，工作区保留。
 - 当前已发布 head `b835c456` 的 push run `37916694886` 与 pull_request run `37916702362` 全部八项 SUCCESS。实测 base `2e4d1c20`、MERGEABLE/CLEAN；backend+tooling 4149 passed/27 既有登记 skip，frontend 1227 passed（66 文件）及 type-check/build，integration 462 passed/4 既有登记 skip，backend-live 44，演示 E2E 2、个人 E2E 4；无新增 skip。日志及精确 head/base/check 快照 `/private/tmp/smartsketch-enum-merge-20261009/`。本最终授权/证据补充只改任务与交接文档；重新运行 basic，正常推送后仍等新 head 全部 CI 成功再执行条件合并，不把 b835c456 的检查外推到新 head。
+
+
+## 2026-10-04 Codex 认领：STARTUP-01 跨平台双击入口与安装向导设计
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| STARTUP-01 | DONE（设计已获用户确认，2026-10-04；非功能完成） | Codex | docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md、当前登记、方向决策/集成边界、Codex交接 | 本机双击入口＋首次向导＋Docker的架构、状态、配置与数据保护、账号引导、平台验收明确；用户审核本文后才写实施计划 |
+
+- 用户已确认采用“双击入口＋安装向导＋Docker”，继续保留 Web 业务；没有批准尚未存在的实施计划或原生桌面应用。
+- 输入：bdb89c46、现有 Compose/Dockerfile/start.sh、ADR-080/081、身份规格；输出：正式待审核设计与交接。写入范围仅文档，未改业务代码/配置/数据。
+- 已核对：Compose完整应用基础可复用；后端镜像未打包教师引导脚本；学生注册已存在；开发启动依赖宿主Python/npm，发行入口需独立。共用Go启动核心已随规格获用户确认，当前未安装新依赖。
+- 风险：Windows/Intel Mac实机、预构建多架构镜像、镜像仓库发布权限仍需实施期落实；本期只管理新的独立安装或自身已有安装，不自动迁移当前工作区的课程库。
+- 验证：./scripts/verify.sh basic（实际命令未传参数，使用默认basic）exit 0；git diff --check exit 0；设计自审无实现占位。日志 /private/tmp/smartsketch-startup-design-basic-retry.log。首次因PATH缺/usr/local/bin的契约工具而exit 1，未计PASS；补齐既有工具路径后重跑。full/integration及启动器定向/三平台实测未执行，不计PASS。
+- 当前：规格已获用户确认；未决为实施计划审核/执行方式→发行镜像发布授权与各平台实机资源。全局向量业务设置保持CANCELLED_BY_USER；向导只生成本机环境配置，不改ADR-081。
+- 交接：docs/handoffs/codex-cross-platform-startup-design.md。stage_c_status OPEN；technical_freeze NOT_PERFORMED；本轮生成调用0、在线向量0，未操作共享或测量数据库、未推送合并。
+
+
+## 2026-10-04 Codex 认领：STARTUP-02 启动方案实施计划
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| STARTUP-02 | DONE（计划/本会话执行已获用户同意） | Codex | docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md、已确认规格的状态更新、项目文档及Codex交接 | 九项任务明确文件/接口/红绿测试/提交/隔离与实机验收；用户审核计划并选择执行方式后才进入产品实现 |
+
+- 用户本轮“确认”批准正式规格，允许编写计划；不视为已批准此前不存在的实施计划、真实调用、镜像发布或技术冻结。
+- 输入：d517eeb的正式规格、既有代码bdb89c46；输出：T1–T9实施计划与交接。规划只改文档，不新增Go/Python/脚本代码、构建依赖或运行配置。
+- T1/STARTUP-03配置/权限/锁；T2/04受控Docker；T3/05教师引导；T4/06发行编排/探测；T5/07生命周期；T6/08向导/诊断；T7/09备份恢复；T8/10打包/CI；T9/11隔离门禁/平台实测。全部PLANNED（未执行、未另认领）。
+- 验证：默认basic ./scripts/verify.sh exit 0（日志/private/tmp/smartsketch-startup-plan-basic.log；受限工作区pytest缓存写入产生警告，不影响测试退出）；git diff --check exit 0；任务/接口/规格覆盖自审。第一次基础检查权限审批超时，未执行；之后默认权限重跑完成，未规避代码测试。
+- 未验证：新启动器、三平台打包/双击、Go定向测试、发行镜像、full/integration。当前无Go；Go1.26.8按官方发布记录选择，实施获批后再准备开发工具链。
+- 风险：新增部署核心接管密码/本机Docker控制，必须完成权限/所有权/跨站门禁回归；恢复要保留原卷；Windows/Mac Intel实机和GHCR权限尚未落实，不计PASS。
+- 交接：docs/handoffs/codex-cross-platform-startup-plan.md。生成调用0、在线向量0；未读真实.env、未启动容器、未改业务/测量库、未推送合并；stage_c_status OPEN，technical_freeze NOT_PERFORMED。
+
+
+## 2026-10-04 Codex：STARTUP 实施（本会话执行已批准）
+
+- STARTUP-03（T1）IMPLEMENTED（最终本地验收见2026-10-05收尾），负责人Codex；范围launcher配置/状态/权限/锁；验收对应批准计划回归，Windows实机项单列OPEN。后续04–11按依赖执行；不发布/推送/真实调用/冻结。
+- 用户本轮“同意”确认计划并选择native执行；正式规格不变。隔离分支codex/cross-platform-startup-design，基线8b3267e，真实.env不读取/复制。测试副本通过git archive创建于/private/tmp/smartsketch-startup-exec，仅含已跟踪源码；开发SDK仅临时解压，不安装系统。
+
+## 2026-10-05 STARTUP 实现验收（Codex）
+
+| 任务 | 当前状态 | 证据 / 剩余 |
+|---|---|---|
+| STARTUP-03～08（T1～6） | IMPLEMENTED / 本地回归已测 | 私有配置、实例控制、教师引导、发行编排、就绪/停启、认证向导；实机项另列 |
+| STARTUP-09（T7） | LOCAL_VERIFIED / 实机OPEN | 真实合成卷整组/重复恢复通过；确认操作/源卷保留/根权限/WAL/完整租约回归通过，非用户业务库签收 |
+| STARTUP-10（T8） | IMPLEMENTED / 未发行 | 三平台编译和打包测试通过；Windows/ARM 实机 OPEN；真实摘要未填写 |
+| STARTUP-11（T9） | LOCAL_VERIFIED / PLATFORM_RELEASE_OPEN | 7fee1c8完整integration exit0、定向29/真实Docker3 PASS；独立复审未有完整clean结论；三平台正式包与发行验收仍OPEN |
+
+- 最新审查及交接：docs/reviews/codex-startup-platform-validation.md、docs/handoffs/codex-cross-platform-startup-implementation.md。
+- 升级/恢复控制仅属 loopback 启动层，不改变业务 API/DTO/迁移；备份含密钥，仅留本机私有目录。
+- 正式镜像、下载包发布需另行授权；不从测试本地标签或虚构摘要生成正式清单。现有 scripts/start.sh 继续适用于原开发环境。
+- stage_c_status=OPEN、technical_freeze=NOT_PERFORMED；无收费模型/在线向量请求、无 push/merge。
+
+
+## 2026-10-05 STARTUP 收尾：本地验证通过，平台／发行未签收
+
+负责人Codex。最终启动器/业务工具代码7fee1c88f870cee1af4a17bee9536bf244baf80c；后续仅文档登记。基于批准计划补齐独立复审提出的令牌权限、写入中断、候选重试、重复恢复、端口确认；真实Docker阶段另修实际挂载代际核验、WAL只读挂载与离线门禁，并复用既有完整租约检查。修复全部有失败回归／合成现场证据，原断言与用例保留。
+
+- 无.env冻结快照+env -i，最终 ./scripts/verify.sh integration exit0：backend+tooling3948 PASS/27登记SKIP；frontend934 PASS/type-check/build；integration393 PASS/4登记SKIP；backend-live44 PASS；演示E2E2、个人假供应商E2E4 PASS。
+- Go race47 PASS/3显式opt-in Docker SKIP、vet exit0；3平台CGO=0编译exit0（非实机）。安装/探测/备份/打包/浏览器定向29 PASS；真实本地镜像三场景3 PASS（641.38s），登录停启/双安装隔离/整组重复恢复。
+- 审查报告docs/reviews/codex-startup-platform-validation.md；摘要docs/reviews/startup-verification.json；交接docs/handoffs/codex-cross-platform-startup-implementation.md；用户指南docs/startup-guide.md。完整本地日志在本工作区忽略且私有的.superpowers验证目录，无个人凭据/业务正文。
+- 仍OPEN：独立整支复审完整结论（reviewer用量中断，已收到发现均处理）；Mac Intel正式包、Mac ARM、Windows11真实双击/ACL/WSL2、中文路径、拉取中断；GHCR多架构真实摘要、匿名拉取、正式包SHA与下载渠道。不得用测试adapter/跨编译冒充正式发行。
+- 本轮未推送/合并/发布、未自动迁移旧开发安装、未改共享Neo4j/测量区、真实生成/向量调用0；生成844451/900000、向量12005另计不变。当前本地分支保留，需用户另授权正式发行。
+- stage_c_status OPEN、technical_freeze NOT_PERFORMED，用户检查与冻结决定保留；不因启动器门禁通过改写计划C历史未测项、准确率签收方式或归因缺口。
+
+
+## 2026-10-05 STARTUP-12：实际安装包与配置至登录验收
+
+负责人 Codex；状态 IN_PROGRESS。用户要求继续完整“双击→配置→启动→登录”，接续 STARTUP-10/11 的发行缺口，不重复已完成源码任务。
+- 输入：e88b56a（源码7fee1c8）、批准规格/计划；输出：真实镜像摘要、版本匹配的三目标包、当前 Mac 的真实入口/向导/登录验证记录、更新用户指南与Codex交接。
+- 范围：发行构建/打包/验收资产及必要回归修复；不改旧e92f或Claude/测量工作区，不读取个人.env，不用业务库。
+- 依赖：本机 Docker Desktop、已校验 Go SDK、GitHub/GHCR发布权限；公开镜像发布单独等待用户答复。未获许可不push/发布。
+- 验收：正式摘要而非测试标签/adapter，真实启动器进入向导、隔离新安装、教师浏览器登录、重开复用；Windows/ARM无实机则OPEN，跨编译不冒充实测。
+- 风险：网络/注册表权限、冷拉取耗时、未签名系统提示。仅处理本轮新合成资源；不prune、不触及原发布、共享Neo4j；不调用真实生成/在线向量。
+- 验证：干净git archive副本，官方Dockerfiles镜像构建；scripts/package-launcher.py及SHA核对；Go race/vet与相关pytest；有代码修改则补红绿及./scripts/verify.sh integration，无代码修改至少basic；实际包入口和浏览器全链路。
+- stage_c_status OPEN；technical_freeze NOT_PERFORMED；生成844451/900000、向量12005另计不变。
+
+STARTUP-12 发布授权：用户已明确同意将后端/前端镜像发布GHCR并设公开，制作本地安装包；GitHub设备授权packages权限已完成。此授权不含合并分支或技术冻结。干净后端第一次PyPI依赖查询失败；官方PyPI与一次性容器确认固定版本存在，未降级/改版本，保持Dockerfile重跑继续。Go首次回环监听受sandbox限制，获准隔离目录重跑race/vet exit0，前端双架构官方构建exit0；均不冒充正式包登录证据。
+
+STARTUP-12当前收尾检查点（非完成）：本地源码8314092/9e8b4a1；真实GHCR双架构镜像已上传，仍Private；UI公开步骤被审批要求临近确认，已询问，未绕过。3份真实摘要包生成并SHA3 OK，dist/startup-preview-20261005保留。真实Mac入口/向导/非法口令拒绝通过，private pull401失败未到登录，0本安装运行残留。独立复审4 Important已修正/明确缩小口径，4红绿helper PASS；Minor输出canary扫描deferred。完整integration首次缺默认浏览器exit1（其他层已过），指定Chrome纠正重跑后台36170仍运行，接续先读结果。报告docs/reviews/codex-startup-delivery-20261005.md、JSON startup-delivery-verification.json、交接docs/handoffs/codex-startup-delivery-20261005.md。OPEN直到公开匿名拉取与实际登录验收；technical_freeze NOT_PERFORMED。
+
+STARTUP-12公开接续（2026-10-05）：用户临近确认“现在将两个GHCR镜像设为Public”；已在GitHub UI逐个提交并观察两包Public。空auth/无密钥助手配置匿名拉取两个固定摘要exit0（warm cache，不代表冷下载速度），未动用户原Docker配置。首次临时context自动选择osxkeychain，首次拉取不计匿名证据；纠正后通过。完整integration重跑session36170实际exit0：backend3949/27登记SKIP、frontend934、integration393/4登记SKIP、backend-live44、演示E2E2、个人fake E2E4；文档basic98359 exit0。实际公开包隔离验收session62895仍在运行，尚不签收登录/跨平台。stage_c_status OPEN；technical_freeze NOT_PERFORMED。
+
+STARTUP-12后续实际结果：匿名PASS；公开包自动验收62895整体FAIL（首次就绪及教师登录已达成，重复入口完成前失败），保留原失败。另独立系统Chrome观察：真实入口→就绪→打开软件按钮→同一教师/teacher→第二入口exit0/既有服务页面已验证；不等同Finder双击。停止确认CDP超时，按钮完成未测；标签核对只stop本fixture，0残留、卷保留，控制器已退出。public-docs-basic43928 exit0。OPEN待自动重复用例诊断、停止UI与平台补验；无冻结、推送合并或真实模型调用。
+
+## 2026-10-05 STARTUP-13：GitHub Release下载测试草稿
+
+负责人Codex；状态DONE（仅草稿和附件，不代表发行验收）。用户明确请求创建Release草稿，范围仅草稿及既有三平台安装包、SHA256SUMS、清单和启动说明附件；不发布、不推源码/合并、不冻结。输入：已校验preview-20261005-e88b56a包与公开镜像；输出：可登录下载的草稿URL/附件核验与Codex交接。无API/DTO/迁移变化。风险：构建源码尚未推送，草稿暂存已核对main SHA，并在说明中明确不代表附件源码、发布前阻断源码/Tag对齐；平台与重复验收缺口保留。验收：draft=true、prerelease=true、附件名/大小/逐个SHA与本地一致；定向打包测试与无.env副本./scripts/verify.sh basic。公开发布/源码推送另行征询用户。
+
+STARTUP-13实际交付：Release ID403670008，draft=true/prerelease=true，URL https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936；三包＋SHA256SUMS＋release-manifest.json＋START-HERE.md共6附件上传state=uploaded，远端大小及SHA均等于本地。3小附件认证回下载逐字节一致；大包可选回下载网络缓慢，02:34停止并保留部分文件，不计完整下载PASS。未创建Tag ref，不推源码/合并，不公开发布；草稿暂存已核对main SHA，不代表构建源码，正文已写发布阻断。隔离basic98260 exit0，打包/发行定向10 PASS。交接docs/handoffs/codex-startup-release-draft-20261005.md，摘要docs/reviews/startup-release-draft-20261005.json。待用户从GitHub下载Mac Intel包人工测试；STARTUP-12、stage_c_status仍OPEN，technical_freeze NOT_PERFORMED；公开发布前需另批源码同步及准确Tag绑定。
+
+## 2026-10-05 STARTUP-14：下载后Mac入口Killed:9
+
+负责人Codex；状态IN_PROGRESS/发行签收OPEN。输入：用户Downloads实际包、PID44020错误；输出：已定位的签名/隔离证据、SIGKILL诊断回归、明确启动说明及交接。只读检查确认二进制SHA9116108b...与发布一致，unsigned且有com.apple.quarantine；spctl exit3/no usable signature，syspolicyd明确Gatekeeper rejection PID44020。不是Docker或个人API故障。本机可用Developer ID Application身份数0；完整分发修复需用户提供签名条件，不读取私钥。修复范围先补入口137条件诊断，不把提示修复冒充信任修复；不自动删quarantine、不更改Gatekeeper或用户配置、数据库，不重发镜像/替换Release附件。先写SIGKILL/成功/其他错误回归，运行定向测试与无.env副本verify.sh basic。未知平台和签收状态保持OPEN。
+
+STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功/其他失败回归先2 RED/1 PASS，修后打包7 PASS、完整打包发行13 PASS，diff-check无误。basic50362仍RUNNING（B14已过，负向契约阶段在执行），未记PASS。用户答复无Apple账号/证书，选择继续测试预览版；由用户本人审阅系统单程序“仍要打开”，代理未执行信任或删隔离。下载信任/完整启动仍OPEN；原下载包、Release附件、系统安全设置和数据未改。详见Codex故障handoff/review。
+
+
+## 2026-10-06 STARTUP-15：Intel 下载包启动失败排查
+
+- 负责人：Codex；状态 IN_PROGRESS，仅定位，不改用户配置、容器、课程或发布版本。
+- 输入：用户报告 Intel 预览包启动失败；复用 STARTUP-14 与原包，不重编、不重发。输出：只读证据、原因与自身交接。
+- 依赖/风险：安装状态 ERROR，未记录失败阶段；需用户提供脱敏诊断。读取安装非敏感字段与镜像清单，不读取 .env、控制令牌或 API Key，不发模型/向量请求。
+- 验证：下载二进制 SHA-256、Docker engine 与本安装容器/卷状态、公开镜像清单探针；未知归因保持 OPEN。源码/接口/模型无变更。
+
+- 实际检查点：用户诊断 PROCESS/unknown；最小 PATH 的缓存镜像 pull exit1（凭据助手缺失），仅补 ~/.docker/bin 后 exit0。Docker正常、本安装无容器/卷；下载SHA一致。发现P2路径继承与P3诊断丢阶段，尚未采集用户实际启动 PATH，唯一归因与完整启动保持OPEN。仅文档记录，未修包/配置/源码。报告 docs/reviews/codex-intel-startup-failure-20261006.md，自身交接 docs/handoffs/codex-intel-startup-failure-20261006.md；完整门禁未跑，未冻结。
+
+- 第二次诊断接续：用户 (1).json 与截图明确失败 teacher/PROCESS，checkpoint=migrated，Neo4j healthy/三卷存在。当前根因为用户名含大写，前端允许/状态原样、后端转小写、启动器精确比较误判。固定发行后端断网临时合成库复现exit0：创建成功但比较false，重入保留ID与原密码；未读取用户库/凭据。P2及旧状态恢复回归方案已追加报告。状态仍OPEN（仅定位；尚未修包/源码/用户配置、完整启动未验）；不删库重装、不冻结。
+
+
+## 2026-10-06 STARTUP-16：启动器热修复与新版草稿 Release
+
+- 负责人 Codex；状态 IN_PROGRESS；用户明确要求修复并提交新草稿。范围：用户名规范化与旧 migrated 配置恢复、Docker子进程工具目录、已有SIGKILL入口提示一并打包。保留首次密码/InstallID/配置/卷，业务镜像/迁移/DTO不变。
+- 输入：STARTUP-15诊断与固定源码3bc7e9b；输出：先红后绿回归、启动器三平台包/摘要、新GitHub草稿及自身交接。只推自己的codex源码分支/草稿，不合并main、不公开发行、不冻结、不执行真实API。
+- 本次仅启动器热修，运行兼容标识沿用 preview-20261005-e88b56a（前后端镜像/数据版本不变），新草稿以20261006-hotfix和源码提交区分，避免未完成安装进入不必要的数据升级流程；说明文件必须明确热修源码出处。
+- 依赖/风险：锁定Go1.26.8临时恢复、GitHub写权限；三平台跨编译不等于ARM/Win实机验收；Mac未签名条件不变。验证：相关Go/打包全量、隔离 ./scripts/verify.sh full 与合成安装恢复（不挂用户库/凭据）；远端草稿/附件hash/源码commit核对。
+
+- STARTUP-16 源码检查点：旧代码新回归5个顶层FAIL/1 PASS（含3个恢复输入子例失败），最小修改后Go全量PASS，最终race/vet PASS；定向Python20 PASS；真实合成Docker旧migrated混合大小写恢复1 PASS（211.26秒），保留原ID/首次密码/配置。隔离basic exit0，full仍执行中，不把检查点当作完成。
+
+- STARTUP-16最终：DONE（修复/草稿交付；用户下载/实机签收OPEN）。源码5f45a5c已推codex/startup-hotfix-20261006；最终race/vet/定向20/真实合成旧状态恢复1 PASS；无.env隔离full单次exit0，backend+tooling3952/27登记skip/1既有warning，frontend934/typecheck/build PASS。三平台包内容与SHA核对、新草稿404525654 draft/prerelease true、7附件远端SHA一致，target精准5f45a5c。保留旧运行兼容ID，不改用户配置/卷/首次密码、业务镜像或迁移；不合并/公开/冻结。P3诊断丢阶段、Mac信任及ARM/Win实机仍OPEN。报告docs/reviews/codex-startup-hotfix-release-20261006.{md,json}与自身handoff已更新。
+
+## 2026-10-09 Claude：正式交付闭环检查（FORMAL-RELEASE-01，用户指示）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| FORMAL-RELEASE-01 | IN_PROGRESS（P1 源码就绪、P2 候选镜像与包、P3 隔离安装已完成；P4 业务闭环被向量网络问题阻塞，已交接） | Claude（主）/ DeepSeek harness（向量网络定位） | 以真实启动器 + 向导 + 个人模型 API（DeepSeek）+ 在线向量（百炼）验证"要交付的软件是否可用"：安装 → 向导 → 教师登录 → 配置模型 → 上传示例章节 → 审核发布 → 学生问答，再测失败路径与生命周期；通过后才合并启动器 PR、推送正式镜像、出完整安装包 | 每步有证据（截图/日志/命令输出）；测试通过与浏览器验收分别报告；真实调用用量熔断 100 万 token；仅实测本机 Mac Intel（darwin-amd64） |
+
+- 已决（用户，2026-10-09）：生成模型默认 DeepSeek，向量沿用阿里云百炼 `text-embedding-v4`（1024 维）；启动器分支 `codex/startup-hotfix-20261006` 合入当前 main；先本地验证再推镜像；真实调用用量上限 100 万 token；材料用仓库示例章节 `datasets/demo/ch3-stack-queue.md`；实测平台仅 Mac Intel；Go 工具链用 1.26.8。
+- 进度与证据：
+  - P1：分支 `claude/release-launcher-merge`（`43939b7`，仅本地）。合并仅 5 处冲突（`ci.yml` + 4 个文档，均保留两边）；`verify.sh` basic、前端门禁 1279 条、启动包 tooling 测试 13 条通过；官方启动器门禁 `scripts/verify/startup.sh`（Go 1.26.8）通过。
+  - 冒烟：本地新镜像上 `tests/startup/test_release_smoke.py` 3 个场景（启动/登录/停止/重启、两个安装互相独立、备份恢复）通过（409 秒）；向导浏览器测试 2 条通过。此前 3 个场景因 Docker 虚拟机被三个常驻 Neo4j 占满 CPU 而超时，重启 Docker Desktop 后消失（环境问题，非代码问题）。
+  - P2：经用户批准，推送候选镜像 `ghcr.io/arvinhanye/smartsketch-backend:rc-43939b7`（`sha256:c6e2ca0d14d915651a89d4a78aa1f5f620d8a1142097f304760d4d39869fbbd6`）与 `smartsketch-frontend:rc-43939b7`（`sha256:085b0f17f60d042b51a26d982d7fb29dae27933ca5ebd0d3242edf7592cdd95b`），仅 linux/amd64，两个包均为 public；镜像自检无 `.env`/私钥/数据库文件；清单 `packaging/release-manifest.rc-43939b7.json`（未提交）；用 Go 1.26.8 交叉编译三平台启动器并打包到 `dist/packages/`（`SHA256SUMS` 已生成，`dist/` 被 Git 忽略）。
+  - P3：真实启动器在隔离 `HOME` 下启动，向导完成后 4 个容器健康、`127.0.0.1:18080` 可访问，镜像由 ghcr 匿名拉取成功。
+- 阻塞：从 API 容器到 `dashscope.aliyuncs.com:443`——DNS 0.3 秒解析正常，TCP 对 `39.96.198.249`、`39.96.213.166` 均 8 秒超时（`api.deepseek.com` 0.46 秒连通；Docker Desktop 配了代理 `http.docker.internal:3128`，容器内无代理变量）。已写交接稿 `docs/handoffs/claude-formal-embedding-network-deepseek-handoff.md` 交 DeepSeek harness 定位；在向量路径恢复前不上传资料。
+- 安装包制作时待处理（用户 2026-10-09 提出，**本轮不改**）：
+  1. 向导缺少填写指引：普通用户不知道向量 API 地址、模型名、维度怎么填；应给出说明、示例或预设（可参考「模型 API 设置」的供应商预设），并说明默认值不是对所有模型通用。
+  2. 向导里的向量配置与软件内的向量设置重复：现在教师可在「模型 API 设置」里配置课程级向量（ADR-092），与向导的系统级向量配置功能重叠；需先决定单一入口与优先级（如向导只设系统默认、软件内为课程覆盖）再改文案与流程，涉及 ADR-081/092 的修订。
+  3. 登录页出现原生滚动条：根因是 `div.auth-layout__form` 设了 `overflow-y: auto`，窗口较矮（1280×800 起就会出现，实测 1000×592 溢出 227px）时表单列装不下，浏览器在深色页上画出浅色滚动条；应让页面自然滚动或压缩间距，而不是内部滚动条。
+- 之后的出包前置：向量路径恢复并通过 P4/P5 → 修复上述待处理项（前端有改动需重建镜像并重推，换新摘要和清单）→ 启动器 PR 合入 main 且 CI 变绿 → 再打包。
+- 本机环境：Go 1.26.8（`/usr/local/go`）、Docker Desktop 重启过一次；隔离安装位于会话临时目录，用户原安装目录未触碰；用户此前误删了自己原安装的容器（数据卷未核实）。
+
+- FORMAL-RELEASE-01 进展更新（2026-10-09 09:45）：DeepSeek harness 已交报告 `docs/handoffs/deepseek-formal-embedding-network-20261009.md`——故障层是**宿主机到阿里云的 TCP 出站**（DNS、TLS、密钥、容器配置均排除；Docker 代理设置与产品出站无关，产品不读代理环境变量）；用户调整本机网络出口（约 09:29–09:31）后，宿主与容器同时恢复，产品自身客户端向量调用成功（1024 维，0.57–0.69 秒），8 次里 1 次偶发 `connection` 失败（产品无重试）。**但 09:45 Claude 复测，容器到阿里云 4 个 IP 又全部 5 秒超时，产品向量请求 `FAIL class=timeout`（60 秒）**——路径不稳定，需用户保持可直连阿里云的出口；稳定前不上传资料。
+- 约束（Claude 核实）：启动器的 `.env` 加载要求键集合与它写入的完全一致（`len(m) != len(allowed)`），不能往安装的 `.env` 里加 `LLM_DAILY_TOKEN_BUDGET` 之类的熔断键；真实调用的 100 万 token 上限改为"每步之后读取 `model_calls` 用量累计并人工止损"，默认任务/日预算（500000 / 5000000）仍在服务端生效。当前用量 0，教师账号 1 个。
+- 产品决策待定（来自 harness 报告第 3、5 节）：方案 5（受控出站代理支持）与方案 6（向量调用自动重试）仅评估未采用；正式模式依赖用户保持可用出口是否可接受，需要用户决定。
+- FORMAL-RELEASE-01 进展更新（2026-10-09 09:58）：DeepSeek harness 向量门禁报告 `docs/handoffs/deepseek-formal-embedding-baseline-20261009.md` 判 `GATE: PASS`（09:48–09:53：TCP 对照全通；产品客户端向量 3/3 成功、1024 维、0.53–0.84 秒；5 分钟探测 20/20）。**但 09:57 Claude 上传前复核，向量请求 `FAIL class=timeout`（60 秒），09:58 容器到阿里云 IP 再次 5 秒超时（DeepSeek 同时 0.24 秒正常）**。可用性时间线：09:32–09:33 通 → 09:45 不通 → 09:48–09:53 通 → 09:57–09:58 不通，说明用户网络出口在切换，单次 5 分钟窗口不足以证明稳定。按门禁约定不上传资料、不重试、不降级；等用户稳定网络后用更长的窗口重新交接。用量：对话/抽取 token 0，业务任务 0。
+- FORMAL-RELEASE-01 分工（2026-10-09，用户决定）：业务闭环（R1–R12：登录/模型配置、上传到待审核、图谱抽样、发布、草稿隔离、学生 409 引导、问答 4+1、无效密钥、重启保留、日志卫生）交 DeepSeek harness 执行，交接稿 `docs/handoffs/claude-formal-loop-deepseek-handoff.md`；凭据只走环境变量，生成类用量硬上限 100 万 token（800000 停），每步前跑向量网络门禁。Claude 负责处理报告里发现的问题与装包前修复。
+- FORMAL-RELEASE-01 P4 业务闭环结果（2026-10-09，DeepSeek harness 报告 `docs/handoffs/deepseek-formal-loop-20261009.md`，`LOOP: PARTIAL`，Claude 复核）：在候选镜像 `rc-43939b7`、真实启动器安装、真实 DeepSeek + 百炼向量（正式模式）下，R1–R12 全部"必须通过"行通过。要点：示例章节（11.5 KiB）上传到待审核 114 秒，71 知识点/62 关系（`PREREQUISITE` 无环，孤立点 3）；harness 抽样知识点 9/10、关系 8/10（单评审、AI 判定，属参考性证据，不替代人工准确率签收）；发布 v1 12.8 秒；草稿/发布隔离、学生 409 引导、标记与推荐、重启后数据保留、日志卫生均通过；问答 4 课内 `answered` 且有来源、1 课外 `not_covered` 0 引用，最慢 10.99 秒（< 15 秒口径）。
+  - Claude 独立核实：生成类用量 115,984 token（报告时点 112,491，之后又有 2 次问答与 1 次问题改写），远低于 100 万上限；embedding 18 次。
+  - 观察分诊：① `meta.status=answered` 而终态 `not_covered`——**按设计**（`specs/grounded-qa.md` Q2 第 3 条明确 meta 不是承诺，前端以 `final` 为准），不修；② 向量设置显示"已配置"而开头 API 返回 `configured=false`——库里现有 1 条教师级向量配置，应是用户后来在软件内保存所致，**非缺陷**，与"向导 vs 软件内向量设置重复"待办同源；③ 两个同名"测试连接"——**成立（轻微）**，并入装包前修复批次（用 aria-label 区分）；④ 登录态不进 `storageState`——**按设计**（会话在 `sessionStorage`）；⑤ 队列未清空仍可发布——**按设计**（`specs/teacher-review-publish.md`：队列不阻塞发布，页面也这样写），不修，可选改进是在发布确认里展示队列摘要；⑥ 画布节点无 DOM——**按设计**（列表视图是键盘/自动化等价路径）；⑦ 重试口径——观测到抽取内部重试吸收了 2 次 `connection`，问答与向量调用无重试，见 harness 方案 6，待决；⑧ 未观测到独立"解析"阶段标签——**未证实**（解析约 2 秒，3 秒轮询可能漏掉），装包前复核任务阶段事件流。
+  - 卫生：harness 在 `/tmp` 留的教师/学生令牌文件（学生令牌为 644 权限）已由 Claude 删除；报告与走查截图在 `/tmp/formal-loop-artifacts/`。
+  - 尚未覆盖（P5，需在最终镜像上做）：处理中强杀后恢复、取消任务、端口冲突、Docker 未运行、真实数据的备份/恢复、升级保护、会话过期、发布超时、向量密钥无效、下载包的 Gatekeeper、arm64/Windows。
+  - 下一步：装包前修复批次（向导填写指引与向量入口定位文案、登录页滚动条、两个"测试连接"区分）→ 重建镜像换摘要与清单 → 在最终镜像上跑 P5 → 启动器 PR 合入 main 且 CI 变绿 → 出包。
+- FORMAL-RELEASE-01 装包前修复批次（2026-10-09，提交 `8a33ab9`，本地）：① 安装向导：说明向量服务是**系统默认**、教师可在「模型 API 设置」为课程单独覆盖；新增「服务商预设」（默认阿里云百炼，预填地址 / `text-embedding-v4` / 1024，也可选「其他服务商」自行填写；手改任一项自动切为「其他服务商」）；每个字段都有说明并用 `aria-describedby` 关联，写明默认 1024 不是对所有模型通用、建立索引后不能更改；`docs/startup-guide.md` 同步。保留向导与软件内两处向量设置（用户确认：两者职责不同，系统默认 vs 教师课程覆盖，改文案不改流程）。② 登录页：表单栏在矮窗口内部滚动是有意的（否则提交按钮会被隐藏），现改为细的深色滚动条（`color-scheme: dark`、`scrollbar-width: thin`）；实测 1000×592 / 1280×800 / 1440×900 计算样式生效，**无头浏览器截图不画滚动条，真实观感待用户确认**；遗留小优化：窗口矮到约 592px 时"登录"按钮被截半，需滚动才能点到。③ 教师设置页两个"测试连接"、两个"刷新模型列表"用 aria-label 区分（如"测试连接（通用模型）"），可见文字不变。④ harness 观察 8（无独立"解析"阶段标签）核查为**非缺陷**：前端已映射 解析中/抽取中/融合中/入库中，后端 `merging` 是直通阶段、解析约 2 秒，3 秒轮询看不到。
+  - 验证：向导指引浏览器测试（新）+ 既有向导测试 + 打包 tooling 测试共 16 条通过；前端 74 文件 / 1282 条、`type-check`、官方启动器门禁（Go 1.26.8）、`verify.sh` basic 通过。后端、契约、compose 自 `43939b7` 起零改动，因此后端镜像摘要 `sha256:c6e2ca0d…` 沿用，只需重建前端（本地 `smartsketch-startup-test-frontend:8a33ab9`，尚未推送）。
+  - 下一步：批准后推送前端 `rc-8a33ab9` → 生成新清单与包 → 新隔离安装（用户走新向导）→ 把失败路径（P5）交 DeepSeek harness 在最终镜像上执行 → 启动器 PR 合入 main 且 CI 变绿 → 出包。
+- FORMAL-RELEASE-01 冒烟回归（2026-10-09）：新前端镜像 `8a33ab9` + 后端 `43939b7` 上 `tests/startup/test_release_smoke.py` 3 个场景通过（436 秒）。中途两个场景在 neo4j 阶段瞬间失败，**根因不是代码**：Docker 默认网络地址池用尽（`all predefined address pools have been fully subnetted`，系统里积累了 28 个 `smartsketch-*_default` 空网络）。启动器的冒烟测试收尾只停容器、删卷，**不删 compose 网络**，每跑一次漏 1–2 个网络，约 7 次后耗尽地址池。已手工清理本会话今天创建的 10 个空网络（10 月 5/6 日遗留的 17 个未动）。待办（低优先级，不阻塞出包）：冒烟测试收尾应 `docker network rm` 本安装的项目网络；用户若仍遇到类似报错可 `docker network prune`（仅删未使用网络，compose 会自动重建）。真实用户一个安装只有一个网络，不会遇到。
+- FORMAL-RELEASE-01 候选镜像 rc-8a33ab9（2026-10-09，用户批准推送）：前端 `ghcr.io/arvinhanye/smartsketch-frontend:rc-8a33ab9` → `sha256:a66a9d9eed495ac4137d0a859f410e2fefe0c6e8280dcb25a5bde27bf1e510e5`（公开）；后端沿用 `sha256:c6e2ca0d14d915651a89d4a78aa1f5f620d8a1142097f304760d4d39869fbbd6`（`rc-43939b7`，自该提交起后端零改动）；清单 `packaging/release-manifest.rc-8a33ab9.json`；用 Go 1.26.8 编译并打包三平台（`dist/packages2/`，`SHA256SUMS` 已生成，darwin-amd64 包 `0ac18142…`；仅 darwin-amd64 计划实测）。下一步：用户用新向导做全新隔离安装 → 失败路径（P5）交 DeepSeek harness → 启动器 PR 合入 main 且 CI 变绿 → 出包。
+- 待评估需求（用户 2026-10-09 提出，**未排期**）：① "软件启动后再填写向量模型"（向导不再要求向量）——现状：生产/个人模式下后端启动必须有系统级 `EMBEDDING_BASE_URL/API_KEY/MODEL`（`config.py` 校验），启动时还要初始化/校验系统向量空间（`services/startup.py`），启动器就绪判定包含 `EmbeddingSpaceMatches` 与 `VectorIndexesOnline`；因此是架构级改动而不是界面调整，需修订 ADR-081/092。② 除 Docker 桌面安装包外的服务器部署（多用户共享一台服务器）：现状无反向代理/TLS/域名、发行 compose 仅绑定 127.0.0.1、教师账号靠 CLI 创建、学生可自助注册；镜像仅 amd64。估算见对话，需用户先定服务器、域名/TLS、注册策略。
+- FORMAL-RELEASE-01 新包隔离安装（2026-10-09）：旧隔离安装 `74694b2cb256134c` 已停止（卷保留）；用 `rc-8a33ab9` 的 darwin-amd64 包在全新 `HOME` 下装出新隔离安装 `15196dda63d257d1`（`Phase=READY`，网站 `127.0.0.1:8080`，4 个容器健康，用户走完新向导）。失败路径验收（M1–M10、O1、O2）已写成交接稿 `docs/handoffs/claude-formal-failure-paths-deepseek-handoff.md` 交 DeepSeek harness，本安装内生成类用量硬上限 400,000（300,000 停）。
+- FORMAL-RELEASE-01 失败路径验收（2026-10-09，报告 `docs/handoffs/deepseek-formal-failures-20261009.md`，隔离安装 `06177e36fdfcb5c4`，`rc-8a33ab9`，判 `FAILPATHS: FAIL`）：M1 强杀 worker 恢复、M2 取消、M3 api 被杀时前端、M4 会话失效、M6 无效向量密钥、M8 权限与课程隔离、M10 neo4j 重启、M11 问答质量与边界（A 8/8、B 2/2、编造引用 0、提示词泄露 0、AI 逐句忠实率 100%——**AI 判断，非人工签收**）均 `正确`；M5/M7/M9 判缺陷，O1/O2 未完成（控制会话 20 分钟过期）；生成类用量 454,271 越过 300k 停止线与 400k 硬上限（harness 步后未即时核算，非产品问题）。
+  - Claude 分诊：**M5 属实**（nginx 50m 与文件上限相同，加表单开销后先于后端拦截，用户看到英文 HTML 413）→ 已修；**M7 属实**（`EmbeddingAdapter` 无重试，向量一次连接抖动让发布 500，且错误文案笼统）→ 已修（有界重试 + 503 原因）；**M9(b) 基本不成立**（守护进程不可达时网页状态已显示「Docker 尚未就绪」，harness 只看了终端输出；终端文案可改进，低优先级，不修）；观察「`docker kill` 后不自愈」——Claude 在 `06177e36…` worker 上实测属实（48 秒不重启，策略 `unless-stopped`），但 Docker 视手动 kill 为人为停止，非产品缺陷，真实崩溃/守护进程重启自愈**未实测**；C2 超长提问 503 → 已加 2000 字上限与 422。
+  - 另：用户在向导误填维度 1021，发布 500 且无法在向导内修复 → 向导对已知模型（`text-embedding-v4`）校验维度（页面 + 启动器），已修。
+  - 修复批次 2（ADR-095，本地未提交/未推送）：nginx 51m + `error_page 413` JSON；`EmbeddingAdapter` 瞬时故障有界重试（仅无截止时间调用方，2 次，1s/3s）；发布向量失败 503 `LLM_UNAVAILABLE` + `details.reason`（`vector_unavailable`/`vector_rejected`），契约与生成物同步，前端固定文案；`ChatRequest.question` ≤ 2000（契约 + 输入框）；向导维度校验（datalist + 提交前拦截 + Go 端 `checkKnownDimensions`）。
+  - 未处理（待排期）：① 冒烟测试泄漏 compose 网络（Docker 默认地址池耗尽，已有清理，测试自身不清理）；② ~~Windows `go vet` 的 `unsafe.Pointer` 警告，门禁只 vet 宿主 OS~~（已修：`permissions_windows.go` 改用 `unsafe.Pointer` 接收 DACL 指针，`scripts/verify/startup.sh` 增加 `GOOS=windows go vet`；**仅编译与 vet 验证，无 Windows 实机运行**）；③ ~~登录按钮在约 592px 高窗口被截断~~（见下一条，已处理）；④ 健康探针 `/health` 不覆盖「模型调用链就绪」（api 重启后约 2 分钟问答才恢复）；⑤ 教师在向导外修复错误向量维度的恢复流程（p4 `1021` 安装可作 M12 恢复测试对象，未测）。
+  - 下一步：全量回归 → 提交本地 → 批准后推送并重建后端/前端镜像（换摘要与清单）→ 新包与新隔离安装（用户走向导，维度 1024）→ 第二轮交 DeepSeek：复核 M5（`FILE_TOO_LARGE` JSON）、发布 503 `vector_rejected`（无效向量密钥）、C2 的 422、O1 端口冲突、O2 备份恢复，每步后即时核算用量（300k 停）→ 启动器 PR 合入 main 且 CI 变绿 → 出包。
+- FORMAL-RELEASE-01 登录页滚动条（2026-10-09，用户复查：软件首页仍有突兀的上下滚动条）：根因是登录表单栏 `.auth-layout__form` 上下各有 96px 内边距（共 192px），而表单自身约 503px；窗口高度低于约 860px 时内容 695px 超过容器 534–594px，出现滚动条。上一轮只把滚动条换成细的深色样式，没有消除滚动本身。已改为：内边距 8px（`LoginLayout.vue`），约 650px 及以上高度的窗口完全放得下；更矮的窗口仍可内部滚动（不藏提交按钮），但不显示滚动条（`scrollbar-width: none` + `::-webkit-scrollbar`）。浏览器实测（Playwright）：旧版 1440×780、1280×720 有滚动容器；新版 1440×900/780、1280×720、1100×650、1920×1080 无滚动容器，1280×600 仍可滚动但隐藏滚动条。限制：无头浏览器用悬浮式滚动条，无法量出「条是否可见」，隐藏效果由样式与测试保证，用户仍需在自己的浏览器里目视确认。
+- FORMAL-RELEASE-01 候选镜像 rc-e3b04b5 与新隔离安装（2026-10-09，用户批准推送；范围：先只正式发 Mac Intel 与 Windows）：后端 `ghcr.io/arvinhanye/smartsketch-backend:rc-e3b04b5` → `sha256:362953d27589d35af42097f9d31168e9c4c2da7b91c55370cac319f4011b5bc5`，前端 `…smartsketch-frontend:rc-e3b04b5` → `sha256:e0d64e481338b1c8497db8925888256f6e0c735aaf2efc3c6a38117957d4c9fb`（均 `linux/amd64`，已验证匿名可拉取）；清单 `packaging/release-manifest.rc-e3b04b5.json`（清单格式与打包脚本强制三个目标，arm64 包照常生成，但不作为正式交付）；三平台包在 `dist/packages3/`（`SHA256SUMS`：darwin-amd64 `01cfb89a…`、windows-amd64 `32c30f48…`、darwin-arm64 `e5bddb89…`）。新隔离安装 `abbd7b041fd3b514`（`Phase=READY`，`127.0.0.1:8080`，维度 1024，`rc-e3b04b5`，容器运行新镜像；`nginx` 已是 51m + 413 JSON）；旧安装 `15196dda…`、`06177e36…` 的容器已停（卷保留）。线上复核登录页：1440×900/780、1280×720、1100×650 无滚动容器，1280×600 仍可滚动但隐藏滚动条。第二轮交接稿 `docs/handoffs/claude-formal-recheck-deepseek-handoff.md`（R1 上传超限、R2 超长提问、R3 登录页滚动条、R4 发布回归、可选 O1/O2；每步后即时核算；生成类 ≥ 80,000 停）。
+  - **用量提醒**：用户 100 万 token 总上限已用约 675,000（p3 约 116k + p4 约 105k + p5 454k），剩余约 325,000；第二轮预算压到 100,000 硬上限，S1 改用约 8 KB 的截短材料。
+  - 仍未做：分支推送与启动器 PR（等用户批准）；Windows 实机测试（需 Windows + Docker Desktop 机器，用户尚未确认有无）；代码签名/公证（用户尚未决定）；Gatekeeper 与 SmartScreen 行为实测。
+- FORMAL-RELEASE-01 第二轮复核与冒烟（2026-10-09）：DeepSeek 报告 `docs/handoffs/deepseek-formal-recheck-20261009.md` 判 `RECHECK: PARTIAL`——R1 上传超限（`limit+1` 与 60 MB 均 413 + JSON `FILE_TOO_LARGE`，前端本地拦截）、R2 超长提问（2001/200000 字均 422，`model_calls` 无新增，输入框 `maxlength=2000`）、R3 登录页滚动条（四个常见尺寸无滚动容器；1280×600 `scrollbar-width: none`）、R4 发布/回滚回归（v2 发布、v3 回滚，无 failed 行）全部 `正确`；O1/O2 未完成（控制会话 20 分钟过期，无副作用）。生成类用量 66,448，累计约 742,000 / 1,000,000；`model_calls` 全程 0 错误。Claude 在 rc-e3b04b5 的两个推送摘要（打本地合成标签）上跑 `tests/startup/test_release_smoke.py` **3 个场景通过（439.8 秒）**，覆盖登录/停止/重启、两个安装互相独立、自有备份与恢复；冒烟前清理了 17 个泄漏的空 Docker 网络（22 → 5）。
+  - M7 并发下的向量瞬时失败**未在真实环境复测**（难以确定性触发），由 `test_e07.py`/`test_g06.py` 单元测试覆盖；M9(b) 判定非缺陷，不复测。O1/O2 由启动器单元测试（端口冲突不杀占用者、原配置不变）与冒烟场景（备份恢复）覆盖，不再单独交 harness。
+  - 下一步（等用户回答）：批准推送分支并开启动器 PR → 处理 Windows `go vet` → CI 变绿 → 合入 main → 出 Mac Intel 与 Windows 的包；Windows 实机、签名/公证未决。
+- FORMAL-RELEASE-01 全站布局溢出复查与修复（2026-10-09，用户要求查「和首页滚动条类似的错误」并修复）：在演示模式本地环境里用 Playwright 遍历 14 个页面 × 6 个桌面窗口尺寸（1920×1080、1440×900、1440×780、1280×720、1100×650、1280×600，共 84 组），检查内部滚动容器、横向溢出、被裁切的可点击元素与 JS 报错。结果：无横向溢出、无 JS 报错；除登录页外无内部滚动容器。修复：① 注册页（`AuthLayout.vue`）：桌面宽度下布局占满视口、插画随高度缩小，极矮窗口仅表单栏内部滚动且隐藏滚动条（1280×600 整页多出 51px → 0）；② 共用页面容器 `.ui-sheet__inner` 底部内边距 64px → 40px（资料页 1440×900 的 14px、审核页 1280×720 的 6–21px 近似溢出归零）；③ 模型设置页紧凑排版触发高度 850px → 930px（教师/学生设置页 1440×900 的 21px/8px 归零，原因是 850–920px 之间宽松排版比紧凑排版高 84px）；④ 教师图谱编辑页画布顶栏允许换行、选择器 `flex: 0 1 260px; min-width: 160px`（1100×650 下「选择知识点」下拉框被裁到边缘外 186px，1280×720 被裁 6px → 都在画布内；这是原有缺陷，会让不靠鼠标选节点的路径基本不可用）。同一份数据上改动前后对照：**无任何组合变差**，被裁切的可点击元素 3 → 0。
+  - **不是错误、未改动**：学生图谱页左栏「下一步推荐」较长时整页变长（545–1243px）——这是 2026-10-07 用户批准的设计「整页滚动取代面板滚动」（见上文 Codex 续做证据）。剩余的近似溢出（学生概览 1280×720 多 30px、聊天页 1280×600 多 5px）是内容本身的长度。
+  - 验证：前端 75 文件 / 1290 条、`type-check`、Playwright 教师与学生端到端 2 条通过；新增 4 条样式守护测试（`tests/frontend/login-scrollbar-style.test.ts`）。限制：无头 Chromium 为悬浮式滚动条，无法判断「条是否好看」；只测 Chromium，未测 Safari；未覆盖图谱选中节点后的详情面板、弹窗与抽屉、教师端大量数据列表。
+  - **注意**：这些是前端样式改动，已推送的镜像 `rc-e3b04b5` 不含它们；要进安装包必须重建前端镜像、更换清单摘要并重新打包（需用户批准推送镜像）。
+- FORMAL-RELEASE-01 最终候选 rc-b59869d（2026-10-09，用户批准推送）：只重建前端（后端源码自 `fbe176c` 起零改动，沿用 `sha256:362953d2…`）。前端 `ghcr.io/arvinhanye/smartsketch-frontend:rc-b59869d` → `sha256:0c1525010e24246a4da5d78bff79586cdb3e96f80319df88d449b85173bb66c4`（`linux/amd64`，已验证匿名可拉取）；镜像内核对：nginx `client_max_body_size 51m` + `error_page 413`，构建后的 CSS 含 `(height<=930px)` 设置页紧凑排版、注册页 `100dvh - 3.5rem`、画布顶栏选择器 `min-width:160px`，旧的 850px 规则已不存在。清单 `packaging/release-manifest.rc-b59869d.json`（compose 摘要不变）；Go 1.26.8 重新编译（含 Windows 权限代码修复），三平台包在 `dist/packages4/`（`SHA256SUMS`：darwin-amd64 `87371e8f…`、windows-amd64 `5a9ed93a…`、darwin-arm64 `c6eef3d6…`；darwin-arm64 与 windows-amd64 不是正式交付：未实机运行，仅交叉编译）。
+  - rc-b59869d 验证：`tests/startup/test_release_smoke.py` 3 个场景在这两个推送摘要上通过（443 秒）；`SHA256SUMS` 三个包全部校验通过；解压核对 darwin-amd64 与 windows-amd64 包内清单的版本与前后端摘要一致，compose 摘要一致，Windows 包含 `smartsketch-launcher.exe` 与 `start-windows.cmd`。**未做**：用最终包再做一次干净安装（上一轮 `rc-e3b04b5` 已用同一套包结构走完整向导与第二轮复核，本次只换了前端与清单）；Gatekeeper/SmartScreen 实测；Windows 实机；签名与公证（用户决定不做）。PR #330 待最终 CI 与用户确认合并；GitHub Release 尚未创建（建议先建草稿，由用户公开）。
+  - rc-b59869d 干净安装验证（2026-10-09）：用 `dist/packages4/SmartSketch-rc-b59869d-darwin-amd64.tar.gz` 重新解压，在全新隔离 `HOME` 下启动，用户走完整向导，得到安装 `0b4cf802cfb53484`（`Phase=READY`，`127.0.0.1:8080`，`rc-b59869d`，维度 1024）。四个容器全部 healthy，镜像为后端 `362953d27589`、前端 `0c1525010e24`、neo4j `ab3aafb0020e`（与清单一致）；nginx 为 `51m` + `error_page 413`。真实安装上复查：登录页与注册页在 1440×900、1440×780、1280×720、1100×650 无整页滚动、无内部滚动容器，1280×600 登录页仅表单栏内部滚动且滚动条隐藏、注册页不滚动；60 MB 上传返回 413 + `application/json` + `FILE_TOO_LARGE`；一次性测试学生账号注册 201、登录 200（学生角色）、错误密码 401、学生首页无整页溢出、无 JS 报错。**未覆盖**：教师业务闭环与问答（上一轮 `rc-e3b04b5` 同一后端已验证，本次只换前端样式）；教师账号路径（用户在向导里创建，凭据不在会话内）。该安装里留有两个 `verify_*` 一次性学生测试账号，属测试数据。
+

@@ -392,10 +392,17 @@ tr:last-child td {
   overflow: hidden;
 }
 
-/* 窄而矮的窗口中只让表单栏内部滚动，避免隐藏提交按钮。 */
+/* 表单栏高度由 LoginLayout 的小边距保证：约 650px 及以上的窗口完全放得下，不出现滚动条。
+   更矮的窗口里仍允许表单栏内部滚动（滚轮、触控板、键盘都可用，避免提交按钮被藏起来），
+   但不显示滚动条本身：之前细的深色条在登录页上仍然很突兀。 */
 .app.app--login .auth-layout__form {
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.app.app--login .auth-layout__form::-webkit-scrollbar {
+  display: none;
 }
 
 /* 组件里的 <section> 直接落在 .app-main 的网格里，统一卡片外观 */

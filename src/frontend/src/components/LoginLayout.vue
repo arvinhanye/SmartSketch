@@ -139,7 +139,8 @@
 .auth-layout__form {
   min-width:0;
   width:100%;
-  padding:96px 0;
+  /* 表单本身约 500px 高。这里只留小边距：之前上下各 96px，窗口一矮表单栏就出现滚动条。 */
+  padding:8px 0;
   max-height:100%;
   overscroll-behavior:contain
 }
@@ -187,7 +188,4 @@
   }
 }
 
-@media(min-width:761px) and (max-height:700px) {
-  .auth-layout__form { padding-top:96px; }
-}
 </style>

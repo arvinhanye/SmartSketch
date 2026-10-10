@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "verified_code_commit": "7fee1c88f870cee1af4a17bee9536bf244baf80c",
+  "recorded_utc": "2026-10-05T08:25:35.854133+00:00",
+  "environment": {
+    "dotenv_present": false,
+    "parent_env": "env -i",
+    "ports": {
+      "verify_neo4j": 20689,
+      "e2e_neo4j": 20688,
+      "e2e_api": 20681,
+      "e2e_web": 20673
+    },
+    "go_version": "1.26.8",
+    "go_archive_sha256": "186be014105aa6542b767d2c6ed5cca10a0214bdff809ef1724022a8c7894150"
+  },
+  "results": {
+    "verify_integration_exit": 0,
+    "backend_tooling": {
+      "passed": 3948,
+      "registered_skipped": 27
+    },
+    "frontend": {
+      "passed": 934,
+      "typecheck_exit": 0,
+      "build_exit": 0
+    },
+    "integration": {
+      "passed": 393,
+      "registered_skipped": 4
+    },
+    "backend_live": 44,
+    "demo_e2e": 2,
+    "personal_fake_provider_e2e": 4,
+    "go_race": {
+      "passed": 47,
+      "opt_in_skipped": 3
+    },
+    "go_vet_exit": 0,
+    "cross_build": {
+      "darwin-amd64": 0,
+      "darwin-arm64": 0,
+      "windows-amd64": 0
+    },
+    "targeted_pytest": 29,
+    "local_docker_smoke": {
+      "passed": 3,
+      "seconds": 641.38
+    },
+    "documentation_basic_exit": 0
+  },
+  "paid_generation_calls": 0,
+  "online_embedding_calls": 0,
+  "generation_ledger": {
+    "used": 844451,
+    "ceiling": 900000
+  },
+  "embedding_ledger": 12005,
+  "stage_c_status": "OPEN",
+  "technical_freeze": "NOT_PERFORMED",
+  "platform_release_acceptance": "OPEN",
+  "independent_review": "PARTIAL_USAGE_LIMIT_INTERRUPTION_NOT_CLEAN",
+  "logs": {
+    "integration-release-validation.log": {
+      "sha256": "a35eadcb200a052fe662c16acee9142c01598052cfa387a47e5ef7a99f8f3791",
+      "bytes": 28764,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/integration-release-validation.log"
+    },
+    "smoke-release-validation.log": {
+      "sha256": "5b28440be01725596d1ebc241674bc9c3330037bdc2926c7bdb887c1fa267d60",
+      "bytes": 110,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/smoke-release-validation.log"
+    },
+    "race-release-validation.jsonl": {
+      "sha256": "5a991dd0e7bac65ccd9aae4899bf5823ea380a43260f08eca866c61ba4b62a47",
+      "bytes": 46040,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/race-release-validation.jsonl"
+    },
+    "targeted-release-validation.log": {
+      "sha256": "75d598ad2215c100e7bcb3fddebfbd1e56130828f6a4b7f8aea0481da1c22683",
+      "bytes": 100,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/targeted-release-validation.log"
+    },
+    "review-go-red.log": {
+      "sha256": "5829288b1c491490e7a0628c9e4ce30409aaf3c17438ed548440fcf43b094c46",
+      "bytes": 1065,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/review-go-red.log"
+    },
+    "smoke-3775399.log": {
+      "sha256": "c7225918af95b7fbdef915b06e244b3deb91b1f772c209e870023b60bee4bd73",
+      "bytes": 5785,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/smoke-3775399.log"
+    },
+    "smoke-final.log": {
+      "sha256": "cb075587f40465b9c8e49526c019ea0eaee711b66b8d39ea31f35412c0856137",
+      "bytes": 2035,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/smoke-final.log"
+    },
+    "smoke-wal-backup.log": {
+      "sha256": "43675a278c21710f285c1b7c173a5996808681485366f96ba3dee002c389f546",
+      "bytes": 124,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/smoke-wal-backup.log"
+    },
+    "doccheck-basic.log": {
+      "sha256": "2b06b16befd259b64c19ff749edf521763cba88acf3b5b4828675c9e13993f15",
+      "bytes": 1293,
+      "private_local_path": "/Users/arvinhan/.codex/worktrees/plan-c-acceptance-review/SmartSketch/.superpowers/sdd/2026-10-04-cross-platform-startup-plan/validation/doccheck-basic.log"
+    }
+  }
+}

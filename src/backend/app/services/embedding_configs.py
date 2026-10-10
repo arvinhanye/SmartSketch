@@ -61,7 +61,7 @@ def adapter(settings, *, space: str, transport=None, record: bool=True):
     client = CompatibleEmbeddingClient(
         settings.EMBEDDING_BASE_URL,settings.EMBEDDING_API_KEY.get_secret_value(),transport=transport or build_transport(settings),
         batch_size=settings.EMBEDDING_BATCH_SIZE,default_timeout_seconds=settings.LLM_REQUEST_TIMEOUT_SECONDS)
-    return EmbeddingAdapter(settings,client,space=space,
+    return EmbeddingAdapter(settings,client,space=space,max_retries=2,
                             store=SqliteCallStore(settings.SQLITE_URL) if record else None)
 
 def for_course(settings, course_id: str):

@@ -111,6 +111,9 @@
 | `EMBEDDING_DIMENSIONS` | 整数 ≥ 1 | `1024` | 向量维度；`online` 调用时作为 `dimensions` 参数发送；与返回长度或 Neo4j 索引不一致即报错 | 已签收（ADR-081） |
 | `EMBEDDING_BATCH_SIZE` | 整数 ≥ 1 | `10` | 单次向量请求的文本条数上限，不得超过供应商限制 | 已签收（ADR-081） |
 
+> 向量请求重试（ADR-095，非环境变量）：发布与建索引（无截止时间的调用方）对 `timeout`/`connection`/`rate_limited`/`server` 最多重试 2 次，退避 1 秒与 3 秒；问答查询向量带截止时间，不重试。
+
+
 ### 任务处理（只登记，不改语义）
 
 类型、默认值与语义以 `specs/task-processing.md` §5、§8.8 为准；本表与之冲突时以规格为准并回改本表。
@@ -344,3 +347,36 @@ docker compose --profile app down        # 保留 app-data 卷
 - `SMARTSKETCH_NETWORK_EVIDENCE_DIR` 是仅供测试的可选输出目录；不进入应用配置、用户模型凭据或生产服务。未设置时由 pytest `tmp_path_factory` 创建独立临时目录；设置时在该目录下按自建图库随机身份生成独立 JSONL 文件，写入前创建父目录，不依赖 macOS `/private/tmp`。
 - CI 将目录设为 `${{ runner.temp }}/worker-network-evidence`，无论测试成功/失败都保存 `worker-network-evidence` artifact（7 天）。证据仅含测试身份、计时、状态和源码 SHA256，不含认证包、课程正文或密钥；写入失败仍判失败，不吞异常。
 - 真实旧版本对照实验固定归档历史提交 `e111315ffabdc5ce980afdf525b8321ef572dc8e`，Integration checkout 使用 `fetch-depth: 0`，保留完整历史及 `persist-credentials: false`。该改动不跳过对照实验、不放宽网络预算、不改变应用依赖。
+
+
+## 候选：跨平台本机发行启动（STARTUP-01，未实现）
+
+- 用户已确认双击入口＋首次安装向导＋Docker方向；详细方案见docs/superpowers/specs/2026-10-04-cross-platform-startup-design.md，规格已APPROVED，实施计划仍AWAITING_PLAN_APPROVAL。
+- 继续消费现有个人生成模式与在线向量环境变量。向导拟在本机私有配置目录写.env，应用仍经环境读取配置；未新增系统模型配置表或业务API，ADR-081不变。此处不含真实凭据，也未新增可用的环境变量。
+- 拟采用独立发行Compose、稳定安装ID/命名卷、固定多架构镜像与容器内教师引导。当前开发Compose与start.sh继续有效；不要执行尚不存在的发行入口，也不要把现有.env复制到评测隔离目录。
+- 初版目标Mac arm64/amd64与Windows11 x64＋Docker Desktop WSL2；三平台支持须有实机记录，当前均未验证。普通用户无需宿主Python/Node；共用编译启动核心拟使用Go，构建依赖尚未增加。
+- 镜像拟通过仓库关联GHCR发布，公开发行匿名拉取和固定摘要为验收条件；发布权限/网络与实机条件要在实施期落实，本轮不访问或写镜像仓库。
+- 默认无真实模型/向量连接测试；格式/容器健康通过不代表供应商可用。升级只针对本安装，先停机备份；不接管原开发或测量库。新功能实现完成前以现有本机启动指南为准。
+
+- 2026-10-04计划补充：拟采用Go1.26.8开发/构建工具链（官方发布记录https://go.dev/doc/devel/release，本机尚无Go），不新增用户运行依赖。计划docs/superpowers/plans/2026-10-04-cross-platform-startup-plan.md；开发工具准备、GHCR推送/公开发行和跨平台实测均未执行。环境文件格式按Docker官方插值规则，需用实际Compose读取诱饵值验证：https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/。
+
+## 双击启动发行基础设施（2026-10-05）
+
+- 开发/CI：Go 1.26.8（仅开发者工具）；用户发行核心为预编译 Go，用户不安装 Go/Python/Node。
+- 用户环境：Docker Desktop、Mac Intel/Apple Silicon 或 Windows 11 x64 + WSL2/Linux 容器；实机支持以验收报告为准。
+- 发行资源：GHCR smartsketch-backend / smartsketch-frontend 多架构固定 sha256 清单，Neo4j 固定 sha256；当前未发布或验证匿名拉取，不填写虚构摘要。
+- 环境变量沿用 .env.example：EMBEDDING_*、NEO4J_PASSWORD、AUTH_JWT_SECRET、MODEL_CREDENTIAL_KEY、LLM_MODE=personal；INSTALL_ID / BACKEND_IMAGE / FRONTEND_IMAGE / NEO4J_IMAGE / BACKUP_DIR 仅启动器向 Compose 注入，由核心生成/校验，不接受网页供应。
+- 向导无自动 API 联网测试；会话令牌只在本机 fragment/内存及权限保护的控制 capability 文件，诊断不含任何真实配置值。
+- .github/workflows/release-local.yml 仅上传构建 artifacts，无 packages:write / 镜像推送 / 自动发布。正式发行仍需用户另行授权。
+
+## 2026-10-05 启动预览发行镜像（已公开，安装包验收尚未签收）
+
+经用户授权，GHCR ghcr.io/arvinhanye/smartsketch-backend 与 smartsketch-frontend 的 preview-20261005-e88b56a 双架构镜像已上传；固定真实摘要见 packaging/release-manifest.preview-20261005.json。用户临近确认后已通过GitHub UI设为Public；无凭据/无密钥助手配置匿名拉取两个固定摘要exit0（使用已有镜像缓存，不代表冷下载速度）。Docker发布认证仅在本机工具/密钥存储中，凭据不进镜像、包、源码或诊断；不引入业务模型API变化，不把拉取成功等同于供应商API验证。
+
+## 2026-10-05 GitHub Release下载测试草稿
+
+用户授权创建arvinhanye/SmartSketch Release草稿（ID403670008）；draft/prerelease，未发布。附件仅三个既有安装包、SHA256SUMS、清单与中文启动说明，无真实配置/业务库。可登录仓库账号下载：https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936 。目标暂存已核对main SHA，不是附件构建源码；发布前必须另批源码推送和正确Tag绑定。未添加新集成密钥或业务变量，不改已公开GHCR摘要。
+
+## 2026-10-05 Mac下载信任门禁
+
+preview Intel二进制经GitHub下载后有隔离属性且未签名，系统明确拒绝PID44020。当前本机可用Developer ID Application身份数0，签名与公证接入待用户说明条件；不采集私钥/证书密码，不加入业务环境变量。源码仅修137错误提示，不移除隔离、不关安全策略，不冒充Apple验证。正式签名公证与下载后验收仍OPEN。

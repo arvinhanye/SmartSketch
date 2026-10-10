@@ -1349,6 +1349,15 @@ paths:
                 oneOf:
                   - $ref: '#/components/schemas/PublishBlockedError'
                   - $ref: '#/components/schemas/PublishConflictError'
+        '503':
+          description: |
+            存储不可用（`STORAGE_UNAVAILABLE`），或发布期向量化失败（`LLM_UNAVAILABLE`）：
+            `details.reason = vector_unavailable`（网络波动、限流、服务繁忙；已自动重试，稍后重试即可）或
+            `vector_rejected`（向量地址、密钥、模型或维度被供应商拒绝，需先修正向量配置）。两种情况当前已发布版本均保持不变。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /api/v1/courses/{cid}/versions:
     parameters:
@@ -3970,6 +3979,8 @@ components:
         question:
           type: string
           minLength: 1
+          maxLength: 2000
+          description: 问题文本，最多 2000 字；超出返回 422 `VALIDATION_ERROR`，不会触发任何模型或向量调用。
         history:
           type: array
           description: 多轮上下文，供问题改写补全指代

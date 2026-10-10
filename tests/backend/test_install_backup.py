@@ -1,0 +1,75 @@
+import hashlib
+import io
+from pathlib import Path
+import sqlite3
+import tarfile
+import pytest
+from app.tools.install_backup import backup_volumes, restore_volumes, BackupError
+
+def fixtures(tmp_path):
+    volumes = {name: tmp_path/name for name in ('app','neo4j','neo4j-logs')}
+    for path in volumes.values(): path.mkdir()
+    db = sqlite3.connect(volumes['app']/'smartsketch.sqlite3'); db.execute('CREATE TABLE fixture(value TEXT)'); db.execute("INSERT INTO fixture VALUES ('synthetic')"); db.commit(); db.close()
+    (volumes['neo4j']/'graph-fixture').write_bytes(b'synthetic graph')
+    return volumes
+
+def test_backup_restores_sqlite_and_graph_as_one_set(tmp_path):
+    volumes = fixtures(tmp_path); export=tmp_path/'backup'; export.mkdir()
+    backup_volumes(volumes,export)
+    target={name:tmp_path/('stage-'+name) for name in volumes}
+    for path in target.values(): path.mkdir()
+    restore_volumes(target,export)
+    for name in volumes:
+        for path in volumes[name].rglob('*'):
+            if path.is_file(): assert path.read_bytes()==(target[name]/path.relative_to(volumes[name])).read_bytes()
+
+@pytest.mark.parametrize('kind',['traversal','absolute','symlink','truncated','missing'])
+def test_restore_rejects_traversal_links_and_partial_archives(tmp_path,kind):
+    volumes=fixtures(tmp_path); export=tmp_path/'backup';export.mkdir();backup_volumes(volumes,export)
+    bad=export/'neo4j.tar.gz'
+    if kind=='truncated': bad.write_bytes(bad.read_bytes()[:15])
+    elif kind=='missing': bad.unlink()
+    else:
+        with tarfile.open(bad,'w:gz') as archive:
+            item=tarfile.TarInfo({'traversal':'../outside','absolute':'/outside','symlink':'link'}[kind]);item.size=1
+            if kind=='symlink': item.type=tarfile.SYMTYPE;item.linkname='../outside';item.size=0
+            archive.addfile(item,io.BytesIO(b'x'))
+    target={name:tmp_path/('stage-'+name) for name in volumes}
+    for path in target.values(): path.mkdir()
+    with pytest.raises(BackupError): restore_volumes(target,export)
+    assert all(not list(path.iterdir()) for path in target.values())
+
+def test_restore_preserves_volume_root_permissions(tmp_path):
+    import os
+    volumes=fixtures(tmp_path);os.chmod(volumes['app'],0o700)
+    export=tmp_path/'backup';export.mkdir();backup_volumes(volumes,export)
+    targets={name:tmp_path/('stage-'+name) for name in volumes}
+    for root in targets.values():root.mkdir(mode=0o755)
+    restore_volumes(targets,export)
+    assert targets['app'].stat().st_mode & 0o777==0o700
+    assert targets['app'].stat().st_uid==volumes['app'].stat().st_uid
+
+
+def test_db_gate_checks_copied_live_wal_without_opening_readonly_source(tmp_path,monkeypatch):
+    from app.tools import install_backup as tool
+    root=tmp_path/'source';root.mkdir();db=root/'smartsketch.sqlite3'
+    conn=sqlite3.connect(db);conn.execute('PRAGMA journal_mode=WAL');conn.execute('CREATE TABLE processing_tasks(lease_expires_at INTEGER)');conn.execute('INSERT INTO processing_tasks VALUES(unixepoch()+120)');conn.commit()
+    original_connect=sqlite3.connect
+    def read_only_volume_connect(filename,*args,**kwargs):
+        if str(filename).startswith(db.as_uri()):raise sqlite3.OperationalError('synthetic read-only mount cannot create shm')
+        return original_connect(filename,*args,**kwargs)
+    before=db.read_bytes();wal=Path(str(db)+'-wal').read_bytes();monkeypatch.setattr(tool.sqlite3,'connect',read_only_volume_connect)
+    try:
+        with pytest.raises(BackupError,match='Live task lease'):tool._db_gate(root)
+        assert db.read_bytes()==before and Path(str(db)+'-wal').read_bytes()==wal
+    finally:conn.close()
+
+
+@pytest.mark.parametrize('table,column',[('tasks','lease_expires_at'),('course_locks','expires_at')])
+def test_snapshot_gate_rejects_all_existing_lease_tables(tmp_path,table,column):
+    volumes=fixtures(tmp_path);export=tmp_path/'backup';export.mkdir()
+    with sqlite3.connect(volumes['app']/'smartsketch.sqlite3') as conn:
+        conn.execute(f'CREATE TABLE {table} ({column} INTEGER)')
+        conn.execute(f'INSERT INTO {table} VALUES(unixepoch()+120)')
+    with pytest.raises(BackupError,match='Live task lease'):backup_volumes(volumes,export)
+    assert not list(export.iterdir())

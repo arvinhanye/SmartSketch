@@ -1,0 +1,67 @@
+{
+  "release_id": 403670008,
+  "url": "https://github.com/arvinhanye/SmartSketch/releases/tag/untagged-52effcfbf6907990f936",
+  "draft": true,
+  "prerelease": true,
+  "upload": "six assets uploaded; GitHub SHA256 equal local for all six",
+  "assets": [
+    {
+      "name": "release-manifest.json",
+      "bytes": 578,
+      "sha256": "7ab0df5fd0094f717100fa71f5b6df67ccde959db9188776b9f7fb84cc509e67",
+      "github_digest_equal": true,
+      "download_equal_at_check": true
+    },
+    {
+      "name": "SHA256SUMS",
+      "bytes": 367,
+      "sha256": "9b668f6233f240ed93f5a5c58d098f618652af34cfce58be74e16a47906640d5",
+      "github_digest_equal": true,
+      "download_equal_at_check": true
+    },
+    {
+      "name": "SmartSketch-preview-20261005-e88b56a-darwin-amd64.tar.gz",
+      "bytes": 5786268,
+      "sha256": "beea90ba5aa13ddff3e332605f4d8a032b988dc204822d070a3de480ae5bc6c5",
+      "github_digest_equal": true,
+      "download_equal_at_check": false
+    },
+    {
+      "name": "SmartSketch-preview-20261005-e88b56a-darwin-arm64.tar.gz",
+      "bytes": 5413116,
+      "sha256": "b8d25504dac3df6f69aad88645416b7b411efa125148a1736774fd325a31ab12",
+      "github_digest_equal": true,
+      "download_equal_at_check": false
+    },
+    {
+      "name": "SmartSketch-preview-20261005-e88b56a-windows-amd64.zip",
+      "bytes": 5707001,
+      "sha256": "7aa3f6c162ab0b71b2afd6dcef52bbe041e5f4b4030fad5759df4442416d7f82",
+      "github_digest_equal": true,
+      "download_equal_at_check": false
+    },
+    {
+      "name": "START-HERE.md",
+      "bytes": 2504,
+      "sha256": "f49fac07beccb4cd8644f8c6e7b5c6687ed56a9e78c5933f4632ff53b4fa7402",
+      "github_digest_equal": true,
+      "download_equal_at_check": true
+    }
+  ],
+  "full_archive_readback": "NOT_COMPLETED: optional readback stopped due low transfer speed; partial files not user artifacts",
+  "small_readback": "manifest, SHA256SUMS, START-HERE byte-identical",
+  "source_target": "temporary existing main bdb89c46; not build source; source/tag alignment required before publication",
+  "source_pushed": false,
+  "technical_freeze": "NOT_PERFORMED",
+  "stage_c_status": "OPEN",
+  "basic_gate": {
+    "exit": 0,
+    "log": "/private/tmp/smartsketch-delivery-20261005/logs/release-draft-basic.log"
+  },
+  "tooling_tests": {
+    "passed": 10,
+    "exit": 0,
+    "command": "pytest tests/tooling/test_startup_package.py tests/tooling/test_startup_release.py -q"
+  },
+  "tag_ref_created": false
+}

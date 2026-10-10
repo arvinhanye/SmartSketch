@@ -2,7 +2,7 @@
 .app--graph .app-main--sheet { padding: 0 12px 12px 0; }
 .app--graph .app-main--sheet > .ui-sheet { padding: 0; border: 0; box-shadow: none; background: var(--gw-panel); }
 .light-surface.ui-sheet { flex: 1; min-width: 0; border-radius: 10px; background: var(--gw-panel); color: var(--gw-text); }
-.light-surface .ui-sheet__inner { max-width: 1120px; margin: 0 auto; padding: 40px 44px 64px; }
+.light-surface .ui-sheet__inner { max-width: 1120px; margin: 0 auto; padding: 40px 44px 40px; }
 .light-surface.ui-sheet--compact .ui-sheet__inner { max-width: 728px; }
 .light-surface h2 { margin: 0; color: var(--gw-text); font-size: 24px; line-height: 32px; letter-spacing: -.5px; }
 .light-surface h3 { margin: 0; color: var(--gw-text); font-size: 15px; line-height: 24px; }
@@ -305,7 +305,7 @@
 .model-settings__help { margin-top: 12px; color: var(--gw-text-2); font-size: 12px; line-height: 20px; }
 .model-settings__help summary { cursor: pointer; width: fit-content; }
 .model-settings__help p { margin: 6px 0 0; }
-@media(min-width:1051px) and (max-height:850px) {
+@media(min-width:1051px) and (max-height:930px) {
  .light-surface.model-settings .ui-sheet__inner { padding-top: 16px; padding-bottom: 16px; }
  .model-settings .ui-page-header { margin-bottom: 12px; }
  .model-settings__card { padding: 14px 16px; }
@@ -554,10 +554,10 @@
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker select { flex: 1; min-width: 0; min-height: 32px; padding: 4px 8px; }
 
 /* 画布上方一行：节点类型图例 | 提示（放不下时省略号） | 键盘选择器 */
-.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar { flex-wrap: nowrap; gap: 10px 14px; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar { flex-wrap: wrap; gap: 6px 14px; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .node-legend { flex: none; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__hint { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { flex: 0 0 260px; }
+.light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { flex: 0 1 260px; min-width: 160px; }
 
 /* UI-BATCH2-01：教师图谱详情的来源行与标题焦点 */
 .light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail h2[tabindex='-1']:focus { outline: none; }

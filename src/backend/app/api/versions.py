@@ -26,7 +26,10 @@ from app.repositories.versions import PublishInProgress, VersionNotFound
 from app.schemas.contracts import GraphVersion, PublishResult
 from app.schemas.errors import Error
 from app.services.access import CourseAccess
+from app.services.ai.client import ModelCallError
 from app.services.ai.factory import build_embedding_adapter
+from app.services.ai.policy import TRANSIENT_ERROR_CLASSES
+from app.services.ai.embeddings import EmbeddingBatchError
 from app.services.versions.publish import CourseBusy, PublishContext, PublishFailed, PublishOutcome, publish
 from app.services.versions.rollback import rollback
 from app.services.versions.snapshot import SnapshotBlocked
@@ -38,7 +41,7 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
     403: {"model": Error},
     409: {"model": Error},
     500: {"model": Error},
-    503: {"model": Error, "description": "图数据库或数据库暂不可用（`STORAGE_UNAVAILABLE`）"},
+    503: {"model": Error, "description": "图数据库或数据库暂不可用（`STORAGE_UNAVAILABLE`），或向量服务暂不可用/拒绝请求（`LLM_UNAVAILABLE`，`details.reason` 为 `vector_unavailable` 或 `vector_rejected`）"},
 }
 
 
@@ -92,6 +95,25 @@ def _storage_failure(error: BaseException) -> bool:
     return False
 
 
+def _vector_failure(error: BaseException) -> str | None:
+    """发布期（P8）向量化失败的原因：瞬时故障 ``vector_unavailable``，鉴权/参数被拒 ``vector_rejected``；不是向量失败返回 None。"""
+    cause: BaseException | None = error
+    batch: EmbeddingBatchError | None = None
+    while cause is not None:
+        if isinstance(cause, EmbeddingBatchError):
+            batch = cause
+        elif batch is not None and isinstance(cause, ModelCallError):
+            return "vector_unavailable" if cause.error_class in TRANSIENT_ERROR_CLASSES else "vector_rejected"
+        cause = cause.__cause__
+    return "vector_unavailable" if batch is not None else None
+
+
+_VECTOR_MESSAGES = {
+    "vector_unavailable": "向量服务暂时不可用（网络波动或服务繁忙），当前版本保持不变，请稍后重试",
+    "vector_rejected": "向量服务拒绝了请求，请在「模型 API 设置」中检查向量地址、密钥、模型与维度，当前版本保持不变",
+}
+
+
 def _run(action: Any) -> JSONResponse:
     try:
         return _result(action())
@@ -108,6 +130,9 @@ def _run(action: Any) -> JSONResponse:
     except PublishFailed as error:
         if _storage_failure(error):
             return _error(503, "STORAGE_UNAVAILABLE", "图数据库暂不可用，请稍后重试")
+        reason = _vector_failure(error)
+        if reason is not None:
+            return _error(503, "LLM_UNAVAILABLE", _VECTOR_MESSAGES[reason], {"reason": reason})
         return _error(500, "INTERNAL_ERROR", "发布未完成，当前版本保持不变，请重试")
 
 
