@@ -357,7 +357,9 @@ describe('首屏总览与径向布局的边', () => {
     const m = lowZoom()
     createGraphLifecycle(box(), { data: sample(), factory: m.factory, enhance: { ...enhance, onLabels }, positions, initialView: 'overview' })
     await settle()
-    expect(onLabels).toHaveBeenCalled()
+    // 标签排布在渲染链结束后由计时器触发。settle 只等 10 个微任务加 5ms，CI 机器忙时渲染链会超过它（偶发失败过一次），
+    // 所以等到回调真的被调用，而不是赌一个固定时长。
+    await vi.waitFor(() => expect(onLabels).toHaveBeenCalled())
     const [shown, total] = onLabels.mock.calls.at(-1)!
     expect(total).toBe(2)
     expect(shown).toBeGreaterThanOrEqual(0)
