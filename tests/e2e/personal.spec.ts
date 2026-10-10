@@ -33,7 +33,11 @@ async function configureModel(page: Page, key: string, expectOk: boolean, disabl
   }, (milliseconds) => page.waitForTimeout(milliseconds))
   expect(response.status()).toBe(200)
   await expect(page.locator('[data-test=mc-test-result]')).toContainText(expectOk ? '连接成功' : '密钥被拒绝')
+  // 必须等保存请求返回再刷新：上一个用例已配置过，页面一进来就显示「已配置」，只看这行字不能证明这次保存已落库。
+  const saved = page.waitForResponse((response) =>
+    response.url().endsWith('/api/v1/me/model-config') && response.request().method() === 'PUT')
   await page.locator('[data-test=mc-save]').click()
+  expect((await saved).status()).toBe(200)
   await expect(page.locator('[data-test=mc-status]')).toContainText('已配置')
   await page.reload()
   await expect(page.locator('[data-test=mc-form]')).toBeVisible()
