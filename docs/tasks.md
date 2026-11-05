@@ -2474,3 +2474,16 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - UI-NORAIL-01：DONE（未提交）；负责人 Claude；分支 `claude/home-topbar-nav`（从 `codex/invite-hover-refactor` 的 `e0b26e7` 切出）。用户指出课程进入页侧栏只有两项、没必要保留。课程列表与模型 API 设置页不再显示侧栏与抽屉按钮；顶栏左侧放品牌，右侧「模型 API」入口（`data-test="nav-model-settings"`，未配置带标记，设置页为当前页）；进入课程后侧栏不变。
 - 改动：`App.vue`（`inCourse`、`app--no-rail`）、`components/AppTopbar.vue`、`styles/ui.css` 末尾；新增 `tests/frontend/home-topbar-nav.test.ts`（3 条，先红后绿）。
 - 验收：type-check、前端 82 文件 / 1375 条、build、`./scripts/verify.sh` basic 均通过；演示环境截图：学生课程列表（1440、390 宽）、模型 API 设置、课程概览（侧栏保留）。
+
+
+## 2026-11-05 Claude → Codex 交接：图谱生成提速（EXTRACT-PERF-01）
+
+- 用户反馈图谱生成仍慢。Claude 读代码与 L02 实测（141.7 秒：抽取 94.4、merging 45.7）后的初判：块阶段与小节关系阶段之间有屏障；块过小导致调用多、并发上限仅 4；merging 慢段根因仍 OPEN（已有 `persist steps` 日志未被分析）；发布向量化逐批串行。
+- 交接稿：`docs/handoffs/claude-to-codex-extraction-perf.md`；prompt：`docs/handoffs/claude-to-codex-extraction-perf.prompt.md`。先用假供应商测量；只做不影响抽取结果的优化；合并小块、默认关闭思考、合并调用等影响准确率的方案交用户决定；真实复测需用户确认预算。
+
+- Codex 认领：IN_PROGRESS；负责人 Codex；分支 `codex/extraction-perf`，隔离 worktree，基线 `ad63341`。OPT-05 尚未提交，按交接 §1 暂不编辑发布向量化文件。源工作区全部改动保留。
+- 输入：本交接、L02 报告、任务/图谱规格与 ADR-011/080/082/089/090。输出：固定 8 秒假供应商基线、逐项收益与回归测试、性能报告和 `codex-extraction-perf.md`。
+- 执行：先测量；再逐项先红测试→最小优化→复测→全量后端/basic 验证→独立本地提交。并发 4/8 仅实验覆盖，不改默认值；P2 只做离线评估。
+- 风险/依赖：已有 Python/Node 环境、隔离 SQLite/Neo4j、本地假供应商；取消/失败阈值/接管/租约/凭据语义和模型输入保持。真实模型调用与默认配置变化须用户决定。
+- 验证：`scripts/verify/backend.sh full`、`./scripts/verify.sh`；涉及 Neo4j 写入运行 integration；最终差异检查。未推送、不开 PR、不合并。
+- 用户决定（2026-11-05）：采用保守去屏障方案，实体块优先；仅在剩余块全部失败仍不超阈值且有空位时提前派发已就绪小节，保留全部既有断言。并发/调度变更前新增确定性交错回归。
