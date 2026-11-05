@@ -2468,3 +2468,9 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - REFACTOR-01 测试类开始：共享逻辑已提交00e251c。h14/l14固定等待替换为本次绘制/目标聚焦条件，afterEach释放裸lifecycle并恢复spy。84个原用例及全部原断言保留，不改timeout/重试；三文件定向98 PASS（11.87s），开始全门禁。
 
 - REFACTOR-01 测试类验收：前端81文件/1372 PASS（39.99s），type-check/build exit0；backend full 4245 PASS/27登记SKIP（754.64s）、gate exit0，basic exit0（240.55s）。h14/l14原84用例及257条原断言行全部保留；没有更改timeout、重试或worker设置。三类改动完成；未纳入可能改变视觉/鉴权语义的合并，没有新增待用户决定项。
+
+## 2026-11-05 Claude：课程之外的页面去掉侧栏（UI-NORAIL-01）
+
+- UI-NORAIL-01：DONE（未提交）；负责人 Claude；分支 `claude/home-topbar-nav`（从 `codex/invite-hover-refactor` 的 `e0b26e7` 切出）。用户指出课程进入页侧栏只有两项、没必要保留。课程列表与模型 API 设置页不再显示侧栏与抽屉按钮；顶栏左侧放品牌，右侧「模型 API」入口（`data-test="nav-model-settings"`，未配置带标记，设置页为当前页）；进入课程后侧栏不变。
+- 改动：`App.vue`（`inCourse`、`app--no-rail`）、`components/AppTopbar.vue`、`styles/ui.css` 末尾；新增 `tests/frontend/home-topbar-nav.test.ts`（3 条，先红后绿）。
+- 验收：type-check、前端 82 文件 / 1375 条、build、`./scripts/verify.sh` basic 均通过；演示环境截图：学生课程列表（1440、390 宽）、模型 API 设置、课程概览（侧栏保留）。

@@ -193,7 +193,9 @@ const crumbs = computed<Crumb[]>(() => {
 })
 const railExpanded = ref(false)
 const vw = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
-const railVisible = computed(() => vw.value >= 1024)
+// 课程之外（课程列表、模型 API 设置）只剩两项导航：不显示侧栏，入口放在顶栏（UI-PINE-01 后续）
+const inCourse = computed(() => courseId.value !== null)
+const railVisible = computed(() => vw.value >= 1024 && inCourse.value)
 const navDrawer = ref(false)
 const drawer = ref<HTMLElement | null>(null)
 function onResize(): void {
@@ -230,12 +232,16 @@ function signOut(): void {
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--login': onAuthShell }">
+  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--no-rail': graphShell && !inCourse, 'app--login': onAuthShell }">
     <AppTopbar
       v-if="graphShell"
       :crumbs="crumbs"
       :user="`${session?.user?.username ?? ''} · ${roleLabel}`"
-      :show-menu="!railVisible"
+      :show-menu="!railVisible && inCourse"
+      :home="!inCourse"
+      :settings-to="settingsLink"
+      :settings-active="settingsActive"
+      :settings-pending="runtime?.needsConfig === true"
       :mode="runtime?.isDemo ? '演示模式：使用内置演示模型' : ''"
       @menu="openNav"
       @sign-out="signOut"

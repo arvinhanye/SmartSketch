@@ -655,3 +655,14 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 .model-settings .mc-advanced .ui-thinking { padding-top: 0; border-top: 0; }
 /* 旧的两列表单把服务地址固定在第 2 列；三步式里服务地址独占一行 */
 .model-settings :is(.mc-step, .mc-advanced__body) > .ui-field:has(#mc-base-url) { grid-column: 1 / -1; }
+
+/* ---------- 课程之外的页面（课程列表、模型 API 设置）：没有侧栏，导航放在顶栏 */
+.app--graph.app--no-rail { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'main'; }
+.app--graph.app--no-rail .app-main { padding: 0 12px 12px; border-top-left-radius: 0; }
+.app-topbar__brand { display: inline-flex; align-items: center; gap: 10px; margin-right: 12px; padding-right: 16px; border-right: 1px solid var(--ss-line); color: var(--ss-text); font-size: 15px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.app--graph .app-topbar__link { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 8px; color: var(--ss-text-2); text-decoration: none; white-space: nowrap; transition: background-color 120ms var(--ss-ease), color 120ms var(--ss-ease); }
+.app--graph .app-topbar__link:hover { background: var(--ss-hover); color: var(--ss-text); text-decoration: none; }
+.app--graph .app-topbar__link.is-current { background: var(--ui-highlight); color: var(--ui-brand); font-weight: 500; }
+.app-topbar__pending { padding: 0 6px; border-radius: 6px; background: var(--ss-warn-bg); color: var(--ss-warn); font-size: 11px; line-height: 18px; font-weight: 600; }
+.app--graph .app-topbar__link.is-current .app-topbar__pending { background: rgb(15 61 54 / 14%); color: var(--ui-brand); }
+@media (max-width: 767px) { .app-topbar__brand span { display: none; } .app-topbar__brand { margin-right: 4px; padding-right: 10px; } .app-topbar__mode { display: none; } }
