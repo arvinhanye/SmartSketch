@@ -2400,3 +2400,15 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - FORMAL-RELEASE-01 Release 已公开（2026-10-10，用户操作）：`rc-7f8a0cd` 作为**预发布**公开（`isDraft: false`、`isPrerelease: true`，2026-10-10T07:04:58Z），tag `rc-7f8a0cd` 指向 `21858897cfe07d5759126009cc520543f2ce8622`（PR #335 合并提交），附件为 `SmartSketch-rc-7f8a0cd-darwin-amd64.tar.gz`、`SmartSketch-rc-7f8a0cd-windows-amd64.zip` 与只列这两个包的 `SHA256SUMS`。仓库 `README.md` 已改为已发布状态，下载链接直接指向 tag 页面（预发布不会出现在 GitHub 的「最新版本」入口）。交付范围不变：Mac Intel 已实测；Windows 仅交叉编译、从未实机运行；Apple Silicon 与 Windows ARM 不提供；未签名未公证。
   - 仍待办：两个更早的旧草稿（2026-10-05 预览、2026-10-06 热修复预览）是否删除由用户决定；Windows 实机验证；Gatekeeper/SmartScreen 实测；签名与公证；`upgrade.json` 升级成功后未清理（无害）；冒烟测试泄漏 Docker 网络；`test_stop_procs` 在本机 macOS 稳定失败；测试里其他固定时长等待可能还有同类竞态；从预览版升级的路径只在一台真实安装上走通过一次。
 
+
+## 2026-11-05 Claude：代码结构审查与优化任务交接（CODE-STRUCT-REVIEW-01）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| CODE-STRUCT-REVIEW-01 | DONE（只读审查，未改代码） | Claude | 统计代码/测试/文档结构，挑出适合 Codex 的高耗读、低决策优化任务 | 交接 `docs/handoffs/claude-code-structure-review-codex-handoff.md` |
+| OPT-01 | OPEN / 待认领（建议 Codex） | — | `docs/tasks.md`（496 KB）与 `docs/decisions.md`（356 KB）归档瘦身；同步 ADR 唯一性测试 | 历史内容零丢失 diff；`verify.sh`；`AGENTS.md` §2 措辞改动需用户先确认 |
+| OPT-02 | OPEN / 待认领（建议 Codex） | — | 测试中 31 处固定时长等待改为条件轮询；`test_stop_procs` macOS 稳定失败定位 | 改动文件连跑 20 次全绿；`verify.sh full` |
+| OPT-03 | OPEN / 待认领（OPT-02 之后） | — | 后端测试重复辅助函数与迁移初始化收敛到 conftest/helpers | 用例总数不变；`verify.sh full` |
+| OPT-04 | OPEN / 待认领 | — | 新增 `tests/INDEX.md`（任务 ID 命名测试 → 被测功能），不重命名文件 | 索引覆盖全部测试文件；`verify.sh` |
+| OPT-05 | OPEN / 待认领（需 Neo4j） | — | services 中的 Cypher/SQL 下沉 repositories；`api/chat.py` 落库移入 service | 纯搬移；`verify.sh integration` |
+| OPT-06 | OPEN / 可选（最后） | — | 大文件按职责拆分（compatible.py、extract_task.py、useMaterials.ts、StudentGraphView.vue） | 行为不变；对应全量测试与 type-check/build |
