@@ -2417,3 +2417,9 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 - 计划：`docs/superpowers/plans/2026-11-04-ui-pine-redesign.md`；分支 `claude/ui-pine-redesign`（本地，未推送）。
 - 依赖与风险：多处前端测试断言样式类与文案，需随设计更新并写明原因；邀请码需新接口与迁移，单列 P6，先写规格与 ADR。
+
+## 2026-11-05 Claude → Codex 交接：邀请码、图谱悬停卡顿、全局优化重构
+
+- 已决（用户，2026-11-05）：邀请码本期只做「学生输码入课」与「教师查看/重置邀请码」，不做注册时填码；图谱悬停卡顿现在修；同时对整个软件做一次行为不变的代码优化重构。三项交给 Codex。
+- 交接稿：`docs/handoffs/claude-to-codex-invite-hover-refactor.md`；可直接使用的 prompt：`docs/handoffs/claude-to-codex-invite-hover-refactor.prompt.md`。基线提交 `ef5e297`（分支 `claude/ui-pine-redesign`）。
+- 待 Codex 认领：INVITE-01、GRAPH-HOVER-01、REFACTOR-01。
