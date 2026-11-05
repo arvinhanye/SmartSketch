@@ -1,7 +1,8 @@
 /* Scoped surfaces for the course and model configuration rollout. */
 .app--graph .app-main--sheet { padding: 0 12px 12px 0; }
-.app--graph .app-main--sheet > .ui-sheet { padding: 0; border: 0; box-shadow: none; background: var(--gw-panel); }
-.light-surface.ui-sheet { flex: 1; min-width: 0; border-radius: 10px; background: var(--gw-panel); color: var(--gw-text); }
+.app--graph .app-main--sheet > .ui-sheet { padding: 0; border: 0; box-shadow: none; background: var(--ui-bg); }
+/* 页面（非图谱画布）用青松明黄：链接、选中、焦点从靛紫换成青松；图谱工作区的 --gw-* 不受影响 */
+.light-surface.ui-sheet { --gw-accent: var(--ui-primary); --gw-selected: var(--ui-primary-soft); --gw-hover: #e8efeb; --gw-line: var(--ui-line-soft); --gw-panel: var(--ui-surface-2); --gw-edge: var(--ui-edge); flex: 1; min-width: 0; border-radius: 10px; background: var(--ui-bg); color: var(--ui-text); }
 .light-surface .ui-sheet__inner { max-width: 1120px; margin: 0 auto; padding: 40px 44px 40px; }
 .light-surface.ui-sheet--compact .ui-sheet__inner { max-width: 728px; }
 .light-surface h2 { margin: 0; color: var(--gw-text); font-size: 24px; line-height: 32px; letter-spacing: -.5px; }
@@ -589,3 +590,68 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 @keyframes ui-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { div.ui-toast.ui-toast.ui-toast { animation: none; } }
 
+
+/* ---------- 图谱页外围（UI-PINE-01 青松明黄）
+ * 只改面板、浮层与控件配色；图谱画布（节点、关系线、选中光圈、小地图内容）的颜色在 graph/theme.ts，不受影响。
+ * 控件边界用 --ui-edge（≥3:1），纯容器用 --ui-line 加阴影。 */
+.app--graph .graph-workspace { --gw-accent: var(--ui-primary); --gw-selected: var(--ui-primary-soft); --gw-hover: #e8efeb; }
+.app--graph .graph-workspace.gw { box-shadow: 0 1px 2px rgb(15 61 54 / 12%); }
+.app--graph .graph-workspace .gw-panel { background: var(--ui-surface); border-right-color: var(--ui-line-soft); }
+.app--graph .graph-workspace .gw-link:hover { color: var(--ui-primary-press); }
+.app--graph .graph-workspace .gw-bar { background: var(--ui-line-soft); }
+.app--graph .graph-workspace .gw-bar i { background: var(--ui-primary); }
+.app--graph .graph-workspace .gw-next { background: var(--ui-surface-2); border-color: var(--ui-line-soft); }
+.app--graph .graph-workspace .gw-seg button, .app--graph .graph-workspace .gw-chip, .app--graph .graph-workspace .gw-rec__item, .app--graph .graph-workspace .gw-btn.gw-btn--ghost, .app--graph .graph-workspace .gw-segmini button, .app--graph .graph-workspace .gw-legend__types li button { border-color: var(--ui-edge); }
+.app--graph .graph-workspace .gw-seg button[aria-pressed='true'], .app--graph .graph-workspace .gw-seg button[aria-pressed='true']:disabled, .app--graph .graph-workspace .gw-segmini button[aria-pressed='true'] { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; }
+.app--graph .graph-workspace .gw-btn:not(.gw-btn--ghost) { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; }
+.app--graph .graph-workspace .gw-btn:not(.gw-btn--ghost):hover:not(:disabled) { background: var(--ui-primary-press); border-color: var(--ui-primary-press); }
+.app--graph .graph-workspace .recommendations .recommendations__item { border-color: var(--ui-line); background: var(--ui-surface-2); }
+.app--graph .graph-workspace .recommendations .recommendations__item:first-child { box-shadow: none; border-color: var(--ui-highlight); background: var(--ui-highlight-soft); }
+.app--graph .graph-workspace .recommendations .recommendations__item:first-child .recommendations__order { background: var(--ui-highlight); color: var(--ui-text); }
+.app--graph .graph-workspace .recommendations .recommendations__item:hover, .app--graph .graph-workspace .recommendations .recommendations__item[data-highlighted='true'] { border-color: var(--ui-primary); }
+.app--graph .graph-workspace .recommendations .recommendations__order { background: var(--ui-line-soft); color: var(--ui-text); }
+/* 画布浮层：白色卡片、柔和阴影、14px 圆角 */
+.app--graph .graph-workspace :is(.gw-menu, .gw-preview, .gw-count, .gw-legend) { background: rgb(255 255 255 / 96%); border-color: var(--ui-line); border-radius: 14px; box-shadow: var(--ui-shadow-pop); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.app--graph .graph-workspace .gw-tl .gw-tool { background: rgb(255 255 255 / 96%); border-color: var(--ui-line); box-shadow: var(--ui-shadow); }
+.app--graph .graph-workspace .gw-tr { padding: 6px; border: 1px solid var(--ui-line); border-radius: 14px; background: rgb(255 255 255 / 96%); box-shadow: var(--ui-shadow-pop); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.app--graph .graph-workspace .gw-tr .gw-tool, .app--graph .graph-workspace .gw-map__ctl .gw-tool { border-color: var(--ui-line-soft); border-radius: 10px; background: var(--ui-surface-2); }
+.app--graph .graph-workspace .gw-tr .gw-tool:hover:not(:disabled), .app--graph .graph-workspace .gw-map__ctl .gw-tool:hover:not(:disabled) { background: #e8efeb; }
+.app--graph .graph-workspace .gw-tool[aria-pressed='true'] { background: var(--ui-primary-soft); border-color: #9fcfc2; color: var(--ui-primary); }
+.app--graph .graph-workspace .gw-tr__sep { background: var(--ui-line-soft); }
+.app--graph .graph-workspace .gw-tr .gw-tool[data-test='gw-layout-toggle'] { background: var(--ui-brand); border-color: var(--ui-brand); color: #fff; }
+.app--graph .graph-workspace .gw-tr .gw-tool[data-test='gw-layout-toggle']:hover:not(:disabled) { background: var(--ui-primary); border-color: var(--ui-primary); }
+.app--graph .graph-workspace .gw-map__ctl { padding: 6px; border: 1px solid var(--ui-line); border-radius: 14px; background: rgb(255 255 255 / 96%); box-shadow: var(--ui-shadow-pop); }
+.app--graph .graph-workspace .gw-mini { border-color: var(--ui-line); border-radius: 12px; box-shadow: var(--ui-shadow-pop); }
+.app--graph .graph-workspace .gw-count__btn { background: var(--ui-primary-soft); color: var(--ui-primary-text); }
+.app--graph .graph-workspace .gw-menu__item.is-current { box-shadow: inset 3px 0 0 var(--ui-primary); }
+
+/* ---------- 课程与设置等页面（UI-PINE-01）：内容放在浅松灰底上的白色卡片里 */
+.light-surface .ui-course-list { border: 1px solid var(--ui-line); border-radius: 14px; background: var(--ui-surface); box-shadow: var(--ui-shadow); overflow: hidden; }
+.light-surface .ui-course-list li:last-child .ui-course-row { border-bottom: 0; }
+.light-surface .ui-course-row { padding: 16px 20px; }
+.light-surface .ui-create, .light-surface .ui-next-step, .light-surface .ui-entry, .light-surface .ui-config-status, .model-settings__card { box-shadow: var(--ui-shadow); }
+.light-surface .ui-chip--success { color: var(--ui-primary-text); background: var(--ui-primary-soft); }
+
+/* ---------- 模型 API 三步式（UI-PINE-01）：服务商卡片 → API Key → 模型；服务地址与思考开关收在高级选项 */
+.model-settings .mc-step { min-width: 0; margin: 0; padding: 0 0 18px; border: 0; border-bottom: 1px solid var(--ui-line-soft); display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.model-settings .mc-step > * { grid-column: 1 / -1; min-width: 0; }
+.model-settings .mc-step:last-child { border-bottom: 0; padding-bottom: 0; }
+.model-settings .mc-step__title { display: flex; align-items: center; gap: 10px; padding: 0; margin: 0 0 2px; color: var(--ui-text); font-size: 15px; line-height: 24px; font-weight: 600; }
+.model-settings .mc-step__no { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: var(--ui-primary); color: #fff; font-size: 12px; font-weight: 600; flex: none; }
+.model-settings .mc-providers { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.model-settings .mc-provider { position: relative; display: flex; align-items: center; min-height: 42px; padding: 6px 12px; border: 1px solid var(--ui-edge); border-radius: 10px; background: var(--ui-surface); color: var(--ui-text); font-size: 13px; line-height: 18px; cursor: pointer; transition: background-color 120ms var(--ss-ease), border-color 120ms var(--ss-ease); }
+.model-settings .mc-provider:hover { background: var(--ui-surface-2); }
+.model-settings .mc-provider input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.model-settings .mc-provider.is-on { border: 2px solid var(--ui-primary); padding: 5px 11px; background: var(--ui-primary-soft); color: var(--ui-primary-text); font-weight: 600; }
+.model-settings .mc-provider:has(input:focus-visible) { outline: 2px solid var(--ui-highlight); outline-offset: 2px; }
+.model-settings fieldset:disabled .mc-provider { cursor: default; opacity: .7; }
+.model-settings .mc-key { display: flex; flex-wrap: wrap; gap: 8px; }
+.model-settings .mc-key input { flex: 1 1 220px; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--ui-edge); border-radius: 8px; background: var(--ui-surface); color: var(--ui-text); font: inherit; }
+.model-settings .mc-key .ui-btn { min-height: 44px; border-color: var(--ui-primary); color: var(--ui-primary); }
+.model-settings .mc-step .ui-notice { margin: 0; }
+.model-settings .mc-advanced { margin-top: 2px; }
+.model-settings .mc-advanced summary { width: fit-content; padding: 6px 0; color: var(--ui-text-2); font-size: 13px; cursor: pointer; }
+.model-settings .mc-advanced__body { display: grid; gap: 12px; padding-top: 6px; }
+.model-settings .mc-advanced .ui-thinking { padding-top: 0; border-top: 0; }
+/* 旧的两列表单把服务地址固定在第 2 列；三步式里服务地址独占一行 */
+.model-settings :is(.mc-step, .mc-advanced__body) > .ui-field:has(#mc-base-url) { grid-column: 1 / -1; }

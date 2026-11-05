@@ -2400,3 +2400,20 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - FORMAL-RELEASE-01 Release 已公开（2026-10-10，用户操作）：`rc-7f8a0cd` 作为**预发布**公开（`isDraft: false`、`isPrerelease: true`，2026-10-10T07:04:58Z），tag `rc-7f8a0cd` 指向 `21858897cfe07d5759126009cc520543f2ce8622`（PR #335 合并提交），附件为 `SmartSketch-rc-7f8a0cd-darwin-amd64.tar.gz`、`SmartSketch-rc-7f8a0cd-windows-amd64.zip` 与只列这两个包的 `SHA256SUMS`。仓库 `README.md` 已改为已发布状态，下载链接直接指向 tag 页面（预发布不会出现在 GitHub 的「最新版本」入口）。交付范围不变：Mac Intel 已实测；Windows 仅交叉编译、从未实机运行；Apple Silicon 与 Windows ARM 不提供；未签名未公证。
   - 仍待办：两个更早的旧草稿（2026-10-05 预览、2026-10-06 热修复预览）是否删除由用户决定；Windows 实机验证；Gatekeeper/SmartScreen 实测；签名与公证；`upgrade.json` 升级成功后未清理（无害）；冒烟测试泄漏 Docker 网络；`test_stop_procs` 在本机 macOS 稳定失败；测试里其他固定时长等待可能还有同类竞态；从预览版升级的路径只在一台真实安装上走通过一次。
 
+
+## 2026-11-02 Claude：决赛前全流程走查（WALKTHROUGH-20261102）
+
+- WALKTHROUGH-20261102：DONE；负责人 Claude。演示模式下走查教师与学生主链路，全部可走通；问题清单（P0×4、P1×8、P2×6）与「AI 感」来源见 `docs/handoffs/claude-walkthrough-20261102.md`，截图在 `.demo/walkthrough-20261102/`（Git 忽略）。只读走查，未改业务代码；正式模式、窄屏、Safari 未测。
+- 已决（用户，2026-11-02）：学生问答保持每人各自配置模型 API（沿用 ADR-080），不改为教师共享；后续只降低学生配置门槛。
+- 已决（用户，2026-11-02）：学生入课改为课程邀请码（不做批量导入；按用户名添加保留）；实施前先更新规格、契约与 ADR。
+- 已决（用户，2026-11-02）：界面重做先出 2–3 个方向的静态样稿，用户选定后再改代码。
+- 已知问题（2026-11-03 实测，用户决定暂不修）：图谱悬停卡顿。`graph/enhancer.ts` 的 `applyHover()` 每次移入/移出都把全部节点和边（示例课程 135 个）的状态整份交给 G6 `setElementState`，单次主线程 47–63 ms；与后端无关（悬停期间无网络请求）。修复思路：只传状态变化的元素、悬停停留约 120 ms 再淡化、必要时改为只高亮悬停节点及邻居（后者改变交互，需用户确认）。
+
+## 2026-11-04 Claude 认领：青松明黄界面改版（UI-PINE-01）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-PINE-01 | IN_PROGRESS（配色、Logo、外壳、登录/注册、页面与图谱页外围、学生继续学习主卡、三步式模型设置已完成并通过全量门禁；邀请码、向量卡片三步式、图谱工具轨合并未做） | Claude | 按设计预览 v3 改前端配色、Logo、外壳、登录/注册、图谱页外围、课程进入页、模型 API 页；图谱画布样式不变；不改接口与数据模型 | type-check、前端全量 vitest、build、`./scripts/verify.sh` 通过；演示环境截图走查；`data-test` 钩子保留 |
+
+- 计划：`docs/superpowers/plans/2026-11-04-ui-pine-redesign.md`；分支 `claude/ui-pine-redesign`（本地，未推送）。
+- 依赖与风险：多处前端测试断言样式类与文案，需随设计更新并写明原因；邀请码需新接口与迁移，单列 P6，先写规格与 ADR。

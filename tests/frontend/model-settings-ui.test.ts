@@ -11,10 +11,11 @@ async function view(initial:ModelConfig,overrides:Partial<ModelConfigApi>={}) {
  const wrapper=mount(ModelSettingsView,{attachTo:document.body,global:{plugins:[createPinia()],provide:{[MODEL_CONFIG_API_KEY as symbol]:api}}});await flushPromises();return wrapper
 }
 describe('模型设置分区与可访问性',()=>{
- it('去配置聚焦服务地址，密钥保留密码框安全属性',async()=>{
+ // UI-PINE-01：页面改为三步（服务商 → API Key → 模型），「去配置」聚焦第一步当前选中的服务商
+ it('去配置聚焦第一步的服务商，密钥保留密码框安全属性',async()=>{
   const wrapper=await view({runtime_mode:'personal',configured:false})
   await wrapper.get('[data-test="mc-configure"]').trigger('click')
-  expect(document.activeElement).toBe(wrapper.get('[data-test="mc-base-url"]').element)
+  expect(document.activeElement).toBe(wrapper.get('[data-test="mc-provider-custom"]').element)
   const key=wrapper.get('[data-test="mc-api-key"]')
   expect(key.attributes('type')).toBe('password');expect(key.attributes('autocomplete')).toBe('off');expect(key.attributes('spellcheck')).toBe('false')
  })
@@ -61,5 +62,16 @@ describe('模型设置文案随角色变化（学生不能上传资料，也没�
   const wrapper=await viewAs('teacher')
   expect(wrapper.text()).toContain('用于知识图谱生成与课程问答')
   expect(wrapper.get('[data-test="mc-status"]').text()).toContain('上传资料生成图谱或提问')
+ })
+ it('三步结构：服务商、API Key、模型依次编号；服务地址与思考开关收在高级选项里（自定义服务商时地址放在第一步）',async()=>{
+  const wrapper=await view({runtime_mode:'personal',configured:false})
+  const steps=wrapper.findAll('[data-test="mc-step"]').map(s=>s.text())
+  expect(steps).toEqual(['服务商','API Key','模型'])
+  expect(wrapper.get('[data-test="mc-provider-custom"]').element.closest('details')).toBeNull()
+  expect(wrapper.get('[data-test="mc-base-url"]').element.closest('details')).toBeNull()
+  await wrapper.get('[data-test="mc-provider-deepseek"]').setValue(true)
+  expect((wrapper.get('[data-test="mc-provider-deepseek"]').element as HTMLInputElement).checked).toBe(true)
+  expect(wrapper.get('[data-test="mc-base-url"]').element.closest('details')).not.toBeNull()
+  expect(wrapper.get('[data-test="mc-disable-thinking"]').element.closest('details')).not.toBeNull()
  })
 })

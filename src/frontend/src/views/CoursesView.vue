@@ -8,6 +8,10 @@ import { DESTINATION_ICONS } from '../components/navIcons'
 import CourseList from '../components/courses/CourseList.vue'
 import CourseOverview from '../components/courses/CourseOverview.vue'
 import CourseCreate from '../components/courses/CourseCreate.vue'
+import ResumeCard from '../components/courses/ResumeCard.vue'
+import { PROGRESS_API_KEY } from '../api/progress'
+import { RECOMMEND_API_KEY } from '../api/recommend'
+import { useResumeLearning } from '../composables/resumeLearning'
 import { MATERIALS_API_KEY } from '../api/materials'
 import { useRuntimeStore } from '../stores/runtime'
 import { COURSES_API_KEY } from '../api/courses'
@@ -96,6 +100,14 @@ const nextLink = computed(() => {
   return { to: {name: actionRoutes[action], ...(action === 'settings' ? {} : {params: {cid: current.value.id}})}, label: actionLabels[action] }
 })
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
+// UI-PINE-01：学生课程列表页顶部的「继续学习」主卡；进度或推荐接口未注入时不显示
+const { resume } = useResumeLearning({
+  courses,
+  enabled: computed(() => courseId.value === null && !canCreate.value && listStatus.value === 'ready' && hasStudentGraph),
+  progressApi: inject(PROGRESS_API_KEY, null),
+  recommendApi: inject(RECOMMEND_API_KEY, null),
+  sessionKey: computed(() => session.accessToken),
+})
 const createOpen = ref(false)
 const createButton = ref<HTMLButtonElement | null>(null)
 const highlightedId = ref<string | null>(null)
@@ -158,6 +170,7 @@ const entryLinks = computed(() => {
    <p v-else-if="currentStatus === 'error'" data-test="current-course-error" class="ui-notice ui-notice--danger" role="alert">{{ currentError }}</p>
    <CourseOverview v-else-if="current" :current="current" :next-step="nextStep?.text ?? null" :next-link="nextLink" :links="entryLinks" />
   </section>
+  <ResumeCard v-if="resume" :resume="resume" :graph-route="STUDENT_GRAPH_ROUTE" :chat-route="hasChat ? CHAT_ROUTE : null" />
   <section class="ui-list-region" data-test="course-list-region" aria-labelledby="course-list-title" :aria-busy="listStatus === 'loading'">
    <div class="ui-section-heading"><h3 id="course-list-title">{{ courseId ? '全部课程' : '课程列表' }}</h3><span v-if="listStatus === 'ready'" class="ui-muted">{{ courses.length }} 门课程</span></div>
    <div v-if="listStatus === 'loading'" data-test="courses-loading" class="ui-state" role="status"><p>正在加载课程…</p><div v-for="i in 3" :key="i" class="ui-skeleton" aria-hidden="true" /></div>

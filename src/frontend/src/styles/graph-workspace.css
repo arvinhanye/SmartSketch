@@ -256,7 +256,7 @@
 .app--graph :where(button) { padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; justify-self: auto; cursor: pointer; }
 .app--graph :where(button):hover:not(:disabled) { background: transparent; }
 .app-topbar { grid-area: top; position: sticky; top: 0; z-index: 20; background: var(--ss-bg); display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 24px; }
-.app-topbar__logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--ss-radius-sm); background: var(--ss-primary); color: #fff; font-weight: 600; }
+.app-topbar__mode { padding: 2px 10px; border: 1px solid var(--ui-highlight); border-radius: 8px; color: var(--ss-warn); font-size: 12px; line-height: 20px; white-space: nowrap; }
 .app-topbar__crumb { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ss-text-2); }
 .app-topbar__crumb a { padding: 2px 4px; border-radius: var(--ss-radius-sm); color: var(--ss-text-2); text-decoration: none; transition: background-color 120ms var(--ss-ease); }
 .app-topbar__crumb a:hover { background: var(--ss-hover); color: var(--ss-text); }
@@ -271,14 +271,15 @@
 .app-rail.is-expanded { width: 224px; }
 .app--graph .app-rail__item, .app--graph .app-rail__toggle { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 11px; border-radius: 6px; color: var(--ss-text-2); text-decoration: none; text-align: left; transition: background-color 120ms var(--ss-ease), color 120ms var(--ss-ease); }
 .app--graph .app-rail__item:hover, .app--graph .app-rail__toggle:hover:not(:disabled) { background: var(--ss-hover); color: var(--ss-text); }
-.app--graph .app-rail__item.is-current { background: var(--ss-selected); color: var(--ss-text); box-shadow: inset 2px 0 0 var(--ss-link); }
+.app--graph .app-rail__item.is-current { background: var(--ui-highlight); color: var(--ui-brand); font-weight: 500; }
+.app--graph .app-rail__item.is-current:hover { background: var(--ui-highlight); color: var(--ui-brand); }
 .app-rail__toggle { margin-top: auto; }
 .app-rail__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-scrim { position: fixed; inset: 0; z-index: 30; background: rgb(0 0 0 / 48%); animation: gw-fade 160ms var(--ss-ease); }
 .app-drawer { position: fixed; z-index: 31; inset: 0 auto 0 0; width: min(280px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 4px; padding: 56px 12px 12px; background: var(--ss-panel); box-shadow: var(--ss-shadow-pop-dark); animation: gw-slide-l 220ms var(--ss-ease); }
 .app-drawer__close { position: absolute; top: 10px; right: 12px; }
 .app-rail__item.is-wide { padding: 0 12px; }
-.app--graph .app-main { grid-area: main; max-width: none; margin: 0; padding: 0 12px 12px 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.app--graph .app-main { grid-area: main; max-width: none; margin: 0; padding: 0 12px 12px 0; background: var(--ui-bg); color: var(--ui-text); border-top-left-radius: 14px; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
 .app--graph .app-main > .student-graph { flex: 1; min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;  height: auto;}  /* 覆盖全站 `.app-main > section` 的卡片外观 */
 .app--graph .student-graph > .graph-workspace { height: auto; min-height: calc(100dvh - 68px - var(--gw-banner, 0px)); }
 @media (max-width: 1023px) { .app--graph { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'main'; } .app--graph .app-main { padding: 0 16px 12px; } }
