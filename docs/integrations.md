@@ -87,7 +87,7 @@
 | `LLM_REQUEST_TIMEOUT_SECONDS` | 正数 | `60` | worker 侧非流式调用（抽取、补漏、裁决、归并）的单次 HTTP 超时；问答链路不用此值 | 占位（D-02e） |
 | `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` | 正数，且 < `LLM_CHAT_TIMEOUT_SECONDS` | `5` | 流式问答首字超时；到点前未出字才允许切备用 | 占位（D-02e） |
 | `LLM_CHAT_TIMEOUT_SECONDS` | 正数 | `15` | 问答链路（问题改写 + 流式生成）整体上限（赛题 ≤ 15 秒）；链路内任何调用及重试都不得超出剩余时间 | 占位（D-02e） |
-| `LLM_MAX_CONCURRENCY` | 整数 ≥ 1 | `4` | 每进程 LLM 调用信号量；worker 侧总并发 = `WORKER_PROCESSES` × 此值；API 进程的问答调用另计 | 占位（D-02e；S2 估算按 8 路） |
+| `LLM_MAX_CONCURRENCY` | 整数 ≥ 1 | `8` | 抽取 worker 的块/小节共享池上限；环境变量可覆盖，多个 worker 上限相加；API 问答独立 | EXTRACT-PERF-01 用户已确认（2026-11-05） |
 | `LLM_MAX_RETRIES` | 整数 ≥ 0 | `2` | ADR-011 三层重试中的 L1：单次调用在同一供应商上的重试次数，不含首次 | 占位（D-02e） |
 | `LLM_CIRCUIT_FAILURE_THRESHOLD` | 整数 ≥ 1 | `5` | 连续失败多少次后熔断；主用、备用、向量各自计数 | 占位（D-02e） |
 | `LLM_CIRCUIT_OPEN_SECONDS` | 整数 ≥ 1 | `30` | 熔断持续时长，到期放一次试探调用；与 ADR-011 阶段级退避首档 30 秒对齐 | 占位（D-02e） |
