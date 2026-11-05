@@ -1,6 +1,6 @@
 # Codex 交接：邀请码、悬停性能与行为保持重构
 
-- 日期：2026-11-05；状态：实施中。
+- 日期：2026-11-05；状态：三项按已确认范围完成；B保留用户接受的性能限制。
 - 分支：`codex/invite-hover-refactor`，起点 `445bfc9`（包含界面改版 `ef5e297` 与本轮 Claude 交接）。工作区起始干净；只本地提交，不推送、PR、合并或发布。
 - 顺序与范围：GRAPH-HOVER-01 → INVITE-01 → REFACTOR-01，遵循用户明确批准的交接稿；不新增/升级依赖、不改图谱主题色与已有 data-test。
 
@@ -13,14 +13,14 @@
 | `cd src/frontend && npx vite build` | exit 0 | 3.06s |
 | `PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh` | basic/契约门禁 exit 0 | 223.93s |
 
-完整日志与机读摘要：`/private/tmp/smartsketch-invite-hover-20261105/`。运行时 Node v26.4.0、Python 3.11.9。Docker Desktop 启动后用 `PATH="$HOME/.docker/bin:$PATH" scripts/start-demo.sh --no-open` 启动既有演示环境；模型与向量均 demo，无付费模型请求。
+完整日志与机读摘要：`/private/tmp/smartsketch-invite-hover-20261105/`。基线表与JSON记录命令墙钟；其余pytest/vitest段落使用测试器报告时长。运行时 Node v26.4.0、Python 3.11.9。Docker Desktop 启动后用 `PATH="$HOME/.docker/bin:$PATH" scripts/start-demo.sh --no-open` 启动既有演示环境；模型与向量均 demo，无付费模型请求。
 
 ## GRAPH-HOVER-01
 
 - RED：`npm --prefix src/frontend test -- --run ../../tests/frontend/graph-enhancer.test.ts --reporter=dot`，39 条中 14 failed/25 passed；尚未改生产代码时复现停留阈值、重复状态、兜底、数据替换、销毁与异步覆盖问题。
 - 原语义断言保留，FakeEnhancedGraph 增加按元素累计状态；状态批次另用于确认差分。
 - 优化前真实演示图 64 节点+71 边，1440×900，普通/预览各 10 次移入+移出。使用真实 G6 `Graph.prototype.setElementState` 包裹同步计时、PerformanceObserver 长任务；通过 G6 事件派发做确定性重复，**不是物理鼠标轨迹测量**。
-- 普通：20 次均 135 元素，同步 32.2–47.8ms，未记录 >50ms 长任务；预览：20 次均 135 元素，32.2–45.9ms，未记录 >50ms 长任务。详细数组 `hover-metrics.json`；本次未复现历史 63ms 上限，不把历史数值当成本机新基线。
+- 普通：20 次均 135 元素，同步 32.2–47.8ms，未记录 >50ms 长任务；预览：20 次均 135 元素，32.2–45.9ms，未记录 >50ms 长任务。详细数组见 [`codex-invite-hover-metrics.json`](../reviews/codex-invite-hover-metrics.json)；本次未复现历史 63ms 上限，不把历史数值当成本机新基线。
 - GREEN：三组定向（graph-enhancer、graph-lifecycle-enhance、graph-canvas-enhanced）3 文件/77 passed；全量前端78 文件/1326 passed，type-check与basic exit0。
 - 第1/2项优化后：普通完整进出33.3–58.7ms（135元素，2次>50ms长任务），预览32.6–43.7ms（134元素，无长任务）。快速划过10次零写入，相邻切换10次均20元素、8.5–15.8ms。**全进出目标尚未全部达到；用户已明确选择保留现有淡化，仅交付第1/2项并记录该限制，继续A/C。**
 - 首轮优化后采样与baseline环境不一致（basic仍运行且临时开启Vite轮询监听），普通33.4–70.4ms、预览46.3–194.4ms；原始值保留在`after_during_basic`，不作为同环境前后对比。关闭轮询、待测试完成后采集上述`after_idle`，没有删除不利观测。
@@ -54,10 +54,40 @@ A 已提交 `d051a47` 后开始，三类分别提交并各跑 type-check、全�
 
 1. 样式：删除 `graph-workspace.css` 较早的重复 `.gw-hint` 和完全被后条覆盖的 `.gw-list`；保留后条位置和所有有效声明，修正“旧色等于当前token”的过时注释。四组指定样式测试基线32 passed；重构前1440×900图谱/列表与768×900列表截图、全部计算样式已存验证目录。改后type-check、81文件/1368测试、build均exit0；1440×900和768×900下三个受影响元素各569项计算样式逐项相同，截图目视无变化（未做像素级解码比较，本地未装Pillow且未新增依赖）。后端full 4245 passed/27登记SKIP、gate exit0（733.66s）；basic exit0（233.19s）。
 2. 纯逻辑：已提取师生两页重复的知识点类型计数/切换，保留整图统计、固定顺序及各自恢复语义；收敛HTTP/任务SSE/问答SSE三份同序30项ErrorCode闭集，保留生成契约完整性检查、消息/details验证和聊天专用错误码。新增H05等价性用例4条，7文件定向260 PASS；独立只读复审确认数组30值逐项同序、无运行时循环依赖，计数数据源/零项/顺序/XOR切换不变。前端全量81文件/1372 PASS（54.29s），type-check/build exit0；backend full 4245 PASS/27登记SKIP、gate exit0（770.63s），basic exit0（275.74s）。Chrome师生两端都验证隐藏55个概念后显示9/64，计数仍保留55，恢复后64/64；教师关系5/71→71/71。未写图数据。
-3. 测试：计划用本次绘制/聚焦完成条件替换固定10/30ms等待，并在afterEach销毁裸graph lifecycle。不会改断言、timeout或重试次数；不能将消除固定等待等同于证明所有负载超时的根因。
+3. 测试：在共享逻辑提交 `00e251c` 后，用本次绘制/聚焦完成条件替换 h14/l14 固定10/30ms等待，更新/resize必须看到本次调用与焦点恢复；afterEach销毁裸graph lifecycle并恢复mock，断言失败也不会遗留尺寸spy。只读复核确认59+25个原用例、162+95条原断言行全部保留，timeout与重试次数不变。三文件定向（h14、l14、student-graph-workbench）98 PASS（11.87s）；前端全量81文件/1372 PASS（39.99s），type-check（30.11s）/build（3.16s）exit0，basic exit0（240.55s），backend full 4245 PASS/27登记SKIP（754.64s）、gate exit0。student-graph-workbench没有固定等待，未为形式改动；不声称已证明或根治所有并发负载超时。
 
-审计未纳入：页面覆盖层的token重定义和不同硬编码色不等价，不能为去重改变视觉；课程内teacher与账号teacher门槛不同，不能盲目合并鉴权；未找到有充分未引用证据的组件可删，不以文件数量作为重构目标。删除清单仅上述两条无效CSS规则。768px窄屏长用户名会挤压顶栏退出按钮，重构前后截图一致；属于既有布局限制，本次保持视觉范围不改。
+审计未纳入：页面覆盖层的token重定义和不同硬编码色不等价，不能为去重改变视觉；课程内teacher与账号teacher门槛不同，不能盲目合并鉴权；未找到有充分未引用证据的组件可删，不以文件数量作为重构目标。删除清单：两条无效CSS规则、三份ErrorCode重复块（收敛为一份）、h14/l14固定等待与冗余flush。没有删除组件、用例或断言。768px窄屏长用户名会挤压顶栏退出按钮，重构前后截图一致；属于既有布局限制，本次保持视觉范围不改。
 
-## 未完成与下一步
+## 验证复现与交付边界
 
-B第1/2项已提交 `2728315`，性能限制由用户确认保留。A已完成前后端、浏览器验收与全量验证，接下来按三类安全候选实施C（样式、共享图例逻辑、测试等待/清理）。
+以下命令在仓库根目录运行；vitest/build 使用括号内前端目录。每类 C 提交前都完整运行这五项，不调整断言、timeout或worker配置来通过。
+
+```sh
+npm --prefix src/frontend run type-check
+(cd src/frontend && npx vitest --run)
+(cd src/frontend && npx vite build)
+PATH="$PWD/.venv/bin:$PATH" scripts/verify/backend.sh full
+PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh
+```
+
+- 日志与命令/退出码/墙钟时间 JSON：`/private/tmp/smartsketch-invite-hover-20261105/`；C各类前端全量先运行，随后 backend full 与 basic 并行。该目录是本机临时证据，悬停数字另已入库。
+- 文档复核补齐身份规格§1.2/L15的旧描述：教师添加与学生输码两条入课路径并存，账号类型也决定student-only邀请码资格；不改变注册。
+- 约束核对：依赖清单/锁文件与 `graph/theme.ts` 无差异，未改变 `--gw-*` 色值；旧 Vue 静态 `data-test` 全部保留；旧 API 路径定义不变，旧 schema 只有 ErrorCode 添加两个值。
+- 既有告警：前端 JSDOM `window.scrollTo`、Vite 大块提示；后端 Starlette/httpx 弃用提示。没有因此升级依赖。27 条后端跳过均为门禁已登记项，不能视为已运行通过。
+- 浏览器验收结束后已停止本次启动的 API/worker/Vite，Neo4j 与合成演示数据保留；复看可重新运行 `PATH="$HOME/.docker/bin:$PATH" scripts/start-demo.sh --no-open`。未提交数据库、真实课程资料、密钥或构建产物。
+
+## 本地提交
+
+- `2728315` — 悬停状态差分与120ms停留阈值。
+- `d051a47` — 邀请码契约、ADR-096、迁移020、前后端与测试。
+- `26cdda1` — 删除被覆盖的图谱外围样式。
+- `00e251c` — 共享图例纯逻辑与契约错误码守卫。
+- `dee055d` — 以图谱完成条件替换固定等待，并清理生命周期与mock。
+- 本交接所在文档收尾提交 — 最终验收记录、身份规格旧措辞补齐、ADR-091用户决定补记、原始悬停测量数组。
+
+## 未完成与已接受限制
+
+- 本轮确认范围内没有遗留实现项，没有新增待用户决定项。全量通过不替代下列明确未覆盖的验收范围。
+- B仅交付用户指定的第1/2项，全图淡化保留；普通完整进出仍可能>50ms。第3项未实施，也不把“快速划过零写入”表述为全场景≤16ms。
+- 未覆盖Safari/Windows、正式模型服务与真实断网交互；本轮不发布、不构建安装包、不推送、不开PR、不合并。
+- 邀请码进程内限流、迁移回滚历史丢失、既有窄屏布局限制见上文。
