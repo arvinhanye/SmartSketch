@@ -2440,11 +2440,11 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 ## 2026-11-05 Codex：REFACTOR-01 行为保持重构
 
-- 状态 IN_PROGRESS（INVITE-01 已提交 d051a47）；负责人 Codex。
+- 状态 DONE（三类行为保持重构均完成独立全量验证）；负责人 Codex。
 - 输入：完成 B/A 后代码与测试；输出按优先级审查样式、前端逻辑、后端分层、测试 helper/等待、死代码，以可测试的小类改动分别提交。
 - 约束：功能、视觉、契约保持；不改 `graph/theme.ts`、`--gw-*` 色值或既有 `data-test`；无依赖增删升级；不删除/放宽断言。
 - 验证：每类提交前 type-check、全量 vitest、build、backend full、basic；样式类额外截图对照。范围不清或需交互/契约破坏性变化时登记并询问用户。
-- 总交接：`docs/handoffs/codex-invite-hover-refactor.md`；只本地提交，不推送/PR/合并。验收待填写。
+- 总交接：`docs/handoffs/codex-invite-hover-refactor.md`；只本地提交，不推送/PR/合并。验收见以下三类完成记录及总交接。
 - INVITE-01 用户已决（2026-11-05）：允许加入未发布课程，提示“教师发布后可见”；原学生列表发布可见性不变，已发布课程入课后刷新并高亮。
 
 - GRAPH-HOVER-01 第1/2项本地验证：新增回归先14 FAIL/25 PASS，修后3文件77 PASS；全量前端78文件1326 PASS，type-check与basic exit0。真实G6/1440×900/64节点71边：普通完整进出33.3–58.7ms（2个>50ms长任务），预览32.6–43.7ms（0长任务）；快速划过10次零状态写入，相邻切换20元素/8.5–15.8ms。性能目标尚未全部达到，已询问用户是否授权第3项“不淡化其他元素”，未自行改变交互。
@@ -2461,6 +2461,10 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 - REFACTOR-01 样式类验收：四组样式守卫32 PASS；改后前端81文件/1368 PASS，type-check/build exit0；backend full 4245 PASS/27登记SKIP（733.66s），basic exit0。宽/窄屏三个元素各569项计算样式相同，图谱/列表截图目视一致。仅两条无效CSS声明删除，无颜色/DOM/钩子变更；既有窄屏长用户名挤压顶栏问题记录handoff而不扩展视觉修改。
 
-- REFACTOR-01 共享逻辑类：在样式提交26cdda1后应用。共享师生图例计数/类型切换及HTTP/两SSE的30项ErrorCode守卫；既有plain-object、message/details与chat专有码校验不变。H05新增4项等价覆盖；7文件260定向PASS，独立审查无行为差异，正在全门禁。
+- REFACTOR-01 共享逻辑类：在样式提交26cdda1后应用。共享师生图例计数/类型切换及HTTP/两SSE的30项ErrorCode守卫；既有plain-object、message/details与chat专有码校验不变。H05新增4项等价覆盖；7文件260定向PASS，独立审查无行为差异；全门禁结果见下一条验收记录。
 
 - REFACTOR-01 共享逻辑类验收：前端81文件/1372 PASS（54.29s），type-check/build exit0；backend full 4245 PASS/27登记SKIP（770.63s），basic exit0（275.74s）。Chrome学生/教师隐藏55个概念后均9/64且图例计数仍55，恢复64/64；教师关系5/71恢复71/71。独立复核保留30项错误码和师生各自数据源/恢复语义。
+
+- REFACTOR-01 测试类开始：共享逻辑已提交00e251c。h14/l14固定等待替换为本次绘制/目标聚焦条件，afterEach释放裸lifecycle并恢复spy。84个原用例及全部原断言保留，不改timeout/重试；三文件定向98 PASS（11.87s），开始全门禁。
+
+- REFACTOR-01 测试类验收：前端81文件/1372 PASS（39.99s），type-check/build exit0；backend full 4245 PASS/27登记SKIP（754.64s）、gate exit0，basic exit0（240.55s）。h14/l14原84用例及257条原断言行全部保留；没有更改timeout、重试或worker设置。三类改动完成；未纳入可能改变视觉/鉴权语义的合并，没有新增待用户决定项。
