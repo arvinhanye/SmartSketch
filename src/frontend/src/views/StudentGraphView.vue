@@ -19,9 +19,11 @@ import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import LocalViewBar from '../components/LocalViewBar.vue'
 import Recommendations from '../components/Recommendations.vue'
 import {
+  countNodeTypes,
   locateNode,
-  NODE_TYPE_LABELS,
+  NODE_TYPE_ORDER,
   RELATION_TYPE_ORDER,
+  toggledNodeTypes,
   useGraphFilters,
   type KnowledgePointType,
 } from '../composables/useGraphFilters'
@@ -232,7 +234,7 @@ const selectedName = computed(() => {
 })
 
 // ---------------------------------------------------------------- 图例：关系与类型筛选（单一事实来源是筛选状态）
-const allTypes = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
+const allTypes = NODE_TYPE_ORDER
 const hiddenRelations = computed(() => RELATION_TYPE_ORDER.filter((t) => !filters.state.value.relationTypes.includes(t)))
 const hiddenTypes = computed(() => allTypes.filter((t) => !filters.state.value.nodeTypes.includes(t)))
 const relationCounts = computed(() => {
@@ -240,16 +242,11 @@ const relationCounts = computed(() => {
   for (const edge of graph.value?.edges ?? []) counts[edge.data.type] += 1
   return counts
 })
-const typeCounts = computed(() => {
-  const counts = Object.fromEntries(allTypes.map((t) => [t, 0])) as Record<KnowledgePointType, number>
-  for (const node of graph.value?.nodes ?? []) counts[node.data.type] += 1
-  return counts
-})
+const typeCounts = computed(() => countNodeTypes(graph.value?.nodes ?? []))
 function toggleType(type: KnowledgePointType): void {
-  const current = filters.state.value.nodeTypes
   filters.state.value = {
     ...filters.state.value,
-    nodeTypes: allTypes.filter((t) => t === type !== current.includes(t)),
+    nodeTypes: toggledNodeTypes(filters.state.value.nodeTypes, type),
   }
 }
 function restoreAllFilters(): void {

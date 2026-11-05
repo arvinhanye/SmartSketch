@@ -2429,7 +2429,7 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - 状态 DONE_WITH_ACCEPTED_PERFORMANCE_LIMIT；负责人 Codex；分支 `codex/invite-hover-refactor`，基线 `445bfc9`（包含 UI-PINE-01 `ef5e297`）。
 - 输入：交接稿第 3 节、G6 enhancer 与已有悬停测试；输出：变化元素差分更新、120ms 停留阈值，保留 60ms 防闪、所有离开兜底及现有淡化视觉。
 - 依赖：现有前端运行时、演示环境；风险：状态缓存与重绘、预览、销毁不同步。先写失败回归；真实 1440×900 普通/预览各 10 次移入移出记录调用耗时。若仍需改变淡化交互，先由用户决定。
-- 验证：前端 type-check、全量 vitest、Vite build、`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh`；基线日志 `/private/tmp/smartsketch-invite-hover-20261105/`。验收待填写。
+- 验证：前端 type-check、全量 vitest、Vite build、`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh`；基线日志 `/private/tmp/smartsketch-invite-hover-20261105/`。验收及已接受的性能限制见下方 GRAPH-HOVER-01 证据与本轮交接。
 
 ## 2026-11-05 Codex：INVITE-01 课程邀请码
 
@@ -2453,10 +2453,14 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 - INVITE-01 前置证据：OpenAPI新增3操作及2 DTO，生成39路径/135 schema；`PATH="$PWD/.venv/bin:$PATH" ./scripts/gen-contracts.sh`与`./scripts/verify/contracts.sh`均exit0。ADR-096、身份规格、架构、错误码先行；迁移020新增回归RED 9条missing table失败→迁移及全回滚守卫24 PASS。初次测试fixture使用不合规占位密码hash导致9个setup error，已改为既有测试PHC格式后重跑；不计该次为产品RED。
 
-- INVITE-01 后端证据：邀请新41项与成员/课程相邻回归共74 PASS；独立复审发现两个教师操作漏声明生成耗尽500，追加2 RED→2 PASS并同步真源/生成物/路由。所有旧OpenAPI路径结构不变，旧schema仅ErrorCode扩展。全量backend仍执行中，前端已进入实现验证。
+- INVITE-01 后端证据：邀请新41项与成员/课程相邻回归共74 PASS；独立复审发现两个教师操作漏声明生成耗尽500，追加2 RED→2 PASS并同步真源/生成物/路由。所有旧OpenAPI路径结构不变，旧schema仅ErrorCode扩展。完整后端结果见下一条完成记录。
 
 - INVITE-01 完成：完整前端81文件/1368 PASS，type-check/build exit0；backend full 4243 PASS/27登记SKIP、gate PASS，后补500声明用例2 PASS；basic exit0。并行负载首轮出现交接已知l14/student-graph-workbench各1项5秒超时，保留失败日志、空闲负载完整重跑通过，未放宽断言/timeout。Chrome真实教师取码/复制/取消及确认重置、旧码失效、学生规范化入课/刷新高亮/重复提示/进入图谱、未发布成功但列表不可见全部走通。额外补修重置响应丢失继续显示旧码的问题：3 RED→3 GREEN，新前端测试总42 PASS。详情、截图路径和回滚步骤见本轮handoff。
 
 - REFACTOR-01 样式类开始：仅删除graph-workspace.css较早的重复gw-hint和已被完整覆盖的gw-list，保留后条规则原位置，修正“旧硬编码等于当前token”的过时注释；颜色/媒体规则/DOM不变。四组样式守卫基线通过，浏览器1440×900与768×900截图/计算样式已留档；后续执行每类全门禁再提交。
 
 - REFACTOR-01 样式类验收：四组样式守卫32 PASS；改后前端81文件/1368 PASS，type-check/build exit0；backend full 4245 PASS/27登记SKIP（733.66s），basic exit0。宽/窄屏三个元素各569项计算样式相同，图谱/列表截图目视一致。仅两条无效CSS声明删除，无颜色/DOM/钩子变更；既有窄屏长用户名挤压顶栏问题记录handoff而不扩展视觉修改。
+
+- REFACTOR-01 共享逻辑类：在样式提交26cdda1后应用。共享师生图例计数/类型切换及HTTP/两SSE的30项ErrorCode守卫；既有plain-object、message/details与chat专有码校验不变。H05新增4项等价覆盖；7文件260定向PASS，独立审查无行为差异，正在全门禁。
+
+- REFACTOR-01 共享逻辑类验收：前端81文件/1372 PASS（54.29s），type-check/build exit0；backend full 4245 PASS/27登记SKIP（770.63s），basic exit0（275.74s）。Chrome学生/教师隐藏55个概念后均9/64且图例计数仍55，恢复64/64；教师关系5/71恢复71/71。独立复核保留30项错误码和师生各自数据源/恢复语义。
