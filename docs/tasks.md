@@ -2433,7 +2433,7 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 ## 2026-11-05 Codex：INVITE-01 课程邀请码
 
-- 状态 IN_PROGRESS；负责人 Codex。
+- 状态 DONE；负责人 Codex。
 - 输入：交接稿第 2 节与身份/成员模型；输出：学生课程列表输码入课，教师查看/复制/确认重置；保留按用户名添加，不改注册。
 - 顺序：OpenAPI 真源与生成/门禁 → ADR-096、身份规格及错误码 → 迁移 020（含 ROLLBACK）→ 分层后端 → 前端 → 完整验证。
 - 风险与验收：码唯一性/轮换立即失效、用户与 IP 限流、课程隔离、学生角色限制、重复入课、迁移前进回滚、提交中禁用与错误文案。验证含契约、后端 full、前端全量/type-check/build/basic。
@@ -2450,3 +2450,9 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - GRAPH-HOVER-01 第1/2项本地验证：新增回归先14 FAIL/25 PASS，修后3文件77 PASS；全量前端78文件1326 PASS，type-check与basic exit0。真实G6/1440×900/64节点71边：普通完整进出33.3–58.7ms（2个>50ms长任务），预览32.6–43.7ms（0长任务）；快速划过10次零状态写入，相邻切换20元素/8.5–15.8ms。性能目标尚未全部达到，已询问用户是否授权第3项“不淡化其他元素”，未自行改变交互。
 
 - GRAPH-HOVER-01 用户已决（2026-11-05）：保留全图淡化，只交付第1/2项；明确接受上述完整进出性能限制，继续A/C。最终type-check、build、basic均exit0，临时计时入口已撤回。
+
+- INVITE-01 前置证据：OpenAPI新增3操作及2 DTO，生成39路径/135 schema；`PATH="$PWD/.venv/bin:$PATH" ./scripts/gen-contracts.sh`与`./scripts/verify/contracts.sh`均exit0。ADR-096、身份规格、架构、错误码先行；迁移020新增回归RED 9条missing table失败→迁移及全回滚守卫24 PASS。初次测试fixture使用不合规占位密码hash导致9个setup error，已改为既有测试PHC格式后重跑；不计该次为产品RED。
+
+- INVITE-01 后端证据：邀请新41项与成员/课程相邻回归共74 PASS；独立复审发现两个教师操作漏声明生成耗尽500，追加2 RED→2 PASS并同步真源/生成物/路由。所有旧OpenAPI路径结构不变，旧schema仅ErrorCode扩展。全量backend仍执行中，前端已进入实现验证。
+
+- INVITE-01 完成：完整前端81文件/1368 PASS，type-check/build exit0；backend full 4243 PASS/27登记SKIP、gate PASS，后补500声明用例2 PASS；basic exit0。并行负载首轮出现交接已知l14/student-graph-workbench各1项5秒超时，保留失败日志、空闲负载完整重跑通过，未放宽断言/timeout。Chrome真实教师取码/复制/取消及确认重置、旧码失效、学生规范化入课/刷新高亮/重复提示/进入图谱、未发布成功但列表不可见全部走通。额外补修重置响应丢失继续显示旧码的问题：3 RED→3 GREEN，新前端测试总42 PASS。详情、截图路径和回滚步骤见本轮handoff。

@@ -204,6 +204,8 @@ const ERROR_CODES = [
   'REVISION_CONFLICT',
   'USERNAME_TAKEN',
   'MODEL_CONFIG_REQUIRED',
+  'INVITE_CODE_INVALID',
+  'ALREADY_MEMBER',
 ] as const satisfies readonly ErrorCode[]
 type MissingErrorCode = Exclude<ErrorCode, (typeof ERROR_CODES)[number]>
 const errorCodesComplete: [MissingErrorCode] extends [never] ? true : MissingErrorCode = true
