@@ -82,7 +82,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 
 ## 契约真源与生成物（ADR-004）
 
-下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/decisions.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
+下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/archive/decisions-adr-001-040.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
 
 | 角色 | 位置 | 谁写 | 规则 |
 | --- | --- | --- | --- |

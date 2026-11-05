@@ -96,7 +96,7 @@
   > `PUT /progress` 的 `ProgressUpdate` 是闭合对象（`api.v1.yaml`），请求体中夹带 `user_id` 即 schema 违约：按契约中该操作的 422 说明与
   > `specs/learning-path.md` §5，整批返回 422 `VALIDATION_ERROR` 且零写入——不是忽略，也不是只按 A 的身份继续写。本条其余部分不变：
   > 调用者身份仍只取自令牌，写入的 `user_id` 一律取自调用者；**查询参数与自定义请求头**（`?user_id=`、`X-User-Id`）不受请求体 schema
-  > 校验，仍按本条被忽略、不参与身份判定。裁决记录见 `docs/decisions.md` ADR-064 签收行；问答接口（J07，尚未实现）的 `ChatRequest`
+  > 校验，仍按本条被忽略、不参与身份判定。裁决记录见 `docs/archive/decisions-adr-041-080.md` ADR-064 签收行；问答接口（J07，尚未实现）的 `ChatRequest`
   > 目前未声明 `additionalProperties: false`，落地时须先定这条并按同样方式登记。
 - 进度、问答记录、编辑日志、成员 `added_by` 等写入的 `user_id` 一律取自调用者身份。
 - 成员管理中的用户名或 `uid` 表示**被操作的对象**，不是调用者身份，不受本条限制，但同样要经 §4 授权。
