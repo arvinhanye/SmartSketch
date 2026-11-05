@@ -2440,7 +2440,7 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 ## 2026-11-05 Codex：REFACTOR-01 行为保持重构
 
-- 状态 CLAIMED（等待 INVITE-01）；负责人 Codex。
+- 状态 IN_PROGRESS（INVITE-01 已提交 d051a47）；负责人 Codex。
 - 输入：完成 B/A 后代码与测试；输出按优先级审查样式、前端逻辑、后端分层、测试 helper/等待、死代码，以可测试的小类改动分别提交。
 - 约束：功能、视觉、契约保持；不改 `graph/theme.ts`、`--gw-*` 色值或既有 `data-test`；无依赖增删升级；不删除/放宽断言。
 - 验证：每类提交前 type-check、全量 vitest、build、backend full、basic；样式类额外截图对照。范围不清或需交互/契约破坏性变化时登记并询问用户。
@@ -2456,3 +2456,7 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - INVITE-01 后端证据：邀请新41项与成员/课程相邻回归共74 PASS；独立复审发现两个教师操作漏声明生成耗尽500，追加2 RED→2 PASS并同步真源/生成物/路由。所有旧OpenAPI路径结构不变，旧schema仅ErrorCode扩展。全量backend仍执行中，前端已进入实现验证。
 
 - INVITE-01 完成：完整前端81文件/1368 PASS，type-check/build exit0；backend full 4243 PASS/27登记SKIP、gate PASS，后补500声明用例2 PASS；basic exit0。并行负载首轮出现交接已知l14/student-graph-workbench各1项5秒超时，保留失败日志、空闲负载完整重跑通过，未放宽断言/timeout。Chrome真实教师取码/复制/取消及确认重置、旧码失效、学生规范化入课/刷新高亮/重复提示/进入图谱、未发布成功但列表不可见全部走通。额外补修重置响应丢失继续显示旧码的问题：3 RED→3 GREEN，新前端测试总42 PASS。详情、截图路径和回滚步骤见本轮handoff。
+
+- REFACTOR-01 样式类开始：仅删除graph-workspace.css较早的重复gw-hint和已被完整覆盖的gw-list，保留后条规则原位置，修正“旧硬编码等于当前token”的过时注释；颜色/媒体规则/DOM不变。四组样式守卫基线通过，浏览器1440×900与768×900截图/计算样式已留档；后续执行每类全门禁再提交。
+
+- REFACTOR-01 样式类验收：四组样式守卫32 PASS；改后前端81文件/1368 PASS，type-check/build exit0；backend full 4245 PASS/27登记SKIP（733.66s），basic exit0。宽/窄屏三个元素各569项计算样式相同，图谱/列表截图目视一致。仅两条无效CSS声明删除，无颜色/DOM/钩子变更；既有窄屏长用户名挤压顶栏问题记录handoff而不扩展视觉修改。

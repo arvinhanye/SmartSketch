@@ -1,8 +1,8 @@
 /*
  * 图谱工作区组件样式（UI-GRAPH-PILOT-01，规格 §3、§5、§6、§9）。
  * 所有选择器都带 `.graph-workspace` 前缀：既隔离其他页面，也让特异性高于全站的 `button:hover:not(:disabled)`。
- * 颜色只用 `--gw-*` / `--ss-*` tokens（`styles/tokens.css`）；个别写死的 #747a87 / #5b5bd6 是控件边界与主按钮，
- * 与 tokens 的 `--gw-edge` / `--ss-primary` 数值一致。
+ * 颜色主要使用 `--gw-*` / `--ss-*` tokens（`styles/tokens.css`）。历史控件色保留原值；
+ * 页面覆盖层会重定义部分 tokens，替换前须核对最终计算色，不能假定数值等价。
  */
 
 /* 仅屏幕阅读器可见（页面标题放在工作区之外，所以不带 .graph-workspace 前缀） */
@@ -33,7 +33,6 @@
 .graph-workspace .gw-h3 { margin: 0 0 8px; font-size: 14px; line-height: 22px; font-weight: 600; color: var(--gw-text); }
 .graph-workspace .gw-body { margin: 0; font-size: 14px; line-height: 24px; overflow-wrap: anywhere; }
 .graph-workspace .gw-muted { color: var(--gw-text-3); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
-.graph-workspace .gw-hint { margin: 0; color: var(--gw-text-3); font-size: 12px; line-height: 18px; }
 .graph-workspace .gw-type { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 18px; color: var(--gw-text-2); flex-wrap: wrap; }
 /* 行高必须压到 1：继承正文 22px 行高时，文字行框比圆圈还高，字会被撑得偏下 */
 .graph-workspace .gw-glyph { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 1.5px solid #606a7b; border-radius: 50%; font-size: 12px; line-height: 1; font-weight: 500; color: var(--gw-text); flex: none; }
@@ -170,7 +169,6 @@
 .graph-workspace .gw-btn { min-height: 40px; padding: 0 14px; border: 0; border-radius: 6px; background: #5b5bd6; color: #fff; font-weight: 500; }
 .graph-workspace .gw-btn:hover { background: #6262da; }
 .graph-workspace .gw-btn:active { background: #4b4bc0; transform: scale(0.98); }
-.graph-workspace .gw-list { position: absolute; inset: 0; overflow-y: auto; padding: 72px 24px 24px; display: grid; gap: 16px; align-content: start; }
 .graph-workspace .gw-list ul { list-style: none; margin: 0; padding: 0; }
 .graph-workspace .gw-row { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; border: 0; border-radius: 6px; background: transparent; text-align: left; color: var(--gw-text); }
 .graph-workspace .gw-row:hover { background: var(--gw-hover); }
