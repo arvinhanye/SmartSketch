@@ -2474,3 +2474,16 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - UI-NORAIL-01：DONE（未提交）；负责人 Claude；分支 `claude/home-topbar-nav`（从 `codex/invite-hover-refactor` 的 `e0b26e7` 切出）。用户指出课程进入页侧栏只有两项、没必要保留。课程列表与模型 API 设置页不再显示侧栏与抽屉按钮；顶栏左侧放品牌，右侧「模型 API」入口（`data-test="nav-model-settings"`，未配置带标记，设置页为当前页）；进入课程后侧栏不变。
 - 改动：`App.vue`（`inCourse`、`app--no-rail`）、`components/AppTopbar.vue`、`styles/ui.css` 末尾；新增 `tests/frontend/home-topbar-nav.test.ts`（3 条，先红后绿）。
 - 验收：type-check、前端 82 文件 / 1375 条、build、`./scripts/verify.sh` basic 均通过；演示环境截图：学生课程列表（1440、390 宽）、模型 API 设置、课程概览（侧栏保留）。
+
+## 2026-11-05 Codex：代码结构优化 OPT-04 测试索引
+
+| ID | 状态 | 负责人 | 分支 / 基线 | 范围与验收 |
+| --- | --- | --- | --- | --- |
+| OPT-04 | DONE（本地未提交） | Codex | `codex/opt-04-test-index` / `ad63341` | `tests/INDEX.md` 覆盖 224 文件（backend 115 / frontend 82 / integration 27）；完整性测试 1 passed，临时正反例 6/6 符合预期；`./scripts/verify.sh` basic exit 0；交接 `docs/handoffs/codex-opt-04.md` |
+
+- 输入：`claude/code-structure-review-handoff-49e73a@0796917` 的 `docs/handoffs/claude-code-structure-review-codex-handoff.md` OPT-04 节，以及当前测试文件的头部文档字符串、import、describe；该交接尚未合入本基线，已从本地分支读取。
+- 输出与文件所有权：Codex 唯一写入 `tests/INDEX.md`、`tests/tooling/test_test_index.py`、本节与 `docs/handoffs/codex-opt-04.md`；不重命名或修改已有测试。
+- 依赖与风险：描述/规格关联无明确依据时标「待确认」；索引限定 `tests/backend/test_*.py`、`tests/frontend/*.test.ts`、`tests/integration/test_*.py`。若 OPT-03 同期合入，合并后重新核对来源并生成索引，再跑完整性测试。
+- 验证命令：`python3 -m pytest tests/tooling/test_test_index.py -q`、`./scripts/verify.sh`（默认 basic）、`git diff --check`；使用仓库已有 Python 3.11 虚拟环境。不推送、不开 PR。
+- 验收证据：索引与三个匹配范围双向一致；来源不足的关联与功能保留「待确认」；原有测试零改动、零重命名。完整性测试在缺少索引时先失败，最终 1 passed；临时样例验证漏项、失效文件、重复项、错误链接和无效格式均被拒绝。basic 契约门禁及 25 项负例通过（仅 pytest 缓存受沙箱限制警告）；日志 `/private/tmp/opt04-verify.log`。
+- OPT-03 同步：本分支基线未包含 OPT-03，本轮结束时本地分支/提交记录未检出同期合入；未自行合并其他任务。若后续合并 OPT-03，按交接重新核对头部/import/describe、重生成索引并复跑完整性测试与 basic。
