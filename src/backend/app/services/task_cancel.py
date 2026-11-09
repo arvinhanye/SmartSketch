@@ -17,8 +17,8 @@ and a worker write on the same row are serialized and the first committed writer
 
 Pushing the SSE event named by ``CancelOutcome.sse_event`` belongs to the task event stream
 (C11). The row read and the compare-and-swap write live in ``repositories/tasks.py``
-(``read_task_snapshot`` / ``mark_cancel_requested``, TD-02) and run on this module's connection,
-so both stay inside the one ``BEGIN IMMEDIATE`` transaction. ``snapshot_from_row`` is the single
+(``read_task_snapshot`` / ``mark_cancel_requested``, TD-02) and run on its ``cancel_transaction``
+connection, so both stay inside the one ``BEGIN IMMEDIATE`` transaction. ``snapshot_from_row`` is the single
 row → ``TaskSnapshot`` mapping, shared with the C11 task stream.
 """
 
@@ -28,8 +28,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 
-from app.repositories.sqlite import connect
-from app.repositories.tasks import TaskSnapshotRow, mark_cancel_requested, read_task_snapshot
+from app.repositories.tasks import TaskSnapshotRow, cancel_transaction, mark_cancel_requested, read_task_snapshot
 from app.services.task_state import (
     Applied,
     TaskError,
@@ -149,15 +148,8 @@ def cancel_task(sqlite_url: str, task_id: str, *, course_id: str) -> CancelOutco
     """
     _non_empty("task_id", task_id)
     _non_empty("course_id", course_id)
-    with connect(sqlite_url) as database:
-        database.execute("BEGIN IMMEDIATE")
-        try:
-            outcome = _cancel_in_transaction(database, task_id, course_id)
-            database.execute("COMMIT")
-        except BaseException:
-            if database.in_transaction:
-                database.execute("ROLLBACK")
-            raise
+    with cancel_transaction(sqlite_url) as database:
+        outcome = _cancel_in_transaction(database, task_id, course_id)
     return outcome
 
 

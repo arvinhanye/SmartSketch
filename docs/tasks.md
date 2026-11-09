@@ -1,5 +1,19 @@
 # 任务看板
 
+## 2026-11-05 Codex：OPT-05 后端分层修正
+
+- 状态 READY_FOR_REVIEW（实现/复核/续验完成，2026-11-09；原版个人模式 E2E 有既有验收例外）；负责人 Codex；分支 `codex/opt-05-backend-layering`；代码基线 `ad63341`，开始时工作区干净。过程中出现的并行改动未由本任务覆盖/回退。
+- 输入：`AGENTS.md`、`.claude/rules/backend.md`、`docs/architecture.md` 后端分层；审查分支 `claude/code-structure-review-handoff-49e73a` 的 `docs/handoffs/claude-code-structure-review-codex-handoff.md` OPT-05（当前基线无此文件）；发布、任务与问答规格。
+- 输出：版本物化/文本块向量的 Cypher 与指定三个服务的 SQL 下沉仓储；问答服务装配与日志下沉 `services/qa/`；`docs/handoffs/codex-opt-05.md` 逐函数移动清单与验证证据。
+- 实施顺序：并行搬移版本 Cypher、配置/取消/版本解析 SQL；主代理下沉 QA 装配和日志；汇总审查查询原文、参数、调用次序与事务作用域；运行门禁后更新状态。代理按文件独占，文档由主代理维护。
+- 依赖与风险：Python 3.11.9 / 现有 `.venv`；本机 Docker 可用，集成门禁使用一次性 Neo4j。查询文本逐字不变，`course_id` 参数、事务内外位置与 PREREQUISITE 环检测链路不变；契约生成物不得变化。
+- 验收：定向后端测试、`./scripts/verify.sh integration`（环境不可用则 `full` 并标 integration 未验证）、`git diff --color-moved` 与 `git diff --check`；不推送、不开 PR。
+- 已实现：35 个查询定义下沉，85/85 查询定义原文及重复次数一致；课程参数、事务边界、调用次序和环检测路径保留；新增分层护栏 10/10 通过；契约生成物无变化。
+- 验证证据：11 月 5 日完整门禁的后端 4264 passed / 27 登记跳过，前端 1375 passed；11 月 9 日 `scripts/verify/integration.sh --no-e2e` **exit 0**，真实 Neo4j 集成 **463 passed / 4 登记跳过**、图库专项 **44 passed**；demo+K10 原失败定向 4 passed、教师/学生 E2E 2 passed。
+- 验收例外：原版个人模式 E2E 因折叠高级选项中的开关不可见而超时（1 failed / 1 interrupted / 2 未执行），临时副本仅补展开步骤后 4 passed，原用例与前端均未改；此补测不等同于原版完整门禁通过。基线 `ad63341` 也复现过 demo 入库传输超时，本轮集成该用例通过，稳定性现象如实保留在交接中。
+- 交接：[codex-opt-05.md](handoffs/codex-opt-05.md) 含逐函数移动表、查询对照、原失败与基线复现、补测边界。保持未提交，不推送、不开 PR。
+
+
 > **R1 最新状态（2026-10-09）**：PR #324 已整合 main 并消除文档/ADR 冲突；代码 head `36b421e` 的 push/pull_request 两轮 8 项 CI 全部 SUCCESS，含真实网络/恢复和 E2E。worker 围栏限定风险 **CLOSED**；用户已授权「CI通过就合并PR」，按最终 head 全绿门禁合入 main，最终合并结局以 PR 状态/提交为准。不部署或技术冻结；全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。验收见末节及 `docs/handoffs/codex-pr324-conflict-ci-repair.md`。
 
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
