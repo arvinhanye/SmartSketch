@@ -1,8 +1,18 @@
 # 任务看板
 
+## 2026-11-10 Codex：E2E-PERSONAL-01 高级选项操作修复
+
+- 状态 DONE；负责人 Codex；工作区 `opt-02-test-waits/SmartSketch-main`，分支 `codex/opt-02-test-waits`，起点 `51ef5cb`（干净）。用户要求先确定可行方案再修复，范围为个人模式E2E隐藏控件超时；窄屏布局缺陷仍另行OPEN。
+- 输入：4份真实E2E超时trace、`ModelSettingsView.vue`默认折叠的高级选项、`personal.spec.ts`共享配置步骤、测试规则及个人配置规格。
+- 方案：只改测试；在通用模型表单内定位高级选项，仅收起时正常点击summary，确认开关可见后操作；刷新后重复展开并保留保存值断言。真实页面教师/学生两角色已验证旧步骤失败、新步骤可行，覆盖true/false、已展开、刷新路径。
+- 输出：`tests/e2e/personal.spec.ts`、本任务记录与 `docs/handoffs/codex-e2e-personal-01.md`；不改产品、API、持久化或用例总超时，不使用force或直接改DOM状态。
+- 依赖/风险：本地Chrome、现有依赖、一次性Neo4j与本机假供应商；后续E2E可能暴露此前被第一步阻挡的问题，需如实记录，不以隐藏控件修复推断整个业务闭环通过。
+- 验收命令：真实页面方案诊断；`E2E_LLM_MODE=personal scripts/e2e.sh tests/e2e/personal.spec.ts --max-failures=1`（全4项，首次失败即停止避免重复长超时）；`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh`；`git diff --check`。本轮不重跑已完成的Python20轮或整条integration长门禁。
+- 结果：教师/学生真实页面方案检查通过；个人模式E2E **4 passed，exit 0，约1.7分钟**；基础门禁exit 0；`git diff --check`通过。原15个测试/辅助文件SHA256未变。详见[交接](handoffs/codex-e2e-personal-01.md)。
+
 ## 2026-11-05 Codex：OPT-02 测试等待稳定性
 
-- 状态 IN_PROGRESS（测试改动已完成；浏览器20轮未通过/受阻，个人模式E2E失败，总门禁按用户要求取消，不能标DONE）；负责人 Codex；分支 `codex/opt-02-test-waits`；基线 `ad63341`；原任务起点干净，本轮接手时已有未提交改动全部保留。
+- 状态 IN_PROGRESS（浏览器20轮仍受阻；完整integration前次被取消，尚无自然结束结果；个人模式E2E已另项修复并通过）；负责人 Codex；分支 `codex/opt-02-test-waits`；基线 `ad63341`；原任务起点干净，本轮接手时已有未提交改动全部保留。
 - 输入：`AGENTS.md`、`.claude/rules/testing.md`、审查分支 `claude/code-structure-review-handoff-49e73a` 中 `docs/handoffs/claude-code-structure-review-codex-handoff.md` 的 OPT-02 节（当前分支无该文件）；重新运行的固定等待清单。
 - 输出：仅 `tests/` 内条件轮询、事件/假时钟或真实时长保留说明；本任务记录和 `docs/handoffs/codex-opt-02.md`。先复现 macOS `test_grace_period_is_not_shortened_by_shell_seconds_rounding`，确认根因再改；产品竞态只记录，不修产品。
 - 依赖与风险：现有 Python/前端测试环境；集成验证需要可用的本机 Neo4j。计时测试不得弱化断言，子进程与后台线程必须清理；不同代理按文件划分所有权。
@@ -10,7 +20,7 @@
 - 已验证（2026-11-09恢复核对）：31处固定等待逐项处理，27处改用条件/事件/局部假时钟或移除，4处保留真实时长并说明原因；macOS宽限期失败先复现，根因是测试跨进程相减单调时钟，已改同进程计时与就绪握手。12个Python测试文件各20轮通过，共11480项；full通过。完整清单、命令、重启造成的验证中断及证据边界见 [交接](handoffs/codex-opt-02.md)。
 - 门禁：11月10日使用绝对Python路径与一次性Neo4j重新执行完整`./scripts/verify.sh integration`；后端4254通过/27登记跳过、前端1375通过、真实集成463通过/4登记跳过、图库补验44通过、教师/学生E2E 2通过。个人模式4项均因隐藏的`mc-disable-thinking`控件超时失败，E2E子脚本exit 1。用户要求取消时已停止；总脚本未写最终退出码，不计完整自然结束。停止后核对日志，最后一项已记录原定超时，最终日志为4 failed，不是3 failed + 1 interrupted。命令、证据及前次中断记录见[交接](handoffs/codex-opt-02.md)。未重做12个Python文件已通过的20轮。
 - 浏览器：原版与当前版诊断副本各退出1；四个宽视口通过，390×844在原断言`initial.mapTop >= initial.canvasTop`失败。实测越界的是`.gw-map__ctl`五按钮列；缩略图`.gw-mini`已隐藏。`5×44 + 4×6 + 16 - 239 = 21px`，首按钮实际覆盖知识点下拉框；是产品布局缺陷，非测量错误。浏览器20轮明确为未通过/受阻，保留全部断言与产品代码。
-- 未决：布局缺陷单独登记下方`UI-TEACHER-CONTROLS-01` OPEN；未改动的个人模式E2E还有未展开高级选项即操作控件的既有阻塞，本轮按实际失败与用户取消结果记录，不顺手改。与原目录OPT-05隔离，已有改动全部保留；按用户要求提交当前分支，不推送、不开PR。
+- 续修结果：`E2E-PERSONAL-01`已完成，高级选项先展开再操作/刷新核验，个人模式E2E 4项通过、基础门禁通过；前次失败与取消记录保留为历史证据。当前未决为下方`UI-TEACHER-CONTROLS-01` OPEN及之后的浏览器20轮/完整integration验收。未改产品布局；不推送、不开PR。
 
 ## 2026-11-09：UI-TEACHER-CONTROLS-01 教师窄屏地图/缩放按钮列越界
 

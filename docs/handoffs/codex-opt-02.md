@@ -1,12 +1,16 @@
 # OPT-02：测试等待稳定性
 
-- task_id：OPT-02；负责人：Codex；状态：IN_PROGRESS（测试改动已完成；浏览器20轮未通过/受阻，integration个人模式E2E失败，总门禁按用户要求取消，不能宣称全部验收通过）；收尾核对日期：2026-11-10。
+- task_id：OPT-02；负责人：Codex；状态：IN_PROGRESS（浏览器20轮仍受阻；完整integration前次取消，尚无自然结束结果；个人模式E2E已另项修复并通过）；收尾核对日期：2026-11-10。
 - 分支：`codex/opt-02-test-waits`；基线：`ad63341`。
 - 交付工作区：`/Users/arvinhan/.codex/worktrees/opt-02-test-waits/SmartSketch-main`。
 - 原目录开始时干净。过程中用户确认另一个会话在执行 OPT-05，共享检出也切到 OPT-05。本任务从原基线建立独立工作区，只带入自己的测试和文档；产品改动不属于本任务。
 - 已迁出原目录中的本任务测试副本和 OPT-02 认领段：逐文件核对其内容仍为本任务版本、没有暂存变更、对应文件的 HEAD 仍与基线相同后才恢复；OPT-05 产品、文档和新测试全部保留。迁出备份与核对结果在 `.demo/opt-02/moved-source-tests.patch`、`source-move-result.json`。
 - 已读 AGENTS、测试规则、任务/问答规格。指定 Claude 交接文件不在基线分支，已通过 `git show claude/code-structure-review-handoff-49e73a:docs/handoffs/claude-code-structure-review-codex-handoff.md` 阅读 OPT-02。
 - 无产品、API、数据模型、配置或依赖清单变更；本轮仅补充验收证据与任务记录，按用户要求提交到当前分支，不推送、不开 PR。
+
+## 2026-11-10 后续修复
+
+用户随后授权先验证方案再修复隐藏控件问题。`E2E-PERSONAL-01`只更新个人模式测试的高级选项操作，真实教师/学生页面方案检查通过，个人模式E2E **4 passed，exit 0，约1.7分钟**，基础门禁exit 0；见[独立交接](codex-e2e-personal-01.md)。下文此前失败/取消结果保留为历史证据，不改写为通过。21px产品布局问题仍OPEN，浏览器20轮仍受阻，本次没有重跑整条integration，OPT-02保持IN_PROGRESS。
 
 ## macOS：先复现，再定位，再修复
 
