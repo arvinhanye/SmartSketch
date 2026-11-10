@@ -17,7 +17,6 @@ import secrets
 import shutil
 import sqlite3
 import threading
-import time
 from pathlib import Path
 
 import pytest
@@ -109,7 +108,7 @@ class Script:
         self.lock = threading.Lock()
         self.active = 0
         self.peak = 0
-        self.delay = 0.0
+        self.first_batch: threading.Barrier | None = None
         self.calls: list[tuple[str, str]] = []  # (purpose, key)
         self.hooks: dict[str, object] = {}  # key -> callable(n) -> step | None
 
@@ -129,9 +128,10 @@ class Script:
             self.peak = max(self.peak, self.active)
             self.calls.append((request.purpose, key))
             n = sum(1 for _, k in self.calls if k == key)
+            call_number = len(self.calls)
         try:
-            if self.delay:
-                time.sleep(self.delay)
+            if self.first_batch is not None and call_number <= self.first_batch.parties:
+                self.first_batch.wait(timeout=5)
             hook = self.hooks.get(key)
             if hook is not None:
                 step = hook(n)  # type: ignore[operator]
@@ -344,12 +344,12 @@ def test_same_name_across_chunks_becomes_one_entity_with_all_sources(db_url, sto
 def test_concurrent_model_calls_never_exceed_the_limit(db_url, storage, limit):
     lease, _ = _extracting(db_url, storage)
     script = Script()
-    script.delay = 0.03
+    script.first_batch = threading.Barrier(limit)
 
     outcome = _run(db_url, lease, _toolkit(db_url, script), max_concurrency=limit)
 
     assert outcome.status is ExtractStatus.ADVANCED
-    assert 1 <= script.peak <= limit
+    assert script.peak == limit
 
 
 def test_limits_reject_invalid_values():
@@ -976,20 +976,31 @@ def test_relation_auth_failure_ends_the_task_instead_of_advancing_to_merging(db_
     assert [key for _, key in script.calls if key.startswith("sec:")] == ["sec:" + chunk_ids[0]]
 
 
-def test_auth_failure_with_concurrent_units_stops_dispatching(db_url, storage):
+def test_auth_failure_with_concurrent_units_stops_dispatching(db_url, storage, monkeypatch):
     lease, chunk_ids = _extracting(db_url, storage)
     script = Script()
 
-    def slow(n):                                            # 其余在途单元在鉴权失败被观察到之后才结束
-        time.sleep(0.3)
+    auth_observed = threading.Event()
+    real_settle = extract_task._Dispatcher._settle
+
+    def settle(dispatcher, unit, future):
+        real_settle(dispatcher, unit, future)
+        if dispatcher.halt == "auth":
+            auth_observed.set()
+
+    monkeypatch.setattr(extract_task._Dispatcher, "_settle", settle)
+
+    def finish_after_auth(n):                              # 观察到鉴权终止后才让其余在途单元结束
+        assert auth_observed.wait(5), "dispatcher did not observe the auth failure"
         return None
 
     for index in range(1, len(chunk_ids)):
-        script.hooks[_key(chunk_ids, index)] = slow
+        script.hooks[_key(chunk_ids, index)] = finish_after_auth
     script.hooks[_key(chunk_ids, 0)] = lambda n: ModelAuthError(MODEL)
 
     outcome = _run(db_url, lease, _toolkit(db_url, script), max_concurrency=3)
 
+    assert auth_observed.is_set()
     assert outcome.status is ExtractStatus.FAILED and outcome.error_code == "LLM_UNAVAILABLE"
     assert _auth_rows(db_url, lease.task_id)[1] == {"reason": "auth"}
     assert script.count(_key(chunk_ids, 0)) == 1

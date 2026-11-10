@@ -16,11 +16,12 @@ import io
 import json
 import secrets
 import sqlite3
-import time
 import zipfile
 from pathlib import Path
 
 import pytest
+
+from tests.waiting import wait_until
 
 from app.config import load_settings
 from app.repositories import chunks as store
@@ -485,9 +486,7 @@ def test_heartbeat_renews_and_detects_a_lost_lease(db_url, storage):
     _sql(db_url, "UPDATE processing_tasks SET lease_expires_at = unixepoch() + 5 WHERE id = ?", task_id)
 
     with LeaseHeartbeat(db_url, lease, lease_seconds=LEASE_SECONDS, interval=0.02) as beat:
-        deadline = time.monotonic() + 5
-        while beat.renewals == 0 and time.monotonic() < deadline:
-            time.sleep(0.01)
+        wait_until(lambda: beat.renewals >= 1, timeout=5, description="heartbeat's first successful renewal")
         assert beat.renewals >= 1 and not beat.lost.is_set()
         now = _sql(db_url, "SELECT unixepoch()")[0][0]
         assert _row(db_url, task_id)["lease_expires_at"] >= now + LEASE_SECONDS - 2

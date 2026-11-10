@@ -1,5 +1,26 @@
 # 任务看板
 
+## 2026-11-05 Codex：OPT-02 测试等待稳定性
+
+- 状态 IN_PROGRESS（测试改动已完成；浏览器20轮未通过/受阻，个人模式E2E失败，总门禁按用户要求取消，不能标DONE）；负责人 Codex；分支 `codex/opt-02-test-waits`；基线 `ad63341`；原任务起点干净，本轮接手时已有未提交改动全部保留。
+- 输入：`AGENTS.md`、`.claude/rules/testing.md`、审查分支 `claude/code-structure-review-handoff-49e73a` 中 `docs/handoffs/claude-code-structure-review-codex-handoff.md` 的 OPT-02 节（当前分支无该文件）；重新运行的固定等待清单。
+- 输出：仅 `tests/` 内条件轮询、事件/假时钟或真实时长保留说明；本任务记录和 `docs/handoffs/codex-opt-02.md`。先复现 macOS `test_grace_period_is_not_shortened_by_shell_seconds_rounding`，确认根因再改；产品竞态只记录，不修产品。
+- 依赖与风险：现有 Python/前端测试环境；集成验证需要可用的本机 Neo4j。计时测试不得弱化断言，子进程与后台线程必须清理；不同代理按文件划分所有权。
+- 验收：每个改动的测试文件循环 20 次；`./scripts/verify.sh full`；涉及集成时 `./scripts/verify.sh integration`（环境缺失则记录 SKIP/原因）；最终差异仅测试与上述文档。不推送、不开 PR。
+- 已验证（2026-11-09恢复核对）：31处固定等待逐项处理，27处改用条件/事件/局部假时钟或移除，4处保留真实时长并说明原因；macOS宽限期失败先复现，根因是测试跨进程相减单调时钟，已改同进程计时与就绪握手。12个Python测试文件各20轮通过，共11480项；full通过。完整清单、命令、重启造成的验证中断及证据边界见 [交接](handoffs/codex-opt-02.md)。
+- 门禁：11月10日使用绝对Python路径与一次性Neo4j重新执行完整`./scripts/verify.sh integration`；后端4254通过/27登记跳过、前端1375通过、真实集成463通过/4登记跳过、图库补验44通过、教师/学生E2E 2通过。个人模式4项均因隐藏的`mc-disable-thinking`控件超时失败，E2E子脚本exit 1。用户要求取消时已停止；总脚本未写最终退出码，不计完整自然结束。停止后核对日志，最后一项已记录原定超时，最终日志为4 failed，不是3 failed + 1 interrupted。命令、证据及前次中断记录见[交接](handoffs/codex-opt-02.md)。未重做12个Python文件已通过的20轮。
+- 浏览器：原版与当前版诊断副本各退出1；四个宽视口通过，390×844在原断言`initial.mapTop >= initial.canvasTop`失败。实测越界的是`.gw-map__ctl`五按钮列；缩略图`.gw-mini`已隐藏。`5×44 + 4×6 + 16 - 239 = 21px`，首按钮实际覆盖知识点下拉框；是产品布局缺陷，非测量错误。浏览器20轮明确为未通过/受阻，保留全部断言与产品代码。
+- 未决：布局缺陷单独登记下方`UI-TEACHER-CONTROLS-01` OPEN；未改动的个人模式E2E还有未展开高级选项即操作控件的既有阻塞，本轮按实际失败与用户取消结果记录，不顺手改。与原目录OPT-05隔离，已有改动全部保留；按用户要求提交当前分支，不推送、不开PR。
+
+## 2026-11-09：UI-TEACHER-CONTROLS-01 教师窄屏地图/缩放按钮列越界
+
+- 状态 OPEN；发现/记录 Codex（OPT-02验收），实施负责人待定；等待用户决定是否另行修复，不属于OPT-02的测试等待改造范围。
+- 复现：基线`ad63341`，390×844，教师图谱编辑页只读API夹具。`.gw-map`/`.gw-map__ctl` top=495.671875，`.graph-canvas`/stage/原生canvas top=516.671875、高239；首个“展开小地图”按钮上缘越界21px，覆盖上方知识点下拉框。原版和当前版测试同样失败，测量正确。
+- 来源：`src/frontend/src/styles/ui.css:259`移动端按钮高度44px；`src/frontend/src/components/GraphCanvas.vue:348–350`控件列`display:grid;gap:6px`；同文件`:330–334`工具组绝对定位`bottom:16px`。五按钮共244px，要求至少260px绘图区，而卡片340px减上下边框2px和换行栏99px后只剩239px。不是继续等待能消除的问题。
+- 证据：见[OPT-02收尾交接](handoffs/codex-opt-02.md)的DOM/CSS数据、命中测试与截图路径；本次仅记录，未调整CSS或断言。
+- 待用户决定：是否授权单独安排窄屏控件布局修复。后续验收需保留原断言，390×844下控件完整位于绘图区且不覆盖知识点选择栏，其他四种宽视口不回归；随后原浏览器脚本连续20轮通过。
+
+
 > **R1 最新状态（2026-10-09）**：PR #324 已整合 main 并消除文档/ADR 冲突；代码 head `36b421e` 的 push/pull_request 两轮 8 项 CI 全部 SUCCESS，含真实网络/恢复和 E2E。worker 围栏限定风险 **CLOSED**；用户已授权「CI通过就合并PR」，按最终 head 全绿门禁合入 main，最终合并结局以 PR 状态/提交为准。不部署或技术冻结；全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。验收见末节及 `docs/handoffs/codex-pr324-conflict-ci-repair.md`。
 
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
