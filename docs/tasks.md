@@ -2541,3 +2541,5 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - 风险：Python 导入兼容/循环依赖、网络资源释放、worker 事务与租约、前端请求/SSE 生命周期、响应式及焦点/布局；`codex/extraction-perf` 同时修改 `extract_task.py`，最终基线确定后重查。
 - 验收：各项最小相关回归及对应后端/前端全量，`./scripts/verify.sh`，前端 type-check/build，Vue 同视口截图与交互走查，最终 diff；命令与分项范围见 `docs/superpowers/plans/2026-11-10-opt-06-responsibility-split.md`。
 - 已决：用户确认允许本地整合后继续，不等待远端合入；暂不推送或合并远端 PR。四项分别保留本地叠加分支与独立提交范围。核查证据和验证记录见 `docs/handoffs/codex-opt-06.md`。
+
+- OPT-06A：AI 兼容客户端拆分；44 定义/30 签名核对通过，定向 413 passed，后端 full 4264 passed / 27 登记 skip，exit 0；共用门禁与最终审查待完成。

@@ -36,6 +36,8 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 OPT-05：版本发布/回滚的 Cypher 位于 `repositories/version_materialize.py`，共享文本块向量查询位于 `repositories/version_chunk_vectors.py`；服务保留快照/向量校验及事务回调中的计数检查，仓储执行数据库操作，检查失败仍回滚原事务。向量配置、任务取消与版本解析的 SQL 分别归入 `repositories/embedding_configs.py`、`tasks.py`、`versions.py`；既有连接作用域、提交点与查询顺序不变。`services/qa/factory.py` 负责问答依赖装配和课程/个人模型绑定，`services/qa/audit.py` 汇总并写入终态日志，`api/chat.py` 保留 HTTP/SSE 转换与应用状态依赖注入。以上不改变发布 P6/P7 环检测、P8/P9 物化与 P11 提交链路，也不改变契约或数据模型。
 
+OPT-06A：`services/ai/compatible.py` 保留聊天客户端和原导入入口；`compatible_transport.py` 负责 HTTP/DNS/连接与总时限，`compatible_protocol.py` 负责协议解析/错误映射/用量，`compatible_base.py` 负责共享 HTTP 请求与响应读取，`compatible_embedding.py` 负责向量客户端。旧模块显式再导出原符号，底层模块不反向依赖入口；请求体、错误、超时、资源释放与配置默认值不变。
+
 ## 前端构建、测试与应用外壳（B01～B04）
 
 - `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
