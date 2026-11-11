@@ -204,6 +204,7 @@
 | [`tests/frontend/lazy-view.test.ts`](frontend/lazy-view.test.ts) | 路由页面按需加载。 | 待确认 |
 | [`tests/frontend/local-view.test.ts`](frontend/local-view.test.ts) | useLocalView 局部图视图、知识点集合与图范围限制。 | 待确认 |
 | [`tests/frontend/login-scrollbar-style.test.ts`](frontend/login-scrollbar-style.test.ts) | 登录页表单栏滚动条与页面溢出的样式约束。 | 待确认 |
+| [`tests/frontend/merge-preview.test.ts`](frontend/merge-preview.test.ts) | 合并两个知识点前后局部图的前端推算（改接、去重、别名、相邻知识点上限）。 | UX-REVIEW-DEDUP-01；ADR-047 |
 | [`tests/frontend/model-discovery.test.ts`](frontend/model-discovery.test.ts) | ModelSettingsView 模型设置页的服务商卡片式单选。 | UI-PINE-01 |
 | [`tests/frontend/model-settings-ui.test.ts`](frontend/model-settings-ui.test.ts) | 模型设置页面的分区、可访问性与随账号角色变化的文案。 | 待确认 |
 | [`tests/frontend/n03-n05.test.ts`](frontend/n03-n05.test.ts) | 模型运行状态的账号隔离、保存测试清除互斥以及测试对象与表单一致性。 | N03；N04；N05 |
@@ -216,6 +217,7 @@
 | [`tests/frontend/redesign-chat.test.ts`](frontend/redesign-chat.test.ts) | ChatView 问答页改版的展示行为。 | 待确认 |
 | [`tests/frontend/register-layout.test.ts`](frontend/register-layout.test.ts) | 学生注册页外观、结构及与登录页版式的一致性。 | 待确认 |
 | [`tests/frontend/resume-learning.test.ts`](frontend/resume-learning.test.ts) | 学生课程列表继续学习主卡的课程选择、进度推荐读取与失败隐藏。 | UI-PINE-01 |
+| [`tests/frontend/review-dedup.test.ts`](frontend/review-dedup.test.ts) | 审核页疑似重复的并排对比组件与合并预览小图。 | UX-REVIEW-DEDUP-01；specs/teacher-review-publish.md |
 | [`tests/frontend/student-graph-workbench.test.ts`](frontend/student-graph-workbench.test.ts) | 学生图谱工作台的预览详情、局部视图、图例筛选、章节聚焦、响应式面板与可访问性。 | 待确认 |
 | [`tests/frontend/teacher-embedding-settings.test.ts`](frontend/teacher-embedding-settings.test.ts) | 教师模型设置页的向量设置可见性、表单与同名按钮区分。 | 待确认 |
 | [`tests/frontend/toast-notice.test.ts`](frontend/toast-notice.test.ts) | ToastNotice 提示与自动消失逻辑，以及审核页固定弹窗避免布局位移的样式。 | 待确认 |

@@ -3,12 +3,13 @@ import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
 import ToastNotice from '../components/ToastNotice.vue'
-import { computed, inject } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createReviewApi, REVIEW_API_KEY, type Relation, type ReviewItemKind, type SuspectedDuplicate } from '../api/review'
+import DuplicateCompare from '../components/review/DuplicateCompare.vue'
 import VersionPanel from '../components/VersionPanel.vue'
 import { useAutoDismiss } from '../composables/useAutoDismiss'
 import {
@@ -70,6 +71,7 @@ const {
   itemError,
   notice,
   mergeDraft,
+  draftGraph,
   nameOf,
 } = review
 
@@ -118,12 +120,68 @@ function percent(value: number): string {
 function isMerging(pair: SuspectedDuplicate): boolean {
   return mergeDraft.value?.key === duplicateKey(pair)
 }
-function primaryName(pair: SuspectedDuplicate): string {
-  return pair.candidates.find((c) => c.id === mergeDraft.value?.primaryId)?.name ?? ''
+
+// ---------------------------------------------------------------- 疑似重复：对比、连续处理与键盘（UX-REVIEW-DEDUP-01）
+/** 相似度缺失或不是数字时不显示（候选怎样产生由后端决定，页面不假设一定有分数） */
+function duplicateMeta(pair: SuspectedDuplicate): string {
+  const parts: string[] = []
+  if (typeof pair.similarity === 'number' && Number.isFinite(pair.similarity)) parts.push(`相似度 ${percent(pair.similarity)}`)
+  const reason = DUPLICATE_REASON_LABELS[pair.reason] ?? pair.reason
+  if (typeof reason === 'string' && reason !== '') parts.push(reason)
+  return parts.join(' · ')
 }
-function otherName(pair: SuspectedDuplicate): string {
-  return pair.candidates.find((c) => c.id !== mergeDraft.value?.primaryId)?.name ?? ''
+function graphLinkFor(pair: SuspectedDuplicate) {
+  if (courseId.value === null || !hasGraphRoute.value) return null
+  return { name: TEACHER_GRAPH_ROUTE, params: { cid: courseId.value }, query: { pair: pair.candidates.map((c) => c.id).join(',') } }
 }
+
+/** 本次进入页面后处理过的重复项：留一行记录，让教师看得到进度；刷新页面后不保留 */
+const handled = ref<Array<{ key: string; text: string }>>([])
+
+const expandedIndex = computed(() => items.value.suspected_duplicates.findIndex(isMerging))
+function expandAt(index: number): void {
+  const list = items.value.suspected_duplicates
+  const pair = list[Math.min(Math.max(index, 0), list.length - 1)]
+  if (pair !== undefined) review.startMerge(pair)
+}
+/** 处理成功（条目已离开队列）后，若处理的是展开着的那条，自动展开原位置上的下一条 */
+async function settle(pair: SuspectedDuplicate, verb: 'merge' | 'reject'): Promise<void> {
+  const key = duplicateKey(pair)
+  const index = items.value.suspected_duplicates.findIndex((p) => duplicateKey(p) === key)
+  const wasExpanded = mergeDraft.value?.key === key
+  const primaryId = wasExpanded ? mergeDraft.value!.primaryId : null
+  const [first, second] = pair.candidates
+  if (verb === 'merge') await review.confirmMerge(pair)
+  else await review.resolve({ kind: 'suspected_duplicate', pair }, 'reject')
+  if (items.value.suspected_duplicates.some((p) => duplicateKey(p) === key)) return
+  const kept = pair.candidates.find((c) => c.id === primaryId)?.name ?? first?.name ?? ''
+  const gone = pair.candidates.find((c) => c.id !== primaryId)?.name ?? second?.name ?? ''
+  handled.value = [...handled.value, { key, text: verb === 'merge' ? `已合并：「${gone}」并入「${kept}」` : `不是重复：「${first?.name ?? ''}」与「${second?.name ?? ''}」` }]
+  // 只有处理的是展开着的那条才前进；在收起的一行上直接标记不打开别的条目
+  if (wasExpanded && index >= 0 && mergeDraft.value === null) expandAt(index)
+}
+
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target instanceof HTMLInputElement) return !['radio', 'checkbox', 'button'].includes(target.type)
+  return target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable
+}
+function onKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
+  if (status.value !== 'ready' || busy.value || isTyping(event.target)) return
+  const index = expandedIndex.value
+  const pair = items.value.suspected_duplicates[index]
+  if (pair === undefined) return
+  const key = event.key.toLowerCase()
+  if (key === 'm') void settle(pair, 'merge')
+  else if (key === 'n') void settle(pair, 'reject')
+  else if (event.key === 'ArrowRight' && index < items.value.suspected_duplicates.length - 1) expandAt(index + 1)
+  else if (event.key === 'ArrowLeft' && index > 0) expandAt(index - 1)
+  else return
+  event.preventDefault()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -202,59 +260,62 @@ function otherName(pair: SuspectedDuplicate): string {
           </li>
         </ul>
 
-        <!-- 疑似重复 -->
-        <ul v-else-if="kind === 'suspected_duplicate'" class="review__list">
+        <!-- 疑似重复：每条收成一行，展开一条看对比与合并预览（UX-REVIEW-DEDUP-01） -->
+        <template v-else-if="kind === 'suspected_duplicate'">
+        <ul v-if="handled.length > 0" class="review__handled" data-test="rv-handled" aria-label="本次已处理">
+          <li v-for="entry in handled" :key="entry.key"><AppIcon name="check" :size="14" />{{ entry.text }}</li>
+        </ul>
+        <ul class="review__list">
           <li
-            v-for="pair in items.suspected_duplicates"
+            v-for="(pair, index) in items.suspected_duplicates"
             :key="duplicateKey(pair)"
             data-test="rv-duplicate"
             :data-id="duplicateKey(pair)"
+            :class="{ 'is-expanded': isMerging(pair) }"
             :aria-busy="busyKey === duplicateKey(pair) ? 'true' : 'false'"
           >
-            <p>
-              <strong>{{ pair.candidates[0]?.name }}</strong> 与 <strong>{{ pair.candidates[1]?.name }}</strong>
-            </p>
-            <p class="review__meta">
-              相似度 {{ percent(pair.similarity) }} · {{ DUPLICATE_REASON_LABELS[pair.reason] ?? pair.reason }}
-            </p>
-
-            <fieldset v-if="isMerging(pair)" class="review__merge" data-test="rv-merge-panel">
-              <legend>选择保留的主知识点</legend>
-              <label v-for="candidate in pair.candidates" :key="candidate.id">
-                <input
-                  type="radio"
-                  :name="`primary-${duplicateKey(pair)}`"
-                  :value="candidate.id"
-                  :checked="mergeDraft?.primaryId === candidate.id"
-                  :disabled="busy"
-                  data-test="rv-primary"
-                  @change="review.choosePrimary(candidate.id)"
-                />
-                {{ candidate.name }}
-              </label>
-              <p data-test="rv-merge-summary">
-                「{{ otherName(pair) }}」将并入「{{ primaryName(pair) }}」：名称并入别名，关系与来源迁到主知识点，主知识点被锁定。合并后不能自动拆回。
+            <div class="review__dup-row">
+              <p>
+                <strong>{{ pair.candidates[0]?.name }}</strong> 与 <strong>{{ pair.candidates[1]?.name }}</strong>
               </p>
-              <button type="button" data-test="rv-merge-confirm" :disabled="busy" @click="review.confirmMerge(pair)">确认合并</button>
-              <button type="button" data-test="rv-merge-cancel" :disabled="busy" @click="review.cancelMerge">取消</button>
-            </fieldset>
-            <div v-else class="review__actions">
-              <button type="button" data-test="rv-merge" :disabled="busy" @click="review.startMerge(pair)">合并…</button>
-              <button type="button" data-test="rv-not-duplicate" :disabled="busy" @click="review.resolve({ kind, pair }, 'reject')">
-                不是重复
-              </button>
-            </div>
-
-            <div v-if="itemError?.key === duplicateKey(pair)" data-test="rv-item-error" role="alert">
-              <p>{{ itemError.message }}</p>
-              <p v-if="itemError.cycle" data-test="rv-cycle">
-                环路：<template v-for="(step, index) in itemError.cycle" :key="`${step.kpId}-${index}`">
-                  <span v-if="index > 0"> → </span>{{ step.name }}
-                </template>
+              <p class="review__meta">
+                {{ duplicateMeta(pair) }}<template v-if="isMerging(pair)"> · 第 {{ index + 1 }} / {{ items.suspected_duplicates.length }} 条</template>
               </p>
             </div>
+
+            <DuplicateCompare
+              v-if="isMerging(pair)"
+              :pair="pair"
+              :graph="draftGraph"
+              :primary-id="mergeDraft?.primaryId ?? ''"
+              :busy="busy"
+              :error="itemError?.key === duplicateKey(pair) ? itemError : null"
+              :radio-name="`primary-${duplicateKey(pair)}`"
+              :graph-link="graphLinkFor(pair)"
+              @choose="review.choosePrimary"
+              @merge="settle(pair, 'merge')"
+              @reject="settle(pair, 'reject')"
+              @collapse="review.cancelMerge"
+            />
+            <template v-else>
+              <div class="review__actions">
+                <button type="button" data-test="rv-merge" :disabled="busy" @click="review.startMerge(pair)">合并…</button>
+                <button type="button" data-test="rv-not-duplicate" :disabled="busy" @click="settle(pair, 'reject')">
+                  不是重复
+                </button>
+              </div>
+              <div v-if="itemError?.key === duplicateKey(pair)" data-test="rv-item-error" role="alert">
+                <p>{{ itemError.message }}</p>
+                <p v-if="itemError.cycle" data-test="rv-cycle">
+                  环路：<template v-for="(step, stepIndex) in itemError.cycle" :key="`${step.kpId}-${stepIndex}`">
+                    <span v-if="stepIndex > 0"> → </span>{{ step.name }}
+                  </template>
+                </p>
+              </div>
+            </template>
           </li>
         </ul>
+        </template>
 
         <!-- 孤立知识点 -->
         <ul v-else class="review__list">

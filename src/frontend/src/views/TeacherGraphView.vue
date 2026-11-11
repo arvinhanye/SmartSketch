@@ -98,11 +98,36 @@ const relations = useRelationEditor({
 const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value), { search: 'highlight' })
 const { selected, visible, summary, isDefault, selectedHidden } = filters
 /** 交给画布的图：有命中时命中带 `match`、其余淡化（选中的节点不淡化） */
+// UX-REVIEW-DEDUP-01：从审核页“在图谱中查看”带来的一对疑似重复知识点（`?pair=a,b`）
+const pairDismissed = ref(false)
+const pairView = computed<{ ids: string[]; names: string[] } | { missing: true } | null>(() => {
+  const raw = route.query.pair
+  const g = graph.value
+  if (pairDismissed.value || typeof raw !== 'string' || raw === '' || g === null) return null
+  const ids = [...new Set(raw.split(',').filter((id) => id !== ''))]
+  if (ids.length !== 2) return null
+  const found = ids.map((id) => g.nodes.find((n) => n.id === id))
+  if (found.some((node) => node === undefined)) return { missing: true }
+  return { ids, names: found.map((node) => node!.name) }
+})
+const pairIds = computed(() => (pairView.value !== null && 'ids' in pairView.value ? pairView.value.ids : []))
+function dismissPair(): void {
+  pairDismissed.value = true
+  const { pair: _pair, ...rest } = route.query
+  void router.replace({ query: rest })
+}
+/** 画布建好后把镜头适应到这一对（画布还没建好时调用会被忽略，所以等它的 ready 事件） */
+function onCanvasReady(): void {
+  if (pairIds.value.length === 2) canvas.value?.fitTo(pairIds.value)
+}
+
+/** 交给画布的图：搜索命中优先；没有搜索时高亮正在查看的这一对。命中带 `match`、其余淡化（选中的节点不淡化） */
 const canvasGraph = computed(() => {
   const v = visible.value
   const hits = filters.matches.value
-  if (v === null || hits.length === 0) return v
-  return applyFocusStates(v, { selectedId: null, matchedIds: new Set(hits.map((hit) => nodeElementId(hit.kpId))), chapterIds: null, fade: 'standard' })
+  const marked = hits.length > 0 ? hits.map((hit) => hit.kpId) : pairIds.value
+  if (v === null || marked.length === 0) return v
+  return applyFocusStates(v, { selectedId: null, matchedIds: new Set(marked.map(nodeElementId)), chapterIds: null, fade: 'standard' })
 })
 
 // 节点类型图例：计数取整张草稿图；点击与工具栏“筛选”里的知识点类型是同一份状态
@@ -411,6 +436,14 @@ useGraphShortcuts({
 
     <template v-else-if="status === 'ready' && graph !== null">
       <p v-if="notice" data-test="tg-notice" role="status">{{ notice }}</p>
+      <p v-if="pairView && 'ids' in pairView" class="teacher-graph__pair" data-test="tg-pair-notice" role="status">
+        正在查看疑似重复：「{{ pairView.names[0] }}」与「{{ pairView.names[1] }}」
+        <button type="button" data-test="tg-pair-dismiss" @click="dismissPair">结束查看</button>
+      </p>
+      <p v-else-if="pairView" class="teacher-graph__pair" data-test="tg-pair-missing" role="status">
+        要查看的知识点已不在草稿中（可能已被合并或删除）。
+        <button type="button" data-test="tg-pair-dismiss" @click="dismissPair">知道了</button>
+      </p>
       <p v-if="refreshing" data-test="tg-refreshing" role="status">正在刷新草稿图谱…</p>
       <p v-if="refreshError" data-test="tg-refresh-error" role="alert">
         {{ refreshError }}
@@ -457,7 +490,7 @@ useGraphShortcuts({
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="canvasGraph" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div

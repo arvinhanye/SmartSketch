@@ -707,3 +707,116 @@ describe('审核页面栏目去重', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------- UX-REVIEW-DEDUP-01：对比预览、连续处理与键盘
+describe('UX-REVIEW-DEDUP-01 疑似重复：对比预览、连续处理与键盘', () => {
+  const three = () => [dup(ref_('k4', '栈'), ref_('k5', '堆栈')), dup(ref_('k6', '队列'), ref_('k7', '队列的定义'), 0.9), dup(ref_('k8', '链栈'), ref_('k9', '链式栈'), 0.8)]
+  const names = { k1: '线性表', k2: '栈', k3: '括号匹配', k4: '栈', k5: '堆栈', k6: '队列', k7: '队列的定义', k8: '链栈', k9: '链式栈' }
+  const expandedId = (wrapper: VueWrapper) => wrapper.find('[data-test="rv-duplicate"].is-expanded').attributes('data-id')
+  function key(k: string, target: EventTarget = document.body): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })
+    target.dispatchEvent(event)
+    return event
+  }
+
+  it('展开后显示两张对比卡片和“合并前 / 合并后（预计）”两张小图', async () => {
+    const { wrapper } = await mountPage(fakes())
+    expect(wrapper.find('[data-test="rv-dup-preview"]').exists()).toBe(false)
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(wrapper.findAll('[data-test="rv-dup-card"]')).toHaveLength(2)
+    const minis = wrapper.findAll('[data-test="rv-mini"]')
+    expect(minis.map((m) => m.find('figcaption').text())).toEqual(['合并前', '合并后（预计）'])
+    expect(minis[0]!.findAll('[data-test="rv-mini-node"]')).toHaveLength(2)
+    expect(minis[1]!.findAll('[data-test="rv-mini-node"]')).toHaveLength(1)
+  })
+
+  it('合并成功后自动展开原位置上的下一条，并留下一行处理记录；最后一条处理完不再展开', async () => {
+    const f = fakes({ duplicates: three(), names, isolated: [] })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(expandedId(wrapper)).toBe('dup:k4|k5')
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(rows(wrapper, 'rv-duplicate')).toEqual(['dup:k6|k7', 'dup:k8|k9'])
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+    expect(wrapper.get('[data-test="rv-handled"]').text()).toContain('已合并：「堆栈」并入「栈」')
+
+    // 展开状态下标记“不是重复”：同样前进
+    await click(wrapper, '.is-expanded [data-test="rv-not-duplicate"]')
+    expect(expandedId(wrapper)).toBe('dup:k8|k9')
+    expect(wrapper.get('[data-test="rv-handled"]').text()).toContain('不是重复：「队列」与「队列的定义」')
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(rows(wrapper, 'rv-duplicate')).toEqual([])
+    expect(wrapper.find('[data-test="rv-merge-panel"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-test="rv-handled"] li')).toHaveLength(3)
+  })
+
+  it('没有展开时点一行上的“不是重复”不会自动展开别的条目', async () => {
+    const { wrapper } = await mountPage(fakes({ duplicates: three(), names, isolated: [] }))
+    await click(wrapper, '[data-test="rv-not-duplicate"]')
+    expect(rows(wrapper, 'rv-duplicate')).toEqual(['dup:k6|k7', 'dup:k8|k9'])
+    expect(wrapper.find('[data-test="rv-merge-panel"]').exists()).toBe(false)
+  })
+
+  it('键盘：→ ← 切换展开的条目，M 合并，N 不是重复；没有展开时不处理', async () => {
+    const f = fakes({ duplicates: three(), names, isolated: [] })
+    const { wrapper } = await mountPage(f)
+    expect(key('m').defaultPrevented).toBe(false)
+    expect(f.review.resolve).not.toHaveBeenCalled()
+
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(key('ArrowRight').defaultPrevented).toBe(true)
+    await flushPromises()
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+    key('ArrowLeft')
+    await flushPromises()
+    expect(expandedId(wrapper)).toBe('dup:k4|k5')
+    expect(key('ArrowLeft').defaultPrevented).toBe(false)
+
+    key('n')
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenLastCalledWith('c1', { item: 'suspected_duplicate', kp_ids: ['k4', 'k5'], action: 'reject' }, expect.anything())
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+    key('M')
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenLastCalledWith('c1', { item: 'suspected_duplicate', kp_ids: ['k6', 'k7'], action: 'merge', primary_id: 'k6' }, expect.anything())
+    expect(expandedId(wrapper)).toBe('dup:k8|k9')
+  })
+
+  it('键盘：焦点在文本输入框里、带修饰键、或有请求在途时不触发', async () => {
+    const f = fakes({ duplicates: three(), names, isolated: [] })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    expect(key('m', input).defaultPrevented).toBe(false)
+    const withCtrl = new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, bubbles: true, cancelable: true })
+    document.body.dispatchEvent(withCtrl)
+    expect(withCtrl.defaultPrevented).toBe(false)
+    expect(f.review.resolve).not.toHaveBeenCalled()
+    // 焦点在“选择保留对象”的单选上时仍然可用
+    key('m', wrapper.find('[data-test="rv-primary"]').element)
+    key('m')
+    key('n')
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenCalledTimes(1)
+  })
+
+  it('草稿图谱读取失败时照常可以合并，条目里说明没有预览', async () => {
+    const f = fakes()
+    f.draft.getDraft.mockRejectedValue(new Error('down'))
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(wrapper.get('[data-test="rv-dup-no-preview"]').text()).toContain('草稿图谱暂时读取不到')
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(f.review.resolve).toHaveBeenCalledTimes(1)
+    expect(rows(wrapper, 'rv-duplicate')).toEqual([])
+  })
+
+  it('未知的 reason 原样显示；相似度缺失时不显示分数，页面不报错', async () => {
+    const odd = { candidates: [ref_('k4', '栈'), ref_('k5', '堆栈')], similarity: 0.5, reason: 'entity_resolution_v2' } as unknown as SuspectedDuplicate
+    const { wrapper } = await mountPage(fakes({ duplicates: [odd] }))
+    const text = wrapper.get('[data-test="rv-duplicate"] .review__meta').text()
+    expect(text).toContain('相似度 50%')
+    expect(text).toContain('entity_resolution_v2')
+  })
+})

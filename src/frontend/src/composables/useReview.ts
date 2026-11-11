@@ -93,6 +93,8 @@ export interface ReviewNotice {
   text: string
 }
 
+type DraftGraph = NonNullable<Awaited<ReturnType<DraftGraphApi['getDraft']>>>
+
 export interface UseReviewOptions {
   coursesApi: Pick<CoursesApi, 'get'>
   reviewApi: ReviewApi
@@ -195,6 +197,8 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
   const totals = shallowRef<ReviewCounts>(EMPTY_COUNTS)
   const cursors = shallowRef<Cursors>(EMPTY_CURSORS)
   const names = shallowRef<ReadonlyMap<string, string>>(new Map())
+  /** 最近一次读到的草稿图谱（UX-REVIEW-DEDUP-01：疑似重复的定义对比与合并预览用）；读不到为 null */
+  const draftGraph = shallowRef<DraftGraph | null>(null)
   const loadingMore = ref<ReviewItemKind | null>(null)
   const moreError = ref<{ kind: ReviewItemKind; message: string } | null>(null)
   const refreshing = ref(false)
@@ -248,6 +252,7 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     totals.value = EMPTY_COUNTS
     cursors.value = EMPTY_CURSORS
     names.value = new Map()
+    draftGraph.value = null
     loadingMore.value = null
     moreError.value = null
     refreshing.value = false
@@ -294,16 +299,19 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     cursors.value = { ...queue.next_cursors }
   }
 
-  async function readNames(cid: string, signal: AbortSignal): Promise<ReadonlyMap<string, string> | null> {
+  /** 草稿图谱只是显示辅助（名称、对比与预览）：读不到返回 null，页面退回 ID 与无预览形态 */
+  async function readDraft(cid: string, signal: AbortSignal): Promise<DraftGraph | null> {
     if (graphApi === undefined) return null
     try {
       const graph = await graphApi.getDraft(cid, { signal })
       if (graph?.course_id !== cid || !Array.isArray(graph.nodes)) return null
-      return new Map(graph.nodes.map((n) => [n.id, n.name]))
+      // 名称只需要节点；关系缺失时按没有关系处理，预览照常能画出两个知识点
+      return Array.isArray(graph.edges) ? graph : { ...graph, edges: [] }
     } catch {
-      return null // 名称只是显示辅助，读不到退回 ID
+      return null
     }
   }
+  const namesOf = (graph: DraftGraph): ReadonlyMap<string, string> => new Map(graph.nodes.map((n) => [n.id, n.name]))
 
   async function load(cid: string | null): Promise<void> {
     seq += 1
@@ -328,15 +336,16 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
       courseName.value = course.name
       if (course.my_role !== 'teacher') return reset('not_teacher')
 
-      const [queue, nameMap] = await Promise.all([
+      const [queue, draft] = await Promise.all([
         reviewApi.getQueue(cid, { limit: PAGE_SIZE }, { signal: own.signal }),
-        readNames(cid, own.signal),
+        readDraft(cid, own.signal),
       ])
       if (!current()) return
       if (!isQueue(queue)) return fail(INVALID_MESSAGE, true)
       store.commit(scope, () => {
         applyQueue(queue)
-        names.value = nameMap ?? new Map()
+        names.value = draft === null ? new Map() : namesOf(draft)
+        draftGraph.value = draft
         status.value = 'ready'
       })
     } catch (cause) {
@@ -369,9 +378,9 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     loadingMore.value = null
     moreError.value = null
     try {
-      const [queue, nameMap] = await Promise.all([
+      const [queue, draft] = await Promise.all([
         reviewApi.getQueue(cid, { limit }, { signal: own.signal }),
-        readNames(cid, own.signal),
+        readDraft(cid, own.signal),
       ])
       if (!current()) return
       if (!isQueue(queue)) {
@@ -380,7 +389,10 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
       }
       store.commit(scope, () => {
         applyQueue(queue)
-        if (nameMap !== null) names.value = nameMap
+        if (draft !== null) {
+          names.value = namesOf(draft)
+          draftGraph.value = draft
+        }
         if (mergeDraft.value !== null && !queue.suspected_duplicates.some((p) => duplicateKey(p) === mergeDraft.value?.key)) {
           mergeDraft.value = null
         }
@@ -626,6 +638,7 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     notice,
     dismissNotice: () => { notice.value = null },
     mergeDraft,
+    draftGraph,
     nameOf,
     reload: () => void load(courseId.value),
     refresh: () => refresh(),
