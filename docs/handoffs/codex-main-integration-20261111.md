@@ -26,6 +26,7 @@
 - 重复 PR #337/#339/#340 关闭，#342/#343 合并，开放 PR 为零。远端删除先 dry-run，采用逐 SHA lease 与 atomic push；未强推 main。
 - 完整 bundle（8,731,810 bytes，校验通过）、原始引用清单、删除日志及本地红/绿验证日志，位于主检出 `.demo/branch-cleanup-20261111/`，未提交仓库。
 - 主检出原来的 tasks.md 追加段落与两份未跟踪抽取交接稿已逐字核实进入 main；额外保存于 stash `5410571383d83078f79843c5575d9879d0419d21`，三文件字节校验通过。其他工作区的文件、依赖、配置和数据保留，只将清洁检出转为 detached HEAD。
+- 本次临时 worktree 是当前聊天的主检出，宿主归档接口以 `The task's primary checkout cannot be removed` 拒绝删除；目录保留为干净 detached HEAD，恢复文件与日志已另存主检出。收尾文档通过独立 PR 提交，遵循 main 的保护规则。
 - 恢复旧引用：已合入 main 的提交按审计 SHA 建分支；需恢复未被 main 包含的旧引用时，从上述 bundle fetch 对应 `refs/remotes/origin/<branch>` 到新的恢复分支。不要直接用旧 tasks.md 覆盖当前归档看板。
 
 ## 接口、数据与剩余边界
