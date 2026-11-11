@@ -2531,3 +2531,13 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - UI-NORAIL-01：DONE（未提交）；负责人 Claude；分支 `claude/home-topbar-nav`（从 `codex/invite-hover-refactor` 的 `e0b26e7` 切出）。用户指出课程进入页侧栏只有两项、没必要保留。课程列表与模型 API 设置页不再显示侧栏与抽屉按钮；顶栏左侧放品牌，右侧「模型 API」入口（`data-test="nav-model-settings"`，未配置带标记，设置页为当前页）；进入课程后侧栏不变。
 - 改动：`App.vue`（`inCourse`、`app--no-rail`）、`components/AppTopbar.vue`、`styles/ui.css` 末尾；新增 `tests/frontend/home-topbar-nav.test.ts`（3 条，先红后绿）。
 - 验收：type-check、前端 82 文件 / 1375 条、build、`./scripts/verify.sh` basic 均通过；演示环境截图：学生课程列表（1440、390 宽）、模型 API 设置、课程概览（侧栏保留）。
+
+## 2026-11-10 Codex 认领：OPT-06 大文件按职责拆分
+
+- 状态 **IN_PROGRESS**；负责人 Codex；依赖核查后用户已明确允许在隔离分支本地整合 OPT-03/05、验证后继续，暂不推送或合并远端 PR。本地整合基线 `ec92026`，工作区 `opt-06-responsibility-split/SmartSketch-main`。
+- 输入：审查分支 `claude/code-structure-review-handoff-49e73a` 的原交接 OPT-06、OPT-03/05 交接、任务/图谱/路径规格；当前基线 `99c1f01`。
+- 依赖核查（2026-11-10）：OPT-03 本地 `36c1f92` 已验收，GitHub 未找到对应分支或 PR；OPT-05 [PR #339](https://github.com/arvinhanye/SmartSketch/pull/339) 为 open / merged=false，目标为底座分支；底座 [PR #338](https://github.com/arvinhanye/SmartSketch/pull/338) 也未合并。当前 HEAD 含 OPT-05、不含 OPT-03。原交接「只在 OPT-03/05 合入后做」的条件尚未满足。
+- 输出范围：`compatible.py`、`extract_task.py`、`useMaterials.ts`、`StudentGraphView.vue` 分为四项独立交付；旧入口/导出名保留，不改行为，每个原候选文件一个 PR 范围。
+- 风险：Python 导入兼容/循环依赖、网络资源释放、worker 事务与租约、前端请求/SSE 生命周期、响应式及焦点/布局；`codex/extraction-perf` 同时修改 `extract_task.py`，最终基线确定后重查。
+- 验收：各项最小相关回归及对应后端/前端全量，`./scripts/verify.sh`，前端 type-check/build，Vue 同视口截图与交互走查，最终 diff；命令与分项范围见 `docs/superpowers/plans/2026-11-10-opt-06-responsibility-split.md`。
+- 已决：用户确认允许本地整合后继续，不等待远端合入；暂不推送或合并远端 PR。四项分别保留本地叠加分支与独立提交范围。核查证据和验证记录见 `docs/handoffs/codex-opt-06.md`。
