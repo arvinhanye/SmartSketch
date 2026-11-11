@@ -1,4 +1,4 @@
-"""E08：名称归一与重复候选（``docs/atomic-task-plan.md`` E08；``docs/tasks.md`` 第六批 E08 验收）。
+"""E08：名称归一与重复候选（``docs/atomic-task-plan.md`` E08；``docs/archive/tasks-2026-09.md`` 第六批 E08 验收）。
 
 归一键：NFKC → 去格式字符 → 仅 ASCII 字母小写 → 圆括号拆分主名/别名 → 空白规则。
 候选：主键相同 ``same_key``；别名命中 ``alias``；名称前缀包含 ``containment``（短键有效字符 ≥ 2、

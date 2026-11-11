@@ -1,4 +1,4 @@
-"""E09：向量候选分层（``docs/atomic-tasks.json`` E09；``docs/tasks.md`` 第八批 E09 验收）。
+"""E09：向量候选分层（``docs/atomic-tasks.json`` E09；``docs/archive/tasks-2026-09.md`` 第八批 E09 验收）。
 
 输入：同一课程、同一向量空间的实体向量与两条阈值；输出：自动合并 / 需裁决两组配对 + 保留组计数
 （保留组不物化配对；三组计数之和 = n(n-1)/2）。
