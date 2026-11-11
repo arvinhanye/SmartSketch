@@ -2,11 +2,13 @@
 
 ## 2026-11-11 Codex：MAIN-INTEGRATE-01 分支整合与清理
 
-- 状态 IN_PROGRESS；负责人 Codex；基线 origin/main `99e169a`；隔离分支 `codex/main-integration-20261111`。
-- 输入：195 个远端分支、20 个本地分支、开放 PR #337/#339/#340/#342，以及本地抽取优化 `e8c20bd`。用户授权合并所需内容至 main、清理无用旧分支。
-- 输出：保留 OPT-01～06 的拆分与文档归档，整合图谱查找及抽取性能优化，记录逐分支处置与恢复 SHA；原目录未提交文件保持原样。
-- 风险与边界：抽取调度与 OPT-06 模块拆分冲突、旧分支已被 squash/cherry-pick 或产品替代；只删除可证明已覆盖的引用。含未确认独有工作的分支保留；无付费模型调用、部署或真实数据库变更。
-- 验收：定向抽取/E12/工具回归、完整 `./scripts/verify.sh integration`、合并差异审查、`git diff --check`、远端 main/PR/分支复核。交接 `docs/handoffs/codex-main-integration-20261111.md`。
+- 状态 DONE；负责人 Codex；基线 `99e169a`；整合代码 `6bbcf14` 经 [PR #343](https://github.com/arvinhanye/SmartSketch/pull/343) 合入 main，合并提交 `1dbd272`；#342 随之合并。
+- 范围：OPT-01～06 已由 #341 进入主线；本轮整合图谱查找/快捷键/视图记忆及抽取性能优化，处理 OPT-06 模块拆分、测试夹具、测量探针和 ADR 归档冲突。没有新增 API、迁移、依赖或付费模型调用。
+- 验证：定向 73 passed；GitHub 9 项检查全绿，后端/工具 4293 passed / 27 登记 skip，前端 1414 passed，真实 Neo4j 463 passed / 4 登记 skip，图库专项 44 passed，教师/学生 E2E 2 passed，个人模式 E2E 4 passed。
+- 本地验证：`./scripts/verify.sh integration` 的契约、启动器、后端、前端、Neo4j及图库专项均通过；E2E 入口因新 worktree 缺根目录 Playwright 依赖退出，整条命令 exit 1。接回已有依赖后单独补跑两组 E2E，2/2、4/4 通过且各 exit 0；没有将首轮整条命令改记为通过，也未重复已通过的长门禁。
+- 清理：原远端 195→16（main + 15 个含未确认独有改动的历史分叉），删除 179 个旧远端引用；原本地 20→1，仅 main；本次临时整合分支也已清理。重复 PR #337/#339/#340 关闭，开放 PR 为零。逐分支 SHA 与保留依据见 [审计](reviews/branch-cleanup-20261111.md)。
+- 保护：原未提交的任务段落与两份交接稿已逐字核实包含在 main，并额外保留恢复 stash；完整 Git bundle 与操作日志存主检出 `.demo/branch-cleanup-20261111/`。其他工作区文件和本地环境保留。
+- 限制：真实模型准确率/耗时、图库持久化优化、发布向量化以及既有窄屏/读屏验收状态不因合并而关闭。交接 [codex-main-integration-20261111.md](handoffs/codex-main-integration-20261111.md)。
 
 ## 2026-11-10 Claude：图谱查找、快捷键与视图记忆（UI-GRAPH-FIND-01，用户确认“开始第一批”）
 
