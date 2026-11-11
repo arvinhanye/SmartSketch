@@ -618,13 +618,12 @@ describe('有未保存修改时切换节点先确认', () => {
       await input.setValue(query)
       await input.trigger('keydown', { key: 'Enter' })
       await flushPromises()
-      await new Promise((resolve) => setTimeout(resolve, 30))
-      await flushPromises()
     }
 
     it('有修改时：搜索只弹确认，不移动画布；继续编辑后画布与详情都留在原节点', async () => {
       const { wrapper } = await dirtyOn('k1')
       await search(wrapper, '知识点 k2')
+      await vi.waitFor(() => expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(true))
       expect(wrapper.find('[data-test="tg-discard-confirm"]').text()).toContain('知识点 k2')
       expect(focused).not.toContain('kp:k2')
       await wrapper.find('[data-test="tg-discard-no"]').trigger('click')
@@ -636,9 +635,10 @@ describe('有未保存修改时切换节点先确认', () => {
     it('确认放弃后：画布聚焦到搜索目标，详情同时切换', async () => {
       const { wrapper } = await dirtyOn('k1')
       await search(wrapper, '知识点 k2')
+      await vi.waitFor(() => expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(true))
       await wrapper.find('[data-test="tg-discard-yes"]').trigger('click')
       await flushPromises()
-      await new Promise((resolve) => setTimeout(resolve, 30))
+      await vi.waitFor(() => expect(focused.at(-1)).toBe('kp:k2'))
       expect(focused.at(-1)).toBe('kp:k2')
       expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k2')
     })
@@ -647,6 +647,7 @@ describe('有未保存修改时切换节点先确认', () => {
       const f = fakes()
       const { wrapper } = await mountPage(f)
       await search(wrapper, '知识点 k3')
+      await vi.waitFor(() => expect(focused.at(-1)).toBe('kp:k3'))
       expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(false)
       expect(focused.at(-1)).toBe('kp:k3')
     })
@@ -885,12 +886,12 @@ describe('教师图谱：面板选择与画布、关系页保持同步', () => {
   async function pick(wrapper: VueWrapper, kid: string) {
     await wrapper.find('[data-test="tg-node-picker"]').setValue(kid)
     await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 30))
   }
 
   it('下拉选择知识点：详情切换，画布同时聚焦到该节点', async () => {
     const { wrapper } = await mountPage(fakes())
     await pick(wrapper, 'k3')
+    await vi.waitFor(() => expect(focused.at(-1)).toBe('kp:k3'))
     expect(focused.at(-1)).toBe('kp:k3')
     expect(wrapper.find('[data-test="tg-detail-empty"]').exists()).toBe(false)
   })
@@ -902,11 +903,12 @@ describe('教师图谱：面板选择与画布、关系页保持同步', () => {
     await openTab(wrapper, 'edit')
     await editName(wrapper, '未保存的名字')
     await pick(wrapper, 'k2')
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(true))
     expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(true)
     expect(focused).not.toContain('kp:k2')
     await wrapper.find('[data-test="tg-discard-yes"]').trigger('click')
     await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    await vi.waitFor(() => expect(focused.at(-1)).toBe('kp:k2'))
     expect(focused.at(-1)).toBe('kp:k2')
   })
 

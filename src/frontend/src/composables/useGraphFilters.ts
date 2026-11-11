@@ -71,8 +71,25 @@ export const STATUS_LABELS: Readonly<Record<ReviewStatus, string>> = Object.free
   rejected: '已驳回',
 })
 
-const NODE_TYPE_ORDER = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
+export const NODE_TYPE_ORDER: readonly KnowledgePointType[] = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
 const STATUS_ORDER = Object.keys(STATUS_LABELS) as ReviewStatus[]
+
+/** 图例计数使用调用方传入的整图；没有节点的类型也保留零计数。 */
+export function countNodeTypes(
+  nodes: ReadonlyArray<{ readonly data: { readonly type: KnowledgePointType } }>,
+): Record<KnowledgePointType, number> {
+  const counts = Object.fromEntries(NODE_TYPE_ORDER.map((type) => [type, 0])) as Record<KnowledgePointType, number>
+  for (const node of nodes) counts[node.data.type] += 1
+  return counts
+}
+
+/** 只切换目标类型，按固定图例顺序返回新数组，不修改当前筛选。 */
+export function toggledNodeTypes(
+  current: readonly KnowledgePointType[],
+  target: KnowledgePointType,
+): KnowledgePointType[] {
+  return NODE_TYPE_ORDER.filter((type) => (type === target) !== current.includes(type))
+}
 
 export function defaultFilterState(): GraphFilterState {
   return {

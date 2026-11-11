@@ -8,6 +8,8 @@
 
 ## 逻辑分层
 
+邀请码（INVITE-01 / ADR-096）：API 仅协议转换，服务负责码生成、账号门槛、限流与错误映射，SQLite仓储在同一写事务内复核授权、按码解析课程并写成员。迁移020的 `course_invite_codes` 保存有效/撤销历史，码全历史唯一、每课仅一个有效码；按码解析是受限入课入口，后续查询按course_id隔离。原课程列表与图谱发布可见性不变，无Neo4j变更。
+
 ```text
 Vue 3 Web（教师端 / 学生端）
           │ REST + SSE
@@ -31,6 +33,8 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 | `src/backend/app/repositories/` | Neo4j / SQLite 读写 | 产品策略 |
 | `src/backend/app/workers/` | 长时文档任务与状态迁移；以与 API **同机的独立进程**运行，经 SQLite 租约领取任务（`specs/task-processing.md` §8，ADR-011）；常驻入口 `python -m app.workers`（`workers/runner.py`，K08/ADR-039）先过与 API 相同的启动门禁，再起 `WORKER_PROCESSES` 个子进程循环调用 `run_pipeline_once` | Web 请求处理；跨机器部署 |
 | `src/contracts/` | OpenAPI 真源、REST/SSE/图谱交换约定与只读生成类型 | 供应商专用密钥/实现、两端自定义的重复 DTO |
+
+OPT-05：版本发布/回滚的 Cypher 位于 `repositories/version_materialize.py`，共享文本块向量查询位于 `repositories/version_chunk_vectors.py`；服务保留快照/向量校验及事务回调中的计数检查，仓储执行数据库操作，检查失败仍回滚原事务。向量配置、任务取消与版本解析的 SQL 分别归入 `repositories/embedding_configs.py`、`tasks.py`、`versions.py`；既有连接作用域、提交点与查询顺序不变。`services/qa/factory.py` 负责问答依赖装配和课程/个人模型绑定，`services/qa/audit.py` 汇总并写入终态日志，`api/chat.py` 保留 HTTP/SSE 转换与应用状态依赖注入。以上不改变发布 P6/P7 环检测、P8/P9 物化与 P11 提交链路，也不改变契约或数据模型。
 
 ## 前端构建、测试与应用外壳（B01～B04）
 

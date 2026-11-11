@@ -25,7 +25,14 @@ import { applyFocusStates } from '../graph/focusStates'
 import { normalizeQuery } from '../graph/search'
 import { kpIdFromElementId, nodeElementId } from '../graph/adapter'
 import type { GraphLayoutName } from '../graph/lifecycle'
-import { chapterOptions, NODE_TYPE_LABELS, useGraphFilters, type KnowledgePointType } from '../composables/useGraphFilters'
+import {
+  chapterOptions,
+  countNodeTypes,
+  NODE_TYPE_ORDER,
+  toggledNodeTypes,
+  useGraphFilters,
+  type KnowledgePointType,
+} from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
@@ -97,16 +104,11 @@ const canvasGraph = computed(() => {
 })
 
 // 节点类型图例：计数取整张草稿图；点击与工具栏“筛选”里的知识点类型是同一份状态
-const allTypes = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
-const typeCounts = computed(() => {
-  const counts = Object.fromEntries(allTypes.map((t) => [t, 0])) as Record<KnowledgePointType, number>
-  for (const node of relations.canvasData.value?.nodes ?? []) counts[node.data.type] += 1
-  return counts
-})
+const allTypes = NODE_TYPE_ORDER
+const typeCounts = computed(() => countNodeTypes(relations.canvasData.value?.nodes ?? []))
 const hiddenTypes = computed(() => allTypes.filter((t) => !filters.state.value.nodeTypes.includes(t)))
 function toggleType(type: KnowledgePointType): void {
-  const current = filters.state.value.nodeTypes
-  filters.state.value = { ...filters.state.value, nodeTypes: allTypes.filter((t) => (t === type) !== current.includes(t)) }
+  filters.state.value = { ...filters.state.value, nodeTypes: toggledNodeTypes(filters.state.value.nodeTypes, type) }
 }
 function restoreTypes(): void {
   filters.state.value = { ...filters.state.value, nodeTypes: [...allTypes] }

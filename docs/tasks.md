@@ -1,5 +1,19 @@
 # 任务看板
 
+## 2026-11-05 Codex：OPT-05 后端分层修正
+
+- 状态 READY_FOR_REVIEW（实现/复核/续验完成，2026-11-09；原版个人模式 E2E 有既有验收例外）；负责人 Codex；分支 `codex/opt-05-backend-layering`；代码基线 `ad63341`，开始时工作区干净。过程中出现的并行改动未由本任务覆盖/回退。
+- 输入：`AGENTS.md`、`.claude/rules/backend.md`、`docs/architecture.md` 后端分层；审查分支 `claude/code-structure-review-handoff-49e73a` 的 `docs/handoffs/claude-code-structure-review-codex-handoff.md` OPT-05（当前基线无此文件）；发布、任务与问答规格。
+- 输出：版本物化/文本块向量的 Cypher 与指定三个服务的 SQL 下沉仓储；问答服务装配与日志下沉 `services/qa/`；`docs/handoffs/codex-opt-05.md` 逐函数移动清单与验证证据。
+- 实施顺序：并行搬移版本 Cypher、配置/取消/版本解析 SQL；主代理下沉 QA 装配和日志；汇总审查查询原文、参数、调用次序与事务作用域；运行门禁后更新状态。代理按文件独占，文档由主代理维护。
+- 依赖与风险：Python 3.11.9 / 现有 `.venv`；本机 Docker 可用，集成门禁使用一次性 Neo4j。查询文本逐字不变，`course_id` 参数、事务内外位置与 PREREQUISITE 环检测链路不变；契约生成物不得变化。
+- 验收：定向后端测试、`./scripts/verify.sh integration`（环境不可用则 `full` 并标 integration 未验证）、`git diff --color-moved` 与 `git diff --check`；不推送、不开 PR。
+- 已实现：35 个查询定义下沉，85/85 查询定义原文及重复次数一致；课程参数、事务边界、调用次序和环检测路径保留；新增分层护栏 10/10 通过；契约生成物无变化。
+- 验证证据：11 月 5 日完整门禁的后端 4264 passed / 27 登记跳过，前端 1375 passed；11 月 9 日 `scripts/verify/integration.sh --no-e2e` **exit 0**，真实 Neo4j 集成 **463 passed / 4 登记跳过**、图库专项 **44 passed**；demo+K10 原失败定向 4 passed、教师/学生 E2E 2 passed。
+- 验收例外：原版个人模式 E2E 因折叠高级选项中的开关不可见而超时（1 failed / 1 interrupted / 2 未执行），临时副本仅补展开步骤后 4 passed，原用例与前端均未改；此补测不等同于原版完整门禁通过。基线 `ad63341` 也复现过 demo 入库传输超时，本轮集成该用例通过，稳定性现象如实保留在交接中。
+- 交接：[codex-opt-05.md](handoffs/codex-opt-05.md) 含逐函数移动表、查询对照、原失败与基线复现、补测边界。保持未提交，不推送、不开 PR。
+
+
 > **R1 最新状态（2026-10-09）**：PR #324 已整合 main 并消除文档/ADR 冲突；代码 head `36b421e` 的 push/pull_request 两轮 8 项 CI 全部 SUCCESS，含真实网络/恢复和 E2E。worker 围栏限定风险 **CLOSED**；用户已授权「CI通过就合并PR」，按最终 head 全绿门禁合入 main，最终合并结局以 PR 状态/提交为准。不部署或技术冻结；全项目 stage_c_status OPEN、technical_freeze NOT_PERFORMED 不变。验收见末节及 `docs/handoffs/codex-pr324-conflict-ci-repair.md`。
 
 > **当前状态（2026-10-04，GitHub 主线集成）**：人工准确率已签收，方式为 arvin 逐条复核后采纳辅助判定，非独立盲判；stage_c_status **OPEN**，technical_freeze **NOT_PERFORMED**。用户要求先修复并自行检查，再决定冻结。关闭思考 Markdown 抽取、浏览器可见首字、v3 + 思考开启基线三项按用户决定不执行，均为未测。旧接手/初始交接的“未签收”“待补测决定”只作历史记录；计划A/B/C与四项验收修复已通过#317、#319、#318合入GitHub main；代码集成不是技术冻结。当前依据以末节与 `docs/handoffs/codex-plan-c-github-integration.md` 为准。
@@ -2400,6 +2414,80 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - FORMAL-RELEASE-01 Release 已公开（2026-10-10，用户操作）：`rc-7f8a0cd` 作为**预发布**公开（`isDraft: false`、`isPrerelease: true`，2026-10-10T07:04:58Z），tag `rc-7f8a0cd` 指向 `21858897cfe07d5759126009cc520543f2ce8622`（PR #335 合并提交），附件为 `SmartSketch-rc-7f8a0cd-darwin-amd64.tar.gz`、`SmartSketch-rc-7f8a0cd-windows-amd64.zip` 与只列这两个包的 `SHA256SUMS`。仓库 `README.md` 已改为已发布状态，下载链接直接指向 tag 页面（预发布不会出现在 GitHub 的「最新版本」入口）。交付范围不变：Mac Intel 已实测；Windows 仅交叉编译、从未实机运行；Apple Silicon 与 Windows ARM 不提供；未签名未公证。
   - 仍待办：两个更早的旧草稿（2026-10-05 预览、2026-10-06 热修复预览）是否删除由用户决定；Windows 实机验证；Gatekeeper/SmartScreen 实测；签名与公证；`upgrade.json` 升级成功后未清理（无害）；冒烟测试泄漏 Docker 网络；`test_stop_procs` 在本机 macOS 稳定失败；测试里其他固定时长等待可能还有同类竞态；从预览版升级的路径只在一台真实安装上走通过一次。
 
+
+## 2026-11-02 Claude：决赛前全流程走查（WALKTHROUGH-20261102）
+
+- WALKTHROUGH-20261102：DONE；负责人 Claude。演示模式下走查教师与学生主链路，全部可走通；问题清单（P0×4、P1×8、P2×6）与「AI 感」来源见 `docs/handoffs/claude-walkthrough-20261102.md`，截图在 `.demo/walkthrough-20261102/`（Git 忽略）。只读走查，未改业务代码；正式模式、窄屏、Safari 未测。
+- 已决（用户，2026-11-02）：学生问答保持每人各自配置模型 API（沿用 ADR-080），不改为教师共享；后续只降低学生配置门槛。
+- 已决（用户，2026-11-02）：学生入课改为课程邀请码（不做批量导入；按用户名添加保留）；实施前先更新规格、契约与 ADR。
+- 已决（用户，2026-11-02）：界面重做先出 2–3 个方向的静态样稿，用户选定后再改代码。
+- 已知问题（2026-11-03 实测；2026-11-05 已完成差分/120ms，用户选择保留淡化并接受完整进出性能限制，见 GRAPH-HOVER-01）：图谱悬停卡顿。`graph/enhancer.ts` 的 `applyHover()` 每次移入/移出都把全部节点和边（示例课程 135 个）的状态整份交给 G6 `setElementState`，单次主线程 47–63 ms；与后端无关（悬停期间无网络请求）。修复思路：只传状态变化的元素、悬停停留约 120 ms 再淡化、必要时改为只高亮悬停节点及邻居（后者改变交互，需用户确认）。
+
+## 2026-11-04 Claude 认领：青松明黄界面改版（UI-PINE-01）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-PINE-01 | IN_PROGRESS（配色、Logo、外壳、登录/注册、页面与图谱页外围、学生继续学习主卡、三步式模型设置已完成并通过全量门禁；邀请码、向量卡片三步式、图谱工具轨合并未做） | Claude | 按设计预览 v3 改前端配色、Logo、外壳、登录/注册、图谱页外围、课程进入页、模型 API 页；图谱画布样式不变；不改接口与数据模型 | type-check、前端全量 vitest、build、`./scripts/verify.sh` 通过；演示环境截图走查；`data-test` 钩子保留 |
+
+- 计划：`docs/superpowers/plans/2026-11-04-ui-pine-redesign.md`；分支 `claude/ui-pine-redesign`（本地，未推送）。
+- 依赖与风险：多处前端测试断言样式类与文案，需随设计更新并写明原因；邀请码需新接口与迁移，单列 P6，先写规格与 ADR。
+
+## 2026-11-05 Claude → Codex 交接：邀请码、图谱悬停卡顿、全局优化重构
+
+- 已决（用户，2026-11-05）：邀请码本期只做「学生输码入课」与「教师查看/重置邀请码」，不做注册时填码；图谱悬停卡顿现在修；同时对整个软件做一次行为不变的代码优化重构。三项交给 Codex。
+- 交接稿：`docs/handoffs/claude-to-codex-invite-hover-refactor.md`；可直接使用的 prompt：`docs/handoffs/claude-to-codex-invite-hover-refactor.prompt.md`。基线提交 `ef5e297`（分支 `claude/ui-pine-redesign`）。
+- 待 Codex 认领：INVITE-01、GRAPH-HOVER-01、REFACTOR-01。
+
+## 2026-11-05 Codex：GRAPH-HOVER-01 悬停性能修复
+
+- 状态 DONE_WITH_ACCEPTED_PERFORMANCE_LIMIT；负责人 Codex；分支 `codex/invite-hover-refactor`，基线 `445bfc9`（包含 UI-PINE-01 `ef5e297`）。
+- 输入：交接稿第 3 节、G6 enhancer 与已有悬停测试；输出：变化元素差分更新、120ms 停留阈值，保留 60ms 防闪、所有离开兜底及现有淡化视觉。
+- 依赖：现有前端运行时、演示环境；风险：状态缓存与重绘、预览、销毁不同步。先写失败回归；真实 1440×900 普通/预览各 10 次移入移出记录调用耗时。若仍需改变淡化交互，先由用户决定。
+- 验证：前端 type-check、全量 vitest、Vite build、`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh`；基线日志 `/private/tmp/smartsketch-invite-hover-20261105/`。验收及已接受的性能限制见下方 GRAPH-HOVER-01 证据与本轮交接。
+
+## 2026-11-05 Codex：INVITE-01 课程邀请码
+
+- 状态 DONE；负责人 Codex。
+- 输入：交接稿第 2 节与身份/成员模型；输出：学生课程列表输码入课，教师查看/复制/确认重置；保留按用户名添加，不改注册。
+- 顺序：OpenAPI 真源与生成/门禁 → ADR-096、身份规格及错误码 → 迁移 020（含 ROLLBACK）→ 分层后端 → 前端 → 完整验证。
+- 风险与验收：码唯一性/轮换立即失效、用户与 IP 限流、课程隔离、学生角色限制、重复入课、迁移前进回滚、提交中禁用与错误文案。验证含契约、后端 full、前端全量/type-check/build/basic。
+
+## 2026-11-05 Codex：REFACTOR-01 行为保持重构
+
+- 状态 DONE（三类行为保持重构均完成独立全量验证）；负责人 Codex。
+- 输入：完成 B/A 后代码与测试；输出按优先级审查样式、前端逻辑、后端分层、测试 helper/等待、死代码，以可测试的小类改动分别提交。
+- 约束：功能、视觉、契约保持；不改 `graph/theme.ts`、`--gw-*` 色值或既有 `data-test`；无依赖增删升级；不删除/放宽断言。
+- 验证：每类提交前 type-check、全量 vitest、build、backend full、basic；样式类额外截图对照。范围不清或需交互/契约破坏性变化时登记并询问用户。
+- 总交接：`docs/handoffs/codex-invite-hover-refactor.md`；只本地提交，不推送/PR/合并。验收见以下三类完成记录及总交接。
+- INVITE-01 用户已决（2026-11-05）：允许加入未发布课程，提示“教师发布后可见”；原学生列表发布可见性不变，已发布课程入课后刷新并高亮。
+
+- GRAPH-HOVER-01 第1/2项本地验证：新增回归先14 FAIL/25 PASS，修后3文件77 PASS；全量前端78文件1326 PASS，type-check与basic exit0。真实G6/1440×900/64节点71边：普通完整进出33.3–58.7ms（2个>50ms长任务），预览32.6–43.7ms（0长任务）；快速划过10次零状态写入，相邻切换20元素/8.5–15.8ms。性能目标尚未全部达到，已询问用户是否授权第3项“不淡化其他元素”，未自行改变交互。
+
+- GRAPH-HOVER-01 用户已决（2026-11-05）：保留全图淡化，只交付第1/2项；明确接受上述完整进出性能限制，继续A/C。最终type-check、build、basic均exit0，临时计时入口已撤回。
+
+- INVITE-01 前置证据：OpenAPI新增3操作及2 DTO，生成39路径/135 schema；`PATH="$PWD/.venv/bin:$PATH" ./scripts/gen-contracts.sh`与`./scripts/verify/contracts.sh`均exit0。ADR-096、身份规格、架构、错误码先行；迁移020新增回归RED 9条missing table失败→迁移及全回滚守卫24 PASS。初次测试fixture使用不合规占位密码hash导致9个setup error，已改为既有测试PHC格式后重跑；不计该次为产品RED。
+
+- INVITE-01 后端证据：邀请新41项与成员/课程相邻回归共74 PASS；独立复审发现两个教师操作漏声明生成耗尽500，追加2 RED→2 PASS并同步真源/生成物/路由。所有旧OpenAPI路径结构不变，旧schema仅ErrorCode扩展。完整后端结果见下一条完成记录。
+
+- INVITE-01 完成：完整前端81文件/1368 PASS，type-check/build exit0；backend full 4243 PASS/27登记SKIP、gate PASS，后补500声明用例2 PASS；basic exit0。并行负载首轮出现交接已知l14/student-graph-workbench各1项5秒超时，保留失败日志、空闲负载完整重跑通过，未放宽断言/timeout。Chrome真实教师取码/复制/取消及确认重置、旧码失效、学生规范化入课/刷新高亮/重复提示/进入图谱、未发布成功但列表不可见全部走通。额外补修重置响应丢失继续显示旧码的问题：3 RED→3 GREEN，新前端测试总42 PASS。详情、截图路径和回滚步骤见本轮handoff。
+
+- REFACTOR-01 样式类开始：仅删除graph-workspace.css较早的重复gw-hint和已被完整覆盖的gw-list，保留后条规则原位置，修正“旧硬编码等于当前token”的过时注释；颜色/媒体规则/DOM不变。四组样式守卫基线通过，浏览器1440×900与768×900截图/计算样式已留档；后续执行每类全门禁再提交。
+
+- REFACTOR-01 样式类验收：四组样式守卫32 PASS；改后前端81文件/1368 PASS，type-check/build exit0；backend full 4245 PASS/27登记SKIP（733.66s），basic exit0。宽/窄屏三个元素各569项计算样式相同，图谱/列表截图目视一致。仅两条无效CSS声明删除，无颜色/DOM/钩子变更；既有窄屏长用户名挤压顶栏问题记录handoff而不扩展视觉修改。
+
+- REFACTOR-01 共享逻辑类：在样式提交26cdda1后应用。共享师生图例计数/类型切换及HTTP/两SSE的30项ErrorCode守卫；既有plain-object、message/details与chat专有码校验不变。H05新增4项等价覆盖；7文件260定向PASS，独立审查无行为差异；全门禁结果见下一条验收记录。
+
+- REFACTOR-01 共享逻辑类验收：前端81文件/1372 PASS（54.29s），type-check/build exit0；backend full 4245 PASS/27登记SKIP（770.63s），basic exit0（275.74s）。Chrome学生/教师隐藏55个概念后均9/64且图例计数仍55，恢复64/64；教师关系5/71恢复71/71。独立复核保留30项错误码和师生各自数据源/恢复语义。
+
+- REFACTOR-01 测试类开始：共享逻辑已提交00e251c。h14/l14固定等待替换为本次绘制/目标聚焦条件，afterEach释放裸lifecycle并恢复spy。84个原用例及全部原断言保留，不改timeout/重试；三文件定向98 PASS（11.87s），开始全门禁。
+
+- REFACTOR-01 测试类验收：前端81文件/1372 PASS（39.99s），type-check/build exit0；backend full 4245 PASS/27登记SKIP（754.64s）、gate exit0，basic exit0（240.55s）。h14/l14原84用例及257条原断言行全部保留；没有更改timeout、重试或worker设置。三类改动完成；未纳入可能改变视觉/鉴权语义的合并，没有新增待用户决定项。
+
+## 2026-11-05 Claude：课程之外的页面去掉侧栏（UI-NORAIL-01）
+
+- UI-NORAIL-01：DONE（未提交）；负责人 Claude；分支 `claude/home-topbar-nav`（从 `codex/invite-hover-refactor` 的 `e0b26e7` 切出）。用户指出课程进入页侧栏只有两项、没必要保留。课程列表与模型 API 设置页不再显示侧栏与抽屉按钮；顶栏左侧放品牌，右侧「模型 API」入口（`data-test="nav-model-settings"`，未配置带标记，设置页为当前页）；进入课程后侧栏不变。
+- 改动：`App.vue`（`inCourse`、`app--no-rail`）、`components/AppTopbar.vue`、`styles/ui.css` 末尾；新增 `tests/frontend/home-topbar-nav.test.ts`（3 条，先红后绿）。
+- 验收：type-check、前端 82 文件 / 1375 条、build、`./scripts/verify.sh` basic 均通过；演示环境截图：学生课程列表（1440、390 宽）、模型 API 设置、课程概览（侧栏保留）。
 
 ## 2026-11-10 Claude：图谱查找、快捷键与视图记忆（UI-GRAPH-FIND-01，用户确认“开始第一批”）
 
