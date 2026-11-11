@@ -74,7 +74,7 @@ class ExtractLimits:
     max_attempts: int
     chunk_max_attempts: int = 2
     max_failed_ratio: float = 0.2
-    max_concurrency: int = 4
+    max_concurrency: int = 8
 
     def __post_init__(self) -> None:
         for name in ("max_attempts", "chunk_max_attempts", "max_concurrency"):

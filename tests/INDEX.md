@@ -71,6 +71,8 @@
 | [`tests/backend/test_e10.py`](backend/test_e10.py) | 同课程实体证据对的模型裁决与配对校验。 | E10 |
 | [`tests/backend/test_e11.py`](backend/test_e11.py) | 两阶段关系抽取及悬空、跨课程、自环、重复和前置方向校验。 | E11；E02 |
 | [`tests/backend/test_e12.py`](backend/test_e12.py) | 抽取阶段 worker 编排、实体和关系检查点、取消及局部重试边界。 | E12；[specs/task-processing.md](../specs/task-processing.md)；ADR-011；E04；E05；E06；E11；TASK-4；TASK-9；TASK-10；TASK-13；LEASE-2；LEASE-6；LEASE-11 |
+| [`tests/backend/test_extraction_concurrency_default.py`](backend/test_extraction_concurrency_default.py) | 默认并发 8 与环境覆盖对实际在途请求的约束。 | EXTRACT-PERF-01；[specs/task-processing.md](../specs/task-processing.md)；ADR-011 |
+| [`tests/backend/test_extraction_perf_scheduler.py`](backend/test_extraction_perf_scheduler.py) | 共享池重叠、阈值、取消、接管、鉴权与调用记账。 | EXTRACT-PERF-01；[specs/task-processing.md](../specs/task-processing.md)；ADR-011 |
 | [`tests/backend/test_enum_input_validation.py`](backend/test_enum_input_validation.py) | 图谱节点、关系与审核接口在编辑 IO 前拒绝非法枚举输入。 | 待确认 |
 | [`tests/backend/test_f02.py`](backend/test_f02.py) | 验证 Neo4j 图仓储的作用域边界。 | F02 |
 | [`tests/backend/test_f05.py`](backend/test_f05.py) | DAG 纯函数检测候选前置关系是否成环，并返回闭合环路径。 | F05；[specs/course-knowledge-graph.md](../specs/course-knowledge-graph.md)；DAG-1；DAG-8；DAG-9；DAG-10；B11 |
