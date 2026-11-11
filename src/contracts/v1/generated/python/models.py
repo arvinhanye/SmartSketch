@@ -197,6 +197,8 @@ class ErrorCode(Enum):
     REVISION_CONFLICT = 'REVISION_CONFLICT'
     USERNAME_TAKEN = 'USERNAME_TAKEN'
     MODEL_CONFIG_REQUIRED = 'MODEL_CONFIG_REQUIRED'
+    INVITE_CODE_INVALID = 'INVITE_CODE_INVALID'
+    ALREADY_MEMBER = 'ALREADY_MEMBER'
 
 
 class CycleItem(RootModel[str]):
@@ -289,6 +291,39 @@ class Course(BaseModel):
         Optional[int], Field(description='学生可见的版本号；从未发布为 null')
     ] = None
     created_at: datetime
+
+
+class InviteCodeResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: Annotated[
+        str,
+        Field(
+            description='六位邀请码，排除 0/O/1/I；仅本课教师可读取',
+            max_length=6,
+            min_length=6,
+            pattern='^[A-HJ-NP-Z2-9]{6}$',
+        ),
+    ]
+    rotated_at: Annotated[
+        datetime, Field(description='当前码生成的 UTC 时间，首次生成也提供此值')
+    ]
+
+
+class CourseJoinRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: Annotated[
+        str,
+        Field(
+            description='客户端去除首尾空白并转大写后提交；调用者身份仅来自访问令牌',
+            max_length=6,
+            min_length=6,
+            pattern='^[A-HJ-NP-Z2-9]{6}$',
+        ),
+    ]
 
 
 class CourseCreate(BaseModel):

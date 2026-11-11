@@ -21,7 +21,6 @@ import pytest
 
 import app.schemas.contracts  # noqa: F401  装载生成的契约模型（ChatTurn）
 from app.repositories.model_calls import SqliteCallStore
-from app.repositories.sqlite import migrate
 from app.services.ai.client import (
     ModelAuthError,
     ModelConnectionError,
@@ -56,6 +55,7 @@ from app.services.qa.rewrite import (
     prepare_history,
     strip_citation_markers,
 )
+from tests.backend.helpers.sqlite import migrated_database
 
 MODEL = "chat-model"
 COURSE = "course-1"
@@ -80,8 +80,7 @@ class Clock:
 
 class Env:
     def __init__(self, tmp_path, *, store: Any = None, **policy_kwargs: Any) -> None:
-        self.url = f"sqlite:///{tmp_path / 'j03.sqlite3'}"
-        migrate(self.url)
+        self.url = migrated_database(f"sqlite:///{tmp_path / 'j03.sqlite3'}")
         self.clock = Clock()
         self.fake = FakeModelClient()
         defaults: dict[str, Any] = {

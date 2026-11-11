@@ -1,4 +1,5 @@
 import type { components } from '../../../contracts/v1/generated/typescript/openapi'
+import { isContractErrorCode } from './errorCodes'
 import type { CourseRequestScope } from '../stores/course'
 import {
   AbortedError,
@@ -6,7 +7,6 @@ import {
   InvalidResponseError,
   NetworkError,
   apiPath,
-  type ErrorCode,
   type FetchLike,
   type HttpClient,
 } from './http'
@@ -153,44 +153,8 @@ type MissingStage = Exclude<TaskStage, (typeof ALL_STAGES)[number]>
 const stagesComplete: [MissingStage] extends [never] ? true : MissingStage = true
 void stagesComplete
 
-// 契约 ErrorCode 的运行时副本（B15 的同名常量未导出）；类型断言保证与契约双向一致
-const ERROR_CODES = [
-  'UNAUTHENTICATED',
-  'COURSE_FORBIDDEN',
-  'ROLE_FORBIDDEN',
-  'NOT_FOUND',
-  'GRAPH_NOT_PUBLISHED',
-  'UNSUPPORTED_FORMAT',
-  'FILE_TOO_LARGE',
-  'VALIDATION_ERROR',
-  'CYCLE_DETECTED',
-  'DANGLING_ENDPOINT',
-  'DUPLICATE_RELATION',
-  'NODE_LOCKED',
-  'TASK_NOT_CANCELLABLE',
-  'PUBLISH_BLOCKED',
-  'RATE_LIMITED',
-  'LLM_UNAVAILABLE',
-  'DOCUMENT_UNREADABLE',
-  'EXTRACTION_INCOMPLETE',
-  'STORAGE_UNAVAILABLE',
-  'INTERNAL_ERROR',
-  'TASK_ATTEMPTS_EXHAUSTED',
-  'PUBLISH_IN_PROGRESS',
-  'COURSE_BUSY',
-  'BUDGET_EXCEEDED',
-  'DOCUMENT_NOT_DELETABLE',
-  'REVISION_CONFLICT',
-  'USERNAME_TAKEN',
-  'MODEL_CONFIG_REQUIRED',
-] as const satisfies readonly ErrorCode[]
-type MissingErrorCode = Exclude<ErrorCode, (typeof ERROR_CODES)[number]>
-const errorCodesComplete: [MissingErrorCode] extends [never] ? true : MissingErrorCode = true
-void errorCodesComplete
-
 const PROCESSING_STAGE_SET: ReadonlySet<string> = new Set(PROCESSING_STAGES)
 const STAGE_SET: ReadonlySet<string> = new Set(ALL_STAGES)
-const ERROR_CODE_SET: ReadonlySet<string> = new Set(ERROR_CODES)
 const EVENT_NAMES: ReadonlySet<string> = new Set<TaskEventName>(['stage', 'done', 'error', 'cancelled'])
 /** 处理期连接的结束：`awaiting_review` 与三个终态 */
 const END_STAGES: ReadonlySet<string> = new Set(['awaiting_review', 'completed', 'failed', 'cancelled'])
@@ -224,8 +188,7 @@ function isCounts(value: unknown): value is TaskCounts {
 function isErrorBody(value: unknown): value is ErrorBody {
   return (
     isPlainObject(value) &&
-    typeof value.code === 'string' &&
-    ERROR_CODE_SET.has(value.code) &&
+    isContractErrorCode(value.code) &&
     typeof value.message === 'string' &&
     (value.details === undefined || isPlainObject(value.details))
   )

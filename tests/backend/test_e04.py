@@ -28,7 +28,6 @@ from app.repositories.model_calls import (
     billed_for_task,
     get_call,
 )
-from app.repositories.sqlite import migrate
 from app.services.ai import policy as policy_module
 from app.services.ai.client import (
     Message,
@@ -63,6 +62,7 @@ from app.services.ai.policy import (
     ModelUnavailableError,
     new_call_id,
 )
+from tests.backend.helpers.sqlite import migrated_database
 
 PROMPT = "PROMPT-SECRET-栈与队列的区别"
 OUTPUT = "OUTPUT-SECRET-答案正文"
@@ -81,8 +81,7 @@ class Clock:
 
 class Env:
     def __init__(self, tmp_path, **policy_kwargs: Any) -> None:
-        self.url = f"sqlite:///{tmp_path / 'e04.sqlite3'}"
-        migrate(self.url)
+        self.url = migrated_database(f"sqlite:///{tmp_path / 'e04.sqlite3'}")
         self.clock = Clock()
         self.sleeps: list[float] = []
         self.primary = FakeModelClient()
@@ -587,8 +586,7 @@ def test_retry_after_timeout_keeps_both_records(tmp_path) -> None:
 
 def test_call_id_dedup_on_replayed_prewrite_and_writeback(tmp_path) -> None:
     """LEASE-17/25/28: replays neither add rows nor change the billed amount."""
-    url = f"sqlite:///{tmp_path / 'd.sqlite3'}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{tmp_path / 'd.sqlite3'}")
     store = SqliteCallStore(url)
     record = CallRecord(call_id=new_call_id(), course_id="c", task_id="t", chunk_id=None, request_id=None,
                         purpose="extract_entities", task_attempt=1, chunk_attempt=1, call_seq=1,
@@ -615,8 +613,7 @@ def test_call_id_dedup_on_replayed_prewrite_and_writeback(tmp_path) -> None:
 
 
 def test_store_budget_rejection_scopes(tmp_path) -> None:
-    url = f"sqlite:///{tmp_path / 'b.sqlite3'}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{tmp_path / 'b.sqlite3'}")
     store = SqliteCallStore(url)
 
     def record(task_id: str | None, purpose: str = "extract_entities") -> CallRecord:
@@ -638,8 +635,7 @@ def test_store_budget_rejection_scopes(tmp_path) -> None:
 
 
 def test_daily_budget_uses_beijing_calendar_day(tmp_path) -> None:
-    url = f"sqlite:///{tmp_path / 'day.sqlite3'}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{tmp_path / 'day.sqlite3'}")
     rows = [
         ("a", "2026-09-24T15:59:59.999Z", "extract_entities"),  # Beijing 09-24 23:59
         ("b", "2026-09-24T16:00:00.000Z", "extract_entities"),  # Beijing 09-25 00:00

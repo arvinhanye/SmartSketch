@@ -16,7 +16,7 @@ from app.api import chat as chat_api
 from app.api.dependencies import course_student
 from app.config import Settings
 from app.repositories.chat_logs import list_chat_logs
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.ai.client import ModelConnectionError, ModelResult, StreamDelta, StreamDone
 from app.services.qa.chat import ChatService, PreparedChat
 from app.services.qa.context import (
@@ -24,6 +24,7 @@ from app.services.qa.context import (
 )
 from app.services.qa.generate import AnswerGeneration
 from app.services.versions.resolver import PublishedVersion
+from tests.backend.helpers.sqlite import migrated_database
 
 COURSE, VERSION_ID = "c" * 32, "v" * 26
 VERSION = PublishedVersion(COURSE, VERSION_ID, 1, frozenset({"revision"}))
@@ -147,8 +148,7 @@ def test_deadline_reached_during_generation_is_timeout():
 
 @pytest.fixture
 def chat_app(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}")
     user_id = "u" * 32
     with connect(url) as db:
         db.execute("INSERT INTO users(id, username, password_hash, role) VALUES (?, 'student', ?, 'student')",

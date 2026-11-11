@@ -35,6 +35,8 @@ from app.services.graph.review import (
     page,
     relation_key,
 )
+from tests.backend.helpers.contracts import rewrite_schema_refs as _rewrite
+from tests.backend.helpers.sqlite import migrated_database
 
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = ROOT / "src/backend/migrations"
@@ -44,15 +46,6 @@ VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 SECRET = "f11-test-signing-key-0123456789abcdefghij"
 
 _SPEC = yaml.safe_load((ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8"))
-
-
-def _rewrite(node):
-    if isinstance(node, dict):
-        return {k: (v.replace("#/components/schemas/", "#/$defs/") if k == "$ref" and isinstance(v, str)
-                    else _rewrite(v)) for k, v in node.items()}
-    if isinstance(node, list):
-        return [_rewrite(i) for i in node]
-    return node
 
 
 _DEFS = _rewrite(copy.deepcopy(_SPEC["components"]["schemas"]))
@@ -253,8 +246,7 @@ def test_dismissals_are_unique_per_course_kind_and_key(tmp_path):
     from app.repositories.courses import create_course
     from app.repositories.review import dismiss, pair_key, read_dismissals
 
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username="teacher1", password_hash=VALID_HASH, role="teacher")
     course = create_course(url, name="数据结构", description=None, creator_id=teacher.id)
     assert pair_key("b", "a") == pair_key("a", "b") == '["a","b"]'
@@ -347,8 +339,7 @@ def env(tmp_path, monkeypatch):
     from app.services.auth import issue_access_token
     from app.services.graph.edit_node import EditContext
 
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
 
     def account(name, role):
         return insert_account(url, account_id=uuid.uuid4().hex, username=name, password_hash=VALID_HASH, role=role)

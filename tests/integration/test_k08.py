@@ -31,6 +31,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from tests.waiting import wait_until
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "src/backend"
@@ -256,22 +257,30 @@ def test_api_starts_from_image_layout_and_answers_health(tmp_path: Path) -> None
     env = _layout_env(workdir, data, API_HOST="127.0.0.1", API_PORT=str(port))
     subprocess.run([sys.executable, "-m", "app.repositories.sqlite"], cwd=workdir, env=env, check=True,
                    capture_output=True)
-    server = subprocess.Popen([sys.executable, "-m", "app"], cwd=workdir, env=env,
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    try:
-        deadline = time.monotonic() + 30
-        while True:
+    output = tmp_path / "api.log"
+    with output.open("wb") as log:
+        server = subprocess.Popen([sys.executable, "-m", "app"], cwd=workdir, env=env,
+                                  stdout=log, stderr=subprocess.STDOUT)
+        try:
+            def healthy() -> bool:
+                if server.poll() is not None:
+                    pytest.fail(output.read_text(errors="replace"))
+                try:
+                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:
+                        assert response.status == 200
+                    return True
+                except OSError:
+                    return False
+
+            wait_until(healthy, timeout=30, interval=0.2, description=f"API health response; log: {output}")
+        finally:
+            server.send_signal(signal.SIGTERM)
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:
-                    assert response.status == 200
-                    break
-            except OSError:
-                if server.poll() is not None or time.monotonic() > deadline:
-                    pytest.fail(server.stdout.read().decode(errors="replace") if server.stdout else "no output")
-                time.sleep(0.2)
-    finally:
-        server.send_signal(signal.SIGTERM)
-        server.wait(timeout=10)
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=5)
+                raise
 
 
 # ---------------------------------------------------------------- worker entry
@@ -348,8 +357,10 @@ def _exit_at_once() -> None:
     sys.exit(0)
 
 
-def _sleep_until_terminated() -> None:
-    time.sleep(60)
+def _wait_until_terminated() -> None:
+    # Independent test watchdog: even a broken supervisor must not join this child forever.
+    signal.alarm(60)
+    signal.pause()
 
 
 def test_supervisor_exits_nonzero_when_a_child_dies(settings, tmp_path: Path,
@@ -372,24 +383,28 @@ def test_supervisor_beats_while_children_live_and_stops_them_on_sigterm(settings
     monkeypatch.setattr(worker, "HEARTBEAT_SECONDS", 0.1)
     previous = signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGINT)
     seen: list[int] = []
+    errors: list[BaseException] = []
 
     def watch() -> None:
-        deadline = time.monotonic() + 20
-        while not beat.exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        seen.append(worker.health())
-        os.kill(os.getpid(), signal.SIGTERM)
+        try:
+            wait_until(beat.exists, timeout=20, interval=0.05, description="supervisor heartbeat file")
+            seen.append(worker.health())
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            os.kill(os.getpid(), signal.SIGTERM)
 
     watcher = threading.Thread(target=watch)
     watcher.start()
     try:
         started = time.monotonic()
-        assert worker.supervise(settings, target=_sleep_until_terminated) == 0
+        assert worker.supervise(settings, target=_wait_until_terminated) == 0
         assert time.monotonic() - started < 30
     finally:
-        watcher.join()
+        watcher.join(timeout=21)
         signal.signal(signal.SIGTERM, previous[0])
         signal.signal(signal.SIGINT, previous[1])
+    assert not watcher.is_alive() and not errors, errors
     assert seen == [0]
     assert not beat.exists() and worker.health() == 1
 

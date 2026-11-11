@@ -74,13 +74,6 @@ class GatedTransport(Transport):
         return reply
 
 
-@pytest.fixture
-def url(tmp_path):
-    value = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(value)
-    return value
-
-
 def _settings(url, **extra):
     return load_settings({"SQLITE_URL": url, "LLM_MODE": "personal", "MODEL_CREDENTIAL_KEY": ROOT_KEY_B64,
                           "LLM_MAX_RETRIES": "0", **extra})

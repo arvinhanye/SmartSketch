@@ -19,6 +19,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
+from app.repositories import version_materialize as version_repo
 from app.repositories.graph_migrations import VectorSpaceError, _dimensions, _validate_vector, vector_property
 from app.repositories.neo4j import GraphScope, Neo4jRepository, ScopedTransaction
 from app.services.versions.snapshot import Snapshot, canonical_bytes, digest_of
@@ -98,49 +99,11 @@ def _scope(snapshot: Snapshot, version_id: str) -> GraphScope:
     return GraphScope(str(snapshot.data["course_id"]), version_id)
 
 
-# 按标签匹配走 (course_id, version_id) 索引，不做无标签全库扫描。
-_DELETE = """
-CALL () { MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $version_id}) DETACH DELETE k }
-CALL () { MATCH (c:Chapter {course_id: $course_id, version_id: $version_id}) DETACH DELETE c }
-"""
-_CHAPTERS = """
-UNWIND $rows AS row
-CREATE (c:Chapter)
-SET c = row, c.course_id = $course_id, c.version_id = $version_id
-RETURN count(c) AS written
-"""
-_NODES = """
-UNWIND $rows AS row
-CREATE (k:KnowledgePoint)
-SET k = row, k.course_id = $course_id, k.version_id = $version_id
-RETURN count(k) AS written
-"""
-_EVIDENCE = """
-UNWIND $rows AS row
-MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.kp_id})
-MATCH (c:Chunk {course_id: $course_id, chunk_id: row.chunk_id})
-CREATE (k)-[:EVIDENCED_BY {chunk_id: row.chunk_id}]->(c)
-RETURN count(*) AS written
-"""
-
-
-def _relations_query(kind: str) -> str:
-    return f"""
-UNWIND $rows AS row
-MATCH (a:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: row.from_id}})
-MATCH (b:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: row.to_id}})
-CREATE (a)-[r:{kind}]->(b)
-SET r.course_id = $course_id, r.version_id = $version_id, r.rel_id = row.rel_id, r.source_refs = row.source_refs
-RETURN count(r) AS written
-"""
-
-
-def _written(tx: ScopedTransaction, query: str, rows: list[dict[str, Any]], what: str) -> int:
+def _written(written: int, rows: list[dict[str, Any]], what: str) -> int:
     if not rows:
         return 0
-    [record] = tx.run(query, {"rows": rows})
-    if record["written"] != len(rows):
-        raise MaterializeError(f"{what}: wrote {record['written']} of {len(rows)}")
+    if written != len(rows):
+        raise MaterializeError(f"{what}: wrote {written} of {len(rows)}")
     return len(rows)
 
 
@@ -176,34 +139,19 @@ def materialize(
         edges_by_type[edge["type"]].append({k: edge[k] for k in ("rel_id", "from_id", "to_id", "source_refs")})
 
     def work(tx: ScopedTransaction) -> MaterializeResult:
-        tx.run(_DELETE)
-        chapters = _written(tx, _CHAPTERS, chapter_rows, "chapters")
-        nodes = _written(tx, _NODES, node_rows, "knowledge points")
-        evidence = _written(tx, _EVIDENCE, evidence_rows, "source links (missing Chunk?)")
-        edges = sum(_written(tx, _relations_query(kind), rows, f"{kind} relations")
+        version_repo.delete_in(tx)
+        chapters = _written(version_repo.write_chapters(tx, chapter_rows), chapter_rows, "chapters")
+        nodes = _written(version_repo.write_nodes(tx, node_rows), node_rows, "knowledge points")
+        evidence = _written(version_repo.write_evidence(tx, evidence_rows), evidence_rows, "source links (missing Chunk?)")
+        edges = sum(_written(version_repo.write_relations(tx, kind, rows), rows, f"{kind} relations")
                     for kind, rows in edges_by_type.items())
         return MaterializeResult(version_id, space, chapters, nodes, edges, evidence)
 
-    return repo.write_transaction(scope, work)
+    return version_repo.transaction(repo, scope, work)
 
 
 # ---------------------------------------------------------------- P9
 
-_READ_CHAPTERS = """
-MATCH (c:Chapter {course_id: $course_id, version_id: $version_id})
-RETURN properties(c) AS p
-"""
-_READ_NODES = """
-MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $version_id})
-OPTIONAL MATCH (k)-[e:EVIDENCED_BY]->(c:Chunk {course_id: $course_id})
-RETURN properties(k) AS p, collect(c.chunk_id) AS source_refs
-"""
-_READ_EDGES = """
-MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id})
-      -[r {course_id: $course_id, version_id: $version_id}]->
-      (b:KnowledgePoint {course_id: $course_id, version_id: $version_id})
-RETURN type(r) AS type, a.kp_id AS from_id, b.kp_id AS to_id, properties(r) AS p
-"""
 _NODE_FIELDS: Final = ("aliases", "chapter_id", "definition", "difficulty", "importance", "kp_id", "merged_from",
                        "name", "type")
 
@@ -214,17 +162,14 @@ def verify(repo: Neo4jRepository, snapshot: Snapshot, version_id: str, space: st
     prop = vector_property(space)
     dims = _dimensions(space)
 
-    def read(query: str) -> list[dict[str, Any]]:
-        return repo.read(query, scope, reader="worker")
-
     chapters = sorted(
         ({"chapter_id": p.get("chapter_id"), "title": p.get("title"), "order": p.get("order"),
-          "parent_id": p.get("parent_id")} for p in (r["p"] for r in read(_READ_CHAPTERS))),
+          "parent_id": p.get("parent_id")} for p in (r["p"] for r in version_repo.read_chapters(repo, scope))),
         key=lambda c: str(c["chapter_id"]),
     )
     nodes = []
     missing_vectors = 0
-    for record in read(_READ_NODES):
+    for record in version_repo.read_nodes(repo, scope):
         p = record["p"]
         vector = p.get(prop)
         if not isinstance(vector, list) or len(vector) != dims:
@@ -237,7 +182,7 @@ def verify(repo: Neo4jRepository, snapshot: Snapshot, version_id: str, space: st
     nodes.sort(key=lambda n: str(n["kp_id"]))
     edges = sorted(
         ({"rel_id": r["p"].get("rel_id"), "type": r["type"], "from_id": r["from_id"], "to_id": r["to_id"],
-          "source_refs": sorted(set(r["p"].get("source_refs") or []))} for r in read(_READ_EDGES)),
+          "source_refs": sorted(set(r["p"].get("source_refs") or []))} for r in version_repo.read_edges(repo, scope)),
         key=lambda e: str(e["rel_id"]),
     )
     if missing_vectors:
@@ -251,40 +196,10 @@ def drop_version(repo: Neo4jRepository, course_id: str, version_id: str) -> None
     """C1 第 2 步：删除一个非草稿版本的全部副本（可重复执行，不碰共享文本块）。"""
     if not isinstance(version_id, str) or not version_id.strip() or version_id == DRAFT:
         raise ValueError("a published version_id is required")
-    repo.write(_DELETE, GraphScope(course_id, version_id))
+    version_repo.delete(repo, GraphScope(course_id, version_id))
 
 
 # ---------------------------------------------------------------- R5 回滚复制
-
-_COPY_CHAPTERS = """
-MATCH (c:Chapter {course_id: $course_id, version_id: $source})
-CREATE (n:Chapter) SET n = c {.*, version_id: $version_id}
-RETURN count(n) AS written
-"""
-_COPY_NODES = """
-MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $source})
-CREATE (n:KnowledgePoint) SET n = k {.*, version_id: $version_id}
-RETURN count(n) AS written
-"""
-_COPY_EVIDENCE = """
-MATCH (k:KnowledgePoint {course_id: $course_id, version_id: $source})-[e:EVIDENCED_BY]->
-      (c:Chunk {course_id: $course_id})
-MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: k.kp_id})
-CREATE (n)-[:EVIDENCED_BY {chunk_id: e.chunk_id}]->(c)
-RETURN count(*) AS written
-"""
-
-
-def _copy_relations_query(kind: str) -> str:
-    return f"""
-MATCH (a:KnowledgePoint {{course_id: $course_id, version_id: $source}})
-      -[r:{kind} {{course_id: $course_id, version_id: $source}}]->
-      (b:KnowledgePoint {{course_id: $course_id, version_id: $source}})
-MATCH (x:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: a.kp_id}})
-MATCH (y:KnowledgePoint {{course_id: $course_id, version_id: $version_id, kp_id: b.kp_id}})
-CREATE (x)-[s:{kind}]->(y) SET s = r {{.*, version_id: $version_id}}
-RETURN count(s) AS written
-"""
 
 
 def copy_version(repo: Neo4jRepository, snapshot: Snapshot, source_version_id: str, version_id: str) -> int:
@@ -297,14 +212,14 @@ def copy_version(repo: Neo4jRepository, snapshot: Snapshot, source_version_id: s
     expected = len(snapshot.data["nodes"])
 
     def work(tx: ScopedTransaction) -> int:
-        tx.run(_DELETE)
-        tx.run(_COPY_CHAPTERS, {"source": source_version_id})
-        [nodes] = tx.run(_COPY_NODES, {"source": source_version_id})
-        if nodes["written"] != expected:
-            raise SourceCopyMissing(f"source version has {nodes['written']} of {expected} knowledge points")
-        tx.run(_COPY_EVIDENCE, {"source": source_version_id})
+        version_repo.delete_in(tx)
+        version_repo.copy_chapters(tx, source_version_id)
+        written = version_repo.copy_nodes(tx, source_version_id)
+        if written != expected:
+            raise SourceCopyMissing(f"source version has {written} of {expected} knowledge points")
+        version_repo.copy_evidence(tx, source_version_id)
         for kind in RELATION_TYPES:
-            tx.run(_copy_relations_query(kind), {"source": source_version_id})
+            version_repo.copy_relations(tx, kind, source_version_id)
         return expected
 
-    return repo.write_transaction(scope, work)
+    return version_repo.transaction(repo, scope, work)

@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.waiting import wait_until
+
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "fake_provider.py"
 
@@ -43,18 +45,24 @@ def provider():
     proc = subprocess.Popen([sys.executable, str(SCRIPT), "--port", str(port)], env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{port}"
-    for _ in range(100):
+    def ready():
+        assert proc.poll() is None, f"fake provider exited with {proc.returncode}"
         try:
-            urllib.request.urlopen(f"{base}/health", timeout=0.2)
-            break
+            with urllib.request.urlopen(f"{base}/health", timeout=0.2) as response:
+                return response.status == 200
         except OSError:
-            time.sleep(0.05)
-    else:
-        proc.kill()
-        pytest.fail("fake provider did not start")
-    yield f"{base}/v1"
-    proc.terminate()
-    proc.wait(5)
+            return False
+
+    try:
+        wait_until(ready, timeout=5, interval=0.05, description="fake provider /health")
+        yield f"{base}/v1"
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(5)
 
 
 def _post(base, key, body, headers=None):

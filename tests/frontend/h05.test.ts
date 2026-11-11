@@ -5,8 +5,11 @@ import GraphCanvas from '../../src/frontend/src/components/GraphCanvas.vue'
 import GraphToolbar from '../../src/frontend/src/components/GraphToolbar.vue'
 import {
   chapterOptions,
+  countNodeTypes,
   defaultFilterState,
   filterGraph,
+  NODE_TYPE_ORDER,
+  toggledNodeTypes,
   useGraphFilters,
   type GraphFilterState,
 } from '../../src/frontend/src/composables/useGraphFilters'
@@ -218,6 +221,36 @@ describe('H05 filterGraph', () => {
     const s = deepFreeze(state({ query: '栈', relationTypes: ['CONTAINS'] }))
     expect(() => filterGraph(data, s, 'stack')).not.toThrow()
     expect(data).toEqual(sample())
+  })
+})
+
+describe('H05 节点类型图例', () => {
+  it('空图仍列出五类零计数，顺序与默认筛选保持一致', () => {
+    const counts = countNodeTypes([])
+    expect(counts).toEqual({ concept: 0, theorem: 0, formula: 0, method: 0, example: 0 })
+    expect(Object.keys(counts)).toEqual(['concept', 'theorem', 'formula', 'method', 'example'])
+    expect(NODE_TYPE_ORDER).toEqual(defaultFilterState().nodeTypes)
+  })
+
+  it('统计传入整图的各类节点，包括低置信度和驳回节点，不修改输入', () => {
+    const data = deepFreeze(sample())
+    expect(countNodeTypes(data.nodes)).toEqual({ concept: 3, theorem: 1, formula: 1, method: 1, example: 1 })
+    expect(data).toEqual(sample())
+  })
+
+  it('隐藏已显示类型并再次恢复时，其他类型保持不变，输入数组不变', () => {
+    const current = deepFreeze<KpType[]>(['example', 'concept'])
+    const hidden = toggledNodeTypes(current, 'concept')
+    expect(hidden).toEqual(['example'])
+    expect(toggledNodeTypes(hidden, 'concept')).toEqual(['concept', 'example'])
+    expect(current).toEqual(['example', 'concept'])
+  })
+
+  it('显示已隐藏类型时按图例顺序插入，空筛选只显示目标类型', () => {
+    const current = deepFreeze<KpType[]>(['example', 'concept'])
+    expect(toggledNodeTypes(current, 'method')).toEqual(['concept', 'method', 'example'])
+    expect(toggledNodeTypes([], 'formula')).toEqual(['formula'])
+    expect(current).toEqual(['example', 'concept'])
   })
 })
 

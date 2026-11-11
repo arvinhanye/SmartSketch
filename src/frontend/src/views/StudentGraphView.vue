@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, watch, type InjectionKey } from 'vue'
+import { computed, inject, nextTick, provide, ref, watch, type InjectionKey } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
@@ -19,22 +19,23 @@ import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import LocalViewBar from '../components/LocalViewBar.vue'
 import Recommendations from '../components/Recommendations.vue'
 import {
+  countNodeTypes,
   locateNode,
-  NODE_TYPE_LABELS,
+  NODE_TYPE_ORDER,
   RELATION_TYPE_ORDER,
+  toggledNodeTypes,
   useGraphFilters,
   type KnowledgePointType,
 } from '../composables/useGraphFilters'
-import { useGraphLayout } from '../composables/useGraphLayout'
+import { useStudentGraphPanel } from '../composables/useStudentGraphPanel'
+import { useStudentGraphPresentation } from '../composables/useStudentGraphPresentation'
 import { MASTERY_LABELS, useLearning } from '../composables/useLearning'
 import { kpLinkOutcome } from '../composables/kpLink'
 import { useLocalView } from '../composables/useLocalView'
 import { usePreviewFocus } from '../composables/usePreviewFocus'
 import { useReducedMotion } from '../composables/useReducedMotion'
 import { toKnowledgeCards, useStudentGraph } from '../composables/useStudentGraph'
-import { kpIdFromElementId, nodeElementId, type RelationType } from '../graph/adapter'
-import { applyFocusStates } from '../graph/focusStates'
-import type { GraphCanvasData } from '../graph/lifecycle'
+import type { RelationType } from '../graph/adapter'
 import { createObstacleRegistry, GRAPH_OBSTACLES_KEY } from '../graph/obstacles'
 import { masteryOfStates } from '../graph/presentation'
 import { COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
@@ -232,7 +233,7 @@ const selectedName = computed(() => {
 })
 
 // ---------------------------------------------------------------- 图例：关系与类型筛选（单一事实来源是筛选状态）
-const allTypes = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
+const allTypes = NODE_TYPE_ORDER
 const hiddenRelations = computed(() => RELATION_TYPE_ORDER.filter((t) => !filters.state.value.relationTypes.includes(t)))
 const hiddenTypes = computed(() => allTypes.filter((t) => !filters.state.value.nodeTypes.includes(t)))
 const relationCounts = computed(() => {
@@ -240,16 +241,11 @@ const relationCounts = computed(() => {
   for (const edge of graph.value?.edges ?? []) counts[edge.data.type] += 1
   return counts
 })
-const typeCounts = computed(() => {
-  const counts = Object.fromEntries(allTypes.map((t) => [t, 0])) as Record<KnowledgePointType, number>
-  for (const node of graph.value?.nodes ?? []) counts[node.data.type] += 1
-  return counts
-})
+const typeCounts = computed(() => countNodeTypes(graph.value?.nodes ?? []))
 function toggleType(type: KnowledgePointType): void {
-  const current = filters.state.value.nodeTypes
   filters.state.value = {
     ...filters.state.value,
-    nodeTypes: allTypes.filter((t) => t === type !== current.includes(t)),
+    nodeTypes: toggledNodeTypes(filters.state.value.nodeTypes, type),
   }
 }
 function restoreAllFilters(): void {
@@ -323,168 +319,15 @@ function clearChapter(): void {
   }
 }
 
-// ---------------------------------------------------------------- 画布数据：学习状态 → 局部视图 → 聚焦状态
-/** 预览/选中由 `highlightId` 决定；筛选层与学习路径带来的 `selected` 要去掉，否则预览与详情会同时出现两个外环 */
-function withoutSelected(g: GraphCanvasData): GraphCanvasData {
-  return {
-    nodes: g.nodes.map((n) => (n.states?.includes('selected') ? { ...n, states: n.states.filter((s) => s !== 'selected') } : n)),
-    edges: g.edges,
-  }
-}
-const canvasGraph = computed<GraphCanvasData | null>(() => {
-  const base = localView.apply(learningGraph.value)
-  if (base === null) return null
-  const hl = highlightId.value
-  const scope = chapterId.value === null ? null : new Set(chapterKpIds.value.map(nodeElementId))
-  return applyFocusStates(withoutSelected(base), {
-    selectedId: hl === null ? null : nodeElementId(hl),
-    matchedIds: new Set(),
-    chapterIds: scope,
-    fade: 'standard',
-  })
+const { canvasGraph, positions, preview, progress } = useStudentGraphPresentation({
+  graph, chapters, learningGraph, localView, highlightId, previewId, chapterId, chapterKpIds, statusOf,
 })
 
-// ---------------------------------------------------------------- 章节分区布局（对完整已发布图算一次，筛选只显示子集）
-const layoutSource = computed(() => {
-  const g = graph.value
-  if (g === null) return null
-  return {
-    nodes: g.nodes.map((n) => ({ id: n.data.kpId, chapter: n.data.chapterId })),
-    edges: g.edges.map((e) => ({
-      id: e.data.relationId,
-      source: kpIdFromElementId(e.source),
-      target: kpIdFromElementId(e.target),
-      type: e.data.type,
-    })),
-    chapterOrder: [...chapters.value].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1)).map((c) => c.id),
-  }
-})
-const { positions } = useGraphLayout(() => layoutSource.value)
-
-// ---------------------------------------------------------------- 预览卡
-const preview = computed(() => {
-  const id = previewId.value
-  const g = graph.value
-  const node = id === null || g === null ? undefined : g.nodes.find((n) => n.data.kpId === id)
-  if (id === null || g === null || node === undefined) return null
-  const el = nodeElementId(id)
-  const status = statusOf(id)
-  const mastery: 'mastered' | 'learning' | 'unknown' = status === 'mastered' ? 'mastered' : status === 'learning' ? 'learning' : 'unknown'
-  return {
-    id,
-    name: node.data.name,
-    type: node.data.type,
-    chapter: chapters.value.find((c) => c.id === node.data.chapterId)?.title ?? '未分章',
-    mastery,
-    masteryText: MASTERY_LABELS[status],
-    prerequisites: g.edges.filter((e) => e.data.type === 'PREREQUISITE' && e.target === el).length,
-    unlocks: g.edges.filter((e) => e.data.type === 'PREREQUISITE' && e.source === el).length,
-  }
-})
-
-// ---------------------------------------------------------------- 进度（左面板概览）
-const progress = computed(() => {
-  const total = graph.value?.nodes.length ?? 0
-  let done = 0
-  let learning = 0
-  for (const node of graph.value?.nodes ?? []) {
-    const s = statusOf(node.data.kpId)
-    if (s === 'mastered') done += 1
-    else if (s === 'learning') learning += 1
-  }
-  return { total, done, learning, percent: total === 0 ? 0 : Math.round((done / total) * 100) }
-})
-
-// ---------------------------------------------------------------- 面板：按容器宽度判断并置/覆盖
-const ws = ref<HTMLElement | null>(null)
-const panel = ref<InstanceType<typeof GraphSidePanel> | null>(null)
-const panelToggle = ref<HTMLButtonElement | null>(null)
-const wsWidth = ref(0)
-/** 可调并置面板；窄屏仍使用覆盖抽屉。 */
-const docked = computed(() => wsWidth.value >= 960)
-const preferredPanelWidth = ref(25)
-const minPanelWidth = computed(() => Math.max(20, 280 / Math.max(wsWidth.value, 1) * 100))
-const maxPanelWidth = computed(() => Math.min(45, (wsWidth.value - 640) / Math.max(wsWidth.value, 1) * 100))
-const panelWidth = computed(() => Math.min(maxPanelWidth.value, Math.max(minPanelWidth.value, preferredPanelWidth.value)))
-const resizingPanel = ref(false)
-function setPanelWidth(value: number): void {
-  preferredPanelWidth.value = Math.min(maxPanelWidth.value, Math.max(minPanelWidth.value, value))
-}
-function moveDivider(event: PointerEvent): void {
-  if (!resizingPanel.value || ws.value === null) return
-  const rect = ws.value.getBoundingClientRect()
-  if (rect.width > 0) setPanelWidth((event.clientX - rect.left) / rect.width * 100)
-}
-function startDivider(event: PointerEvent): void {
-  if (event.button !== 0) return
-  event.preventDefault()
-  resizingPanel.value = true
-  const handle = event.currentTarget as HTMLElement
-  handle.focus()
-  handle.setPointerCapture(event.pointerId)
-}
-function endDivider(event: PointerEvent): void {
-  resizingPanel.value = false
-  const handle = event.currentTarget as HTMLElement
-  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId)
-}
-function keyDivider(event: KeyboardEvent): void {
-  const values: Record<string, number> = {
-    ArrowLeft: panelWidth.value - 2, ArrowRight: panelWidth.value + 2,
-    Home: minPanelWidth.value, End: maxPanelWidth.value,
-  }
-  const value = values[event.key]
-  if (value === undefined) return
-  event.preventDefault()
-  setPanelWidth(value)
-}
-const dockedOpen = ref(true)
-const overlayOpen = ref(false)
-const panelVisible = computed(() => (docked.value ? dockedOpen.value : overlayOpen.value))
-let observer: ResizeObserver | null = null
-const measureWorkspace = (): void => {
-  wsWidth.value = ws.value?.clientWidth ?? 0
-}
-
-function openPanel(): void {
-  if (docked.value) dockedOpen.value = true
-  else overlayOpen.value = true
-  void nextTick(() => panel.value?.el?.querySelector<HTMLElement>('[data-focus-start]')?.focus())
-}
-function closePanel(): void {
-  if (docked.value) dockedOpen.value = false
-  else overlayOpen.value = false
-  void nextTick(() => panelToggle.value?.focus())
-}
-// 覆盖模式下选中知识点时抽屉同时打开；并置模式下面板本来就在
-watch(selected, (now) => {
-  if (now !== null && !docked.value) overlayOpen.value = true
-})
-watch(docked, (now) => {
-  if (now) overlayOpen.value = false
-})
-// Esc 依次关闭：章节菜单（菜单自己处理）→ 覆盖抽屉 → 预览
-function onKey(event: KeyboardEvent): void {
-  if (event.key !== 'Escape') return
-  if (!docked.value && overlayOpen.value) closePanel()
-  else if (previewId.value !== null) focus.clearPreview()
-}
-onMounted(() => {
-  window.addEventListener('keydown', onKey)
-  if (ws.value !== null) {
-    // 首帧先同步量一次：避免第一次渲染按「0 宽」判成覆盖模式，后台标签页也不依赖观察器回调
-    wsWidth.value = ws.value.clientWidth
-    if (typeof ResizeObserver === 'function') {
-      observer = new ResizeObserver(measureWorkspace)
-      observer.observe(ws.value)
-    } else window.addEventListener('resize', measureWorkspace)
-  }
-})
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKey)
-  window.removeEventListener('resize', measureWorkspace)
-  observer?.disconnect()
-})
+const {
+  ws, panel, panelToggle, docked, minPanelWidth, maxPanelWidth, panelWidth,
+  resizingPanel, setPanelWidth, moveDivider, startDivider, endDivider, keyDivider,
+  dockedOpen, overlayOpen, panelVisible, openPanel, closePanel,
+} = useStudentGraphPanel({ selected, previewId, focus })
 
 // ---------------------------------------------------------------- 底部折叠条与布局切换
 const nextOpen = ref(false)

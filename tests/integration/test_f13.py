@@ -22,6 +22,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from tests.waiting import wait_until
 
 from app.config import load_settings
 from app.repositories import course_locks, task_leases, tasks
@@ -231,13 +232,15 @@ def test_course_lock_wait_is_bounded(db_url):
 
 
 def test_course_lock_is_renewed_while_held_and_released_after(db_url):
-    import time
-
     lock = course_locks.try_acquire(db_url, "c1", holder="a", lease_seconds=3)
     assert lock is not None
     with course_locks.held(db_url, lock, lease_seconds=3):
         _sql(db_url, "UPDATE course_locks SET expires_at = unixepoch() WHERE course_id = 'c1'")
-        time.sleep(1.3)
+        def renewed() -> bool:
+            [(expires, now)] = _sql(db_url, "SELECT expires_at, unixepoch() FROM course_locks WHERE course_id = 'c1'")
+            return expires >= now + 2
+
+        wait_until(renewed, timeout=3, description="course-lock heartbeat to renew the stored expiry")
         [(expires, now)] = _sql(db_url, "SELECT expires_at, unixepoch() FROM course_locks WHERE course_id = 'c1'")
         assert expires >= now + 2
     assert _sql(db_url, "SELECT count(*) FROM course_locks") == [(0,)]

@@ -14,12 +14,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Final
 
-from app.repositories.chunks import StoredChunk, list_chunks
-from app.repositories.graph_migrations import VectorSpaceError, _dimensions, _validate_vector, vector_property
+from app.repositories import version_chunk_vectors as chunk_repo
+from app.repositories.version_chunk_vectors import _chunks, _index_online, _missing
+from app.repositories.graph_migrations import VectorSpaceError, _validate_vector, vector_property
 from app.repositories.neo4j import GraphScope, Neo4jRepository, ScopedTransaction
 from app.services.versions.materialize import Embedder, VerificationError
 
@@ -32,59 +33,6 @@ DEFAULT_BATCH_SIZE: Final = 200  # 每个 Neo4j 写事务的块数
 class ChunkIndexResult:
     total: int  # 版本修订内的文本块数
     embedded: int  # 本次新算向量的块数
-
-
-def _missing_query(prop: str) -> str:
-    # $version_id 只满足作用域参数约定：文本块跨版本共享。
-    return f"""
-UNWIND $expected AS row
-OPTIONAL MATCH (c:Chunk {{course_id: $course_id, chunk_id: row.chunk_id}})
-WITH row, c, $version_id AS version_id
-WHERE c IS NULL OR c.revision_id IS NULL OR c.revision_id <> row.revision_id
-   OR c.document_id IS NULL OR c.document_id <> row.document_id
-   OR c.{prop} IS NULL OR size(c.{prop}) <> $dims
-RETURN row.chunk_id AS chunk_id
-"""
-
-
-def _write_query(prop: str) -> str:
-    return f"""
-UNWIND $rows AS row
-MERGE (c:Chunk {{course_id: $course_id, chunk_id: row.chunk_id}})
-SET c.document_id = row.document_id, c.revision_id = row.revision_id, c.{prop} = row.vector
-RETURN count(c) AS written, $version_id AS version_id
-"""
-
-
-def _chunks(sqlite_url: str, course_id: str, revision_ids: Iterable[str]) -> list[StoredChunk]:
-    chunks: list[StoredChunk] = []
-    for revision_id in sorted(set(revision_ids)):
-        chunks.extend(list_chunks(sqlite_url, course_id=course_id, revision_id=revision_id))
-    return chunks
-
-
-def _missing(repo: Neo4jRepository, scope: GraphScope, chunks: Sequence[StoredChunk], space: str) -> set[str]:
-    """缺节点、身份（``revision_id``、``document_id``）与 SQLite 不符、缺向量或维度不对的块。"""
-    if not chunks:
-        return set()
-    expected = [{"chunk_id": c.chunk_id, "revision_id": c.revision_id, "document_id": c.material_id}
-                for c in chunks]
-    rows = repo.read(_missing_query(vector_property(space)), scope, reader="worker",
-                     parameters={"expected": expected, "dims": _dimensions(space)})
-    return {row["chunk_id"] for row in rows}
-
-
-_INDEX_STATE = """
-SHOW VECTOR INDEXES YIELD name, state
-WHERE name = $index
-RETURN state, $course_id AS course_id, $version_id AS version_id
-"""
-
-
-def _index_online(repo: Neo4jRepository, scope: GraphScope, space: str) -> bool:
-    rows = repo.read(_INDEX_STATE, scope, reader="worker",
-                     parameters={"index": "chunk_" + vector_property(space)})
-    return any(row["state"] == "ONLINE" for row in rows)
 
 
 def index_chunks(
@@ -115,16 +63,16 @@ def index_chunks(
          "vector": _validate_vector(v, space)}
         for c, v in zip(todo, vectors, strict=True)
     ]
-    query = _write_query(vector_property(space))
+    prop = vector_property(space)
     for start in range(0, len(rows), batch_size):
         batch = rows[start:start + batch_size]
 
         def work(tx: ScopedTransaction, batch: list[dict[str, Any]] = batch) -> None:
-            [row] = tx.run(query, {"rows": batch})
-            if row["written"] != len(batch):
+            written = chunk_repo.write_batch(tx, prop, batch)
+            if written != len(batch):
                 raise VectorSpaceError("chunk vector write count differs from the batch")
 
-        repo.write_transaction(scope, work)
+        chunk_repo.transaction(repo, scope, work)
     return ChunkIndexResult(len(chunks), len(todo))
 
 

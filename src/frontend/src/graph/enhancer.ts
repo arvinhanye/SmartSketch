@@ -117,8 +117,14 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
   let chapterOf = new Map<string, string | null>()
   let importance = new Map<string, number>()
   let scope: readonly string[] | null = null
+  /** 当前指针所在节点与已经生效的淡化节点分开，短暂划过只影响前者。 */
+  let pointerId: string | null = null
   let hoverId: string | null = null
+  let hoverEnter: ReturnType<typeof setTimeout> | null = null
   let hoverLeave: ReturnType<typeof setTimeout> | null = null
+  /** null 表示重绘后状态未知，需要完整恢复；其余情况只提交差分。 */
+  let appliedStates: Record<string, string[]> | null = null
+  let dataRevision = 0
   let labelTimer: ReturnType<typeof setTimeout> | null = null
   let labelDirty = false
   let hullAdded = false
@@ -142,6 +148,17 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
   function decorate(data: EnhancedData): EnhancedData {
     nodes = data.nodes
     edges = data.edges
+    dataRevision += 1
+    const present = new Set(nodes.map((n) => n.id))
+    if (hoverId !== null && !present.has(hoverId)) hoverId = null
+    if (pointerId !== null && !present.has(pointerId)) endHover()
+    if (hoverId === null && hoverLeave !== null) {
+      clearTimeout(hoverLeave)
+      hoverLeave = null
+    }
+    // 生命周期随后用这份数据 setData/render，基础状态因此成为新的比较起点。
+    // afterRender 会把仍然有效的悬停叠回去，不能继续沿用上一份图的快照。
+    appliedStates = hoverStateMap({ nodes, edges, hoverId: null, selectedId: selectedElement() })
     chapterOf = chapterOfNodes(nodes)
     const degree = new Map<string, number>()
     for (const e of edges) {
@@ -161,6 +178,28 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     return hoverStateMap({ nodes, edges, hoverId, selectedId: selectedElement() })
   }
 
+  /** 在生命周期串行队列里调用；按状态顺序比较，因为后面的状态覆盖前面的样式。 */
+  async function applyStates(g: CanvasGraph): Promise<void> {
+    if (!live() || deps.graph() !== g || g.setElementState === undefined) return
+    const revision = dataRevision
+    const next = stateMap()
+    const changed: Record<string, string[]> = {}
+    for (const [id, states] of Object.entries(next)) {
+      const previous = appliedStates?.[id]
+      if (previous === undefined || previous.length !== states.length || states.some((state, index) => state !== previous[index])) {
+        changed[id] = states
+      }
+    }
+    if (Object.keys(changed).length === 0) return
+    try {
+      await g.setElementState(changed, false)
+    } catch (error) {
+      if (live() && deps.graph() === g && dataRevision === revision) appliedStates = null
+      throw error
+    }
+    if (live() && deps.graph() === g && dataRevision === revision) appliedStates = next
+  }
+
   /** 把当前视图状态写进元素数据并重绘；重绘会丢元素状态，所以随后重新写一次 */
   async function pushView(): Promise<void> {
     const g = deps.graph()
@@ -168,7 +207,9 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     g.updateNodeData(decoratedNodes().map((n) => ({ id: n.id, data: n.data })))
     g.updateEdgeData(decoratedEdges().map((e) => ({ id: e.id, data: e.data, style: e.style })))
     await g.draw()
-    if (live()) await g.setElementState?.(stateMap(), false)
+    if (!live() || deps.graph() !== g) return
+    appliedStates = null
+    await applyStates(g)
   }
 
   /** 按当前缩放重算档位；返回是否变化。档位量化，滚轮缩放时不会每帧重绘 */
@@ -296,15 +337,24 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
   function applyHover(): void {
     const g = deps.graph()
     if (!live() || g === null || g.setElementState === undefined) return
-    void g.setElementState(stateMap(), false).catch(() => undefined)
+    deps.enqueue(async () => {
+      // 排到时再计算当前状态：快速切换只落地最新意图，不让旧悬停覆盖预览更新。
+      await applyStates(g).catch(() => undefined)
+    })
   }
 
   function endHover(): void {
+    pointerId = null
+    if (hoverEnter !== null) clearTimeout(hoverEnter)
+    hoverEnter = null
     options.onHover?.(null)
-    if (hoverLeave !== null) clearTimeout(hoverLeave)
+    // 连续 canvas:pointermove 不重置截止时间，离开后最多保留 60ms。
+    if (hoverId === null || hoverLeave !== null) return
+    const g = deps.graph()
     // 稍等一下再恢复：从一个节点移到相邻节点时不闪（期间进入新节点会取消）
     hoverLeave = setTimeout(() => {
       hoverLeave = null
+      if (!live() || deps.graph() !== g) return
       hoverId = null
       applyHover()
     }, 60)
@@ -323,30 +373,41 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
       scheduleLabels()
     })
     g.on('canvas:click', () => {
-      if (live()) options.onBlankClick?.()
+      if (live() && deps.graph() === g) options.onBlankClick?.()
     })
     g.on('node:pointerenter', (event: GraphEvent) => {
       const id = event.target?.id
       // 触屏没有悬停：不做悬停淡化与 tooltip
-      if (!live() || id === undefined || event.pointerType === 'touch') return
+      if (!live() || deps.graph() !== g || id === undefined || event.pointerType === 'touch') return
+      const node = nodes.find((n) => n.id === id)
+      if (node === undefined || pointerId === id) return
       if (hoverLeave !== null) clearTimeout(hoverLeave)
       hoverLeave = null
-      hoverId = id
-      applyHover()
-      const node = nodes.find((n) => n.id === id)
-      if (node !== undefined) {
-        options.onHover?.({ kpId: node.data.kpId, clientX: event.client?.x ?? 0, clientY: event.client?.y ?? 0 })
-      }
+      if (hoverEnter !== null) clearTimeout(hoverEnter)
+      hoverEnter = null
+      pointerId = id
+      // tooltip 自己等待 300ms；这里立即通知，避免把两个停留时间相加。
+      options.onHover?.({ kpId: node.data.kpId, clientX: event.client?.x ?? 0, clientY: event.client?.y ?? 0 })
+      if (hoverId === id) return
+      hoverEnter = setTimeout(() => {
+        hoverEnter = null
+        if (!live() || deps.graph() !== g || pointerId !== id || !nodes.some((n) => n.id === id)) return
+        hoverId = id
+        applyHover()
+      }, 120)
     })
-    g.on('node:pointerleave', () => {
-      if (live() && hoverId !== null) endHover()
+    g.on('node:pointerleave', (event: GraphEvent) => {
+      if (!live() || deps.graph() !== g) return
+      // G6 快速切换时旧节点的 leave 可能晚于新节点的 enter。
+      if (event.target?.id !== undefined && pointerId !== null && event.target.id !== pointerId) return
+      if (pointerId !== null || hoverId !== null) endHover()
     })
     // 兜底：只依赖节点的 pointerleave 在快速移动时不可靠
     g.on('canvas:pointermove', () => {
-      if (live() && hoverId !== null) endHover()
+      if (live() && deps.graph() === g && (pointerId !== null || hoverId !== null)) endHover()
     })
     g.on('edge:pointerenter', () => {
-      if (live() && hoverId !== null) endHover()
+      if (live() && deps.graph() === g && (pointerId !== null || hoverId !== null)) endHover()
     })
   }
 
@@ -358,6 +419,9 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
       deps.onZoom(round2(zoom))
       if (syncView(zoom)) await pushView()
     }
+    if (!live() || deps.graph() !== g) return
+    await applyStates(g)
+    if (!live() || deps.graph() !== g) return
     syncHull()
     scheduleLabels()
   }
@@ -433,7 +497,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     },
     relayoutLabels: scheduleLabels,
     leaveHover() {
-      if (live() && hoverId !== null) endHover()
+      if (live() && (pointerId !== null || hoverId !== null)) endHover()
     },
     minimapColor(elementId) {
       const states = nodes.find((n) => n.id === elementId)?.states ?? []
@@ -445,9 +509,14 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     detach() {
       detached = true
       if (labelTimer !== null) clearTimeout(labelTimer)
+      if (hoverEnter !== null) clearTimeout(hoverEnter)
       if (hoverLeave !== null) clearTimeout(hoverLeave)
       labelTimer = null
+      hoverEnter = null
       hoverLeave = null
+      pointerId = null
+      hoverId = null
+      appliedStates = null
     },
   }
 }

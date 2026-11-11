@@ -114,35 +114,25 @@ def save(settings,user_id: str, *, transport=None, rebuilder=None, **values) -> 
         # Publication leases outlive their draft locks. Refuse all active attempts;
         # begin_attempt also checks our owner lock in its insertion transaction.
         with connect(settings.SQLITE_URL) as db:
-            if db.execute("SELECT 1 FROM graph_versions v JOIN courses c ON c.id=v.course_id WHERE c.teacher_id=? AND v.state IN ('preparing','materialized')",(user_id,)).fetchone():
+            if rows.active_publication(db,user_id):
                 raise EmbeddingConfigBusy()
         result=test(settings,user_id,transport=transport,**values)
         if not result['ok']: raise EmbeddingConfigFailure(result['error_class'])
         if old is None or old.space != target:
             (rebuilder or rebuild_courses)(configured,user_id,courses,target,transport=transport)
         sealed=_cipher(settings).seal(domain(user_id),key)
-        with connect(settings.SQLITE_URL) as db:
-            db.execute('BEGIN IMMEDIATE')
-            if db.execute("SELECT 1 FROM graph_versions v JOIN courses c ON c.id=v.course_id WHERE c.teacher_id=? AND v.state IN ('preparing','materialized')",(user_id,)).fetchone():
+        with rows.config_update(settings.SQLITE_URL,user_id) as (db,publishing):
+            if publishing:
                 raise EmbeddingConfigBusy()
-            current=db.execute('SELECT revision FROM teacher_embedding_configs WHERE user_id=?',(user_id,)).fetchone()
-            owned=[r[0] for r in db.execute('SELECT id FROM courses WHERE teacher_id=? ORDER BY id',(user_id,))]
+            current=rows.config_revision(db,user_id)
+            owned=rows.owned_courses_in_connection(db,user_id)
             if owned!=courses or (current[0] if current else None)!=(old.revision if old else None):
                 raise EmbeddingConfigBusy()
             for lock in locks:
-                if db.execute('SELECT 1 FROM course_locks WHERE course_id=? AND token=? AND expires_at>=unixepoch()',
-                              (lock.course_id,lock.token)).fetchone() is None: raise EmbeddingConfigBusy()
-            db.execute('''INSERT INTO teacher_embedding_configs
-              (user_id,base_url,model,dimensions,key_ciphertext,key_nonce,key_hint,space,revision,version)
-              VALUES (?,?,?,?,?,?,?,?,?,1) ON CONFLICT(user_id) DO UPDATE SET
-              base_url=excluded.base_url,model=excluded.model,dimensions=excluded.dimensions,
-              key_ciphertext=excluded.key_ciphertext,key_nonce=excluded.key_nonce,key_hint=excluded.key_hint,
-              space=excluded.space,revision=excluded.revision,version=teacher_embedding_configs.version+1,
-              updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')''',
-              (user_id,configured.EMBEDDING_BASE_URL,configured.EMBEDDING_MODEL,configured.EMBEDDING_DIMENSIONS,
-               sealed.ciphertext,sealed.nonce,key[-4:],target,uuid.uuid4().hex))
-            db.execute("UPDATE graph_versions SET embedding_space=? WHERE state='committed' AND course_id IN (SELECT id FROM courses WHERE teacher_id=?)",(target,user_id))
-            db.execute('COMMIT')
+                if rows.current_lock(db,lock.course_id,lock.token) is None: raise EmbeddingConfigBusy()
+            rows.upsert_config(db,user_id,base_url=configured.EMBEDDING_BASE_URL,model=configured.EMBEDDING_MODEL,
+                dimensions=configured.EMBEDDING_DIMENSIONS,sealed=sealed,key_hint=key[-4:],target=target,revision=uuid.uuid4().hex)
+            rows.update_committed_spaces(db,user_id,target)
     return public(settings,user_id)
 
 def rebuild_courses(settings, user_id: str, courses: list[str], target: str, *, transport=None):
@@ -151,20 +141,16 @@ def rebuild_courses(settings, user_id: str, courses: list[str], target: str, *, 
     try:
         writer=GraphVectorWriter(driver,lambda:target)
         writer.ensure_vector_indexes(target)
-        driver.execute_query('CALL db.awaitIndexes(60)',database_='neo4j')
+        rows.await_vector_indexes(driver)
         embedder=adapter(settings,space=target,transport=transport)
         prop=vector_property(target)
         def inventory(course):
-            records,_,_=driver.execute_query('''MATCH (n) WHERE n.course_id=$course AND (n:Chunk OR n:KnowledgePoint)
-              RETURN CASE WHEN n:Chunk THEN 'Chunk' ELSE 'KnowledgePoint' END AS kind,
-              coalesce(n.chunk_id,n.kp_id) AS id,n.version_id AS version,n.name AS name,n.definition AS definition
-              ORDER BY kind,id,version''',course=course,database_='neo4j')
-            return [dict(r) for r in records]
+            return rows.graph_inventory(driver,course)
         for course in courses:
             stock=inventory(course)
             with connect(settings.SQLITE_URL) as db:
-                texts={r[0]:r[1] for r in db.execute('SELECT chunk_id,text FROM chunks WHERE course_id=?',(course,))}
-                versions=list(db.execute("SELECT version_id,node_count FROM graph_versions WHERE course_id=? AND state='committed'",(course,)))
+                texts=rows.course_chunk_texts(db,course)
+                versions=rows.committed_versions(db,course)
             for version,count in versions:
                 if sum(item['kind']=='KnowledgePoint' and item['version']==version for item in stock)!=count:
                     raise EmbeddingConfigFailure('version_stock_mismatch')
@@ -184,9 +170,7 @@ def rebuild_courses(settings, user_id: str, courses: list[str], target: str, *, 
                 for item,vector in zip(batch,vectors,strict=True):
                     writer.write_runtime(item['kind'],course,item['version'] if item['kind']=='KnowledgePoint' else None,item['id'],vector)
             if inventory(course)!=stock: raise EmbeddingConfigBusy()
-            records,_,_=driver.execute_query(f'''MATCH (n) WHERE n.course_id=$course AND (n:Chunk OR n:KnowledgePoint)
-              RETURN count(n) AS total,sum(CASE WHEN n.{prop} IS NOT NULL AND size(n.{prop})=$dimensions THEN 1 ELSE 0 END) AS ready''',
-              course=course,dimensions=settings.EMBEDDING_DIMENSIONS,database_='neo4j')
+            records=rows.vector_readiness(driver,course,prop,settings.EMBEDDING_DIMENSIONS)
             if not records or records[0]['total']!=len(stock) or records[0]['ready']!=len(stock):
                 raise EmbeddingConfigFailure('verification_failed')
     finally:

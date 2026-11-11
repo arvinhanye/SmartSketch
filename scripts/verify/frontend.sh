@@ -17,7 +17,7 @@ trap 'rm -rf -- "$out"' EXIT
 
 status=0
 npm --prefix src/frontend run type-check || status=$?
-# B02 的嵌套进程用例在慢机器上会超过缺省 5 秒（已知，见 docs/tasks.md 集成批次记录）
+# B02 的嵌套进程用例在慢机器上会超过缺省 5 秒（已知，见 docs/archive/tasks-2026-09.md 集成批次记录）
 npm --prefix src/frontend run test -- --run --testTimeout 30000 \
   --reporter=default --reporter=junit --outputFile.junit="$out/frontend.xml" || status=$?
 "$py" scripts/verify/gate.py frontend "$mode" "$out/frontend.xml" --min-tests 100 || status=1

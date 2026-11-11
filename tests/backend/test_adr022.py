@@ -3,23 +3,17 @@
 from __future__ import annotations
 
 import time
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
-from app.repositories.sqlite import migrate
 from app.services.auth import issue_access_token
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.sqlite import migrated_database
 
 SECRET = "adr022-test-signing-key-0123456789abcdef"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
-
-
-def _account(url: str, username: str, role: str):
-    return insert_account(url, account_id=uuid.uuid4().hex, username=username, password_hash=VALID_HASH, role=role)
 
 
 def _headers(user) -> dict[str, str]:
@@ -31,8 +25,7 @@ def _headers(user) -> dict[str, str]:
 
 @pytest.fixture
 def world(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = _account(url, "teacher1", "teacher")
     student = _account(url, "student1", "student")
     outsider = _account(url, "teacher2", "teacher")

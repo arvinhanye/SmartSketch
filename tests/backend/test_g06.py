@@ -10,7 +10,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import time
-import uuid
 from pathlib import Path
 
 import jsonschema
@@ -21,33 +20,23 @@ from fastapi.testclient import TestClient
 from app.api import versions as api
 from app.main import create_app
 from app.repositories import versions
-from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
 from app.repositories.neo4j import RepositoryConnectionError
-from app.repositories.sqlite import migrate
 from app.repositories.versions import PublishInProgress
 from app.services.auth import issue_access_token
 from app.services.ai.client import ModelAuthError, ModelConnectionError, ModelInvalidRequestError
 from app.services.ai.embeddings import EmbeddingBatchError
 from app.services.versions.publish import CourseBusy, PublishFailed, PublishOutcome
 from app.services.versions.snapshot import BlockReason, SnapshotBlocked
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.contracts import rewrite_schema_refs as _rewrite
+from tests.backend.helpers.sqlite import migrated_database
 
 ROOT = Path(__file__).resolve().parents[2]
 SECRET = "g06-test-signing-key-0123456789abcdefghij"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 EXCLUDED = {"low_confidence_nodes": 1, "low_confidence_edges": 0, "cascaded_edges": 2}
 
 _SPEC = yaml.safe_load((ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8"))
-
-
-def _rewrite(node):
-    if isinstance(node, dict):
-        return {key: (value.replace("#/components/schemas/", "#/$defs/")
-                      if key == "$ref" and isinstance(value, str) else _rewrite(value))
-                for key, value in node.items()}
-    if isinstance(node, list):
-        return [_rewrite(item) for item in node]
-    return node
 
 
 _DEFS = _rewrite(copy.deepcopy(_SPEC["components"]["schemas"]))
@@ -55,10 +44,6 @@ _DEFS = _rewrite(copy.deepcopy(_SPEC["components"]["schemas"]))
 
 def assert_schema(name, instance):
     jsonschema.Draft202012Validator({"$defs": _DEFS, "$ref": f"#/$defs/{name}"}).validate(instance)
-
-
-def _account(url, username, role):
-    return insert_account(url, account_id=uuid.uuid4().hex, username=username, password_hash=VALID_HASH, role=role)
 
 
 class Scenario:
@@ -81,8 +66,7 @@ OUTCOME = PublishOutcome(4, "01VERSION", "2026-09-26T10:00:00.000Z", False, 3, 2
 
 @pytest.fixture
 def s(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = _account(url, "teacher1", "teacher")
     student = _account(url, "student1", "student")
     outsider = _account(url, "teacher2", "teacher")

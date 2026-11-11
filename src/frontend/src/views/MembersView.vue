@@ -6,11 +6,15 @@ import { computed, inject, nextTick, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { MEMBERS_API_KEY } from '../api/members'
 import { useMembers } from '../composables/useMembers'
+import CourseInviteCode from '../components/courses/CourseInviteCode.vue'
+import { INVITE_CODE_API_KEY } from '../api/inviteCode'
+import { useInviteCode } from '../composables/useInviteCode'
 import { COURSE_MEMBERS_ROUTE, COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
 
 const api = inject(MEMBERS_API_KEY, null)
 if (api === null) throw new Error('MembersView 需要注入 MEMBERS_API_KEY')
+const inviteApi = inject(INVITE_CODE_API_KEY, null)
 
 const route = useRoute()
 const router = useRouter()
@@ -43,12 +47,26 @@ const {
   api,
   courseId,
   // errors.v1.md：COURSE_FORBIDDEN 提示无权限并返回课程列表（提示由课程页渲染）
-  onCourseForbidden: () => {
-    const role = session.role
-    void router.replace(
-      role === null ? { name: ROOT_ROUTE } : { name: homeRouteFor(role), query: { notice: NOTICE_COURSE_FORBIDDEN } },
-    )
-  },
+  onCourseForbidden: leaveForbiddenCourse,
+})
+
+function leaveForbiddenCourse(): void {
+  const role = session.role
+  void router.replace(
+    role === null ? { name: ROOT_ROUTE } : { name: homeRouteFor(role), query: { notice: NOTICE_COURSE_FORBIDDEN } },
+  )
+}
+const canManageInvite = computed(() => inviteApi !== null && courseId.value !== null && status.value === 'ready')
+const {
+  code: inviteCode, loading: inviteLoading, rotating: inviteRotating, confirming: inviteConfirming,
+  error: inviteError, notice: inviteNotice, copying: inviteCopying, copyStatus: inviteCopyStatus,
+  load: loadInvite, rotate: rotateInvite, copy: copyInvite, askReset: askInviteReset, cancelReset: cancelInviteReset,
+} = useInviteCode({
+  api: inviteApi,
+  courseId,
+  sessionKey: computed(() => session.accessToken),
+  enabled: canManageInvite,
+  onCourseForbidden: leaveForbiddenCourse,
 })
 
 // 焦点：展开确认后落在“不移除”（默认安全）；收起后回到该行的“移除”；移除成功后落在结果提示上
@@ -96,6 +114,13 @@ watch(
         <p v-if="addNotice" data-test="member-add-success" role="status">{{ addNotice }}</p>
       </fieldset>
     </form>
+
+    <CourseInviteCode
+      v-if="canManageInvite"
+      :code="inviteCode" :loading="inviteLoading" :rotating="inviteRotating" :copying="inviteCopying"
+      :confirming="inviteConfirming" :error="inviteError" :notice="inviteNotice" :copy-status="inviteCopyStatus"
+      @load="loadInvite" @copy="copyInvite" @ask-reset="askInviteReset" @cancel-reset="cancelInviteReset" @rotate="rotateInvite"
+    />
 
     <section
       class="list members-list-card"

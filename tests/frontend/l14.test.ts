@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { buildLearningPath } from '../../src/frontend/src/graph/learningPath'
 
 // L14（R11）：掌握标记 → 推荐更新 → 看懂学习路径。
@@ -318,7 +318,6 @@ describe('L14-2 学生图谱页路径焦点', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
     const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
-    await new Promise((resolve) => setTimeout(resolve, 30))
     // 章节分区布局是异步计算的，算完才建图并聚焦
     await vi.waitFor(() => expect(focused.at(-1)).toBe(nodeElementId('C')))
     await wrapper.get('[data-test="rc-select-G"]').trigger('click')
@@ -384,7 +383,13 @@ describe('L14-3 推荐解释：先修事实优先，缺省值不冒充测量', (
 // ---------------------------------------------------------------- 数据更新不重置视口
 
 // UI-GRAPH-PILOT-01：可读缩放常量按计划由 0.7 调为 0.9。
-import { createGraphLifecycle, READABLE_ZOOM, type CanvasGraphInit } from '../../src/frontend/src/graph/lifecycle'
+import { createGraphLifecycle, READABLE_ZOOM, type CanvasGraphInit, type GraphLifecycle } from '../../src/frontend/src/graph/lifecycle'
+
+const lifecycles: GraphLifecycle[] = []
+afterEach(() => {
+  for (const life of lifecycles.splice(0)) life.destroy()
+  vi.restoreAllMocks()
+})
 
 /** 模拟 G6 5.x：设置了 `autoFit` 时每次 render 都把视口重置为整图适配（缩放 0.2、原点 [0,0]） */
 class AutoFitGraph {
@@ -414,15 +419,20 @@ describe('L14-2 数据更新保留视口', () => {
     Object.defineProperty(el, 'clientHeight', { value: 600 })
     const data = canvasData()
     const life = createGraphLifecycle(el, { data, factory: (init) => (graph = new AutoFitGraph(init)) as unknown as CanvasGraph })
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    await flushPromises()
+    lifecycles.push(life)
+    await vi.waitFor(() => expect(life.status).toBe('ready'))
     life.focus('C')
     await flushPromises()
     expect(graph.zoom).toBe(READABLE_ZOOM)
     expect(graph.position).toEqual([123, 45])
+    const setData = vi.spyOn(graph, 'setData')
+    const render = vi.spyOn(graph, 'render')
     life.update({ ...data, nodes: data.nodes.map((n) => ({ ...n, states: ['dimmed'] })) })
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    await flushPromises()
+    await vi.waitFor(() => {
+      expect(setData).toHaveBeenCalledTimes(1)
+      expect(render).toHaveBeenCalledTimes(1)
+      expect(life.status).toBe('ready')
+    })
     expect(graph.zoom).toBe(READABLE_ZOOM)
     expect(graph.position).toEqual([123, 45])
   })
@@ -436,15 +446,21 @@ describe('L14-2 尺寸变化后仍聚焦最近一次请求的节点', () => {
     Object.defineProperty(el, 'clientWidth', { get: () => width })
     Object.defineProperty(el, 'clientHeight', { value: 600 })
     const life = createGraphLifecycle(el, { data: canvasData(), factory: (init) => (graph = new AutoFitGraph(init)) as unknown as CanvasGraph })
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    await flushPromises()
+    lifecycles.push(life)
+    await vi.waitFor(() => expect(life.status).toBe('ready'))
     expect(graph.focused.at(-1)).toBe(nodeElementId('A'))   // 入口节点（无前置的第一个）
     life.focus('C')
     await flushPromises()
+    await vi.waitFor(() => expect(graph.focused.at(-1)).toBe(nodeElementId('C')))
+    const focusCount = graph.focused.length
+    const setSize = vi.spyOn(graph, 'setSize')
     width = 640
     life.refreshSize()
-    await new Promise((resolve) => setTimeout(resolve, 30))
-    await flushPromises()
+    await vi.waitFor(() => {
+      expect(setSize).toHaveBeenCalledWith(640, 600)
+      expect(graph.focused.length).toBeGreaterThan(focusCount)
+      expect(graph.focused.at(-1)).toBe(nodeElementId('C'))
+    })
     expect(graph.zoom).toBe(READABLE_ZOOM)
     expect(graph.focused.at(-1)).toBe(nodeElementId('C'))
   })
@@ -476,10 +492,13 @@ describe('C05-3 路径行里的「之后解锁」可点击定位', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
     const wrapper = await mountStudent(['A', 'B'], ['C', 'G'])
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    await vi.waitFor(() => expect(focused.at(-1)).toBe(nodeElementId('C')))
     await wrapper.get('[data-test="rc-unlock-D"]').trigger('click')
     await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点D')
+      expect(focused.at(-1)).toBe(nodeElementId('D'))
+    })
     expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点D')
     expect(focused.at(-1)).toBe(nodeElementId('D'))
     wrapper.unmount()

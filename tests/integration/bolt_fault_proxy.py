@@ -12,14 +12,21 @@ import select
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 import uuid
 from typing import Literal
 
+if __name__ == '__main__':
+    root = Path(__file__).resolve().parents[2]
+    sys.path[:0] = [str(root), str(root / 'src/backend')]
+
 import pytest
 from neo4j import GraphDatabase
-from app.repositories.graph_migrations import apply_migrations
+from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
+from app.repositories.graph_migrations import GraphMigrationError, apply_migrations
+from tests.waiting import wait_until
 
 
 @dataclass(frozen=True)
@@ -293,6 +300,67 @@ class BoltFaultProxy:
             raise AssertionError('proxy thread did not exit')
 
 
+def _readiness_is_transient(error: Exception) -> bool:
+    """Migrations preserve their driver failure as an implicit exception context."""
+    seen = set()
+    while isinstance(error, GraphMigrationError) and id(error) not in seen:
+        seen.add(id(error))
+        error = error.__cause__ or error.__context__
+    return isinstance(error, (ServiceUnavailable, SessionExpired)) or (
+        isinstance(error, Neo4jError) and error.is_retryable()
+    )
+
+
+def _neo4j_probe_main() -> int:
+    config = json.load(sys.stdin)
+    try:
+        with GraphDatabase.driver(config['uri'], auth=tuple(config['auth']), connection_timeout=1,
+                                  connection_acquisition_timeout=2, max_transaction_retry_time=0) as driver:
+            driver.verify_connectivity()
+            if config['migrate']:
+                apply_migrations(driver)
+            driver.execute_query('RETURN 1', database_='neo4j')
+        return 0
+    except Exception as exc:
+        if _readiness_is_transient(exc):
+            return 75
+        # Diagnostics must not echo the fixture credentials, query bodies, or driver messages.
+        print(type(exc).__name__, file=sys.stderr)
+        return 2
+
+
+def wait_for_neo4j(uri, auth, *, timeout, migrate=False, interval=.5):
+    """Bound connectivity, migrations, query, and driver close by killing/reaping a probe process."""
+    deadline = time.monotonic() + timeout
+
+    def ready():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        try:
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__).resolve()), '--probe-neo4j'],
+                input=json.dumps({'uri': uri, 'auth': auth, 'migrate': migrate}),
+                # DDL may still be building its backing index. Do not kill and
+                # replay it at an artificial per-attempt cap before the deadline.
+                capture_output=True, text=True, timeout=remaining,
+            )
+        except subprocess.TimeoutExpired:
+            # subprocess.run kills and waits for its child before raising.
+            return False
+        if result.returncode == 0:
+            return True
+        if result.returncode == 75:
+            return False
+        detail = result.stderr.strip()
+        # Only the probe's single exception-class diagnostic is safe to include.
+        if not detail.isidentifier():
+            detail = f'exit {result.returncode}'
+        raise AssertionError(f'Neo4j readiness probe failed: {detail}')
+
+    wait_until(ready, timeout=timeout, interval=interval, description='disposable Neo4j readiness and migrations')
+
+
 @pytest.fixture(scope='module')
 def owned_neo4j(tmp_path_factory):
     docker = shutil.which('docker') or '/Users/arvinhan/.docker/bin/docker'
@@ -316,18 +384,7 @@ def owned_neo4j(tmp_path_factory):
         info = json.loads(command('inspect', cid))[0]
         port = int(info['NetworkSettings']['Ports']['7687/tcp'][0]['HostPort'])
         uri = f'bolt://127.0.0.1:{port}'
-        deadline = time.monotonic() + 120
-        while True:
-            try:
-                with GraphDatabase.driver(uri, auth=('neo4j', password), connection_timeout=1) as driver:
-                    driver.verify_connectivity()
-                    apply_migrations(driver)
-                    driver.execute_query('RETURN 1')
-                break
-            except Exception:
-                if time.monotonic() >= deadline:
-                    raise AssertionError('owned Neo4j did not start') from None
-                time.sleep(.5)
+        wait_for_neo4j(uri, ('neo4j', password), timeout=120, migrate=True)
         yield {'uri': uri, 'host': '127.0.0.1', 'port': port,
                'auth': ('neo4j', password), 'id': cid, 'docker': docker,
                'evidence_path': evidence_root / (nonce + '.jsonl')}
@@ -336,3 +393,7 @@ def owned_neo4j(tmp_path_factory):
         if info['Config']['Labels'].get('smartsketch.fixture') != nonce:
             raise AssertionError('fixture ownership changed; leave container intact')
         command('rm', '-f', cid)
+
+
+if __name__ == '__main__' and sys.argv[1:] == ['--probe-neo4j']:
+    sys.exit(_neo4j_probe_main())

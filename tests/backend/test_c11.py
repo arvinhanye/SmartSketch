@@ -32,11 +32,10 @@ import yaml
 from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
-from app.main import create_app
 from app.repositories import event_tickets
 from app.repositories.accounts import insert_account, set_disabled
 from app.repositories.courses import add_member, create_course, remove_member
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services import task_events
 from app.services.auth import issue_access_token
 from app.services.task_cancel import TaskSnapshot, cancel_task
@@ -48,6 +47,9 @@ from app.services.task_events import (
     task_body,
 )
 from app.services.task_state import TaskError
+from tests.backend.helpers.contracts import rewrite_schema_refs as _rewrite
+from tests.backend.helpers.sqlite import migrated_database, sqlite_url as _url
+from tests.backend.helpers.tasks import insert_queued_task as _insert_task
 
 ROOT = Path(__file__).resolve().parents[2]
 SECRET = "c11-test-signing-key-0123456789abcdefghij"
@@ -68,18 +70,6 @@ PROCESSING = ("queued", "parsing", "extracting", "merging", "persisting", "await
 # --- 契约校验（与 tests/contracts/test_b10.py、test_c10.py 同法）--------------------------------
 
 _SPEC = yaml.safe_load((ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8"))
-
-
-def _rewrite(node):
-    if isinstance(node, dict):
-        return {
-            key: (value.replace("#/components/schemas/", "#/$defs/")
-                  if key == "$ref" and isinstance(value, str) else _rewrite(value))
-            for key, value in node.items()
-        }
-    if isinstance(node, list):
-        return [_rewrite(item) for item in node]
-    return node
 
 
 _DEFS = _rewrite(copy.deepcopy(_SPEC["components"]["schemas"]))
@@ -124,31 +114,11 @@ def parse_frame(frame: str) -> tuple[str, dict | None]:
 # --- 数据准备 ------------------------------------------------------------------------------------
 
 
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
-
-
 def _row(url: str, task_id: str) -> dict[str, object]:
     with connect(url) as database:
         database.row_factory = sqlite3.Row
         row = database.execute("SELECT * FROM processing_tasks WHERE id = ?", (task_id,)).fetchone()
     return dict(row)
-
-
-def _insert_task(url: str, course_id: str, task_id: str) -> str:
-    with connect(url) as db:
-        db.execute(
-            "INSERT INTO materials (id, course_id, filename, format, size_bytes, content_hash,"
-            " storage_name) VALUES (?, ?, 'a.txt', 'txt', 1, ?, ?)",
-            (f"doc-{task_id}", course_id, "sha256:" + "a" * 64, f"stored-{task_id}"),
-        )
-        db.execute(
-            "INSERT INTO processing_tasks (id, course_id, document_id, idempotency_key,"
-            " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (task_id, course_id, f"doc-{task_id}", f"key-{task_id}",
-             "2026-09-25T00:00:00.000Z", "2026-09-25T00:00:00.000Z"),
-        )
-    return task_id
 
 
 def set_task(url: str, task_id: str, stage: str, progress: float, *, cancel: int = 0,
@@ -197,9 +167,8 @@ class Clock:
 
 
 @pytest.fixture
-def env(tmp_path, monkeypatch):
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
+def env(tmp_path, app_factory):
+    url = migrated_database(_url(tmp_path / "state.sqlite3"))
 
     def account(name: str, role: str):
         return insert_account(
@@ -218,9 +187,7 @@ def env(tmp_path, monkeypatch):
         _insert_task(url, course.id, tid)
     _insert_task(url, other.id, "task-b")
 
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    application = create_app()
+    application = app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET)
     clock = Clock(T0)
     application.state.auth_clock = clock
     streams = TaskEventStreams(**FAST)

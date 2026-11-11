@@ -20,33 +20,23 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from app.main import create_app
-from app.repositories.accounts import insert_account
 from app.repositories.chunks import persist_revision_chunks
 from app.repositories.courses import add_member, create_course
 from app.repositories.neo4j import RepositoryConnectionError
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.auth import issue_access_token
 from app.services.chunking import ChunkSource, SemanticChunk, chunking_version
 from app.services.parsers.models import RevisionKey, SourceLocator
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.contracts import rewrite_schema_refs as _rewrite
+from tests.backend.helpers.sqlite import migrated_database
 
 ROOT = Path(__file__).resolve().parents[2]
 SECRET = "f08-test-signing-key-0123456789abcdefghij"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 PARSER = "txt/1+" + chunking_version(1500, 200)
 CHUNK_TEXT = "栈是一种后进先出的线性表。"
 
 _SPEC = yaml.safe_load((ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8"))
-
-
-def _rewrite(node):
-    if isinstance(node, dict):
-        return {key: (value.replace("#/components/schemas/", "#/$defs/")
-                      if key == "$ref" and isinstance(value, str) else _rewrite(value))
-                for key, value in node.items()}
-    if isinstance(node, list):
-        return [_rewrite(item) for item in node]
-    return node
 
 
 _DEFS = _rewrite(copy.deepcopy(_SPEC["components"]["schemas"]))
@@ -145,10 +135,6 @@ class FakeReader:
 # --- scenario ----------------------------------------------------------------------------
 
 
-def _account(url, name, role):
-    return insert_account(url, account_id=uuid.uuid4().hex, username=name, password_hash=VALID_HASH, role=role)
-
-
 def token(user):
     return issue_access_token(user_id=user.id, role=user.role, secret=SECRET.encode(),
                               issued_at=int(time.time()), ttl_seconds=3600)
@@ -207,9 +193,8 @@ class Scenario:
 
 
 @pytest.fixture
-def s(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+def s(tmp_path, app_factory):
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = _account(url, "teacher1", "teacher")
     teacher2 = _account(url, "teacher3", "teacher")
     student = _account(url, "student1", "student")
@@ -217,10 +202,7 @@ def s(tmp_path, monkeypatch):
     course = create_course(url, name="数据结构", description=None, creator_id=teacher.id)
     add_member(url, course_id=course.id, user_id=teacher2.id, role="teacher", added_by=teacher.id)
     add_member(url, course_id=course.id, user_id=student.id, role="student", added_by=teacher.id)
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    monkeypatch.setenv("COURSE_LOCK_WAIT_SECONDS", "0")
-    application = create_app()
+    application = app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET, COURSE_LOCK_WAIT_SECONDS="0")
     store = FakeStore()
     reader = FakeReader(store)
     application.state.graph_node_store = store

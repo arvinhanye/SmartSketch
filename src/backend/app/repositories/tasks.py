@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import uuid4
@@ -300,6 +302,20 @@ def mark_cancel_requested(
               AND stage IN ('queued', 'parsing', 'extracting', 'merging')""",
         (target_stage, task_id, course_id, expected_stage),
     ).rowcount == 1
+
+
+@contextmanager
+def cancel_transaction(sqlite_url: str) -> Iterator[sqlite3.Connection]:
+    """Keep the cancellation read, decision and compare-and-swap in one write transaction."""
+    with connect(sqlite_url) as database:
+        database.execute("BEGIN IMMEDIATE")
+        try:
+            yield database
+            database.execute("COMMIT")
+        except BaseException:
+            if database.in_transaction:
+                database.execute("ROLLBACK")
+            raise
 
 
 def read_leased_task(

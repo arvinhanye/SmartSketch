@@ -13,10 +13,11 @@ from app.api import graph_nodes, relations, review
 from app.main import create_app
 from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.schemas.contracts import KnowledgePointStatus, KnowledgePointType, RelationType
 from app.services.auth import issue_access_token
 from test_f08 import assert_schema
+from tests.backend.helpers.sqlite import migrated_database
 
 SECRET = 'enum-regression-only-key-0123456789abcdefghij'
 VALID_HASH = '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA'
@@ -47,8 +48,7 @@ ROUTES = [
 
 @pytest.fixture
 def http_env(tmp_path, monkeypatch):
-    url = f'sqlite:///{tmp_path / "state.sqlite3"}'
-    migrate(url)
+    url = migrated_database(f'sqlite:///{tmp_path / "state.sqlite3"}')
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username='teacher',
                              password_hash=VALID_HASH, role='teacher')
     student = insert_account(url, account_id=uuid.uuid4().hex, username='student',
