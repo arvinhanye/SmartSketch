@@ -2543,3 +2543,5 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - 已决：用户确认允许本地整合后继续，不等待远端合入；暂不推送或合并远端 PR。四项分别保留本地叠加分支与独立提交范围。核查证据和验证记录见 `docs/handoffs/codex-opt-06.md`。
 
 - OPT-06A：AI 兼容客户端拆分；44 定义/30 签名核对通过，定向 413 passed，后端 full 4264 passed / 27 登记 skip，exit 0；共用门禁与最终审查待完成。
+
+- OPT-06C：材料页纯函数/类型拆分；41 声明/14 导出核对通过，定向 95 passed；前端 full 82 文件 / 1375 passed，type-check/build exit 0；共用门禁与最终审查待完成。

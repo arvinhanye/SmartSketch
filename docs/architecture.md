@@ -40,6 +40,8 @@ OPT-06A：`services/ai/compatible.py` 保留聊天客户端和原导入入口；
 
 ## 前端构建、测试与应用外壳（B01～B04）
 
+OPT-06C：`composables/useMaterials.ts` 保留状态及请求/SSE 生命周期；`composables/materials/{files,status,errors,types}.ts` 分别承载文件校验、状态呈现、错误映射和共享类型。旧入口导出名与返回对象不变，切课/卸载清理和晚到响应防护保持原顺序。
+
 - `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
 - Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。
 - 测试（B02）：`src/frontend/vitest.config.ts` 继承 `vite.config.ts`，收集仓库外层 `tests/frontend/**/*.test.ts`（jsdom 环境，排除点开头目录，零用例即失败）；测试文件中的裸模块从 `src/frontend/node_modules` 解析。类型检查拆为应用（`tsconfig.json`，浏览器类型）与 Node 侧（`tsconfig.node.json`：构建/测试配置与 `tests/frontend`），应用代码不可见 Node 类型。
