@@ -12,7 +12,7 @@ from app.config import load_settings
 from app.repositories import model_configs as repo
 from app.repositories.accounts import insert_account
 from app.repositories.model_calls import BudgetRejected, CallRecord, SqliteCallStore
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.ai.client import Message, ModelAuthError, ModelRequest
 from app.services.ai.policy import CallAttribution, ModelUnavailableError
 from app.services.credentials import CredentialCipher, ModelConfigRequired
@@ -43,13 +43,6 @@ class Transport:
             return chunk
 
         return SimpleNamespace(status=status, header=lambda name: None, read=read, close=lambda: None)
-
-
-@pytest.fixture
-def url(tmp_path):
-    value = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(value)
-    return value
 
 
 def _settings(url, **extra):

@@ -129,7 +129,7 @@
 
 - 17 个任务中任务 1–16 已实施，加上用户批准的两处局部修正（学生详情的自适应面板、去掉重复关闭叉）。**用户已本地验收并开了 Draft PR #321。**
 - 自动化（2026-10-07，Codex 记录）：`type-check` 通过；前端全量 **57 个文件 / 1144 条**通过（基线 38 / 934）；`build` 通过（G6 所在 chunk >500 kB 的提示是既有现象）；`./scripts/verify.sh` 基础档通过。
-- 相关记录：规格、实施计划、ADR-091（`docs/decisions.md`）、交接 `docs/handoffs/claude-ui-graph-pilot-01.md`、`codex-ui-graph-pilot-01.md`、`claude-ui-graph-pilot-01-to-codex.md`。
+- 相关记录：规格、实施计划、ADR-091（`docs/archive/decisions-adr-081-120.md`）、交接 `docs/handoffs/claude-ui-graph-pilot-01.md`、`codex-ui-graph-pilot-01.md`、`claude-ui-graph-pilot-01-to-codex.md`。
 
 ### 6.2 样板页的未验证项（不阻塞第二批，但必须收口）
 

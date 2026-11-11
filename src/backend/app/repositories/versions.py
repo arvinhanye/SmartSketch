@@ -53,7 +53,9 @@ __all__ = [
     "new_version_id",
     "next_commit_seq",
     "read_draft_state",
+    "read_published_binding",
     "read_snapshot",
+    "read_snapshot_digest",
     "record_snapshot",
     "set_cleanup_pending",
 ]
@@ -65,6 +67,19 @@ _COLUMNS: Final = (
     "excluded, draft_revision, task_watermark, embedding_space, failure_reason, cleanup_pending, created_by, "
     "created_at, committed_at, commit_seq"
 )
+
+_BY_POINTER: Final = """
+    SELECT c.published_version_id, c.published_version,
+           v.version_id, v.course_id, v.version, v.state
+    FROM courses c LEFT JOIN graph_versions v ON v.version_id = c.published_version_id
+    WHERE c.id = ?"""
+
+_BY_NUMBER: Final = """
+    SELECT c.published_version_id, c.published_version,
+           v.version_id, v.course_id, v.version, v.state
+    FROM courses c LEFT JOIN graph_versions v
+         ON v.course_id = c.id AND v.version = ? AND v.state = 'committed'
+    WHERE c.id = ?"""
 
 
 class PublishInProgress(Exception):
@@ -161,6 +176,23 @@ def _require_transaction(database: sqlite3.Connection, operation: str) -> None:
 def _get(database: sqlite3.Connection, version_id: str) -> VersionRecord | None:
     row = database.execute(f"SELECT {_COLUMNS} FROM graph_versions WHERE version_id = ?", (version_id,)).fetchone()
     return None if row is None else _record(row)
+
+
+def read_published_binding(
+    database: sqlite3.Connection, course_id: str, *, version: int | None = None
+) -> tuple[Any, ...] | None:
+    """Read the course pointer together with its current or explicitly numbered version row."""
+    if version is None:
+        return database.execute(_BY_POINTER, (course_id,)).fetchone()
+    return database.execute(_BY_NUMBER, (version, course_id)).fetchone()
+
+
+def read_snapshot_digest(database: sqlite3.Connection, version_id: str) -> tuple[Any, ...] | None:
+    """Return the committed snapshot and digest for service-level integrity validation."""
+    return database.execute(
+        "SELECT snapshot_json, digest FROM graph_versions WHERE version_id = ? AND state = 'committed'",
+        (version_id,),
+    ).fetchone()
 
 
 # ---------------------------------------------------------------- attempts

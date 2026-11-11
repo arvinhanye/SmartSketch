@@ -20,6 +20,8 @@ _spec.loader.exec_module(_module)
 
 Course = _module.Course
 CourseCreate = _module.CourseCreate
+CourseJoinRequest = _module.CourseJoinRequest
+InviteCodeResponse = _module.InviteCodeResponse
 CourseStatus = _module.CourseStatus
 ChatRequest = _module.ChatRequest
 ChatResponse = _module.ChatResponse

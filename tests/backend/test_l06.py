@@ -13,8 +13,8 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 from app.repositories import model_configs as repo
 from app.repositories.accounts import insert_account
-from app.repositories.sqlite import migrate
 from app.services.auth import issue_access_token
+from tests.backend.helpers.sqlite import migrated_database
 
 SECRET = "l06-test-signing-key-0123456789abcdefghijkl"
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
@@ -62,8 +62,7 @@ def _auth(user):
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     alice = insert_account(url, account_id=uuid.uuid4().hex, username="alice01", password_hash=VALID_HASH, role="teacher")
     bob = insert_account(url, account_id=uuid.uuid4().hex, username="bob0001", password_hash=VALID_HASH, role="student")
     monkeypatch.setenv("SQLITE_URL", url)
@@ -225,8 +224,7 @@ def test_test_is_rate_limited_per_user(env):
 
 
 def test_writes_disabled_without_root_key(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     user = insert_account(url, account_id=uuid.uuid4().hex, username="carol01", password_hash=VALID_HASH, role="student")
     monkeypatch.setenv("SQLITE_URL", url)
     monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)

@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
+from tests.waiting import wait_until
 from neo4j import AsyncGraphDatabase, GraphDatabase
 from app.repositories import course_locks, task_leases
 from app.repositories.lease_guard import LeaseGuard
@@ -94,17 +95,24 @@ def test_worker_fault_fence_and_physical_connection_exit(task, owned_neo4j, monk
                 try:
                     with connect(url) as db:
                         db.execute('PRAGMA busy_timeout=5000' if repeat % 2 else 'PRAGMA busy_timeout=0')
-                        while not stop.is_set():
+                        def committed_or_stopped():
+                            if stop.is_set():
+                                return True
                             try:
                                 db.execute('BEGIN IMMEDIATE')
                                 db.execute('UPDATE courses SET name=name WHERE id=?', (lease.course_id,))
                                 db.execute('COMMIT')
                                 writer_wait.append(time.monotonic() - started)
-                                return
-                            except sqlite3.OperationalError:
-                                time.sleep(.005)
+                                return True
+                            except sqlite3.OperationalError as exc:
+                                if exc.sqlite_errorcode & 0xFF not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                                    raise
+                                return False
+
+                        wait_until(committed_or_stopped, timeout=5, interval=.005,
+                                   description='competing SQLite writer to commit after fence release')
                 except BaseException as exc:
-                    writer_errors.append(type(exc).__name__)
+                    writer_errors.append(f'{type(exc).__name__}: {exc}')
             thread = threading.Thread(target=writer)
             thread.start()
             started = time.monotonic()

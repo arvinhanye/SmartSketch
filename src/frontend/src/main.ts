@@ -6,6 +6,7 @@ import { AUTH_API_KEY, createAuthApi, createSessionHttpClient } from './api/auth
 import { HTTP_CLIENT_KEY } from './api/client'
 import { COURSES_API_KEY, createCoursesApi } from './api/courses'
 import { createMembersApi, MEMBERS_API_KEY } from './api/members'
+import { createInviteCodeApi, INVITE_CODE_API_KEY } from './api/inviteCode'
 import { createModelConfigApi, MODEL_CONFIG_API_KEY } from './api/modelConfig'
 import { createMaterialsApi, MATERIALS_API_KEY, TASK_EVENTS_CLIENT_KEY } from './api/materials'
 import { createDraftGraphApi, createPublishedGraphApi, DRAFT_GRAPH_API_KEY, PUBLISHED_GRAPH_API_KEY } from './api/graph'
@@ -74,6 +75,7 @@ createApp(App)
   .provide(AUTH_API_KEY, createAuthApi(http))
   .provide(COURSES_API_KEY, createCoursesApi(http))
   .provide(MEMBERS_API_KEY, createMembersApi(http))
+  .provide(INVITE_CODE_API_KEY, createInviteCodeApi(http))
   .provide(MODEL_CONFIG_API_KEY, createModelConfigApi(http))
   .provide(EMBEDDING_CONFIG_API_KEY, createEmbeddingConfigApi(http))
   .provide(MATERIALS_API_KEY, createMaterialsApi(http))

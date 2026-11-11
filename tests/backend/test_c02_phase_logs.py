@@ -25,6 +25,28 @@ from app.workers.parse_task import ParseStatus
 VERSION = PublishedVersion("c" * 32, "v" * 26, 1, frozenset({"revision"}))
 
 
+class _Clock:
+    """Advance only when a scripted phase consumes time; leave other modules' clocks alone."""
+
+    def __init__(self):
+        self.now = 1000.0
+
+    def monotonic(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    clock = _Clock()
+    local_time = SimpleNamespace(monotonic=clock.monotonic, time=time.time)
+    monkeypatch.setattr(chat_module, "time", local_time)
+    monkeypatch.setattr(persist_graph, "time", local_time)
+    return clock
+
+
 def _fields(line: str) -> dict[str, str]:
     return dict(re.findall(r"(\w+)=(\S+)", line))
 
@@ -42,9 +64,9 @@ class _Embedding:
         return [[0.1, 0.2]]
 
 
-def _chat(monkeypatch, *, slow_vector: float = 0.0, fail_subgraph: bool = False) -> ChatService:
+def _chat(monkeypatch, clock, *, slow_vector: float = 0.0, fail_subgraph: bool = False) -> ChatService:
     def search_chunks(*args, **kwargs):
-        time.sleep(slow_vector)
+        clock.advance(slow_vector)
         return []
 
     def search_subgraph(*args, **kwargs):
@@ -61,13 +83,13 @@ def _chat(monkeypatch, *, slow_vector: float = 0.0, fail_subgraph: bool = False)
 
 
 def _prepare(service: ChatService):
-    return service.prepare(version=VERSION, request_id="req-1", started=time.monotonic(), question="什么是栈",
+    return service.prepare(version=VERSION, request_id="req-1", started=chat_module.time.monotonic(), question="什么是栈",
                            history=None, kp_id=None)
 
 
-def test_prepare_logs_one_line_with_every_phase(monkeypatch, caplog):
+def test_prepare_logs_one_line_with_every_phase(monkeypatch, caplog, clock):
     caplog.set_level(logging.INFO, logger=chat_module.logger.name)
-    _prepare(_chat(monkeypatch, slow_vector=0.05))
+    _prepare(_chat(monkeypatch, clock, slow_vector=0.05))
     [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("chat prepare phases")]
     fields = _fields(line)
     assert fields["request_id"] == "req-1" and fields["outcome"] == "ok"
@@ -78,10 +100,10 @@ def test_prepare_logs_one_line_with_every_phase(monkeypatch, caplog):
     assert "什么是栈" not in line                          # 不记问题与资料原文
 
 
-def test_prepare_logs_completed_phases_even_when_a_step_fails(monkeypatch, caplog):
+def test_prepare_logs_completed_phases_even_when_a_step_fails(monkeypatch, caplog, clock):
     caplog.set_level(logging.INFO, logger=chat_module.logger.name)
     with pytest.raises(ChatFailure):
-        _prepare(_chat(monkeypatch, fail_subgraph=True))
+        _prepare(_chat(monkeypatch, clock, fail_subgraph=True))
     [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("chat prepare phases")]
     fields = _fields(line)
     assert fields["outcome"] == "STORAGE_UNAVAILABLE"
@@ -107,25 +129,25 @@ class _Heartbeat:
         return False
 
 
-def test_pipeline_logs_each_stage_duration(monkeypatch, caplog):
+def test_pipeline_logs_each_stage_duration(monkeypatch, caplog, clock):
     caplog.set_level(logging.INFO, logger=persist_graph.logger.name)
     monkeypatch.setattr(persist_graph, "reclaim_expired", lambda *a, **k: SimpleNamespace(cleanup_pending=()))
     monkeypatch.setattr(persist_graph, "claim_next", lambda *a, **k: _lease())
     monkeypatch.setattr(persist_graph, "LeaseHeartbeat", _Heartbeat)
     monkeypatch.setattr(persist_graph, "ExtractLimits", SimpleNamespace(from_settings=lambda s: None))
 
-    def slow(result, seconds=0.0):
+    def timed(result, seconds=0.0):
         def run(*args, **kwargs):
-            time.sleep(seconds)
+            clock.advance(seconds)
             return result
         return run
 
-    monkeypatch.setattr(persist_graph, "run_parse_stage", slow(SimpleNamespace(status=ParseStatus.ADVANCED)))
-    monkeypatch.setattr(persist_graph, "run_extract_stage", slow(SimpleNamespace(status=ExtractStatus.ADVANCED)))
+    monkeypatch.setattr(persist_graph, "run_parse_stage", timed(SimpleNamespace(status=ParseStatus.ADVANCED)))
+    monkeypatch.setattr(persist_graph, "run_extract_stage", timed(SimpleNamespace(status=ExtractStatus.ADVANCED)))
     monkeypatch.setattr(persist_graph, "run_merge_stage",
-                        slow(SimpleNamespace(status=persist_graph.PersistStatus.ADVANCED), 0.03))
+                        timed(SimpleNamespace(status=persist_graph.PersistStatus.ADVANCED), 0.03))
     monkeypatch.setattr(persist_graph, "run_persist_stage",
-                        slow(SimpleNamespace(status=persist_graph.PersistStatus.ADVANCED), 0.05))
+                        timed(SimpleNamespace(status=persist_graph.PersistStatus.ADVANCED), 0.05))
     settings = SimpleNamespace(SQLITE_URL="sqlite:///unused", STORAGE_DIR="unused", UPLOAD_MAX_BYTES=1,
                                TASK_LEASE_SECONDS=60, TASK_MAX_ATTEMPTS=3)
     result = persist_graph.run_pipeline_once(settings, toolkit=lambda lease: object(), repo=None, storage=object())
@@ -144,14 +166,14 @@ from app.repositories.neo4j import RepositoryError
 from app.repositories.task_leases import LeaseLost
 
 
-class _Sleep:
+class _TimedStep:
     """按名字给每个被替换的步骤一个可区分的耗时（毫秒）。"""
 
-    def __init__(self, ms: int, result=None, exc: Exception | None = None):
-        self.ms, self.result, self.exc = ms, result, exc
+    def __init__(self, clock, ms: int, result=None, exc: Exception | None = None):
+        self.clock, self.ms, self.result, self.exc = clock, ms, result, exc
 
     def __call__(self, *args, **kwargs):
-        time.sleep(self.ms / 1000)
+        self.clock.advance(self.ms / 1000)
         if self.exc is not None:
             raise self.exc
         return self.result
@@ -168,45 +190,45 @@ class _Repo:
         def commit(*, started_at):
             if self.exc is not None:
                 raise self.exc
-        yield SimpleNamespace(commit=commit, deadline=time.monotonic()+remaining(), commit_started=False, committed=False)
+        yield SimpleNamespace(commit=commit, deadline=persist_graph.time.monotonic()+remaining(), commit_started=False, committed=False)
 
 
 SENTINEL_NAME = "绝不应出现在日志里的知识点名"
 
 
-def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None, released=None,
+def _persist(monkeypatch, caplog, clock, *, lock=object(), repo=None, lease_check=None, released=None,
              held_context=None):
     caplog.set_level(logging.INFO, logger=persist_graph.logger.name)
     if lock is not None:
         lock = SimpleNamespace(expires_at=int(time.time()) + 60, token="lock-token")
     written = SimpleNamespace(nodes=None, relations=None, downgraded=())
-    monkeypatch.setattr(persist_graph, "load_candidates", _Sleep(20, SimpleNamespace(name=SENTINEL_NAME)))
-    monkeypatch.setattr(persist_graph, "build_plan", _Sleep(5, SimpleNamespace()))
+    monkeypatch.setattr(persist_graph, "load_candidates", _TimedStep(clock, 20, SimpleNamespace(name=SENTINEL_NAME)))
+    monkeypatch.setattr(persist_graph, "build_plan", _TimedStep(clock, 5, SimpleNamespace()))
     monkeypatch.setattr(persist_graph, "_source_chunk_ids", lambda plan: [])
-    monkeypatch.setattr(persist_graph, "get_chunks", _Sleep(10, ()))
-    monkeypatch.setattr(persist_graph.course_locks, "acquire", _Sleep(30, lock))
+    monkeypatch.setattr(persist_graph, "get_chunks", _TimedStep(clock, 10, ()))
+    monkeypatch.setattr(persist_graph.course_locks, "acquire", _TimedStep(clock, 30, lock))
 
     @contextmanager
     def held(*args, **kwargs):
         yield lock
-        time.sleep(0.015)                                 # 退出时释放锁
+        clock.advance(0.015)                              # 退出时释放锁
 
     monkeypatch.setattr(persist_graph.course_locks, "held", held_context or held)
-    monkeypatch.setattr(persist_graph, "_check_lease", lease_check or _Sleep(2))
-    monkeypatch.setattr(persist_graph, "_effective", _Sleep(2, ("t1",)))
-    monkeypatch.setattr(persist_graph, "_write_draft", _Sleep(40, written))
-    monkeypatch.setattr(persist_graph, "_t6_in", _Sleep(8, 1))
+    monkeypatch.setattr(persist_graph, "_check_lease", lease_check or _TimedStep(clock, 2))
+    monkeypatch.setattr(persist_graph, "_effective", _TimedStep(clock, 2, ("t1",)))
+    monkeypatch.setattr(persist_graph, "_write_draft", _TimedStep(clock, 40, written))
+    monkeypatch.setattr(persist_graph, "_t6_in", _TimedStep(clock, 8, 1))
 
     @contextmanager
     def database(*args, **kwargs):
         if kwargs.get("on_acquired"):
-            kwargs["on_acquired"](time.monotonic())
+            kwargs["on_acquired"](clock.monotonic())
         yield SimpleNamespace(execute=lambda *a: SimpleNamespace(fetchone=lambda: ('awaiting_review', 1, None, 1)))
 
     monkeypatch.setattr(persist_graph, "persist_transaction", database)
     monkeypatch.setattr(persist_graph, "connect", database)
     outcome = SimpleNamespace(status=persist_graph.PersistStatus.RELEASED)
-    monkeypatch.setattr(persist_graph, "_release", released or _Sleep(6, outcome))
+    monkeypatch.setattr(persist_graph, "_release", released or _TimedStep(clock, 6, outcome))
     result = persist_graph.run_persist_stage("sqlite:///unused", _lease("persisting"), repo=repo or _Repo(),
                                              max_attempts=3, lock_seconds=60, lock_wait_seconds=60,
                                              task_guard=SimpleNamespace(check=lambda: None, remaining=lambda: 40))
@@ -216,8 +238,8 @@ def _persist(monkeypatch, caplog, *, lock=object(), repo=None, lease_check=None,
     return result, _fields(lines[0])
 
 
-def test_persist_logs_every_substep_on_success(monkeypatch, caplog):
-    result, f = _persist(monkeypatch, caplog, repo=_Repo())
+def test_persist_logs_every_substep_on_success(monkeypatch, caplog, clock):
+    result, f = _persist(monkeypatch, caplog, clock, repo=_Repo())
     assert result.status is persist_graph.PersistStatus.ADVANCED
     assert f["task_id"] == "t1" and f["outcome"] == "advanced"
     for name, at_least in (("candidates_ms", 20), ("plan_ms", 5), ("chunks_ms", 10), ("lock_wait_ms", 30),
@@ -227,26 +249,26 @@ def test_persist_logs_every_substep_on_success(monkeypatch, caplog):
     assert int(f["total_ms"]) >= 130
 
 
-def test_persist_logs_completed_steps_when_the_lock_is_not_acquired(monkeypatch, caplog):
-    result, f = _persist(monkeypatch, caplog, lock=None)
+def test_persist_logs_completed_steps_when_the_lock_is_not_acquired(monkeypatch, caplog, clock):
+    result, f = _persist(monkeypatch, caplog, clock, lock=None)
     assert result.status is persist_graph.PersistStatus.RELEASED
     assert f["outcome"] == "released"
     assert int(f["lock_wait_ms"]) >= 30 and int(f["task_release_ms"]) >= 6
     assert "neo4j_ms" not in f and "t6_ms" not in f
 
 
-def test_persist_logs_neo4j_failure_and_lost_lease(monkeypatch, caplog):
-    result, f = _persist(monkeypatch, caplog, repo=_Repo(exc=RepositoryError()))
+def test_persist_logs_neo4j_failure_and_lost_lease(monkeypatch, caplog, clock):
+    result, f = _persist(monkeypatch, caplog, clock, repo=_Repo(exc=RepositoryError()))
     assert result.status is persist_graph.PersistStatus.RELEASED
     assert f["outcome"] == "released" and "neo4j_ms" in f and "t6_ms" in f and f["neo4j_attempts"] == "1"
     caplog.clear()
-    result, f = _persist(monkeypatch, caplog, lease_check=_Sleep(1, exc=LeaseLost("lost")))
+    result, f = _persist(monkeypatch, caplog, clock, lease_check=_TimedStep(clock, 1, exc=LeaseLost("lost")))
     assert result.status is persist_graph.PersistStatus.LOST
     assert f["outcome"] == "lost" and "neo4j_ms" not in f
 
 
 @pytest.mark.parametrize("failure", ["neo4j", "lease", "unlock", "uncaught"])
-def test_unlock_is_timed_on_failures_without_changing_cleanup_or_propagation(monkeypatch, caplog, failure):
+def test_unlock_is_timed_on_failures_without_changing_cleanup_or_propagation(monkeypatch, caplog, clock, failure):
     import sqlite3
 
     events = []
@@ -257,7 +279,7 @@ def test_unlock_is_timed_on_failures_without_changing_cleanup_or_propagation(mon
             yield
         finally:
             events.append("unlock-start")
-            time.sleep(0.020)
+            clock.advance(0.020)
             events.append("unlock-end")
             if failure == "unlock":
                 raise sqlite3.OperationalError("unlock failed")
@@ -268,15 +290,15 @@ def test_unlock_is_timed_on_failures_without_changing_cleanup_or_propagation(mon
 
     exc = RepositoryError() if failure == "neo4j" else KeyError("uncaught") if failure == "uncaught" else None
     kwargs = dict(repo=_Repo(exc=exc), held_context=held, released=release,
-                  lease_check=_Sleep(1, exc=LeaseLost("lost")) if failure == "lease" else None)
+                  lease_check=_TimedStep(clock, 1, exc=LeaseLost("lost")) if failure == "lease" else None)
     if failure == "uncaught":
         with pytest.raises(KeyError, match="uncaught"):
-            _persist(monkeypatch, caplog, **kwargs)
+            _persist(monkeypatch, caplog, clock, **kwargs)
         [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("persist steps")]
         f = _fields(line)
         assert f["outcome"] == "KeyError"
     else:
-        result, f = _persist(monkeypatch, caplog, **kwargs)
+        result, f = _persist(monkeypatch, caplog, clock, **kwargs)
         expected = (persist_graph.PersistStatus.LOST if failure == "lease" else
                     persist_graph.PersistStatus.ADVANCED if failure == "unlock" else persist_graph.PersistStatus.RELEASED)
         assert result.status is expected

@@ -73,13 +73,6 @@ def test_extra_body_is_copied_at_construction():
 # ---------------------------------------------------------------- 仓储与迁移 018
 
 
-@pytest.fixture
-def url(tmp_path):
-    value = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(value)
-    return value
-
-
 def _save(url, user, *, key: str | None = "sk-aaaa-1111", disable_thinking=None):
     sealed = None if key is None else CredentialCipher(ROOT_KEY).seal(user.id, key)
     return repo.save_config(url, user_id=user.id, base_url="https://a.example/v1", model="m1", sealed=sealed,

@@ -14,7 +14,7 @@ import pytest
 
 from app.config import Settings
 from app.repositories.model_calls import EMBEDDING_PURPOSE, CallRecord, SqliteCallStore, billed_for_day
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.ai.client import EmbeddingResult, ModelServerError, Usage
 from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingRecordError, embedding_calls
 from app.services.ai.factory import build_embedding_adapter
@@ -23,13 +23,6 @@ from app.services.versions.resolver import PublishedVersion
 
 COURSE = "c" * 32
 SETTINGS = dict(EMBEDDING_MODE="fake", EMBEDDING_DIMENSIONS=2, EMBEDDING_BATCH_SIZE=2)
-
-
-@pytest.fixture
-def url(tmp_path):
-    value = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(value)
-    return value
 
 
 def _rows(url):

@@ -18,7 +18,7 @@
 | `answer_with_context` | 1 | 占位 | 无（同上） | `d07afc2` | #182 |
 | `gen_study_material` | — | 未建：待 O01 准入 | 无；装载器报「未知用途」 | — | — |
 
-出处：版本、状态、变量与摘要见 `prompts/MANIFEST.md`「清单」表；提交历史取自 `git log --follow -- prompts/<用途>.yaml`；PR 号取自合并提交信息（`git log --merges`）；E01 合并 PR #182 见 `docs/tasks.md` E01 行（`dc20326`）。调用方由 `grep -rn PromptLibrary src/` 确定：业务代码中只有 `entities.py`、`gleaning.py`、`qa/rewrite.py` 三处取用提示词（E11 之后增加 `relations.py`）。
+出处：版本、状态、变量与摘要见 `prompts/MANIFEST.md`「清单」表；提交历史取自 `git log --follow -- prompts/<用途>.yaml`；PR 号取自合并提交信息（`git log --merges`）；E01 合并 PR #182 见 `docs/archive/tasks-2026-09.md` E01 行（`dc20326`）。调用方由 `grep -rn PromptLibrary src/` 确定：业务代码中只有 `entities.py`、`gleaning.py`、`qa/rewrite.py` 三处取用提示词（E11 之后增加 `relations.py`）。
 
 **使用程度说明**：上表「代码调用方」指服务层模块已按固定版本取用提示词并有测试覆盖。截至 `d624208`，这三个服务尚未接入任务编排（E12）或问答接口装配（J07），`src/` 中除各自模块与 `app/services/qa/__init__.py` 的导出外没有其他引用；它们目前只在 fake 模型测试中被调用，从未对真实模型发出过请求。
 

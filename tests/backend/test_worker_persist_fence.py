@@ -9,15 +9,15 @@ from contextlib import contextmanager
 import pytest
 
 from app.repositories import course_locks, task_leases
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.repositories.neo4j import Neo4jRepository
 from app.workers import persist_graph
+from tests.backend.helpers.sqlite import migrated_database
 
 
 @pytest.fixture
 def task(tmp_path):
-    url = f"sqlite:///{tmp_path / 'state.sqlite3'}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{tmp_path / 'state.sqlite3'}")
     cid, tid, uid = [uuid.uuid4().hex for _ in range(3)]
     with connect(url) as db:
         db.execute("INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA', 'teacher')",

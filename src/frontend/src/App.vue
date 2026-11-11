@@ -20,6 +20,7 @@ import {
 import AppIcon from './components/AppIcon.vue'
 import { DESTINATION_ICONS } from './components/navIcons'
 import AppTopbar, { type Crumb } from './components/AppTopbar.vue'
+import BrandMark from './components/BrandMark.vue'
 import { readCourseDetail } from './composables/courseDetailRequest'
 import { COURSES_API_KEY } from './api/courses'
 import { useCourseStore } from './stores/course'
@@ -192,7 +193,9 @@ const crumbs = computed<Crumb[]>(() => {
 })
 const railExpanded = ref(false)
 const vw = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
-const railVisible = computed(() => vw.value >= 1024)
+// 课程之外（课程列表、模型 API 设置）只剩两项导航：不显示侧栏，入口放在顶栏（UI-PINE-01 后续）
+const inCourse = computed(() => courseId.value !== null)
+const railVisible = computed(() => vw.value >= 1024 && inCourse.value)
 const navDrawer = ref(false)
 const drawer = ref<HTMLElement | null>(null)
 function onResize(): void {
@@ -229,20 +232,24 @@ function signOut(): void {
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--login': onAuthShell }">
+  <div class="app" :class="{ 'app--workbench': withSidebar && !graphShell, 'app--graph': graphShell, 'app--no-rail': graphShell && !inCourse, 'app--login': onAuthShell }">
     <AppTopbar
       v-if="graphShell"
       :crumbs="crumbs"
       :user="`${session?.user?.username ?? ''} · ${roleLabel}`"
-      :show-menu="!railVisible"
+      :show-menu="!railVisible && inCourse"
+      :home="!inCourse"
+      :settings-to="settingsLink"
+      :settings-active="settingsActive"
+      :settings-pending="runtime?.needsConfig === true"
+      :mode="runtime?.isDemo ? '演示模式：使用内置演示模型' : ''"
       @menu="openNav"
       @sign-out="signOut"
     />
-    <header v-if="!withSidebar" class="app-header">
+    <header v-if="!withSidebar && !onAuthShell" class="app-header">
       <div class="app-header-inner">
-        <span class="app-logo" aria-hidden="true">智</span>
+        <BrandMark :size="28" />
         <h1>{{ appName }}</h1>
-        <p class="app-tagline">AIGC 课程知识图谱智能构建与学习导航</p>
       </div>
     </header>
     <main class="app-main" :class="{ 'app-main--graph': graphShell, 'app-main--sheet': graphShell && upgradedPage }">
@@ -250,7 +257,6 @@ function signOut(): void {
         <span>{{ notice }}</span>
         <button type="button" class="app-notice__close" aria-label="关闭提示" @click="dismissedNotice = true">×</button>
       </div>
-      <p v-if="graphShell && runtime?.isDemo" class="app-mode ui-mode" data-test="mode-demo" role="status">演示模式 · 使用内置演示模型，不调用个人 API</p>
       <RouterView v-if="route && onLoginPage" :login-notice="notice" @dismiss-login-notice="dismissedNotice = true" />
       <RouterView v-else-if="route" />
     </main>
@@ -303,7 +309,6 @@ function signOut(): void {
     </template>
     <aside v-if="withSidebar && !graphShell" class="app-sidebar" aria-label="导航">
       <div class="app-sidebar__brand">
-        <span class="app-logo" aria-hidden="true">智</span>
         <h1>{{ appName }}</h1>
       </div>
       <nav class="app-nav" aria-label="主导航">

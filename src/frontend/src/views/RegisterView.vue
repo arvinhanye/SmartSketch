@@ -89,9 +89,8 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <LoginLayout>
+  <LoginLayout subtitle="创建学生账号">
     <form class="register" novalidate :aria-busy="pending" aria-label="注册智绘学途学生账号" data-test="register-form" @submit.prevent="submit">
-      <p class="register__eyebrow">加入智绘学途</p>
       <h2>注册学生账号</h2>
       <fieldset :disabled="pending">
         <legend class="register__sr-only">注册学生账号</legend>
@@ -155,7 +154,6 @@ async function submit(): Promise<void> {
         <p v-if="error" class="register__error" data-test="register-error" role="alert">{{ error }}</p>
         <button type="submit" class="register__submit" :disabled="pending">
           {{ pending ? '注册中…' : '注册并登录' }}
-          <svg v-if="!pending" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
         </button>
       </fieldset>
       <p class="register__login">已有账号？<RouterLink :to="{ name: ROOT_ROUTE }">去登录</RouterLink></p>
@@ -165,84 +163,158 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-/* 版式与登录页（LoginView）一致，保持两页观感统一。 */
-.register { position: relative; width: 100%; color: var(--ss-text); }
-.register__eyebrow { color: var(--ss-link); font-size: 12px; letter-spacing: 1px; margin: 0 0 13px; }
-.register h2 { font-size: 29px; font-weight: 600; margin: 0 0 24px; color: var(--ss-text); line-height: 1.4; }
-.register fieldset { display: block; min-width: 0; margin: 0; padding: 0; border: 0; background: none; }
-.register__sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.register .register__field { display: block; margin: 0 0 16px; }
-.register label { display: block; color: #d4d6df; font-size: 13px; line-height: 1.5; }
+.register {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  color: var(--ui-text);
+}
+.register h2 {
+  margin: 12px 0 18px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ui-text);
+}
+.register fieldset {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.register__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.register .register__field {
+  display: block;
+  margin: 0 0 16px;
+}
+.register label {
+  display: block;
+  color: var(--ui-text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .register input {
   display: block;
-  margin-top: 8px;
+  margin-top: 2px;
   width: 100%;
-  height: 44px;
-  border: 1px solid #777c8c;
-  border-radius: 8px;
-  background: var(--ss-panel);
-  color: var(--ss-text);
-  padding: 0 14px;
+  height: 40px;
+  border: 0;
+  border-bottom: 1.5px solid var(--ui-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-text);
+  padding: 0 2px;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
 }
-.register input::placeholder { color: #9da2b2; font-size: 13px; }
-.register input[aria-invalid='true'] { border-color: #b4616f; }
-.register__password { position: relative; }
-.register__password input { padding-right: 44px; }
+.register input:focus { border-bottom-color: var(--ui-primary); outline: none; }
+.register input::placeholder {
+  color: var(--ui-text-3);
+  font-size: 13px;
+}
+.register input[aria-invalid='true'] {
+  border-bottom-color: #c8412f;
+}
+.register__password {
+  position: relative;
+}
+.register__password input {
+  padding-right: 46px;
+}
 .register .register__eye {
   position: absolute;
-  top: 3px;
-  right: 3px;
+  top: -2px;
+  right: 0;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   min-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  color: #aeb2bf;
-  border-radius: 6px;
+  color: var(--ui-text-2);
+  border-radius: 8px;
   cursor: pointer;
 }
-.register__eye svg { width: 19px; height: 19px; }
-.register .register__eye:hover:not(:disabled) { background: #242631; }
-.register .register__submit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-  height: 46px;
-  margin-top: 4px;
-  padding: 0;
-  border-radius: 8px;
-  background: var(--ss-primary);
-  border: 1px solid var(--ss-primary);
-  color: white;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
+.register__eye svg {
+  width: 19px;
+  height: 19px;
 }
-.register__submit svg { width: 18px; height: 18px; }
-.register__field-error { color: #f2a7b1; font-size: 12px; line-height: 1.7; margin: 8px 0 0; }
+.register .register__eye:hover:not(:disabled) {
+  background: var(--ui-surface-2);
+}
+.register__field-error {
+  margin: 6px 0 0;
+  color: #8f2323;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .register__error {
-  color: #f2a7b1;
-  background: #32202a;
-  border: 1px solid #794a57;
+  color: #8f2323;
+  background: #fdecec;
+  border: 1px solid #f0b4b4;
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.7;
-  margin: 0 0 16px;
+  margin: 0 0 14px;
 }
-.register__login { border-top: 1px solid var(--ss-line); margin: 22px 0 0; padding-top: 18px; color: #aeb2bf; font-size: 13px; line-height: 1.8; }
-.register__login a { margin-left: 7px; color: var(--ss-link); }
-.register__hint { color: #9da2b2; font-size: 12px; line-height: 1.7; margin: 8px 0 0; }
-.register :is(input, button, a):focus-visible { outline: 2px solid var(--ss-link); outline-offset: 3px; }
-.register button:disabled { opacity: 0.65; cursor: wait; }
-@media (max-width: 760px) {
-  .register h2 { font-size: 25px; }
+.register .register__submit {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin-top: 6px;
+  padding: 0 28px;
+  border-radius: 22px;
+  background: var(--ui-primary);
+  border: 1px solid var(--ui-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 6px 14px rgb(14 107 92 / 28%);
+  cursor: pointer;
+}
+.register .register__submit:hover:not(:disabled) { background: var(--ui-primary-press); border-color: var(--ui-primary-press); }
+.register__login {
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-line-soft);
+  color: var(--ui-text-2);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.register__login a {
+  margin-left: 6px;
+  color: var(--ui-primary);
+  font-weight: 500;
+}
+.register__hint {
+  margin: 4px 0 0;
+  color: var(--ui-text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.register :is(input, button, a):focus-visible {
+  outline: 2px solid var(--ui-highlight);
+  outline-offset: 3px;
+}
+.register button:disabled {
+  opacity: .65;
+  cursor: wait;
 }
 </style>

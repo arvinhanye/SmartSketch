@@ -29,6 +29,7 @@ from app.services.chunk_identity import (
 from app.services.chunking import SemanticChunk, chunk_blocks, chunking_version
 from app.services.file_storage import StoredFile
 from app.services.parsers.models import ParsedBlock, RevisionKey, SourceLocator
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "backend" / "migrations"
 HASH_A = "sha256:" + "a" * 64
@@ -37,10 +38,6 @@ PV_1 = "txt/1+" + chunking_version(40, 10)
 PV_2 = "txt/2+" + chunking_version(40, 10)
 COURSE = "course-a"
 OTHER = "course-b"
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
 
 
 def _chunk_migration() -> Path:

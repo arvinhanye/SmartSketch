@@ -10,7 +10,6 @@ from __future__ import annotations
 import copy
 import sqlite3
 import time
-import uuid
 from contextlib import closing
 from pathlib import Path
 
@@ -20,35 +19,25 @@ import yaml
 from fastapi.testclient import TestClient
 
 from app.api import progress as progress_api
-from app.main import create_app
 from app.repositories import versions
-from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
 from app.repositories.progress import read_progress
-from app.repositories.sqlite import connect, database_path, migrate
+from app.repositories.sqlite import connect, database_path
 from app.services.auth import issue_access_token
 from app.services.learning import progress as service
 from app.services.learning.eligible import build_prerequisite_graph, eligible_set
 from app.services.versions import resolver
 from app.services.versions.resolver import resolve_published
 from app.services.versions.snapshot import DraftGraph, DraftNode, Revision, build_snapshot
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.contracts import rewrite_schema_refs as _rewrite
+from tests.backend.helpers.sqlite import migrated_database
 
 ROOT = Path(__file__).resolve().parents[2]
 SECRET = "i02-test-signing-key-0123456789abcdefghijkl"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 EXCLUDED = {"low_confidence_nodes": 0, "low_confidence_edges": 0, "cascaded_edges": 0}
 
 _SPEC = yaml.safe_load((ROOT / "src/contracts/api.v1.yaml").read_text(encoding="utf-8"))
-
-
-def _rewrite(node):
-    if isinstance(node, dict):
-        return {key: (value.replace("#/components/schemas/", "#/$defs/")
-                      if key == "$ref" and isinstance(value, str) else _rewrite(value))
-                for key, value in node.items()}
-    if isinstance(node, list):
-        return [_rewrite(item) for item in node]
-    return node
 
 
 _DEFS = _rewrite(copy.deepcopy(_SPEC["components"]["schemas"]))
@@ -61,10 +50,6 @@ def assert_schema(name, instance):
 def token(user):
     return issue_access_token(user_id=user.id, role=user.role, secret=SECRET.encode(), issued_at=int(time.time()),
                               ttl_seconds=3600)
-
-
-def _account(url, username, role):
-    return insert_account(url, account_id=uuid.uuid4().hex, username=username, password_hash=VALID_HASH, role=role)
 
 
 class Env:
@@ -140,9 +125,8 @@ def fresh_cache():
 
 
 @pytest.fixture
-def env(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+def env(tmp_path, app_factory):
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = _account(url, "teacher1", "teacher")
     alice = _account(url, "alice01", "student")
     bob = _account(url, "bob0001", "student")
@@ -152,9 +136,7 @@ def env(tmp_path, monkeypatch):
     for student in (alice, bob):
         add_member(url, course_id=course.id, user_id=student.id, role="student", added_by=teacher.id)
         add_member(url, course_id=other.id, user_id=student.id, role="student", added_by=teacher.id)
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    with TestClient(create_app()) as client:
+    with TestClient(app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET)) as client:
         yield Env(client, url, teacher, alice, bob, outsider, course.id, other.id)
 
 

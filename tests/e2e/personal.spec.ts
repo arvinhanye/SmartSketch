@@ -18,13 +18,25 @@ function file(relative: string, mimeType: string) {
   return { name: relative.split('/').at(-1)!, mimeType, buffer: readFileSync(path) }
 }
 
+async function visibleThinkingSwitch(page: Page) {
+  const advanced = page.locator('[data-test=mc-form] details.mc-advanced')
+  // Use the normal disclosure control; repeated calls must not collapse it.
+  if (await advanced.getAttribute('open') === null) {
+    await advanced.locator('summary').click()
+  }
+  const toggle = advanced.locator('[data-test=mc-disable-thinking]')
+  await expect(toggle).toBeVisible()
+  return toggle
+}
+
 async function configureModel(page: Page, key: string, expectOk: boolean, disableThinking = false): Promise<void> {
   await page.goto(`${appUrl}/settings/model`)
   await expect(page.locator('[data-test=mc-form]')).toBeVisible()
   await page.locator('[data-test=mc-base-url]').fill(providerUrl)
   await page.locator('[data-test=mc-model]').fill('fake-model')
   await page.locator('[data-test=mc-api-key]').fill(key)
-  await page.locator('[data-test=mc-disable-thinking]').setChecked(disableThinking)
+  const thinkingSwitch = await visibleThinkingSwitch(page)
+  await thinkingSwitch.setChecked(disableThinking)
   const response = await testLocalConnection(providerUrl, async () => {
     const pending = page.waitForResponse((response) =>
       response.url().endsWith('/api/v1/me/model-config/test') && response.request().method() === 'POST')
@@ -41,7 +53,7 @@ async function configureModel(page: Page, key: string, expectOk: boolean, disabl
   await expect(page.locator('[data-test=mc-status]')).toContainText('已配置')
   await page.reload()
   await expect(page.locator('[data-test=mc-form]')).toBeVisible()
-  await expect(page.locator('[data-test=mc-disable-thinking]')).toBeChecked({ checked: disableThinking })
+  await expect(await visibleThinkingSwitch(page)).toBeChecked({ checked: disableThinking })
 }
 
 async function uploadThroughPage(page: Page, courseId: string, upload: ReturnType<typeof file>): Promise<void> {

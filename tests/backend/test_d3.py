@@ -22,13 +22,15 @@ from app.api.dependencies import course_student
 from app.config import Settings
 from app.repositories.chat_logs import list_chat_logs
 from app.repositories.neo4j import GraphScope, Neo4jRepository, RepositoryError, read_deadline
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.ai.client import EmbeddingRequest, EmbeddingResult, ModelTimeoutError
 from app.services.ai.compatible import CompatibleEmbeddingClient, StdlibTransport
 from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingDeadlineExceeded
 from app.services.ai.outbound import GuardedTransport
+from app.services.qa import chat as chat_module
 from app.services.qa.chat import ChatFailure, ChatService
 from app.services.versions.resolver import PublishedVersion
+from tests.backend.helpers.sqlite import migrated_database
 
 SLACK = 0.25          # 调度误差余量；业务时限本身不放宽
 COURSE, VERSION_ID = "c" * 32, "v" * 26
@@ -56,11 +58,14 @@ def _finishes_within(seconds, work):
 
 # ---- 传输层：同一预算覆盖解析、连接、等待响应 ---------------------------------------------------
 
-def _slow_resolver(delay, calls):
+def _blocked_resolver(release, calls, finished):
     def resolve(host, port):
         calls.append(host)
-        time.sleep(delay)
-        return ["127.0.0.1"]
+        try:
+            assert release.wait(5), "test did not release the blocked DNS resolver"
+            return ["127.0.0.1"]
+        finally:
+            finished.set()
     return resolve
 
 
@@ -72,13 +77,18 @@ def test_dns_hang_is_bounded_and_nothing_connects(kind):
         connected.append(address)
         raise OSError("must not connect")
 
-    resolver = _slow_resolver(2.0, resolved)
+    release, finished = threading.Event(), threading.Event()
+    resolver = _blocked_resolver(release, resolved, finished)
     transport = (StdlibTransport(resolver=resolver, connector=connector) if kind == "stdlib"
                  else GuardedTransport(allow_private=True, resolver=resolver, connector=connector))
-    outcome = _finishes_within(0.3, lambda: transport.open("http://model.test:9/v1/x", b"{}", {}, 0.3))
-    assert isinstance(outcome.get("error"), TimeoutError)
-    assert outcome["elapsed"] < 0.3 + SLACK
-    assert connected == []
+    try:
+        outcome = _finishes_within(0.3, lambda: transport.open("http://model.test:9/v1/x", b"{}", {}, 0.3))
+        assert isinstance(outcome.get("error"), TimeoutError)
+        assert outcome["elapsed"] < 0.3 + SLACK
+        assert connected == []
+    finally:
+        release.set()
+        assert finished.wait(5), "DNS resolver did not finish after release"
 
 
 @pytest.mark.parametrize("kind", ["stdlib", "guarded"])
@@ -87,6 +97,7 @@ def test_multi_address_attempts_share_one_budget(kind):
 
     def connector(address, timeout):
         given.append(timeout)
+        # WHY: consume real connection time to verify the shared wall-clock deadline cuts off retries.
         time.sleep(min(timeout, 0.15))
         raise TimeoutError("connect timed out")
 
@@ -163,12 +174,11 @@ def test_hanging_response_is_cut_at_deadline_and_the_connection_closed(kind, dri
 # ---- 向量：请求携带剩余预算；无截止时刻（发布）沿用单次时限；缓存命中不出站 ----------------------------
 
 class RecordingEmbeddingClient:
-    def __init__(self, delay=0.0):
-        self.requests, self.delay = [], delay
+    def __init__(self):
+        self.requests = []
 
     def embed(self, request):
         self.requests.append(request)
-        time.sleep(self.delay)
         return EmbeddingResult(tuple(tuple([1.0] + [0.0] * (request.dimensions - 1)) for _ in request.texts),
                                request.model, request.model, None)
 
@@ -213,6 +223,7 @@ class BudgetTransport:
 
     def open(self, url, body, headers, timeout):
         self.timeouts.append(timeout)
+        # WHY: these timeout tests assert real elapsed bounds through the embedding/HTTP request chain.
         time.sleep(min(self.delay, timeout))
         if self.delay >= timeout:
             raise TimeoutError("timed out")
@@ -269,23 +280,19 @@ def test_graph_reads_carry_the_remaining_time_and_stop_after_the_deadline():
 
 # ---- 问答准备阶段 ------------------------------------------------------------------------------
 
-class SlowRewriter:
-    def __init__(self, delay):
-        self.delay = delay
-
+class Rewriter:
     def rewrite(self, question, history, *, course_id, request_id, deadline):
-        time.sleep(self.delay)
         return SimpleNamespace(query=question)
 
 
-def _service(embedding_client, *, budget=0.3, rewrite_delay=0.0, url=None):
+def _service(embedding_client, *, budget=0.3, url=None):
     settings = Settings(LLM_CHAT_TIMEOUT_SECONDS=budget, LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS=budget / 2,
                         **({"SQLITE_URL": url} if url else {}))
-    return ChatService(settings, None, EmbeddingAdapter(settings, embedding_client), SlowRewriter(rewrite_delay), None)
+    return ChatService(settings, None, EmbeddingAdapter(settings, embedding_client), Rewriter(), None)
 
 
-def _prepare(service):
-    return service.prepare(version=VERSION, request_id="r", started=time.monotonic(),
+def _prepare(service, *, started=None):
+    return service.prepare(version=VERSION, request_id="r", started=time.monotonic() if started is None else started,
                            question="什么是栈？", history=None, kp_id=None)
 
 
@@ -304,9 +311,18 @@ def test_slow_query_embedding_times_out_within_the_chat_budget():
     assert transport.timeouts and transport.timeouts[0] <= 0.3
 
 
-def test_rewrite_exhausting_the_budget_sends_no_embedding_request():
+def test_rewrite_exhausting_the_budget_sends_no_embedding_request(monkeypatch):
     client = RecordingEmbeddingClient()
-    outcome = _finishes_within(0.3, lambda: _prepare(_service(client, rewrite_delay=0.35)))
+    service = _service(client)
+    clock = SimpleNamespace(now=1000.0)
+    monkeypatch.setattr(chat_module, "time", SimpleNamespace(monotonic=lambda: clock.now))
+
+    def rewrite(question, *args, **kwargs):
+        clock.now += 0.35
+        return SimpleNamespace(query=question)
+
+    monkeypatch.setattr(service.rewriter, "rewrite", rewrite)
+    outcome = _finishes_within(0.3, lambda: _prepare(service, started=clock.now))
     error = outcome.get("error")
     assert isinstance(error, ChatFailure) and (error.code, error.reason) == ("LLM_UNAVAILABLE", "timeout")
     assert client.requests == []
@@ -316,8 +332,7 @@ def test_rewrite_exhausting_the_budget_sends_no_embedding_request():
 
 @pytest.mark.parametrize("accept", ["application/json", "text/event-stream"])
 def test_timeout_in_preparation_is_the_same_on_both_transports_and_in_the_log(tmp_path, monkeypatch, accept):
-    url = f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}")
     user_id = "u" * 32
     with connect(url) as db:
         db.execute("INSERT INTO users(id, username, password_hash, role) VALUES (?, 'student', ?, 'student')",

@@ -18,21 +18,17 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.repositories import event_tickets
 from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
 from app.repositories.sqlite import MIGRATIONS_DIR, connect, migrate, pending_migrations
 from app.services.auth import issue_access_token
+from tests.backend.helpers.sqlite import migrated_database, sqlite_url as _url
 
 SECRET = "c16-test-signing-key-0123456789abcdefghij"
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 T0 = 1_900_000_000  # 固定时钟起点；全部时间由注入时钟决定，不 sleep
 URL_SAFE = re.compile(r"^[A-Za-z0-9_-]+$")
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
 
 
 class Clock:
@@ -58,9 +54,8 @@ def _insert_task(url: str, course_id: str, task_id: str) -> None:
 
 
 @pytest.fixture
-def scenario(tmp_path, monkeypatch):
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
+def scenario(tmp_path, app_factory):
+    url = migrated_database(_url(tmp_path / "state.sqlite3"))
 
     def account(name: str, role: str):
         return insert_account(
@@ -77,9 +72,7 @@ def scenario(tmp_path, monkeypatch):
     _insert_task(url, course.id, "task2")
     _insert_task(url, other_course.id, "task-b")
 
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    application = create_app()
+    application = app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET)
     clock = Clock(T0)
     application.state.auth_clock = clock
     with TestClient(application) as client:

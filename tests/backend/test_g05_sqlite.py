@@ -12,15 +12,15 @@ import pytest
 from app.repositories import versions
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
+from tests.backend.helpers.sqlite import migrated_database
 
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 
 
 @pytest.fixture
 def env(tmp_path):
-    url = f"sqlite:///{(tmp_path / 's.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 's.sqlite3').as_posix()}")
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username="teacher1", password_hash=VALID_HASH,
                              role="teacher")
     a = create_course(url, name="A", description=None, creator_id=teacher.id).id

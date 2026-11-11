@@ -30,7 +30,6 @@ import socket
 import sqlite3
 import subprocess
 import sys
-import time
 import uuid
 from contextlib import closing
 from pathlib import Path
@@ -575,18 +574,11 @@ def _port_free(port: int) -> bool:
 
 
 def _wait_bolt(uri: str, seconds: float = 180) -> None:
-    from neo4j import GraphDatabase
+    # The publish hook imports embedder from this module outside pytest's test
+    # package path; only container setup needs the shared readiness helper.
+    from bolt_fault_proxy import wait_for_neo4j
 
-    deadline = time.monotonic() + seconds
-    while True:
-        try:
-            with GraphDatabase.driver(uri, auth=("neo4j", "x")) as driver:
-                driver.execute_query("RETURN 1", database_="neo4j")
-            return
-        except Exception:
-            if time.monotonic() > deadline:
-                raise
-            time.sleep(1)
+    wait_for_neo4j(uri, ("neo4j", "x"), timeout=seconds, interval=1)
 
 
 @pytest.fixture(scope="module")

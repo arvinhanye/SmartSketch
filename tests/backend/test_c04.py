@@ -9,12 +9,12 @@ import pytest
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
-from app.main import create_app
 from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.schemas.contracts import Course, CourseCreate
 from app.services.auth import issue_access_token
+from tests.backend.helpers.sqlite import migrated_database
 
 
 SECRET = "c04-test-signing-key-0123456789abcdefghij"
@@ -22,9 +22,8 @@ VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 
 
 @pytest.fixture
-def scenario(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+def scenario(tmp_path, app_factory):
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = insert_account(
         url, account_id=uuid.uuid4().hex, username="teacher1",
         password_hash=VALID_HASH, role="teacher",
@@ -37,9 +36,7 @@ def scenario(tmp_path, monkeypatch):
         url, account_id=uuid.uuid4().hex, username="teacher2",
         password_hash=VALID_HASH, role="teacher",
     )
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    with TestClient(create_app()) as client:
+    with TestClient(app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET)) as client:
         yield client, url, teacher, student, outsider
 
 

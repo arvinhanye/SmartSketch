@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
+from app.api.invite_codes import invite_rate_limit_response, router as invite_codes_router
 from app.api.dependencies import access_error_response
 from app.api.event_tickets import router as event_tickets_router
 from app.api.graph import router as graph_router
@@ -37,6 +38,7 @@ from app.services.auth import (
     prepare_timing_dummy_hash,
 )
 from app.services.access import AccessDenied
+from app.services.invite_codes import InviteRateLimited, InviteRateLimiter
 from app.services.model_configs import ConfigTestLimiter
 from app.services.startup import validate_embedding_space, validate_schema_current
 
@@ -97,6 +99,7 @@ def create_app() -> FastAPI:
     application.state.settings = settings
     application.state.login_limiter = LoginRateLimiter()
     application.state.registration_limiter = RegistrationRateLimiter()
+    application.state.invite_limiter = InviteRateLimiter()
     # ADR-080：个人模型配置的测试连接限流；model_transport 为 None 时按设置构建出站校验传输（测试可注入）
     application.state.config_test_limiter = ConfigTestLimiter()
     application.state.model_discovery_limiter = ConfigTestLimiter(limit=10)
@@ -106,6 +109,7 @@ def create_app() -> FastAPI:
     prepare_timing_dummy_hash()  # never let the first unknown-user login take twice as long
     application.add_exception_handler(RequestValidationError, _validation_error_handler)
     application.add_exception_handler(AccessDenied, access_error_response)
+    application.add_exception_handler(InviteRateLimited, invite_rate_limit_response)
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(model_config_router)
@@ -114,6 +118,7 @@ def create_app() -> FastAPI:
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)
     application.include_router(tasks_router)
+    application.include_router(invite_codes_router)
     application.include_router(courses_router)
     application.include_router(materials_router)
     application.include_router(upload_policy_router)

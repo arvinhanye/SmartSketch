@@ -31,6 +31,19 @@ async function fixture(page, role = 'teacher') {
         await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     });
 }
+// Keep the normal 30s action budget: this checks layout, not render latency.
+async function waitForCanvasSize(page, viewport) {
+    // ResizeObserver applies the new G6 size on a later animation frame. Wait for
+    // the rendered surface to match its container, not an assumed frame duration.
+    await page.waitForFunction(({ width, height }) => {
+        const stage = document.querySelector('.graph-canvas__stage');
+        const canvas = stage?.querySelector('canvas');
+        if (!stage || !canvas) return false;
+        return window.innerWidth === width && window.innerHeight === height &&
+            stage.clientWidth > 0 && stage.clientHeight > 0 &&
+            canvas.clientWidth === stage.clientWidth && canvas.clientHeight === stage.clientHeight;
+    }, viewport, { timeout: 30_000 });
+}
 (async () => {
     const b = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined });
     try {
@@ -41,7 +54,7 @@ async function fixture(page, role = 'teacher') {
             await p.goto(origin + '/courses/' + cid + '/graph/edit');
             await p.locator('[data-test=tg-node-picker] option').nth(1).waitFor({ state: 'attached' });
             await p.locator('.gw-map').waitFor();
-            await p.waitForTimeout(600);
+            await p.locator('[data-test=graph-canvas][aria-busy=false][data-zoom]').waitFor({ timeout: 30_000 });
             const measure = () => p.evaluate(() => { const c = document.querySelector('.graph-canvas').getBoundingClientRect(), m = document.querySelector('.gw-map').getBoundingClientRect(), panel = document.querySelector('.teacher-graph__panel'); return { page: document.documentElement.scrollHeight, width: document.documentElement.scrollWidth, canvas: c.height, map: m.bottom, mapTop: m.top, canvasTop: c.top, panel: panel.clientHeight, scroll: panel.scrollHeight, left: panel.getBoundingClientRect().width }; });
             const initial = await measure();
             assert(initial.page <= height + 1);
@@ -51,7 +64,7 @@ async function fixture(page, role = 'teacher') {
             await p.locator('[data-test=tg-node-picker]').selectOption({ index: 1 });
             await p.locator('[data-test=tg-tab-edit]').click();
             await p.locator('[data-test=ne-name]').waitFor();
-            await p.waitForTimeout(300);
+            await p.locator('[data-test=ne-definition]').waitFor({ timeout: 30_000 });
             await p.locator('[data-test=ne-definition]').evaluate(e => e.style.height = '1400px');
             const edit = await measure();
             assert(edit.scroll > edit.panel);
@@ -68,10 +81,10 @@ async function fixture(page, role = 'teacher') {
                 const wider = await measure();
                 assert(wider.left > edit.left);
                 await p.setViewportSize({ width: 900, height });
-                await p.waitForTimeout(200);
+                await waitForCanvasSize(p, { width: 900, height });
                 assert((await measure()).map <= height);
                 await p.setViewportSize({ width, height });
-                await p.waitForTimeout(200);
+                await waitForCanvasSize(p, { width, height });
                 await divider.press('Home');
                 const min = Number(await divider.getAttribute('aria-valuenow'));
                 await divider.press('ArrowLeft');
@@ -85,7 +98,7 @@ async function fixture(page, role = 'teacher') {
                 assert((await measure()).map <= height);
             }
             await p.locator('[data-test=ne-close]').click();
-            await p.waitForTimeout(300);
+            await p.locator('[data-test=ne-empty]').waitFor({ timeout: 30_000 });
             const closed = await measure();
             assert(Math.abs(initial.canvas - closed.canvas) < 1);
             assert(closed.page <= height + 1);

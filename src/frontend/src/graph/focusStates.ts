@@ -104,7 +104,7 @@ export function applyFocusStates<N extends FocusNodeLike, E extends FocusEdgeLik
 }
 
 /**
- * 悬停（瞬时强淡化，Obsidian 式）：返回「基础状态 + 悬停状态」的完整表，直接交给 `setElementState`。
+ * 悬停（瞬时强淡化，Obsidian 式）：返回「基础状态 + 悬停状态」的完整表，由 enhancer 比较差分后交给 `setElementState`。
  * 悬停状态排在基础状态之后，所以悬停时它赢；被预览/选中的节点即使与悬停节点无关也保留，用户不会丢掉自己的焦点。
  * `hoverId` 为 null 时只返回基础状态（用于悬停结束后恢复）。
  */

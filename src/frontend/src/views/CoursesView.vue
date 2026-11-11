@@ -8,6 +8,13 @@ import { DESTINATION_ICONS } from '../components/navIcons'
 import CourseList from '../components/courses/CourseList.vue'
 import CourseOverview from '../components/courses/CourseOverview.vue'
 import CourseCreate from '../components/courses/CourseCreate.vue'
+import ResumeCard from '../components/courses/ResumeCard.vue'
+import CourseJoin from '../components/courses/CourseJoin.vue'
+import { INVITE_CODE_API_KEY } from '../api/inviteCode'
+import { useCourseJoin } from '../composables/useCourseJoin'
+import { PROGRESS_API_KEY } from '../api/progress'
+import { RECOMMEND_API_KEY } from '../api/recommend'
+import { useResumeLearning } from '../composables/resumeLearning'
 import { MATERIALS_API_KEY } from '../api/materials'
 import { useRuntimeStore } from '../stores/runtime'
 import { COURSES_API_KEY } from '../api/courses'
@@ -35,6 +42,7 @@ const router = useRouter()
 const session = useSessionStore()
 const runtime = useRuntimeStore()
 const materialsApi = inject(MATERIALS_API_KEY, null)
+const inviteApi = inject(INVITE_CODE_API_KEY, null)
 
 const courseId = computed(() => {
   const cid = route.params.cid
@@ -74,6 +82,14 @@ const {
   },
 })
 
+const canJoin = computed(() => courseId.value === null && session.role === 'student' && inviteApi !== null)
+const { code: joinCode, joining, error: joinError, notice: joinNotice, joinedId, join: joinCourse } = useCourseJoin({
+  api: inviteApi,
+  enabled: canJoin,
+  sessionKey: computed(() => session.accessToken),
+  refreshCourses: loadCourses,
+})
+
 // H12：成员管理入口只给本课教师成员，且仅在注册了成员路由时显示；学生无入口
 // H12：成员管理入口只给本课教师成员，且仅在注册了成员路由时显示；学生无入口
 const hasMembersRoute = router.hasRoute(COURSE_MEMBERS_ROUTE)
@@ -96,6 +112,14 @@ const nextLink = computed(() => {
   return { to: {name: actionRoutes[action], ...(action === 'settings' ? {} : {params: {cid: current.value.id}})}, label: actionLabels[action] }
 })
 const courseForbidden = computed(() => route.query.notice === NOTICE_COURSE_FORBIDDEN)
+// UI-PINE-01：学生课程列表页顶部的「继续学习」主卡；进度或推荐接口未注入时不显示
+const { resume } = useResumeLearning({
+  courses,
+  enabled: computed(() => courseId.value === null && !canCreate.value && listStatus.value === 'ready' && hasStudentGraph),
+  progressApi: inject(PROGRESS_API_KEY, null),
+  recommendApi: inject(RECOMMEND_API_KEY, null),
+  sessionKey: computed(() => session.accessToken),
+})
 const createOpen = ref(false)
 const createButton = ref<HTMLButtonElement | null>(null)
 const highlightedId = ref<string | null>(null)
@@ -158,13 +182,15 @@ const entryLinks = computed(() => {
    <p v-else-if="currentStatus === 'error'" data-test="current-course-error" class="ui-notice ui-notice--danger" role="alert">{{ currentError }}</p>
    <CourseOverview v-else-if="current" :current="current" :next-step="nextStep?.text ?? null" :next-link="nextLink" :links="entryLinks" />
   </section>
+  <ResumeCard v-if="resume" :resume="resume" :graph-route="STUDENT_GRAPH_ROUTE" :chat-route="hasChat ? CHAT_ROUTE : null" />
+  <CourseJoin v-if="canJoin" v-model:code="joinCode" :joining="joining" :error="joinError" :notice="joinNotice" @submit="joinCourse" />
   <section class="ui-list-region" data-test="course-list-region" aria-labelledby="course-list-title" :aria-busy="listStatus === 'loading'">
    <div class="ui-section-heading"><h3 id="course-list-title">{{ courseId ? '全部课程' : '课程列表' }}</h3><span v-if="listStatus === 'ready'" class="ui-muted">{{ courses.length }} 门课程</span></div>
    <div v-if="listStatus === 'loading'" data-test="courses-loading" class="ui-state" role="status"><p>正在加载课程…</p><div v-for="i in 3" :key="i" class="ui-skeleton" aria-hidden="true" /></div>
    <p v-else-if="listStatus === 'forbidden'" data-test="courses-forbidden" class="ui-notice ui-notice--danger" role="alert">{{ listError }}</p>
    <div v-else-if="listStatus === 'error'" class="ui-state"><p data-test="courses-error" role="alert">{{ listError }}</p><button type="button" class="ui-btn" data-test="courses-retry" @click="loadCourses">重试</button></div>
    <div v-else-if="isEmpty" class="ui-empty"><span class="ui-empty__icon"><AppIcon name="chapters" :size="28" /></span><p data-test="courses-empty">{{ canCreate ? '暂无课程。新建第一门课程，开始上传资料。' : `你还没有加入任何课程。请把用户名「${session.user?.username ?? ''}」告诉任课教师，由教师在「成员」中添加你；发布后即可学习。` }}</p><button v-if="canCreate" type="button" class="ui-btn ui-btn--primary" @click="createOpen = true">新建第一门课程</button><button v-else type="button" class="ui-btn" data-test="course-copy-username" @click="copyUsername">复制用户名</button><p v-if="copyStatus" data-test="course-copy-status" role="status">{{ copyStatus }}</p></div>
-   <CourseList v-else :courses="courses" :selected-id="selectedId" :highlighted-id="highlightedId" />
+   <CourseList v-else :courses="courses" :selected-id="selectedId" :highlighted-id="joinedId ?? highlightedId" />
   </section>
  </PageSheet>
 </template>

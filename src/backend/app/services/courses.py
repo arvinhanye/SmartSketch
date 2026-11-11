@@ -14,7 +14,7 @@ def _status(row: CourseRecord) -> CourseStatus:
     return CourseStatus.revising
 
 
-def _wire(row: CourseRecord, role: str, kp_count: int | None = None) -> Course:
+def course_to_contract(row: CourseRecord, role: str, kp_count: int | None = None) -> Course:
     return Course(
         id=row.id,
         name=row.name,
@@ -34,16 +34,16 @@ def list_courses(sqlite_url: str, user: AccountRecord) -> list[Course]:
         if role != "student" or row.published_version is not None
     ]
     counts = published_kp_counts(sqlite_url, [row.id for row, _ in rows])
-    return [_wire(row, role, counts.get(row.id)) for row, role in rows]
+    return [course_to_contract(row, role, counts.get(row.id)) for row, role in rows]
 
 
 def course_detail(sqlite_url: str, access: CourseAccess) -> Course:
     counts = published_kp_counts(sqlite_url, [access.course.id])
-    return _wire(access.course, access.member.role, counts.get(access.course.id))
+    return course_to_contract(access.course, access.member.role, counts.get(access.course.id))
 
 
 def create_new_course(
     sqlite_url: str, user: AccountRecord, *, name: str, description: str | None
 ) -> Course:
     row = create_course(sqlite_url, name=name, description=description, creator_id=user.id)
-    return _wire(row, "teacher")
+    return course_to_contract(row, "teacher")

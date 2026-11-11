@@ -24,7 +24,7 @@
 
 ## 术语
 
-- **账号类型**：`users.role ∈ {teacher, student}`。只决定两件事：登录后的默认首页，以及能否新建课程。**不参与任何课程内授权。**
+- **账号类型**：`users.role ∈ {teacher, student}`。决定登录后的默认首页、能否新建课程，以及能否以学生身份凭码入课（ADR-096）。**不替代任何课程内成员角色授权。**
 - **课程内角色**：`course_members.role ∈ {teacher, student}`。课程内一切授权只看它，每次请求回查数据库。
 - **成员**：在 `course_members` 中存在 `(course_id, user_id)` 行的用户。
 - **调用者身份**：服务端从已验证的访问令牌（或已核销的事件票据）得到的 `user_id`。**这是唯一来源。**
@@ -48,7 +48,7 @@
 
 ### 1.2 账号来源
 
-- **学生自助注册（ADR-079，取代原「没有注册端点」）。** `POST /api/v1/auth/register` 只创建账号类型为 `student` 的账号：请求体 `{username, password}` 为闭合对象，字段规则同 §1.1/§1.4，不合规 422 `VALIDATION_ERROR`；用户名已占用 409 `USERNAME_TAKEN`；成功 201 返回与登录相同的 `LoginResponse`。每进程 60 秒内最多 60 次尝试，超出 429 `RATE_LIMITED`。注册不加入任何课程，入课仍按 §3.3 由教师添加。
+- **学生自助注册（ADR-079，取代原「没有注册端点」）。** `POST /api/v1/auth/register` 只创建账号类型为 `student` 的账号：请求体 `{username, password}` 为闭合对象，字段规则同 §1.1/§1.4，不合规 422 `VALIDATION_ERROR`；用户名已占用 409 `USERNAME_TAKEN`；成功 201 返回与登录相同的 `LoginResponse`。每进程 60 秒内最多 60 次尝试，超出 429 `RATE_LIMITED`。注册不加入任何课程；注册并登录后，可按 §3.3 由教师添加，或按 §3.4 在课程列表页输入邀请码加入。
 - 教师账号只由后端命令行创建；所有账号的停用、启用、重置口令也只走命令行；协作教师由命令行加入课程（§3.3）。
 - 演示账号由幂等种子脚本创建：至少一个教师账号、两个学生账号（两个学生用于演示进度互不可见；用户名建议 `demo_teacher`、`demo_student`、`demo_student2`，K09 可调整）。
   - 口令读环境变量 `SEED_DEMO_PASSWORD`；**未设置时脚本非 0 退出**，不得回退到写在仓库里的默认口令。
@@ -96,7 +96,7 @@
   > `PUT /progress` 的 `ProgressUpdate` 是闭合对象（`api.v1.yaml`），请求体中夹带 `user_id` 即 schema 违约：按契约中该操作的 422 说明与
   > `specs/learning-path.md` §5，整批返回 422 `VALIDATION_ERROR` 且零写入——不是忽略，也不是只按 A 的身份继续写。本条其余部分不变：
   > 调用者身份仍只取自令牌，写入的 `user_id` 一律取自调用者；**查询参数与自定义请求头**（`?user_id=`、`X-User-Id`）不受请求体 schema
-  > 校验，仍按本条被忽略、不参与身份判定。裁决记录见 `docs/decisions.md` ADR-064 签收行；问答接口（J07，尚未实现）的 `ChatRequest`
+  > 校验，仍按本条被忽略、不参与身份判定。裁决记录见 `docs/archive/decisions-adr-041-080.md` ADR-064 签收行；问答接口（J07，尚未实现）的 `ChatRequest`
   > 目前未声明 `additionalProperties: false`，落地时须先定这条并按同样方式登记。
 - 进度、问答记录、编辑日志、成员 `added_by` 等写入的 `user_id` 一律取自调用者身份。
 - 成员管理中的用户名或 `uid` 表示**被操作的对象**，不是调用者身份，不受本条限制，但同样要经 §4 授权。
@@ -143,6 +143,18 @@
 
 学生被移除后，其进度与问答记录**保留**但不可访问；重新加入后恢复可见。
 
+### 3.4 邀请码入课（INVITE-01 / ADR-096）
+
+- 教师：本课 teacher 成员可 `GET /api/v1/courses/{cid}/invite-code` 查看/复制当前码，首次查看懒生成；`POST /api/v1/courses/{cid}/invite-code:rotate` 在确认后重置。非成员/不存在课程仍为403 COURSE_FORBIDDEN，本课student成员为403 ROLE_FORBIDDEN。事务内复查账号及课程角色；响应禁止缓存。
+- 学生：仅已认证未停用的 student 账号可 `POST /api/v1/courses/join`，闭合请求体仅 `code`。六位字符为 `[A-HJ-NP-Z2-9]`；客户端trim/转大写。服务端身份仅来自令牌，不允许指定角色或user_id。新成员为student、added_by为本人。
+- 结果：新入课201 Course；已是任意成员409 ALREADY_MEMBER；未知/撤销码同一404 INVITE_CODE_INVALID，不返回课程ID；格式不符422 VALIDATION_ERROR；非学生账号403 ROLE_FORBIDDEN；超限429 RATE_LIMITED + Retry-After。
+- 每用户10次/分钟、每IP60次/分钟，所有尝试计数，进程内滑窗最多4096个活跃桶。容量满不驱逐活跃限制；不自行采用用户提供的转发头。模型详见ADR-096。
+- 迁移020独立保存邀请码历史：每码全局唯一、每课最多一个有效码，重置事务提交后旧码立即失效且永不重用。与入课事务串行化；已加入成员不因重置退出。
+- 用户已决：允许加入未发布课程，仅回执透露该课名称/状态；提示“教师发布后可见”。§4.4课程列表及详情/图谱发布权限不变。已发布课加入后刷新并高亮卡片。学生卡片位于课程列表页继续学习卡下方；不在注册页放邀请码。
+- 保留§3.3按用户名添加/移除与教师CLI管理；邀请码入课不会覆盖已有角色。教师查看/复制/确认重置放在成员页，与按用户名添加并存。
+
+验收：成功入已发布/未发布课、未知码与旧码同错误、重复成员零角色变化、非学生拒绝、协作教师授权与跨课拒绝、事务内授权失效、碰撞重试/耗尽回滚、并发join与rotate顺序、用户/IP/容量/过期限流、迁移回滚重放；前端刷新高亮、待发布提示、分错误文案、提交中禁用、复制成功/失败与确认取消/重置、会话/课程切换迟到结果。
+
 ## 4. 授权判定
 
 ### 4.1 判定顺序
@@ -157,9 +169,11 @@
 5. **发布状态**：学生成员访问从未发布过的课程 → 404 `GRAPH_NOT_PUBLISHED`。
 6. **子资源作用域**：`kid`、`rid`、`version` 等一律在该 `course_id` 范围内查找（仓储层强制），查不到 → 404 `NOT_FOUND`。
 
-不走上述流程的只有两类：`POST /courses` 在第 1 步之后只检查账号类型（非 `teacher` → 403 `ROLE_FORBIDDEN`）；`GET /courses` 在第 1 步之后按 §4.4 过滤，不会返回 403。
+不走上述流程的只有三类：`POST /courses` 在第 1 步之后只检查账号类型（非 `teacher` → 403 `ROLE_FORBIDDEN`）；`GET /courses` 在第 1 步之后按 §4.4 过滤，不会返回 403。
 
 **为什么课程级给 403，任务级给 404**：非成员拿到课程 ID 有正当途径，比如被移出课程后打开旧链接，此时明确提示「无权限，回课程列表」对用户更有用；课程 ID 是随机串，不存在的课程也同样返回 403，所以 403 不会泄露课程是否存在。非成员则没有任何正当途径拿到 `tid`，返回 404 不给探测任务是否存在的机会（A03 TASK-19）。
+
+邀请码 `POST /courses/join` 不接受路径课程标识：身份认证 → student账号门槛 → 用户/IP限流 → 事务内重新核实账号 → 解析有效码 → 判断已有成员 → 写本人student成员。它不绕过之后课程资源请求的上述授权流程。
 
 ### 4.2 错误语义汇总
 
@@ -169,6 +183,9 @@
 | 登录口令错误、用户名不存在或账号已停用 | 401 `UNAUTHENTICATED`（与上一行同形） |
 | 登录连续失败达到上限；注册尝试超出窗口上限 | 429 `RATE_LIMITED` |
 | 自助注册的用户名已被占用 | 409 `USERNAME_TAKEN`（ADR-079） |
+| 入课码不存在或已撤销 | 404 `INVITE_CODE_INVALID`（ADR-096） |
+| 凭码入课时已是任意角色成员 | 409 `ALREADY_MEMBER`（ADR-096） |
+| 非student账号输码入课 | 403 `ROLE_FORBIDDEN`（ADR-096） |
 | 路径带 `cid`，调用者不是成员，或课程不存在 | 403 `COURSE_FORBIDDEN` |
 | 是成员但课程内角色不符；学生账号新建课程；移除教师成员 | 403 `ROLE_FORBIDDEN` |
 | 学生成员访问从未发布的课程 | 404 `GRAPH_NOT_PUBLISHED` |
@@ -190,6 +207,9 @@
 | `listCourses` | `GET /api/v1/courses` | 401 | ✓（§4.4 过滤） | ✓（§4.4 过滤） | ✓（§4.4 过滤） |
 | `createCourse` | `POST /api/v1/courses` | 401 | 账号类型 `teacher` 才放行，否则 ROLE | — | — |
 | `getCourse` | `GET /api/v1/courses/{cid}` | 401 | COURSE | ✓（未发布 404） | ✓ |
+| `getCourseInviteCode` | `GET /api/v1/courses/{cid}/invite-code` | 401 | COURSE | ROLE | ✓ |
+| `rotateCourseInviteCode` | `POST /api/v1/courses/{cid}/invite-code:rotate` | 401 | COURSE | ROLE | ✓ |
+| `joinCourse` | `POST /api/v1/courses/join` | 401 | 仅student账号凭有效码加入（§3.4） | 409 ALREADY_MEMBER | 账号非student为ROLE |
 | `listMembers` * | `GET /api/v1/courses/{cid}/members` | 401 | COURSE | ROLE | ✓ |
 | `addMember` * | `POST /api/v1/courses/{cid}/members` | 401 | COURSE | ROLE | ✓（§3.3） |
 | `removeMember` * | `DELETE /api/v1/courses/{cid}/members/{uid}` | 401 | COURSE | ROLE | ✓（仅学生成员） |
@@ -312,7 +332,7 @@
 
 
 ### L15 课程闭环与导航（ADR-087）
-账号类型只决定首页及建课入口；课程导航使用 GET course 的 my_role，读取中/失败只提供概览。切课/换号/退出清空旧角色与数据，迟到响应丢弃。教师下一步依次考虑已发布维护、修订审核、未发布且缺配置、无资料上传、有资料审核；资料数未知不假报无资料。学生未发布等待教师，已发布浏览图谱与路径，即使缺个人 API 也可浏览，提问前配置。空态指导学生把当前用户名交给任课教师在成员页添加；保持后端授权为准。
+账号类型决定首页、建课入口及学生邀请码入课资格；课程导航使用 GET course 的 my_role，读取中/失败只提供概览。切课/换号/退出清空旧角色与数据，迟到响应丢弃。教师下一步依次考虑已发布维护、修订审核、未发布且缺配置、无资料上传、有资料审核；资料数未知不假报无资料。学生未发布等待教师，已发布浏览图谱与路径，即使缺个人 API 也可浏览，提问前配置。空态保留把当前用户名交给任课教师添加的引导，同时课程列表页提供 §3.4 邀请码入课卡；保持后端授权为准。
 
 ## 2026-10-08 模型供应商与模型发现补充
 

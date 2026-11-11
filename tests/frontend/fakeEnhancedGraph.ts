@@ -15,6 +15,8 @@ export class FakeEnhancedGraph implements CanvasGraph {
   nodeUpdates: Update[] = []
   edgeUpdates: Update[] = []
   stateCalls: Array<Record<string, string[]>> = []
+  /** G6 按传入的元素逐项替换状态；未传入的元素保留，不是整表替换。 */
+  elementStates: Record<string, string[]> = {}
   pluginsAdded: unknown[][] = []
   pluginUpdates: Array<Record<string, unknown>> = []
   focusCalls: Array<[string, unknown]> = []
@@ -25,6 +27,7 @@ export class FakeEnhancedGraph implements CanvasGraph {
     readonly pos: Record<string, [number, number]> = {},
     readonly init?: CanvasGraphInit,
   ) {
+    if (init !== undefined) this.replaceStates(init.data)
     // 带初始坐标的节点（章节布局）直接取它们的位置
     for (const node of init?.data.nodes ?? []) {
       const at = (node as { style?: { x: number; y: number } }).style
@@ -37,9 +40,13 @@ export class FakeEnhancedGraph implements CanvasGraph {
     this.calls.push('render')
     return Promise.resolve()
   }
-  setData(data: unknown): void {
+  setData(data: CanvasGraphInit['data']): void {
     this.calls.push('setData')
     this.data = data
+    this.replaceStates(data)
+  }
+  private replaceStates(data: CanvasGraphInit['data']): void {
+    this.elementStates = Object.fromEntries([...data.nodes, ...data.edges].map((element) => [element.id, [...(element.states ?? [])]]))
   }
   setSize(width: number, height: number): void {
     this.calls.push(`setSize ${width}x${height}`)
@@ -102,6 +109,7 @@ export class FakeEnhancedGraph implements CanvasGraph {
   }
   setElementState(state: Record<string, string[]>): Promise<void> {
     this.stateCalls.push(state)
+    for (const [id, states] of Object.entries(state)) this.elementStates[id] = [...states]
     return Promise.resolve()
   }
   setPlugins(update: (plugins: unknown[]) => unknown[]): void {

@@ -42,10 +42,11 @@ async function mountRegister() {
 }
 
 describe('注册页外观', () => {
-  it('左侧品牌区与登录页相同：同一个标题、同一幅插画；不再有随机漂浮的图谱气泡', async () => {
+  // UI-PINE-01：登录与注册改为同一张分栏封面，品牌面板的标题换成「欢迎使用 智绘学途」（设计预览 v3）
+  it('品牌面板与登录页相同：同一个标题、同一幅几何插画；不再有随机漂浮的图谱气泡', async () => {
     const wrapper = await mountRegister()
     expect(wrapper.find('.auth-layout--editorial').exists()).toBe(true)
-    expect(wrapper.get('.login-brand__headline').text()).toContain('把知识连起来')
+    expect(wrapper.get('.login-brand__headline').text()).toContain('智绘学途')
     expect(wrapper.find('[data-test="login-knowledge-art"]').exists()).toBe(true)
     expect(wrapper.find('.auth-layout__art').exists()).toBe(false)
     expect(wrapper.find('[data-test="auth-graph"]').exists()).toBe(false)

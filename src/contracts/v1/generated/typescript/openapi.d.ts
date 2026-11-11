@@ -215,6 +215,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 学生账号凭邀请码加入课程
+         * @description 仅已登录且未停用的 student 账号可用。邀请码不存在或已撤销均返回同一 404，
+         *     不泄露课程信息。每用户每分钟最多 10 次、每 IP 每分钟最多 60 次尝试，
+         *     成功和失败均计数；429 带 Retry-After。限流为单 API 进程内保护。
+         *     允许加入未发布课程，响应为 Course（status=draft）；前端提示“教师发布后可见”。
+         *     原课程列表、详情和图谱的发布可见性规则不变。已是任何角色的成员返回 409，不修改角色。
+         *
+         */
+        post: operations["joinCourse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/invite-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 查看课程邀请码（本课教师）
+         * @description 只对本课 teacher 成员开放；首次查看时为旧课程懒生成邀请码。
+         *     响应禁止缓存（Cache-Control: no-store），不在学生列表、课程详情或日志中附带邀请码。
+         *
+         */
+        get: operations["getCourseInviteCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/invite-code:rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 重置课程邀请码（本课教师）
+         * @description 前端需二次确认。事务提交时旧码立即失效且不会被重新分配；既有成员不受影响。
+         *     只有本课 teacher 成员可操作，响应 Cache-Control: no-store。
+         *
+         */
+        post: operations["rotateCourseInviteCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses/{cid}": {
         parameters: {
             query?: never;
@@ -1018,7 +1093,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN" | "MODEL_CONFIG_REQUIRED";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN" | "MODEL_CONFIG_REQUIRED" | "INVITE_CODE_INVALID" | "ALREADY_MEMBER";
         PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
         /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
         PublishBlockedCycleReason: {
@@ -1095,6 +1170,19 @@ export interface components {
             published_version?: number | null;
             /** Format: date-time */
             created_at: string;
+        };
+        InviteCodeResponse: {
+            /** @description 六位邀请码，排除 0/O/1/I；仅本课教师可读取 */
+            code: string;
+            /**
+             * Format: date-time
+             * @description 当前码生成的 UTC 时间，首次生成也提供此值
+             */
+            rotated_at: string;
+        };
+        CourseJoinRequest: {
+            /** @description 客户端去除首尾空白并转大写后提交；调用者身份仅来自访问令牌 */
+            code: string;
         };
         CourseCreate: {
             name: string;
@@ -2862,6 +2950,119 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    joinCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseJoinRequest"];
+            };
+        };
+        responses: {
+            /** @description 已加入课程；不代表图谱已经发布 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description 非 student 账号（ROLE_FORBIDDEN） */
+            403: components["responses"]["Forbidden"];
+            /** @description 邀请码不存在或已失效（INVITE_CODE_INVALID），不返回课程标识 */
+            404: components["responses"]["NotFound"];
+            /** @description 已是课程成员（ALREADY_MEMBER），原角色不变 */
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+            /** @description 用户或 IP 尝试过于频繁（RATE_LIMITED） */
+            429: {
+                headers: {
+                    /** @description 至少等待的整秒数 */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCourseInviteCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前有效邀请码 */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteCodeResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 随机码碰撞重试耗尽（INTERNAL_ERROR），事务回滚并保留原邀请码 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    rotateCourseInviteCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 新的有效邀请码 */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteCodeResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description 随机码碰撞重试耗尽（INTERNAL_ERROR），事务回滚并保留原邀请码 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getCourse: {

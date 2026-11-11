@@ -14,8 +14,9 @@ from app.repositories import course_locks
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
 from app.repositories.neo4j import RepositoryConnectionError
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.workers import persist_graph
+from tests.backend.helpers.sqlite import migrated_database
 
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 
@@ -56,8 +57,7 @@ class _Recorder:
 
 
 def _failed_task(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username="teacher1", password_hash=VALID_HASH,
                              role="teacher")
     course = create_course(url, name="数据结构", description=None, creator_id=teacher.id)

@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 
 from app.repositories.model_calls import SqliteCallStore
-from app.repositories.sqlite import migrate
 from app.services.ai.client import ModelServerError
 from app.services.ai.entities import (
     REPAIR_PURPOSE,
@@ -42,6 +41,7 @@ from app.services.chunk_identity import (
 )
 from app.services.chunking import chunk_blocks, chunking_version
 from app.services.parsers.models import ParsedBlock, RevisionKey, SourceLocator
+from tests.backend.helpers.sqlite import migrated_database
 
 MODEL = "extract-model-2026-01"
 MAX_OUT = 4000
@@ -112,8 +112,7 @@ class PolicyEnv:
     """真实 E04 ``ModelCallPolicy`` + SQLite ``model_calls``，主用为 fake。"""
 
     def __init__(self, tmp_path, *, task_budget: int = 1_000_000) -> None:
-        self.url = f"sqlite:///{tmp_path / 'e06.sqlite3'}"
-        migrate(self.url)
+        self.url = migrated_database(f"sqlite:///{tmp_path / 'e06.sqlite3'}")
         self.primary = FakeModelClient()
         self.policy = ModelCallPolicy(
             primary=self.primary,
