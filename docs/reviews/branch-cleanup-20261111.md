@@ -100,7 +100,7 @@
 | `claude/integration-0927` | `3ea7cca06b3e86d9a2ddfa9ddf55685db498a763` | 删除 | ancestor of origin/main@99e169a |
 | `claude/j03-query-rewrite` | `616d758604f3f3d693404aad4e75e594bc0c0531` | 删除 | ancestor of origin/main@99e169a |
 | `claude/k14-prompt-record` | `8f11b39c5e733b9eabd40b6e531bc6826af19f90` | 删除 | ancestor of origin/main@99e169a |
-| `claude/knowledge-graph-ux-analysis-2e7400` | `983dcba0009abbbf56394771ebe361768dfae768` | 保留 | unique work; not proven redundant |
+| `claude/knowledge-graph-ux-analysis-2e7400` | `983dcba0009abbbf56394771ebe361768dfae768` | 删除 | integrated through PR #343; PR #342 merged |
 | `claude/laughing-ptolemy-4x1c7g` | `4ca834058de73c9ebad1fadc73ec99dce5b5115c` | 保留 | unique work; not proven redundant |
 | `claude/launcher-upgrade-fix` | `14fd1ee9bd2476c5c83c9a22a077552b4fc9eee1` | 删除 | ancestor of origin/main@99e169a |
 | `claude/migration-numbering` | `9f21e0737aafd24966dbee92438dd15fe1e0a8af` | 删除 | ancestor of origin/main@99e169a |
@@ -209,6 +209,36 @@
 ## 整合与保留边界
 
 - OPT-01～06 已在 #341；#339/#340 是旧底座上的重复 PR，关闭。
-- #337 与 main 文件树一致，关闭；#342 的图谱查找和本地 `codex/extraction-perf@e8c20bd` 正在本轮整合。
+- #337 与 main 文件树一致，关闭；#342 的图谱查找和本地 `codex/extraction-perf@e8c20bd` 已随 #343 合入 main `1dbd272`。
 - 旧 UI/API 配置、Windows 启动器、级联删除及早期契约分叉含独有实现，保持远端引用；这不表示这些功能已验收或应整体覆盖当前实现。
 - 当前目录的未提交交接资料及其他 worktree 的本地环境不作为可丢弃文件处理。
+
+## 最终结果与本地引用
+
+- 原远端 195 个分支：删除 179，保留 16（main + 15 个含未确认独有内容的历史分叉）；本次创建的远端整合分支另已删除。
+- 原本地 20 个分支：删除 19，仅保留 main；本次创建的本地整合分支另已删除。
+- 原主检出已切回 main，原未提交三项资料的完整字节保存在 stash `5410571383d83078f79843c5575d9879d0419d21`，且内容已经在 main；不需要把旧任务看板整份覆盖回主线。
+- 清理仅删除引用；其他干净 worktree 转为 detached HEAD，其目录与环境不删除。本次创建的临时 worktree 在日志保存后通过宿主归档。
+
+| 本地分支 | 原 SHA | 处置 |
+| --- | --- | --- |
+| `claude/code-structure-review-handoff-49e73a` | `2675a44c2b6a9c0de0a68c29de07a5b5c7793341` | 删除；提交已覆盖或与 main 文件树相同 |
+| `claude/home-topbar-nav` | `ad633416e436a23f28172db3bd5a11757fe573e0` | 删除；提交已覆盖或与 main 文件树相同 |
+| `claude/knowledge-graph-ux-analysis-2e7400` | `983dcba0009abbbf56394771ebe361768dfae768` | 删除；提交已覆盖或与 main 文件树相同 |
+| `claude/opt-05-remaining-tasks-78755a` | `3f26766d39d8c8cd1a6334b7e781d58ff40496cc` | 删除；提交已覆盖或与 main 文件树相同 |
+| `claude/opt01-06-review-submit-598cc3` | `030408e80609107ee37f7585cfa374c42af1037a` | 删除；提交已覆盖或与 main 文件树相同 |
+| `claude/project-sidebar-missing-conversations-79b4f7` | `3f26766d39d8c8cd1a6334b7e781d58ff40496cc` | 删除；提交已覆盖或与 main 文件树相同 |
+| `claude/ui-pine-redesign` | `445bfc9ecd7e51267ddd1c42b956fe7ae5c4241b` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/extraction-perf` | `e8c20bde31fe34d8022cf010d26f1e35e010bd8c` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/invite-hover-refactor` | `e0b26e7ecb4aff2f9701443a9de2fd81e0968a5b` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-01-doc-archive` | `f10d44fb671fc4b69c97eedce080f0f7ee87e4f5` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-02-test-waits` | `eca579caf262522056a57b65b30601d9688c6dbf` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-03-test-fixtures` | `36c1f928af174140cb8b0e25c279e1f36b2ed99f` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-04-test-index` | `df181ce465bc81e2deca9c539b2ebb7ba7a9da0a` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-05-backend-layering` | `99c1f017f1f6c48f2f1d31dc0fe8f5c9d6a00586` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-06-base` | `ffef748b7c67f7a7d009c78373111e2bd24c8bbe` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-06a-compatible` | `7cccaaa4ad2eda36b27fe1dd38dca66879669a1b` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-06b-extraction` | `2f49e14339fdea2c79c713736bb454c2785f1f78` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-06c-materials` | `936b41ef24e361fe720ebb5861a72d925e3cef3f` | 删除；提交已覆盖或与 main 文件树相同 |
+| `codex/opt-06d-student-graph` | `3974731efa8727b0ac885bcce221ab2875c1f724` | 删除；提交已覆盖或与 main 文件树相同 |
+| `main` | `99e169af9cbb42b696a610bc785c1fb2fd94c93a` | 保留并更新 |
