@@ -508,7 +508,7 @@ describe('画布选中联动详情与编辑面板', () => {
     expect(canvasNodeNames(wrapper)).toEqual(cascade ? ['知识点 k3'] : ['知识点 k2', '知识点 k3'])
     expect(canvasEdgeIds(wrapper)).toEqual([])
     expect(wrapper.find('[data-test="nd-dialog"]').exists()).toBe(false)
-    expect(wrapper.get('[data-test="tg-detail-empty"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="tg-detail-empty"]').exists()).toBe(true)
     wrapper.unmount()
   })
 

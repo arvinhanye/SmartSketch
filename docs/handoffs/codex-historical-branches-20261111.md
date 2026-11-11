@@ -23,6 +23,7 @@
 - 首次完整命令：`PATH="$PWD/.venv/bin:$PATH" PYTHON="$PWD/.venv/bin/python" E2E_PYTHON="$PWD/.venv/bin/python" GOCACHE=/tmp/smartsketch-historical-go-cache PLAYWRIGHT_CHROMIUM_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ./scripts/verify.sh integration`。为修复独立复核发现而在契约回归阶段主动中断（2 passed 后 KeyboardInterrupt，剩余进程树已终止），不能记为通过。原日志 `/tmp/smartsketch-historical-integration.log`；修复后重新运行。
 - 独立复核：Windows 门禁、级联后端两个 P2 已经原反例重跑关闭；单删漏修订号已补精确参数和两模式页面回归。根代理复核最终透传实现，QA 日志、E2E 新增选择器/等待/数据边界另有独立审查；当前无已知未关闭代码问题。真实 Neo4j、真实浏览器和 Windows 仍待相应运行，不能以 mock/静态复核代替。
 - 新一轮完整门禁已启动，日志 `/tmp/smartsketch-historical-integration-final.log`；包含新增真实 Neo4j 8 项，以及教师 E2E 发布后默认单删/明确级联/已发布学生版本保留的真实浏览器回归。
+- PR #345 首轮前端 84 文件 / 1443 条测试及 build 通过，但新增 H14 断言对 `get()` 返回值调用 `exists()` 不符合 Vue Test Utils 类型，类型门禁失败；改为 `find().exists()`，存在性断言保持。修复后 `npm --prefix src/frontend run type-check` exit 0；等待新 head CI，未将首轮 job 记为通过。
 
 ## 接口、配置与数据
 
