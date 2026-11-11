@@ -292,6 +292,8 @@ describe('H03 稳定 ID', () => {
       data: {
         kpId: 'push',
         name: '知识点 push',
+        // UI-GRAPH-FIND-01：别名随节点进画布数据，供查找使用
+        aliases: ['别名 push'],
         type: 'method',
         level: 2,
         chapterId: null,

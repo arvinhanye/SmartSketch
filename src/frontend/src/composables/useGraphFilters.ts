@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef, toValue, watch, type ComputedRef, type MaybeRefOrGetter, type Ref } from 'vue'
 import type { components } from '../../../contracts/v1/generated/typescript/openapi'
 import type { KnowledgePoint, RelationType } from '../graph/adapter'
+import { normalizeQuery as normalize, searchNodes, type SearchHit } from '../graph/search'
 import type {
   CanvasEdge,
   CanvasElementState,
@@ -114,10 +115,6 @@ export function sameFilterState(a: GraphFilterState, b: GraphFilterState): boole
   )
 }
 
-function normalize(text: string): string {
-  return text.normalize('NFKC').toLowerCase().trim()
-}
-
 function reviewState(status: ReviewStatus): CanvasElementState[] {
   if (status === 'rejected') return ['rejected']
   if (status === 'low_confidence') return ['lowConfidence']
@@ -131,19 +128,23 @@ function chapterMatches(filter: ChapterFilter, chapterId: string | null): boolea
 }
 
 /**
- * 搜索定位（L13-2）：在类型、状态、章节筛选可见的节点中按名称查找，完全一致优先，其次包含；
- * 规范化规则同 `query`（忽略大小写、全半角与首尾空白）。没有匹配或关键字为空时返回 null。
+ * 查找（UI-GRAPH-FIND-01）：在类型、状态、章节筛选可见的节点中按名称与别名查找，排序见 `graph/search.ts`。
+ * 关键字为空时返回空数组。
  */
-export function locateNode(graph: GraphCanvasData, state: GraphFilterState, query: string): string | null {
-  const wanted = normalize(query)
-  if (wanted === '') return null
+export function matchNodes(graph: GraphCanvasData, state: GraphFilterState, query: string): SearchHit[] {
   const nodeTypes = new Set(state.nodeTypes)
   const statuses = new Set(state.statuses)
-  const candidates = graph.nodes.filter((node) => nodeTypes.has(node.data.type) && statuses.has(node.data.status)
-    && chapterMatches(state.chapter, node.data.chapterId))
-  const exact = candidates.find((node) => normalize(node.data.name) === wanted)
-  if (exact) return exact.data.kpId
-  return candidates.find((node) => normalize(node.data.name).includes(wanted))?.data.kpId ?? null
+  const candidates = graph.nodes
+    .filter((node) => nodeTypes.has(node.data.type) && statuses.has(node.data.status) && chapterMatches(state.chapter, node.data.chapterId))
+    .map((node) => node.data)
+  return searchNodes(candidates, query)
+}
+
+/**
+ * 搜索定位（L13-2）：`matchNodes` 的第一个命中（完全一致优先）。没有匹配或关键字为空时返回 null。
+ */
+export function locateNode(graph: GraphCanvasData, state: GraphFilterState, query: string): string | null {
+  return matchNodes(graph, state, query)[0]?.kpId ?? null
 }
 
 /** 纯函数：不修改输入；输出的节点与边是新对象（`data`/`style` 与输入共享，画布生命周期会再复制） */
@@ -214,6 +215,11 @@ export interface UseGraphFiltersOptions {
   /** 覆盖默认条件（如教师视图默认隐藏驳回项）；`clear` 回到这里 */
   initial?: Partial<GraphFilterState>
   layout?: GraphLayoutName
+  /**
+   * 搜索关键字的作用方式：`filter`（缺省，H05）隐藏不匹配的知识点；
+   * `highlight`（UI-GRAPH-FIND-01）不隐藏，页面用 `matches` 高亮命中并淡化其余。
+   */
+  search?: 'filter' | 'highlight'
 }
 
 export interface GraphFilters {
@@ -227,6 +233,8 @@ export interface GraphFilters {
   isDefault: ComputedRef<boolean>
   /** 有选中项但被当前筛选隐藏 */
   selectedHidden: ComputedRef<boolean>
+  /** 当前关键字的命中（按相关度排序，只在类型、状态、章节筛选可见的知识点里找）；关键字为空时为空数组 */
+  matches: ComputedRef<SearchHit[]>
   clear(): void
   select(kpId: string | null): void
   /** 搜索定位：命中即选中并返回知识点 ID；未命中返回 null，不改当前选中 */
@@ -247,7 +255,13 @@ export function useGraphFilters(
 
   const visible = computed(() => {
     const g = graph.value
-    return g === null ? null : filterGraph(g, state.value, selected.value)
+    if (g === null) return null
+    return filterGraph(g, options.search === 'highlight' ? { ...state.value, query: '' } : state.value, selected.value)
+  })
+
+  const matches = computed<SearchHit[]>(() => {
+    const g = graph.value
+    return g === null ? [] : matchNodes(g, state.value, state.value.query)
   })
 
   const summary = computed<GraphSummary | null>(() => {
@@ -279,6 +293,7 @@ export function useGraphFilters(
     summary,
     isDefault,
     selectedHidden,
+    matches,
     clear() {
       state.value = cloneState(initial)
     },

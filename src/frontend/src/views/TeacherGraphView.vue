@@ -19,9 +19,13 @@ import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
 import { readArrangement, writeArrangement, type Arrangement } from '../composables/useArrangementPreference'
 import { useGraphLayout } from '../composables/useGraphLayout'
-import { kpIdFromElementId } from '../graph/adapter'
+import { useGraphShortcuts } from '../composables/useGraphShortcuts'
+import { readPanelWidth, writePanelWidth } from '../composables/usePanelWidthPreference'
+import { applyFocusStates } from '../graph/focusStates'
+import { normalizeQuery } from '../graph/search'
+import { kpIdFromElementId, nodeElementId } from '../graph/adapter'
 import type { GraphLayoutName } from '../graph/lifecycle'
-import { chapterOptions, locateNode, NODE_TYPE_LABELS, useGraphFilters, type KnowledgePointType } from '../composables/useGraphFilters'
+import { chapterOptions, NODE_TYPE_LABELS, useGraphFilters, type KnowledgePointType } from '../composables/useGraphFilters'
 import { nodePickerOptions, useNodeCreator } from '../composables/useNodeCreator'
 import { useRelationEditor } from '../composables/useRelationEditor'
 import { useSelectionGuard, useTeacherGraph } from '../composables/useTeacherGraph'
@@ -81,8 +85,16 @@ const relations = useRelationEditor({
 })
 
 // 画布取连边编辑器的派生图：含保存中的临时边与成环冲突标色
-const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value))
+// UI-GRAPH-FIND-01：搜索只高亮命中，不把其余知识点从画布上移除
+const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value), { search: 'highlight' })
 const { selected, visible, summary, isDefault, selectedHidden } = filters
+/** 交给画布的图：有命中时命中带 `match`、其余淡化（选中的节点不淡化） */
+const canvasGraph = computed(() => {
+  const v = visible.value
+  const hits = filters.matches.value
+  if (v === null || hits.length === 0) return v
+  return applyFocusStates(v, { selectedId: null, matchedIds: new Set(hits.map((hit) => nodeElementId(hit.kpId))), chapterIds: null, fade: 'standard' })
+})
 
 // 节点类型图例：计数取整张草稿图；点击与工具栏“筛选”里的知识点类型是同一份状态
 const allTypes = Object.keys(NODE_TYPE_LABELS) as KnowledgePointType[]
@@ -122,13 +134,33 @@ const currentName = computed(() => graph.value?.nodes.find((n) => n.id === selec
 // L13-2：搜索框回车定位；选中经过「未保存修改」守卫，画布聚焦到该节点
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
 const searchNotice = ref<string | null>(null)
+/** 回车依次定位下一个命中：关键字没变就接着上一次的位置往下走，到末尾回到第一个 */
+let locateQuery = ''
+const locateCursor = ref(-1)
+const searchCount = computed(() => {
+  const total = filters.matches.value.length
+  if (total === 0) return null
+  return locateCursor.value >= 0 && locateCursor.value < total ? `匹配 ${locateCursor.value + 1} / ${total}，回车定位下一个` : `匹配 ${total} 个，回车逐个定位`
+})
+watch(
+  () => normalizeQuery(filters.state.value.query),
+  () => {
+    locateCursor.value = -1
+  },
+)
 function onLocate(query: string): void {
-  const full = graph.value === null ? null : relations.canvasData.value
-  const kpId = full === null ? null : locateNode(full, filters.state.value, query)
-  searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
-  if (kpId === null) return
+  if (graph.value === null) return
+  // 工具栏的输入值与筛选状态由 v-model 同步；这里以筛选状态的命中为准
+  if (normalizeQuery(query) !== normalizeQuery(filters.state.value.query)) filters.state.value = { ...filters.state.value, query }
+  const hits = filters.matches.value
+  searchNotice.value = hits.length === 0 ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
+  if (hits.length === 0) return
+  const wanted = normalizeQuery(query)
+  const index = wanted === locateQuery && locateCursor.value >= 0 ? (locateCursor.value + 1) % hits.length : 0
+  locateQuery = wanted
+  locateCursor.value = index
   // C05-1：有未保存修改时先确认；画布只在选中真正切换后才聚焦，取消则画布与详情都留在原节点
-  guard.request(kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
+  guard.request(hits[index]!.kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
 }
 
 // L11：画布之外的可访问选择方式（键盘与自动化可用），选择同样经过「未保存修改」守卫
@@ -270,12 +302,13 @@ const TEACHER_FIT_PADS = { left: 40, top: 40, right: 96 }
 // 面板只在有限高度内滚动；宽度调整不会改变草稿或选择状态。
 const workspace = ref<HTMLElement | null>(null)
 const workspaceWidth = ref(0)
-const preferredWidth = ref(360)
+const preferredWidth = ref(readPanelWidth('teacher-graph') ?? 360)
 const minWidth = computed(() => Math.min(280, workspaceWidth.value * .4))
 const maxWidth = computed(() => Math.max(minWidth.value, Math.min(640, workspaceWidth.value - 360)))
 const panelWidth = computed(() => Math.min(maxWidth.value, Math.max(minWidth.value, preferredWidth.value)))
 function setWidth(value: number): void {
   preferredWidth.value = Math.min(maxWidth.value, Math.max(minWidth.value, value))
+  writePanelWidth('teacher-graph', preferredWidth.value)
 }
 const resizing = ref(false)
 function startResize(event: PointerEvent): void {
@@ -306,6 +339,20 @@ watch(workspace, (element) => {
 }, { flush: 'post' })
 onBeforeUnmount(() => workspaceObserver?.disconnect())
 const empty = computed(() => status.value === 'ready' && graph.value !== null && graph.value.nodes.length === 0)
+
+// 快捷键（UI-GRAPH-FIND-01）：/ 聚焦搜索，F 适应画布，+、- 缩放
+const filtersEl = ref<HTMLElement | null>(null)
+useGraphShortcuts({
+  search: () => {
+    const input = filtersEl.value?.querySelector<HTMLInputElement>('input[type="search"]')
+    if (input == null) return false
+    input.focus()
+    input.select()
+  },
+  fit: () => (canvas.value === null ? false : void canvas.value.fitTo()),
+  zoomIn: () => (canvas.value === null ? false : void canvas.value.zoomBy(1.25)),
+  zoomOut: () => (canvas.value === null ? false : void canvas.value.zoomBy(0.8)),
+})
 </script>
 
 <template>
@@ -353,7 +400,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
       </p>
 
       <div ref="workspace" class="teacher-graph__body" :class="{ 'is-resizing': resizing }" :style="{ '--teacher-panel-width': `${panelWidth}px` }">
-        <aside class="teacher-graph__filters" aria-label="筛选">
+        <aside ref="filtersEl" class="teacher-graph__filters" aria-label="筛选">
           <GraphToolbar
             v-model="filters.state.value"
             :layout="arrangement"
@@ -374,6 +421,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             </template>
           </GraphToolbar>
           <p v-if="searchNotice" data-test="tg-search-notice" role="status">{{ searchNotice }}</p>
+          <p v-else-if="searchCount" class="ui-muted" data-test="tg-search-count" role="status">{{ searchCount }}</p>
         </aside>
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
@@ -391,7 +439,7 @@ const empty = computed(() => status.value === 'ready' && graph.value !== null &&
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="visible" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <GraphCanvas ref="canvas" :graph="canvasGraph" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
         </div>
 
         <div

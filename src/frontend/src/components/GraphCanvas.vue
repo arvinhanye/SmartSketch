@@ -168,6 +168,8 @@ defineExpose({
   fitTo: (kpIds?: readonly string[]) => lifecycle?.fitTo(kpIds),
   /** 节点在视口外时才移动镜头（面板里的显式选择） */
   ensureVisible: (kpId: string) => lifecycle?.ensureVisible(kpId),
+  /** 按比例缩放（快捷键 +、-） */
+  zoomBy: (ratio: number) => lifecycle?.zoomBy(ratio),
 })
 
 const zoomBy = (ratio: number): void => lifecycle?.zoomBy(ratio)
@@ -276,9 +278,9 @@ onBeforeUnmount(() => {
         <button type="button" class="gw-tool" :aria-label="miniOpen ? '收起小地图' : '展开小地图'" :title="miniOpen ? '收起小地图' : '展开小地图'" :aria-pressed="miniOpen" @click="miniOpen = !miniOpen">
           <AppIcon name="map" />
         </button>
-        <button type="button" class="gw-tool" aria-label="放大" title="放大" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
-        <button type="button" class="gw-tool" aria-label="缩小" title="缩小" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
-        <button type="button" class="gw-tool" aria-label="适应画布" title="适应画布" @click="fitAll"><AppIcon name="fit" /></button>
+        <button type="button" class="gw-tool" aria-label="放大" title="放大（+）" @click="zoomBy(1.25)"><AppIcon name="plus" /></button>
+        <button type="button" class="gw-tool" aria-label="缩小" title="缩小（-）" @click="zoomBy(0.8)"><AppIcon name="minus" /></button>
+        <button type="button" class="gw-tool" aria-label="适应画布" title="适应画布（F）" @click="fitAll"><AppIcon name="fit" /></button>
         <button type="button" class="gw-tool" aria-label="放大到可读大小" title="放大到可读大小（标签字号舒适的缩放）" data-test="zoom-readable" @click="toReadable"><AppIcon name="readable" /></button>
       </div>
     </div>

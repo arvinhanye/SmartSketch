@@ -1052,3 +1052,79 @@ describe('教师知识点面板调宽', () => {
     vi.restoreAllMocks()
   })
 })
+
+// ---------------------------------------------------------------- UI-GRAPH-FIND-01：教师页查找与宽度记忆
+describe('UI-GRAPH-FIND-01 教师页：搜索高亮、循环定位与面板宽度记忆', () => {
+  const statesByName = (wrapper: VueWrapper) =>
+    Object.fromEntries((canvasGraph(wrapper)?.nodes ?? []).map((n) => [n.data.name, n.states ?? []]))
+
+  async function type(wrapper: VueWrapper, query: string) {
+    await wrapper.find('input[type="search"]').setValue(query)
+    await flushPromises()
+  }
+  async function enter(wrapper: VueWrapper) {
+    await wrapper.find('input[type="search"]').trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+  }
+
+  it('输入关键字不隐藏节点：命中带 match，其余淡化；清空后恢复', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const all = canvasNodeNames(wrapper)
+    expect(all.length).toBeGreaterThan(2)
+    await type(wrapper, '知识点 k2')
+    expect(canvasNodeNames(wrapper)).toEqual(all)
+    const states = statesByName(wrapper)
+    expect(states['知识点 k2']).toContain('match')
+    expect(states['知识点 k1']).toContain('dimmed')
+    await type(wrapper, '')
+    expect(Object.values(statesByName(wrapper)).flat()).not.toContain('dimmed')
+  })
+
+  it('回车依次定位下一个命中并显示位置，到末尾回到第一个；没有命中时提示且不改选中', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const total = canvasNodeNames(wrapper).length
+    await type(wrapper, '知识点')
+    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 ${total} 个`)
+    await enter(wrapper)
+    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 1 / ${total}`)
+    const first = wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement
+    const firstId = first.value
+    await enter(wrapper)
+    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 2 / ${total}`)
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).not.toBe(firstId)
+    for (let i = 2; i < total; i += 1) await enter(wrapper)
+    await enter(wrapper)
+    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 1 / ${total}`)
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe(firstId)
+
+    await type(wrapper, '不存在的知识点')
+    await enter(wrapper)
+    expect(wrapper.get('[data-test="tg-search-notice"]').text()).toContain('未找到匹配的知识点')
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe(firstId)
+  })
+
+  it('面板宽度记在本浏览器：调整后重新进入页面保留；存储抛异常时照常工作', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200)
+    const first = await mountPage(fakes())
+    const divider = first.wrapper.get('[data-test="tg-panel-divider"]')
+    await divider.trigger('keydown', { key: 'ArrowRight' })
+    expect(Number(divider.attributes('aria-valuenow'))).toBe(380)
+    first.wrapper.unmount()
+
+    const second = await mountPage(fakes())
+    expect(Number(second.wrapper.get('[data-test="tg-panel-divider"]').attributes('aria-valuenow'))).toBe(380)
+    second.wrapper.unmount()
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    const third = await mountPage(fakes())
+    const blocked = third.wrapper.get('[data-test="tg-panel-divider"]')
+    expect(Number(blocked.attributes('aria-valuenow'))).toBe(360)
+    await blocked.trigger('keydown', { key: 'ArrowRight' })
+    expect(Number(blocked.attributes('aria-valuenow'))).toBe(380)
+  })
+})

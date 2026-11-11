@@ -2400,3 +2400,13 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - FORMAL-RELEASE-01 Release 已公开（2026-10-10，用户操作）：`rc-7f8a0cd` 作为**预发布**公开（`isDraft: false`、`isPrerelease: true`，2026-10-10T07:04:58Z），tag `rc-7f8a0cd` 指向 `21858897cfe07d5759126009cc520543f2ce8622`（PR #335 合并提交），附件为 `SmartSketch-rc-7f8a0cd-darwin-amd64.tar.gz`、`SmartSketch-rc-7f8a0cd-windows-amd64.zip` 与只列这两个包的 `SHA256SUMS`。仓库 `README.md` 已改为已发布状态，下载链接直接指向 tag 页面（预发布不会出现在 GitHub 的「最新版本」入口）。交付范围不变：Mac Intel 已实测；Windows 仅交叉编译、从未实机运行；Apple Silicon 与 Windows ARM 不提供；未签名未公证。
   - 仍待办：两个更早的旧草稿（2026-10-05 预览、2026-10-06 热修复预览）是否删除由用户决定；Windows 实机验证；Gatekeeper/SmartScreen 实测；签名与公证；`upgrade.json` 升级成功后未清理（无害）；冒烟测试泄漏 Docker 网络；`test_stop_procs` 在本机 macOS 稳定失败；测试里其他固定时长等待可能还有同类竞态；从预览版升级的路径只在一台真实安装上走通过一次。
 
+
+## 2026-11-10 Claude：图谱查找、快捷键与视图记忆（UI-GRAPH-FIND-01，用户确认“开始第一批”）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-GRAPH-FIND-01 | 实现与自动化验收完成，待浏览器实测与用户视觉签收（2026-11-11；review_status: ready_for_review） | Claude | 分支 `claude/knowledge-graph-ux-analysis-2e7400`。搜索改为“高亮 + 淡化”并支持别名、候选、上一个/下一个；画布快捷键（`/`、`F`、`+`、`-`）；学生页视图状态写入地址；两页面板宽度本地记忆。文件：`src/frontend/src/graph/search.ts`（新）、`graph/adapter.ts`、`graph/focusStates.ts`、`composables/useGraphFilters.ts`、`composables/useGraphShortcuts.ts`（新）、`composables/usePanelWidthPreference.ts`（新）、`composables/graphViewQuery.ts`（新）、`components/GraphSearch.vue`（新）、`components/GraphCanvas.vue`、`views/StudentGraphView.vue`、`views/TeacherGraphView.vue`、`styles/graph-workspace.css`、相关前端测试、`specs/course-knowledge-graph.md` | 不改后端、接口、契约、数据与权限；`filterGraph` 既有语义与既有 `data-test` 钩子保留。验收条件见 `specs/course-knowledge-graph.md`「图谱查找、快捷键与视图记忆」；`type-check`、前端全量、`build`、`./scripts/verify.sh`；浏览器实走与自动化分别报告 |
+
+- 输入：2026-11-10 体验差距分析（搜索是过滤而非查找、无效率快捷键、视图状态不记忆）；输出：上表文件与交接 `docs/handoffs/claude-ui-graph-find-01.md`。依赖：现有 `match`/`dimmed` 画布状态、契约 `KnowledgePoint.aliases`。风险：既有测试里依赖“搜索隐藏节点”的断言；地址写回与问答链接 `?kp=&v=` 的处理互相触发；G6 画布重建时快捷键调用落空。回滚：还原本任务提交即可，无数据迁移。
+- 本批不做（留待后续批次）：镜头位置写入地址；教师页视图状态写入地址；拼音/模糊匹配；搜索定义正文；命令面板。
+- 验收证据（2026-11-11，详见 `docs/handoffs/claude-ui-graph-find-01.md`）：新增 `tests/frontend/graph-find.test.ts`（31 条）与 `h14.test.ts` 3 条；因规格变更调整 2 条既有断言（`graph-focus-states.test.ts` 命中时其余淡化、`h03.test.ts` 节点数据带别名）。`scripts/verify/frontend.sh full` exit 0（type-check 无错误，78 文件 / 1338 条通过，build 成功）；`./scripts/verify.sh`（basic）exit 0。反向验证一次：去掉学生页的 `search: 'highlight'` 后新测试 3 条失败，恢复后通过。**未做**：浏览器实走（本机 Docker 未启动，没有可用后端）、读屏、真实课程数据下的候选与淡化观感、`verify.sh full/integration` 的后端与集成部分（后端未改）。测试是在实现之后补写的，不是先红后绿。未提交、未推送。

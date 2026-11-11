@@ -42,6 +42,8 @@ export const RELATION_STYLES: Readonly<Record<RelationType, RelationStyle>> = Ob
 export interface G6NodeData {
   kpId: string
   name: string
+  /** 别名（契约 `aliases`）：只用于查找；没有别名时不带这个字段 */
+  aliases?: string[]
   type: KnowledgePoint['type']
   level: number
   chapterId: string | null
@@ -150,6 +152,7 @@ function toNode(kp: KnowledgePoint): G6Node {
     data: {
       kpId: kp.id,
       name: kp.name,
+      ...(kp.aliases !== undefined && kp.aliases.length > 0 ? { aliases: [...kp.aliases] } : {}),
       type: kp.type,
       level: kp.level,
       chapterId: kp.chapter_id ?? null,
