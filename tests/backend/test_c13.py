@@ -27,6 +27,7 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 BACKEND = Path(__file__).resolve().parents[2] / "src" / "backend"
 SECRET = "c13-test-signing-key-0123456789abcdefghij"  # 41 bytes, test only
@@ -43,10 +44,6 @@ class FakeClock:
         return self.now
 
 
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
-
-
 def _b64decode(segment: str) -> bytes:
     return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
 
@@ -59,13 +56,6 @@ def _decode(token: str) -> tuple[dict, dict, bytes, bytes]:
         f"{header}.{payload}".encode("ascii"),
         _b64decode(signature),
     )
-
-
-@pytest.fixture
-def db_url(tmp_path):
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
-    return url
 
 
 @pytest.fixture

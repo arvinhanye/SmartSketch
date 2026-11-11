@@ -19,7 +19,6 @@ from typing import Any
 import pytest
 
 from app.repositories.model_calls import SqliteCallStore
-from app.repositories.sqlite import migrate
 from app.services.ai.client import (
     ModelAuthError,
     ModelConnectionError,
@@ -55,6 +54,7 @@ from app.services.qa.generate import (
     neutralize,
     render_evidence_blocks,
 )
+from tests.backend.helpers.sqlite import migrated_database
 
 MODEL = "chat-model"
 FALLBACK_MODEL = "chat-model-backup"
@@ -77,8 +77,7 @@ class Clock:
 class Env:
     def __init__(self, tmp_path, *, store: Any = None, fallback: bool = False, fake: FakeModelClient | None = None,
                  **policy_kwargs: Any) -> None:
-        self.url = f"sqlite:///{tmp_path / 'j05.sqlite3'}"
-        migrate(self.url)
+        self.url = migrated_database(f"sqlite:///{tmp_path / 'j05.sqlite3'}")
         self.clock = Clock()
         self.fake = fake if fake is not None else FakeModelClient()
         self.backup = FakeModelClient() if fallback else None

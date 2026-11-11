@@ -6,7 +6,7 @@ import pytest
 
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.repositories.progress import (
     InvalidProgressTarget, ProgressUpdate, StalePublishedVersion,
     read_progress, read_committed_progress, write_progress,
@@ -14,14 +14,14 @@ from app.repositories.progress import (
 from app.repositories import progress as progress_repository
 from app.repositories.versions import immediate
 from app.services.versions.snapshot import DraftGraph, DraftNode, Revision, build_snapshot
+from tests.backend.helpers.sqlite import migrated_database
 
 HASH = '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA'
 
 
 @pytest.fixture
 def env(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite').as_posix()}")
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username='teacher', password_hash=HASH, role='teacher')
     alice = insert_account(url, account_id=uuid.uuid4().hex, username='alice', password_hash=HASH, role='student')
     bob = insert_account(url, account_id=uuid.uuid4().hex, username='bobby', password_hash=HASH, role='student')

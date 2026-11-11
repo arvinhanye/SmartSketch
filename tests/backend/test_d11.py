@@ -23,10 +23,9 @@ import pytest
 
 from tests.waiting import wait_until
 
-from app.config import load_settings
 from app.repositories import chunks as store
 from app.repositories import task_leases, tasks
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.chunk_identity import assign_chunk_identities, revision_parser_version
 from app.services.chunking import chunk_blocks, chunking_version
 from app.services.file_storage import FileStorage, StoredFile
@@ -36,6 +35,7 @@ from app.services.task_cancel import cancel_task
 from app.services.task_state import TaskError, TaskState, TransitionEvent, apply_event, Applied
 from app.workers import parse_task
 from app.workers.parse_task import LeaseHeartbeat, ParseStatus, report_progress, run_once, run_parse_stage
+from tests.backend.helpers.settings import worker_settings as _settings
 
 COURSE = "course-a"
 OTHER = "course-b"
@@ -149,17 +149,6 @@ _NAME = {"txt": "notes.txt", "markdown": "notes.md", "docx": "notes.docx", "pdf"
 
 
 # --- 数据准备 ------------------------------------------------------------------------------------
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
-
-
-@pytest.fixture
-def db_url(tmp_path: Path) -> str:
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
-    return url
 
 
 @pytest.fixture
@@ -764,12 +753,6 @@ def test_lease_for_a_non_parsing_task_is_refused(db_url, storage):
 
 
 # --- 运行一次入口 --------------------------------------------------------------------------------
-
-
-def _settings(db_url: str, storage: FileStorage):
-    return load_settings(
-        {"SQLITE_URL": db_url, "STORAGE_DIR": str(storage.root), "TASK_LEASE_SECONDS": "15"}
-    )
 
 
 def test_run_once_parses_then_hands_the_task_back(db_url, storage):

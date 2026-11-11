@@ -15,8 +15,6 @@ import pytest
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
-from app.main import create_app
-from app.repositories.accounts import insert_account
 from app.repositories.courses import (
     RoleNotAllowed,
     add_member,
@@ -24,12 +22,13 @@ from app.repositories.courses import (
     get_member,
     list_members,
 )
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.auth import issue_access_token
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.sqlite import migrated_database
 
 
 SECRET = "c15-test-signing-key-0123456789abcdefghij"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 CONTRACT = json.loads(
     (Path(__file__).resolve().parents[2] / "src/contracts/v1/generated/openapi.json").read_text(
         encoding="utf-8"
@@ -37,17 +36,9 @@ CONTRACT = json.loads(
 )
 
 
-def _account(url, username, role):
-    return insert_account(
-        url, account_id=uuid.uuid4().hex, username=username,
-        password_hash=VALID_HASH, role=role,
-    )
-
-
 @pytest.fixture
-def scenario(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+def scenario(tmp_path, app_factory):
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     users = {
         "teacher": _account(url, "teacher1", "teacher"),
         "co_teacher": _account(url, "teacher2", "teacher"),
@@ -63,9 +54,7 @@ def scenario(tmp_path, monkeypatch):
         url, course_id=course.id, user_id=users["student"].id, role="student",
         added_by=users["teacher"].id,
     )
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    with TestClient(create_app()) as client:
+    with TestClient(app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET)) as client:
         yield client, url, course, users
 
 

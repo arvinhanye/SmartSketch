@@ -18,6 +18,7 @@ from app.repositories.sqlite import (
     migrate,
     pending_migrations,
 )
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 ROOT = Path(__file__).resolve().parents[2]
 # C01 之前 B06 启动门禁自己建出的表（ADR-012 补注第 1 条），用于模拟已有数据库。
@@ -27,10 +28,6 @@ LEGACY_B06_DDL = """CREATE TABLE embedding_space_state (
     dimensions INTEGER NOT NULL CHECK (dimensions >= 1),
     is_fake INTEGER NOT NULL CHECK (is_fake IN (0, 1))
 )"""
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
 
 
 def _base_only(tmp_path: Path) -> Path:

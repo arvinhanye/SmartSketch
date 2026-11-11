@@ -12,7 +12,7 @@ from app.config import SettingsError, load_settings
 from app.repositories import model_configs as repo
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.repositories.tasks import create_material_task
 from app.services.credentials import CredentialCipher, CredentialError, SealedKey
 
@@ -20,13 +20,6 @@ VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 ROOT_KEY = bytes(range(32))
 ROOT_KEY_B64 = base64.urlsafe_b64encode(ROOT_KEY).decode()
 SECRET = "sk-test-0123456789abcd"
-
-
-@pytest.fixture
-def url(tmp_path):
-    value = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(value)
-    return value
 
 
 def _user(url, name, role="teacher"):

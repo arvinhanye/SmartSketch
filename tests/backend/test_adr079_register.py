@@ -5,9 +5,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.repositories.accounts import find_by_username
-from app.repositories.sqlite import migrate
 from app.services.auth import RegistrationRateLimiter, create_account
 
 SECRET = "adr079-test-signing-key-0123456789abcdefgh"  # test only
@@ -25,22 +23,13 @@ class FakeClock:
 
 
 @pytest.fixture
-def db_url(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
-    return url
-
-
-@pytest.fixture
 def clock():
     return FakeClock(1000.0)
 
 
 @pytest.fixture
-def app(db_url, clock, monkeypatch):
-    monkeypatch.setenv("SQLITE_URL", db_url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    application = create_app()
+def app(db_url, clock, app_factory):
+    application = app_factory(SQLITE_URL=db_url, AUTH_JWT_SECRET=SECRET)
     application.state.registration_limiter = RegistrationRateLimiter(
         clock=clock, max_attempts=3, window_seconds=60
     )

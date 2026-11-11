@@ -22,7 +22,7 @@ from app.api.dependencies import course_student
 from app.config import Settings
 from app.repositories.chat_logs import list_chat_logs
 from app.repositories.neo4j import GraphScope, Neo4jRepository, RepositoryError, read_deadline
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.ai.client import EmbeddingRequest, EmbeddingResult, ModelTimeoutError
 from app.services.ai.compatible import CompatibleEmbeddingClient, StdlibTransport
 from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingDeadlineExceeded
@@ -30,6 +30,7 @@ from app.services.ai.outbound import GuardedTransport
 from app.services.qa import chat as chat_module
 from app.services.qa.chat import ChatFailure, ChatService
 from app.services.versions.resolver import PublishedVersion
+from tests.backend.helpers.sqlite import migrated_database
 
 SLACK = 0.25          # 调度误差余量；业务时限本身不放宽
 COURSE, VERSION_ID = "c" * 32, "v" * 26
@@ -331,8 +332,7 @@ def test_rewrite_exhausting_the_budget_sends_no_embedding_request(monkeypatch):
 
 @pytest.mark.parametrize("accept", ["application/json", "text/event-stream"])
 def test_timeout_in_preparation_is_the_same_on_both_transports_and_in_the_log(tmp_path, monkeypatch, accept):
-    url = f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}")
     user_id = "u" * 32
     with connect(url) as db:
         db.execute("INSERT INTO users(id, username, password_hash, role) VALUES (?, 'student', ?, 'student')",

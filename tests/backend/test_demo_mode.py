@@ -53,6 +53,7 @@ from app.services.versions.resolver import PublishedVersion
 from app.workers import runner
 from app.workers.extract_task import ExtractLimits, ExtractStatus, load_candidates, run_extract_stage
 from app.workers.parse_task import ParseStatus, run_parse_stage
+from tests.backend.helpers.sqlite import migrated_database
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests" / "fixtures" / "documents" / "stack-queue-notes.md"
@@ -255,8 +256,7 @@ def _material(db_url: str, storage: FileStorage, data: bytes) -> str:
 
 
 def _extract_with_worker_toolkit(tmp_path: Path, data: bytes):
-    db_url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(db_url)
+    db_url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     storage = FileStorage(tmp_path / "files", 10 * 1024 * 1024)
     settings = load_settings(_env(SQLITE_URL=db_url, STORAGE_DIR=str(tmp_path / "files")))
     task_id = _material(db_url, storage, data)
@@ -321,8 +321,7 @@ def test_lexical_overlap_beats_unrelated_text():
 
 
 def _policy(tmp_path: Path, client: DemoModelClient) -> ModelCallPolicy:
-    db_url = f"sqlite:///{(tmp_path / 'calls.sqlite3').as_posix()}"
-    migrate(db_url)
+    db_url = migrated_database(f"sqlite:///{(tmp_path / 'calls.sqlite3').as_posix()}")
     return ModelCallPolicy(primary=client, store=SqliteCallStore(db_url), max_retries=0,
                            failure_threshold=100, open_seconds=30, task_token_budget=10**9,
                            daily_token_budget=10**9, sleep=lambda _s: None)
@@ -330,8 +329,7 @@ def _policy(tmp_path: Path, client: DemoModelClient) -> ModelCallPolicy:
 
 def _ask(tmp_path: Path, question: str) -> dict:
     """无 Neo4j 的问答链路：演示向量检索 → J04 闸门 → J05 演示生成 → J06 引用校验。"""
-    db_url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(db_url)
+    db_url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     storage = FileStorage(tmp_path / "files", 10 * 1024 * 1024)
     _material(db_url, storage, FIXTURE.read_bytes())
     lease = task_leases.claim_next(db_url, owner="w", lease_seconds=60, max_attempts=3)

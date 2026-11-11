@@ -31,6 +31,7 @@ from app.services.ai.client import (
 )
 from app.services.ai.policy import CallAttribution, ModelCallPolicy
 from test_e03 import MODEL, SSE_HEADERS, ScriptedResponse, ScriptedTransport, make_client, make_request, sse
+from tests.backend.helpers.sqlite import migrated_database
 
 REASONING_TEXT = "先回忆栈的定义，再比较队列……"
 
@@ -139,8 +140,7 @@ class _ReasoningClient:
 
 
 def _policy(tmp_path, client, clock) -> tuple[ModelCallPolicy, str]:
-    url = f"sqlite:///{tmp_path / 'c02.sqlite3'}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{tmp_path / 'c02.sqlite3'}")
     policy = ModelCallPolicy(primary=client, store=SqliteCallStore(url), clock=clock, sleep=lambda s: None,
                              random=lambda: 1.0, max_retries=0, failure_threshold=5, open_seconds=30,
                              task_token_budget=1_000_000, daily_token_budget=10_000_000)

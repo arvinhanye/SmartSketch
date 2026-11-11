@@ -1,5 +1,18 @@
 # 任务看板
 
+## 2026-11-10 Codex：OPT-03 后端测试夹具收敛
+
+- 状态 DONE；负责人 Codex；分支 `codex/opt-03-test-fixtures`；从已提交且干净的 `codex/opt-02-test-waits@eca579c` 建立独立 worktree。OPT-02 剩余浏览器/集成验收不属于本任务。
+- 输入：AGENTS、`.claude/rules/testing.md`、原审查分支 OPT-03 节及当前后端测试；本基线没有 `tests/INDEX.md`。
+- 输出：仅后端测试共享辅助/初始化、消费者迁移及本任务文档；不改断言、不删或增加用例、不改产品代码。
+- 依赖/风险：复用已有 Python/前端依赖；SQLite 路径与所有 fixture 保持 function 作用域，保留不同实现和专门迁移测试，避免状态交叉污染。
+- 执行：先记录收集数/重复定义及初始化计数；每批只迁一种辅助并立即运行该批测试；最后对修改文件用两个固定随机种子运行。
+- 验收：`PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend --collect-only -q`；各批 pytest；修改文件两次随机运行；`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh full`；`git diff --check`；交接 `docs/handoffs/codex-opt-03.md` 记录实际结果/未合并差异，最后仅本地提交（含 Co-Authored-By），不推送、不建 PR。
+
+- 验收结果：基线与最终均收集 4072 项；原断言、测试参数定义不变。27 批最终全部通过；54 个修改测试文件以 seed 20261110/20261111 随机运行，各 1545 passed / 27 原有 skip，实际顺序全部不同。五类辅助总实现 41→11；直接迁移文件 63→23；create_app 文件 27→16。
+- 完整门禁：`PATH="$PWD/.venv/bin:$PATH" GOCACHE="$PWD/.demo/opt-03/go-build-cache" ./scripts/verify.sh full` exit 0；后端/工具 4254 passed / 27 登记 skip，前端 82 文件/1375 passed，类型检查、构建、启动器与契约通过。首轮因系统 Go 缓存权限失败后主动中止（143），没有计为通过；重跑只调整测试进程缓存位置。`git diff --check` 与源文件校验值核对通过。
+- 交付：[OPT-03 交接](handoffs/codex-opt-03.md) 包含 grep 计数命令、各批文件/结果、未合并原因和原始失败记录；按授权仅本地提交，含 Co-Authored-By，不推送、不建 PR。
+
 ## 2026-11-10 Codex：E2E-PERSONAL-01 高级选项操作修复
 
 - 状态 DONE；负责人 Codex；工作区 `opt-02-test-waits/SmartSketch-main`，分支 `codex/opt-02-test-waits`，起点 `51ef5cb`（干净）。用户要求先确定可行方案再修复，范围为个人模式E2E隐藏控件超时；窄屏布局缺陷仍另行OPEN。

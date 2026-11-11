@@ -43,6 +43,8 @@ from app.workers.extract_task import (
     task_entity_id,
 )
 from app.workers.parse_task import ParseStatus, run_parse_stage
+from tests.backend.helpers.settings import worker_settings as _settings
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 COURSE = "course-a"
 OTHER = "course-b"
@@ -152,17 +154,6 @@ class Script:
 
 
 # --- 数据准备 ------------------------------------------------------------------------------------
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
-
-
-@pytest.fixture
-def db_url(tmp_path: Path) -> str:
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
-    return url
 
 
 @pytest.fixture
@@ -852,10 +843,6 @@ def test_failed_chunk_entities_are_left_out_of_the_section_table(db_url, storage
 
 
 # --- 运行一次入口 --------------------------------------------------------------------------------
-
-
-def _settings(db_url: str, storage: FileStorage):
-    return load_settings({"SQLITE_URL": db_url, "STORAGE_DIR": str(storage.root), "TASK_LEASE_SECONDS": "15"})
 
 
 def test_run_once_parses_extracts_and_hands_back_at_merging(db_url, storage):

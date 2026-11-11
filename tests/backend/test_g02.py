@@ -17,6 +17,7 @@ from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
 from app.repositories.sqlite import MIGRATIONS_DIR, connect, migrate
 from app.repositories.versions import CommitRejected, PublishInProgress, VersionNotFound
+from tests.backend.helpers.sqlite import migrated_database
 
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 LEASE = 60
@@ -25,8 +26,7 @@ EXCLUDED = {"low_confidence_nodes": 1, "low_confidence_edges": 0, "cascaded_edge
 
 @pytest.fixture
 def env(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = insert_account(url, account_id=uuid.uuid4().hex, username="teacher1", password_hash=VALID_HASH,
                              role="teacher")
     course = create_course(url, name="A", description=None, creator_id=teacher.id)

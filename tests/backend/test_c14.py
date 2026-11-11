@@ -11,7 +11,6 @@ import pytest
 
 from app.config import load_settings
 from app.repositories.accounts import find_by_username
-from app.repositories.sqlite import migrate
 from app.services import account_admin
 from app.services.account_admin import (
     DEMO_ACCOUNTS,
@@ -26,16 +25,13 @@ from app.services.auth import (
     create_account,
     verify_password,
 )
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 PASSWORD = "correct-horse-battery"
 NEW_PASSWORD = "another-horse-battery"
 SECRET = "c14-test-signing-key-0123456789abcdefghij"
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
 
 
 def _load_script(name: str):
@@ -51,13 +47,6 @@ def _rows(db_url: str) -> list[tuple]:
             "SELECT id, username, password_hash, role, created_at, disabled_at FROM users"
             " ORDER BY username"
         ).fetchall()
-
-
-@pytest.fixture
-def db_url(tmp_path):
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
-    return url
 
 
 @pytest.fixture

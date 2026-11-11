@@ -19,32 +19,15 @@ from pathlib import Path
 import pytest
 
 from app.repositories import tasks as task_repo
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services import task_cancel, task_events
 from app.workers import parse_task
+from tests.backend.helpers.sqlite import migrated_database, sqlite_url as _url
+from tests.backend.helpers.tasks import insert_queued_task as _insert_task
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "src/backend/app"
 TS = "2026-09-25T00:00:00.000Z"
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
-
-
-def _insert_task(url: str, course_id: str, task_id: str) -> str:
-    with connect(url) as db:
-        db.execute(
-            "INSERT INTO materials (id, course_id, filename, format, size_bytes, content_hash,"
-            " storage_name) VALUES (?, ?, 'a.txt', 'txt', 1, ?, ?)",
-            (f"doc-{task_id}", course_id, "sha256:" + "a" * 64, f"stored-{task_id}"),
-        )
-        db.execute(
-            "INSERT INTO processing_tasks (id, course_id, document_id, idempotency_key,"
-            " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (task_id, course_id, f"doc-{task_id}", f"key-{task_id}", TS, TS),
-        )
-    return task_id
 
 
 def _sql(url: str, statement: str, *params: object) -> None:
@@ -60,8 +43,7 @@ def _row(url: str, task_id: str) -> dict[str, object]:
 
 @pytest.fixture
 def db_url(tmp_path: Path) -> str:
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
+    url = migrated_database(_url(tmp_path / "state.sqlite3"))
     _insert_task(url, "course-a", "t-a")
     _insert_task(url, "course-b", "t-b")
     return url
