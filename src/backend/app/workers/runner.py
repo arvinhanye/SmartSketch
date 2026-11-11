@@ -30,6 +30,7 @@ import os
 import signal
 import sqlite3
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -56,7 +57,7 @@ IDLE_SECONDS = 2.0
 HEARTBEAT_SECONDS = 10.0
 HEARTBEAT_STALE_SECONDS = 60.0
 HEARTBEAT_ENV = "WORKER_HEARTBEAT_FILE"
-DEFAULT_HEARTBEAT_FILE = "/tmp/smartsketch-worker.heartbeat"
+DEFAULT_HEARTBEAT_FILE = str(Path(tempfile.gettempdir()) / "smartsketch-worker.heartbeat")
 
 EXIT_CONFIG = 2
 EXIT_CHILD_DIED = 3

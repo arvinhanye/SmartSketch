@@ -117,6 +117,49 @@ describe('L10 模型 API 设置页', () => {
     expect(wrapper.find('[data-test="mc-test-result"]').text()).toContain('密钥被拒绝')
   })
 
+  it.each(
+    (['saved', 'form'] as const).flatMap((source) => [
+      { source, field: 'base-url', value: 'https://other.example.com/v1' },
+      { source, field: 'model', value: 'm2' },
+      { source, field: 'api-key', value: 'different-test-key' },
+      { source, field: 'disable-thinking', value: true },
+    ]),
+  )('$source 测试完成后修改 $field，旧连接结果失效', async ({ source, field, value }) => {
+    const api = fakeApi(SAVED)
+    const wrapper = await mountView(api)
+    if (source === 'form') await wrapper.get('[data-test="mc-api-key"]').setValue(KEY)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    const result = wrapper.get('[data-test="mc-test-result"]')
+    expect(result.text()).toContain('连接成功')
+    expect(result.text()).toContain(source === 'saved' ? '已保存的配置' : '表单中的配置（尚未保存）')
+
+    await wrapper.get(`[data-test="mc-${field}"]`).setValue(value)
+    await flushPromises()
+    expect(wrapper.find('[data-test="mc-test-result"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each(['save', 'clear'] as const)('%s 失败不替换独立的连接测试结果', async (operation) => {
+    const api = fakeApi(SAVED, { [operation]: async () => { throw new Error('request failed') } })
+    const wrapper = await mountView(api)
+    await wrapper.get('[data-test="mc-test"]').trigger('click')
+    await flushPromises()
+    const result = wrapper.get('[data-test="mc-test-result"]').text()
+    expect(result).toContain('连接成功')
+
+    if (operation === 'save') {
+      await wrapper.get('[data-test="mc-form"]').trigger('submit')
+    } else {
+      await wrapper.get('[data-test="mc-clear"]').trigger('click')
+      await wrapper.get('[data-test="mc-clear-confirm"]').trigger('click')
+    }
+    await flushPromises()
+    expect(wrapper.get('[data-test="mc-error"]').text()).toContain(operation === 'save' ? '保存失败' : '清除失败')
+    expect(wrapper.get('[data-test="mc-test-result"]').text()).toBe(result)
+    wrapper.unmount()
+  })
+
   it('清除后回到未配置', async () => {
     const api = fakeApi(SAVED)
     const wrapper = await mountView(api)

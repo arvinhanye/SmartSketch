@@ -277,6 +277,21 @@ describe('审核队列 API', () => {
 // ---------------------------------------------------------------- 页面
 
 describe('审核队列页：加载与三类空态', () => {
+  it.each([
+    { type: 'RELATED_TO', directed: false },
+    { type: 'PREREQUISITE', directed: true },
+    { type: 'CONTAINS', directed: true },
+    { type: 'EXAMPLE_OF', directed: true },
+  ] as const)('$type 只按关系语义显示方向', async ({ type, directed }) => {
+    const f = fakes({ relations: [{ ...rel('r1', 'k1', 'k2'), type }], names: { k1: '线性表', k2: '栈' } })
+    const { wrapper } = await mountPage(f)
+    const relation = wrapper.get('[data-test="rv-relation"]').get('p').text()
+    expect(relation).toContain('线性表')
+    expect(relation).toContain('栈')
+    expect(relation.includes('→')).toBe(directed)
+    wrapper.unmount()
+  })
+
   it('三栏显示条目与服务端完整条数，关系两端显示名称', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)

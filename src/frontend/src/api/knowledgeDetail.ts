@@ -12,6 +12,13 @@ export type KnowledgePointDetail = components['schemas']['KnowledgePointDetail']
 export type SourceRef = components['schemas']['SourceRef']
 export type KnowledgePointRef = components['schemas']['KnowledgePointRef']
 
+export type KnowledgePointDeletion = components['schemas']['KnowledgePointDeletion']
+export interface KnowledgeDeletionApi {
+  deleteImpact(cid: string, kid: string, control?: RequestControl): Promise<KnowledgePointDeletion>
+  remove(cid: string, kid: string, options?: RequestControl & { cascade?: boolean; previewToken?: string; expectedRevision?: number }): Promise<KnowledgePointDeletion | null>
+}
+export const KNOWLEDGE_DELETION_API_KEY: InjectionKey<KnowledgeDeletionApi> = Symbol('smartsketch.knowledge-deletion-api')
+
 export interface KnowledgeDetailApi {
   /** 知识点详情与出处；不存在 404 `NOT_FOUND`，学生读未发布课程 404 `GRAPH_NOT_PUBLISHED` */
   get(cid: string, kid: string, control?: RequestControl): Promise<KnowledgePointDetail>
@@ -20,9 +27,18 @@ export interface KnowledgeDetailApi {
 /** 组件经 inject 取得详情接口，测试可注入假实现；未提供时组件用 `HTTP_CLIENT_KEY` 的客户端构造 */
 export const KNOWLEDGE_DETAIL_API_KEY: InjectionKey<KnowledgeDetailApi> = Symbol('smartsketch.knowledge-detail-api')
 
-export function createKnowledgeDetailApi(client: HttpClient): KnowledgeDetailApi {
+export function createKnowledgeDetailApi(client: HttpClient): KnowledgeDetailApi & KnowledgeDeletionApi {
   return {
     get: (cid, kid, control = {}) =>
       client.request('get', '/api/v1/courses/{cid}/kp/{kid}', { ...control, params: { cid, kid } }),
+    deleteImpact: (cid, kid, control = {}) =>
+      client.request('get', '/api/v1/courses/{cid}/kp/{kid}/delete-impact', { ...control, params: { cid, kid } }),
+    remove: async (cid, kid, { cascade = false, previewToken, expectedRevision, ...control } = {}) =>
+      (await client.request('delete', '/api/v1/courses/{cid}/kp/{kid}', {
+        ...control, params: { cid, kid }, query: {
+          cascade, ...(expectedRevision !== undefined ? { expected_revision: expectedRevision } : {}),
+          ...(cascade ? { preview_token: previewToken } : {}),
+        },
+      })) ?? null,
   }
 }

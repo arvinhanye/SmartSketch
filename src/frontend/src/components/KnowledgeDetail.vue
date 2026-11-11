@@ -29,13 +29,16 @@ const props = withDefaults(
     documentNames?: Record<string, string>
     /** 工作台已有「返回课程」时隐藏重复关闭入口；其他调用保持原行为 */
     showClose?: boolean
+    /** ADR-097: teacher-only explicit deletion confirmation. */
+    allowDelete?: boolean
   }>(),
-  { documentNames: () => ({}), showClose: true },
+  { documentNames: () => ({}), showClose: true, allowDelete: false },
 )
 
 const emit = defineEmits<{
   locateSource: [location: SourceLocation]
   selectKnowledgePoint: [kpId: string]
+  delete: [kpId: string]
   close: []
   courseForbidden: []
 }>()
@@ -124,6 +127,7 @@ watch(detail, async (next) => {
           <span> · 层级 {{ detail.level }}</span>
         </p>
         <p v-if="detail.aliases.length" data-test="kd-aliases">别名：{{ detail.aliases.join('、') }}</p>
+        <button v-if="allowDelete" type="button" data-test="kd-delete" :disabled="busy" @click="emit('delete', detail.id)">删除此知识点</button>
       </header>
 
       <section :aria-labelledby="`${titleId}-definition`">

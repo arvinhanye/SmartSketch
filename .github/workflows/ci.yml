@@ -93,6 +93,22 @@ jobs:
           PYTHON: python
         run: scripts/verify/backend.sh full
 
+  portability-windows:
+    name: Backend portability (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install locked backend test dependencies
+        run: python -m pip install -e './src/backend[test]'
+      - name: Check portable paths, dataset bytes, output and report parsing
+        run: python -m pytest tests/tooling/test_portability.py -q
+
   integration:
     name: Integration and E2E
     runs-on: ubuntu-latest

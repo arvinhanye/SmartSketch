@@ -33,6 +33,7 @@ from app.repositories.neo4j import Neo4jRepository, RepositoryError
 from app.schemas.contracts import (
     KnowledgePoint,
     KnowledgePointCreate,
+    KnowledgePointDeletion,
     KnowledgePointStatus,
     KnowledgePointType,
     KnowledgePointUnlock,
@@ -51,6 +52,7 @@ from app.services.graph.edit_node import (
     update_node,
 )
 from app.services.graph.delete_node import delete_node
+from app.services.graph.delete_node_cascade import delete_node_cascade, preview_deletion
 from app.services.graph.merge_nodes import merge_nodes
 from app.services.graph.relations import CycleDetectedError
 
@@ -222,14 +224,27 @@ def merge_knowledge_points(
 
 
 @router.delete("/kp/{kid}", operation_id="deleteKnowledgePoint", status_code=204, response_class=Response,
-               responses={**_ERRORS, 404: {"model": Error}})
+               responses={**_ERRORS, 404: {"model": Error}, 200: {"model": KnowledgePointDeletion}})
 def delete_knowledge_point(
     request: Request,
     kid: str,
     expected_revision: int | None = Query(None, ge=1),
+    cascade: bool = Query(False),
+    preview_token: str | None = Query(None, pattern=r"^[0-9a-f]{64}$"),
     access: CourseAccess = Depends(course_teacher),
 ) -> Response:
+    if cascade:
+        return _run(request, access, lambda ctx: delete_node_cascade(
+            ctx, access.course.id, kid, preview_token, expected_revision))
+
     def operation(ctx: EditContext) -> None:
         delete_node(ctx, access.course.id, kid, expected_revision)
 
     return _run(request, access, operation, status=204)
+
+
+@router.get("/kp/{kid}/delete-impact", operation_id="getKnowledgePointDeleteImpact",
+            response_model=KnowledgePointDeletion, responses={**_ERRORS, 404: {"model": Error}})
+def get_knowledge_point_delete_impact(request: Request, kid: str,
+                                      access: CourseAccess = Depends(course_teacher)) -> Response:
+    return _run(request, access, lambda ctx: preview_deletion(ctx, access.course.id, kid))

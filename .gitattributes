@@ -1,3 +1,6 @@
 src/contracts/v1/generated/** text eol=lf
 # 迁移校验和按内容计算，检出时统一为 LF（REVIEW-C01-R01）
 src/backend/migrations/*.sql text eol=lf
+# Dataset fingerprints use LF text bytes; keep binary PDFs outside this rule.
+datasets/**/*.md text eol=lf
+datasets/**/*.json text eol=lf

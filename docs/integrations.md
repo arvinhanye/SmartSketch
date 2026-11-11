@@ -323,7 +323,7 @@ cp .env.example .env          # 首次；按需改 NEO4J_PASSWORD
 - **镜像**：两个 Dockerfile 的构建上下文都是仓库根目录，只 COPY 白名单路径；根目录 `.dockerignore` 另外排除所有 `.env*`、`.git`、运行数据与依赖目录。后端镜像按仓库布局放 `/app/src/backend`、`/app/src/contracts/v1/generated/python`、`/app/prompts`（运行时按相对路径加载迁移、生成 DTO 与提示词，C04 风险项），只装 `pyproject.toml` 声明的运行依赖，不装后端包本身；以 uid 10001 非 root 运行。
 - **密钥**：只经 `env_file: .env` 进入 `migrate`/`api`/`worker`；`web` 没有 `env_file`、`environment` 与构建参数，前端 Dockerfile 不声明任何 `ARG`/`ENV` 形式的密钥。镜像里没有密钥。
 - **数据**：SQLite 与上传文件在本地命名卷 `app-data`（容器内 `/data`），API 与 worker 共用。compose 在容器里固定覆盖 `API_HOST=0.0.0.0`、`NEO4J_URI=bolt://neo4j:7687`、`SQLITE_URL=sqlite:////data/smartsketch.sqlite3`、`STORAGE_DIR=/data/storage`、`WEB_ORIGIN=http://localhost:${WEB_PUBLISH_PORT:-8080}`，其余取 `.env`。
-- **compose 变量**：`WEB_PUBLISH_PORT`（缺省 `8080`，只用于端口发布与 `WEB_ORIGIN`）。**镜像内变量**：`WORKER_HEARTBEAT_FILE`（缺省 `/tmp/smartsketch-worker.heartbeat`，worker 心跳文件路径，一般无需改）。
+- **compose 变量**：`WEB_PUBLISH_PORT`（缺省 `8080`，只用于端口发布与 `WEB_ORIGIN`）。**镜像内变量**：`WORKER_HEARTBEAT_FILE`（缺省 `/tmp/smartsketch-worker.heartbeat`，worker 心跳文件路径，一般无需改）。源码直接运行且未设置该变量时，默认使用操作系统临时目录（`tempfile.gettempdir()`）下的同名文件；Dockerfile 仍显式设置上述 `/tmp` 路径。
 
 ```bash
 cp .env.example .env   # 首次；填 NEO4J_PASSWORD，API 还需要 ≥ 32 字节的 AUTH_JWT_SECRET

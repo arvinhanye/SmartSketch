@@ -92,6 +92,42 @@ test('教师上传四格式资料、编辑并审核图谱、拒绝成环关系�
     await studentPage.goto(`${appUrl}/courses/${courseId}/graph`)
     await expect(studentPage.locator('[data-test=sg-version]')).toContainText('v1')
     await expect(studentPage.locator('[data-test=sg-graph]')).toBeVisible()
+
+    // ADR-097: the real details-to-confirmation flow keeps single delete as default,
+    // carries the preview revision, and only cascades after an explicit checkbox.
+    await page.goto(`${appUrl}/courses/${courseId}/graph/edit`)
+    await page.locator('[data-test=tg-node-picker]').selectOption(a.id)
+    await page.locator('[data-test=tg-tab-detail]').click()
+    await page.locator('[data-test=kd-delete]').click()
+    await expect(page.locator('[data-test=nd-confirm]')).toBeEnabled()
+    await expect(page.locator('[data-test=nd-cascade]')).not.toBeChecked()
+    const singleResponse = page.waitForResponse(response =>
+      response.request().method() === 'DELETE' && new URL(response.url()).pathname.endsWith(`/kp/${a.id}`))
+    await page.locator('[data-test=nd-confirm]').click()
+    const single = await singleResponse
+    expect(single.status()).toBe(204)
+    expect(new URL(single.url()).searchParams.get('expected_revision')).toMatch(/^[1-9]\d*$/)
+    await expect(page.locator(`[data-test=tg-node-picker] option[value="${a.id}"]`)).toHaveCount(0)
+
+    await page.locator('[data-test=tg-node-picker]').selectOption(b.id)
+    await page.locator('[data-test=kd-delete]').click()
+    await expect(page.locator('[data-test=nd-confirm]')).toBeEnabled()
+    await page.locator('[data-test=nd-cascade]').check()
+    const cascadeResponse = page.waitForResponse(response =>
+      response.request().method() === 'DELETE' && new URL(response.url()).pathname.endsWith(`/kp/${b.id}`))
+    await page.locator('[data-test=nd-confirm]').click()
+    const cascaded = await cascadeResponse
+    expect(cascaded.status()).toBe(200)
+    const report = await cascaded.json()
+    expect(report.root_id).toBe(b.id)
+    expect(report.deleted_count).toBeGreaterThanOrEqual(1)
+    expect(new URL(cascaded.url()).searchParams.get('preview_token')).toMatch(/^[0-9a-f]{64}$/)
+    await expect(page.locator('[data-test=nd-dialog]')).toHaveCount(0)
+
+    // Draft deletion must not alter the already published student snapshot.
+    await studentPage.reload()
+    await expect(studentPage.locator('[data-test=sg-version]')).toContainText('v1')
+    await expect(studentPage.locator('[data-test=sg-graph]')).toBeVisible()
   } finally {
     await student.close()
   }

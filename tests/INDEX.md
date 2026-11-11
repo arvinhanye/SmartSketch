@@ -78,6 +78,7 @@
 | [`tests/backend/test_f05.py`](backend/test_f05.py) | DAG 纯函数检测候选前置关系是否成环，并返回闭合环路径。 | F05；[specs/course-knowledge-graph.md](../specs/course-knowledge-graph.md)；DAG-1；DAG-8；DAG-9；DAG-10；B11 |
 | [`tests/backend/test_f07.py`](backend/test_f07.py) | 图谱与知识点读取接口，以及模拟图读取器记录的课程作用域。 | F07；D10 |
 | [`tests/backend/test_f08.py`](backend/test_f08.py) | 教师知识点编辑、修订冲突与手工编辑锁的显式解锁。 | F08；ADR-035；F04 |
+| [`tests/backend/test_f09_cascade.py`](backend/test_f09_cascade.py) | 级联删除预览的可见范围、共享后代、令牌冲突、权限与事务重试。 | F09；ADR-097 |
 | [`tests/backend/test_f11.py`](backend/test_f11.py) | 审核队列分类、游标分页与单项通过、拒绝和合并处理。 | F11；ADR-060 |
 | [`tests/backend/test_f12.py`](backend/test_f12.py) | 教师图谱编辑审计日志及跨 Neo4j、SQLite 写入失败后的可重试记录。 | F12；ADR-061 |
 | [`tests/backend/test_g01.py`](backend/test_g01.py) | 发布快照集合、阻断原因、规范化序列化、摘要及完整往返恢复。 | G01；[specs/teacher-review-publish.md](../specs/teacher-review-publish.md) |
@@ -103,7 +104,7 @@
 | [`tests/backend/test_j05.py`](backend/test_j05.py) | 基于编号证据的流式问答生成、资料注入处理及超时错误。 | J05；[specs/grounded-qa.md](../specs/grounded-qa.md)；ADR-068；E02；E04 |
 | [`tests/backend/test_j06.py`](backend/test_j06.py) | `app.services.qa.citations` 的引用流相关接口。 | 待确认 |
 | [`tests/backend/test_j07.py`](backend/test_j07.py) | 问答生成终止边界上的整条链路截止时间处理。 | J07 |
-| [`tests/backend/test_j10.py`](backend/test_j10.py) | 当前迁移序列下的问答结果持久化。 | J10 |
+| [`tests/backend/test_j10.py`](backend/test_j10.py) | 问答结果持久化及 SQLite 写入失败时保持 JSON/SSE 原响应和脱敏日志。 | J10；[specs/grounded-qa.md](../specs/grounded-qa.md) |
 | [`tests/backend/test_k02_run.py`](backend/test_k02_run.py) | 本机抽取运行脚本的离线验证，覆盖输出、失败继续、预算停止与凭据保护。 | K02；E02 |
 | [`tests/backend/test_k02.py`](backend/test_k02.py) | 抽取与融合离线评测的匹配、分项指标、阈值判定和可复现性。 | K02；[specs/course-knowledge-graph.md](../specs/course-knowledge-graph.md)；K01 |
 | [`tests/backend/test_k03.py`](backend/test_k03.py) | evaluation.evaluate_qa 的问答负例与人工语义复核。 | K03 |
@@ -208,6 +209,7 @@
 | [`tests/frontend/n03-n05.test.ts`](frontend/n03-n05.test.ts) | 模型运行状态的账号隔离、保存测试清除互斥以及测试对象与表单一致性。 | N03；N04；N05 |
 | [`tests/frontend/nav-icons.test.ts`](frontend/nav-icons.test.ts) | 导航入口图标按去向保持唯一。 | 待确认 |
 | [`tests/frontend/node-type-legend.test.ts`](frontend/node-type-legend.test.ts) | 教师图谱页节点类型图例组件。 | 待确认 |
+| [`tests/frontend/node-deletion.test.ts`](frontend/node-deletion.test.ts) | 显式级联删除确认、预览迟到与切换隔离，以及冲突后重新确认。 | F09；ADR-097 |
 | [`tests/frontend/plan-b-review.test.ts`](frontend/plan-b-review.test.ts) | KnowledgeDetail 与 useLearning 模块相关测试；具体功能待确认。 | 待确认 |
 | [`tests/frontend/planCConfigTestRetry.test.ts`](frontend/planCConfigTestRetry.test.ts) | 本机 E2E 配置测试的共享限流窗口工具。 | 待确认 |
 | [`tests/frontend/preview-focus.test.ts`](frontend/preview-focus.test.ts) | usePreviewFocus 预览焦点组合逻辑。 | 待确认 |
@@ -235,6 +237,7 @@
 | [`tests/integration/test_f07_live.py`](integration/test_f07_live.py) | 验证真实 Neo4j 上 GraphReader 的草稿可见性与已发布版本副本查询。 | F07 |
 | [`tests/integration/test_f08.py`](integration/test_f08.py) | 验证教师编辑的修订号条件更新、人工锁与贡献登记，以及自动写入对锁的遵守。 | F08；ADR-035 |
 | [`tests/integration/test_f09.py`](integration/test_f09.py) | 验证删除草稿知识点仅清理同版本关系，保留发布快照并区分缺失、跨课与并发删除。 | F09；ADR-048 |
+| [`tests/integration/test_f09_cascade.py`](integration/test_f09_cascade.py) | 真实 Neo4j 上的级联删除、共享节点与发布隔离、预览失效、回滚和并发确认。 | F09；ADR-097 |
 | [`tests/integration/test_f10.py`](integration/test_f10.py) | 验证知识点合并的边迁移、去重、防环、来源保留与失败原子性。 | F10；ADR-047 |
 | [`tests/integration/test_f12.py`](integration/test_f12.py) | 验证删除和合并的图编辑审计、事务失败记录与持锁对账补齐。 | F12；ADR-061；ADR-012 修订 3 |
 | [`tests/integration/test_f13.py`](integration/test_f13.py) | 验证 worker 合并与持久化阶段的重试幂等、取消、部分失败、降级与清理。 | F13；[specs/task-processing.md](../specs/task-processing.md) §3、§8.4、§8.5；ADR-009；ADR-029 |

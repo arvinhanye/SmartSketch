@@ -257,6 +257,9 @@ P2 之后发生的错误在 `Error.details.request_id` 中带回请求 ID（B13�
 
 **每个通过 P2 的请求**（已认证、已授权、已绑定版本）恰好一条问答日志（J10）。实体名 `ChatLog`、SQLite 表名 `chat_logs`（A10 N5 交 A09 定名，ADR-015 决定 8）；服务端不保存会话，因此不设 `QuestionSession`。P1 拒绝与 P2 失败的请求没有 `request_id`，也可能没有已认证身份或绑定版本，因此**不写 `chat_logs`**：由统一错误处理写一条结构化应用日志（HTTP 状态、错误码、路径中的课程 ID、已认证时的 `user_id`），不伪造缺失字段（ADR-015 修订 1，Codex A09-R02）。开流前在 P3～P4 失败的请求已通过 P2，照常写 `chat_logs`，结局为 `error`。结局取闭集 `answered`、`not_covered`、`error`、`aborted` 之一，字段至少包括：`request_id`、`user_id`（取自调用者身份，ADR-013）、`course_id`、`version_id`（四者均非空）、原问题、结局与 `reason` / `error.code` / `details.reason`、`citations` 的编号与文本块 ID、「未知引用」计数、`all_citations_invalidated` 的子类与未覆盖单元数、`truncated`、`latency_ms` 与首个 delta 的时延。模型用量不在日志中重复，按 `request_id` 从 `model_calls` 汇总。被撤回的临时正文不作为回答记录；J10 只保存原问题及上述诊断字段，不保存回答正文或模型原始输出；每次写入清理 30 天前的日志行。用户重试是新请求、新日志行。
 
+**持久日志故障（MAIN-INTEGRATE-02，2026-11-11）**：正常存储下保持每请求恰好一条。若 `write_chat_log` 发生 `sqlite3.Error`，仅在该写入边界隔离异常，保留已经确定的 JSON 状态/内容、SSE 唯一终态及取消结果；另写一条仅含 `request_id`、结局和异常类型的 warning，不输出问题、回答、引用正文、密钥或异常消息。该请求日志未持久化，不计作写入成功；不自动重放问题或增加模型调用，不吞掉程序/DTO错误。回归覆盖JSON成功与准备失败、SSE done/error及断开。
+
+
 ### Q11 与其他任务的接口
 
 | 对象 | 本协议的要求 | 去向 |

@@ -363,6 +363,35 @@ def delete_draft_node(tx: ScopedTransaction, kp_id: str, expected_revision: int)
     return int(rows[0]["relations"]) if rows else None
 
 
+# ADR-097: load a finite draft snapshot; Python traverses visible CONTAINS edges
+# with a visited set instead of silently truncating a variable-length Cypher path.
+_TX_CASCADE_NODES = f"""
+MATCH (n:KnowledgePoint {{course_id: $course_id, version_id: $version_id}})
+WHERE $effective_task_ids IS NOT NULL
+RETURN {_TX_NODE_FIELDS}
+"""
+
+
+def read_cascade_nodes(tx: ScopedTransaction) -> dict[str, dict[str, Any]]:
+    return {str(row["p"]["kp_id"]): dict(row["p"]) for row in tx.run(_TX_CASCADE_NODES)}
+
+
+def delete_cascade_nodes(tx: ScopedTransaction, kp_ids: Sequence[str],
+                         relations: Sequence[IncidentRelation]) -> int:
+    """Clean identities/relations and nodes in the caller's guarded transaction."""
+    replace_relations(tx, removed=[(r.type, r.rel_id) for r in relations], created=[])
+    return delete_merged_nodes(tx, kp_ids)
+
+
+def draft_revision(sqlite_url: str, course_id: str) -> int:
+    """Read while holding the course lock; include this revision in preview tokens."""
+    with connect(sqlite_url) as database:
+        row = database.execute("SELECT draft_revision FROM courses WHERE id = ?", (course_id,)).fetchone()
+    if row is None:
+        raise LookupError("course does not exist")
+    return int(row[0])
+
+
 # ---------------------------------------------------------------- SQLite
 
 

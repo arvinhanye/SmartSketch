@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import sqlite3
 import time
 from typing import Any
 
 from app.repositories.chat_logs import ChatLog, write_chat_log
 from app.services.qa.chat import ChatAudit
+
+logger = logging.getLogger(__name__)
 
 
 def record_outcome(
@@ -31,7 +35,7 @@ def record_outcome(
         error = terminal["error"]
         error_code = error["code"]
         error_reason = error.get("details", {}).get("reason")
-    write_chat_log(sqlite_url, ChatLog(
+    log = ChatLog(
         request_id=request_id, user_id=user_id, course_id=course_id,
         version_id=version_id, question=question, outcome=outcome,
         latency_ms=latency_ms, reason=reason, error_code=error_code,
@@ -41,4 +45,10 @@ def record_outcome(
         uncovered_unit_count=audit.uncovered_unit_count,
         truncated=audit.truncated,
         first_delta_latency_ms=audit.first_delta_latency_ms,
-    ))
+    )
+    try:
+        write_chat_log(sqlite_url, log)
+    except sqlite3.Error as error:
+        # Audit storage must not replace an already selected or delivered chat outcome.
+        logger.warning("chat log not written request_id=%s outcome=%s error_type=%s",
+                       request_id, outcome, type(error).__name__)
