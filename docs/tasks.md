@@ -2547,3 +2547,5 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 - OPT-06C：材料页纯函数/类型拆分；41 声明/14 导出核对通过，定向 95 passed；前端 full 82 文件 / 1375 passed，type-check/build exit 0；共用门禁与最终审查待完成。
 
 - OPT-06D：学生图谱页面拆分；81 声明、模板/样式核对通过，定向 135 passed；前端 full 82 文件 / 1375 passed、type-check/build exit 0，四种宽度浏览器走查通过；共用门禁与最终审查待完成。
+
+- OPT-06B：worker 五职责拆分，60 定义/47 签名核对通过，定向 87 passed；后端 full 4264 passed / 27 登记 skip、共用 basic exit 0，独立审查无可操作问题；本地验收完成。

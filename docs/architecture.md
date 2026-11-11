@@ -38,6 +38,8 @@ OPT-05：版本发布/回滚的 Cypher 位于 `repositories/version_materialize.
 
 OPT-06A：`services/ai/compatible.py` 保留聊天客户端和原导入入口；`compatible_transport.py` 负责 HTTP/DNS/连接与总时限，`compatible_protocol.py` 负责协议解析/错误映射/用量，`compatible_base.py` 负责共享 HTTP 请求与响应读取，`compatible_embedding.py` 负责向量客户端。旧模块显式再导出原符号，底层模块不反向依赖入口；请求体、错误、超时、资源释放与配置默认值不变。
 
+OPT-06B：`workers/extract_task.py` 保留任务装配入口及旧符号再导出；`workers/extraction/{types,candidates,units,state,dispatch}.py` 分别承载共享类型、候选数据、单元执行、状态/检查点写入和有界派发。原日志类别、并发默认值、阶段屏障、重试/取消/租约及事务顺序保持不变。
+
 ## 前端构建、测试与应用外壳（B01～B04）
 
 OPT-06D：`views/StudentGraphView.vue` 保留路由/API 装配、模板与样式；`useStudentGraphPanel.ts` 管理面板/分隔条及焦点/observer 生命周期，`useStudentGraphPresentation.ts` 组合原响应式引用计算画布、章节布局、预览与进度。DOM、事件及视口行为不变。
