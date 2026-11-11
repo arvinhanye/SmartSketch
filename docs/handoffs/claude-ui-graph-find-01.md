@@ -2,8 +2,8 @@
 
 - 日期：2026-11-11
 - 负责人：Claude
-- 分支 / 基线：`claude/knowledge-graph-ux-analysis-2e7400` / `main@3f26766`，已合入 `codex/opt-05-backend-layering@99c1f01`（改版前端）
-- 状态：实现、自动化验收与浏览器实走完成；已提交到本分支，**未推送**；待用户视觉签收
+- 分支 / 基线：`claude/knowledge-graph-ux-analysis-2e7400`，已合入 `main@99e169a`（含 #341 的 OPT-01..06 与改版前端）
+- 状态：实现、自动化验收与浏览器实走完成；PR arvinhanye/SmartSketch#342（目标 main）已推送，待 CI 与用户视觉签收
 
 ## 背景
 
@@ -93,6 +93,12 @@ scripts/verify/frontend.sh full     # exit 0：type-check 无错误；83 文件 
 
 ## 下一步
 
-1. 用户视觉签收；决定搜索框是否加宽。
-2. 推送并开 PR。本分支包含 `codex/opt-05-backend-layering` 的全部提交，PR 的目标分支需要先定（直接对 main 会把那 10 个提交一起带上）。
+1. #342 的 CI 通过后合入 main。
+2. 用户视觉签收；决定搜索框是否加宽。
 3. 本批明确不做、留给后续批次：镜头位置写入地址、教师页视图写入地址、拼音/模糊匹配、搜索定义正文、命令面板。
+
+## 与 main 合并后的补充（2026-11-11）
+
+- OPT-06D 把学生页的画布数据与面板逻辑拆到了 `useStudentGraphPresentation` / `useStudentGraphPanel`。本任务相应改接：前者新增可选参数 `matchedKpIds`（搜索命中），后者读写面板宽度偏好；页面不再直接做这两件事。
+- `tests/INDEX.md` 登记了 `tests/frontend/graph-find.test.ts`（OPT-04 的索引校验要求）。
+- 合并后的验证：`scripts/verify/frontend.sh full` exit 0（83 文件 / 1414 条）、`./scripts/verify.sh` exit 0、`python3 -m pytest tests/tooling/test_test_index.py -q` 1 passed。**合并后没有重新做浏览器实走**：实走是在合入 OPT-06 之前的代码上做的，拆分后的接线只有自动化测试覆盖。
