@@ -44,7 +44,7 @@ function mountCompare(props: Record<string, unknown> = {}) {
   return mount(DuplicateCompare, {
     attachTo: document.body,
     global: { plugins: [router] },
-    props: { pair, graph: draft(), primaryId: 'a', busy: false, error: null, radioName: 'primary-a|b', graphLink: null, ...props },
+    props: { pair, graph: draft(), graphState: 'current', sources: { a: { state: 'ready', count: 1 }, b: { state: 'ready', count: 0 } }, primaryId: 'a', busy: false, error: null, radioName: 'primary-a|b', graphLink: null, ...props },
   })
 }
 afterEach(() => {
@@ -111,6 +111,31 @@ describe('DuplicateCompare：并排对比', () => {
     const missing = mountCompare({ graph: { ...draft(), nodes: draft().nodes.filter((n) => n.id !== 'b') } })
     expect(missing.get('[data-test="rv-dup-no-preview"]').text()).toContain('找不到这两个知识点')
     missing.unmount()
+  })
+
+  it('草稿图过期（队列已更新、图没刷新成功）：隐藏旧的定义与小图，说明原因并给“重新读取”；仍可操作', async () => {
+    const w = mountCompare({ graphState: 'stale' })
+    expect(w.find('[data-test="rv-dup-preview"]').exists()).toBe(false)
+    expect(w.find('[data-test="rv-dup-definition"]').exists()).toBe(false)
+    expect(w.get('[data-test="rv-dup-no-preview"]').text()).toContain('没有刷新成功')
+    expect(w.get('[data-test="rv-merge-confirm"]').attributes('disabled')).toBeUndefined()
+    await w.get('[data-test="rv-dup-reload"]').trigger('click')
+    expect(w.emitted('reloadGraph')).toHaveLength(1)
+    await w.setProps({ reloading: true })
+    expect(w.get('[data-test="rv-dup-reload"]').attributes('disabled')).toBeDefined()
+    expect(w.get('[data-test="rv-dup-reload"]').text()).toBe('正在重新读取…')
+    w.unmount()
+  })
+
+  it('来源数量：读取中、读取失败、未读取与真实的 0 各有各的文字，失败不显示成 0', () => {
+    const text = (sources: Record<string, unknown>) => {
+      const w = mountCompare({ sources })
+      const out = w.findAll('[data-test="rv-dup-counts"]').map((x) => x.text())
+      w.unmount()
+      return out
+    }
+    expect(text({ a: { state: 'loading' }, b: { state: 'error' } })).toEqual(['来源读取中… · 关系 2 条', '来源数量读取失败 · 关系 2 条'])
+    expect(text({ a: { state: 'ready', count: 0 } })).toEqual(['来源 0 处 · 关系 2 条', '来源数量未读取 · 关系 2 条'])
   })
 
   it('合并成环的错误与环路显示在条目里；处理中时按钮与单选不可用', () => {

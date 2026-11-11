@@ -11,6 +11,8 @@
 
 - UX-REVIEW-DEDUP-01 前端认领（2026-11-11，Claude，分支 `claude/ux-backlog-20261111`）：用户确认“先做这项、审核页预览与图谱内查看两处都做、不做批量”，并确认设计稿。范围只含前端：`views/ReviewView.vue`、`composables/useReview.ts`（暴露草稿图）、新增 `graph/mergePreview.ts`、`components/review/DuplicateCompare.vue`、`components/review/MergePreviewGraph.vue`、`views/TeacherGraphView.vue`（`pair` 参数高亮）、`styles/ui.css`、相关前端测试；规格 `specs/teacher-review-publish.md`「疑似重复知识点：对比与合并预览」。**边界：Codex 正在改进疑似重复的产生方式（规范化与消歧去重），本任务不碰后端、契约和审核队列的数据形状，只消费现有字段，未知 `reason`、缺失相似度都要能显示。** 风险：合并后预览是前端按 ADR-047 推算，可能与服务端结果有出入（界面标“预计”）；审核页布局由三栏改为左右两区，既有 H09 测试的钩子需保留。回滚：还原本任务提交，无数据迁移。
 - UX-REVIEW-DEDUP-01 验收证据（2026-11-11，详见 `docs/handoffs/claude-ux-review-dedup-01.md`）：新增 `merge-preview.test.ts` 8 条（先红后绿）、`review-dedup.test.ts` 9 条，`h09.test.ts` 追加 7 条、`h14.test.ts` 追加 3 条；H09 原有 42 条未改且通过。`scripts/verify/frontend.sh full` exit 0（86 文件 / 1470 条），`./scripts/verify.sh` exit 0；`src/backend`、`src/contracts` 零改动。样式在临时预览页（示例数据，已删除）上看过。**未做**：连真实后端的完整流程（本机 Docker 未启动）、预览与真实合并结果的对照、窄屏与读屏。
+- UX-REVIEW-DEDUP-01 审查意见修复（2026-11-11）：Codex 的 `docs/handoffs/codex-to-claude-review-dedup-fixes-20261111.md` 提出 F1～F6，六条我在 `8420097` 上都复现或确认成立。F1（长按 M 连续合并）、F2（来源显示 0 处）、F3（404 记为已合并）、F4（旧预览无提示）、F5（单选框方向键被抢）FIXED，先写失败回归再改；F6（缺 `similarity` 整页报错）OPEN，登记为待契约任务，规格已改回与契约一致。`scripts/verify/frontend.sh full` exit 0（87 文件 / 1490 条），`./scripts/verify.sh` exit 0；隔离真实后端（临时 Neo4j / SQLite、临时课程 4 对疑似重复）上逐场景复核通过，环境已清理。后端与契约零改动。详见 `docs/handoffs/claude-ux-review-dedup-01.md`「审查意见修复」。
+- **待契约任务（未认领）**：`SuspectedDuplicate.similarity` 是否改为可选（F6）。需要后端 / 契约任务先改 OpenAPI 与生成类型，前端再放宽 `useReview.ts` 的 `isDuplicate`；与 Codex 的消歧去重设计一并决定。
 - 与图谱体验后续批次的关系：UX-REVIEW-DEDUP-01 若选择“在图谱里就地处理”，会用到第二批计划中的节点菜单与边的直接操作，两者的先后需要一起定。
 - 来源：2026-11-10 体验差距分析之后的用户反馈；现状描述是读代码得到的，没有在浏览器里逐步走过这两个流程。
 

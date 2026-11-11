@@ -6,6 +6,7 @@ import { createMemoryHistory, RouterView } from 'vue-router'
 import type { components } from '../../src/contracts/v1/generated/typescript/openapi'
 import { COURSES_API_KEY, type CoursesApi } from '../../src/frontend/src/api/courses'
 import { DRAFT_GRAPH_API_KEY, type DraftGraphApi } from '../../src/frontend/src/api/graph'
+import { KNOWLEDGE_DETAIL_API_KEY, type KnowledgeDetailApi } from '../../src/frontend/src/api/knowledgeDetail'
 import { ApiError, createHttpClient, NetworkError, type FetchLike } from '../../src/frontend/src/api/http'
 import { createReviewApi, REVIEW_API_KEY, type ReviewAction, type ReviewApi } from '../../src/frontend/src/api/review'
 import { VERSIONS_API_KEY } from '../../src/frontend/src/api/versions'
@@ -213,6 +214,7 @@ async function mountPage(f: Fakes, path = '/courses/c1/review', accountRole: 'st
         [REVIEW_API_KEY as symbol]: f.review,
         [VERSIONS_API_KEY as symbol]: { list: async () => [], publish: vi.fn(), rollback: vi.fn() },
         [DRAFT_GRAPH_API_KEY as symbol]: f.draft,
+        ...('detail' in f ? { [KNOWLEDGE_DETAIL_API_KEY as symbol]: (f as { detail: unknown }).detail } : {}),
       },
     },
   })
@@ -812,11 +814,253 @@ describe('UX-REVIEW-DEDUP-01 疑似重复：对比预览、连续处理与键盘
     expect(rows(wrapper, 'rv-duplicate')).toEqual([])
   })
 
-  it('未知的 reason 原样显示；相似度缺失时不显示分数，页面不报错', async () => {
+  it('未知的 reason 原样显示（相似度按契约仍是数字）', async () => {
     const odd = { candidates: [ref_('k4', '栈'), ref_('k5', '堆栈')], similarity: 0.5, reason: 'entity_resolution_v2' } as unknown as SuspectedDuplicate
     const { wrapper } = await mountPage(fakes({ duplicates: [odd] }))
     const text = wrapper.get('[data-test="rv-duplicate"] .review__meta').text()
     expect(text).toContain('相似度 50%')
     expect(text).toContain('entity_resolution_v2')
+  })
+})
+
+// ---------------------------------------------------------------- DEDUP-FIX：Codex 2026-11-11 审查意见 F1～F6 的回归
+describe('DEDUP-FIX 疑似重复审核：审查缺陷回归', () => {
+  const three = () => [dup(ref_('k4', '栈'), ref_('k5', '堆栈')), dup(ref_('k6', '队列'), ref_('k7', '队列的定义'), 0.9), dup(ref_('k8', '链栈'), ref_('k9', '链式栈'), 0.8)]
+  // 每个用例一份：假后端合并时会从这张表里删名字
+  const names = () => ({ k1: '线性表', k2: '栈', k3: '括号匹配', k4: '栈', k5: '堆栈', k6: '队列', k7: '队列的定义', k8: '链栈', k9: '链式栈' })
+  const setup = () => fakes({ duplicates: three(), names: names(), isolated: [] })
+  const expandedId = (wrapper: VueWrapper) => wrapper.find('[data-test="rv-duplicate"].is-expanded').attributes('data-id')
+  const handledText = (wrapper: VueWrapper) => (wrapper.find('[data-test="rv-handled"]').exists() ? wrapper.get('[data-test="rv-handled"]').text() : '')
+  function press(init: KeyboardEventInit, target: EventTarget = document.body): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+    target.dispatchEvent(event)
+    return event
+  }
+
+  // ---- F1
+  it('F1 长按 M：第一笔完成并自动前进后，重复的 keydown 不再产生写请求；松开重按才处理下一条', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    press({ key: 'm' })
+    await flushPromises()
+    // 已跨过第一笔请求完成的时间点：页面前进到下一条，不再 busy
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+    press({ key: 'm', repeat: true })
+    press({ key: 'M', repeat: true })
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenCalledTimes(1)
+    expect(rows(wrapper, 'rv-duplicate')).toEqual(['dup:k6|k7', 'dup:k8|k9'])
+
+    press({ key: 'm' })
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenCalledTimes(2)
+    expect(expandedId(wrapper)).toBe('dup:k8|k9')
+  })
+
+  it('F1 长按 N 同样只处理一条', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    press({ key: 'n' })
+    await flushPromises()
+    press({ key: 'n', repeat: true })
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenCalledTimes(1)
+    expect(rows(wrapper, 'rv-duplicate')).toEqual(['dup:k6|k7', 'dup:k8|k9'])
+  })
+
+  // ---- F3
+  it('F3 别人已处理（404）：条目消失并前进，但不记“已合并”', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    f.server.duplicates = f.server.duplicates.slice(1) // 另一个会话把这一对处理掉了
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(f.review.resolve).toHaveBeenCalledTimes(1)
+    expect(f.server.names.k4).toBe('栈')
+    expect(f.server.names.k5).toBe('堆栈')
+    expect(handledText(wrapper)).not.toContain('已合并')
+    expect(wrapper.get('[data-test="rv-notice"]').text()).toContain('已不在队列中')
+    expect(rows(wrapper, 'rv-duplicate')).toEqual(['dup:k6|k7', 'dup:k8|k9'])
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+  })
+
+  it('F3 标记“不是重复”遇到 404 同样不记成功；正常 200 才记', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    f.server.duplicates = f.server.duplicates.slice(1)
+    await click(wrapper, '.is-expanded [data-test="rv-not-duplicate"]')
+    expect(handledText(wrapper)).toBe('')
+    await click(wrapper, '.is-expanded [data-test="rv-not-duplicate"]')
+    expect(handledText(wrapper)).toContain('不是重复：「队列」与「队列的定义」')
+  })
+
+  it('F3 幂等重放（changed=false）、成环 409、网络失败都不记成功', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    f.review.resolve.mockResolvedValueOnce({ item: 'suspected_duplicate', action: 'merge', changed: false, totals: { low_confidence_relations: 2, suspected_duplicates: 2, isolated_nodes: 0 } } as never)
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(handledText(wrapper)).toBe('')
+
+    await click(wrapper, '[data-test="rv-merge"]')
+    f.review.resolve.mockRejectedValueOnce(apiError(409, 'CYCLE_DETECTED', { cycle: ['k1', 'k2', 'k1'] }))
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(handledText(wrapper)).toBe('')
+    expect(wrapper.find('.is-expanded [data-test="rv-cycle"]').exists()).toBe(true)
+
+    f.review.resolve.mockRejectedValueOnce(new NetworkError('offline'))
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(handledText(wrapper)).toBe('')
+  })
+
+  it('F3 换课程后清空“本次已处理”', async () => {
+    const f = setup()
+    const { wrapper, router } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(handledText(wrapper)).toContain('已合并')
+    await router.push('/courses/c2/review')
+    await flushPromises()
+    expect(handledText(wrapper)).toBe('')
+  })
+
+  // ---- F4
+  it('F4 合并成功但草稿图刷新失败：不再显示旧预览，说明原因并可重试；成功提示保留；恢复后预览回来', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(wrapper.find('[data-test="rv-dup-preview"]').exists()).toBe(true)
+    f.draft.getDraft.mockRejectedValueOnce(new Error('network'))
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+    expect(handledText(wrapper)).toContain('已合并：「堆栈」并入「栈」')
+    expect(wrapper.get('[data-test="rv-notice"]').text()).toContain('已合并')
+    expect(wrapper.find('[data-test="rv-dup-preview"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="rv-dup-definition"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="rv-dup-no-preview"]').text()).toContain('没有刷新成功')
+    // 没有小图时仍可手动处理（规格允许）
+    expect(wrapper.get('[data-test="rv-merge-confirm"]').attributes('disabled')).toBeUndefined()
+
+    await click(wrapper, '[data-test="rv-dup-reload"]')
+    expect(wrapper.find('[data-test="rv-dup-preview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="rv-dup-no-preview"]').exists()).toBe(false)
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+  })
+
+  it('F4 首次加载就读不到草稿图：说明“暂时读取不到”，同样可重试', async () => {
+    const f = setup()
+    f.draft.getDraft.mockRejectedValueOnce(new Error('down'))
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(wrapper.get('[data-test="rv-dup-no-preview"]').text()).toContain('暂时读取不到')
+    await click(wrapper, '[data-test="rv-dup-reload"]')
+    expect(wrapper.find('[data-test="rv-dup-preview"]').exists()).toBe(true)
+  })
+
+  // ---- F5
+  it('F5 焦点在“保留”单选框上按方向键：不切换条目，也不拦截浏览器的单选切换', async () => {
+    const f = setup()
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    press({ key: 'ArrowRight' }) // 页面空白处：切到中间一条
+    await flushPromises()
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+
+    const radio = wrapper.find('.is-expanded [data-test="rv-primary"]').element
+    for (const key of ['ArrowRight', 'ArrowLeft']) {
+      const event = press({ key }, radio)
+      await flushPromises()
+      expect(event.defaultPrevented).toBe(false)
+      expect(expandedId(wrapper)).toBe('dup:k6|k7')
+    }
+    // 其他表单控件同样不触发条目导航
+    const select = document.createElement('select')
+    document.body.appendChild(select)
+    expect(press({ key: 'ArrowRight' }, select).defaultPrevented).toBe(false)
+    expect(expandedId(wrapper)).toBe('dup:k6|k7')
+
+    // 按钮、页面空白处仍可导航；首条向左、末条向右不动
+    press({ key: 'ArrowLeft' }, wrapper.find('.is-expanded [data-test="rv-merge-confirm"]').element)
+    await flushPromises()
+    expect(expandedId(wrapper)).toBe('dup:k4|k5')
+    expect(press({ key: 'ArrowLeft' }).defaultPrevented).toBe(false)
+    press({ key: 'ArrowRight' })
+    press({ key: 'ArrowRight' })
+    await flushPromises()
+    expect(expandedId(wrapper)).toBe('dup:k8|k9')
+    expect(press({ key: 'ArrowRight' }).defaultPrevented).toBe(false)
+    // M / N 在单选框上仍然可用
+    press({ key: 'n' }, wrapper.find('.is-expanded [data-test="rv-primary"]').element)
+    await flushPromises()
+    expect(f.review.resolve).toHaveBeenCalledTimes(1)
+  })
+
+  // ---- F2
+  it('F2 草稿图不带来源：展开时才向详情接口读这两个知识点的来源数，1 / 2 / 0 如实显示；重复展开不再请求', async () => {
+    const counts: Record<string, number> = { k4: 1, k5: 2, k6: 0, k7: 1 }
+    const get = vi.fn<KnowledgeDetailApi['get']>(async (_cid, kid) => ({ source_refs: Array.from({ length: counts[kid] ?? 0 }, (_, i) => ({ chunk_id: `c${i}` })) }) as never)
+    const f = Object.assign(setup(), { detail: { get } })
+    const { wrapper } = await mountPage(f)
+    expect(get).not.toHaveBeenCalled()
+
+    await click(wrapper, '[data-test="rv-merge"]')
+    const texts = () => wrapper.findAll('[data-test="rv-dup-counts"]').map((w) => w.text())
+    expect(get.mock.calls.map((call) => call[1]).sort()).toEqual(['k4', 'k5'])
+    expect(texts()[0]).toContain('来源 1 处')
+    expect(texts()[1]).toContain('来源 2 处')
+
+    press({ key: 'ArrowRight' })
+    await flushPromises()
+    expect(texts()[0]).toContain('来源 0 处')
+    expect(texts()[1]).toContain('来源 1 处')
+    press({ key: 'ArrowLeft' })
+    await flushPromises()
+    expect(texts()[0]).toContain('来源 1 处')
+    expect(get).toHaveBeenCalledTimes(4)
+  })
+
+  it('F2 详情读取失败时显示“读取失败”，不显示 0；读取中有说明', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const get = vi.fn<KnowledgeDetailApi['get']>(async (_cid, kid) => {
+      if (kid === 'k4') throw apiError(503, 'STORAGE_UNAVAILABLE')
+      await gate
+      return { source_refs: [{ chunk_id: 'c' }] } as never
+    })
+    const f = Object.assign(setup(), { detail: { get } })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    const texts = () => wrapper.findAll('[data-test="rv-dup-counts"]').map((w) => w.text())
+    expect(texts()[0]).toContain('来源数量读取失败')
+    expect(texts()[0]).not.toContain('来源 0 处')
+    expect(texts()[1]).toContain('来源读取中')
+    release()
+    await flushPromises()
+    expect(texts()[1]).toContain('来源 1 处')
+  })
+
+  it('F2 合并成功后保留的知识点重新读取来源数（合并会把对方的来源并过来）', async () => {
+    const pairs = [dup(ref_('k4', '栈'), ref_('k5', '堆栈')), dup(ref_('k4', '栈'), ref_('k9', '链式栈'), 0.8)]
+    let merged = false
+    const get = vi.fn<KnowledgeDetailApi['get']>(async (_cid, kid) => ({ source_refs: Array.from({ length: kid === 'k4' && merged ? 3 : 1 }, (_, i) => ({ chunk_id: `c${i}` })) }) as never)
+    const f = Object.assign(fakes({ duplicates: pairs, names: names(), isolated: [] }), { detail: { get } })
+    const { wrapper } = await mountPage(f)
+    await click(wrapper, '[data-test="rv-merge"]')
+    expect(wrapper.findAll('[data-test="rv-dup-counts"]')[0]!.text()).toContain('来源 1 处')
+    merged = true
+    await click(wrapper, '[data-test="rv-merge-confirm"]')
+    expect(expandedId(wrapper)).toBe('dup:k4|k9')
+    expect(wrapper.findAll('[data-test="rv-dup-counts"]')[0]!.text()).toContain('来源 3 处')
+  })
+
+  // ---- F6
+  it('F6 现状登记：契约要求 similarity 为数字，缺失时整份队列按数据异常处理（放宽需先改契约）', async () => {
+    const odd = { candidates: [ref_('k4', '栈'), ref_('k5', '堆栈')], reason: 'same_key' } as unknown as SuspectedDuplicate
+    const { wrapper } = await mountPage(fakes({ duplicates: [odd] }))
+    expect(wrapper.get('[data-test="rv-error"]').text()).toContain('数据异常')
   })
 })

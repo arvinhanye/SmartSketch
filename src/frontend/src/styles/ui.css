@@ -716,3 +716,4 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 .light-surface.review .rv-dup__keys { margin-left:auto; color:var(--ui-text-3); font-size:12px; }
 @media(max-width:640px) { .light-surface.review .rv-dup__cards, .light-surface.review .rv-dup__graphs { grid-template-columns:minmax(0,1fr); } .light-surface.review .rv-dup__keys { display:none; } }
 .light-surface .teacher-graph__pair { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 12px; padding:8px 12px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); color:var(--ui-text); font-size:13px; }
+.light-surface.review .rv-dup__nopreview { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0 0; padding:10px 12px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); color:var(--ui-text); font-size:13px; line-height:1.6; }

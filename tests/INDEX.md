@@ -218,6 +218,7 @@
 | [`tests/frontend/register-layout.test.ts`](frontend/register-layout.test.ts) | 学生注册页外观、结构及与登录页版式的一致性。 | 待确认 |
 | [`tests/frontend/resume-learning.test.ts`](frontend/resume-learning.test.ts) | 学生课程列表继续学习主卡的课程选择、进度推荐读取与失败隐藏。 | UI-PINE-01 |
 | [`tests/frontend/review-dedup.test.ts`](frontend/review-dedup.test.ts) | 审核页疑似重复的并排对比组件与合并预览小图。 | UX-REVIEW-DEDUP-01；specs/teacher-review-publish.md |
+| [`tests/frontend/source-counts.test.ts`](frontend/source-counts.test.ts) | 知识点来源数量的按需读取、缓存、失效与课程隔离。 | UX-REVIEW-DEDUP-01（DEDUP-FIX F2） |
 | [`tests/frontend/student-graph-workbench.test.ts`](frontend/student-graph-workbench.test.ts) | 学生图谱工作台的预览详情、局部视图、图例筛选、章节聚焦、响应式面板与可访问性。 | 待确认 |
 | [`tests/frontend/teacher-embedding-settings.test.ts`](frontend/teacher-embedding-settings.test.ts) | 教师模型设置页的向量设置可见性、表单与同名按钮区分。 | 待确认 |
 | [`tests/frontend/toast-notice.test.ts`](frontend/toast-notice.test.ts) | ToastNotice 提示与自动消失逻辑，以及审核页固定弹窗避免布局位移的样式。 | 待确认 |
