@@ -2,12 +2,16 @@
 
 ## 2026-11-11 Codex：MAIN-INTEGRATE-02 历史独有改动审查与收敛
 
-- 状态 IN_PROGRESS；负责人 Codex；基线 main `f944786`；分支 `codex/historical-branch-integration-20261111`。用户授权继续检查剩余 15 个历史分支，有用独有内容整合到 main，过时或被替代分支删除。
+- 状态 DONE；负责人 Codex；基线 main `f944786`；有效代码 `e0022ab` 经 [PR #345](https://github.com/arvinhanye/SmartSketch/pull/345) 合入 main `9dccc30`。用户授权的剩余 15 个历史分支全部完成审查和原子删除。
 - 输入：15 个远端历史分支及逐分支 merge-base 差异、现行规格/ADR、主线实现与测试；输出：逐分支语义比对和处置证据、必要的最小移植、恢复清单、更新后的 main。
 - 执行：前端、问答/导入/E2E、跨平台/图谱三组只读并行审查；协调者核对历史契约/文档并统一实施。按文件所有权推进，不对旧分支整体覆盖主线。
 - 约束：保留现行权限、接口、请求隔离、图谱工作台与模型设置行为；旧设计不能仅因提交独有就重新启用。确有规格冲突先记录并解决；无迁移、依赖升级或付费模型调用。
 - 验证：原引用和完整 bundle 校验；逐分支差异覆盖与后续替代证据；必要代码移植先做有意义的失败回归，执行对应门禁及 `./scripts/verify.sh`；文档差异检查；PR 检查通过后合并；删除使用精确 SHA lease 与最终远端复核。
 - 恢复材料：主检出 `.demo/historical-branch-cleanup-20261111/`；审计 `docs/reviews/historical-branches-20261111.md`，交接 `docs/handoffs/codex-historical-branches-20261111.md`。
+- 实际纳入：用户确认的 ADR-097 安全级联删除（默认单点、明确选择、预览变化拒绝、修订号保护）；模型设置结果失效、RELATED_TO 无向显示、SQLite 问答审计故障隔离与最小跨平台修复；旧 K08 有效记录归档。
+- 验收：最终代码 10 项 CI 全绿；后端 4340 passed / 27 登记跳过，前端 1443 passed，Windows portability 13 passed，真实 Neo4j 471 passed / 4 登记跳过，图库专项 44 passed，两组 E2E 2+4 passed。独立复核的已确认缺陷均已修复并重跑原反例。
+- 本地：完整命令的契约/启动器/后端/前端/Neo4j/F11 通过，但受限环境 Chrome 启动报 EPERM/SIGABRT，整条命令 exit 1。正常权限审批后单独补跑原两组 E2E，2/2、4/4 且 exit 0；原失败记录保留，没有弱化断言或重记为整条通过。
+- 清理：完整 bundle 校验成功后，逐项核对 15 个远端 SHA，dry-run 与实际删除均使用 atomic + 精确 SHA lease；操作后远端确认全部消失，main 不变。原 SHA、删除日志、CI 与本地验证证据均在恢复目录，其他工作区与本地环境保留。
 
 
 ## 2026-11-11 Codex：MAIN-INTEGRATE-01 分支整合与清理
