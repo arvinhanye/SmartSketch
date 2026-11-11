@@ -26,25 +26,20 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.repositories import edit_logs
-from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
 from app.repositories.neo4j import RepositoryConnectionError
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.auth import issue_access_token
 from app.services.graph import audit
 from test_f08 import assert_schema
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.sqlite import migrated_database
 
 SECRET = "relations-api-test-key-0123456789abcdefghij"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 V = ("t-done",)
 #: ``Scenario`` 的默认调用者哨兵：省略 ``user`` 就是课程教师，``None`` 是不带令牌。
 TEACHER = object()
-
-
-def _account(url, name, role):
-    return insert_account(url, account_id=uuid.uuid4().hex, username=name, password_hash=VALID_HASH, role=role)
 
 
 def token(user):
@@ -274,9 +269,8 @@ def _no_backoff(monkeypatch):
 
 
 @pytest.fixture
-def s(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+def s(tmp_path, app_factory):
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = _account(url, "teacher1", "teacher")
     teacher2 = _account(url, "teacher3", "teacher")
     student = _account(url, "student1", "student")
@@ -290,10 +284,7 @@ def s(tmp_path, monkeypatch):
                    (course.id, "sha256:" + uuid.uuid4().hex * 2))
         db.execute("INSERT INTO processing_tasks (id, course_id, document_id, idempotency_key, stage, progress)"
                    " VALUES ('t-done', ?, 'doc1', 'idem-done', 'completed', 1.0)", (course.id,))
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    monkeypatch.setenv("COURSE_LOCK_WAIT_SECONDS", "0")
-    application = create_app()
+    application = app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET, COURSE_LOCK_WAIT_SECONDS="0")
     draft = FakeDraft(course.id)
     application.state.relation_store = FakeRelationStore(draft)
     application.state.graph_reader = FakeReader()

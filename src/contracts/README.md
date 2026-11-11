@@ -1,6 +1,6 @@
 # 契约（Contracts）
 
-本目录是 SmartSketch 前后端共享协议的**单一真源**。`src/frontend/` 与 `src/backend/` 的所有对外数据结构都以此处为准；两边都不得自行定义同名结构。格式决策见 [ADR-004](../../docs/decisions.md)，命名基线见同文件 ADR-016；状态转换以 [任务处理规格](../../specs/task-processing.md) 为准。
+本目录是 SmartSketch 前后端共享协议的**单一真源**。`src/frontend/` 与 `src/backend/` 的所有对外数据结构都以此处为准；两边都不得自行定义同名结构。格式决策见 [ADR-004](../../docs/archive/decisions-adr-001-040.md)，命名基线见同文件 ADR-016；状态转换以 [任务处理规格](../../specs/task-processing.md) 为准。
 
 ## 1. 真源与生成物
 

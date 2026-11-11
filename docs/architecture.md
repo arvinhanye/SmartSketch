@@ -36,7 +36,15 @@ Neo4j（图谱/向量）    SQLite（课程、用户、任务、进度、版本�
 
 OPT-05：版本发布/回滚的 Cypher 位于 `repositories/version_materialize.py`，共享文本块向量查询位于 `repositories/version_chunk_vectors.py`；服务保留快照/向量校验及事务回调中的计数检查，仓储执行数据库操作，检查失败仍回滚原事务。向量配置、任务取消与版本解析的 SQL 分别归入 `repositories/embedding_configs.py`、`tasks.py`、`versions.py`；既有连接作用域、提交点与查询顺序不变。`services/qa/factory.py` 负责问答依赖装配和课程/个人模型绑定，`services/qa/audit.py` 汇总并写入终态日志，`api/chat.py` 保留 HTTP/SSE 转换与应用状态依赖注入。以上不改变发布 P6/P7 环检测、P8/P9 物化与 P11 提交链路，也不改变契约或数据模型。
 
+OPT-06A：`services/ai/compatible.py` 保留聊天客户端和原导入入口；`compatible_transport.py` 负责 HTTP/DNS/连接与总时限，`compatible_protocol.py` 负责协议解析/错误映射/用量，`compatible_base.py` 负责共享 HTTP 请求与响应读取，`compatible_embedding.py` 负责向量客户端。旧模块显式再导出原符号，底层模块不反向依赖入口；请求体、错误、超时、资源释放与配置默认值不变。
+
+OPT-06B：`workers/extract_task.py` 保留任务装配入口及旧符号再导出；`workers/extraction/{types,candidates,units,state,dispatch}.py` 分别承载共享类型、候选数据、单元执行、状态/检查点写入和有界派发。原日志类别、并发默认值、阶段屏障、重试/取消/租约及事务顺序保持不变。
+
 ## 前端构建、测试与应用外壳（B01～B04）
+
+OPT-06D：`views/StudentGraphView.vue` 保留路由/API 装配、模板与样式；`useStudentGraphPanel.ts` 管理面板/分隔条及焦点/observer 生命周期，`useStudentGraphPresentation.ts` 组合原响应式引用计算画布、章节布局、预览与进度。DOM、事件及视口行为不变。
+
+OPT-06C：`composables/useMaterials.ts` 保留状态及请求/SSE 生命周期；`composables/materials/{files,status,errors,types}.ts` 分别承载文件校验、状态呈现、错误映射和共享类型。旧入口导出名与返回对象不变，切课/卸载清理和晚到响应防护保持原顺序。
 
 - `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
 - Vite 负责开发服务器与产物构建，`vue-tsc` 单独执行严格类型检查；依赖版本由 `src/frontend/package-lock.json` 锁定。
@@ -84,7 +92,7 @@ E07 接收配置与 E02 `EmbeddingClient`，依 `EMBEDDING_BATCH_SIZE` 分批，
 
 ## 契约真源与生成物（ADR-004）
 
-下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/decisions.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
+下表是 ADR-004 的裁定（2026-09-22 由 ArvinHan 签收），完整理由见 `docs/archive/decisions-adr-001-040.md`。**任何 REST / SSE / 图谱格式变更的第一步必须是改真源**；本节固定分工，避免两端各写一份接口。
 
 | 角色 | 位置 | 谁写 | 规则 |
 | --- | --- | --- | --- |

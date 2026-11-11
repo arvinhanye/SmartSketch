@@ -19,8 +19,9 @@ import pytest
 from app.config import load_settings
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course, list_members
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.demo_import import DemoImportError, import_demo, load_manifest
+from tests.backend.helpers.sqlite import migrated_database
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "datasets" / "demo" / "manifest.json"
@@ -29,8 +30,7 @@ VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 
 @pytest.fixture
 def env(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     settings = load_settings({"SQLITE_URL": url, "STORAGE_DIR": str(tmp_path / "files")})
     users = {name: insert_account(url, account_id=uuid.uuid4().hex, username=name,
                                   password_hash=VALID_HASH, role=role)
@@ -155,8 +155,7 @@ def test_substituted_or_escaping_documents_are_refused_before_any_write(env, tmp
 
 
 def test_missing_accounts_are_refused_before_any_write(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     settings = load_settings({"SQLITE_URL": url, "STORAGE_DIR": str(tmp_path / "files")})
     with pytest.raises(DemoImportError, match="seed-demo-accounts"):
         import_demo(settings, load_manifest(MANIFEST), publisher=None, sleep=lambda s: None)

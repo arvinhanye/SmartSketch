@@ -930,12 +930,16 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         return
 
     def do_POST(self) -> None:  # noqa: N802
+        # Each test sends one request; do not read a keep-alive request after the client closes.
+        self.close_connection = True
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length)
         type(self).seen.append({"path": self.path, "headers": dict(self.headers), "body": json.loads(body)})
         mode = type(self).script["mode"]
-        if mode == "sleep":
-            time.sleep(1.0)
+        if mode == "blocked":
+            # Keep the response pending until fixture teardown; the client's real timeout is under test.
+            assert type(self).script["release"].wait(5), "test did not release the blocked HTTP handler"
+            type(self).script["finished"].set()
             return
         if mode == "json":
             payload = completion_body()
@@ -985,8 +989,15 @@ def loopback() -> Iterator[str]:
     try:
         yield f"http://127.0.0.1:{server.server_address[1]}/v1"
     finally:
-        server.shutdown()
-        server.server_close()
+        try:
+            if _Handler.script.get("mode") == "blocked":
+                _Handler.script["release"].set()
+                assert _Handler.script["finished"].wait(5), "blocked HTTP handler did not finish"
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(5)
+            assert not thread.is_alive(), "loopback server did not stop"
 
 
 def test_stdlib_transport_complete_over_loopback(loopback: str) -> None:
@@ -1016,7 +1027,7 @@ def test_stdlib_transport_error_status_over_loopback(loopback: str) -> None:
 
 
 def test_stdlib_transport_timeout_over_loopback(loopback: str) -> None:
-    _Handler.script = {"mode": "sleep"}
+    _Handler.script = {"mode": "blocked", "release": threading.Event(), "finished": threading.Event()}
     started = time.monotonic()
     with pytest.raises(ModelTimeoutError):
         CompatibleModelClient(loopback, API_KEY).complete(make_request(timeout_seconds=0.2))

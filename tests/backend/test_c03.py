@@ -11,10 +11,9 @@ import pytest
 from fastapi import APIRouter, Depends
 from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.repositories.accounts import insert_account, set_disabled
 from app.repositories.courses import add_member, create_course, remove_member
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.auth import issue_access_token
 from app.config import load_settings
 from app.services.access import AccessDenied, AccessService
@@ -27,15 +26,15 @@ from app.api.dependencies import (
     task_teacher,
     teacher_account,
 )
+from tests.backend.helpers.sqlite import migrated_database
 
 SECRET = "c03-test-signing-key-0123456789abcdefghij"
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 
 
 @pytest.fixture
-def scenario(tmp_path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(url)
+def scenario(tmp_path, app_factory):
+    url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
     teacher = insert_account(
         url,
         account_id=uuid.uuid4().hex,
@@ -65,9 +64,7 @@ def scenario(tmp_path, monkeypatch):
         role="student",
         added_by=teacher.id,
     )
-    monkeypatch.setenv("SQLITE_URL", url)
-    monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    application = create_app()
+    application = app_factory(SQLITE_URL=url, AUTH_JWT_SECRET=SECRET)
     router = APIRouter()
 
     @router.get("/probe/me")

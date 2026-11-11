@@ -15,25 +15,21 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 from app.repositories import chunks as chunk_store
 from app.repositories import materials as materials_repo
-from app.repositories.accounts import insert_account
 from app.repositories.courses import add_member, create_course
 from app.repositories.event_tickets import issue_ticket
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services import materials as materials_service
 from app.services.auth import issue_access_token
 from app.services.chunking import chunk_blocks, chunking_version
 from app.services.parsers.models import ParsedBlock, RevisionKey, SourceLocator
+from tests.backend.helpers.accounts import make_account as _account
+from tests.backend.helpers.sqlite import migrated_database
 
 SECRET = "adr021-test-signing-key-0123456789abcdef"
-VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 PV = "txt/1+" + chunking_version(40, 10)
 
 PROCESSING = ("queued", "parsing", "extracting", "merging", "persisting")
 CONTRIBUTED = ("awaiting_review", "completed")
-
-
-def _account(url: str, username: str, role: str):
-    return insert_account(url, account_id=uuid.uuid4().hex, username=username, password_hash=VALID_HASH, role=role)
 
 
 def _token(user) -> str:
@@ -44,8 +40,7 @@ def _token(user) -> str:
 
 class World:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        self.url = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-        migrate(self.url)
+        self.url = migrated_database(f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}")
         self.storage = tmp_path / "storage"
         self.teacher = _account(self.url, "teacher1", "teacher")
         self.student = _account(self.url, "student1", "student")

@@ -16,14 +16,11 @@ from app.repositories.sqlite import MigrationError, connect, migrate
 from app.repositories.task_leases import LeaseLost
 from app.services.file_storage import StoredFile
 from app.services.task_state import Applied, TaskError, TaskState, TransitionEvent, apply_event
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "backend" / "migrations"
 LEASE_SECONDS = 60
 MAX_ATTEMPTS = 3
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
 
 
 def _lease_migration() -> Path:

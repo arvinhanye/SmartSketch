@@ -14,7 +14,7 @@ import pytest
 from app.config import Settings
 from app.repositories.graph_read import NodeEvidence
 from app.repositories.materials import material_names
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.services.ai.client import ModelResult, StreamDelta, StreamDone
 from app.services.qa import chat as chat_module
 from app.services.qa.chat import ChatService, PreparedChat
@@ -23,6 +23,7 @@ from app.services.qa.context import ContextStats, ContextStatus, EvidenceChunk, 
 from app.services.qa.generate import AnswerGeneration
 from app.services.versions.resolver import PublishedVersion
 from test_f07 import PAGE, SECTION, assert_schema, kp, s  # noqa: F401  (s 是夹具)
+from tests.backend.helpers.sqlite import migrated_database
 
 SHA = "sha256:" + "0" * 64
 
@@ -126,8 +127,7 @@ def _chat_service(url, answer):
 
 @pytest.fixture
 def chat_db(tmp_path):
-    url = f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}"
-    migrate(url)
+    url = migrated_database(f"sqlite:///{(tmp_path / 'chat.sqlite').as_posix()}")
     with connect(url) as db:
         db.execute("INSERT INTO users(id, username, password_hash, role) VALUES (?, 'teacher', ?, 'teacher')",
                    ("u" * 32, "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"))

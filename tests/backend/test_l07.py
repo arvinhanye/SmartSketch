@@ -15,7 +15,7 @@ from app.main import create_app
 from app.repositories import model_configs as repo
 from app.repositories.accounts import insert_account
 from app.repositories.courses import create_course
-from app.repositories.sqlite import connect, migrate
+from app.repositories.sqlite import connect
 from app.repositories.task_leases import Lease
 from app.repositories.tasks import ModelConfigMissing, create_material_task
 from app.services.ai.client import Message, ModelRequest
@@ -57,13 +57,6 @@ def _reader(payload):
 
 def _settings(url, **extra):
     return load_settings({"SQLITE_URL": url, "LLM_MODE": "personal", "MODEL_CREDENTIAL_KEY": ROOT_KEY_B64, **extra})
-
-
-@pytest.fixture
-def url(tmp_path):
-    value = f"sqlite:///{(tmp_path / 'state.sqlite3').as_posix()}"
-    migrate(value)
-    return value
 
 
 def _user(url, name, role="teacher"):

@@ -28,13 +28,10 @@ from app.repositories.courses import (
     remove_member,
 )
 from app.repositories.sqlite import connect, migrate
+from tests.backend.helpers.sqlite import sqlite_url as _url
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "backend" / "migrations"
 VALID_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
-
-
-def _url(path: Path) -> str:
-    return f"sqlite:///{path.as_posix()}"
 
 
 def _new_id() -> str:
@@ -47,13 +44,6 @@ def _dump(url: str) -> dict[str, list[tuple]]:
             table: database.execute(f"SELECT * FROM {table} ORDER BY 1, 2").fetchall()
             for table in ("users", "courses", "course_members")
         }
-
-
-@pytest.fixture
-def db_url(tmp_path):
-    url = _url(tmp_path / "state.sqlite3")
-    migrate(url)
-    return url
 
 
 @pytest.fixture

@@ -45,6 +45,14 @@ def test_integration_checkout_contains_history_for_real_baseline():
 
 
 def test_decision_identifiers_are_unique_after_main_integration():
-    numbers = re.findall(r'^## (ADR-\d+)[：:]', (ROOT / 'docs/decisions.md').read_text(), re.M)
+    index = ROOT / 'docs/decisions.md'
+    archives = sorted((ROOT / 'docs/archive').glob('decisions-adr-*.md'))
+    assert archives, 'Decision body archives are missing'
+    numbers = [number for path in [index, *archives]
+               for number in re.findall(r'^## (ADR-\d+)[：:]', path.read_text(), re.M)]
+    assert numbers, 'Decision body scan must not pass with no ADRs'
     duplicates = [number for number, count in Counter(numbers).items() if count > 1]
     assert not duplicates, f'Conflicting decision identifiers: {duplicates}'
+    indexed = re.findall(r'^\| \[(ADR-\d+)\]\(', index.read_text(), re.M)
+    assert Counter(indexed) == Counter(numbers), (
+        'ADR index and body archives must contain the same identifiers exactly once')
