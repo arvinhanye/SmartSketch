@@ -1,5 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type GraphSidePanel from '../components/GraphSidePanel.vue'
+import { readPanelWidth, writePanelWidth } from './usePanelWidthPreference'
 
 interface StudentGraphPanelOptions {
   selected: Readonly<Ref<string | null>>
@@ -16,13 +17,15 @@ export function useStudentGraphPanel({ selected, previewId, focus }: StudentGrap
   const wsWidth = ref(0)
   /** 可调并置面板；窄屏仍使用覆盖抽屉。 */
   const docked = computed(() => wsWidth.value >= 960)
-  const preferredPanelWidth = ref(25)
+  // 宽度记在本浏览器（UI-GRAPH-FIND-01）；存储不可用时按默认 25%
+  const preferredPanelWidth = ref(readPanelWidth('student-graph') ?? 25)
   const minPanelWidth = computed(() => Math.max(20, 280 / Math.max(wsWidth.value, 1) * 100))
   const maxPanelWidth = computed(() => Math.min(45, (wsWidth.value - 640) / Math.max(wsWidth.value, 1) * 100))
   const panelWidth = computed(() => Math.min(maxPanelWidth.value, Math.max(minPanelWidth.value, preferredPanelWidth.value)))
   const resizingPanel = ref(false)
   function setPanelWidth(value: number): void {
     preferredPanelWidth.value = Math.min(maxPanelWidth.value, Math.max(minPanelWidth.value, value))
+    writePanelWidth('student-graph', preferredPanelWidth.value)
   }
   function moveDivider(event: PointerEvent): void {
     if (!resizingPanel.value || ws.value === null) return

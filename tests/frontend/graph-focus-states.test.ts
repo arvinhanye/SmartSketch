@@ -75,9 +75,24 @@ describe('applyFocusStates：章节聚焦与搜索命中', () => {
     expect(s.b).toEqual(['neighbor', 'match'])
   })
 
-  it('搜索命中只加 match，不淡化其他节点', () => {
+  // UI-GRAPH-FIND-01：查找时保留全图，命中 match、其余标准淡化（原先只加 match 是因为不匹配的节点已被筛选隐藏）
+  it('搜索命中加 match，未命中的节点标准淡化，关系线不动', () => {
     const out = applyFocusStates({ nodes, edges }, { ...none, matchedIds: new Set(['c']) })
-    expect(statesOf(out.nodes)).toEqual({ a: [], b: [], c: ['match'], d: [] })
+    expect(statesOf(out.nodes)).toEqual({ a: ['dimmed'], b: ['dimmed'], c: ['match'], d: ['dimmed'] })
+    expect(statesOf(out.edges)).toEqual({ ab: [], bc: [] })
+  })
+
+  it('搜索命中时已带 selected 的节点不淡化（教师页的选中由筛选层打标）', () => {
+    const out = applyFocusStates(
+      { nodes: [node('a', ['selected']), node('b'), node('c')], edges },
+      { ...none, matchedIds: new Set(['c']) },
+    )
+    expect(statesOf(out.nodes)).toEqual({ a: ['selected'], b: ['dimmed'], c: ['match'] })
+  })
+
+  it('有预览/选中时命中仍带 match，淡化由预览/选中决定', () => {
+    const out = applyFocusStates({ nodes, edges }, { ...none, selectedId: 'a', matchedIds: new Set(['c', 'b']) })
+    expect(statesOf(out.nodes)).toEqual({ a: ['selected'], b: ['neighbor', 'match'], c: ['dimmed', 'match'], d: ['dimmed'] })
   })
 
   it('不修改输入', () => {

@@ -66,7 +66,7 @@ class Settings(BaseModel):
     QA_CONTEXT_GRAPH_TOKENS: int = Field(default=2000, ge=0)
     QA_CONTEXT_MAX_CHUNKS: int = Field(default=8, ge=1)
     QA_VECTOR_LIMIT: int = Field(default=20, ge=1)
-    LLM_MAX_CONCURRENCY: int = Field(default=4, ge=1)
+    LLM_MAX_CONCURRENCY: int = Field(default=8, ge=1)
     LLM_MAX_RETRIES: int = Field(default=2, ge=0)
     LLM_CIRCUIT_FAILURE_THRESHOLD: int = Field(default=5, ge=1)
     LLM_CIRCUIT_OPEN_SECONDS: int = Field(default=30, ge=1)

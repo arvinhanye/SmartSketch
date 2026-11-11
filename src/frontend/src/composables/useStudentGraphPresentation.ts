@@ -17,12 +17,14 @@ interface StudentGraphPresentationOptions {
   previewId: Readonly<Ref<string | null>>
   chapterId: Readonly<Ref<string | null>>
   chapterKpIds: Readonly<Ref<string[]>>
+  /** 搜索命中的知识点（UI-GRAPH-FIND-01）：带 `match`，没有预览/选中与章节聚焦时其余淡化；缺省没有命中 */
+  matchedKpIds?: Readonly<Ref<readonly string[]>>
   statusOf(kpId: string): MasteryStatus
 }
 
 /** Derived canvas data, chapter positions, node preview and mastery summary. */
 export function useStudentGraphPresentation({
-  graph, chapters, learningGraph, localView, highlightId, previewId, chapterId, chapterKpIds, statusOf,
+  graph, chapters, learningGraph, localView, highlightId, previewId, chapterId, chapterKpIds, statusOf, matchedKpIds,
 }: StudentGraphPresentationOptions) {
   // ---------------------------------------------------------------- 画布数据：学习状态 → 局部视图 → 聚焦状态
   /** 预览/选中由 `highlightId` 决定；筛选层与学习路径带来的 `selected` 要去掉，否则预览与详情会同时出现两个外环 */
@@ -39,7 +41,7 @@ export function useStudentGraphPresentation({
     const scope = chapterId.value === null ? null : new Set(chapterKpIds.value.map(nodeElementId))
     return applyFocusStates(withoutSelected(base), {
       selectedId: hl === null ? null : nodeElementId(hl),
-      matchedIds: new Set(),
+      matchedIds: new Set((matchedKpIds?.value ?? []).map(nodeElementId)),
       chapterIds: scope,
       fade: 'standard',
     })

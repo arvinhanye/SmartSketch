@@ -1,5 +1,25 @@
 # 任务看板
 
+## 2026-11-11 Codex：MAIN-INTEGRATE-01 分支整合与清理
+
+- 状态 IN_PROGRESS；负责人 Codex；基线 origin/main `99e169a`；隔离分支 `codex/main-integration-20261111`。
+- 输入：195 个远端分支、20 个本地分支、开放 PR #337/#339/#340/#342，以及本地抽取优化 `e8c20bd`。用户授权合并所需内容至 main、清理无用旧分支。
+- 输出：保留 OPT-01～06 的拆分与文档归档，整合图谱查找及抽取性能优化，记录逐分支处置与恢复 SHA；原目录未提交文件保持原样。
+- 风险与边界：抽取调度与 OPT-06 模块拆分冲突、旧分支已被 squash/cherry-pick 或产品替代；只删除可证明已覆盖的引用。含未确认独有工作的分支保留；无付费模型调用、部署或真实数据库变更。
+- 验收：定向抽取/E12/工具回归、完整 `./scripts/verify.sh integration`、合并差异审查、`git diff --check`、远端 main/PR/分支复核。交接 `docs/handoffs/codex-main-integration-20261111.md`。
+
+## 2026-11-10 Claude：图谱查找、快捷键与视图记忆（UI-GRAPH-FIND-01，用户确认“开始第一批”）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-GRAPH-FIND-01 | 实现、自动化验收与浏览器实走完成，待用户视觉签收（2026-11-11；review_status: ready_for_review） | Claude | 分支 `claude/knowledge-graph-ux-analysis-2e7400`。搜索改为“高亮 + 淡化”并支持别名、候选、上一个/下一个；画布快捷键（`/`、`F`、`+`、`-`）；学生页视图状态写入地址；两页面板宽度本地记忆。文件：`src/frontend/src/graph/search.ts`（新）、`graph/adapter.ts`、`graph/focusStates.ts`、`composables/useGraphFilters.ts`、`composables/useGraphShortcuts.ts`（新）、`composables/usePanelWidthPreference.ts`（新）、`composables/graphViewQuery.ts`（新）、`components/GraphSearch.vue`（新）、`components/GraphCanvas.vue`、`views/StudentGraphView.vue`、`views/TeacherGraphView.vue`、`styles/graph-workspace.css`、相关前端测试、`specs/course-knowledge-graph.md` | 不改后端、接口、契约、数据与权限；`filterGraph` 既有语义与既有 `data-test` 钩子保留。验收条件见 `specs/course-knowledge-graph.md`「图谱查找、快捷键与视图记忆」；`type-check`、前端全量、`build`、`./scripts/verify.sh`；浏览器实走与自动化分别报告 |
+
+- 输入：2026-11-10 体验差距分析（搜索是过滤而非查找、无效率快捷键、视图状态不记忆）；输出：上表文件与交接 `docs/handoffs/claude-ui-graph-find-01.md`。依赖：现有 `match`/`dimmed` 画布状态、契约 `KnowledgePoint.aliases`。风险：既有测试里依赖“搜索隐藏节点”的断言；地址写回与问答链接 `?kp=&v=` 的处理互相触发；G6 画布重建时快捷键调用落空。回滚：还原本任务提交即可，无数据迁移。
+- 本批不做（留待后续批次）：镜头位置写入地址；教师页视图状态写入地址；拼音/模糊匹配；搜索定义正文；命令面板。
+- 验收证据（2026-11-11，详见 `docs/handoffs/claude-ui-graph-find-01.md`）：新增 `tests/frontend/graph-find.test.ts`（31 条）与 `h14.test.ts` 3 条；因规格变更调整 2 条既有断言（`graph-focus-states.test.ts` 命中时其余淡化、`h03.test.ts` 节点数据带别名）。`scripts/verify/frontend.sh full` exit 0（type-check 无错误，78 文件 / 1338 条通过，build 成功）；`./scripts/verify.sh`（basic）exit 0。反向验证一次：去掉学生页的 `search: 'highlight'` 后新测试 3 条失败，恢复后通过。**未做**：浏览器实走（本机 Docker 未启动，没有可用后端）、读屏、真实课程数据下的候选与淡化观感、`verify.sh full/integration` 的后端与集成部分（后端未改）。测试是在实现之后补写的，不是先红后绿。未提交、未推送。
+- 续（2026-11-11）：按用户指示合入 `codex/opt-05-backend-layering@99c1f01`（改版前端），冲突三处已解。最终代码 `scripts/verify/frontend.sh full` exit 0（83 文件 / 1414 条）、`./scripts/verify.sh` exit 0。浏览器实走（1440×900，演示课程 64 节点，学生与教师两页）逐项通过，并修掉实走发现的两处：缩得很小时搜索定位不放大、教师页回车后焦点被详情与编辑面板标题抢走（新增 `composables/searchFocus.ts`）。上一条里“未做浏览器实走”“未提交”已不再成立；仍未验证：读屏、Firefox/Safari、窄屏、后端与集成门禁。已提交到本分支，未推送。待定：PR 目标分支（本分支含对方 10 个提交）、搜索框是否加宽。
+- 续（2026-11-11）：按用户“整合到 main”的指示，在 #341（OPT-01..06 集成）合入 main 后把 main 合进本分支。冲突两处：本文件（取 main 的归档版，只保留本节）与 `StudentGraphView.vue`（OPT-06D 已把画布数据与面板逻辑拆到 `useStudentGraphPresentation` / `useStudentGraphPanel`，本任务的搜索命中与面板宽度记忆改接到这两个组合式）。
+
 ## 2026-11-10 Codex：OPT-03 后端测试夹具收敛
 
 - 状态 DONE；负责人 Codex；分支 `codex/opt-03-test-fixtures`；从已提交且干净的 `codex/opt-02-test-waits@eca579c` 建立独立 worktree。OPT-02 剩余浏览器/集成验收不属于本任务。
@@ -653,3 +673,28 @@
 - 验证命令：`python3 -m pytest tests/tooling/test_test_index.py -q`、`./scripts/verify.sh`（默认 basic）、`git diff --check`；使用仓库已有 Python 3.11 虚拟环境。不推送、不开 PR。
 - 验收证据：索引与三个匹配范围双向一致；来源不足的关联与功能保留「待确认」；原有测试零改动、零重命名。完整性测试在缺少索引时先失败，最终 1 passed；临时样例验证漏项、失效文件、重复项、错误链接和无效格式均被拒绝。basic 契约门禁及 25 项负例通过（仅 pytest 缓存受沙箱限制警告）；日志 `/private/tmp/opt04-verify.log`。
 - OPT-03 同步：本分支基线未包含 OPT-03，本轮结束时本地分支/提交记录未检出同期合入；未自行合并其他任务。若后续合并 OPT-03，按交接重新核对头部/import/describe、重生成索引并复跑完整性测试与 basic。
+
+## 2026-11-05 Claude → Codex 交接：图谱生成提速（EXTRACT-PERF-01）
+
+- 用户反馈图谱生成仍慢。Claude 读代码与 L02 实测（141.7 秒：抽取 94.4、merging 45.7）后的初判：块阶段与小节关系阶段之间有屏障；块过小导致调用多、并发上限仅 4；merging 慢段根因仍 OPEN（已有 `persist steps` 日志未被分析）；发布向量化逐批串行。
+- 交接稿：`docs/handoffs/claude-to-codex-extraction-perf.md`；prompt：`docs/handoffs/claude-to-codex-extraction-perf.prompt.md`。先用假供应商测量；只做不影响抽取结果的优化；合并小块、默认关闭思考、合并调用等影响准确率的方案交用户决定；真实复测需用户确认预算。
+
+- Codex 认领：DONE_SCOPED（按用户确认范围交付生成提速；图库与发布优化后续，真实模型验收仍待复测）；负责人 Codex；分支 `codex/extraction-perf`，隔离 worktree，基线 `ad63341`。起步时OPT-05尚未提交，按交接 §1 未编辑发布向量化文件。源工作区全部改动保留。
+- 输入：本交接、L02 报告、任务/图谱规格与 ADR-011/080/082/089/090。输出：固定 8 秒假供应商基线、逐项收益与回归测试、性能报告和 `codex-extraction-perf.md`。
+- 执行：先测量；再逐项先红测试→最小优化→复测→全量后端/basic 验证→独立本地提交。并发 4/8 先实验覆盖，再按下方用户决定改默认8；P2只做离线评估。
+- 风险/依赖：已有 Python/Node 环境、隔离 SQLite/Neo4j、本地假供应商；取消/失败阈值/接管/租约/凭据语义和模型输入保持。真实模型调用与默认配置变化须用户决定。
+- 验证：`scripts/verify/backend.sh full`、`./scripts/verify.sh`；涉及 Neo4j 写入运行 integration；最终差异检查。未推送、不开 PR、不合并。
+- 用户决定（2026-11-05）：采用保守去屏障方案，实体块优先；仅在剩余块全部失败仍不超阈值且有空位时提前派发已就绪小节，保留全部既有断言。并发/调度变更前新增确定性交错回归。
+- P1-1 已验证：新增13项确定性交错回归，与原E12合计57 PASS；全后端4270 PASS/27登记SKIP，basic PASS。均匀8秒假供应商暖轮抽取65.450→64.752秒；早关系交叠0.160秒，31次请求及归一化图摘要相同。总耗时76.157→72.491秒中图库波动不能计为调度收益；冷轮异常及复跑均保留。证据见 `evaluation/reports/extraction-perf-2026-11.md`、`docs/handoffs/codex-extraction-perf.md`。
+- 用户决定（2026-11-05）：并发8实验冷/暖轮58.901/44.871秒，抽取33.324/33.429秒、图摘要一致；批准默认 `LLM_MAX_CONCURRENCY=8`，保留环境变量覆盖，独立配置提交。真实429与准确率尚未付费复测。
+- 用户决定（2026-11-05）：本轮先交付生成提速；发布向量化登记后续待办，等待OPT-05完成提交后接续。原工作区未提交文件完全保留，本轮不碰发布相关文件。
+- 默认8落地复测：从应用缺省值读取8，冷轮52.388秒、暖轮41.172秒；抽取33.167/32.952秒，31次调用与原归一化图SHA相同。实际池上限/环境覆盖测试先1红1绿，改后连同调度/E12共59 PASS；本项全后端4272 PASS/27登记SKIP、gate PASS（1184.07秒），basic PASS。独立提交 `efb866c`；调度提交 `507f609`。
+- P1-3定位：新增逐查询PROFILE证据，SQLite锁为毫秒、图库写入已批量且命中唯一索引，主要时间在服务端首结果返回前；冷暖差异显著，未证明安全有效的生产修法。用户于2026-11-05明确决定本轮交付生成提速，图库根因与修复登记后续专项 `GRAPH-PERSIST-PERF-01`；不标为已修复。
+- 当前交付边界：生成代码两项及本地验证完成；真实≤60秒/准确率尚未付费复测，B-QUALITY-01/B-EVAL-01原验收状态不变。P1-5按用户决定后续；P2默认分块、思考、合并调用不变。性能报告含完整分解、每项收益、异常冷轮和P2调用数评估。
+
+## GRAPH-PERSIST-PERF-01：图库持久化慢段专项
+
+- 状态：OPEN（待认领，未启动）；来源：用户2026-11-05决定从EXTRACT-PERF-01转后续专项。
+- 输入：`evaluation/reports/extraction-perf-2026-11.md`、`evaluation/raw/extraction-perf/persist-profile-summary.json`及冷轮超时/续跑证据；开始前核对届时基线与相关文件所有权。
+- 范围：在可记录的负载条件下复测冷暖查询，区分规划、执行、传输与环境因素；先证明根因和可安全修复点，再实施不改图内容、DAG校验、双租约及提交围栏语义的优化。不凭冷暖差值宣称代码收益，不调大截止时间掩盖问题。
+- 验收：可复现的分步耗时与前后收益、图内容一致、相关故障回归；改代码前先补复现，改Neo4j写入时运行integration，并运行backend full及`./scripts/verify.sh`。不调用付费模型，真实复测另行确认预算。

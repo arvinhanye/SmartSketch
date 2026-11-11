@@ -1,0 +1,5061 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-11-05T15:11:43.473972+00:00",
+  "file": "datasets/demo/ch3-stack-queue.md",
+  "file_bytes": 11779,
+  "delay_seconds": 8.0,
+  "concurrency": 8,
+  "stage": "awaiting_review",
+  "error": null,
+  "worker_errors": [],
+  "task_id": "980a296f383044ba8d820f61d3d055e1",
+  "course_id": "092ae8f819a3413585824470cd1c682a",
+  "run_dir": "/Users/arvinhan/.codex/worktrees/extraction-perf/SmartSketch-main/.demo/extraction-perf/default-c8/20261105T151032Z-03b85592",
+  "neo4j_container": "smartsketch-extraction-perf-fdab6f6e9e49",
+  "neo4j_uri": "bolt://127.0.0.1:56557",
+  "provider_url": "http://127.0.0.1:56726/v1",
+  "paid_calls": 0,
+  "boundary": "TestClient upload request start to terminal task snapshot; includes initial worker idle poll",
+  "poll_seconds": 0.1,
+  "stage_rounding_uncertainty_seconds": 0.001,
+  "cold_graph_write": true,
+  "repeat_index": 0,
+  "neo4j_temperature": "cold",
+  "upload_response_seconds": 0.06649727200056077,
+  "elapsed_seconds": 52.38828663200002,
+  "initial_queue_seconds": 2.015206246001282,
+  "model_active_wall_seconds": 32.56370023999989,
+  "outside_model_calls_seconds": 19.82458639200013,
+  "model_call_count": 31,
+  "chunk_count": 16,
+  "section_count": 16,
+  "graph_counts": {
+    "knowledge_points": 64,
+    "relations": 71
+  },
+  "normalized_graph": {
+    "sha256": "10e6daa4a44c8c92db353b50390d5c4e48c43bf9733f818890f01e8845e37ce2",
+    "nodes": [
+      {
+        "name": "双端队列",
+        "type": "concept",
+        "definition": "双端队列是允许在两端都进行插入和删除的线性表。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 9,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.4 双端队列"
+            ],
+            "text_sha256": "88acb29da8361affcd0d05d224e411bb6d0df088eb4f820a4aa82387d0c2d8dc",
+            "evidence_start": 0,
+            "evidence_end": 36
+          }
+        ]
+      },
+      {
+        "name": "栈",
+        "type": "concept",
+        "definition": "课程资料中「3.2 栈」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 0,
+            "evidence_end": 33
+          },
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296",
+            "evidence_start": 0,
+            "evidence_end": 34
+          },
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 0,
+            "evidence_end": 35
+          },
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 0,
+            "evidence_end": 38
+          }
+        ]
+      },
+      {
+        "name": "栈的定义",
+        "type": "concept",
+        "definition": "课程资料中「3.2.1 栈的定义」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 0,
+            "evidence_end": 35
+          }
+        ]
+      },
+      {
+        "name": "链栈",
+        "type": "concept",
+        "definition": "课程资料中「3.2.3 链栈」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 0,
+            "evidence_end": 33
+          }
+        ]
+      },
+      {
+        "name": "出栈序列的性质",
+        "type": "theorem",
+        "definition": "课程资料中「3.2.4 出栈序列的性质」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 0,
+            "evidence_end": 38
+          }
+        ]
+      },
+      {
+        "name": "队列",
+        "type": "concept",
+        "definition": "课程资料中「3.3 队列」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a",
+            "evidence_start": 0,
+            "evidence_end": 35
+          },
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 0,
+            "evidence_end": 36
+          },
+          {
+            "ordinal": 9,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.4 双端队列"
+            ],
+            "text_sha256": "88acb29da8361affcd0d05d224e411bb6d0df088eb4f820a4aa82387d0c2d8dc",
+            "evidence_start": 0,
+            "evidence_end": 36
+          },
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 0,
+            "evidence_end": 37
+          },
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490",
+            "evidence_start": 0,
+            "evidence_end": 39
+          }
+        ]
+      },
+      {
+        "name": "队列的定义",
+        "type": "concept",
+        "definition": "课程资料中「3.3.1 队列的定义」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 0,
+            "evidence_end": 37
+          }
+        ]
+      },
+      {
+        "name": "链队列",
+        "type": "concept",
+        "definition": "课程资料中「3.3.3 链队列」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a",
+            "evidence_start": 0,
+            "evidence_end": 35
+          }
+        ]
+      },
+      {
+        "name": "栈与队列的比较",
+        "type": "concept",
+        "definition": "课程资料中「3.3.5 栈与队列的比较」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490",
+            "evidence_start": 0,
+            "evidence_end": 39
+          }
+        ]
+      },
+      {
+        "name": "栈的应用",
+        "type": "concept",
+        "definition": "课程资料中「3.4 栈的应用」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd",
+            "evidence_start": 0,
+            "evidence_end": 38
+          },
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 0,
+            "evidence_end": 38
+          },
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 0,
+            "evidence_end": 45
+          }
+        ]
+      },
+      {
+        "name": "括号匹配",
+        "type": "concept",
+        "definition": "课程资料中「3.4.1 括号匹配」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd",
+            "evidence_start": 0,
+            "evidence_end": 38
+          }
+        ]
+      },
+      {
+        "name": "中缀表达式与后缀表达式",
+        "type": "formula",
+        "definition": "课程资料中「3.4.2 中缀表达式与后缀表达式」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 0,
+            "evidence_end": 45
+          }
+        ]
+      },
+      {
+        "name": "递归与栈",
+        "type": "concept",
+        "definition": "课程资料中「3.4.3 递归与栈」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 0,
+            "evidence_end": 38
+          }
+        ]
+      },
+      {
+        "name": "队列的应用",
+        "type": "concept",
+        "definition": "课程资料中「3.5 队列的应用」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 14,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.5 队列的应用"
+            ],
+            "text_sha256": "be1e8d3e2e5ca77f93ed53400fdc4ce92872e74258612e717f3957138846394f",
+            "evidence_start": 0,
+            "evidence_end": 26
+          }
+        ]
+      },
+      {
+        "name": "栈与队列",
+        "type": "concept",
+        "definition": "课程资料中「第3章 栈与队列」一节的主题。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 0,
+            "section_titles": [
+              "第3章 栈与队列"
+            ],
+            "text_sha256": "11485f7b96a1d03837d62d4921f68d9b38d0f104dd5779f28b6754c316a4aeb0",
+            "evidence_start": 0,
+            "evidence_end": 14
+          },
+          {
+            "ordinal": 1,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.1 本章导读"
+            ],
+            "text_sha256": "362bb7282be7fc2fcce240210ffba330fd4009c67cb9bb38455392ca6ba5294b",
+            "evidence_start": 0,
+            "evidence_end": 25
+          },
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d",
+            "evidence_start": 0,
+            "evidence_end": 25
+          },
+          {
+            "ordinal": 14,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.5 队列的应用"
+            ],
+            "text_sha256": "be1e8d3e2e5ca77f93ed53400fdc4ce92872e74258612e717f3957138846394f",
+            "evidence_start": 0,
+            "evidence_end": 26
+          },
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 0,
+            "evidence_end": 33
+          },
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296",
+            "evidence_start": 0,
+            "evidence_end": 34
+          },
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 0,
+            "evidence_end": 35
+          },
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a",
+            "evidence_start": 0,
+            "evidence_end": 35
+          },
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 0,
+            "evidence_end": 36
+          },
+          {
+            "ordinal": 9,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.4 双端队列"
+            ],
+            "text_sha256": "88acb29da8361affcd0d05d224e411bb6d0df088eb4f820a4aa82387d0c2d8dc",
+            "evidence_start": 0,
+            "evidence_end": 36
+          },
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 0,
+            "evidence_end": 37
+          },
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd",
+            "evidence_start": 0,
+            "evidence_end": 38
+          },
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 0,
+            "evidence_end": 38
+          },
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 0,
+            "evidence_end": 38
+          },
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490",
+            "evidence_start": 0,
+            "evidence_end": 39
+          },
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 0,
+            "evidence_end": 45
+          }
+        ]
+      },
+      {
+        "name": "栈在程序运行时",
+        "type": "concept",
+        "definition": "递归工作栈是栈在程序运行时的典型应用，理解递归的执行过程要以栈为基础。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 120,
+            "evidence_end": 155
+          }
+        ]
+      },
+      {
+        "name": "顺序栈",
+        "type": "concept",
+        "definition": "顺序栈用一个数组 data[0..MaxSize-1] 存放元素，并用整型变量 top 指示栈顶元素的下标。",
+        "confidence": 0.5,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296",
+            "evidence_start": 0,
+            "evidence_end": 34
+          }
+        ]
+      },
+      {
+        "name": "线性表的顺序存储与链式存储",
+        "type": "concept",
+        "definition": "学习本章之前需要先掌握线性表的顺序存储与链式存储，因为栈和队列的两种实现方式都直接沿用这两种存储结构。",
+        "confidence": 0.6,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 1,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.1 本章导读"
+            ],
+            "text_sha256": "362bb7282be7fc2fcce240210ffba330fd4009c67cb9bb38455392ca6ba5294b",
+            "evidence_start": 42,
+            "evidence_end": 93
+          }
+        ]
+      },
+      {
+        "name": "掌握后缀表达式的写法",
+        "type": "concept",
+        "definition": "掌握后缀表达式的写法是学习后缀表达式求值算法的前提。",
+        "confidence": 0.6,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 558,
+            "evidence_end": 584
+          }
+        ]
+      },
+      {
+        "name": "空栈",
+        "type": "concept",
+        "definition": "不含任何元素的栈称为空栈。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 93,
+            "evidence_end": 106
+          }
+        ]
+      },
+      {
+        "name": "中缀转后缀算法",
+        "type": "method",
+        "definition": "中缀转后缀算法：从左到右扫描中缀表达式，操作数直接输出；",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 246,
+            "evidence_end": 278
+          }
+        ]
+      },
+      {
+        "name": "共享栈",
+        "type": "concept",
+        "definition": "为了提高空间利用率，可以让两个栈共享同一个数组，两个栈底分别设在数组两端，栈顶相向增长，这种结构称为共享栈。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296",
+            "evidence_start": 261,
+            "evidence_end": 315
+          }
+        ]
+      },
+      {
+        "name": "例 3-1（出栈序列判断",
+        "type": "concept",
+        "definition": "例 3-1（出栈序列判断）：元素 1、2、3 依次入栈，判断 3 1 2 是否为合法出栈序列。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 534,
+            "evidence_end": 585
+          }
+        ]
+      },
+      {
+        "name": "例 3-2（循环队列指针变化",
+        "type": "concept",
+        "definition": "例 3-2（循环队列指针变化）：设 MaxSize = 6，初始 front = rear = 0。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 634,
+            "evidence_end": 688
+          }
+        ]
+      },
+      {
+        "name": "例 3-3（括号匹配",
+        "type": "concept",
+        "definition": "例 3-3（括号匹配）：检查串 [(]) 时，读到 ] 时栈顶是 (，类型不符，匹配失败；",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd",
+            "evidence_start": 176,
+            "evidence_end": 225
+          }
+        ]
+      },
+      {
+        "name": "例 3-4（表达式求值",
+        "type": "concept",
+        "definition": "例 3-4（表达式求值）：求中缀表达式 (3 + 4) * 2 - 6 / 3 的值。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 726,
+            "evidence_end": 773
+          }
+        ]
+      },
+      {
+        "name": "例 3-5（阶乘的递归计算",
+        "type": "concept",
+        "definition": "例 3-5（阶乘的递归计算）：计算 3!",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 317,
+            "evidence_end": 341
+          }
+        ]
+      },
+      {
+        "name": "例 3-6（银行排队模拟",
+        "type": "concept",
+        "definition": "例 3-6（银行排队模拟）：银行只有一个窗口，顾客按到达时间依次入队，窗口空闲时让队头顾客出队办理业务。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 14,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.5 队列的应用"
+            ],
+            "text_sha256": "be1e8d3e2e5ca77f93ed53400fdc4ce92872e74258612e717f3957138846394f",
+            "evidence_start": 176,
+            "evidence_end": 232
+          }
+        ]
+      },
+      {
+        "name": "递归转非递归",
+        "type": "concept",
+        "definition": "借助显式的栈保存待处理的状态，可以把递归算法改写为非递归算法，这种做法称为递归转非递归。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 232,
+            "evidence_end": 276
+          }
+        ]
+      },
+      {
+        "name": "队头",
+        "type": "concept",
+        "definition": "允许插入的一端称为队尾，允许删除的一端称为队头。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 77,
+            "evidence_end": 101
+          }
+        ]
+      },
+      {
+        "name": "队尾",
+        "type": "concept",
+        "definition": "允许插入的一端称为队尾，允许删除的一端称为队头。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 77,
+            "evidence_end": 101
+          }
+        ]
+      },
+      {
+        "name": "栈底",
+        "type": "concept",
+        "definition": "允许操作的一端称为栈顶，另一端称为栈底。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 73,
+            "evidence_end": 93
+          }
+        ]
+      },
+      {
+        "name": "栈顶",
+        "type": "concept",
+        "definition": "允许操作的一端称为栈顶，另一端称为栈底。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 73,
+            "evidence_end": 93
+          }
+        ]
+      },
+      {
+        "name": "后缀表达式求值算法",
+        "type": "method",
+        "definition": "后缀表达式求值算法：从左到右扫描后缀表达式，遇到操作数就入栈；",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 455,
+            "evidence_end": 490
+          }
+        ]
+      },
+      {
+        "name": "定理 3.1（出栈序列计数定理",
+        "type": "concept",
+        "definition": "定理 3.1（出栈序列计数定理）：n 个不同元素依次入栈，可能得到的不同出栈序列的个数等于第 n 个卡特兰数。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 301,
+            "evidence_end": 360
+          }
+        ]
+      },
+      {
+        "name": "性质 3.1（合法出栈序列判定",
+        "type": "concept",
+        "definition": "性质 3.1（合法出栈序列判定）：一个排列 p1 p2 … pn 是合法出栈序列，当且仅当不存在下标 i < j < k 使得 pj < pk < pi。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 137,
+            "evidence_end": 218
+          }
+        ]
+      },
+      {
+        "name": "性质 3.2（循环队列判空与判满",
+        "type": "concept",
+        "definition": "性质 3.2（循环队列判空与判满）：约定 front 指向队头元素、rear 指向队尾元素的下一个位置，并牺牲一个存储单元，则队空的条件是 front == rear，队满的条件是 (rear + 1) % MaxSize == front。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 429,
+            "evidence_end": 554
+          }
+        ]
+      },
+      {
+        "name": "后缀表达式",
+        "type": "formula",
+        "definition": "把运算符放在两个操作数之后的写法称为后缀表达式，也叫逆波兰式，例如 a b c * +。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 118,
+            "evidence_end": 162
+          }
+        ]
+      },
+      {
+        "name": "中缀表达式",
+        "type": "formula",
+        "definition": "日常书写的算术表达式把运算符放在两个操作数中间，称为中缀表达式，例如 a + b * c。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 46,
+            "evidence_end": 91
+          }
+        ]
+      },
+      {
+        "name": "假溢出",
+        "type": "concept",
+        "definition": "若每次出队都只让 front 后移，数组前部腾出的空间将无法再利用，可能出现 rear 已到数组末尾而数组前部仍有空位的情况，这种现象称为假溢出。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 70,
+            "evidence_end": 143
+          }
+        ]
+      },
+      {
+        "name": "递归工作栈",
+        "type": "example",
+        "definition": "递归工作栈是栈在程序运行时的典型应用，理解递归的执行过程要以栈为基础。",
+        "confidence": 0.7,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 120,
+            "evidence_end": 155
+          }
+        ]
+      },
+      {
+        "name": "不含任何元素的栈",
+        "type": "concept",
+        "definition": "不含任何元素的栈称为空栈。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 93,
+            "evidence_end": 106
+          }
+        ]
+      },
+      {
+        "name": "为了提高空间",
+        "type": "concept",
+        "definition": "为了提高空间利用率，可以让两个栈共享同一个数组，两个栈底分别设在数组两端，栈顶相向增长，这种结构称为共享栈。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296",
+            "evidence_start": 261,
+            "evidence_end": 315
+          }
+        ]
+      },
+      {
+        "name": "也可以改",
+        "type": "concept",
+        "definition": "也可以改用计数变量 size 来区分。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 576,
+            "evidence_end": 595
+          }
+        ]
+      },
+      {
+        "name": "也就",
+        "type": "concept",
+        "definition": "也就是说，若某个较大的元素先出栈，则比它小且仍在栈中的元素必须按从大到小的顺序出栈。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7",
+            "evidence_start": 218,
+            "evidence_end": 260
+          }
+        ]
+      },
+      {
+        "name": "代价",
+        "type": "concept",
+        "definition": "代价是每个结点需要额外的指针域。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 115,
+            "evidence_end": 131
+          }
+        ]
+      },
+      {
+        "name": "允许插入的一端",
+        "type": "concept",
+        "definition": "允许插入的一端称为队尾，允许删除的一端称为队头。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 77,
+            "evidence_end": 101
+          }
+        ]
+      },
+      {
+        "name": "允许操作的一端",
+        "type": "concept",
+        "definition": "允许操作的一端称为栈顶，另一端称为栈底。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c",
+            "evidence_start": 73,
+            "evidence_end": 93
+          }
+        ]
+      },
+      {
+        "name": "入队",
+        "type": "method",
+        "definition": "入队是在队尾插入元素，出队是删除队头元素。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056",
+            "evidence_start": 252,
+            "evidence_end": 273
+          }
+        ]
+      },
+      {
+        "name": "凡",
+        "type": "concept",
+        "definition": "凡是需要“按到达先后依次处理”的场合，例如任务排队、消息缓冲和逐层访问，适合用队列。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490",
+            "evidence_start": 226,
+            "evidence_end": 268
+          }
+        ]
+      },
+      {
+        "name": "扫描结束时栈中唯一的元素就",
+        "type": "concept",
+        "definition": "扫描结束时栈中唯一的元素就是表达式的值。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 538,
+            "evidence_end": 558
+          }
+        ]
+      },
+      {
+        "name": "把运算符放在两个操作数之后的写法",
+        "type": "concept",
+        "definition": "把运算符放在两个操作数之后的写法称为后缀表达式，也叫逆波兰式，例如 a b c * +。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 118,
+            "evidence_end": 162
+          }
+        ]
+      },
+      {
+        "name": "日常书写的算术表达式",
+        "type": "formula",
+        "definition": "日常书写的算术表达式把运算符放在两个操作数中间，称为中缀表达式，例如 a + b * c。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf",
+            "evidence_start": 46,
+            "evidence_end": 91
+          }
+        ]
+      },
+      {
+        "name": "栈和队列",
+        "type": "concept",
+        "definition": "栈和队列是两种操作受限的线性表。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 1,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.1 本章导读"
+            ],
+            "text_sha256": "362bb7282be7fc2fcce240210ffba330fd4009c67cb9bb38455392ca6ba5294b",
+            "evidence_start": 26,
+            "evidence_end": 42
+          }
+        ]
+      },
+      {
+        "name": "栈和队列都",
+        "type": "concept",
+        "definition": "栈和队列都是操作受限的线性表：栈限定在栈顶操作，具有后进先出特性；",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d",
+            "evidence_start": 26,
+            "evidence_end": 59
+          }
+        ]
+      },
+      {
+        "name": "栈的典型应",
+        "type": "concept",
+        "definition": "栈的典型应用包括括号匹配、表达式求值和递归，队列的典型应用包括排队服务与广度优先遍历。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d",
+            "evidence_start": 114,
+            "evidence_end": 157
+          }
+        ]
+      },
+      {
+        "name": "牺牲一个单元",
+        "type": "concept",
+        "definition": "牺牲一个单元是为了区分队空和队满这两种状态；",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 554,
+            "evidence_end": 576
+          }
+        ]
+      },
+      {
+        "name": "循环队列",
+        "type": "concept",
+        "definition": "课程资料中「3.3.2 循环队列」一节的主题。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d",
+            "evidence_start": 95,
+            "evidence_end": 114
+          },
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119",
+            "evidence_start": 0,
+            "evidence_end": 36
+          }
+        ]
+      },
+      {
+        "name": "选择使",
+        "type": "concept",
+        "definition": "选择使用哪一种结构，关键是看问题要求的处理次序：凡是需要“暂存后逆序处理”的场合，例如撤销操作、回溯搜索和函数调用，适合用栈；",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490",
+            "evidence_start": 163,
+            "evidence_end": 226
+          }
+        ]
+      },
+      {
+        "name": "递归",
+        "type": "concept",
+        "definition": "递归是指函数在执行过程中直接或间接调用自身。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8",
+            "evidence_start": 39,
+            "evidence_end": 61
+          }
+        ]
+      },
+      {
+        "name": "采",
+        "type": "concept",
+        "definition": "采用顺序存储的栈称为顺序栈。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 34,
+            "evidence_end": 47
+          },
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296",
+            "evidence_start": 35,
+            "evidence_end": 49
+          },
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a",
+            "evidence_start": 36,
+            "evidence_end": 71
+          }
+        ]
+      },
+      {
+        "name": "链栈的优点",
+        "type": "concept",
+        "definition": "链栈的优点是不存在上溢问题，便于多个栈共享存储空间；",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 89,
+            "evidence_end": 115
+          }
+        ]
+      },
+      {
+        "name": "链栈通常",
+        "type": "concept",
+        "definition": "链栈通常用不带头结点的单链表实现，并规定所有操作都在表头进行，表头指针就是栈顶指针。",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5",
+            "evidence_start": 47,
+            "evidence_end": 89
+          }
+        ]
+      },
+      {
+        "name": "顺序存储的优点",
+        "type": "concept",
+        "definition": "顺序存储的优点是结构简单、访问局部性好，缺点是容量需要事先确定；",
+        "confidence": 0.8,
+        "status": "draft",
+        "aliases": [],
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490",
+            "evidence_start": 334,
+            "evidence_end": 366
+          }
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "from_name": "凡",
+        "from_type": "concept",
+        "to_name": "队列",
+        "to_type": "concept",
+        "type": "RELATED_TO",
+        "confidence": 0.5,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          }
+        ]
+      },
+      {
+        "from_name": "线性表的顺序存储与链式存储",
+        "from_type": "concept",
+        "to_name": "栈和队列",
+        "to_type": "concept",
+        "type": "RELATED_TO",
+        "confidence": 0.5,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 1,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.1 本章导读"
+            ],
+            "text_sha256": "362bb7282be7fc2fcce240210ffba330fd4009c67cb9bb38455392ca6ba5294b"
+          }
+        ]
+      },
+      {
+        "from_name": "选择使",
+        "from_type": "concept",
+        "to_name": "凡",
+        "to_type": "concept",
+        "type": "RELATED_TO",
+        "confidence": 0.5,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          }
+        ]
+      },
+      {
+        "from_name": "队列",
+        "from_type": "concept",
+        "to_name": "入队",
+        "to_type": "method",
+        "type": "RELATED_TO",
+        "confidence": 0.5,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "中缀表达式",
+        "to_type": "formula",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "中缀转后缀算法",
+        "to_type": "method",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "例 3-4（表达式求值",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "后缀表达式",
+        "to_type": "formula",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "后缀表达式求值算法",
+        "to_type": "method",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "扫描结束时栈中唯一的元素就",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "把运算符放在两个操作数之后的写法",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "掌握后缀表达式的写法",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "中缀表达式与后缀表达式",
+        "from_type": "formula",
+        "to_name": "日常书写的算术表达式",
+        "to_type": "formula",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "出栈序列的性质",
+        "from_type": "theorem",
+        "to_name": "也就",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7"
+          }
+        ]
+      },
+      {
+        "from_name": "出栈序列的性质",
+        "from_type": "theorem",
+        "to_name": "例 3-1（出栈序列判断",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7"
+          }
+        ]
+      },
+      {
+        "from_name": "出栈序列的性质",
+        "from_type": "theorem",
+        "to_name": "定理 3.1（出栈序列计数定理",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7"
+          }
+        ]
+      },
+      {
+        "from_name": "出栈序列的性质",
+        "from_type": "theorem",
+        "to_name": "性质 3.1（合法出栈序列判定",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7"
+          }
+        ]
+      },
+      {
+        "from_name": "循环队列",
+        "from_type": "concept",
+        "to_name": "也可以改",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          }
+        ]
+      },
+      {
+        "from_name": "循环队列",
+        "from_type": "concept",
+        "to_name": "例 3-2（循环队列指针变化",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          }
+        ]
+      },
+      {
+        "from_name": "循环队列",
+        "from_type": "concept",
+        "to_name": "假溢出",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          }
+        ]
+      },
+      {
+        "from_name": "循环队列",
+        "from_type": "concept",
+        "to_name": "性质 3.2（循环队列判空与判满",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          }
+        ]
+      },
+      {
+        "from_name": "循环队列",
+        "from_type": "concept",
+        "to_name": "牺牲一个单元",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          }
+        ]
+      },
+      {
+        "from_name": "括号匹配",
+        "from_type": "concept",
+        "to_name": "例 3-3（括号匹配",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "栈和队列",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 1,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.1 本章导读"
+            ],
+            "text_sha256": "362bb7282be7fc2fcce240210ffba330fd4009c67cb9bb38455392ca6ba5294b"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "线性表的顺序存储与链式存储",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 1,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.1 本章导读"
+            ],
+            "text_sha256": "362bb7282be7fc2fcce240210ffba330fd4009c67cb9bb38455392ca6ba5294b"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "循环队列",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "栈和队列都",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "栈的典型应",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 15,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.6 本章小结"
+            ],
+            "text_sha256": "2f92e12e1e16c3272165b46632f9fbca8d29948f2487db8de88f7eecc156499d"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列的比较",
+        "from_type": "concept",
+        "to_name": "凡",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列的比较",
+        "from_type": "concept",
+        "to_name": "选择使",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列的比较",
+        "from_type": "concept",
+        "to_name": "顺序存储的优点",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的定义",
+        "from_type": "concept",
+        "to_name": "不含任何元素的栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的定义",
+        "from_type": "concept",
+        "to_name": "允许操作的一端",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的定义",
+        "from_type": "concept",
+        "to_name": "栈底",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的定义",
+        "from_type": "concept",
+        "to_name": "栈顶",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的定义",
+        "from_type": "concept",
+        "to_name": "空栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          }
+        ]
+      },
+      {
+        "from_name": "递归与栈",
+        "from_type": "concept",
+        "to_name": "例 3-5（阶乘的递归计算",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "递归与栈",
+        "from_type": "concept",
+        "to_name": "栈在程序运行时",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "递归与栈",
+        "from_type": "concept",
+        "to_name": "递归",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "递归与栈",
+        "from_type": "concept",
+        "to_name": "递归转非递归",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "链栈",
+        "from_type": "concept",
+        "to_name": "代价",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5"
+          }
+        ]
+      },
+      {
+        "from_name": "链栈",
+        "from_type": "concept",
+        "to_name": "采",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5"
+          }
+        ]
+      },
+      {
+        "from_name": "链栈",
+        "from_type": "concept",
+        "to_name": "链栈的优点",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5"
+          }
+        ]
+      },
+      {
+        "from_name": "链栈",
+        "from_type": "concept",
+        "to_name": "链栈通常",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5"
+          }
+        ]
+      },
+      {
+        "from_name": "链队列",
+        "from_type": "concept",
+        "to_name": "采",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a"
+          }
+        ]
+      },
+      {
+        "from_name": "队列的定义",
+        "from_type": "concept",
+        "to_name": "允许插入的一端",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          }
+        ]
+      },
+      {
+        "from_name": "队列的定义",
+        "from_type": "concept",
+        "to_name": "入队",
+        "to_type": "method",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          }
+        ]
+      },
+      {
+        "from_name": "队列的定义",
+        "from_type": "concept",
+        "to_name": "队头",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          }
+        ]
+      },
+      {
+        "from_name": "队列的定义",
+        "from_type": "concept",
+        "to_name": "队尾",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          }
+        ]
+      },
+      {
+        "from_name": "队列的应用",
+        "from_type": "concept",
+        "to_name": "例 3-6（银行排队模拟",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 14,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.5 队列的应用"
+            ],
+            "text_sha256": "be1e8d3e2e5ca77f93ed53400fdc4ce92872e74258612e717f3957138846394f"
+          }
+        ]
+      },
+      {
+        "from_name": "顺序栈",
+        "from_type": "concept",
+        "to_name": "为了提高空间",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296"
+          }
+        ]
+      },
+      {
+        "from_name": "顺序栈",
+        "from_type": "concept",
+        "to_name": "共享栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296"
+          }
+        ]
+      },
+      {
+        "from_name": "顺序栈",
+        "from_type": "concept",
+        "to_name": "采",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.6,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296"
+          }
+        ]
+      },
+      {
+        "from_name": "栈",
+        "from_type": "concept",
+        "to_name": "栈的定义",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          }
+        ]
+      },
+      {
+        "from_name": "栈",
+        "from_type": "concept",
+        "to_name": "顺序栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296"
+          }
+        ]
+      },
+      {
+        "from_name": "栈",
+        "from_type": "concept",
+        "to_name": "链栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5"
+          }
+        ]
+      },
+      {
+        "from_name": "栈",
+        "from_type": "concept",
+        "to_name": "出栈序列的性质",
+        "to_type": "theorem",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "队列",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          },
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          },
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          },
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a"
+          },
+          {
+            "ordinal": 9,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.4 双端队列"
+            ],
+            "text_sha256": "88acb29da8361affcd0d05d224e411bb6d0df088eb4f820a4aa82387d0c2d8dc"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "栈的应用",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd"
+          },
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          },
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "队列的应用",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 14,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.5 队列的应用"
+            ],
+            "text_sha256": "be1e8d3e2e5ca77f93ed53400fdc4ce92872e74258612e717f3957138846394f"
+          }
+        ]
+      },
+      {
+        "from_name": "栈与队列",
+        "from_type": "concept",
+        "to_name": "栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 2,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.1 栈的定义"
+            ],
+            "text_sha256": "f2d42e290bd8152e56b74f56e3d4c8bb9ae8b852a9ea528cda29481bf6eacb0c"
+          },
+          {
+            "ordinal": 3,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.2 顺序栈"
+            ],
+            "text_sha256": "794b009d32be9c0439a72e53b2e2b95fcc34e71ddff7f892c2b055b200cb1296"
+          },
+          {
+            "ordinal": 4,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.3 链栈"
+            ],
+            "text_sha256": "49f9acf6238158f8b4a6f0fe88168b31d5b13f6fb438a4448fbd6e73f7be53c5"
+          },
+          {
+            "ordinal": 5,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.2 栈",
+              "3.2.4 出栈序列的性质"
+            ],
+            "text_sha256": "031beb43edc39cd6d4824554247803af12d2fe724e30513ac35504a5f66f2bf7"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的应用",
+        "from_type": "concept",
+        "to_name": "括号匹配",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 11,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.1 括号匹配"
+            ],
+            "text_sha256": "db7ff0dda627cab12a1b6fe34cbddaadae73e1c2682111b1bab52e1c09f505fd"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的应用",
+        "from_type": "concept",
+        "to_name": "中缀表达式与后缀表达式",
+        "to_type": "formula",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      },
+      {
+        "from_name": "栈的应用",
+        "from_type": "concept",
+        "to_name": "递归与栈",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "递归工作栈",
+        "from_type": "example",
+        "to_name": "栈在程序运行时",
+        "to_type": "concept",
+        "type": "EXAMPLE_OF",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 13,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.3 递归与栈"
+            ],
+            "text_sha256": "88a0f58f7df4e9f577b51d3e4335a9fc81f707f08d2b6ff648fd745dab8ae0b8"
+          }
+        ]
+      },
+      {
+        "from_name": "队列",
+        "from_type": "concept",
+        "to_name": "栈与队列的比较",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 10,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.5 栈与队列的比较"
+            ],
+            "text_sha256": "41e0ca099fad6eec27b973181653ff477f0086cc229e0a172fae717ea7cd3490"
+          }
+        ]
+      },
+      {
+        "from_name": "队列",
+        "from_type": "concept",
+        "to_name": "队列的定义",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 6,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.1 队列的定义"
+            ],
+            "text_sha256": "58e3e3de54d98688e45b87527b0d325c1fbed2ab1110baa0810931ca9ef2e056"
+          }
+        ]
+      },
+      {
+        "from_name": "队列",
+        "from_type": "concept",
+        "to_name": "循环队列",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 7,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.2 循环队列"
+            ],
+            "text_sha256": "77a731fb3eb0c782339c6abb2c86241c26269cac0dc86be32a6bf7feeda62119"
+          }
+        ]
+      },
+      {
+        "from_name": "队列",
+        "from_type": "concept",
+        "to_name": "链队列",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 8,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.3 链队列"
+            ],
+            "text_sha256": "bb88def3a733bd5e6582231b81bff02bf030c5ba3c6832c2e28c4687be27353a"
+          }
+        ]
+      },
+      {
+        "from_name": "队列",
+        "from_type": "concept",
+        "to_name": "双端队列",
+        "to_type": "concept",
+        "type": "CONTAINS",
+        "confidence": 0.7,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 9,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.3 队列",
+              "3.3.4 双端队列"
+            ],
+            "text_sha256": "88acb29da8361affcd0d05d224e411bb6d0df088eb4f820a4aa82387d0c2d8dc"
+          }
+        ]
+      },
+      {
+        "from_name": "掌握后缀表达式的写法",
+        "from_type": "concept",
+        "to_name": "后缀表达式求值算法",
+        "to_type": "method",
+        "type": "PREREQUISITE",
+        "confidence": 0.8,
+        "status": "draft",
+        "source": "ai",
+        "sources": [
+          {
+            "ordinal": 12,
+            "section_titles": [
+              "第3章 栈与队列",
+              "3.4 栈的应用",
+              "3.4.2 中缀表达式与后缀表达式"
+            ],
+            "text_sha256": "8a7c74c646afbac03d8940daefbbf828d0c3820b26a9d428ed7c1106a8a52bbf"
+          }
+        ]
+      }
+    ]
+  },
+  "purpose_timings": {
+    "extract_entities": {
+      "calls": 16,
+      "first_start_seconds": 2.306091312000717,
+      "last_end_seconds": 18.730659186001503,
+      "span_seconds": 16.424567874000786,
+      "active_wall_seconds": 16.290037582000878,
+      "summed_seconds": 128.15489329599768
+    },
+    "extract_relations": {
+      "calls": 15,
+      "first_start_seconds": 18.93152043200098,
+      "last_end_seconds": 35.20518308999999,
+      "span_seconds": 16.27366265799901,
+      "active_wall_seconds": 16.27366265799901,
+      "summed_seconds": 120.11166628500177
+    }
+  },
+  "entity_relation_union_seconds": 32.56370023999989,
+  "entity_relation_overlap_seconds": 0.0,
+  "source_revision": "507f6094e2b2a7dacadd3b69e9dd67e9a22cb32b",
+  "source_sha256": {
+    "src/backend/app/workers/extract_task.py": "4a99a62b555db98187b0a535e445c7be7d0ec7d841c678cd327c20d5959592f6",
+    "src/backend/app/workers/persist_graph.py": "ed9de538c2d8e6528806be725186e3c9b74f8d07b7568154d414a5e0078672ef",
+    "src/backend/app/workers/runner.py": "a02e358bb0fd381c68872c65d7c3de305b9b506c5486fae0dc67290305d45c49",
+    "scripts/fake_provider.py": "efc90ba8cd7e307e3dfa5d0aa00a6db9f2b8ef995e89cdf4f6fe5b73f39e2c93"
+  },
+  "source_captured_at": "2026-11-05T15:10:36.364624+00:00",
+  "source_identity": "imported baseline (same cached modules for all repetitions)",
+  "source_changed_during_measurement": false,
+  "effective_settings": {
+    "LLM_MODE": "personal",
+    "EMBEDDING_MODE": "demo",
+    "LLM_REQUEST_TIMEOUT_SECONDS": 60.0,
+    "LLM_MAX_CONCURRENCY": 8,
+    "LLM_MAX_RETRIES": 2,
+    "LLM_TASK_TOKEN_BUDGET": 500000,
+    "LLM_DAILY_TOKEN_BUDGET": 5000000,
+    "TASK_MAX_FAILED_CHUNK_RATIO": 0.2,
+    "TASK_LEASE_SECONDS": 60,
+    "TASK_PERSIST_COMMIT_TIMEOUT_SECONDS": 2.0,
+    "TASK_PERSIST_CLEANUP_TIMEOUT_SECONDS": 1.0,
+    "TASK_MAX_ATTEMPTS": 3,
+    "TASK_CHUNK_MAX_ATTEMPTS": 2
+  },
+  "host_load_average": [
+    70.6669921875,
+    70.67236328125,
+    49.04296875
+  ],
+  "concurrent_work_note": "Default8 focused tests initially running; other independent local OPT Docker and test workloads uncontrolled",
+  "chunk_to_section_gap_seconds": 0.032413015000201995,
+  "stage_handoffs": [
+    {
+      "from": "parsing",
+      "to": "extracting",
+      "gap_seconds": 0.00020917599923109265
+    },
+    {
+      "from": "extracting",
+      "to": "merging",
+      "gap_seconds": 0.0004859390006188846
+    },
+    {
+      "from": "merging",
+      "to": "persisting",
+      "gap_seconds": -8.980999510299625e-06
+    }
+  ],
+  "stages": [
+    {
+      "kind": "stage",
+      "ended_seconds": 2.083206246001282,
+      "task_id": "980a296f383044ba8d820f61d3d055e1",
+      "stage": "parsing",
+      "status": "advanced",
+      "duration_ms": 68,
+      "started_seconds": 2.015206246001282
+    },
+    {
+      "kind": "stage",
+      "ended_seconds": 35.250415422000515,
+      "task_id": "980a296f383044ba8d820f61d3d055e1",
+      "stage": "extracting",
+      "status": "advanced",
+      "duration_ms": 33167,
+      "started_seconds": 2.083415422000513
+    },
+    {
+      "kind": "stage",
+      "ended_seconds": 35.25790136100113,
+      "task_id": "980a296f383044ba8d820f61d3d055e1",
+      "stage": "merging",
+      "status": "advanced",
+      "duration_ms": 7,
+      "started_seconds": 35.250901361001134
+    },
+    {
+      "kind": "stage",
+      "ended_seconds": 52.34989238000162,
+      "task_id": "980a296f383044ba8d820f61d3d055e1",
+      "stage": "persisting",
+      "status": "advanced",
+      "duration_ms": 17092,
+      "started_seconds": 35.25789238000162
+    }
+  ],
+  "persist_steps": [
+    {
+      "kind": "persist_steps",
+      "at_seconds": 52.34981204600081,
+      "task_id": "980a296f383044ba8d820f61d3d055e1",
+      "outcome": "advanced",
+      "candidates_ms": 17,
+      "plan_ms": 3,
+      "chunks_ms": 5,
+      "lock_wait_ms": 4,
+      "lease_check_ms": 8,
+      "t6_ms": 273,
+      "neo4j_ms": 17047,
+      "lock_release_ms": 6,
+      "neo4j_attempts": 1,
+      "total_ms": 17092
+    }
+  ],
+  "neo4j_operations": [
+    {
+      "operation": "open",
+      "started_seconds": 35.29613098000118,
+      "status": "ok",
+      "ended_seconds": 35.32802311600062,
+      "duration_seconds": 0.03189213599944196
+    },
+    {
+      "operation": "run",
+      "query_sha256": "821b3b6fe0bd13b99513204f00f1a707f901f0ec2394d487347fd5e9f8930995",
+      "query_template": "MERGE (g:DraftWriteGuard {course_id: $course_id, version_id: $version_id}) SET g.seq = coalesce(g.seq, 0) + 1 RETURN g.seq AS seq, size($effective_task_ids) AS visible_tasks",
+      "query_label": "app.repositories.graph_relations._LOCK",
+      "started_seconds": 35.32811399000093,
+      "status": "ok",
+      "result_rows": 1,
+      "ended_seconds": 36.61799071600035,
+      "duration_seconds": 1.2898767259994202
+    },
+    {
+      "operation": "run",
+      "query_sha256": "c4809eecbdb678eae35a4e3984deb21381a68a03a5eeadab6e8457d181716bad",
+      "query_template": "MATCH (:KnowledgePoint {course_id: $course_id, version_id: $version_id}) -[r {course_id: $course_id, version_id: $version_id}]-> (:KnowledgePoint {course_id: $course_id, version_id: $version_id}) WHERE $task_id IN coalesce(r.contrib_tasks, []) AND $effective_task_ids IS NOT NULL SET r.contrib_tasks = [t IN r.contrib_tasks WHERE t <> $task_id], r.source_pairs = [p IN coalesce(r.source_pairs, []) WHERE NOT p STARTS WITH $pair_prefix] WITH r, r.rel_id AS rel_id, size(r.contrib_tasks) = 0 AND NOT coalesce(r.contrib_manual, false) AS orphan CALL (r, rel_id, orphan) { WITH r, rel_id WHERE orphan OPTIONAL MATCH (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: rel_id}) DELETE r, ri } RETURN count(*) AS revoked, sum(CASE WHEN orphan THEN 1 ELSE 0 END) AS deleted",
+      "query_label": "app.repositories.graph_relations._REVOKE_RELATIONS",
+      "started_seconds": 36.61816308300149,
+      "status": "ok",
+      "result_rows": 1,
+      "ended_seconds": 39.03215653799998,
+      "duration_seconds": 2.41399345499849
+    },
+    {
+      "operation": "run",
+      "query_sha256": "bbdc5197775b5e51e603114adc4d51662e55ff3bcd7d4f5afe97e84bca7bb2e3",
+      "query_template": "MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id}) WHERE $effective_task_ids IS NOT NULL AND ($task_id IN coalesce(n.contrib_tasks, []) OR EXISTS { (n)-[:EVIDENCED_BY {task_id: $task_id}]->(:Chunk {course_id: $course_id}) }) OPTIONAL MATCH (n)-[e:EVIDENCED_BY {task_id: $task_id}]->(:Chunk {course_id: $course_id}) DELETE e WITH DISTINCT n SET n.contrib_tasks = [t IN coalesce(n.contrib_tasks, []) WHERE t <> $task_id] WITH n, size(n.contrib_tasks) = 0 AND NOT coalesce(n.contrib_manual, false) AS orphan CALL (n, orphan) { WITH n WHERE orphan OPTIONAL MATCH (n)-[r {course_id: $course_id, version_id: $version_id}]-(:KnowledgePoint) OPTIONAL MATCH (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: r.rel_id}) DETACH DELETE ri, n } RETURN count(*) AS revoked, sum(CASE WHEN orphan THEN 1 ELSE 0 END) AS deleted",
+      "query_label": "app.repositories.graph_relations._REVOKE_NODES",
+      "started_seconds": 39.032251555001494,
+      "status": "ok",
+      "result_rows": 1,
+      "ended_seconds": 40.56100685400088,
+      "duration_seconds": 1.5287552989993856
+    },
+    {
+      "operation": "run",
+      "query_sha256": "5c44fa81bc5f1896977171af18ebe4f55d9d6ea7d1136eb217504a9c642eb93a",
+      "query_template": "UNWIND $nodes AS row OPTIONAL MATCH (existing:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.kp_id}) WITH row, existing, coalesce(existing.locked, false) AS locked, existing IS NOT NULL AND (coalesce(existing.contrib_manual, false) OR any(t IN coalesce(existing.contrib_tasks, []) WHERE t IN $effective_task_ids)) AS was_visible CALL (row, locked) { WITH row WHERE NOT locked MERGE (n:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.kp_id}) ON CREATE SET n.source = 'ai', n.locked = false, n.contrib_manual = false, n.contrib_tasks = [], n.revision = 0, n.level = 0 WITH row, n, CASE WHEN coalesce(n.status, '') IN ['approved', 'rejected'] THEN n.status ELSE row.status END AS status WITH row, n, status, n.name IS NULL OR n.name <> row.name OR n.type <> row.type OR n.definition <> row.definition OR n.confidence <> row.confidence OR coalesce(n.status, '') <> status OR coalesce(n.aliases, []) <> row.aliases AS changed SET n.name = row.name, n.type = row.type, n.definition = row.definition, n.confidence = row.confidence, n.status = status, n.aliases = row.aliases, n.revision = CASE WHEN changed THEN n.revision + 1 ELSE n.revision END, n.contrib_tasks = CASE WHEN $task_id IN n.contrib_tasks THEN n.contrib_tasks ELSE n.contrib_tasks + $task_id END WITH row, n UNWIND row.sources AS s MERGE (c:Chunk {course_id: $course_id, chunk_id: s.chunk_id}) ON CREATE SET c.document_id = s.document_id, c.revision_id = s.revision_id MERGE (n)-[:EVIDENCED_BY {task_id: $task_id, chunk_id: s.chunk_id, evidence_start: s.evidence_start, evidence_end: s.evidence_end}]->(c) } RETURN row.kp_id AS kp_id, locked, was_visible",
+      "query_label": "app.repositories.graph_nodes._WRITE_BATCH",
+      "started_seconds": 40.56196772200019,
+      "status": "ok",
+      "result_rows": 64,
+      "ended_seconds": 43.09588628500023,
+      "duration_seconds": 2.533918563000043
+    },
+    {
+      "operation": "run",
+      "query_sha256": "3f48c2c9a8d1d1844b354867dfca01961baf5f59126e3e65a86060f4cbc14abf",
+      "query_template": "MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id}) WHERE (coalesce(n.contrib_manual, false) OR any(t IN coalesce(n.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) RETURN n.kp_id AS kp_id",
+      "query_label": "app.repositories.graph_relations._VISIBLE_NODES",
+      "started_seconds": 43.09619094300069,
+      "status": "ok",
+      "result_rows": 64,
+      "ended_seconds": 43.55001063600139,
+      "duration_seconds": 0.45381969300069613
+    },
+    {
+      "operation": "run",
+      "query_sha256": "e87c5de5a7c54ed1a729c0d5341662ec6011b87fbb67c8d44b6652dd96c9ac07",
+      "query_template": "MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id}) -[r:PREREQUISITE {course_id: $course_id, version_id: $version_id}]-> (b:KnowledgePoint {course_id: $course_id, version_id: $version_id}) WHERE coalesce(r.status, '') <> 'rejected' AND (coalesce(r.contrib_manual, false) OR any(t IN coalesce(r.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) RETURN r.rel_id AS rel_id, a.kp_id AS from_id, b.kp_id AS to_id, coalesce(r.confidence, 0.0) AS confidence, r.source = 'ai' AND NOT coalesce(r.contrib_manual, false) AND r.status IN ['draft', 'low_confidence'] AS downgradable",
+      "query_label": "app.repositories.graph_relations._PREREQUISITE_DETAILS",
+      "started_seconds": 43.55015207700126,
+      "status": "ok",
+      "result_rows": 0,
+      "ended_seconds": 44.71977042600156,
+      "duration_seconds": 1.1696183490003023
+    },
+    {
+      "operation": "run",
+      "query_sha256": "fbb00766a302ece55014411201ed5b3b1d74cd8a040830808cbc4dd9cbb71816",
+      "query_template": "UNWIND $rel_ids AS id MATCH (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: id}) OPTIONAL MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: ri.from_id}) -[r {course_id: $course_id, version_id: $version_id, rel_id: id}]-> (b:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: ri.to_id}) WHERE type(r) = ri.type RETURN id AS rel_id, ri.type AS type, ri.from_id AS from_id, ri.to_id AS to_id, r.status AS status, r IS NOT NULL AND (coalesce(r.contrib_manual, false) OR any(t IN coalesce(r.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AS visible",
+      "query_label": "app.repositories.graph_relations._RELATIONS",
+      "started_seconds": 44.72002947800138,
+      "status": "ok",
+      "result_rows": 0,
+      "ended_seconds": 46.32426879800005,
+      "duration_seconds": 1.604239319998669
+    },
+    {
+      "operation": "run",
+      "query_sha256": "821b3b6fe0bd13b99513204f00f1a707f901f0ec2394d487347fd5e9f8930995",
+      "query_template": "MERGE (g:DraftWriteGuard {course_id: $course_id, version_id: $version_id}) SET g.seq = coalesce(g.seq, 0) + 1 RETURN g.seq AS seq, size($effective_task_ids) AS visible_tasks",
+      "query_label": "app.repositories.graph_relations._LOCK",
+      "started_seconds": 46.32640773000094,
+      "status": "ok",
+      "result_rows": 1,
+      "ended_seconds": 46.46709540100164,
+      "duration_seconds": 0.14068767100070545
+    },
+    {
+      "operation": "run",
+      "query_sha256": "3f48c2c9a8d1d1844b354867dfca01961baf5f59126e3e65a86060f4cbc14abf",
+      "query_template": "MATCH (n:KnowledgePoint {course_id: $course_id, version_id: $version_id}) WHERE (coalesce(n.contrib_manual, false) OR any(t IN coalesce(n.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) RETURN n.kp_id AS kp_id",
+      "query_label": "app.repositories.graph_relations._VISIBLE_NODES",
+      "started_seconds": 46.46716970900161,
+      "status": "ok",
+      "result_rows": 64,
+      "ended_seconds": 46.53655270500167,
+      "duration_seconds": 0.06938299600005848
+    },
+    {
+      "operation": "run",
+      "query_sha256": "fbb00766a302ece55014411201ed5b3b1d74cd8a040830808cbc4dd9cbb71816",
+      "query_template": "UNWIND $rel_ids AS id MATCH (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: id}) OPTIONAL MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: ri.from_id}) -[r {course_id: $course_id, version_id: $version_id, rel_id: id}]-> (b:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: ri.to_id}) WHERE type(r) = ri.type RETURN id AS rel_id, ri.type AS type, ri.from_id AS from_id, ri.to_id AS to_id, r.status AS status, r IS NOT NULL AND (coalesce(r.contrib_manual, false) OR any(t IN coalesce(r.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AS visible",
+      "query_label": "app.repositories.graph_relations._RELATIONS",
+      "started_seconds": 46.53680024700043,
+      "status": "ok",
+      "result_rows": 0,
+      "ended_seconds": 46.56738453900107,
+      "duration_seconds": 0.030584292000639834
+    },
+    {
+      "operation": "run",
+      "query_sha256": "acdc05c80750ebabfc02639fc15ef27a6a7cdf2293dc25d0b047d3121e62bdde",
+      "query_template": "MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id}) -[r:PREREQUISITE {course_id: $course_id, version_id: $version_id}]-> (b:KnowledgePoint {course_id: $course_id, version_id: $version_id}) WHERE coalesce(r.status, '') <> 'rejected' AND (coalesce(r.contrib_manual, false) OR any(t IN coalesce(r.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) RETURN r.rel_id AS rel_id, a.kp_id AS from_id, b.kp_id AS to_id",
+      "query_label": "app.repositories.graph_relations._PREREQUISITE_EDGES",
+      "started_seconds": 46.56753781000043,
+      "status": "ok",
+      "result_rows": 0,
+      "ended_seconds": 47.15765930900125,
+      "duration_seconds": 0.5901214990008157
+    },
+    {
+      "operation": "run",
+      "query_sha256": "e30f24bd881a3269db506a847ea39bcda44954ad55fe7314247791566178848a",
+      "query_template": "UNWIND $rows AS row MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.from_id}) MATCH (b:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.to_id}) WHERE (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) MERGE (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}) ON CREATE SET ri.type = 'CONTAINS', ri.from_id = row.from_id, ri.to_id = row.to_id MERGE (a)-[r:CONTAINS {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}]->(b) ON CREATE SET r.confidence = row.confidence, r.status = row.status, r.source = row.source, r.contrib_tasks = [], r.contrib_manual = false, r.source_pairs = [], r.revision = 1, r.downgraded_from_type = CASE WHEN size(row.cycle) > 0 THEN 'PREREQUISITE' END, r.downgrade_cycle = CASE WHEN size(row.cycle) > 0 THEN row.cycle END WITH row, r, $task_id IS NULL AND (r.confidence <> row.confidence OR r.status <> row.status OR r.source <> row.source) AS retake SET r.confidence = CASE WHEN $task_id IS NULL THEN row.confidence ELSE r.confidence END, r.status = CASE WHEN $task_id IS NULL THEN row.status ELSE r.status END, r.source = CASE WHEN $task_id IS NULL THEN row.source ELSE r.source END, r.revision = CASE WHEN retake THEN r.revision + 1 ELSE r.revision END, r.contrib_manual = r.contrib_manual OR $task_id IS NULL, r.contrib_tasks = CASE WHEN $task_id IS NULL OR $task_id IN r.contrib_tasks THEN r.contrib_tasks ELSE r.contrib_tasks + $task_id END, r.source_pairs = r.source_pairs + [p IN row.pairs WHERE NOT p IN r.source_pairs] RETURN row.rel_id AS rel_id",
+      "query_label": "app.repositories.graph_relations._MERGE[CONTAINS]",
+      "started_seconds": 47.158977456001594,
+      "status": "ok",
+      "result_rows": 65,
+      "ended_seconds": 48.94344020800054,
+      "duration_seconds": 1.7844627519989444
+    },
+    {
+      "operation": "run",
+      "query_sha256": "ad607c3cf3d340fb668056cdb9eb023208bcbc466bccbaaafcc99b6fe79f7133",
+      "query_template": "UNWIND $rows AS row MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.from_id}) MATCH (b:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.to_id}) WHERE (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) MERGE (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}) ON CREATE SET ri.type = 'PREREQUISITE', ri.from_id = row.from_id, ri.to_id = row.to_id MERGE (a)-[r:PREREQUISITE {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}]->(b) ON CREATE SET r.confidence = row.confidence, r.status = row.status, r.source = row.source, r.contrib_tasks = [], r.contrib_manual = false, r.source_pairs = [], r.revision = 1, r.downgraded_from_type = CASE WHEN size(row.cycle) > 0 THEN 'PREREQUISITE' END, r.downgrade_cycle = CASE WHEN size(row.cycle) > 0 THEN row.cycle END WITH row, r, $task_id IS NULL AND (r.confidence <> row.confidence OR r.status <> row.status OR r.source <> row.source) AS retake SET r.confidence = CASE WHEN $task_id IS NULL THEN row.confidence ELSE r.confidence END, r.status = CASE WHEN $task_id IS NULL THEN row.status ELSE r.status END, r.source = CASE WHEN $task_id IS NULL THEN row.source ELSE r.source END, r.revision = CASE WHEN retake THEN r.revision + 1 ELSE r.revision END, r.contrib_manual = r.contrib_manual OR $task_id IS NULL, r.contrib_tasks = CASE WHEN $task_id IS NULL OR $task_id IN r.contrib_tasks THEN r.contrib_tasks ELSE r.contrib_tasks + $task_id END, r.source_pairs = r.source_pairs + [p IN row.pairs WHERE NOT p IN r.source_pairs] RETURN row.rel_id AS rel_id",
+      "query_label": "app.repositories.graph_relations._MERGE[PREREQUISITE]",
+      "started_seconds": 48.943727908001165,
+      "status": "ok",
+      "result_rows": 1,
+      "ended_seconds": 50.357297992000895,
+      "duration_seconds": 1.4135700839997298
+    },
+    {
+      "operation": "run",
+      "query_sha256": "53b36130127b7df258278a8f3609a2144c206652bfaa76d9eba8ef1bdc7cac82",
+      "query_template": "UNWIND $rows AS row MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.from_id}) MATCH (b:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.to_id}) WHERE (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) MERGE (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}) ON CREATE SET ri.type = 'RELATED_TO', ri.from_id = row.from_id, ri.to_id = row.to_id MERGE (a)-[r:RELATED_TO {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}]->(b) ON CREATE SET r.confidence = row.confidence, r.status = row.status, r.source = row.source, r.contrib_tasks = [], r.contrib_manual = false, r.source_pairs = [], r.revision = 1, r.downgraded_from_type = CASE WHEN size(row.cycle) > 0 THEN 'PREREQUISITE' END, r.downgrade_cycle = CASE WHEN size(row.cycle) > 0 THEN row.cycle END WITH row, r, $task_id IS NULL AND (r.confidence <> row.confidence OR r.status <> row.status OR r.source <> row.source) AS retake SET r.confidence = CASE WHEN $task_id IS NULL THEN row.confidence ELSE r.confidence END, r.status = CASE WHEN $task_id IS NULL THEN row.status ELSE r.status END, r.source = CASE WHEN $task_id IS NULL THEN row.source ELSE r.source END, r.revision = CASE WHEN retake THEN r.revision + 1 ELSE r.revision END, r.contrib_manual = r.contrib_manual OR $task_id IS NULL, r.contrib_tasks = CASE WHEN $task_id IS NULL OR $task_id IN r.contrib_tasks THEN r.contrib_tasks ELSE r.contrib_tasks + $task_id END, r.source_pairs = r.source_pairs + [p IN row.pairs WHERE NOT p IN r.source_pairs] RETURN row.rel_id AS rel_id",
+      "query_label": "app.repositories.graph_relations._MERGE[RELATED_TO]",
+      "started_seconds": 50.35758041700137,
+      "status": "ok",
+      "result_rows": 4,
+      "ended_seconds": 51.22753545600062,
+      "duration_seconds": 0.869955038999251
+    },
+    {
+      "operation": "run",
+      "query_sha256": "a4645fa26326dfbaec9d709f89d77eb275988d2d208cc4ffea2c30e93373dc62",
+      "query_template": "UNWIND $rows AS row MATCH (a:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.from_id}) MATCH (b:KnowledgePoint {course_id: $course_id, version_id: $version_id, kp_id: row.to_id}) WHERE (coalesce(a.contrib_manual, false) OR any(t IN coalesce(a.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) AND (coalesce(b.contrib_manual, false) OR any(t IN coalesce(b.contrib_tasks, []) WHERE t IN $effective_task_ids OR t IN $own_tasks)) MERGE (ri:RelationIdentity {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}) ON CREATE SET ri.type = 'EXAMPLE_OF', ri.from_id = row.from_id, ri.to_id = row.to_id MERGE (a)-[r:EXAMPLE_OF {course_id: $course_id, version_id: $version_id, rel_id: row.rel_id}]->(b) ON CREATE SET r.confidence = row.confidence, r.status = row.status, r.source = row.source, r.contrib_tasks = [], r.contrib_manual = false, r.source_pairs = [], r.revision = 1, r.downgraded_from_type = CASE WHEN size(row.cycle) > 0 THEN 'PREREQUISITE' END, r.downgrade_cycle = CASE WHEN size(row.cycle) > 0 THEN row.cycle END WITH row, r, $task_id IS NULL AND (r.confidence <> row.confidence OR r.status <> row.status OR r.source <> row.source) AS retake SET r.confidence = CASE WHEN $task_id IS NULL THEN row.confidence ELSE r.confidence END, r.status = CASE WHEN $task_id IS NULL THEN row.status ELSE r.status END, r.source = CASE WHEN $task_id IS NULL THEN row.source ELSE r.source END, r.revision = CASE WHEN retake THEN r.revision + 1 ELSE r.revision END, r.contrib_manual = r.contrib_manual OR $task_id IS NULL, r.contrib_tasks = CASE WHEN $task_id IS NULL OR $task_id IN r.contrib_tasks THEN r.contrib_tasks ELSE r.contrib_tasks + $task_id END, r.source_pairs = r.source_pairs + [p IN row.pairs WHERE NOT p IN r.source_pairs] RETURN row.rel_id AS rel_id",
+      "query_label": "app.repositories.graph_relations._MERGE[EXAMPLE_OF]",
+      "started_seconds": 51.22778110800027,
+      "status": "ok",
+      "result_rows": 1,
+      "ended_seconds": 52.06889560400123,
+      "duration_seconds": 0.8411144960009551
+    },
+    {
+      "operation": "commit",
+      "started_seconds": 52.071610168000916,
+      "status": "ok",
+      "ended_seconds": 52.33770964300129,
+      "duration_seconds": 0.2660994750003738
+    },
+    {
+      "operation": "close",
+      "started_seconds": 52.341550968001684,
+      "status": "ok",
+      "ended_seconds": 52.34341305700036,
+      "duration_seconds": 0.001862088998677791
+    }
+  ],
+  "neo4j_timing_boundary": "PersistTransport open/run/commit/close; run includes async result.data() consumption",
+  "persist_overlap_note": "t6_ms is within neo4j_ms; do not sum them. total_ms is wall time.",
+  "units": [
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-0",
+      "started_seconds": 2.120605884001634,
+      "section_path": "第3章 栈与队列",
+      "text_chars": 72,
+      "status": "done",
+      "ended_seconds": 10.441871953000373,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.03739963800035184
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-1",
+      "started_seconds": 2.1211197080010606,
+      "section_path": "第3章 栈与队列 > 3.1 本章导读",
+      "text_chars": 162,
+      "status": "done",
+      "ended_seconds": 10.44225451100101,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.03791346199977852
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-2",
+      "started_seconds": 2.1218412010002794,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义",
+      "text_chars": 315,
+      "status": "done",
+      "ended_seconds": 10.452137136000601,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.03863495499899727
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-3",
+      "started_seconds": 2.1223709080004483,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈",
+      "text_chars": 336,
+      "status": "done",
+      "ended_seconds": 10.443969926000136,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.03916466199916613
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-4",
+      "started_seconds": 2.123033641000802,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.3 链栈",
+      "text_chars": 219,
+      "status": "done",
+      "ended_seconds": 10.39864414800104,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.03982739499952004
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-5",
+      "started_seconds": 2.1238662380001188,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.4 出栈序列的性质",
+      "text_chars": 765,
+      "status": "done",
+      "ended_seconds": 10.451374810001653,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.04065999199883663
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-6",
+      "started_seconds": 2.1246290740000404,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义",
+      "text_chars": 273,
+      "status": "done",
+      "ended_seconds": 10.401946173000397,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.041422827998758294
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-7",
+      "started_seconds": 2.125678124000842,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列",
+      "text_chars": 863,
+      "status": "done",
+      "ended_seconds": 10.377842960000635,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 0.04247187799956009
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-8",
+      "started_seconds": 10.45270269499997,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.3 链队列",
+      "text_chars": 132,
+      "status": "done",
+      "ended_seconds": 18.51870446600151,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.369496448998689
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-9",
+      "started_seconds": 10.572291500000574,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.4 双端队列",
+      "text_chars": 129,
+      "status": "done",
+      "ended_seconds": 18.72026641500088,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.489085253999292
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-10",
+      "started_seconds": 10.572525666000729,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较",
+      "text_chars": 452,
+      "status": "done",
+      "ended_seconds": 18.79416320600103,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.489319419999447
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-11",
+      "started_seconds": 10.572681638001086,
+      "section_path": "第3章 栈与队列 > 3.4 栈的应用 > 3.4.1 括号匹配",
+      "text_chars": 249,
+      "status": "done",
+      "ended_seconds": 18.782222698000623,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.489475391999804
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-12",
+      "started_seconds": 10.572811784000805,
+      "section_path": "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式",
+      "text_chars": 890,
+      "status": "done",
+      "ended_seconds": 18.75706142600029,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.489605537999523
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-13",
+      "started_seconds": 10.57292678000158,
+      "section_path": "第3章 栈与队列 > 3.4 栈的应用 > 3.4.3 递归与栈",
+      "text_chars": 447,
+      "status": "done",
+      "ended_seconds": 18.793588991000433,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.489720534000298
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-14",
+      "started_seconds": 10.573255510000308,
+      "section_path": "第3章 栈与队列 > 3.5 队列的应用",
+      "text_chars": 358,
+      "status": "done",
+      "ended_seconds": 18.795176079000157,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.490049263999026
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-15",
+      "started_seconds": 10.573554450000302,
+      "section_path": "第3章 栈与队列 > 3.6 本章小结",
+      "text_chars": 157,
+      "status": "done",
+      "ended_seconds": 18.712648936001642,
+      "ready_seconds": 2.083206246001282,
+      "queue_wait_seconds": 8.49034820399902
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_c0aa23a250586688bc60ee278d7a056eab5f1c0900777d2f798671a259ffcf1b",
+      "started_seconds": 18.82758909400036,
+      "section_path": "第3章 栈与队列",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-0"
+      ],
+      "status": "done",
+      "ended_seconds": 18.89285790500071,
+      "ready_seconds": 10.468941699000425,
+      "queue_wait_seconds": 8.358647394999934
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_6ebaa120921d4867b76feec00971e1c38108df56b655bceed6f9ce4f8e818bf9",
+      "started_seconds": 18.828461659000823,
+      "section_path": "第3章 栈与队列 > 3.1 本章导读",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-1"
+      ],
+      "status": "done",
+      "ended_seconds": 26.950987043001078,
+      "ready_seconds": 10.489797941001598,
+      "queue_wait_seconds": 8.338663717999225
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_23d7791e18ee84bba616da1cf04a97720f450f1b01b8a733858c3b468557bde0",
+      "started_seconds": 18.82953853500112,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.1 栈的定义",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-2"
+      ],
+      "status": "done",
+      "ended_seconds": 26.94574804900003,
+      "ready_seconds": 10.513767879001534,
+      "queue_wait_seconds": 8.315770655999586
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_e9d9a9906a1153c10f42beb519f515bf8a2a54224ccc4ff76f606be9530fde52",
+      "started_seconds": 18.830579388000842,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.2 顺序栈",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-3"
+      ],
+      "status": "done",
+      "ended_seconds": 26.97977273700053,
+      "ready_seconds": 10.543402412000432,
+      "queue_wait_seconds": 8.28717697600041
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_f5c434f1c3256b200cef0c0a79803c9ad85bbd1529583087980cab2ce47f0aa5",
+      "started_seconds": 18.831383417000325,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.3 链栈",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-4"
+      ],
+      "status": "done",
+      "ended_seconds": 26.98481333700147,
+      "ready_seconds": 10.552200360001734,
+      "queue_wait_seconds": 8.27918305699859
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_39d82843843baf13fde863f7191fbc98e9bac2b5556c0c8faf9414e68bdfe459",
+      "started_seconds": 18.966381275000458,
+      "section_path": "第3章 栈与队列 > 3.2 栈 > 3.2.4 出栈序列的性质",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-5"
+      ],
+      "status": "done",
+      "ended_seconds": 27.108055263001006,
+      "ready_seconds": 10.56285649900019,
+      "queue_wait_seconds": 8.403524776000268
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_46d833c48c90ac9f06a9a7bc8680b092142bbf588be18ebdfe9b5b1b75f79015",
+      "started_seconds": 18.967515491000086,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.1 队列的定义",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-6"
+      ],
+      "status": "done",
+      "ended_seconds": 27.105961062999995,
+      "ready_seconds": 10.571967440000662,
+      "queue_wait_seconds": 8.395548050999423
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_6aeb209e92dd59ba506f50c287e9f2eaeb51bfc6f2fb584a7b609cbd2c9d69cf",
+      "started_seconds": 18.96854803000133,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.2 循环队列",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-7"
+      ],
+      "status": "done",
+      "ended_seconds": 27.03868577800131,
+      "ready_seconds": 10.452244784000868,
+      "queue_wait_seconds": 8.516303246000462
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_d5dbc47adb236d766efbdd321d4e5bfc69ecbc05ad6366081f1fb909640a89cd",
+      "started_seconds": 19.016370294000808,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.3 链队列",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-8"
+      ],
+      "status": "done",
+      "ended_seconds": 27.118298792000132,
+      "ready_seconds": 18.525713226001244,
+      "queue_wait_seconds": 0.4906570679995639
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_7a86bfe1c2ec28a3566f9ba260afea4574ea592cb4e15dd11827ffe5170a644f",
+      "started_seconds": 26.963430952000635,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.4 双端队列",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-9"
+      ],
+      "status": "done",
+      "ended_seconds": 35.011949266001466,
+      "ready_seconds": 18.802477506000287,
+      "queue_wait_seconds": 8.160953446000349
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_b91fd0e6c37e326ebfb18dcdf598c0ed4ce07a9e119057f656856ab9714b5772",
+      "started_seconds": 26.990934624000147,
+      "section_path": "第3章 栈与队列 > 3.3 队列 > 3.3.5 栈与队列的比较",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-10"
+      ],
+      "status": "done",
+      "ended_seconds": 35.03353224100101,
+      "ready_seconds": 18.933813826000915,
+      "queue_wait_seconds": 8.057120797999232
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_39ad30d6224ec6f01086e4cc96a71b76e5e12748c3e584b55f55ffb7a4f4d7dd",
+      "started_seconds": 27.015852816000915,
+      "section_path": "第3章 栈与队列 > 3.4 栈的应用 > 3.4.1 括号匹配",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-11"
+      ],
+      "status": "done",
+      "ended_seconds": 35.13326986100037,
+      "ready_seconds": 18.817370502001722,
+      "queue_wait_seconds": 8.198482313999193
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_4ddd88d35d19f64c25148b04ca16948e6ba4df20bbd5abb946a3a7252913fc68",
+      "started_seconds": 27.01690484500068,
+      "section_path": "第3章 栈与队列 > 3.4 栈的应用 > 3.4.2 中缀表达式与后缀表达式",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-12"
+      ],
+      "status": "done",
+      "ended_seconds": 35.12467423000089,
+      "ready_seconds": 18.824682131000372,
+      "queue_wait_seconds": 8.192222714000309
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_df65dad10dbfcf61f7eafd962551a363f90ced5335431e8e8a54c93e5815e9d7",
+      "started_seconds": 27.115429276000214,
+      "section_path": "第3章 栈与队列 > 3.4 栈的应用 > 3.4.3 递归与栈",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-13"
+      ],
+      "status": "done",
+      "ended_seconds": 35.156380584001454,
+      "ready_seconds": 18.957436263001,
+      "queue_wait_seconds": 8.157993012999214
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_cb47e86024b88060722ad754717281f8a7742f741dedec4bff416567a08b7cad",
+      "started_seconds": 27.153215302001627,
+      "section_path": "第3章 栈与队列 > 3.5 队列的应用",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-14"
+      ],
+      "status": "done",
+      "ended_seconds": 35.21758271900035,
+      "ready_seconds": 18.96509816500111,
+      "queue_wait_seconds": 8.188117137000518
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_753ff9920a56237584997ecbdece8536819a1b42671c61e0ba8978df9911d89b",
+      "started_seconds": 27.153733695000483,
+      "section_path": "第3章 栈与队列 > 3.6 本章小结",
+      "chunk_ids": [
+        "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-15"
+      ],
+      "status": "done",
+      "ended_seconds": 35.2248732650005,
+      "ready_seconds": 18.790077480000036,
+      "queue_wait_seconds": 8.363656215000447
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-7",
+      "at_seconds": 10.452244784000868
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-0",
+      "at_seconds": 10.468941699000425
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-1",
+      "at_seconds": 10.489797941001598
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-2",
+      "at_seconds": 10.513767879001534
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-3",
+      "at_seconds": 10.543402412000432
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-4",
+      "at_seconds": 10.552200360001734
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-5",
+      "at_seconds": 10.56285649900019
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-6",
+      "at_seconds": 10.571967440000662
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-8",
+      "at_seconds": 18.525713226001244
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-15",
+      "at_seconds": 18.790077480000036
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-9",
+      "at_seconds": 18.802477506000287
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-11",
+      "at_seconds": 18.817370502001722
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-12",
+      "at_seconds": 18.824682131000372
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-10",
+      "at_seconds": 18.933813826000915
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-13",
+      "at_seconds": 18.957436263001
+    },
+    {
+      "kind": "chunk",
+      "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-14",
+      "at_seconds": 18.96509816500111
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_c0aa23a250586688bc60ee278d7a056eab5f1c0900777d2f798671a259ffcf1b",
+      "at_seconds": 19.015619445000993
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_23d7791e18ee84bba616da1cf04a97720f450f1b01b8a733858c3b468557bde0",
+      "at_seconds": 26.96267425500082
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_6ebaa120921d4867b76feec00971e1c38108df56b655bceed6f9ce4f8e818bf9",
+      "at_seconds": 26.989835091000714
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_e9d9a9906a1153c10f42beb519f515bf8a2a54224ccc4ff76f606be9530fde52",
+      "at_seconds": 27.006321971000943
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_f5c434f1c3256b200cef0c0a79803c9ad85bbd1529583087980cab2ce47f0aa5",
+      "at_seconds": 27.015118814000743
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_6aeb209e92dd59ba506f50c287e9f2eaeb51bfc6f2fb584a7b609cbd2c9d69cf",
+      "at_seconds": 27.114530320000995
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_39d82843843baf13fde863f7191fbc98e9bac2b5556c0c8faf9414e68bdfe459",
+      "at_seconds": 27.13774165400173
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_46d833c48c90ac9f06a9a7bc8680b092142bbf588be18ebdfe9b5b1b75f79015",
+      "at_seconds": 27.152431673001047
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_d5dbc47adb236d766efbdd321d4e5bfc69ecbc05ad6366081f1fb909640a89cd",
+      "at_seconds": 27.193077972000538
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_7a86bfe1c2ec28a3566f9ba260afea4574ea592cb4e15dd11827ffe5170a644f",
+      "at_seconds": 35.018368411001575
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_b91fd0e6c37e326ebfb18dcdf598c0ed4ce07a9e119057f656856ab9714b5772",
+      "at_seconds": 35.039594399000634
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_4ddd88d35d19f64c25148b04ca16948e6ba4df20bbd5abb946a3a7252913fc68",
+      "at_seconds": 35.13587401100085
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_39ad30d6224ec6f01086e4cc96a71b76e5e12748c3e584b55f55ffb7a4f4d7dd",
+      "at_seconds": 35.14091988600012
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_df65dad10dbfcf61f7eafd962551a363f90ced5335431e8e8a54c93e5815e9d7",
+      "at_seconds": 35.1635681530006
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_cb47e86024b88060722ad754717281f8a7742f741dedec4bff416567a08b7cad",
+      "at_seconds": 35.230957372001285
+    },
+    {
+      "kind": "section",
+      "unit_id": "sec_753ff9920a56237584997ecbdece8536819a1b42671c61e0ba8978df9911d89b",
+      "at_seconds": 35.24255724500108
+    }
+  ],
+  "model_calls": [
+    {
+      "call_id": "01M6P485H2EM9YQC5PMTFFCRBW",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-4",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.760Z",
+      "finished_at": "2026-11-05T15:11:53.842Z",
+      "latency_ms": 8021,
+      "usage_input": 906,
+      "usage_output": 988,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485H2EM9YQC5PMTFFCRBW",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-4"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.224788403000275,
+        "started_seconds": 2.306091312000717,
+        "ended_seconds": 10.327043833000062,
+        "writeback_seconds": 10.398026467000818,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485H5KZY3MPSR4G790JK1",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-7",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.764Z",
+      "finished_at": "2026-11-05T15:11:53.826Z",
+      "latency_ms": 8018,
+      "usage_input": 1550,
+      "usage_output": 1504,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485H5KZY3MPSR4G790JK1",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-7"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.2280318190005346,
+        "started_seconds": 2.3112187850001646,
+        "ended_seconds": 10.329719023000507,
+        "writeback_seconds": 10.375708592000592,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485H83472VR68FA04MJHG",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-6",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.769Z",
+      "finished_at": "2026-11-05T15:11:53.845Z",
+      "latency_ms": 8009,
+      "usage_input": 960,
+      "usage_output": 1000,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485H83472VR68FA04MJHG",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-6"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.230589521001093,
+        "started_seconds": 2.3160166120014765,
+        "ended_seconds": 10.325108645,
+        "writeback_seconds": 10.401423633000377,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485GSG72D65YJF39CCRG9",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-0",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.791Z",
+      "finished_at": "2026-11-05T15:11:53.890Z",
+      "latency_ms": 8014,
+      "usage_input": 759,
+      "usage_output": 139,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485GSG72D65YJF39CCRG9",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-0"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.215730526000698,
+        "started_seconds": 2.329324288000862,
+        "ended_seconds": 10.343339673001537,
+        "writeback_seconds": 10.441599640000277,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485H3M1CGWHMQ8GNJYDCC",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-1",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.794Z",
+      "finished_at": "2026-11-05T15:11:53.889Z",
+      "latency_ms": 8012,
+      "usage_input": 849,
+      "usage_output": 473,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485H3M1CGWHMQ8GNJYDCC",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-1"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.225721451000936,
+        "started_seconds": 2.330417174000104,
+        "ended_seconds": 10.342034624000007,
+        "writeback_seconds": 10.441937197001607,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485GZH7DZXZ3B9HERB77M",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-3",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.797Z",
+      "finished_at": "2026-11-05T15:11:53.892Z",
+      "latency_ms": 8009,
+      "usage_input": 1023,
+      "usage_output": 987,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485GZH7DZXZ3B9HERB77M",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-3"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.221967086001314,
+        "started_seconds": 2.3325570750002953,
+        "ended_seconds": 10.341746095000417,
+        "writeback_seconds": 10.443480890000501,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485H2500Q9D73Y03GXYDP",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-2",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.805Z",
+      "finished_at": "2026-11-05T15:11:53.911Z",
+      "latency_ms": 8007,
+      "usage_input": 1002,
+      "usage_output": 1071,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485H2500Q9D73Y03GXYDP",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-2"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.224436025000614,
+        "started_seconds": 2.357924363001075,
+        "ended_seconds": 10.364615259000857,
+        "writeback_seconds": 10.451462027000161,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P485H4A7618S7BWSVPQWFS",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-5",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:45.827Z",
+      "finished_at": "2026-11-05T15:11:53.913Z",
+      "latency_ms": 8009,
+      "usage_input": 1452,
+      "usage_output": 1305,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P485H4A7618S7BWSVPQWFS",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-5"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 2.2269494280008075,
+        "started_seconds": 2.3573929400008637,
+        "ended_seconds": 10.36618090400043,
+        "writeback_seconds": 10.450806504000866,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DK3B9G473BF00ZHW6B3",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-8",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:53.970Z",
+      "finished_at": "2026-11-05T15:12:01.990Z",
+      "latency_ms": 8010,
+      "usage_input": 819,
+      "usage_output": 605,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DK3B9G473BF00ZHW6B3",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-8"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.482178456000838,
+        "started_seconds": 10.500711196000339,
+        "ended_seconds": 18.510537011999986,
+        "writeback_seconds": 18.518209085001217,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DR5GRBBKHTDRHVR4RJT",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-15",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.154Z",
+      "finished_at": "2026-11-05T15:12:02.180Z",
+      "latency_ms": 8005,
+      "usage_input": 844,
+      "usage_output": 612,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DR5GRBBKHTDRHVR4RJT",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-15"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.643120803000784,
+        "started_seconds": 10.69413040100153,
+        "ended_seconds": 18.698988743000882,
+        "writeback_seconds": 18.712192610000784,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DR7FD5VSTHKMTKNMZV3",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-9",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.156Z",
+      "finished_at": "2026-11-05T15:12:02.189Z",
+      "latency_ms": 8006,
+      "usage_input": 816,
+      "usage_output": 453,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DR7FD5VSTHKMTKNMZV3",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-9"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.64554384800067,
+        "started_seconds": 10.693919351000659,
+        "ended_seconds": 18.699984654000218,
+        "writeback_seconds": 18.71986788600043,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DRHNZDEDGY4VEGAVHQD",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-12",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.171Z",
+      "finished_at": "2026-11-05T15:12:02.205Z",
+      "latency_ms": 8013,
+      "usage_input": 1577,
+      "usage_output": 2020,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DRHNZDEDGY4VEGAVHQD",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-12"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.655114773000605,
+        "started_seconds": 10.702450313001464,
+        "ended_seconds": 18.715101986001173,
+        "writeback_seconds": 18.75599200200122,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DRK8ZFWGSCHEWX0H7M5",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-11",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.174Z",
+      "finished_at": "2026-11-05T15:12:02.237Z",
+      "latency_ms": 8006,
+      "usage_input": 936,
+      "usage_output": 653,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DRK8ZFWGSCHEWX0H7M5",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-11"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.657275277000736,
+        "started_seconds": 10.710322905000794,
+        "ended_seconds": 18.71590197000114,
+        "writeback_seconds": 18.78174971200133,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DRJGCPPY9042E82MXXM",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-10",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.179Z",
+      "finished_at": "2026-11-05T15:12:02.251Z",
+      "latency_ms": 8007,
+      "usage_input": 1139,
+      "usage_output": 1011,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DRJGCPPY9042E82MXXM",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-10"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.656176639000478,
+        "started_seconds": 10.715007875000083,
+        "ended_seconds": 18.721912285000144,
+        "writeback_seconds": 18.79365015500116,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DSFC8RF8FVRTC4RKKRN",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-13",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.191Z",
+      "finished_at": "2026-11-05T15:12:02.250Z",
+      "latency_ms": 8006,
+      "usage_input": 1134,
+      "usage_output": 1242,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DSFC8RF8FVRTC4RKKRN",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-13"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.685735007000403,
+        "started_seconds": 10.720227277000959,
+        "ended_seconds": 18.72634830000061,
+        "writeback_seconds": 18.79287217900128,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48DSMNES6BZH3SY7PJXJZ",
+      "purpose": "extract_entities",
+      "chunk_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-14",
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:11:54.196Z",
+      "finished_at": "2026-11-05T15:12:02.255Z",
+      "latency_ms": 8004,
+      "usage_input": 1045,
+      "usage_output": 496,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48DSMNES6BZH3SY7PJXJZ",
+        "purpose": "extract_entities",
+        "unit": {
+          "kind": "chunk",
+          "unit_id": "rev_6b08b9836dfa8d92bac0990bc10fc46f1ac31d61ae36d52acb0dfc28090fed17-14"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 10.68996618500023,
+        "started_seconds": 10.726617029000408,
+        "ended_seconds": 18.730659186001503,
+        "writeback_seconds": 18.794771081000363,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NSVM5MNWH53AFMG3X3Y",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.394Z",
+      "finished_at": "2026-11-05T15:12:10.421Z",
+      "latency_ms": 8008,
+      "usage_input": 1438,
+      "usage_output": 595,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NSVM5MNWH53AFMG3X3Y",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_6ebaa120921d4867b76feec00971e1c38108df56b655bceed6f9ce4f8e818bf9"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.889529261999996,
+        "started_seconds": 18.93152043200098,
+        "ended_seconds": 26.939992456000255,
+        "writeback_seconds": 26.950634769000317,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NSZQM65201BFQSTC01P",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.403Z",
+      "finished_at": "2026-11-05T15:12:10.417Z",
+      "latency_ms": 8005,
+      "usage_input": 2000,
+      "usage_output": 1373,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NSZQM65201BFQSTC01P",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_23d7791e18ee84bba616da1cf04a97720f450f1b01b8a733858c3b468557bde0"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.89336469400041,
+        "started_seconds": 18.93439991000014,
+        "ended_seconds": 26.939593418001095,
+        "writeback_seconds": 26.945182660001592,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NTA6XXV1W0VKBKM2PMT",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.411Z",
+      "finished_at": "2026-11-05T15:12:10.443Z",
+      "latency_ms": 8010,
+      "usage_input": 1849,
+      "usage_output": 980,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NTA6XXV1W0VKBKM2PMT",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_e9d9a9906a1153c10f42beb519f515bf8a2a54224ccc4ff76f606be9530fde52"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.90433557600045,
+        "started_seconds": 18.94233458800045,
+        "ended_seconds": 26.951981196001725,
+        "writeback_seconds": 26.979223090000232,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NTRBC92HDKAGFB18AVB",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.419Z",
+      "finished_at": "2026-11-05T15:12:10.453Z",
+      "latency_ms": 8007,
+      "usage_input": 1813,
+      "usage_output": 1167,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NTRBC92HDKAGFB18AVB",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_f5c434f1c3256b200cef0c0a79803c9ad85bbd1529583087980cab2ce47f0aa5"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.917997097001717,
+        "started_seconds": 18.949059629001567,
+        "ended_seconds": 26.956247624000753,
+        "writeback_seconds": 26.984304874000372,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NX6EF8ZZF0GMNRMS1ZR",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.485Z",
+      "finished_at": "2026-11-05T15:12:10.507Z",
+      "latency_ms": 8009,
+      "usage_input": 2571,
+      "usage_output": 1380,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NX6EF8ZZF0GMNRMS1ZR",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_6aeb209e92dd59ba506f50c287e9f2eaeb51bfc6f2fb584a7b609cbd2c9d69cf"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.99582333300168,
+        "started_seconds": 19.01669215900074,
+        "ended_seconds": 27.02607325000099,
+        "writeback_seconds": 27.038236426000367,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NX85WKQ925VD9AKYZGR",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.493Z",
+      "finished_at": "2026-11-05T15:12:10.565Z",
+      "latency_ms": 8011,
+      "usage_input": 1871,
+      "usage_output": 1380,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NX85WKQ925VD9AKYZGR",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_46d833c48c90ac9f06a9a7bc8680b092142bbf588be18ebdfe9b5b1b75f79015"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.998194701000102,
+        "started_seconds": 19.02268341800118,
+        "ended_seconds": 27.033487210001113,
+        "writeback_seconds": 27.10546605500167,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NX7KGF0HJPP282Y12MZ",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.497Z",
+      "finished_at": "2026-11-05T15:12:10.567Z",
+      "latency_ms": 8008,
+      "usage_input": 2396,
+      "usage_output": 1197,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NX7KGF0HJPP282Y12MZ",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_39d82843843baf13fde863f7191fbc98e9bac2b5556c0c8faf9414e68bdfe459"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 18.997265391000838,
+        "started_seconds": 19.028420103000826,
+        "ended_seconds": 27.03630747400166,
+        "writeback_seconds": 27.10761730500053,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48NY3VRMJCD08M8XH5WEJ",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:02.508Z",
+      "finished_at": "2026-11-05T15:12:10.580Z",
+      "latency_ms": 8008,
+      "usage_input": 1477,
+      "usage_output": 597,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48NY3VRMJCD08M8XH5WEJ",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_d5dbc47adb236d766efbdd321d4e5bfc69ecbc05ad6366081f1fb909640a89cd"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 19.025409992000277,
+        "started_seconds": 19.03738180900109,
+        "ended_seconds": 27.045118252000975,
+        "writeback_seconds": 27.118039775999932,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XPXX8K9FCT179ZR7FT9",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.467Z",
+      "finished_at": "2026-11-05T15:12:18.483Z",
+      "latency_ms": 8007,
+      "usage_input": 1394,
+      "usage_output": 405,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XPXX8K9FCT179ZR7FT9",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_7a86bfe1c2ec28a3566f9ba260afea4574ea592cb4e15dd11827ffe5170a644f"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 26.98755837600038,
+        "started_seconds": 26.997748759000388,
+        "ended_seconds": 35.00506896800107,
+        "writeback_seconds": 35.01167541400173,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XQE99T1DAWVB5RD21QV",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.492Z",
+      "finished_at": "2026-11-05T15:12:18.506Z",
+      "latency_ms": 8007,
+      "usage_input": 1972,
+      "usage_output": 1432,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XQE99T1DAWVB5RD21QV",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_b91fd0e6c37e326ebfb18dcdf598c0ed4ce07a9e119057f656856ab9714b5772"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 27.004212276000544,
+        "started_seconds": 27.022538258001077,
+        "ended_seconds": 35.02922136000052,
+        "writeback_seconds": 35.03322053100055,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XRBF3J04JBA1SHV5MSS",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.569Z",
+      "finished_at": "2026-11-05T15:12:18.596Z",
+      "latency_ms": 8005,
+      "usage_input": 2969,
+      "usage_output": 2448,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XRBF3J04JBA1SHV5MSS",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_4ddd88d35d19f64c25148b04ca16948e6ba4df20bbd5abb946a3a7252913fc68"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 27.03375172500091,
+        "started_seconds": 27.11235255400061,
+        "ended_seconds": 35.11774456900093,
+        "writeback_seconds": 35.123939335000614,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XRG2EDSCBP31Z6QHCTR",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.576Z",
+      "finished_at": "2026-11-05T15:12:18.606Z",
+      "latency_ms": 8004,
+      "usage_input": 1607,
+      "usage_output": 606,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XRG2EDSCBP31Z6QHCTR",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_39ad30d6224ec6f01086e4cc96a71b76e5e12748c3e584b55f55ffb7a4f4d7dd"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 27.038023195000278,
+        "started_seconds": 27.117797885000982,
+        "ended_seconds": 35.121746890001305,
+        "writeback_seconds": 35.13296556300156,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XVBJY297VGGFW1MCFAF",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.613Z",
+      "finished_at": "2026-11-05T15:12:18.628Z",
+      "latency_ms": 8006,
+      "usage_input": 2148,
+      "usage_output": 1393,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XVBJY297VGGFW1MCFAF",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_df65dad10dbfcf61f7eafd962551a363f90ced5335431e8e8a54c93e5815e9d7"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 27.128995824001322,
+        "started_seconds": 27.142989121000937,
+        "ended_seconds": 35.14899183500165,
+        "writeback_seconds": 35.15582447400084,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XWR4CMF7H58KCF9ARNE",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.663Z",
+      "finished_at": "2026-11-05T15:12:18.685Z",
+      "latency_ms": 8008,
+      "usage_input": 1635,
+      "usage_output": 385,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XWR4CMF7H58KCF9ARNE",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_cb47e86024b88060722ad754717281f8a7742f741dedec4bff416567a08b7cad"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 27.174217225001485,
+        "started_seconds": 27.190330138000718,
+        "ended_seconds": 35.19828850900012,
+        "writeback_seconds": 35.21730118300002,
+        "status": "ok"
+      }
+    },
+    {
+      "call_id": "01M6P48XWR76N78AH67CKW9D8T",
+      "purpose": "extract_relations",
+      "chunk_id": null,
+      "task_attempt": 1,
+      "chunk_attempt": 1,
+      "call_seq": 1,
+      "is_repair": 0,
+      "status": "ok",
+      "created_at": "2026-11-05T15:12:10.667Z",
+      "finished_at": "2026-11-05T15:12:18.693Z",
+      "latency_ms": 8008,
+      "usage_input": 1511,
+      "usage_output": 567,
+      "error_class": null,
+      "timing": {
+        "call_id": "01M6P48XWR76N78AH67CKW9D8T",
+        "purpose": "extract_relations",
+        "unit": {
+          "kind": "section",
+          "unit_id": "sec_753ff9920a56237584997ecbdece8536819a1b42671c61e0ba8978df9911d89b"
+        },
+        "is_repair": false,
+        "prewrite_begin_seconds": 27.174576403000174,
+        "started_seconds": 27.197131053000703,
+        "ended_seconds": 35.20518308999999,
+        "writeback_seconds": 35.224600345,
+        "status": "ok"
+      }
+    }
+  ],
+  "observed_stages": [
+    {
+      "stage": "queued",
+      "observed_seconds": 0.10264866100078507
+    },
+    {
+      "stage": "extracting",
+      "observed_seconds": 2.097064131001389
+    },
+    {
+      "stage": "merging",
+      "observed_seconds": 35.25522520400045
+    },
+    {
+      "stage": "persisting",
+      "observed_seconds": 35.390279508001186
+    },
+    {
+      "stage": "awaiting_review",
+      "observed_seconds": 52.388283735001096
+    }
+  ],
+  "limitations": [
+    "No browser rendering or API TCP overhead",
+    "No publication/vectorization",
+    "Fake output does not measure paid-model quality, token latency or rate limits",
+    "Initial queue deliberately begins just after the worker's empty poll",
+    "Stage handoff may be slightly negative due to millisecond log rounding",
+    "No maintenance sweep; migrations and startup excluded; repeats share Neo4j query cache"
+  ]
+}

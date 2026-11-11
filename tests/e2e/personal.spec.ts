@@ -261,6 +261,12 @@ test.describe('个人模式（L11）', () => {
       await expect(items.first()).not.toHaveAttribute('data-kp-id', firstId)
       await expect.poll(pathState).not.toEqual(firstPath)
       await student.reload()
+      // UI-GRAPH-FIND-01 restores the selected knowledge point from the URL.
+      // Its recommendation list starts collapsed; expand it through the normal control.
+      await expect.poll(() => new URL(student.url()).searchParams.get('kp')).toBe(firstId)
+      const recommendationsToggle = student.locator('[data-test=gw-next-toggle]')
+      await expect(recommendationsToggle).toHaveAttribute('aria-expanded', 'false')
+      await recommendationsToggle.click()
       await expect(items.first()).toBeVisible()
       await expect(student.locator(`[data-test="rc-select-${firstId}"]`)).toHaveCount(0)
 

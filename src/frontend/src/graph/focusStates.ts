@@ -68,6 +68,8 @@ function withStates(existing: readonly string[] | undefined, extra: readonly str
  *   相关边 `active`，strong 下其余边 `faded`。
  * - 没有预览/选中、有章节聚焦：非本章节点 `dimmed`；与本章节点相连的边 `scoped`（恢复正常粗细）。
  * - 搜索命中与章节成员都带 `match`。
+ * - 没有预览/选中、没有章节聚焦、有搜索命中：未命中的节点 `dimmed`（查找时保留全图上下文，UI-GRAPH-FIND-01）；
+ *   已带 `selected` 的节点（教师页的选中由筛选层打标）不淡化。
  */
 export function applyFocusStates<N extends FocusNodeLike, E extends FocusEdgeLike>(
   graph: { nodes: readonly N[]; edges: readonly E[] },
@@ -83,7 +85,9 @@ export function applyFocusStates<N extends FocusNodeLike, E extends FocusEdgeLik
       if (n.id === sel) extra.push('selected')
       else if (around!.nodes.has(n.id)) extra.push('neighbor')
       else extra.push(focus.fade === 'strong' ? 'faded' : 'dimmed')
-    } else if (scope !== null && !scope.has(n.id)) {
+    } else if (scope !== null) {
+      if (!scope.has(n.id)) extra.push('dimmed')
+    } else if (focus.matchedIds.size > 0 && !focus.matchedIds.has(n.id) && n.states?.includes('selected') !== true) {
       extra.push('dimmed')
     }
     if ((scope !== null && scope.has(n.id)) || focus.matchedIds.has(n.id)) extra.push('match')

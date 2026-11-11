@@ -181,8 +181,11 @@ export interface GraphLifecycle {
   setLayout(layout: GraphLayoutName): void
   /** 容器可能变了尺寸但观察器不会通知时（如 KeepAlive 重新激活）主动复查 */
   refreshSize(): void
-  /** 把视口移到该知识点（搜索定位、问答跳转）；尚未建图时在首次渲染后执行；不在图中的知识点忽略 */
-  focus(kpId: string): void
+  /**
+   * 把视口移到该知识点（搜索定位、问答跳转）；尚未建图时在首次渲染后执行；不在图中的知识点忽略。
+   * `readable`（UI-GRAPH-FIND-01）：当前缩放低于可读缩放时先放大再居中——搜索定位用，否则缩得很小时只看到一个看不清的小点。
+   */
+  focus(kpId: string, options?: { readable?: boolean }): void
   /** 增强模式：把一组知识点（缺省为当前全部）整体放进视口；未开启增强或尚未建图时忽略 */
   fitTo(kpIds?: readonly string[]): void
   /** 增强模式：章节外框的成员（知识点 ID）；null 隐藏外框 */
@@ -652,7 +655,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
       refitNext = true
       scheduleSize()
     },
-    focus(kpId) {
+    focus(kpId, focusOptions) {
       if (!alive()) return
       anchor = kpId
       if (graph === null) {
@@ -664,7 +667,7 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
         const target = nodeElementId(kpId)
         if (g === null || g.focusElement === undefined || !drawn.has(target)) return
         // 总览模式下镜头可能缩得很小：定位到某个知识点时放大到可读缩放，否则只看到一个看不清的小点
-        const overview = options.initialView === 'overview' && g.getZoom !== undefined && g.zoomTo !== undefined && g.getZoom() < READABLE_ZOOM
+        const overview = (options.initialView === 'overview' || focusOptions?.readable === true) && g.getZoom !== undefined && g.zoomTo !== undefined && g.getZoom() < READABLE_ZOOM
         if (overview) await g.zoomTo!(READABLE_ZOOM)
         await g.focusElement(target)
         if (overview && alive()) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSearchFocused } from '../composables/searchFocus'
 import { computed, inject, nextTick, ref, toRef, useId, watch } from 'vue'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY } from '../api/knowledgeDetail'
@@ -83,10 +84,12 @@ function onLocate(source: SourceView): void {
   emit('locateSource', locate(source))
 }
 
-// 新详情就绪后把焦点移到标题，屏幕阅读器从知识点名称开始播报
+// 新详情就绪后把焦点移到标题，屏幕阅读器从知识点名称开始播报。
+// 例外（UI-GRAPH-FIND-01）：焦点在搜索框里时不抢——用户正在用回车逐个定位命中，位置由搜索旁的状态文字播报
 watch(detail, async (next) => {
   if (next === null) return
   await nextTick()
+  if (isSearchFocused()) return
   title.value?.focus()
 })
 </script>

@@ -13,6 +13,7 @@ import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphLegend from '../components/GraphLegend.vue'
 import GraphOverlay from '../components/GraphOverlay.vue'
 import GraphPreviewCard from '../components/GraphPreviewCard.vue'
+import GraphSearch, { type SearchOption } from '../components/GraphSearch.vue'
 import GraphSidePanel from '../components/GraphSidePanel.vue'
 import KnowledgeCards from '../components/KnowledgeCards.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
@@ -20,13 +21,15 @@ import LocalViewBar from '../components/LocalViewBar.vue'
 import Recommendations from '../components/Recommendations.vue'
 import {
   countNodeTypes,
-  locateNode,
+  NODE_TYPE_LABELS,
   NODE_TYPE_ORDER,
   RELATION_TYPE_ORDER,
   toggledNodeTypes,
   useGraphFilters,
   type KnowledgePointType,
 } from '../composables/useGraphFilters'
+import { parseViewQuery, VIEW_QUERY_KEYS, viewQuery } from '../composables/graphViewQuery'
+import { useGraphShortcuts } from '../composables/useGraphShortcuts'
 import { useStudentGraphPanel } from '../composables/useStudentGraphPanel'
 import { useStudentGraphPresentation } from '../composables/useStudentGraphPresentation'
 import { MASTERY_LABELS, useLearning } from '../composables/useLearning'
@@ -98,7 +101,8 @@ const { status, error, retryable, courseName, graphVersion, graph, chapters, rel
   onCourseForbidden: leaveForbidden,
 })
 
-const filters = useGraphFilters(graph)
+// UI-GRAPH-FIND-01：搜索只高亮命中，不把其余知识点从画布上移除
+const filters = useGraphFilters(graph, { search: 'highlight' })
 const { selected, visible, summary } = filters
 
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
@@ -140,26 +144,65 @@ watch(
 type ViewMode = 'graph' | 'cards'
 const mode = ref<ViewMode>('graph')
 
-// L13-2 / 规格 §7：搜索框回车定位并进入预览（列表视图直接打开详情）；未找到时提示
+// L13-2 / 规格 §7 / UI-GRAPH-FIND-01：输入即高亮命中；回车依次定位下一个命中并进入预览（列表视图直接打开详情）
 const searchNotice = ref<string | null>(null)
-function onLocate(): void {
-  const current = graph.value
-  const query = filters.state.value.query
-  if (current === null) return
-  const kpId = locateNode(current, filters.state.value, query)
-  searchNotice.value = kpId === null ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
-  if (kpId === null) return
+const searchBox = ref<InstanceType<typeof GraphSearch> | null>(null)
+/** 当前定位到第几个命中；关键字或命中变化后回到 -1 */
+const searchCursor = ref(-1)
+const hits = filters.matches
+const hasQuery = computed(() => filters.state.value.query.trim() !== '')
+const searchOptions = computed<SearchOption[]>(() => {
+  const g = graph.value
+  if (g === null) return []
+  const byId = new Map(g.nodes.map((n) => [n.data.kpId, n.data]))
+  const titles = new Map(chapters.value.map((c) => [c.id, c.title]))
+  return hits.value.map((hit) => {
+    const data = byId.get(hit.kpId)
+    const chapter = data?.chapterId == null ? '未分章' : (titles.get(data.chapterId) ?? data.chapterId)
+    return { kpId: hit.kpId, name: hit.name, alias: hit.alias, meta: data === undefined ? chapter : `${chapter} · ${NODE_TYPE_LABELS[data.type]}` }
+  })
+})
+watch(hits, () => {
+  searchCursor.value = -1
+})
+function goToHit(index: number): void {
+  const hit = hits.value[index]
+  if (hit === undefined) return
+  searchCursor.value = index
+  searchNotice.value = null
   if (mode.value === 'graph') {
-    focus.preview(kpId)
-    canvas.value?.focus(kpId)
-  } else focus.open(kpId)
+    focus.preview(hit.kpId)
+    // 缩得很小时（如刚按 F 适应画布）定位要先放大到可读缩放，否则只看到一个小点
+    canvas.value?.focus(hit.kpId, { readable: true })
+  } else focus.open(hit.kpId)
 }
-function onQuery(event: Event): void {
-  filters.state.value = { ...filters.state.value, query: (event.target as HTMLInputElement).value }
+function onSearchStep(delta: 1 | -1): void {
+  if (graph.value === null) return
+  const total = hits.value.length
+  if (total === 0) {
+    searchNotice.value = hasQuery.value ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
+    return
+  }
+  const from = searchCursor.value
+  goToHit(from < 0 ? (delta === 1 ? 0 : total - 1) : (from + delta + total) % total)
+}
+function onSearchPick(kpId: string): void {
+  goToHit(hits.value.findIndex((hit) => hit.kpId === kpId))
+}
+function onQuery(query: string): void {
+  filters.state.value = { ...filters.state.value, query }
   searchNotice.value = null
 }
 
-const cards = computed(() => (visible.value === null ? [] : toKnowledgeCards(visible.value.nodes, chapters.value)))
+/** 列表视图没有“淡化”语义：有关键字时只列命中的卡片 */
+const listNodes = computed(() => {
+  const v = visible.value
+  if (v === null) return []
+  if (!hasQuery.value) return v.nodes
+  const matched = new Set(hits.value.map((hit) => hit.kpId))
+  return v.nodes.filter((n) => matched.has(n.data.kpId))
+})
+const cards = computed(() => toKnowledgeCards(listNodes.value, chapters.value))
 const empty = computed(() => status.value === 'ready' && graph.value !== null && graph.value.nodes.length === 0)
 
 // ---------------------------------------------------------------- I06：掌握标记与推荐
@@ -321,6 +364,8 @@ function clearChapter(): void {
 
 const { canvasGraph, positions, preview, progress } = useStudentGraphPresentation({
   graph, chapters, learningGraph, localView, highlightId, previewId, chapterId, chapterKpIds, statusOf,
+  // UI-GRAPH-FIND-01：搜索命中交给画布高亮
+  matchedKpIds: computed(() => hits.value.map((hit) => hit.kpId)),
 })
 
 const {
@@ -339,6 +384,72 @@ function toggleLayout(): void {
   filters.layout.value = filters.layout.value === 'hierarchical' ? 'force' : 'hierarchical'
 }
 const ready = computed(() => status.value === 'ready' && graph.value !== null && !empty.value)
+
+// ---------------------------------------------------------------- 快捷键（UI-GRAPH-FIND-01）
+const onCanvas = (): boolean => ready.value && mode.value === 'graph' && canvas.value !== null
+useGraphShortcuts({
+  search: () => {
+    if (!ready.value || searchBox.value === null) return false
+    searchBox.value.focus()
+  },
+  fit: () => (onCanvas() ? void canvas.value!.fitTo() : false),
+  zoomIn: () => (onCanvas() ? void canvas.value!.zoomBy(1.25) : false),
+  zoomOut: () => (onCanvas() ? void canvas.value!.zoomBy(0.8) : false),
+})
+
+// ---------------------------------------------------------------- 视图状态 ↔ 地址（UI-GRAPH-FIND-01）
+/** 已按地址恢复过视图的课程：恢复之前不写地址，否则会把要恢复的参数先抹掉 */
+let restoredFor: string | null = null
+watch(
+  [status, courseId] as const,
+  ([current, cid]) => {
+    if (cid === null) {
+      restoredFor = null
+      return
+    }
+    if (current !== 'ready' || graph.value === null || restoredFor === cid) return
+    const wanted = parseViewQuery(route.query)
+    filters.state.value = {
+      ...filters.state.value,
+      query: wanted.q,
+      relationTypes: RELATION_TYPE_ORDER.filter((t) => !wanted.hiddenRelations.includes(t)),
+      nodeTypes: allTypes.filter((t) => !wanted.hiddenTypes.includes(t)),
+    }
+    // 章节只在图里确实存在时恢复；`kp` 由上面的链接侦听负责（不在图里时给提示）
+    chapterId.value = wanted.ch !== null && graph.value.nodes.some((n) => n.data.chapterId === wanted.ch) ? wanted.ch : null
+    if (wanted.cards) mode.value = 'cards'
+    restoredFor = cid
+  },
+  { immediate: true },
+)
+watch(
+  [selected, () => filters.state.value.query, chapterId, hiddenRelations, hiddenTypes, mode, status] as const,
+  () => {
+    const cid = courseId.value
+    if (cid === null || restoredFor !== cid || status.value !== 'ready' || route.name !== STUDENT_GRAPH_ROUTE) return
+    const next: Record<string, unknown> = { ...route.query }
+    for (const key of VIEW_QUERY_KEYS) delete next[key]
+    Object.assign(
+      next,
+      viewQuery({
+        kp: selected.value,
+        q: filters.state.value.query,
+        ch: chapterId.value,
+        hiddenRelations: hiddenRelations.value,
+        hiddenTypes: hiddenTypes.value,
+        cards: mode.value === 'cards',
+      }),
+    )
+    // 用户自己改选了知识点：问答链接带来的版本号不再适用
+    if (next.kp !== route.query.kp) delete next.v
+    const keys = new Set([...Object.keys(next), ...Object.keys(route.query)])
+    if ([...keys].every((key) => String(next[key] ?? '') === String(route.query[key] ?? ''))) return
+    // 这是页面自己写回的地址，不是新的问答链接：不让链接侦听再处理一遍
+    handledLink = `${cid}|${String(next.kp)}|${String(next.v)}|${graphVersion.value}`
+    void router.replace({ query: next as Record<string, string> })
+  },
+  { flush: 'post' },
+)
 </script>
 
 <template>
@@ -502,17 +613,15 @@ const ready = computed(() => status.value === 'ready' && graph.value !== null &&
               <button v-if="!panelVisible" ref="panelToggle" type="button" class="gw-tool" aria-label="显示说明面板" title="显示说明面板" data-test="gw-panel-open" @click="openPanel">
                 <AppIcon name="panel" />
               </button>
-              <GraphOverlay as="form" class="gw-search" role="search" @submit.prevent="onLocate">
-                <AppIcon name="search" :size="16" />
-                <input
-                  type="search"
-                  aria-label="搜索知识点"
-                  placeholder="搜索知识点，回车定位"
-                  autocomplete="off"
-                  :value="filters.state.value.query"
-                  @input="onQuery"
-                />
-              </GraphOverlay>
+              <GraphSearch
+                ref="searchBox"
+                :model-value="filters.state.value.query"
+                :options="searchOptions"
+                :cursor="searchCursor"
+                @update:model-value="onQuery"
+                @step="onSearchStep"
+                @pick="onSearchPick"
+              />
               <ChapterMenu :chapters="chapterItems" :current-id="chapterId" :disabled="mode !== 'graph'" @jump="jumpChapter" />
             </div>
             <GraphOverlay v-if="searchNotice" as="p" class="gw-notice" data-test="sg-search-notice" role="status">{{ searchNotice }}</GraphOverlay>

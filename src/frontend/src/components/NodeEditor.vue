@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSearchFocused } from '../composables/searchFocus'
 import { computed, inject, nextTick, ref, toRef, useId, watch } from 'vue'
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { createNodeEditApi, NODE_EDIT_API_KEY, type KnowledgePoint } from '../api/nodeEdit'
@@ -101,12 +102,13 @@ watch(
   },
 )
 
-// 载入新节点后把焦点移到标题
+// 载入新节点后把焦点移到标题；焦点在搜索框里时不抢（见 `composables/searchFocus.ts`）
 watch(
   () => (status.value === 'ready' ? original.value?.id : null),
   async (next, prev) => {
     if (next === null || next === undefined || next === prev) return
     await nextTick()
+    if (isSearchFocused()) return
     title.value?.focus()
   },
 )
