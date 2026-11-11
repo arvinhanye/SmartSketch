@@ -40,6 +40,8 @@ OPT-06A：`services/ai/compatible.py` 保留聊天客户端和原导入入口；
 
 OPT-06B：`workers/extract_task.py` 保留任务装配入口及旧符号再导出；`workers/extraction/{types,candidates,units,state,dispatch}.py` 分别承载共享类型、候选数据、单元执行、状态/检查点写入和有界派发。原日志类别、并发默认值、阶段屏障、重试/取消/租约及事务顺序保持不变。
 
+F09 扩展（ADR-097）：级联删除沿可见草稿 CONTAINS 计算失去全部父节点的后代，默认单点行为保持。删除影响服务生成绑定课程/根/草稿版本/有效任务/计划的指纹；在课程写锁与 Neo4j 守卫事务内重算确认后才开始 F12 审计和批量删除。API 只转换协议，Cypher 留在 graph_edit 仓储，前端请求按课程/节点/代次隔离。发布副本和学生读取边界不变。
+
 ## 前端构建、测试与应用外壳（B01～B04）
 
 OPT-06D：`views/StudentGraphView.vue` 保留路由/API 装配、模板与样式；`useStudentGraphPanel.ts` 管理面板/分隔条及焦点/observer 生命周期，`useStudentGraphPresentation.ts` 组合原响应式引用计算画布、章节布局、预览与进度。DOM、事件及视口行为不变。

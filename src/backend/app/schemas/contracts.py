@@ -31,6 +31,8 @@ Chapter = _module.Chapter
 GraphExchange = _module.GraphExchange
 GraphStats = _module.GraphStats
 KnowledgePoint = _module.KnowledgePoint
+KnowledgePointDeletion = _module.KnowledgePointDeletion
+KnowledgePointDeletionNode = _module.KnowledgePointDeletionNode
 KnowledgePointDetail = _module.KnowledgePointDetail
 # 手工新建、读取时没有任何可定位来源的节点详情：显式空态（ADR-072）。
 KnowledgePointDetailWithoutSource = _module.KnowledgePointDetailWithoutSource

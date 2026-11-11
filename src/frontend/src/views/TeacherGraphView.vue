@@ -7,13 +7,15 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRoute
 import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
-import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY } from '../api/knowledgeDetail'
+import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY, KNOWLEDGE_DELETION_API_KEY } from '../api/knowledgeDetail'
 import { createNodeEditApi, NODE_EDIT_API_KEY } from '../api/nodeEdit'
 import { createRelationsApi, RELATIONS_API_KEY } from '../api/relations'
 import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
+import NodeDeletionConfirm from '../components/NodeDeletionConfirm.vue'
+import { useNodeDeletion } from '../composables/useNodeDeletion'
 import NodeTypeLegend from '../components/NodeTypeLegend.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
@@ -216,6 +218,20 @@ function onDeleted(kpId: string): void {
   notice.value = '知识点已删除，与它相连的关系已一并删除。'
   filters.select(null)
 }
+
+const deletionApi = inject(KNOWLEDGE_DELETION_API_KEY, null) ?? (client === null ? null : createKnowledgeDetailApi(client))
+const deletion = deletionApi === null ? null : useNodeDeletion({
+  api: deletionApi, courseId, selectedId: selected, identity: computed(() => session.accessToken),
+  onCourseForbidden: leaveForbidden,
+  onDeleted: async (kpId, impact) => {
+    justDeleted = kpId
+    notice.value = impact !== null && impact.deleted_count > 1
+      ? `已删除「${impact.root_name}」及 ${impact.deleted_count - 1} 个下级知识点，相关关系一并删除。`
+      : '知识点已删除，与它相连的关系已一并删除。'
+    await teacher.refresh()
+    filters.select(null)
+  },
+})
 
 // 该侦听在面板收到新的 kpId 之前运行，此时 isDirty 仍反映被移除节点的表单
 watch(selected, (next, prev) => {
@@ -499,11 +515,18 @@ useGraphShortcuts({
             <KnowledgeDetail
               v-if="selected !== null"
               :kp-id="selected"
+              :allow-delete="deletion !== null"
+              @delete="deletion?.open($event)"
               @select-knowledge-point="onSelectRelated"
               @close="guard.request(null)"
               @course-forbidden="leaveForbidden"
             />
             <p v-else data-test="tg-detail-empty" role="status">在图谱中点击一个知识点查看详情。</p>
+            <NodeDeletionConfirm v-if="deletion !== null && deletion.kpId.value !== null"
+              :status="deletion.status.value" :impact="deletion.impact.value" :error="deletion.error.value"
+              :name="deletion.impact.value?.root_name ?? currentName ?? '该知识点'"
+              @confirm="deletion.confirm($event)" @cancel="deletion.close"
+              @retry="deletion.kpId.value !== null && deletion.open(deletion.kpId.value)" />
           </template>
 
           <!-- 切到其他页签时保留编辑面板，未保存的修改不丢 -->

@@ -1,5 +1,15 @@
 # 任务看板
 
+## 2026-11-11 Codex：MAIN-INTEGRATE-02 历史独有改动审查与收敛
+
+- 状态 IN_PROGRESS；负责人 Codex；基线 main `f944786`；分支 `codex/historical-branch-integration-20261111`。用户授权继续检查剩余 15 个历史分支，有用独有内容整合到 main，过时或被替代分支删除。
+- 输入：15 个远端历史分支及逐分支 merge-base 差异、现行规格/ADR、主线实现与测试；输出：逐分支语义比对和处置证据、必要的最小移植、恢复清单、更新后的 main。
+- 执行：前端、问答/导入/E2E、跨平台/图谱三组只读并行审查；协调者核对历史契约/文档并统一实施。按文件所有权推进，不对旧分支整体覆盖主线。
+- 约束：保留现行权限、接口、请求隔离、图谱工作台与模型设置行为；旧设计不能仅因提交独有就重新启用。确有规格冲突先记录并解决；无迁移、依赖升级或付费模型调用。
+- 验证：原引用和完整 bundle 校验；逐分支差异覆盖与后续替代证据；必要代码移植先做有意义的失败回归，执行对应门禁及 `./scripts/verify.sh`；文档差异检查；PR 检查通过后合并；删除使用精确 SHA lease 与最终远端复核。
+- 恢复材料：主检出 `.demo/historical-branch-cleanup-20261111/`；审计 `docs/reviews/historical-branches-20261111.md`，交接 `docs/handoffs/codex-historical-branches-20261111.md`。
+
+
 ## 2026-11-11 Codex：MAIN-INTEGRATE-01 分支整合与清理
 
 - 状态 DONE；负责人 Codex；基线 `99e169a`；整合代码 `6bbcf14` 经 [PR #343](https://github.com/arvinhanye/SmartSketch/pull/343) 合入 main，合并提交 `1dbd272`；#342 随之合并。

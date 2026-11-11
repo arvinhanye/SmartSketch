@@ -142,7 +142,8 @@ def _field(field: str, reason: str) -> dict[str, str]:
 
 
 @contextmanager
-def _course_write(ctx: EditContext, course_id: str) -> Iterator[GraphScope]:
+def _course_write(ctx: EditContext, course_id: str, *, reconcile_audit: bool = True) -> Iterator[GraphScope]:
+    """Hold the course lock and capture V; ADR-097 defers reconciliation until validation."""
     lock = course_locks.acquire(ctx.sqlite_url, course_id, holder=LOCK_HOLDER, lease_seconds=ctx.lock_seconds,
                                 wait_seconds=ctx.wait_seconds)
     if lock is None:
@@ -151,7 +152,8 @@ def _course_write(ctx: EditContext, course_id: str) -> Iterator[GraphScope]:
         with connect(ctx.sqlite_url) as database:
             effective = read_effective_task_ids(database, course_id)
         scope = GraphScope(course_id, DRAFT, effective_task_ids=effective)
-        audit.reconcile(ctx, scope)
+        if reconcile_audit:
+            audit.reconcile(ctx, scope)
         yield scope
 
 

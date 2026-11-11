@@ -181,7 +181,7 @@ function otherName(pair: SuspectedDuplicate): string {
           >
             <p>
               <strong>{{ nameOf(relation.from_id) }}</strong>
-              —{{ relationLabel(relation) }}→
+              —{{ relationLabel(relation) }}{{ relation.type === 'RELATED_TO' ? '—' : '→' }}
               <strong>{{ nameOf(relation.to_id) }}</strong>
             </p>
             <p class="review__meta">置信度 {{ percent(relation.confidence) }} · 证据：{{ evidence(relation) }}</p>

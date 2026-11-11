@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { AbortedError, ApiError, NetworkError, TimeoutError } from '../api/http'
 import type { ModelConfig, ModelConfigApi, ModelConfigTestResult } from '../api/modelConfig'
 import { useRuntimeStore, type RuntimeTicket } from '../stores/runtime'
@@ -79,6 +79,15 @@ export function useModelConfig({ api, syncRuntime = true }: { api: ModelConfigAp
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
   const testResult = ref<{ ok: boolean; text: string } | null>(null)
+
+  watch(
+    () => [form.baseUrl, form.model, form.apiKey, form.disableThinking],
+    () => {
+      // 已完成的结果只对应编辑前的配置；在途测试仍由请求快照判断是否作废。
+      if (busy.value === null) testResult.value = null
+    },
+    { flush: 'sync' },
+  )
 
   const configured = computed(() => saved.value?.configured === true)
   /** 首次保存或地址与已存值不同：必须填密钥（与后端规则一致，避免已存密钥被改送到新主机） */

@@ -7,7 +7,7 @@ import type { components } from '../../src/contracts/v1/generated/typescript/ope
 import { COURSES_API_KEY, type CoursesApi } from '../../src/frontend/src/api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY, type DraftGraphApi } from '../../src/frontend/src/api/graph'
 import { ApiError, createHttpClient, NetworkError, type FetchLike } from '../../src/frontend/src/api/http'
-import { KNOWLEDGE_DETAIL_API_KEY, type KnowledgeDetailApi } from '../../src/frontend/src/api/knowledgeDetail'
+import { KNOWLEDGE_DETAIL_API_KEY, KNOWLEDGE_DELETION_API_KEY, type KnowledgeDetailApi, type KnowledgeDeletionApi, type KnowledgePointDeletion } from '../../src/frontend/src/api/knowledgeDetail'
 import { NODE_EDIT_API_KEY, type NodeEditApi } from '../../src/frontend/src/api/nodeEdit'
 import { RELATIONS_API_KEY, type RelationsApi } from '../../src/frontend/src/api/relations'
 import GraphCanvas from '../../src/frontend/src/components/GraphCanvas.vue'
@@ -191,7 +191,7 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-async function mountPage(f: Fakes, path = '/courses/c1/graph/edit', accountRole: 'student' | 'teacher' = 'teacher') {
+async function mountPage(f: Fakes, path = '/courses/c1/graph/edit', accountRole: 'student' | 'teacher' = 'teacher', deletion?: KnowledgeDeletionApi) {
   const session = useSessionStore(pinia)
   session.signIn({
     access_token: 'tok',
@@ -215,6 +215,7 @@ async function mountPage(f: Fakes, path = '/courses/c1/graph/edit', accountRole:
         [COURSES_API_KEY as symbol]: { list: async () => [course('c1')], create: vi.fn(), get: f.courses.get },
         [DRAFT_GRAPH_API_KEY as symbol]: f.draft,
         [KNOWLEDGE_DETAIL_API_KEY as symbol]: f.detail,
+        ...(deletion ? { [KNOWLEDGE_DELETION_API_KEY as symbol]: deletion } : {}),
         [NODE_EDIT_API_KEY as symbol]: f.nodeEdit,
         [RELATIONS_API_KEY as symbol]: f.relations,
         [GRAPH_FACTORY_KEY as symbol]: fakeCanvasFactory(),
@@ -475,6 +476,42 @@ describe('加载草稿与状态', () => {
 // ---------------------------------------------------------------- 选中联动
 
 describe('画布选中联动详情与编辑面板', () => {
+  it.each([false, true])('详情删除真实接线：cascade=%s，确认后刷新画布并清空选中', async (cascade) => {
+    const f = fakes({ edges: [{ ...rel('r1', 'k1', 'k2'), type: 'CONTAINS' }] })
+    const pending = deferred<KnowledgePointDeletion>()
+    const preview: KnowledgePointDeletion = {
+      root_id: 'k1', root_name: '知识点 k1', root_revision: 1, cascade: true,
+      deleted_count: 2, relation_count: 1, preview_token: 'a'.repeat(64), retained: [],
+      nodes: [{ id: 'k1', name: '知识点 k1', depth: 0 }, { id: 'k2', name: '知识点 k2', depth: 1 }],
+    }
+    const deletion = {
+      deleteImpact: vi.fn<KnowledgeDeletionApi['deleteImpact']>(() => pending.promise),
+      remove: vi.fn<KnowledgeDeletionApi['remove']>(async (_cid, kid, options) => {
+        const deletedIds = options?.cascade ? ['k1', 'k2'] : [kid]
+        f.server.nodes = f.server.nodes.filter(node => !deletedIds.includes(node.id))
+        f.server.edges = f.server.edges.filter(edge => !deletedIds.includes(edge.from_id) && !deletedIds.includes(edge.to_id))
+        return options?.cascade ? preview : null
+      }),
+    }
+    const { wrapper } = await mountPage(f, '/courses/c1/graph/edit', 'teacher', deletion)
+    await clickNode(wrapper, 'k1')
+    await wrapper.get('[data-test="kd-delete"]').trigger('click')
+    expect(wrapper.get('[data-test="nd-confirm"]').attributes('disabled')).toBeDefined()
+    expect(deletion.remove).not.toHaveBeenCalled()
+    pending.resolve(preview)
+    await flushPromises()
+    expect((wrapper.get('[data-test="nd-cascade"]').element as HTMLInputElement).checked).toBe(false)
+    if (cascade) await wrapper.get('[data-test="nd-cascade"]').setValue(true)
+    await wrapper.get('[data-test="nd-confirm"]').trigger('click')
+    await flushPromises()
+    expect(deletion.remove).toHaveBeenCalledWith('c1', 'k1', expect.objectContaining({ cascade, expectedRevision: 1 }))
+    expect(canvasNodeNames(wrapper)).toEqual(cascade ? ['知识点 k3'] : ['知识点 k2', '知识点 k3'])
+    expect(canvasEdgeIds(wrapper)).toEqual([])
+    expect(wrapper.find('[data-test="nd-dialog"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="tg-detail-empty"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('点击节点显示 H06 详情，切到编辑页签是 H07 面板', async () => {
     const f = fakes()
     const { wrapper } = await mountPage(f)

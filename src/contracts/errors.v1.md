@@ -179,3 +179,7 @@
 ## 变更策略
 
 删除错误码或改变其 HTTP 状态属于破坏性变更，需新增 `errors.v2.md` 并同步 `api.v2.yaml`。新增错误码为兼容变更，但前端必须有兜底分支处理未知 `code`。
+
+### ADR-097 删除预览过期
+
+级联删除的 `preview_token` 必须为 64 位小写 SHA-256 十六进制指纹；缺少或格式错误为 422 `VALIDATION_ERROR`。持锁重算的指纹不同返回 409 `REVISION_CONFLICT`，`details.reason = deletion_preview_stale`、`details.kp_id` 标识目标；不进入编辑审计或删除，客户端须重新预览并再次明确确认。默认单点删除的节点修订冲突形状不变。

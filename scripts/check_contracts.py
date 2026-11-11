@@ -16,6 +16,16 @@ import argparse
 import sys
 from pathlib import Path
 
+# Legacy Windows console encodings cannot represent the gate's Chinese/check marks.
+# Keep successful validation from failing while emitting its result.
+for _stream in (sys.stdout, sys.stderr):
+    _encoding = getattr(_stream, "encoding", None)
+    if _encoding and hasattr(_stream, "reconfigure"):
+        try:
+            "✓✗契约".encode(_encoding)
+        except (UnicodeEncodeError, LookupError):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+
 SPEC = Path("src/contracts/api.v1.yaml")
 EVENTS = Path("src/contracts/events.v1.md")
 ARCH = Path("docs/architecture.md")

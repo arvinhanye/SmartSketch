@@ -17,11 +17,30 @@ from app.repositories.chat_logs import ChatLog, count_chat_outcomes, list_chat_l
 from app.repositories.sqlite import connect, migrate
 from app.services.qa.chat import ChatFailure
 from app.services.qa.chat import ChatAudit, ChatService, PreparedChat
+from app.services.qa import audit as chat_audit
 from app.services.qa.context import ContextStats, ContextStatus, EvidenceChunk, EvidenceContext, GraphContext
 from app.services.qa.generate import AnswerGeneration
 from app.services.ai.client import ModelResult, StreamDelta, StreamDone
 from app.config import Settings
 from app.services.versions.resolver import PublishedVersion
+
+
+def _fail_chat_log(monkeypatch):
+    def unavailable(*_args, **_kwargs):
+        raise sqlite3.OperationalError("private storage detail: What is a stack?")
+    monkeypatch.setattr(chat_audit, "write_chat_log", unavailable)
+
+
+def _assert_audit_warning(caplog, request_id, outcome):
+    warnings = [record for record in caplog.records if record.name == "app.services.qa.audit"]
+    assert len(warnings) == 1
+    warning = warnings[0]
+    assert warning.levelname == "WARNING" and warning.exc_info is None
+    assert f"request_id={request_id}" in warning.getMessage()
+    assert f"outcome={outcome}" in warning.getMessage()
+    assert "error_type=OperationalError" in warning.getMessage()
+    for private_text in ("What is a stack?", "Answer [1]", "未覆盖", "private storage detail"):
+        assert private_text not in caplog.text
 
 
 @pytest.fixture
@@ -104,7 +123,9 @@ def test_scoped_search_stats_retry_and_retention(chat_env):
     ("error", "error"),
     ("prepare_error", "error"),
 ])
-def test_chat_route_records_one_bound_terminal(chat_env, monkeypatch, terminal, expected):
+@pytest.mark.parametrize("audit_failure", [False, True])
+def test_chat_route_records_one_bound_terminal(chat_env, monkeypatch, caplog, terminal, expected,
+                                               audit_failure):
     url, user_id, course_id, version_id = chat_env
     version = PublishedVersion(course_id, version_id, 1, frozenset())
     monkeypatch.setattr(chat_api, "resolve_published", lambda *_: version)
@@ -144,10 +165,24 @@ def test_chat_route_records_one_bound_terminal(chat_env, monkeypatch, terminal, 
     app.include_router(chat_api.router)
     app.dependency_overrides[course_student] = lambda: SimpleNamespace(
         course=SimpleNamespace(id=course_id), user=SimpleNamespace(id=user_id))
-    with TestClient(app) as client:
+    if audit_failure:
+        _fail_chat_log(monkeypatch)
+    with TestClient(app, raise_server_exceptions=False) as client:
         response = client.post(f"/api/v1/courses/{course_id}/chat", json={"question": "What is a stack?"},
                                headers={"accept": "application/json"})
     assert response.status_code == (503 if terminal in ("error", "prepare_error") else 200)
+    body = response.json()
+    if terminal in ("error", "prepare_error"):
+        assert body["code"] == "LLM_UNAVAILABLE"
+        assert body["details"]["reason"] == ("timeout" if terminal == "prepare_error" else "upstream")
+        request_id = body["details"]["request_id"]
+    else:
+        assert body["status"] == expected
+        request_id = body["request_id"]
+    if audit_failure:
+        assert list_chat_logs(url, user_id=user_id, course_id=course_id) == ()
+        _assert_audit_warning(caplog, request_id, expected)
+        return
     [row] = list_chat_logs(url, user_id=user_id, course_id=course_id)
     assert row.outcome == expected
     assert row.version_id == version_id and row.question == "What is a stack?"
@@ -175,7 +210,9 @@ def test_failed_p2_does_not_create_chat_log(chat_env, monkeypatch):
     assert list_chat_logs(url, user_id=user_id, course_id=course_id) == ()
 
 
-def test_sse_terminal_is_logged_once(chat_env, monkeypatch):
+@pytest.mark.parametrize("terminal", ["done", "error"])
+@pytest.mark.parametrize("audit_failure", [False, True])
+def test_sse_terminal_is_logged_once(chat_env, monkeypatch, caplog, terminal, audit_failure):
     url, user_id, course_id, version_id = chat_env
     version = PublishedVersion(course_id, version_id, 1, frozenset())
     monkeypatch.setattr(chat_api, "resolve_published", lambda *_: version)
@@ -186,8 +223,13 @@ def test_sse_terminal_is_logged_once(chat_env, monkeypatch):
                                    started=kwargs["started"], audit=ChatAudit())
 
         def events(self, prepared, stop=None):
-            yield {"event": "meta", "status": "not_covered", "retrieved": 0,
+            yield {"event": "meta", "status": "answered" if terminal == "error" else "not_covered",
+                   "retrieved": 1 if terminal == "error" else 0,
                    "graph_version": 1, "request_id": prepared.request_id}
+            if terminal == "error":
+                yield {"event": "error", "error": ChatFailure(
+                    "LLM_UNAVAILABLE", reason="upstream").body(prepared.request_id)}
+                return
             yield {"event": "done", "final": {
                 "status": "not_covered", "reason": "no_retrieval_hit", "answer": "未覆盖",
                 "citations": [], "latency_ms": 12, "request_id": prepared.request_id,
@@ -200,16 +242,32 @@ def test_sse_terminal_is_logged_once(chat_env, monkeypatch):
     app.include_router(chat_api.router)
     app.dependency_overrides[course_student] = lambda: SimpleNamespace(
         course=SimpleNamespace(id=course_id), user=SimpleNamespace(id=user_id))
+    if audit_failure:
+        _fail_chat_log(monkeypatch)
     with TestClient(app) as client:
         response = client.post(f"/api/v1/courses/{course_id}/chat", json={"question": "What is a stack?"},
                                headers={"accept": "text/event-stream"})
     assert response.status_code == 200
-    assert "event: done" in response.text
+    events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+    assert [event["event"] for event in events] == ["meta", terminal]
+    expected = "error" if terminal == "error" else "not_covered"
+    if terminal == "error":
+        assert events[-1]["error"]["code"] == "LLM_UNAVAILABLE"
+        assert events[-1]["error"]["details"]["reason"] == "upstream"
+    else:
+        assert events[-1]["final"]["status"] == "not_covered"
+    if audit_failure:
+        assert list_chat_logs(url, user_id=user_id, course_id=course_id) == ()
+        _assert_audit_warning(caplog, events[0]["request_id"], expected)
+        return
     [row] = list_chat_logs(url, user_id=user_id, course_id=course_id)
-    assert row.outcome == "not_covered" and row.reason == "no_retrieval_hit"
+    assert row.outcome == expected
+    if terminal == "done":
+        assert row.reason == "no_retrieval_hit"
 
 
-def test_disconnected_sse_is_logged_as_aborted(chat_env):
+@pytest.mark.parametrize("audit_failure", [False, True])
+def test_disconnected_sse_is_logged_as_aborted(chat_env, monkeypatch, caplog, audit_failure):
     url, user_id, course_id, version_id = chat_env
     request_id = "z" * 26
     prepared = SimpleNamespace(request_id=request_id, audit=ChatAudit())
@@ -231,9 +289,15 @@ def test_disconnected_sse_is_logged_as_aborted(chat_env):
 
     async def consume():
         async for _ in chat_api._stream(Disconnected(), FakeService(), prepared, record):
-            pass
+            pytest.fail("a disconnected client must not receive another event")
 
+    if audit_failure:
+        _fail_chat_log(monkeypatch)
     asyncio.run(consume())
+    if audit_failure:
+        assert list_chat_logs(url, user_id=user_id, course_id=course_id) == ()
+        _assert_audit_warning(caplog, request_id, "aborted")
+        return
     [row] = list_chat_logs(url, user_id=user_id, course_id=course_id)
     assert row.outcome == "aborted"
 

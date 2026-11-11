@@ -15,6 +15,7 @@ Exit 0 pass, 1 gate failure, 2 usage error. Prints a one-line summary either way
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -43,6 +44,24 @@ def load_rules(path: Path = ALLOWLIST) -> list[Rule]:
     return rules
 
 
+def skip_reason(skipped: ET.Element) -> str:
+    message = (skipped.get("message") or "").strip()
+    text = (skipped.text or "").strip()
+    if message != "collection skipped":
+        return message or text or "(no reason)"
+    # pytest serializes collection longrepr as (filename, line, 'Skipped: reason').
+    # Only unwrap that exact structure; never execute report contents or relax rules.
+    try:
+        detail = ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        detail = None
+    if (isinstance(detail, tuple) and len(detail) == 3
+            and isinstance(detail[0], str) and type(detail[1]) is int
+            and isinstance(detail[2], str) and detail[2].startswith("Skipped: ")):
+        return detail[2][len("Skipped: "):].strip() or "(no reason)"
+    return text or "(no reason)"
+
+
 def judge(label: str, mode: str, report: Path, rules: list[Rule], min_tests: int = 1) -> list[str]:
     try:
         root = ET.parse(report).getroot()
@@ -60,7 +79,7 @@ def judge(label: str, mode: str, report: Path, rules: list[Rule], min_tests: int
             problems.append(f"failed: {name}")
             executed += 1
         elif skipped is not None:
-            reason = (skipped.get("message") or skipped.text or "").strip() or "(no reason)"
+            reason = skip_reason(skipped)
             if not any(rule.mode in ("*", mode) and rule.pattern.search(reason) for rule in rules):
                 unexpected[reason] = unexpected.get(reason, 0) + 1
         else:
