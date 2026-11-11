@@ -1,6 +1,6 @@
 # OPT-06 大文件职责拆分实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 按原交接将四个候选文件拆成职责明确的内部模块，保留旧导入入口与既有行为。
 
@@ -12,9 +12,9 @@
 
 ## 状态与前置条件
 
-**IN_PROGRESS：用户已授权本地整合后继续；原远端状态核查如下。** 2026-11-10 核实：OPT-03 为本地 `36c1f92`，未找到远端分支或 PR；OPT-05 PR #339 为 open / merged=false，目标为 `codex/opt-base-ad63341`；底座 PR #338 也未合并。当前 `99c1f01` 含 OPT-05、不含 OPT-03。
+**DONE_LOCAL：本地整合、四项拆分与验收均完成；未推送/创建或合并远端 PR。原依赖状态核查如下。** 2026-11-10 核实：OPT-03 为本地 `36c1f92`，未找到远端分支或 PR；OPT-05 PR #339 为 open / merged=false，目标为 `codex/opt-base-ad63341`；底座 PR #338 也未合并。整合前 `99c1f01` 含 OPT-05、不含 OPT-03。
 
-原交接要求「只在 OPT-03/05 合入后做」。以下为基于当前源码的预备拆分安排；解除依赖后先核对最终基线和导出清单，再开始逐项实施。用户已授权 OPT-06 实施；用户已明确允许在隔离分支本地整合依赖、验证后继续，暂不推送或合并远端 PR。本地整合基线为 `ec92026`（父提交 `36c1f92` / `99c1f01`），任务表冲突保留双方内容。
+原交接要求「只在 OPT-03/05 合入后做」。以下为已核对整合基线、导出清单后执行的拆分安排。用户已授权 OPT-06 实施；用户已明确允许在隔离分支本地整合依赖、验证后继续，暂不推送或合并远端 PR。本地整合基线为 `ec92026`（父提交 `36c1f92` / `99c1f01`），任务表冲突保留双方内容。
 
 ## Global Constraints
 
@@ -36,9 +36,9 @@
 ## 0. 建立可验证基线
 
 - [x] 读取原交接、相关规则和依赖完成记录，核实 GitHub PR 状态与本地提交祖先关系。
-- [ ] 确认含 OPT-03/05 的已合入基线；若用户允许提前本地整合，使用原提交保留历史，记录两者 SHA、冲突解决及独立验证结果。
-- [ ] 在适合的隔离工作区建立每项分支，保存公共导出/签名清单和同视口前端基线截图。
-- [ ] `PATH="$PWD/.venv/bin:$PATH" GOCACHE="$PWD/.demo/opt-06/go-build-cache" ./scripts/verify.sh full`，保存原始日志和退出码。失败归因后再判断后续差异。
+- [x] 确认含 OPT-03/05 的已合入基线；若用户允许提前本地整合，使用原提交保留历史，记录两者 SHA、冲突解决及独立验证结果。
+- [x] 在适合的隔离工作区建立每项分支，保存公共导出/签名清单和同视口前端基线截图。
+- [x] `PATH="$PWD/.venv/bin:$PATH" GOCACHE="$PWD/.demo/opt-06/go-build-cache" ./scripts/verify.sh full`，保存原始日志和退出码。失败归因后再判断后续差异。
 
 ## Task 1: OPT-06A：compatible.py
 
@@ -46,9 +46,9 @@
 
 **Interfaces:** 保留 `CompatibleModelClient`、`CompatibleEmbeddingClient`、`HttpResponse`、`HttpTransport`、`StdlibTransport`、`ExchangeDeadline`、`estimate_input_tokens`、`thinking_body`、`system_addresses`、`resolve_within`、`exchange` 及实际消费者使用的其他旧符号，签名以最终基线为准。
 
-- [ ] 枚举消费方和测试注入点；搬移前后比较导入与签名，给未覆盖的兼容性风险补最小测试。
-- [ ] 原样搬移职责块，核对请求体、响应解析、错误映射及资源关闭顺序；旧模块显式再导出。
-- [ ] 运行 `PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/test_e03.py tests/backend/test_e04.py tests/backend/test_l05.py tests/backend/test_c02b_disable_thinking.py -q`，再运行后端全量门禁 `scripts/verify/backend.sh full`。
+- [x] 枚举消费方和测试注入点；搬移前后比较导入与签名，给未覆盖的兼容性风险补最小测试。
+- [x] 原样搬移职责块，核对请求体、响应解析、错误映射及资源关闭顺序；旧模块显式再导出。
+- [x] 运行 `PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/test_e03.py tests/backend/test_e04.py tests/backend/test_l05.py tests/backend/test_c02b_disable_thinking.py -q`，再运行后端全量门禁 `scripts/verify/backend.sh full`。
 
 ## Task 2: OPT-06B：extract_task.py
 
@@ -56,9 +56,9 @@
 
 **Interfaces:** 保留 `ExtractStatus`、`ExtractOutcome`、`ExtractLimits`、`ExtractionToolkit`、`TaskEntity`、`FailedChunk`、`FailedSection`、`ExtractionCandidates`、`RunOnceResult`、`task_entity_id`、`exceeds_threshold`、`fail_for_credential`、`run_extract_stage`、`load_candidates`、`run_once` 的旧路径与签名。
 
-- [ ] 核对最终基线是否包含提速分支；枚举跨模块类型和私有函数依赖，先划清无循环依赖的移动组。
-- [ ] 按类型 → 候选数据 → 单元执行 → 状态/调度顺序搬移；调度循环、失败阈值、租约检查点与数据库上下文保持原顺序。
-- [ ] 运行 `PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/test_e12.py tests/backend/test_demo_mode.py tests/backend/test_c02_phase_logs.py tests/backend/test_k02_run.py -q`，再运行 `scripts/verify/backend.sh full`；若最终基线已含提速测试，同步加入其定向回归。
+- [x] 核对最终基线是否包含提速分支；枚举跨模块类型和私有函数依赖，先划清无循环依赖的移动组。
+- [x] 按类型 → 候选数据 → 单元执行 → 状态/调度顺序搬移；调度循环、失败阈值、租约检查点与数据库上下文保持原顺序。
+- [x] 运行 `PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/test_e12.py tests/backend/test_demo_mode.py tests/backend/test_c02_phase_logs.py tests/backend/test_k02_run.py -q`，再运行 `scripts/verify/backend.sh full`；若最终基线已含提速测试，同步加入其定向回归。
 
 ## Task 3: OPT-06C：useMaterials.ts
 
@@ -66,9 +66,9 @@
 
 **Interfaces:** 保留 `useMaterials(options: UseMaterialsOptions)` 的返回对象，以及 `MATERIAL_EXTENSIONS`、`SUPPORTED_FORMATS_TEXT`、`MATERIAL_ACCEPT`、`sameChapterOtherFormat`、`formatBytes`、`validateMaterialFile`、`taskStatusOf` 与全部原导出类型。
 
-- [ ] 记录导出/返回值清单，原样搬移纯函数和类型；旧入口显式再导出，避免对 reactive 状态做值拷贝。
-- [ ] 保留 composable 内 watch、上传/取消/删除、请求代次和 dispose 顺序；执行切课、晚到响应、任务终态回归。
-- [ ] 运行 `npm --prefix src/frontend run test -- --run h02.test.ts`，再运行 `scripts/verify/frontend.sh full`。
+- [x] 记录导出/返回值清单，原样搬移纯函数和类型；旧入口显式再导出，避免对 reactive 状态做值拷贝。
+- [x] 保留 composable 内 watch、上传/取消/删除、请求代次和 dispose 顺序；执行切课、晚到响应、任务终态回归。
+- [x] 运行 `npm --prefix src/frontend run test -- --run h02.test.ts`，再运行 `scripts/verify/frontend.sh full`。
 
 ## Task 4: OPT-06D：StudentGraphView.vue
 
@@ -76,12 +76,14 @@
 
 **Interfaces:** 页面仍使用原路由与注入键；新 composable 接收原 refs/computed 和回调，返回现有模板同名绑定。实现前从最终基线提取精确类型；不引入 DOM 包装层，不改变 scoped 样式作用域。
 
-- [ ] 保存同数据、1440/1280/768/390 宽截图；保留模板绑定名称与事件顺序，再逐职责搬移 script 逻辑。
-- [ ] 运行 `npm --prefix src/frontend run test -- --run h11.test.ts i06.test.ts l13-kp-link.test.ts l14.test.ts student-graph-workbench.test.ts`，再运行 `scripts/verify/frontend.sh full`。
-- [ ] 浏览器比较截图并走查窄屏抽屉、分隔条拖拽/键盘、Esc/还焦点、深链接、掌握状态与推荐刷新；无法执行的项目单列未验证。
+- [x] 保存同数据、1440/1280/768/390 宽截图；保留模板绑定名称与事件顺序，再逐职责搬移 script 逻辑。
+- [x] 运行 `npm --prefix src/frontend run test -- --run h11.test.ts i06.test.ts l13-kp-link.test.ts l14.test.ts student-graph-workbench.test.ts`，再运行 `scripts/verify/frontend.sh full`。
+- [x] 浏览器比较截图并走查窄屏抽屉、分隔条拖拽/键盘、Esc/还焦点、深链接、掌握状态与推荐刷新；无法执行的项目单列未验证。
 
 ## Task 5: 各项收尾
 
-- [ ] 每项记录最小相关测试、相应后端/前端全量测试和 `./scripts/verify.sh` 的实际结果；前端确认 type-check 与 build 均通过。
-- [ ] 查看最终 diff / `git diff --check`，核对行为、导出清单及契约无变化。
-- [ ] 更新源码映射、任务状态及 `docs/handoffs/codex-opt-06[a-d].md`，每项保留独立可审查范围；远端提交/推送/PR 按用户授权执行。
+- [x] 每项记录最小相关测试、相应后端/前端全量测试和 `./scripts/verify.sh` 的实际结果；前端确认 type-check 与 build 均通过。
+- [x] 查看最终 diff / `git diff --check`，核对行为、导出清单及契约无变化。
+- [x] 更新源码映射、任务状态及 `docs/handoffs/codex-opt-06[a-d].md`，每项保留独立可审查范围；远端提交/推送/PR 按用户授权执行。
+
+最终验收：A/C/D/B 四项独立本地提交；基线 full、两次后端 full、两次前端 full、最终 basic 均 exit 0，8/8 同视口截图逐像素一致，独立审查无可操作问题。详细命令、日志和已决边界见总交接。

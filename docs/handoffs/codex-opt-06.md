@@ -1,44 +1,54 @@
-# OPT-06：依赖核查与拆分准备
+# OPT-06：四个大文件职责拆分
 
-- task_id：OPT-06；负责人：Codex；核查日期：2026-11-10（America/New_York）。
-- 状态：**IN_PROGRESS**。用户已确认在隔离分支本地整合依赖后继续，暂不推送或合并远端 PR。当前整合基线 `ec92026`，全量基线门禁运行中。
-- 用户范围：先确认 OPT-03/05 依赖，再按原交接分文件拆分并验证。
-- 当前工作区：`/Users/arvinhan/.codex/worktrees/opt-06-responsibility-split/SmartSketch-main`，`codex/opt-06-base@ec92026`。原目录仅本任务文档已转移，既有改动保持不变。
-- 原要求：审查分支 `claude/code-structure-review-handoff-49e73a` 的 `docs/handoffs/claude-code-structure-review-codex-handoff.md:86–90`，明确「只在 OPT-03/05 合入后做；每个文件一个 PR；对外导出名不变（旧模块保留再导出）；不改行为」。
+- task_id：OPT-06；负责人 Codex；状态 **DONE_LOCAL**（四项本地实现与验收完成，未推送/创建或合并远端 PR）。
+- 用户决定：允许本地整合 OPT-03/05 后继续；**暂不推送或合并远端 PR**。
+- 工作区：`/Users/arvinhan/.codex/worktrees/opt-06-responsibility-split/SmartSketch-main`；最终代码位于 `codex/opt-06b-extraction`。
+- 原交接：审查分支 `claude/code-structure-review-handoff-49e73a` 的 `docs/handoffs/claude-code-structure-review-codex-handoff.md:86–90`。每个原候选文件独立 PR 范围，保留旧导入/导出，不改行为。
 
-## 依赖证据
+## 依赖核查与整合
 
-| 依赖 | 已验证状态 | 当前缺口 |
+2026-11-10 查询时：OPT-03 为本地 `36c1f92`，未找到对应远端分支或 PR；OPT-05 [PR #339](https://github.com/arvinhanye/SmartSketch/pull/339) 为 open / merged=false，head `99c1f01`，base `codex/opt-base-ad63341`；底座 [PR #338](https://github.com/arvinhanye/SmartSketch/pull/338) 同样未合并。整合前原目录 HEAD `99c1f01` 含 OPT-05、不含 OPT-03，不能直接满足原交接的远端合入前置条件。
+
+收到用户允许本地整合的明确回复后，用原提交历史建立本地 merge `ec92026`（父提交 `36c1f92`、`99c1f01`）。仅 `docs/tasks.md` 文本冲突，保留双方任务记录；产品与测试路径没有冲突。OPT-03 祖先中的 `eca579c` 个人模式 E2E 辅助修复随之进入基线。文档准备提交为 `ffef748`。原目录 EXTRACT-PERF-01 的任务追加与两份未跟踪 Claude 交接保持原样。
+
+整合后、任何产品改动前实际运行 `PATH="$PWD/.venv/bin:$PATH" GOCACHE="$PWD/.demo/opt-06/go-build-cache" ./scripts/verify.sh full`：**exit 0**；后端/工具测试 **4264 passed / 27 登记 skip**，前端 **82 文件 / 1375 passed**、type-check/build 通过，基础/契约及启动相关门禁通过。总耗时 1059.1 秒，日志 `baseline-full.log` / `.exit`。这不是 `integration` 模式验收，也不改变 OPT-02/05 原有未完成事项的状态。
+
+## 独立交付范围
+
+| 项 | 分支 | 未来 PR base | 本地实现提交 | 原文件行数 |
+| --- | --- | --- | --- | --- |
+| A 兼容客户端 | codex/opt-06a-compatible | codex/opt-06-base | 7cccaaa | 1074 → 423 |
+| C 材料页逻辑 | codex/opt-06c-materials | codex/opt-06a-compatible | 936b41e | 843 → 547 |
+| D 学生图谱页面 | codex/opt-06d-student-graph | codex/opt-06c-materials | 3974731 | 789 → 635 |
+| B 抽取任务 | codex/opt-06b-extraction | codex/opt-06d-student-graph | 76d1fd7 | 1020 → 260 |
+
+四项为叠加本地分支：未来 PR 应以上一分支为 base，避免把之前候选文件重复装入后续 PR。执行顺序 A → C → D → B：A 后端全量运行时只修改互不依赖的前端，后端/测试 298 个文件哈希未变；B 等 A 完成后才改。每项源码映射在 `docs/architecture.md`，具体交接为 `codex-opt-06a.md`、`codex-opt-06b.md`、`codex-opt-06c.md`、`codex-opt-06d.md`。
+
+## 验证证据
+
+| 范围 | 定向回归 | 完整门禁 / 结构证据 |
 | --- | --- | --- |
-| OPT-03 | 本地 `codex/opt-03-test-fixtures@36c1f92`，工作区干净；交接记录 DONE，`verify.sh full` exit 0，4254 passed / 27 登记 skip，前端 1375 passed | GitHub 按 head 查询未找到 PR，按分支名查询未找到远端分支；当前 HEAD 不含此提交 |
-| OPT-05 | 本地/远端 head 均为 `99c1f01`；[PR #339](https://github.com/arvinhanye/SmartSketch/pull/339) 实时元数据为 open、merged=false、merged_at=null，目标 `codex/opt-base-ad63341@ad63341` | 尚未合并；交接仍有原版个人模式 E2E 例外，不能称完整 integration 全绿 |
-| 共用底座 | [PR #338](https://github.com/arvinhanye/SmartSketch/pull/338) 实时元数据为 open、merged=false；目标 `main@3f26766`，head `ad63341` | 底座尚未进入 main |
+| A | E03/E04/L05/C02b：413 passed | 后端 full 4264 passed / 27 skip，exit 0；44 定义 / 30 签名与对象身份核对通过 |
+| C | H02：95 passed | 前端 full 82 文件 / 1375 passed、type-check/build exit 0；41 声明 / 14 导出不变，主函数体逐字相同 |
+| D | H11/I06/L13/L14/workbench：135 passed | 前端 full 82 文件 / 1375 passed、type-check/build exit 0；81 声明不变，模板/样式逐字相同 |
+| B | E12/demo/C02/K02：87 passed | 60 定义 / 47 签名及对象身份核对通过；后端 full 4264 passed / 27 登记 skip，exit 0 |
+| 共用收尾 | 最终 `./scripts/verify.sh` | exit 0（223.7 秒）；最终 diff 检查通过，独立审查无可操作问题 |
 
-上述测试数字引用已读取的依赖交接记录，本轮未重新运行其 full/integration。PR 的 `mergeable=true` 仅表示可合并，不表示已合并；open PR 的 `merge_commit_sha` 不作为合入证据。
+浏览器：本机 Chrome、固定伪造课程/API，1440/1280/768/390 × 900，各一张概览和深链接详情截图；分隔条拖拽/键盘、窄屏抽屉/Esc、关闭还焦点、掌握写入/推荐刷新、列表/图谱和布局切换均通过，无 pageerror/横向溢出。初次两张宽屏概览差异来自缩略图异步绘制，补上“画布有实际像素”条件后，**8/8 图逐像素相同，布局和交互记录完全一致**。没有改产品等待逻辑。此为前端伪造 API 走查，不代替真实服务 E2E。
 
-本地祖先检查：`git merge-base --is-ancestor 36c1f92 HEAD` exit 1；`99c1f01 HEAD` exit 0；两者对 `origin/main` 均 exit 1。远端状态以本轮 GitHub 实时查询为补充，不单凭旧 remote-tracking ref 下结论。
+证据目录：`.superpowers/sdd/2026-11-10-opt-06-responsibility-split/`（本机忽略目录，保留日志、退出码、AST 审计、执行脚本、before/after 及 before-settled/after-settled 截图、visual-comparison-settled.json）。各分项交接列出实际命令。Python 3.11.9 / Node v26.4.0 / npm 11.17.0；无依赖安装升级、无真实付费模型调用。保留已有 Starlette/jsdom/测试警告及 bundle 大小提示，没有放宽断言、超时或跳过登记。
 
-OPT-03 依赖的 OPT-02 提交 `eca579c` 包含个人模式高级选项展开修复；它目前未在 OPT-05 当前基线中。两条线整合后的结果需要实际重验，不能拼接旧测试记录作为综合通过。
+## 接口、回滚与后续
 
-只读 `git merge-tree ad63341 99c1f01 36c1f92` 预演：两条线的改动路径仅 `docs/tasks.md` 重叠，并产生文本冲突；产品/测试路径无交集。这只是冲突预览，尚未修改索引、分支或工作区，也不证明整合后运行通过。
+- 无 API/契约、数据库、配置默认值、提示词、界面文案或样式变更。仅内部职责搬移与源码映射更新；纯搬移复用现有行为测试和结构审计，不添加只验证文件布局的测试。
+- 没有迁移；回滚代码时按独立实现提交逆序撤销相应范围即可，保留依赖整合历史。
+- `codex/extraction-perf` 与 extract_task 有重叠，未纳入本轮；默认并发 4 与原阶段屏障保持。将来整合提速分支须基于新 extraction 模块移植并重新验证。
+- 本地范围已完成，四个实现范围和最终验收记录可审查。远端 PR 创建/合并不在本轮授权内，未执行。
 
-## 拆分准备与风险
+## 最终独立审查
 
-- 预备计划：`docs/superpowers/plans/2026-11-10-opt-06-responsibility-split.md`；四项分别对应 compatible、extract_task、useMaterials、StudentGraphView，不更改公开行为。
-- 当前四文件行数依次为 1074 / 1020 / 843 / 789。关键检查为旧导入兼容、网络 deadline/资源释放、worker 租约和事务、资料 SSE/请求取消、图谱响应式和焦点/布局。
-- `codex/extraction-perf` 对 `workers/extract_task.py` 相较 `ad63341` 有 78 行新增 / 57 行删除；本轮仅核对差异统计，不将该分支整合或回退。依赖合入后须重查此重叠。
-- 已有 `docs/tasks.md` 的 EXTRACT-PERF-01 未提交追加及两份未跟踪 Claude 交接原样保留。
-- 当前工具链：Python 3.11.9、Node v26.4.0、npm 11.17.0；未安装或升级依赖。
+独立 fresh-context reviewer 审查了 `ffef748` 至四项最终源码（B 当时为暂存状态），未发现 Critical/Important/Minor 可操作问题。检查涵盖 794 处 Python 全局读取、13 个模块的新进程导入、198 项类型注解解析，以及实际测试注入点和 Vue 生命周期；未重复长测试。完整报告与执行方范围裁定保存在 `final-review.md` 和 `progress.md`。
 
-## 本轮改动与验证
+定义移动会改变 __module__/repr/新 pickle 的来源路径；未发现业务/持久化消费者依赖这些元数据。旧导入和对象再导出、实际类方法注入保持，未额外承诺任意重新赋值旧模块 helper 后的新模块动态转发。保留既有算法/UI；不把本轮 Chrome 固定 API 走查表述成真实模型或其他浏览器验收。
 
-- 仅新增本交接、预备计划，并在 `docs/tasks.md` 追加认领及阻塞记录。
-- GitHub 查询：OPT-03 按任务/head 检索与分支名检索；OPT-05 与底座 PR 实时元数据读取。未执行远端写操作。
-- `git status`、提交祖先检查、依赖交接与源代码职责核对已完成。
-- 原目录准备阶段 `PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh` exit 0（25 项门禁负例及 B14/B08/B09/B10/B12/B13 通过）；`git diff --check` exit 0。隔离整合基线完整门禁另记。
-- 未运行 OPT-06 后端/前端全量测试、构建和截图对比；尚无产品改动供此类验证。
-- 无 API、数据、配置、依赖或架构实现变更；无迁移或破坏性操作。
-
-## 下一步
-
-用户已于本轮明确允许在隔离分支本地整合 `36c1f92` 与 `99c1f01`、验证后实施。按计划顺序执行，四项使用独立本地叠加分支与提交，未来 PR 各自以上一项为 base，保持每个原候选文件独立审查；暂不推送或合并远端 PR。
+B 全量及共用门禁都自然结束、退出码 0 后才创建 B 实现提交；后续收尾只更新文档。B 门禁期间 304 个后端/测试文件哈希保持不变。代码、测试、契约、配置与依赖范围最终检查通过；执行日志按项目交接要求留在本机忽略目录。

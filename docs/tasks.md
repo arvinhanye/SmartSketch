@@ -2534,18 +2534,20 @@ STARTUP-14检查点：根因确认是Gatekeeper拒绝PID44020；源码137/成功
 
 ## 2026-11-10 Codex 认领：OPT-06 大文件按职责拆分
 
-- 状态 **IN_PROGRESS**；负责人 Codex；依赖核查后用户已明确允许在隔离分支本地整合 OPT-03/05、验证后继续，暂不推送或合并远端 PR。本地整合基线 `ec92026`，工作区 `opt-06-responsibility-split/SmartSketch-main`。
-- 输入：审查分支 `claude/code-structure-review-handoff-49e73a` 的原交接 OPT-06、OPT-03/05 交接、任务/图谱/路径规格；当前基线 `99c1f01`。
-- 依赖核查（2026-11-10）：OPT-03 本地 `36c1f92` 已验收，GitHub 未找到对应分支或 PR；OPT-05 [PR #339](https://github.com/arvinhanye/SmartSketch/pull/339) 为 open / merged=false，目标为底座分支；底座 [PR #338](https://github.com/arvinhanye/SmartSketch/pull/338) 也未合并。当前 HEAD 含 OPT-05、不含 OPT-03。原交接「只在 OPT-03/05 合入后做」的条件尚未满足。
+- 状态 **DONE_LOCAL**；负责人 Codex；依赖核查后用户已明确允许在隔离分支本地整合 OPT-03/05、验证后继续，暂不推送或合并远端 PR。本地整合基线 `ec92026`，工作区 `opt-06-responsibility-split/SmartSketch-main`。
+- 输入：审查分支 `claude/code-structure-review-handoff-49e73a` 的原交接 OPT-06、OPT-03/05 交接、任务/图谱/路径规格；整合前基线 `99c1f01`。
+- 依赖核查（2026-11-10）：OPT-03 本地 `36c1f92` 已验收，GitHub 未找到对应分支或 PR；OPT-05 [PR #339](https://github.com/arvinhanye/SmartSketch/pull/339) 为 open / merged=false，目标为底座分支；底座 [PR #338](https://github.com/arvinhanye/SmartSketch/pull/338) 也未合并。整合前 HEAD 含 OPT-05、不含 OPT-03。原交接的远端合入条件未满足；已由用户明确授权本地整合并完成整合基线 full 验证。
 - 输出范围：`compatible.py`、`extract_task.py`、`useMaterials.ts`、`StudentGraphView.vue` 分为四项独立交付；旧入口/导出名保留，不改行为，每个原候选文件一个 PR 范围。
-- 风险：Python 导入兼容/循环依赖、网络资源释放、worker 事务与租约、前端请求/SSE 生命周期、响应式及焦点/布局；`codex/extraction-perf` 同时修改 `extract_task.py`，最终基线确定后重查。
+- 风险：Python 导入兼容/循环依赖、网络资源释放、worker 事务与租约、前端请求/SSE 生命周期、响应式及焦点/布局；`codex/extraction-perf` 同时修改 `extract_task.py`，本轮已核查并排除，后续合入时重查。
 - 验收：各项最小相关回归及对应后端/前端全量，`./scripts/verify.sh`，前端 type-check/build，Vue 同视口截图与交互走查，最终 diff；命令与分项范围见 `docs/superpowers/plans/2026-11-10-opt-06-responsibility-split.md`。
 - 已决：用户确认允许本地整合后继续，不等待远端合入；暂不推送或合并远端 PR。四项分别保留本地叠加分支与独立提交范围。核查证据和验证记录见 `docs/handoffs/codex-opt-06.md`。
 
-- OPT-06A：AI 兼容客户端拆分；44 定义/30 签名核对通过，定向 413 passed，后端 full 4264 passed / 27 登记 skip，exit 0；共用门禁与最终审查待完成。
+- OPT-06A：AI 兼容客户端拆分；44 定义/30 签名核对通过，定向 413 passed，后端 full 4264 passed / 27 登记 skip，exit 0；最终共用 basic exit 0，独立审查无可操作问题；本地验收完成。
 
-- OPT-06C：材料页纯函数/类型拆分；41 声明/14 导出核对通过，定向 95 passed；前端 full 82 文件 / 1375 passed，type-check/build exit 0；共用门禁与最终审查待完成。
+- OPT-06C：材料页纯函数/类型拆分；41 声明/14 导出核对通过，定向 95 passed；前端 full 82 文件 / 1375 passed，type-check/build exit 0；最终共用 basic exit 0，独立审查无可操作问题；本地验收完成。
 
-- OPT-06D：学生图谱页面拆分；81 声明、模板/样式核对通过，定向 135 passed；前端 full 82 文件 / 1375 passed、type-check/build exit 0，四种宽度浏览器走查通过；共用门禁与最终审查待完成。
+- OPT-06D：学生图谱页面拆分；81 声明、模板/样式核对通过，定向 135 passed；前端 full 82 文件 / 1375 passed、type-check/build exit 0，四种宽度浏览器走查通过；最终共用 basic exit 0，独立审查无可操作问题；本地验收完成。
 
 - OPT-06B：worker 五职责拆分，60 定义/47 签名核对通过，定向 87 passed；后端 full 4264 passed / 27 登记 skip、共用 basic exit 0，独立审查无可操作问题；本地验收完成。
+
+- 最终收尾：整合基线 full exit 0；A/B 后端 full 各 4264 passed / 27 登记 skip；C/D 前端 full 各 82 文件 / 1375 passed，type-check/build 通过；最终 basic exit 0。Chrome 四宽度 8/8 截图逐像素一致、交互通过，独立最终审查无可操作问题。实现提交 A `7cccaaa`、C `936b41e`、D `3974731`、B `76d1fd7`；相邻 base 与证据见 `docs/handoffs/codex-opt-06.md`。无推送/远端 PR 操作，EXTRACT-PERF 重叠留待其整合时处理。

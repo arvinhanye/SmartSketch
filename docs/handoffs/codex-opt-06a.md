@@ -1,6 +1,6 @@
 # OPT-06A：compatible.py 按职责拆分
 
-- task_id：OPT-06A；负责人 Codex；状态 IN_PROGRESS（实现与后端全量通过，共用门禁/最终审查待完成）。
+- task_id：OPT-06A；负责人 Codex；状态 DONE_LOCAL（实现、定向/全量、共用门禁及独立审查完成；仅本地交付）。
 - 本地分支 `codex/opt-06a-compatible`；任务基线 `ffef748`，产品整合基线 `ec92026`。
 - 用户已允许本地整合 OPT-03/05 后继续，暂不推送或合并远端 PR。未来本项 PR 以 `codex/opt-06-base` 为 base。
 
@@ -21,11 +21,11 @@
 - 临时 AST/运行时审计：44 个定义的实现 AST 相同；30 个函数/类签名相同；旧入口与新归属模块的对象身份相同；__all__ 相同。证据 `.superpowers/sdd/2026-11-10-opt-06-responsibility-split/a-audit.json`。
 - `PYTHONPATH=src/backend .venv/bin/python -m pytest tests/backend/test_e03.py tests/backend/test_e04.py tests/backend/test_l05.py tests/backend/test_c02b_disable_thinking.py -q -p no:cacheprovider`：**413 passed，exit 0**（31.36 秒；已有 Starlette/httpx 弃用警告）。
 - `PATH="$PWD/.venv/bin:$PATH" scripts/verify/backend.sh full`：**4264 passed / 27 登记 skip，gate PASS，exit 0**；原始证据 `a-backend-full.log` / `.exit`。
-- 共用 `./scripts/verify.sh` 基础门禁将在四项最终状态运行；最终独立审查和差异检查尚未完成。
+- 最终共用 `./scripts/verify.sh` **exit 0**；最终独立审查无可操作问题，最终差异检查通过，见总交接及 `final-review.md`。
 - 日志目录为上述 `.superpowers/sdd/2026-11-10-opt-06-responsibility-split/`，定向日志 `a-targeted.log` / `.exit`。
 
-## 接口、数据与未完成项
+## 接口、数据与回滚
 
 没有 API/契约、数据模型、数据库、配置、依赖或供应商协议改动。仅同步内部源码映射。纯搬移沿用现有行为回归，不添加只验证文件布局的测试。
 
-当前未完成：共用门禁、最终审查。无真实付费模型调用。回滚本项代码时按本项独立提交范围恢复；没有数据回滚步骤。
+本项本地验收完成。无真实付费模型调用。回滚本项代码时按本项独立提交范围恢复；没有数据回滚步骤。
