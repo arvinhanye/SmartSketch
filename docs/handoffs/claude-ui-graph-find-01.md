@@ -2,8 +2,8 @@
 
 - 日期：2026-11-11
 - 负责人：Claude
-- 分支 / 基线：`claude/knowledge-graph-ux-analysis-2e7400` / `main@3f26766`
-- 状态：实现与自动化验收完成；**浏览器实测未做**；未提交、未推送
+- 分支 / 基线：`claude/knowledge-graph-ux-analysis-2e7400` / `main@3f26766`，已合入 `codex/opt-05-backend-layering@99c1f01`（改版前端）
+- 状态：实现、自动化验收与浏览器实走完成；已提交到本分支，**未推送**；待用户视觉签收
 
 ## 背景
 
@@ -25,29 +25,59 @@
 
 - 后端、契约、数据库：无。
 - 前端内部：`G6NodeData` 新增可选字段 `aliases`（没有别名时不带）；`useGraphFilters` 新增选项 `search` 与返回值 `matches`；新增导出 `matchNodes`。`filterGraph`、`locateNode` 的既有语义保留（`locateNode` 现在也匹配别名，并且“以关键字开头”排在“包含”之前）。
+- `lifecycle.focus` 与 `GraphCanvas.focus` 新增可选参数 `{ readable }`；新增 `composables/searchFocus.ts`（`isSearchFocused`），`KnowledgeDetail` 与 `NodeEditor` 载入后聚焦标题前先判断。
 - `applyFocusStates`：没有预览/选中、没有章节聚焦、有搜索命中时，未命中的节点加 `dimmed`（此前只给命中加 `match`）。
 - 本浏览器存储新增两个键：`smartsketch.panel-width.student-graph`、`smartsketch.panel-width.teacher-graph`，值是一个数字。
 
 ## 验证
 
-在工作树根目录执行：
+在工作树根目录执行（合入改版分支后的最终代码）：
 
 ```bash
 npm ci --prefix src/frontend
-scripts/verify/frontend.sh full     # exit 0：type-check 无错误；78 文件 / 1338 条通过；build 成功
+scripts/verify/frontend.sh full     # exit 0：type-check 无错误；83 文件 / 1414 条通过；build 成功
 ./scripts/verify.sh                 # exit 0（basic）
 ```
 
-- 新增测试：`tests/frontend/graph-find.test.ts` 31 条（查找排序、筛选层高亮模式、快捷键、地址参数、宽度偏好、搜索框组件、学生页整页行为）；`tests/frontend/h14.test.ts` 追加 3 条（教师页高亮、循环定位、宽度记忆）。
+- 新增测试：`tests/frontend/graph-find.test.ts` 33 条（查找排序、筛选层高亮模式、快捷键、地址参数、宽度偏好、搜索框组件、学生页整页行为、生命周期 `focus` 的 `readable` 选项）；`tests/frontend/h14.test.ts` 追加 4 条（教师页高亮、循环定位、搜索中不抢焦点、宽度记忆）。
 - 调整的既有断言 2 条，均因规格变更：`graph-focus-states.test.ts`「搜索命中只加 match」改为「命中加 match、其余淡化」；`h03.test.ts` 节点数据期望加上 `aliases`。
 - 反向验证一次：把学生页的 `search: 'highlight'` 去掉，新测试 3 条失败；恢复后通过。
-- **测试是实现之后补写的，不是先红后绿。**
+- **第一轮测试是实现之后补写的，不是先红后绿。** 浏览器实走发现的两处问题是先有复现（实走现象 / 失败用例）再修的。
+
+### 合并
+
+- 合入 `codex/opt-05-backend-layering`（UI-PINE-01 改版、UI-NORAIL-01 顶栏导航、邀请码、GRAPH-HOVER-01 悬停差分等 10 个提交）。冲突三处：两个页面的导入语句（对方抽出 `countNodeTypes` / `toggledNodeTypes`，本任务去掉 `locateNode` 导入）、`docs/tasks.md` 末尾（两边都追加，按时间保留双方）。
+
+### 浏览器实走（2026-11-11，1440×900，改版后的界面）
+
+环境：主检出目录的后端以演示模式启动（`LLM_MODE=demo`，读现有演示数据，未跑迁移、未导入），本工作树的 Vite 开发服务器；演示账号 `demo_student` / `demo_teacher`；演示课程 64 个知识点、71 条关系。
+
+| 项 | 结果 |
+| --- | --- |
+| 学生页 `/` 聚焦搜索、`F` 适应画布 | 通过（`F` 后缩放 0.2） |
+| 输入“队列” | 画布仍显示 64 / 64，命中 12 个，候选 8 条，地址出现 `q` |
+| 回车 ×2、Shift+回车 ×2 | 计数 2 / 12 → 12 / 12，预览卡随之切换，候选收起 |
+| 由地址恢复 `q` 与 `type=example` | 关键字回填，显示 63 / 64，图例提示“已隐藏 1 类” |
+| 打开详情 | 地址出现 `kp` |
+| 地址里放不存在的 `kp`、`ch` 与 `view=cards` | 给出“不在当前发布版本”提示，无报错，地址清理为 `?view=cards`，列表视图生效 |
+| 学生页面板宽度 | 调到 29% 后重新打开仍为 29% |
+| 教师页 `/`、输入“队列”、回车 ×3 | 显示 64 / 64，计数到 3 / 12，焦点始终在搜索框 |
+| 教师页面板宽度 | 调到 380px 后重新打开仍为 380px |
+
+实走发现并已修的两处：
+
+1. **缩得很小时定位看不清**：按 `F` 后缩放 0.2，搜索定位只居中不放大。改为搜索定位时低于可读缩放（0.9）先放大（`lifecycle.focus(kpId, { readable: true })`，只有学生页搜索定位传这个选项；教师页总览模式原本就会放大）。
+2. **教师页回车后焦点被抢走**：详情（`KnowledgeDetail`）与一直挂载的节点编辑器（`NodeEditor`）在载入新知识点后都会把焦点移到标题，导致无法连续按回车。新增 `composables/searchFocus.ts`，焦点在搜索框里时两处都不移动焦点。
+
+实走中看到但未处理：搜索框 280px 加上原生清除按钮、计数和两个箭头后，输入区约 114px，短关键字够用，长关键字会被遮住一部分。
 
 ### 未验证
 
-- 浏览器实走：本机 Docker 未启动，没有后端与演示数据，未在真实页面上看过。尤其需要看：搜索框在 280px 宽度下加上计数与两个按钮后是否拥挤；候选浮层是否被其他浮层遮挡；淡化在真实课程（63 节点）下的观感；快捷键与浏览器自带的 `/`（Firefox 快速查找）是否冲突。
-- 读屏对 `combobox`/`listbox` 的朗读。
-- `verify.sh full/integration` 的后端与集成部分（后端未改）。
+- 读屏对 `combobox`/`listbox` 的朗读；“搜索中不抢焦点”后读屏用户听到的是搜索旁的位置文字而不是知识点名称，未用读屏确认是否够用。
+- Firefox、Safari（只在内置 Chromium 里走过）；`/` 与 Firefox 快速查找是否冲突。
+- 淡化在节点更多的课程里的观感；窄屏（<960px）下搜索框与候选浮层。
+- 真实拖动分隔条（实走用的是键盘事件）。
+- `verify.sh full/integration` 的后端与集成部分（合入的分支含后端改动，本任务没有跑它们）。
 
 ## 风险与已知限制
 
@@ -63,6 +93,6 @@ scripts/verify/frontend.sh full     # exit 0：type-check 无错误；78 文件 
 
 ## 下一步
 
-1. 启动演示环境（`scripts/start-demo.sh`，需要先启动 Docker）做浏览器实走，重点看“未验证”里的四项。
-2. 用户视觉签收后再提交与开 PR。
+1. 用户视觉签收；决定搜索框是否加宽。
+2. 推送并开 PR。本分支包含 `codex/opt-05-backend-layering` 的全部提交，PR 的目标分支需要先定（直接对 main 会把那 10 个提交一起带上）。
 3. 本批明确不做、留给后续批次：镜头位置写入地址、教师页视图写入地址、拼音/模糊匹配、搜索定义正文、命令面板。

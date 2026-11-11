@@ -157,9 +157,9 @@ function start(attempt = 0): void {
 }
 
 /** 把视口移到该知识点；画布尚未建好时在首次渲染后执行 */
-function focus(kpId: string): void {
+function focus(kpId: string, options?: { readable?: boolean }): void {
   lastFocus = kpId
-  lifecycle?.focus(kpId)
+  lifecycle?.focus(kpId, options)
 }
 
 defineExpose({

@@ -1105,6 +1105,22 @@ describe('UI-GRAPH-FIND-01 教师页：搜索高亮、循环定位与面板宽�
     expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe(firstId)
   })
 
+  it('回车定位后焦点留在搜索框（详情标题不抢焦点），可以连续按回车；从画布点选时详情标题仍获得焦点', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const input = wrapper.find('input[type="search"]')
+    ;(input.element as HTMLInputElement).focus()
+    await type(wrapper, '知识点')
+    await enter(wrapper)
+    await vi.waitFor(() => expect(wrapper.find('[data-test="kd-title"]').exists()).toBe(true))
+    await flushPromises()
+    expect(document.activeElement).toBe(input.element)
+
+    ;(input.element as HTMLInputElement).blur()
+    await clickNode(wrapper, 'k3')
+    await vi.waitFor(() => expect(wrapper.find('[data-test="kd-title"]').text()).toContain('k3'))
+    await vi.waitFor(() => expect(document.activeElement).toBe(wrapper.find('[data-test="kd-title"]').element))
+  })
+
   it('面板宽度记在本浏览器：调整后重新进入页面保留；存储抛异常时照常工作', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1200)
     const first = await mountPage(fakes())

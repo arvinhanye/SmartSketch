@@ -14,7 +14,7 @@ import { defaultFilterState, filterGraph, matchNodes, useGraphFilters } from '..
 import { shortcutAction, useGraphShortcuts } from '../../src/frontend/src/composables/useGraphShortcuts'
 import { readPanelWidth, writePanelWidth } from '../../src/frontend/src/composables/usePanelWidthPreference'
 import { toG6Data } from '../../src/frontend/src/graph/adapter'
-import { GRAPH_FACTORY_KEY, type CanvasGraphFactory, type GraphCanvasData } from '../../src/frontend/src/graph/lifecycle'
+import { createGraphLifecycle, GRAPH_FACTORY_KEY, READABLE_ZOOM, type CanvasGraph, type CanvasGraphFactory, type GraphCanvasData } from '../../src/frontend/src/graph/lifecycle'
 import { searchNodes } from '../../src/frontend/src/graph/search'
 import { createAppRouter } from '../../src/frontend/src/router/index.ts'
 import { useSessionStore } from '../../src/frontend/src/stores/session'
@@ -601,5 +601,60 @@ describe('学生图谱页：面板宽度记忆', () => {
     const second = await mountPage()
     expect(second.w.get('[role="separator"]').attributes('aria-valuenow')).toBe('29')
     second.w.unmount()
+  })
+})
+
+// ---------------------------------------------------------------- 搜索定位时放大到可读缩放
+
+describe('画布生命周期：focus 的 readable 选项', () => {
+  async function build(zoom: number) {
+    const calls: string[] = []
+    let current = zoom
+    const graph = {
+      destroyed: false,
+      render: () => Promise.resolve(),
+      setData: () => {},
+      setSize: () => {},
+      fitView: () => Promise.resolve(),
+      on() {
+        return this
+      },
+      destroy: () => {},
+      getZoom: () => current,
+      zoomTo: (next: number) => {
+        calls.push(`zoomTo:${next}`)
+        current = next
+        return Promise.resolve()
+      },
+      focusElement: (id: string) => {
+        calls.push(`focus:${id}`)
+        return Promise.resolve()
+      },
+    } as unknown as CanvasGraph
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 600 })
+    const lifecycle = createGraphLifecycle(container, { data: adapted(), factory: () => graph })
+    await vi.waitFor(() => expect(lifecycle.status).toBe('ready'))
+    calls.length = 0
+    // 首屏已放大到可读缩放；模拟用户之后把图缩小（如适应画布）
+    current = zoom
+    return { lifecycle, calls }
+  }
+
+  it('缩放低于可读值时先放大再居中；不带选项时只居中（既有行为）', async () => {
+    const { lifecycle, calls } = await build(0.2)
+    lifecycle.focus('c')
+    await vi.waitFor(() => expect(calls).toEqual(['focus:kp:c']))
+    lifecycle.focus('b', { readable: true })
+    await vi.waitFor(() => expect(calls).toEqual(['focus:kp:c', `zoomTo:${READABLE_ZOOM}`, 'focus:kp:b']))
+    lifecycle.destroy()
+  })
+
+  it('已经够大时不改缩放', async () => {
+    const { lifecycle, calls } = await build(1.4)
+    lifecycle.focus('b', { readable: true })
+    await vi.waitFor(() => expect(calls).toEqual(['focus:kp:b']))
+    lifecycle.destroy()
   })
 })

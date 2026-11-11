@@ -174,7 +174,8 @@ function goToHit(index: number): void {
   searchNotice.value = null
   if (mode.value === 'graph') {
     focus.preview(hit.kpId)
-    canvas.value?.focus(hit.kpId)
+    // 缩得很小时（如刚按 F 适应画布）定位要先放大到可读缩放，否则只看到一个小点
+    canvas.value?.focus(hit.kpId, { readable: true })
   } else focus.open(hit.kpId)
 }
 function onSearchStep(delta: 1 | -1): void {
