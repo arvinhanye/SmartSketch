@@ -1,6 +1,6 @@
 # 剩余15个历史分支审查与处置（2026-11-11）
 
-基线 main `f9447860589d450aee34d4b2bf1532fdb21cb033`。以下是语义处置决定，实际合并与删除结果以交接及恢复目录操作日志为准。当前状态：审查完成，选定移植与最终门禁进行中。
+基线 main `f9447860589d450aee34d4b2bf1532fdb21cb033`。有效改动已由 [PR #345](https://github.com/arvinhanye/SmartSketch/pull/345) 合入 main（代码 `e0022ab`，合并 `9dccc30`）；最终代码 10 项 CI 全部通过。下表 15 个历史分支已按原 SHA lease 原子删除，执行后逐项远端复核成功。完整结果见 [交接](../handoffs/codex-historical-branches-20261111.md) 及恢复目录操作日志。
 
 不以落后提交数或patch-id独有作为删除/合并的唯一依据；核对merge-base差异、现行规格、主线实现和替代提交。全历史bundle已校验，路径为主检出 `.demo/historical-branch-cleanup-20261111/all-branches.bundle`（8,744,692 bytes）。
 
@@ -48,3 +48,5 @@
 ## 恢复与删除约束
 
 删除前核对远端SHA仍与表中相同，dry-run后采用逐SHA force-with-lease和atomic删除；不强推main，不删除其他工作区文件/环境。未被main直接包含的原始分支仍可从完整bundle取回：`git fetch /绝对路径/all-branches.bundle refs/remotes/origin/<branch>:refs/heads/recovery/<name>`。新功能只把有效改动移植到当前实现，不把旧分支整树并入。
+
+实际执行记录：`delete-15-dry-run.log`、`delete-15-execute.log`、`delete-15-result.json`；最终代码 CI 为 `final-code-ci.json`。bundle SHA-256 为 `36b95943976d5bf30522307823f13b7714e861d76b69214ccb11fb051bc91dec`（另存 `bundle-integrity.json`）。删引用后 main 保持 `9dccc30` 未变化；本次收尾文档只追加证据，不再改变产品行为。
