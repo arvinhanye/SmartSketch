@@ -40,6 +40,8 @@ OPT-06A：`services/ai/compatible.py` 保留聊天客户端和原导入入口；
 
 ## 前端构建、测试与应用外壳（B01～B04）
 
+OPT-06D：`views/StudentGraphView.vue` 保留路由/API 装配、模板与样式；`useStudentGraphPanel.ts` 管理面板/分隔条及焦点/observer 生命周期，`useStudentGraphPresentation.ts` 组合原响应式引用计算画布、章节布局、预览与进度。DOM、事件及视口行为不变。
+
 OPT-06C：`composables/useMaterials.ts` 保留状态及请求/SSE 生命周期；`composables/materials/{files,status,errors,types}.ts` 分别承载文件校验、状态呈现、错误映射和共享类型。旧入口导出名与返回对象不变，切课/卸载清理和晚到响应防护保持原顺序。
 
 - `src/frontend/index.html` 只提供 `#app` 挂载点；`src/frontend/src/main.ts` 创建并挂载 Vue 应用，`App.vue` 是单个无业务占位页面。
