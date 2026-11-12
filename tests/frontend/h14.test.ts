@@ -1225,3 +1225,189 @@ describe('UX-REVIEW-DEDUP-01 教师图谱页：?pair= 高亮一对疑似重复�
     expect(one.wrapper.find('[data-test="tg-pair-missing"]').exists()).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------- UI-GRAPH-EDIT-02：画布上的直接操作（整页）
+describe('UI-GRAPH-EDIT-02 教师图谱页：关系线工具条、节点菜单与连线', () => {
+  const canvasOf = (wrapper: VueWrapper) => wrapper.findComponent(GraphCanvas)
+  const emit = async (wrapper: VueWrapper, event: string, payload?: unknown) => {
+    canvasOf(wrapper).vm.$emit(event, payload)
+    await flushPromises()
+  }
+  /** 画布替身不排版：给页面一份固定的节点屏幕位置 */
+  function stubAnchors(wrapper: VueWrapper): void {
+    const exposed = canvasOf(wrapper).vm.$.exposed as { nodeAnchors: () => unknown }
+    exposed.nodeAnchors = () => [
+      { kpId: 'k1', x: 100, y: 100, r: 18 },
+      { kpId: 'k2', x: 300, y: 100, r: 18 },
+      { kpId: 'k3', x: 300, y: 300, r: 18 },
+    ]
+  }
+  function withRelationWrites(f: Fakes): Fakes {
+    f.relations.update.mockImplementation(async (_cid, rid, body) => {
+      const old = f.server.edges.find((e) => e.id === rid)!
+      const next = { ...old, ...body } as Relation
+      f.server.edges = f.server.edges.map((e) => (e.id === rid ? next : e))
+      return next
+    })
+    f.relations.remove.mockImplementation(async (_cid, rid) => {
+      f.server.edges = f.server.edges.filter((e) => e.id !== rid)
+    })
+    return f
+  }
+
+  it('点击关系线出现工具条：改类型、反转各发一次请求，画布随之更新', async () => {
+    const f = withRelationWrites(fakes())
+    const { wrapper } = await mountPage(f)
+    expect(wrapper.find('[data-test="ce-edge"]').exists()).toBe(false)
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    expect(wrapper.get('[data-test="ce-edge"]').attributes('aria-label')).toBe('关系：知识点 k1 → 知识点 k2')
+
+    await wrapper.get('[data-test="ce-edge-type"]').setValue('CONTAINS')
+    await flushPromises()
+    expect(f.relations.update).toHaveBeenLastCalledWith('c1', 'r1', { type: 'CONTAINS' }, expect.anything())
+    expect(canvasGraph(wrapper)!.edges[0]!.data.type).toBe('CONTAINS')
+
+    await wrapper.get('[data-test="ce-edge-reverse"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.update).toHaveBeenLastCalledWith('c1', 'r1', { from_id: 'k2', to_id: 'k1' }, expect.anything())
+    expect(f.relations.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('删除关系不弹确认：发一次删除请求并出现可撤销提示；撤销发一次新建请求，关系回到画布', async () => {
+    const f = withRelationWrites(fakes())
+    const { wrapper } = await mountPage(f)
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    await wrapper.get('[data-test="ce-edge-delete"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.remove).toHaveBeenCalledTimes(1)
+    expect(canvasEdgeIds(wrapper)).toEqual([])
+    expect(wrapper.get('[data-test="ce-undo"]').text()).toContain('已删除关系：知识点 k1 → 知识点 k2（前置）')
+
+    await wrapper.get('[data-test="ce-undo-btn"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledWith('c1', { type: 'PREREQUISITE', from_id: 'k1', to_id: 'k2' }, expect.anything())
+    expect(canvasGraph(wrapper)!.edges).toHaveLength(1)
+    expect(wrapper.find('[data-test="ce-undo"]').exists()).toBe(false)
+  })
+
+  it('画布上的操作失败时，原因显示在画布上（不用打开“编辑关系”页签）；在该页签里则由面板显示', async () => {
+    const f = fakes()
+    f.relations.update.mockRejectedValue(apiError(409, 'CYCLE_DETECTED', { cycle: ['k1', 'k2', 'k1'] }))
+    const { wrapper } = await mountPage(f)
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    await wrapper.get('[data-test="ce-edge-reverse"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="ce-error"]').text()).toContain('环路：知识点 k1 → 知识点 k2 → 知识点 k1')
+    expect(canvasGraph(wrapper)!.edges[0]!.source).toBe('kp:k1')
+    await openTab(wrapper, 'relations')
+    expect(wrapper.find('[data-test="ce-error"]').exists()).toBe(false)
+  })
+
+  it('节点右键菜单：查看详情、编辑知识点切换选中与页签；删除打开编辑面板里现有的删除确认', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await emit(wrapper, 'nodeMenu', { kpId: 'k2', x: 310, y: 90 })
+    expect(wrapper.get('[data-test="ce-menu"]').attributes('aria-label')).toBe('「知识点 k2」的操作')
+    await wrapper.get('[data-test="ce-menu-detail"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点 k2')
+
+    await emit(wrapper, 'nodeMenu', { kpId: 'k3', x: 310, y: 290 })
+    await wrapper.get('[data-test="ce-menu-edit"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="tg-tab-edit"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k3')
+
+    await emit(wrapper, 'nodeMenu', { kpId: 'k1', x: 110, y: 90 })
+    await wrapper.get('[data-test="ce-menu-delete"]').trigger('click')
+    await flushPromises()
+    await vi.waitFor(() => expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k1'))
+    await vi.waitFor(() => expect(wrapper.find('[data-test="ne-delete-confirm"]').exists()).toBe(true))
+  })
+
+  it('有未保存修改时，菜单里的“编辑知识点”先确认；取消则不切换', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await clickNode(wrapper, 'k1')
+    await openTab(wrapper, 'edit')
+    await editName(wrapper, '未保存的名字')
+    await emit(wrapper, 'nodeMenu', { kpId: 'k2', x: 310, y: 90 })
+    await wrapper.get('[data-test="ce-menu-edit"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="tg-discard-confirm"]').text()).toContain('知识点 k2')
+    await wrapper.find('[data-test="tg-discard-no"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="ne-title"]').text()).toContain('知识点 k1')
+  })
+
+  it('“从这里连线…”：下一次点击的节点是终点，不改变选中；选定类型后新建关系', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    stubAnchors(wrapper)
+    await clickNode(wrapper, 'k1')
+    await emit(wrapper, 'nodeMenu', { kpId: 'k2', x: 310, y: 90 })
+    await wrapper.get('[data-test="ce-menu-connect"]').trigger('click')
+    expect(wrapper.get('[data-test="ce-picking"]').text()).toContain('从「知识点 k2」连线')
+    // 画布移动不打断点选
+    await emit(wrapper, 'viewChange')
+    expect(wrapper.find('[data-test="ce-picking"]').exists()).toBe(true)
+
+    await clickNode(wrapper, 'k3')
+    expect(wrapper.get('[data-test="kd-title"]').text()).toBe('知识点 k1')
+    expect(wrapper.get('[data-test="ce-chooser"]').text()).toContain('知识点 k2 → 知识点 k3')
+    expect(f.relations.create).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="ce-type-CONTAINS"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledWith('c1', { type: 'CONTAINS', from_id: 'k2', to_id: 'k3' }, expect.anything())
+    expect(canvasGraph(wrapper)!.edges).toHaveLength(2)
+    expect(wrapper.find('[data-test="ce-chooser"]').exists()).toBe(false)
+  })
+
+  it('成环预判：目标沿前置关系能回到起点时“前置”不可选，其他类型可选；Esc 取消不产生写入', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    stubAnchors(wrapper)
+    // 已有 k1 →前置→ k2：从 k2 连到 k1
+    await emit(wrapper, 'nodeMenu', { kpId: 'k2', x: 310, y: 90 })
+    await wrapper.get('[data-test="ce-menu-connect"]').trigger('click')
+    await clickNode(wrapper, 'k1')
+    expect(wrapper.get('[data-test="ce-type-PREREQUISITE"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="ce-type-RELATED_TO"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-test="ce-chooser-cycle"]').text()).toContain('会形成环')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+    await flushPromises()
+    expect(wrapper.find('[data-test="ce-chooser"]').exists()).toBe(false)
+    expect(f.relations.create).not.toHaveBeenCalled()
+  })
+
+  it('悬停节点出现“⋯”与连接柄；从连接柄拖到另一个节点后选类型新建；点空白处收起工具', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    stubAnchors(wrapper)
+    await emit(wrapper, 'nodeHover', 'k1')
+    expect(wrapper.find('[data-test="ce-more"]').exists()).toBe(true)
+    wrapper.get('[data-test="ce-handle"]').element.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 118, clientY: 100, bubbles: true, cancelable: true }))
+    await flushPromises()
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 300, clientY: 300 }))
+    await flushPromises()
+    expect(wrapper.get('[data-test="ce-drag-hint"]').text()).toContain('松开后选关系类型')
+    window.dispatchEvent(new MouseEvent('pointerup', { clientX: 300, clientY: 300 }))
+    await flushPromises()
+    await wrapper.get('[data-test="ce-type-EXAMPLE_OF"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledWith('c1', { type: 'EXAMPLE_OF', from_id: 'k1', to_id: 'k3' }, expect.anything())
+
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    expect(wrapper.find('[data-test="ce-edge"]').exists()).toBe(true)
+    await emit(wrapper, 'blankClick')
+    expect(wrapper.find('[data-test="ce-edge"]').exists()).toBe(false)
+  })
+
+  it('“编辑关系”页签的点选连边不受影响（端到端用例依赖这条路径）', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await openTab(wrapper, 'relations')
+    await clickNode(wrapper, 'k1')
+    await clickNode(wrapper, 'k3')
+    const selects = wrapper.findAll('.relation-editor__form select')
+    expect((selects[0]!.element as HTMLSelectElement).value).toBe('k1')
+    expect((selects[1]!.element as HTMLSelectElement).value).toBe('k3')
+  })
+})

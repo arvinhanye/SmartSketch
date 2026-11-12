@@ -1,5 +1,16 @@
 # 任务看板
 
+## 2026-11-11 Claude：画布上的直接操作（UI-GRAPH-EDIT-02，图谱体验第二批，用户确认设计稿）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-GRAPH-EDIT-02 | 实现与自动化验收完成，真实画布已实测（接口为替身），待真实后端复核与用户视觉签收（2026-11-11；review_status: ready_for_review） | Claude | 分支 `claude/graph-direct-edit-20261111`（基于 `claude/ux-backlog-20261111@d102915`，即 PR #347）。教师页：关系线点击工具条（改类型 / 反转 / 可撤销删除）、节点右键与“⋯”菜单、连接柄拖线与“从这里连线…”、成环预判；学生页：预览卡“就此提问”。文件：`graph/cycle.ts`、`graph/hitTest.ts`（新）、`graph/enhancer.ts`、`graph/lifecycle.ts`、`components/GraphCanvas.vue`、`components/canvas/*`（新）、`composables/useCanvasEditing.ts`（新）、`composables/useRelationEditor.ts`、`views/TeacherGraphView.vue`、`components/GraphPreviewCard.vue`、`views/StudentGraphView.vue`、`views/ChatView.vue`、样式与前端测试；规格 `specs/course-knowledge-graph.md`「画布上的直接操作」 | 不改后端、契约、数据与权限；“编辑关系”页签与既有 `data-test` 钩子保留（端到端用例依赖 `tg-tab-relations`）。`scripts/verify/frontend.sh full`、`./scripts/verify.sh`；隔离真实后端实走 |
+
+- 用户确认的三项取舍：① 只有从连接柄开始拖才是连线，另有“从这里连线…”点选路径；② 拖动中做前端成环预判，最终以后端为准；③ 关系线删除不弹确认、给可撤销提示，节点删除保留现有确认流程。
+- 与设计稿的出入：教师页菜单里没有“只看相邻”（教师页目前没有局部视图，另行排期）。
+- 验收证据（2026-11-11，详见 `docs/handoffs/claude-ui-graph-edit-02.md`）：新增 `graph-direct-edit.test.ts` 9 条、`canvas-edit.test.ts` 15 条，`h14.test.ts` 追加 9 条；`scripts/verify/frontend.sh full` exit 0（89 文件 / 1523 条），`./scripts/verify.sh` exit 0；后端与契约零改动。真实 G6 画布上用真实鼠标走通：点关系线出工具条、删除并撤销、悬停出“⋯”与连接柄、从连接柄拖线并选类型、右键菜单（临时预览页，接口为内存替身，已删除）。**未做**：真实后端（当时 Docker 未运行）、学生“就此提问”的浏览器实走、触屏与其他浏览器。已知既有问题被放大：关系增删后整图重新布局。
+- 风险：G6 的边命中与右键事件、HTML 连接柄与画布拖拽的配合只能在真实浏览器里验证；撤销删除是重新建边，原关系的编号、来源与状态不恢复。回滚：还原本任务提交，无数据迁移。
+
 ## 2026-11-11 待优化：面向非技术用户的两项体验问题（用户提出，待设计）
 
 背景（用户 2026-11-11 提出）：软件的使用者是教师和学生，必须保证在计算机知识储备不足的情况下也能顺畅使用。下面两项是当前体验最差的地方，先登记为待优化项；均**未开始、未认领**，动手前需要先做需求澄清并更新规格。

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { CHAT_STREAM_CLIENT_KEY } from '../api/chatStream'
 import { HTTP_CLIENT_KEY } from '../api/client'
@@ -31,6 +31,20 @@ const courseId = computed(() => {
   return route.name === CHAT_ROUTE && typeof cid === 'string' && cid !== '' ? cid : null
 })
 const { entries, question, sending, currentVersion, ask, stop } = useChat(client, courseId)
+// UI-GRAPH-EDIT-02：从图谱预览卡“就此提问”带来的知识点名称（?about=）：预填问题并把光标放进输入框，不自动发送。
+// 只在输入框还空着时预填，用过就从地址里拿掉，刷新不会再填一遍。
+onMounted(() => {
+  const about = route.query.about
+  if (typeof about !== 'string' || about.trim() === '') return
+  if (question.value.trim() === '') question.value = `请讲解一下「${about.trim().slice(0, 80)}」`
+  const { about: _about, ...rest } = route.query
+  void router.replace({ query: rest })
+  void nextTick(() => {
+    const box = document.getElementById('chat-question') as HTMLTextAreaElement | null
+    box?.focus()
+    box?.setSelectionRange(box.value.length, box.value.length)
+  })
+})
 // L10（ADR-080）：personal 模式下未配置个人模型 API 时不发起提问，引导到设置页
 const runtime = useRuntimeStore()
 function submitQuestion(): void {

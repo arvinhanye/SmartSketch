@@ -10,6 +10,7 @@ import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY, KNOWLEDGE_DELETION_API_KEY } from '../api/knowledgeDetail'
 import { createNodeEditApi, NODE_EDIT_API_KEY } from '../api/nodeEdit'
 import { createRelationsApi, RELATIONS_API_KEY } from '../api/relations'
+import CanvasEditLayer from '../components/canvas/CanvasEditLayer.vue'
 import GraphCanvas from '../components/GraphCanvas.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
@@ -20,6 +21,7 @@ import NodeTypeLegend from '../components/NodeTypeLegend.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
 import { readArrangement, writeArrangement, type Arrangement } from '../composables/useArrangementPreference'
+import { useCanvasEditing } from '../composables/useCanvasEditing'
 import { useGraphLayout } from '../composables/useGraphLayout'
 import { useGraphShortcuts } from '../composables/useGraphShortcuts'
 import { readPanelWidth, writePanelWidth } from '../composables/usePanelWidthPreference'
@@ -126,8 +128,12 @@ const canvasGraph = computed(() => {
   const v = visible.value
   const hits = filters.matches.value
   const marked = hits.length > 0 ? hits.map((hit) => hit.kpId) : pairIds.value
-  if (v === null || marked.length === 0) return v
-  return applyFocusStates(v, { selectedId: null, matchedIds: new Set(marked.map(nodeElementId)), chapterIds: null, fade: 'standard' })
+  if (v === null) return v
+  const focused = marked.length === 0 ? v : applyFocusStates(v, { selectedId: null, matchedIds: new Set(marked.map(nodeElementId)), chapterIds: null, fade: 'standard' })
+  // UI-GRAPH-EDIT-02：工具条对应的那条关系线加粗，看得出正在改哪一条
+  const openRelation = editing.edgeTool.value?.relationId
+  if (openRelation === undefined) return focused
+  return { nodes: focused.nodes, edges: focused.edges.map((e) => (e.data.relationId === openRelation ? { ...e, states: [...(e.states ?? []), 'active' as const] } : e)) }
 })
 
 // 节点类型图例：计数取整张草稿图；点击与工具栏“筛选”里的知识点类型是同一份状态
@@ -228,10 +234,38 @@ watch(tab, (next) => {
   if (next === 'relations' && relations.fromId.value === null && selected.value !== null) relations.pickNode(selected.value)
 })
 
-/** 画布点击：关系页签下用于依次点选起点、终点；其余页签切换当前知识点 */
+/** 画布点击：连线点选中先交给连线；关系页签下用于依次点选起点、终点；其余页签切换当前知识点 */
 function onNodeClick(kpId: string): void {
+  if (editing.consumeNodeClick(kpId)) return
+  editing.dismiss()
   if (tab.value === 'relations') relations.pickNode(kpId)
   else guard.request(kpId)
+}
+
+// ---------------------------------------------------------------- 画布上的直接操作（UI-GRAPH-EDIT-02）
+const editing = useCanvasEditing({
+  relations,
+  anchors: () => canvas.value?.nodeAnchors() ?? [],
+  // 查看、编辑、删除都要先切换选中：经过“未保存修改”确认，确认后才切页签
+  onDetail: (kpId) => guard.request(kpId, { then: (target) => { if (target !== null) tab.value = 'detail' } }),
+  onEdit: (kpId) => guard.request(kpId, { then: (target) => { if (target !== null) tab.value = 'edit' } }),
+  onDelete: (kpId) =>
+    guard.request(kpId, {
+      then: (target) => {
+        if (target === null) return
+        tab.value = 'edit'
+        // 等编辑面板载入该知识点后再打开它自己的删除确认
+        void nextTick(() => nodeEditor.value?.requestDelete())
+      },
+    }),
+})
+/** 画布上发起的关系操作失败时的说明：在“编辑关系”页签里由面板自己显示，这里不重复 */
+const canvasError = computed(() => (tab.value === 'relations' ? null : relations.error.value))
+const canvasConflict = computed(() => (tab.value === 'relations' ? null : (relations.conflict.value?.path.map((p) => p.name) ?? null)))
+function dismissCanvasError(): void {
+  relations.error.value = null
+  relations.dismissConflict()
+  editing.undoError.value = null
 }
 
 // 页面级提示：删除成功、当前节点被刷新掉（面板随选中清空而回到空态，提示留在页面上）
@@ -490,7 +524,9 @@ useGraphShortcuts({
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick" />
+          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" @edge-click="editing.openEdge" @node-menu="editing.openMenu" @node-hover="editing.onNodeHover" @view-change="editing.onViewChange" @blank-click="editing.onViewChange" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick">
+            <CanvasEditLayer :editing="editing" :error="canvasError" :conflict="canvasConflict" @dismiss-error="dismissCanvasError" />
+          </GraphCanvas>
         </div>
 
         <div

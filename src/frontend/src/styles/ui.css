@@ -717,3 +717,42 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 @media(max-width:640px) { .light-surface.review .rv-dup__cards, .light-surface.review .rv-dup__graphs { grid-template-columns:minmax(0,1fr); } .light-surface.review .rv-dup__keys { display:none; } }
 .light-surface .teacher-graph__pair { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 12px; padding:8px 12px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); color:var(--ui-text); font-size:13px; }
 .light-surface.review .rv-dup__nopreview { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0 0; padding:10px 12px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); color:var(--ui-text); font-size:13px; line-height:1.6; }
+
+/* ---------- 画布上的编辑浮层（UI-GRAPH-EDIT-02）。铺满画布容器但不拦指针，只有具体工具可点 */
+.ce-layer { position:absolute; inset:0; z-index:7; pointer-events:none; font-size:13px; color:var(--ui-text); }
+.ce-layer > * { pointer-events:auto; }
+/* 教师页有通用按钮规则（.light-surface.ui-management button）：选择器加倍以压过它，并先清掉它带来的尺寸与底色 */
+.ce-layer.ce-layer button { display:inline-flex; align-items:center; justify-content:center; min-height:0; min-width:0; width:auto; padding:0; border:0; border-radius:0; background:transparent; color:inherit; font:inherit; font-weight:400; cursor:pointer; }
+.ce-layer.ce-layer select { width:auto; min-width:0; }
+.ce-drag { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+.ce-drag line { stroke:var(--ui-primary); stroke-width:2; stroke-dasharray:6 4; }
+.ce-drag circle { fill:none; stroke:var(--ui-primary); stroke-width:2.5; }
+.ce-drag circle.is-cycle { stroke:var(--gw-danger); stroke-dasharray:4 3; }
+.ce-hint { position:absolute; margin:0; padding:3px 9px; border:1px solid var(--ui-primary); border-radius:6px; background:#fff; color:var(--ui-primary-text); font-size:12px; line-height:20px; white-space:nowrap; pointer-events:none; }
+.ce-hint.is-warn { border-color:var(--gw-danger); background:var(--gw-danger-bg); color:var(--gw-danger); }
+.ce-layer.ce-layer .ce-more { position:absolute; width:22px; height:22px; padding:0; border:1px solid var(--ui-edge); border-radius:50%; background:#fff; color:var(--ui-text); font-size:14px; line-height:1; box-shadow:0 1px 3px rgb(15 61 54 / 18%); }
+.ce-layer.ce-layer .ce-more:hover { background:var(--ui-primary-soft); border-color:var(--ui-primary); }
+.ce-layer.ce-layer .ce-handle { position:absolute; width:16px; height:16px; padding:0; border:2px solid #fff; border-radius:50%; background:var(--ui-primary); box-shadow:0 0 0 1px var(--ui-primary); cursor:crosshair; touch-action:none; }
+.ce-layer.ce-layer .ce-handle:hover { transform:scale(1.2); }
+.ce-menu, .ce-chooser, .ce-edge { position:absolute; border:1px solid var(--ui-edge); border-radius:10px; background:#fff; box-shadow:var(--ui-shadow-pop); }
+.ce-menu { display:grid; gap:2px; width:184px; padding:6px; }
+.ce-menu hr { margin:4px 6px; border:0; border-top:1px solid var(--ui-line-soft); }
+.ce-layer.ce-layer .ce-menu button, .ce-layer.ce-layer .ce-chooser button { justify-content:space-between; width:100%; min-height:32px; padding:0 10px; border:0; border-radius:6px; background:transparent; color:var(--ui-text); text-align:left; }
+.ce-layer.ce-layer .ce-menu button:hover, .ce-layer.ce-layer .ce-menu button:focus-visible, .ce-layer.ce-layer .ce-chooser button:hover:not(:disabled), .ce-layer.ce-layer .ce-chooser button:focus-visible { background:var(--ui-primary-soft); color:var(--ui-primary-text); outline:none; }
+.ce-layer.ce-layer .ce-menu button.is-accent { color:var(--ui-primary-text); font-weight:500; }
+.ce-layer.ce-layer .ce-menu button.is-danger, .ce-layer.ce-layer .ce-edge button.is-danger { color:var(--gw-danger); }
+.ce-layer.ce-layer .ce-menu button.is-danger:hover, .ce-layer.ce-layer .ce-edge button.is-danger:hover:not(:disabled) { background:var(--gw-danger-bg); color:var(--gw-danger); }
+.ce-menu kbd { color:var(--ui-text-3); font:11px/1 inherit; }
+.ce-edge { display:flex; align-items:center; gap:4px; padding:6px; white-space:nowrap; }
+.ce-layer.ce-layer .ce-edge select { min-height:30px; padding:0 26px 0 10px; border:1px solid var(--ui-primary); border-radius:6px; background-color:var(--ui-primary-soft); color:var(--ui-primary-text); font:inherit; }
+.ce-layer.ce-layer .ce-edge button { min-height:30px; padding:0 10px; border:0; border-radius:6px; background:transparent; color:var(--ui-text); }
+.ce-layer.ce-layer .ce-edge button:hover:not(:disabled) { background:var(--ui-surface-2); }
+.ce-layer.ce-layer button:disabled, .ce-layer.ce-layer select:disabled { color:var(--ui-text-3); cursor:default; }
+.ce-chooser { display:grid; gap:2px; width:208px; padding:8px; }
+.ce-chooser__title { margin:0 2px 4px; color:var(--ui-text-2); font-size:12px; line-height:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ce-chooser__note { margin:4px 2px 0; color:var(--gw-danger); font-size:12px; line-height:18px; }
+.ce-banner { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; margin:0; padding:6px 8px 6px 14px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); white-space:nowrap; }
+.ce-layer.ce-layer .ce-banner button, .ce-layer.ce-layer .ce-toast button { min-height:28px; padding:0 10px; border:1px solid var(--ui-edge); border-radius:6px; background:#fff; color:var(--ui-text); }
+.ce-toast { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; max-width:calc(100% - 32px); margin:0; padding:8px 8px 8px 14px; border-radius:10px; background:var(--ui-brand); color:#fff; box-shadow:var(--ui-shadow-pop); }
+.ce-toast.is-error { bottom:64px; background:var(--gw-danger-bg); color:var(--gw-danger); border:1px solid var(--gw-danger); }
+.ce-layer.ce-layer .ce-toast .ce-toast__x { border-color:transparent; background:transparent; color:inherit; padding:0 6px; }

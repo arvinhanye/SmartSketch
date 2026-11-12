@@ -384,16 +384,16 @@ export function useRelationEditor({ api, onRefreshNeeded, onCourseForbidden }: U
     return found
   }
 
-  async function createRelation(): Promise<boolean> {
-    const from = fromId.value
-    const to = toId.value
-    if (from === null || to === null) return fail('请选择关系的起点和终点。')
+  /**
+   * 在两个知识点之间新建一条关系（UI-GRAPH-EDIT-02：画布上拖线、点选连线与“撤销删除”共用）。
+   * 不读也不改面板里的起点、终点草稿；校验、乐观更新、成环与冲突处理和面板新建完全一致。
+   */
+  async function createBetween(from: string, to: string, type: RelationType, success?: string): Promise<boolean> {
     if (from === to) return fail('起点和终点不能是同一个知识点。')
     const current = ready()
     if (current === null) return false
     const nodes = nodeIndex.value
     if (!nodes.has(from) || !nodes.has(to)) return fail('所选知识点不在当前图谱中，请刷新图谱。')
-    const type = draftType.value
     tempSeq += 1
     const temp: Relation = {
       id: `${TEMP_ID_PREFIX}${tempSeq}`,
@@ -406,14 +406,41 @@ export function useRelationEditor({ api, onRefreshNeeded, onCourseForbidden }: U
       source: 'manual',
       source_refs: [],
     }
-    const ok = await run(
+    return run(
       { kind: 'create', relation: temp },
       (scope) => api.create(scope.courseId, { type, from_id: from, to_id: to }, { signal: scope.signal }),
-      `已添加关系：${nameOf(nodes, from)} → ${nameOf(nodes, to)}（${RELATION_STYLES[type].label}）。`,
+      success ?? `已添加关系：${nameOf(nodes, from)} → ${nameOf(nodes, to)}（${RELATION_STYLES[type].label}）。`,
       { fromId: from, toId: to, type },
     )
+  }
+
+  async function createRelation(): Promise<boolean> {
+    const from = fromId.value
+    const to = toId.value
+    if (from === null || to === null) return fail('请选择关系的起点和终点。')
+    const ok = await createBetween(from, to, draftType.value)
     if (ok) toId.value = null
     return ok
+  }
+
+  /** 画布工具条用：一条关系的端点、类型与名称；保存中的临时关系也能查到（`pending` 为真） */
+  function describeRelation(relationId: string): RelationRow | null {
+    const edge = graph.value?.edges.find((e) => e.id === relationId)
+    if (edge === undefined) return null
+    const nodes = nodeIndex.value
+    return {
+      id: edge.id,
+      type: edge.type,
+      typeLabel: RELATION_STYLES[edge.type].label,
+      fromId: edge.from_id,
+      fromName: nameOf(nodes, edge.from_id),
+      toId: edge.to_id,
+      toName: nameOf(nodes, edge.to_id),
+      reversible: RELATION_STYLES[edge.type].directed,
+      pending: edge.id === pendingRelationId.value || edge.id.startsWith(TEMP_ID_PREFIX),
+      highlighted: highlightedRelationIds.value.has(edge.id),
+      downgraded: 'downgraded_from_type' in edge,
+    }
   }
 
   async function update(relationId: string, body: RelationUpdate, next: (old: Relation) => Relation, success: string) {
@@ -516,6 +543,8 @@ export function useRelationEditor({ api, onRefreshNeeded, onCourseForbidden }: U
     swapDraft,
     dismissConflict,
     createRelation,
+    createBetween,
+    describeRelation,
     changeType,
     reverseRelation,
     deleteRelation,
