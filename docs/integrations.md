@@ -96,6 +96,9 @@
 | `DISAMBIGUATION_ANALYSIS_ENABLED` | 布尔 | `false` | 第一批生成消歧分析与提及身份；只写分析检查点，不自动合并；接管遵循已有任务身份模式 | ADR-098 |
 | `DISAMBIGUATION_MAX_PAIRS_PER_SECTION` | 整数 1～256 | `32` | 小节最多分析候选对数，超出显式 partial；使用名称/别名及词项召回；未提供真实向量时记录缺失通道 | ADR-098 |
 | `DISAMBIGUATION_MAX_INPUT_BYTES` | 整数 1024～1000000 | `24000` | 完整语义请求 UTF-8 字节加 256 包装开销和输出 Token×4 预留的保守上限；不是供应商有效窗口保证，超限不调用 | ADR-098 |
+| `DISAMBIGUATION_EXTRACTION_MAX_INPUT_BYTES` | 整数 1024～1000000 | `24000` | 消歧新任务的实体/关系/补漏/修复完整请求上限，包含包装及输出预留；不等于模型有效上下文 | ADR-101 |
+| `DISAMBIGUATION_EXTRACTION_MAX_WINDOWS` | 整数 1～256 | `64` | 每块或小节单次尝试的累计窗口上限（含补漏）；主计划/必需最少窗口超限零调用，动态补漏超限在该轮调用前停止并记录缺口 | ADR-101 |
+| `DISAMBIGUATION_EXTRACTION_OVERLAP_CHARS` | 整数 0～4096 | `512` | 同一来源块相邻窗口的字符重叠；小节来源尽量重叠邻接块；原始块 ID/位置不变 | ADR-101 |
 | `LLM_MAX_RETRIES` | 整数 ≥ 0 | `2` | ADR-011 三层重试中的 L1：单次调用在同一供应商上的重试次数，不含首次 | 占位（D-02e） |
 | `LLM_CIRCUIT_FAILURE_THRESHOLD` | 整数 ≥ 1 | `5` | 连续失败多少次后熔断；主用、备用、向量各自计数 | 占位（D-02e） |
 | `LLM_CIRCUIT_OPEN_SECONDS` | 整数 ≥ 1 | `30` | 熔断持续时长，到期放一次试探调用；与 ADR-011 阶段级退避首档 30 秒对齐 | 占位（D-02e） |

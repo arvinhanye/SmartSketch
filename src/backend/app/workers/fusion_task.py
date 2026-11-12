@@ -110,16 +110,41 @@ def _lineage(snapshot, plans):
     return result
 
 
+def _extraction_coverage(checkpoints):
+    incomplete = []
+    for c in checkpoints:
+        meta = c.metadata or {}
+        coverage = meta.get('window_coverage')
+        reason = None
+        if c.status != 'done':
+            reason = (coverage or {}).get('reason') or 'failed_unit'
+        elif coverage is not None:
+            if (coverage.get('status') != 'complete' or
+                type(coverage.get('planned_windows')) is not int or
+                type(coverage.get('completed_windows')) is not int or
+                coverage['planned_windows'] < 0 or
+                coverage['completed_windows'] != coverage['planned_windows']):
+                reason = coverage.get('reason') or 'incomplete_window'
+        elif meta.get('window_policy') is not None:
+            reason = 'missing_window_coverage'
+        if reason:
+            incomplete.append(dict(kind=c.unit_kind, unit_id=c.unit_id, reason=reason))
+    return dict(status='partial' if incomplete else 'complete', total_units=len(checkpoints),
+                incomplete_units=incomplete, reasons=sorted({v['reason'] for v in incomplete}))
+
+
 def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
                    lock_seconds, lock_wait_seconds, embedding=None, max_corpus_nodes=2000,
                    max_corpus_bytes=2_000_000):
     from app.workers.persist_graph import build_plan, load_candidates
     _guard(sqlite_url, lease)
     with connect(sqlite_url) as db:
-        checks = [c for c in read_checkpoints(db, course_id=lease.course_id, task_id=lease.task_id)
+        checkpoints = read_checkpoints(db, course_id=lease.course_id, task_id=lease.task_id)
+        checks = [c for c in checkpoints
                   if c.unit_kind == 'chunk' and c.status == 'done']
     if not checks or any(c.result.get('entity_identity_version', 1) != 2 for c in checks):
         return None  # v1 has already collapsed names; never reinterpret that identity.
+    extraction_coverage = _extraction_coverage(checkpoints)
     toolkit = toolkit if isinstance(toolkit, ExtractionToolkit) else toolkit(lease)
     check = lambda: _guard(sqlite_url, lease, toolkit.guard)
     check()
@@ -150,6 +175,7 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
                     chunk_ids=sorted({e['chunk_id'] for e in before['evidence']} |
                                      {c for r in plan.relations for c in r.chunk_ids}))}
     digest = fingerprint(dict(version=2, head=asdict(head), before=before, lineage=lineage,
+        extraction_checkpoints=[asdict(c) for c in checkpoints],
         chunks={k: asdict(c) for k, c in chunks.items()}, model=resolver.model,
         prompt=resolver.template.sha256, input_bytes=resolver.max_input_bytes,
         output_tokens=resolver.max_output_tokens, max_pairs=max_pairs, top_k=top_k,
@@ -162,7 +188,7 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
         [n['definition'], *[a['node']['definition'] for a in lineage[n['kp_id']]]])), tuple(n.get('aliases', [])))
              for n in before['nodes']]
     texts = [c.name+'\n'+c.definition+'\n'+'\n'.join(c.aliases) for c in cards]
-    reason = None
+    reason = 'extraction_incomplete' if extraction_coverage['status'] != 'complete' else None
     if len(cards) > max_corpus_nodes or sum(len(t.encode('utf-8')) for t in texts) > max_corpus_bytes:
         reason = 'corpus_budget'
     if any(check_node(n, lease.course_id, chunks) for n in plan.nodes): reason = 'invalid_raw_candidate'
@@ -235,7 +261,7 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
         total_pairs=total_pairs, examined_pairs=len(decisions), completed_pairs=completed,
         unprocessed_pairs=total_pairs-completed,
         completion='complete' if reason is None and completed==total_pairs else 'partial',
-        reason=reason, vector_error=vector_error)
+        reason=reason, vector_error=vector_error, extraction_coverage=extraction_coverage)
     check()
     with leased_transaction(sqlite_url, lease.task_id, lease.token) as db:
         task = read_leased_task(db, lease.task_id, lease.token)

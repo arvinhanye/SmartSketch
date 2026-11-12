@@ -246,6 +246,10 @@ class EntityExtractor:
         candidates, dropped = _validate(items, identity, text)
         return outcome(candidates, dropped, None, result, calls)
 
+    def request_size(self, text: str) -> int:
+        from app.services.ai.request_budget import rendered_request_size
+        return rendered_request_size(self.prompt().render({"chunk_text": text}).text, self._max_output_tokens)
+
     def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:
         return ModelRequest(
             purpose=purpose,

@@ -71,6 +71,7 @@ def heartbeat_path() -> Path:
 def build_toolkit(settings: Settings) -> ToolkitSource:
     """``personal``：按任务快照逐个构建（ADR-080）；其余模式按 ``LLM_MODE`` 建一份进程内共用的客户端
     （live / demo / fake，见 ``app.services.ai.factory``），外包 E04 策略（调用记录写应用 SQLite 的 ``model_calls``）。"""
+    from app.services.ai.extraction_windows import WindowPolicy
     if settings.LLM_MODE == "personal":
         return TaskToolkits(settings).for_lease
     primary, fallback = build_model_clients(settings)
@@ -86,6 +87,7 @@ def build_toolkit(settings: Settings) -> ToolkitSource:
             max_input_bytes=settings.DISAMBIGUATION_MAX_INPUT_BYTES)) if (settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
         preserve_mentions=(settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED),
         analysis_max_pairs=settings.DISAMBIGUATION_MAX_PAIRS_PER_SECTION,
+        window_policy=WindowPolicy.from_settings(settings),
     )
 
 
