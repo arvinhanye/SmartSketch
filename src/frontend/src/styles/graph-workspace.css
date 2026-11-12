@@ -118,6 +118,8 @@
 .graph-workspace .gw-preview__actions { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
 .graph-workspace .gw-btn.gw-btn--ghost { background: #fff; color: var(--gw-text); border: 1px solid #747a87; }
 .graph-workspace .gw-btn.gw-btn--ghost:hover { background: var(--gw-hover); }
+.graph-workspace .gw-btn.gw-btn--ask { background: var(--ui-highlight-soft, #fff6db); color: #5c4300; border: 1.5px solid var(--ui-highlight, #f5b82e); }
+.graph-workspace .gw-btn.gw-btn--ask:hover { background: #ffedb8; }
 .graph-workspace .gw-btn.gw-btn--ghost[aria-pressed='true'] { background: var(--gw-selected); border-color: var(--gw-accent); color: var(--gw-accent); font-weight: 600; }
 .graph-workspace .gw-focus { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; max-width: 100%; padding: 6px 12px; border: 1px solid var(--gw-accent); border-radius: 6px; background: var(--gw-selected); font-size: 13px; line-height: 20px; }
 .graph-workspace .gw-segmini { display: inline-flex; gap: 4px; }

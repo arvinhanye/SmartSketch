@@ -148,6 +148,7 @@
 | [`tests/frontend/b04.test.ts`](frontend/b04.test.ts) | 课程上下文 store。 | B04 |
 | [`tests/frontend/b15.test.ts`](frontend/b15.test.ts) | HTTP 客户端的路径、请求响应、错误、认证、取消超时及课程作用域联动。 | B15；B04 |
 | [`tests/frontend/c12.test.ts`](frontend/c12.test.ts) | 任务 SSE 的解析、事件运行时校验与订阅。 | C12 |
+| [`tests/frontend/canvas-edit.test.ts`](frontend/canvas-edit.test.ts) | 画布直接操作的状态逻辑、编辑浮层组件，以及关系线点击、节点右键与节点位置的画布接线。 | UI-GRAPH-EDIT-02；specs/course-knowledge-graph.md |
 | [`tests/frontend/chat-question-limit.test.ts`](frontend/chat-question-limit.test.ts) | 问答输入框与契约保持一致的 2000 字问题长度上限。 | M11/C2 |
 | [`tests/frontend/chat-send-lock.test.ts`](frontend/chat-send-lock.test.ts) | 问答发送期间的逻辑层与页面防重复提交，并保留显式停止。 | 待确认 |
 | [`tests/frontend/chat-sources.test.ts`](frontend/chat-sources.test.ts) | chatSources 的回答状态文字、当前回答出处与复制内容。 | UI-QA-01 |
@@ -157,6 +158,7 @@
 | [`tests/frontend/graph-canvas-enhanced.test.ts`](frontend/graph-canvas-enhanced.test.ts) | GraphCanvas 增强模式与教师页沿用的普通模式。 | 待确认 |
 | [`tests/frontend/graph-chapter-layout.test.ts`](frontend/graph-chapter-layout.test.ts) | 章节分区布局 computeLayout 的真实 dagre 引擎、边界、替换引擎与规模对比。 | 待确认 |
 | [`tests/frontend/graph-detail-layout.test.ts`](frontend/graph-detail-layout.test.ts) | 知识点详情在不同场景中的关闭入口与自适应布局规则。 | 待确认 |
+| [`tests/frontend/graph-direct-edit.test.ts`](frontend/graph-direct-edit.test.ts) | 成环预判与节点命中纯函数；学生预览卡“就此提问”与问答页预填。 | UI-GRAPH-EDIT-02 |
 | [`tests/frontend/graph-enhancer.test.ts`](frontend/graph-enhancer.test.ts) | 图谱增强器的展示装饰、语义缩放、标签排布、视口适应、悬停与章节外框。 | 待确认 |
 | [`tests/frontend/graph-find.test.ts`](frontend/graph-find.test.ts) | 图谱查找（高亮而非隐藏、别名、候选、逐个定位）、画布快捷键、学生页视图状态写入地址与面板宽度记忆。 | UI-GRAPH-FIND-01；specs/course-knowledge-graph.md |
 | [`tests/frontend/graph-fit.test.ts`](frontend/graph-fit.test.ts) | 图谱范围适应 computeFit 与底部边距 bottomPad。 | 待确认 |

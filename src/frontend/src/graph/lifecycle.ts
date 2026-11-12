@@ -4,6 +4,7 @@ import { nodeElementId, type G6Edge, type G6EdgeData, type G6Node, type G6NodeDa
 import { keepCanvasOutOfTabOrder } from './a11y'
 import type { Positions } from './chapterLayout'
 import { createEnhancer, type EnhanceOptions, type Enhancer } from './enhancer'
+import type { NodeAnchor } from './hitTest'
 import { badgesFor, nodeLabel } from './presentation'
 import { NODE_BASE_PX, READABLE_ZOOM } from './scale'
 import { GRAPH_COLORS, GRAPH_FONT, NODE_TYPE_FILL, NODE_TYPE_GLYPH } from './theme'
@@ -200,6 +201,8 @@ export interface GraphLifecycle {
   relayoutLabels(): void
   /** 增强模式：指针离开整个画布容器时结束悬停淡化 */
   leaveHover(): void
+  /** 增强模式：各节点当前在容器内的屏幕位置与半径（UI-GRAPH-EDIT-02）；未开启增强或尚未建图时为空 */
+  anchors(): NodeAnchor[]
   destroy(): void
 }
 
@@ -336,6 +339,8 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         labelBackgroundFill: C.panel,
         labelBackgroundOpacity: 1,
         labelPadding: [1, 5],
+        // 线本身只有 1.5～2 像素：把可点击宽度放宽，关系线才点得中（UI-GRAPH-EDIT-02）
+        increasedLineWidthForHitTesting: 12,
       },
       state: {
         rejected: { opacity: 0.3 },
@@ -710,6 +715,9 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     },
     leaveHover() {
       if (alive()) enhancer?.leaveHover()
+    },
+    anchors() {
+      return alive() && enhancer !== null && graph !== null ? enhancer.anchors() : []
     },
     destroy() {
       if (status === 'destroyed') return

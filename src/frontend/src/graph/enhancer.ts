@@ -1,10 +1,11 @@
 import { nodeElementId } from './adapter'
 import { bottomPad, computeFit, DEFAULT_PADS, type FitPads } from './fit'
 import { hoverStateMap, isForcedLabel, labelScore } from './focusStates'
+import type { NodeAnchor } from './hitTest'
 import { planLabels, type Box, type LabelCandidate } from './labelPlan'
 import type { CanvasEdge, CanvasGraph, CanvasNode, GraphEvent } from './lifecycle'
 import { chapterOfNodes, decorateEdge, decorateNodeData, INITIAL_VIEW, nodeLabel, type ViewState } from './presentation'
-import { LABEL_BASE_PX, labelScale, sameFloors, scaleFloors } from './scale'
+import { LABEL_BASE_PX, labelScale, NODE_BASE_PX, sameFloors, scaleFloors } from './scale'
 import { GRAPH_COLORS, GRAPH_FONT } from './theme'
 
 /**
@@ -29,6 +30,15 @@ export interface EnhanceOptions {
   onHover?: (info: { kpId: string; clientX: number; clientY: number } | null) => void
   /** 点击画布空白处（取消预览） */
   onBlankClick?: () => void
+  /** 点击一条关系线（UI-GRAPH-EDIT-02）：关系的契约 ID 与指针的页面坐标 */
+  onEdgeClick?: (info: { relationId: string; clientX: number; clientY: number }) => void
+  /**
+   * 用户平移或缩放了画布（G6 的 `aftertransform`）。和 `onZoom` 不同：数据更新、重排标签后回报缩放值不算，
+   * 所以页面可以据此收起钉在屏幕位置上的浮层，而不会被一次普通的重绘误伤。
+   */
+  onTransform?: () => void
+  /** 在节点上点右键（UI-GRAPH-EDIT-02） */
+  onNodeMenu?: (info: { kpId: string; clientX: number; clientY: number }) => void
   /** 每次重排标签后回报“当前显示几个标签 / 共几个节点”，页面据此提示“放大可看到更多标签” */
   onLabels?: (shown: number, total: number) => void
   /** 整组适应时四周留白（像素），缺省按学生页的搜索栏与右侧工具；教师页没有顶部浮层，可收紧 */
@@ -70,6 +80,8 @@ export interface Enhancer {
   relayoutLabels(): void
   /** 指针离开整个画布：结束悬停（悬停淡化的兜底之一，只依赖节点的 pointerleave 在快速移动时不可靠） */
   leaveHover(): void
+  /** 当前各节点在画布容器内的屏幕位置与半径（UI-GRAPH-EDIT-02：悬停工具与连线命中）；取不到时为空数组 */
+  anchors(): NodeAnchor[]
   /** 小地图里某个节点点的颜色：当前高亮靛紫、已掌握绿、学习中琥珀、其余石板灰 */
   minimapColor(elementId: string): string
   detach(): void
@@ -360,6 +372,24 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     }, 60)
   }
 
+  function anchors(): NodeAnchor[] {
+    const g = deps.graph()
+    if (!live() || g === null || g.getElementPosition === undefined || g.getViewportByCanvas === undefined) return []
+    const zoom = zoomOf(g) ?? 1
+    // 节点在屏幕上的半径：基础尺寸 × 语义缩放的放大系数 × 缩放
+    const r = (NODE_BASE_PX / 2) * view.floors.nodeK * zoom
+    const out: NodeAnchor[] = []
+    for (const node of nodes) {
+      try {
+        const at = g.getViewportByCanvas(g.getElementPosition(node.id))
+        out.push({ kpId: node.data.kpId, x: at[0]!, y: at[1]!, r })
+      } catch {
+        /* 还没画出来或已移除的忽略 */
+      }
+    }
+    return out
+  }
+
   function attach(): void {
     const g = deps.graph()
     if (g === null) return
@@ -369,6 +399,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
       const zoom = zoomOf(g)
       if (zoom === null) return
       deps.onZoom(round2(zoom))
+      options.onTransform?.()
       if (syncView(zoom)) deps.enqueue(pushView)
       scheduleLabels()
     })
@@ -408,6 +439,19 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     })
     g.on('edge:pointerenter', () => {
       if (live() && deps.graph() === g && (pointerId !== null || hoverId !== null)) endHover()
+    })
+    // UI-GRAPH-EDIT-02：关系线点击与节点右键，只转成契约 ID 交给页面，画布自己不改数据
+    g.on('edge:click', (event: GraphEvent) => {
+      if (!live() || deps.graph() !== g) return
+      const edge = edges.find((e) => e.id === event.target?.id)
+      if (edge === undefined) return
+      options.onEdgeClick?.({ relationId: edge.data.relationId, clientX: event.client?.x ?? 0, clientY: event.client?.y ?? 0 })
+    })
+    g.on('node:contextmenu', (event: GraphEvent) => {
+      if (!live() || deps.graph() !== g) return
+      const node = nodes.find((n) => n.id === event.target?.id)
+      if (node === undefined) return
+      options.onNodeMenu?.({ kpId: node.data.kpId, clientX: event.client?.x ?? 0, clientY: event.client?.y ?? 0 })
     })
   }
 
@@ -499,6 +543,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
     leaveHover() {
       if (live() && (pointerId !== null || hoverId !== null)) endHover()
     },
+    anchors,
     minimapColor(elementId) {
       const states = nodes.find((n) => n.id === elementId)?.states ?? []
       if (states.includes('selected')) return GRAPH_COLORS.accent
