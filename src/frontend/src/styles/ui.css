@@ -666,3 +666,54 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 .app-topbar__pending { padding: 0 6px; border-radius: 6px; background: var(--ss-warn-bg); color: var(--ss-warn); font-size: 11px; line-height: 18px; font-weight: 600; }
 .app--graph .app-topbar__link.is-current .app-topbar__pending { background: rgb(15 61 54 / 14%); color: var(--ui-brand); }
 @media (max-width: 767px) { .app-topbar__brand span { display: none; } .app-topbar__brand { margin-right: 4px; padding-right: 10px; } .app-topbar__mode { display: none; } }
+
+/* ---------- 审核页：疑似重复的对比与合并预览（UX-REVIEW-DEDUP-01）。左窄栏放关系与孤立，右宽栏放疑似重复；文档顺序不变 */
+@media(min-width:1001px) {
+ .light-surface.review .ui-review-inbox { grid-template-columns:minmax(260px,340px) minmax(0,1fr); grid-template-rows:auto 1fr; }
+ .light-surface.review [data-test=rv-column-low_confidence_relation] { grid-column:1; grid-row:1; }
+ .light-surface.review [data-test=rv-column-suspected_duplicate] { grid-column:2; grid-row:1 / span 2; }
+ .light-surface.review [data-test=rv-column-isolated_node] { grid-column:1; grid-row:2; }
+}
+.light-surface.review .review__dup-row p { margin:0 0 6px; }
+.light-surface.review .review__list > li.is-expanded { background:#fff; border-color:var(--ui-primary); box-shadow:0 0 0 1px var(--ui-primary); }
+.light-surface.review .review__handled { list-style:none; margin:0 0 12px; padding:0; display:grid; gap:4px; }
+.light-surface.review .review__handled li { display:flex; align-items:center; gap:6px; color:var(--gw-ok); font-size:12px; line-height:18px; }
+.light-surface.review .rv-dup { margin:10px 0 0; padding:0; border:0; }
+.light-surface.review .rv-dup > legend { padding:0; margin-bottom:8px; color:var(--ui-text-2); font-size:12px; }
+.light-surface.review .rv-dup__cards, .light-surface.review .rv-dup__graphs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.light-surface.review .rv-dup__card { display:grid; align-content:start; gap:6px; margin:0; padding:12px; border:1px solid var(--ui-edge); border-radius:8px; background:#fff; cursor:pointer; font-size:13px; }
+.light-surface.review .rv-dup__card:hover { background:var(--ui-surface-2); }
+.light-surface.review .rv-dup__card.is-primary { border-color:var(--ui-primary); box-shadow:inset 0 0 0 1px var(--ui-primary); background:var(--ui-primary-soft); }
+.light-surface.review .rv-dup__head { display:flex; align-items:center; gap:8px; min-width:0; }
+.light-surface.review .rv-dup__head strong { min-width:0; overflow-wrap:anywhere; font-size:14px; color:var(--ui-text); }
+.light-surface.review .rv-dup__tag { margin-left:auto; flex:none; padding:1px 8px; border-radius:999px; background:var(--ui-surface-2); border:1px solid var(--ui-line); color:var(--ui-text-2); font-size:12px; line-height:18px; }
+.light-surface.review .rv-dup__card.is-primary .rv-dup__tag { background:var(--ui-primary); border-color:var(--ui-primary); color:#fff; }
+.light-surface.review .rv-dup__def { color:var(--ui-text); line-height:1.6; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.light-surface.review .rv-dup__meta { color:var(--ui-text-2); font-size:12px; line-height:18px; overflow-wrap:anywhere; }
+.light-surface.review .rv-dup__graphs { margin-top:12px; }
+.rv-mini { margin:0; padding:8px; border:1px solid var(--ui-line-soft); border-radius:8px; background:var(--gw-canvas); min-width:0; }
+.rv-mini figcaption { padding:0 4px 2px; color:var(--ui-text-2); font-size:12px; line-height:18px; }
+.rv-mini svg { display:block; width:100%; height:auto; }
+.rv-mini__moved { stroke:var(--ui-highlight); stroke-width:7; stroke-linecap:round; opacity:.6; }
+.rv-mini__node circle { stroke:#606a7b; stroke-width:1.5; }
+.rv-mini__node.is-primary circle { stroke:var(--ui-primary); stroke-width:3; }
+.rv-mini__node.is-merged circle { stroke:#606a7b; stroke-width:2; stroke-dasharray:4 3; }
+.rv-mini__glyph { font-size:12px; font-weight:500; fill:#20232a; }
+.rv-mini__name { font-size:11px; fill:#20232a; paint-order:stroke; stroke:var(--gw-canvas); stroke-width:3px; }
+.rv-mini__node.is-primary .rv-mini__name, .rv-mini__node.is-merged .rv-mini__name { font-size:12px; font-weight:600; }
+.rv-mini__more { margin:2px 4px 0; color:var(--ui-text-2); font-size:12px; }
+.light-surface.review .rv-dup__facts { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:10px 0 0; color:var(--ui-text); font-size:12px; line-height:18px; }
+.rv-dup__swatch { flex:none; width:22px; height:7px; border-radius:4px; background:var(--ui-highlight); opacity:.6; }
+.light-surface.review .rv-dup__summary { margin:8px 0 0; color:var(--ui-text-2); font-size:12px; line-height:18px; }
+.light-surface.review .rv-dup__error { margin-top:10px; padding:10px 12px; border-radius:8px; background:var(--gw-danger-bg); color:var(--gw-danger); font-size:13px; }
+.light-surface.review .rv-dup__error p { margin:0; }
+.light-surface.review .rv-dup__actions { margin-top:12px; padding-top:12px; border-top:1px solid var(--ui-line-soft); }
+.light-surface.review.ui-management .rv-dup__primary { background:var(--ui-primary); border-color:var(--ui-primary); color:#fff; font-weight:500; }
+.light-surface.review.ui-management .rv-dup__primary:hover:not(:disabled) { background:var(--ui-primary-press); border-color:var(--ui-primary-press); }
+.light-surface.review.ui-management .rv-dup__quiet { background:transparent; border-color:transparent; color:var(--ui-text-2); }
+.light-surface.review .rv-dup__link { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 8px; color:var(--ui-primary-text); font-size:13px; text-decoration:none; border-radius:6px; }
+.light-surface.review .rv-dup__link:hover { background:var(--ui-primary-soft); }
+.light-surface.review .rv-dup__keys { margin-left:auto; color:var(--ui-text-3); font-size:12px; }
+@media(max-width:640px) { .light-surface.review .rv-dup__cards, .light-surface.review .rv-dup__graphs { grid-template-columns:minmax(0,1fr); } .light-surface.review .rv-dup__keys { display:none; } }
+.light-surface .teacher-graph__pair { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 12px; padding:8px 12px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); color:var(--ui-text); font-size:13px; }
+.light-surface.review .rv-dup__nopreview { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0 0; padding:10px 12px; border:1px solid var(--ui-highlight); border-radius:8px; background:var(--ui-highlight-soft); color:var(--ui-text); font-size:13px; line-height:1.6; }

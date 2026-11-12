@@ -1183,3 +1183,45 @@ describe('UI-GRAPH-FIND-01 教师页：搜索高亮、循环定位与面板宽�
     expect(Number(blocked.attributes('aria-valuenow'))).toBe(380)
   })
 })
+
+// ---------------------------------------------------------------- UX-REVIEW-DEDUP-01：从审核页带来的一对疑似重复
+describe('UX-REVIEW-DEDUP-01 教师图谱页：?pair= 高亮一对疑似重复知识点', () => {
+  const statesById = (wrapper: VueWrapper) => Object.fromEntries((canvasGraph(wrapper)?.nodes ?? []).map((n) => [n.data.kpId, n.states ?? []]))
+
+  it('高亮这两个知识点、其余淡化，并提示正在查看；结束查看后恢复并从地址移除参数', async () => {
+    const { wrapper, router } = await mountPage(fakes(), '/courses/c1/graph/edit?pair=k1,k3')
+    expect(wrapper.get('[data-test="tg-pair-notice"]').text()).toContain('「知识点 k1」与「知识点 k3」')
+    const states = statesById(wrapper)
+    expect(states.k1).toContain('match')
+    expect(states.k3).toContain('match')
+    expect(states.k2).toContain('dimmed')
+
+    await wrapper.get('[data-test="tg-pair-dismiss"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="tg-pair-notice"]').exists()).toBe(false)
+    expect(Object.values(statesById(wrapper)).flat()).not.toContain('dimmed')
+    expect(router.currentRoute.value.query.pair).toBeUndefined()
+  })
+
+  it('搜索命中优先于这一对；清空搜索后回到这一对', async () => {
+    const { wrapper } = await mountPage(fakes(), '/courses/c1/graph/edit?pair=k1,k3')
+    await wrapper.find('input[type="search"]').setValue('知识点 k2')
+    await flushPromises()
+    expect(statesById(wrapper).k2).toContain('match')
+    expect(statesById(wrapper).k1).toContain('dimmed')
+    await wrapper.find('input[type="search"]').setValue('')
+    await flushPromises()
+    expect(statesById(wrapper).k1).toContain('match')
+  })
+
+  it('知识点不在草稿中、或参数不是两个知识点时不高亮；前者给出说明', async () => {
+    const gone = await mountPage(fakes(), '/courses/c1/graph/edit?pair=k1,nope')
+    expect(gone.wrapper.get('[data-test="tg-pair-missing"]').text()).toContain('已不在草稿中')
+    expect(Object.values(statesById(gone.wrapper)).flat()).not.toContain('dimmed')
+    gone.wrapper.unmount()
+
+    const one = await mountPage(fakes(), '/courses/c1/graph/edit?pair=k1')
+    expect(one.wrapper.find('[data-test="tg-pair-notice"]').exists()).toBe(false)
+    expect(one.wrapper.find('[data-test="tg-pair-missing"]').exists()).toBe(false)
+  })
+})

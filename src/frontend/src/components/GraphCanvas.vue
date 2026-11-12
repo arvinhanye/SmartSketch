@@ -48,7 +48,12 @@ const props = withDefaults(
   { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined, showLabelStat: false },
 )
 
-const emit = defineEmits<{ nodeClick: [kpId: string]; blankClick: [] }>()
+const emit = defineEmits<{
+  nodeClick: [kpId: string]
+  blankClick: []
+  /** 画布每次建好并画完第一帧（含换布局后的重建）：页面可在此时做整组适应等需要画布已存在的操作 */
+  ready: []
+}>()
 
 const factory = inject(GRAPH_FACTORY_KEY, loadG6Graph)
 const registry = inject(GRAPH_OBSTACLES_KEY, null)
@@ -146,7 +151,10 @@ function start(attempt = 0): void {
     onNodeClick: (kpId) => emit('nodeClick', kpId),
     onStatus: (next) => {
       status.value = next
-      if (next === 'ready') drawnOnce.value = true
+      if (next === 'ready' && !drawnOnce.value) {
+        drawnOnce.value = true
+        emit('ready')
+      }
     },
     onZoom: (value) => {
       zoom.value = Math.round(value * 100) / 100
