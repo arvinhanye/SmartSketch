@@ -1411,3 +1411,32 @@ describe('UI-GRAPH-EDIT-02 教师图谱页：关系线工具条、节点菜单�
     expect((selects[1]!.element as HTMLSelectElement).value).toBe('k3')
   })
 })
+
+// ---------------------------------------------------------------- UI-GRAPH-STABLE-03：关系增删后节点位置不动
+describe('UI-GRAPH-STABLE-03 教师图谱页：只改关系不重新布局', () => {
+  const canvasOf = (wrapper: VueWrapper) => wrapper.findComponent(GraphCanvas)
+  const positionsOf = (wrapper: VueWrapper) => canvasOf(wrapper).props('positions') as Map<string, { x: number; y: number }> | null
+
+  it('从画布新建关系后，交给画布的位置还是同一份（画布不重建），并出现“重新排布”；点它才重新计算', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    await vi.waitFor(() => expect(positionsOf(wrapper)).not.toBeNull())
+    const before = positionsOf(wrapper)
+    expect(wrapper.find('[data-test="tg-relayout"]').exists()).toBe(false)
+
+    canvasOf(wrapper).vm.$emit('nodeMenu', { kpId: 'k2', x: 10, y: 10 })
+    await flushPromises()
+    await wrapper.get('[data-test="ce-menu-connect"]').trigger('click')
+    await clickNode(wrapper, 'k3')
+    await wrapper.get('[data-test="ce-type-CONTAINS"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledTimes(1)
+    expect(canvasGraph(wrapper)!.edges).toHaveLength(2)
+    expect(positionsOf(wrapper)).toBe(before)
+
+    await wrapper.get('[data-test="tg-relayout"]').trigger('click')
+    await vi.waitFor(() => expect(positionsOf(wrapper)).not.toBeNull())
+    expect(positionsOf(wrapper)).not.toBe(before)
+    expect(wrapper.find('[data-test="tg-relayout"]').exists()).toBe(false)
+  })
+})

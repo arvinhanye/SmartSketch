@@ -68,3 +68,117 @@ describe('useGraphLayout', () => {
     expect(error.value).toBeInstanceOf(Error)
   })
 })
+
+// ---------------------------------------------------------------- UI-GRAPH-STABLE-03：只改关系时位置不动
+describe('useGraphLayout：stable 模式（教师页）', () => {
+  const withEdges = (ids: string[], edges: Array<[string, string]>, chapterOrder = ['c1']): LayoutSource => ({
+    nodes: ids.map((id) => ({ id, chapter: 'c1' })),
+    edges: edges.map(([s, t], i) => ({ id: `e${i}`, source: s, target: t, type: 'CONTAINS' })) as LayoutSource['edges'],
+    chapterOrder,
+  })
+  async function settled(ids: string[], edges: Array<[string, string]> = []) {
+    const src = ref<LayoutSource | null>(withEdges(ids, edges))
+    const { engine, calls, release } = makeEngine()
+    const layout = useGraphLayout(() => src.value, engine, false, { stable: true })
+    await flushPromises()
+    release()
+    await flushPromises()
+    return { src, layout, calls, release }
+  }
+
+  it('只增删关系：不重新计算，位置对象原样保留（画布因此不重建），并标记布局已过期', async () => {
+    const { src, layout, calls } = await settled(['a', 'b', 'c'])
+    const before = layout.positions.value
+    expect(layout.stale.value).toBe(false)
+    src.value = withEdges(['a', 'b', 'c'], [['a', 'b']])
+    await flushPromises()
+    expect(layout.positions.value).toBe(before)
+    expect(calls).toHaveLength(1)
+    expect(layout.stale.value).toBe(true)
+    // 关系改回原样：不再算过期
+    src.value = withEdges(['a', 'b', 'c'], [])
+    await flushPromises()
+    expect(layout.stale.value).toBe(false)
+    expect(layout.positions.value).toBe(before)
+  })
+
+  it('删掉知识点：其余知识点的位置不动，不重新计算', async () => {
+    const { src, layout, calls } = await settled(['a', 'b', 'c'], [['a', 'b']])
+    const before = layout.positions.value
+    src.value = withEdges(['a', 'c'], [])
+    await flushPromises()
+    expect(layout.positions.value).toBe(before)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('出现新知识点、知识点换了章节或章节顺序变了：重新计算', async () => {
+    const { src, layout, calls, release } = await settled(['a', 'b'])
+    src.value = withEdges(['a', 'b', 'n'], [])
+    await flushPromises()
+    expect(layout.positions.value).toBeNull()
+    release()
+    await flushPromises()
+    expect([...layout.positions.value!.keys()].sort()).toEqual(['a', 'b', 'n'])
+    expect(calls).toHaveLength(2)
+
+    // 替身引擎按章节各调一次，所以这里不数调用次数，只看“位置先回到 null 再给出新的”
+    const moved = layout.positions.value
+    src.value = { ...withEdges(['a', 'b', 'n'], []), nodes: [{ id: 'a', chapter: 'c2' }, { id: 'b', chapter: 'c1' }, { id: 'n', chapter: 'c1' }] }
+    await flushPromises()
+    expect(layout.positions.value).toBeNull()
+    // 多个章节时引擎按章节依次调用：放行几轮直到算完
+    for (let round = 0; round < 4; round += 1) {
+      release()
+      await flushPromises()
+    }
+    expect(layout.positions.value).not.toBeNull()
+    expect(layout.positions.value).not.toBe(moved)
+
+    src.value = { ...src.value!, chapterOrder: ['c2', 'c1'] }
+    await flushPromises()
+    expect(layout.positions.value).toBeNull()
+    // 多个章节时引擎按章节依次调用：放行几轮直到算完
+    for (let round = 0; round < 4; round += 1) {
+      release()
+      await flushPromises()
+    }
+    expect(layout.positions.value).not.toBeNull()
+    expect(layout.stale.value).toBe(false)
+  })
+
+  it('relayout()：按当前关系重新计算，过期标记清除；源为 null 后再来同一批知识点也会重新计算', async () => {
+    const { src, layout, calls, release } = await settled(['a', 'b'])
+    src.value = withEdges(['a', 'b'], [['a', 'b']])
+    await flushPromises()
+    expect(layout.stale.value).toBe(true)
+    layout.relayout()
+    await flushPromises()
+    expect(layout.positions.value).toBeNull()
+    release()
+    await flushPromises()
+    expect(calls).toHaveLength(2)
+    expect(layout.stale.value).toBe(false)
+
+    src.value = null
+    await flushPromises()
+    expect(layout.positions.value).toBeNull()
+    src.value = withEdges(['a', 'b'], [['a', 'b']])
+    await flushPromises()
+    release()
+    await flushPromises()
+    expect(calls).toHaveLength(3)
+  })
+
+  it('不开 stable（学生页）时行为不变：关系一变就重新计算', async () => {
+    const src = ref<LayoutSource | null>(withEdges(['a', 'b'], []))
+    const { engine, calls, release } = makeEngine()
+    const layout = useGraphLayout(() => src.value, engine)
+    await flushPromises()
+    release()
+    await flushPromises()
+    src.value = withEdges(['a', 'b'], [['a', 'b']])
+    await flushPromises()
+    expect(layout.positions.value).toBeNull()
+    expect(calls).toHaveLength(2)
+  })
+})

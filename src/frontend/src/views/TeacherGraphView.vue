@@ -351,7 +351,8 @@ const layoutSource = computed(() => {
     chapterOrder: [...chapters.value].sort((a,b) => a.order - b.order || a.id.localeCompare(b.id)).map(c => c.id),
   }
 })
-const { positions, radialPositions, recommended, error: layoutError } = useGraphLayout(() => layoutSource.value, undefined, true)
+// UI-GRAPH-STABLE-03：只增删关系或删掉知识点时节点位置不动，画布不重建；需要时由教师点“重新排布”
+const { positions, radialPositions, recommended, error: layoutError, stale: layoutStale, relayout } = useGraphLayout(() => layoutSource.value, undefined, true, { stable: true })
 
 // 排布：层次（章节分区）/ 径向 / 力导向。层次布局把单章大树拉成长条时，默认用径向；教师手动选择后不再自动改，并按课程记住
 // 教师在本课程选过的布局记在本浏览器里，下次进入直接使用（不再按推荐值重选）
@@ -515,6 +516,9 @@ useGraphShortcuts({
             <p class="teacher-graph__hint" :title="tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。'">
               {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
             </p>
+            <button v-if="layoutStale && arrangement !== 'force'" type="button" class="teacher-graph__relayout" data-test="tg-relayout" title="关系变了之后节点位置保持不动；点这里按现在的关系重新排布整张图" @click="relayout">
+              重新排布
+            </button>
             <label class="teacher-graph__picker">
               选择知识点
               <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
