@@ -192,7 +192,8 @@ class EmbeddingAdapter:
         except Exception as exc:  # noqa: BLE001 - the sent row stays (billed by estimate); never mask the call
             logger.warning("embedding call %s write-back failed (%s)", call_id, type(exc).__name__)
 
-    def embed(self, texts: Sequence[str], *, deadline: float | None = None) -> tuple[EmbeddedVector, ...]:
+    def embed(self, texts: Sequence[str], *, deadline: float | None = None,
+              before_attempt: Callable[[], None] | None = None) -> tuple[EmbeddedVector, ...]:
         """``deadline`` (``time.monotonic()`` axis) bounds QA query embedding (ADR-082 决定 3): each request
         carries the remaining time and none is sent once it has passed. Publish/offline callers pass
         nothing and keep the client's per-request timeout. Cache hits never send a request.
@@ -229,6 +230,7 @@ class EmbeddingAdapter:
             batch_texts = tuple(text for _, text in batch)
             attempt = 0
             while True:
+                if before_attempt is not None: before_attempt()
                 call_id = self._prewrite(batch_texts, batch_index, completed)   # 预写失败则不发请求
                 started = time.monotonic()
                 try:

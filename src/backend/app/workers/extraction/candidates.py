@@ -16,7 +16,7 @@ from app.repositories.chunks import (
 from app.repositories.extraction_checkpoints import Checkpoint, read_checkpoints
 from app.repositories.sqlite import connect
 from app.services.ai.entities import EntityCandidate, EntitySource
-from app.services.ai.gleaning import entity_name_key
+from app.services.ai.gleaning import entity_name_key, entity_mention_key
 from app.services.ai.relations import RelationCandidate, RelationSource
 from app.services.chunk_identity import ChunkIdentity, split_chunk_id, text_sha256
 from app.workers.extraction.types import (
@@ -34,11 +34,17 @@ def task_entity_id(task_id: str, name: str) -> str:
     return "tent_" + digest.hexdigest()[:32]
 
 
+def mention_entity_id(task_id: str, candidate: EntityCandidate) -> str:
+    """Version 2: stable occurrence ID. Confidence is deliberately not identity."""
+    payload = json.dumps([task_id, entity_mention_key(candidate)], ensure_ascii=False, separators=(",", ":"))
+    return "ment_" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
+
+
 # ---------------------------------------------------------------- 候选编解码
 
 
 def _source_json(source: EntitySource | RelationSource) -> dict[str, object]:
-    return {
+    result = {
         "document_id": source.document_id,
         "revision_id": source.revision_id,
         "chunk_id": source.chunk_id,
@@ -46,6 +52,9 @@ def _source_json(source: EntitySource | RelationSource) -> dict[str, object]:
         "evidence_end": source.evidence_end,
         "sources": json.loads(_sources_json(source.sources)),
     }
+    if isinstance(source, EntitySource) and source.evidence_ambiguous:
+        result["evidence_ambiguous"] = True
+    return result
 
 
 def _source_fields(course_id: str, raw: Mapping[str, object]) -> dict[str, object]:
@@ -61,7 +70,7 @@ def _source_fields(course_id: str, raw: Mapping[str, object]) -> dict[str, objec
 
 
 def _encode_entity(candidate: EntityCandidate) -> dict[str, object]:
-    return {
+    result = {
         "name": candidate.name,
         "type": candidate.type,
         "definition": candidate.definition,
@@ -69,6 +78,9 @@ def _encode_entity(candidate: EntityCandidate) -> dict[str, object]:
         "confidence": candidate.confidence,
         "source": _source_json(candidate.source),
     }
+    if candidate.occurrence_index is not None:
+        result["occurrence_index"] = candidate.occurrence_index
+    return result
 
 
 def _decode_entity(course_id: str, raw: Mapping[str, object]) -> EntityCandidate:
@@ -78,7 +90,9 @@ def _decode_entity(course_id: str, raw: Mapping[str, object]) -> EntityCandidate
         definition=raw["definition"],  # type: ignore[arg-type]
         evidence=raw["evidence"],  # type: ignore[arg-type]
         confidence=raw["confidence"],  # type: ignore[arg-type]
-        source=EntitySource(**_source_fields(course_id, raw["source"])),  # type: ignore[arg-type]
+        source=EntitySource(**_source_fields(course_id, raw["source"]),  # type: ignore[arg-type]
+                            evidence_ambiguous=raw["source"].get("evidence_ambiguous", False)),
+        occurrence_index=raw.get("occurrence_index"),  # type: ignore[arg-type]
     )
 
 
@@ -154,9 +168,13 @@ def _group_entities(
     grouped: dict[str, list[EntityCandidate]] = {}
     for checkpoint in ordered:
         assert checkpoint.result is not None
+        version = checkpoint.result.get("entity_identity_version", 1)
+        if type(version) is not int or version not in (1, 2):
+            raise ValueError("unsupported entity identity version")
         for raw in checkpoint.result["entities"]:  # type: ignore[union-attr]
             candidate = _decode_entity(course_id, raw)
-            entity_id = task_entity_id(task_id, candidate.name)
+            entity_id = (mention_entity_id(task_id, candidate) if version == 2
+                         else task_entity_id(task_id, candidate.name))
             names.setdefault(entity_id, (candidate.name, candidate.type))
             grouped.setdefault(entity_id, []).append(candidate)
     return tuple(

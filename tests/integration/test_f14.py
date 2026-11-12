@@ -672,3 +672,25 @@ def test_live_failure_keeps_old_space_then_rerun_switches(db, neo):
     names = {r["name"] for r in neo.q("SHOW INDEXES YIELD name, type WHERE type = 'VECTOR' RETURN name")}
     assert f"kp_embedding_{OLD_PROP[10:]}" in names
     assert run(db, neo.driver).action == "switched" and recorded(db) == NEW
+
+
+def test_physical_draft_projection_is_reembedded_as_mutable_draft(db):
+    graph = FakeGraph(); build_stock(db, graph)
+    course = db.courses[0]
+    graph.add('KnowledgePoint', course_id=course, version_id='draftgen_test', kp_id='projected',
+              name='projected', definition='changed definition', **{OLD_PROP:old_vector(), NEW_PROP:old_vector(99)})
+    client = FakeEmbeddingClient()
+    report = run(db, graph, client)
+    assert report.draft_kps == 5 and report.orphans == 1
+    assert graph.kp(course, 'draftgen_test', 'projected')[NEW_PROP] != old_vector(99)
+    assert any('changed definition' in text for c in client.calls for text in c.request.texts)
+
+
+@live
+def test_live_physical_draft_projection_is_in_reembedding_stock(db, neo):
+    course = db.courses[0]
+    neo.q('CREATE (n:KnowledgePoint {course_id:$c,version_id:"draftgen_live",kp_id:"projected",name:"projected",definition:"definition"})', c=course)
+    report = run(db, neo.driver)
+    assert report.draft_kps == 5
+    result = neo.q(f'MATCH(n:KnowledgePoint {{course_id:$c,version_id:"draftgen_live"}}) RETURN n.{NEW_PROP} AS vector', c=course)
+    assert len(result[0]['vector']) == 4

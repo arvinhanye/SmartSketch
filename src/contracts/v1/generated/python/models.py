@@ -948,6 +948,114 @@ class GraphStats(BaseModel):
     ] = None
 
 
+class Status(Enum):
+    not_analyzed = 'not_analyzed'
+    complete = 'complete'
+    partial = 'partial'
+    stale = 'stale'
+
+
+class QueueMode(Enum):
+    legacy = 'legacy'
+    semantic = 'semantic'
+
+
+class DisambiguationRecallCoverage(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pair_unit: Literal['visible_node_pairs']
+    total_pairs: Annotated[int, Field(ge=0)]
+    retrieved_pairs: Annotated[int, Field(ge=0)]
+    truncated_pairs: Annotated[int, Field(ge=0)]
+    limited_queries: Annotated[int, Field(ge=0)]
+    missing_channels: list[str]
+
+
+class Verdict(Enum):
+    SAME = 'SAME'
+    UNCERTAIN = 'UNCERTAIN'
+
+
+class Basis(Enum):
+    material = 'material'
+    model_knowledge = 'model_knowledge'
+    mixed = 'mixed'
+
+
+class ReviewSemanticAnalysis(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    plan_id: str
+    verdict: Verdict
+    basis: Basis
+    reasons: list[str]
+    differences: list[str]
+    constraints: list[str]
+
+
+class Status1(Enum):
+    applied = 'applied'
+    undone = 'undone'
+
+
+class FusionMergeRecord(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    plan_id: str
+    group_id: str
+    task_id: str
+    canonical_id: str
+    members: list[KnowledgePointRef]
+    status: Status1
+    created_at: str
+    undone_at: Optional[str] = None
+
+
+class FusionUndoRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    expected_revision: Annotated[int, Field(ge=0)]
+
+
+class Kind1(Enum):
+    nodes = 'nodes'
+    edges = 'edges'
+    evidence = 'evidence'
+
+
+class FusionUndoConflict(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reason: str
+    kind: Optional[Kind1] = None
+    ids: Optional[list[str]] = None
+
+
+class Status2(Enum):
+    ready = 'ready'
+    conflict = 'conflict'
+    undone = 'undone'
+    already_undone = 'already_undone'
+
+
+class FusionUndoResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    plan_id: str
+    group_id: str
+    status: Status2
+    changed: bool
+    current_revision: Annotated[int, Field(ge=0)]
+    affected_ids: list[str]
+    conflicts: list[FusionUndoConflict]
+
+
 class ReviewItemKind(Enum):
     low_confidence_relation = 'low_confidence_relation'
     suspected_duplicate = 'suspected_duplicate'
@@ -976,9 +1084,12 @@ class Reason1(Enum):
     same_key = 'same_key'
     alias = 'alias'
     containment = 'containment'
+    semantic_uncertain = 'semantic_uncertain'
+    merge_blocked = 'merge_blocked'
 
 
 class SuspectedDuplicate(BaseModel):
+    analysis: Optional[ReviewSemanticAnalysis] = None
     candidates: Annotated[list[KnowledgePointRef], Field(max_length=2, min_length=2)]
     similarity: Annotated[float, Field(ge=0.0, le=1.0)]
     reason: Reason1
@@ -1709,7 +1820,41 @@ class GraphExchange(BaseModel):
     stats: Optional[GraphStats] = None
 
 
+class DisambiguationCoverage(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    status: Status
+    queue_mode: QueueMode
+    draft_revision: Annotated[int, Field(ge=0)]
+    plan_id: Optional[str] = None
+    task_id: Optional[str] = None
+    pair_unit: Literal['original_member_pairs']
+    total_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    examined_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    completed_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    same_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    different_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    uncertain_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    technical_unchecked_pairs: Annotated[Optional[int], Field(ge=0)] = None
+    auto_merged_groups: Annotated[Optional[int], Field(ge=0)] = None
+    review_pairs: Annotated[int, Field(ge=0)]
+    legacy_candidates: Annotated[int, Field(ge=0)]
+    recall: Optional[DisambiguationRecallCoverage] = None
+    reasons: list[str]
+
+
+class FusionMergeHistory(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    draft_revision: Annotated[int, Field(ge=0)]
+    items: list[FusionMergeRecord]
+    next_cursor: Optional[str] = None
+
+
 class ReviewQueue(BaseModel):
+    disambiguation: Optional[DisambiguationCoverage] = None
     low_confidence_relations: list[Relation]
     suspected_duplicates: list[SuspectedDuplicate]
     isolated_nodes: list[KnowledgePointRef]

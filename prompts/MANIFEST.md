@@ -12,6 +12,7 @@
 | `extract_entities_gleaning` | 2 | `chunk_text`、`entities_json` | `evaluation/evaluate_extraction.py` | `61a0c8d0040e457d8310dc0d9e451769ee89e0b3c004fa73e8278042b3397c7e` | E06 | 草稿 |
 | `extract_relations` | 2 | `entity_table`、`source_chunks` | `evaluation/evaluate_extraction.py` | `be9c788194869a7421e3058dc73923608697995bb50e662de6a60d1b6cc963d6` | E11 | 草稿 |
 | `judge_duplicate` | 2 | `name_a`、`definition_a`、`sources_a`、`name_b`、`definition_b`、`sources_b` | `evaluation/evaluate_extraction.py` | `1523521301541090a9c82c0b3398a534bfa655a30d211f9cca7d220aeada589d` | E10 | 草稿 |
+| `resolve_duplicate` | 1 | `phase`、`pair_json` | `evaluation/evaluate_disambiguation.py` | `c75e2cae12db7222649ae4829235cf839d0fb56a302e468d36ded55fc0f288bc` | DISAMBIG-BE-01 | 草稿 |
 | `summarize_definition` | 2 | `name`、`definitions`、`sources` | `evaluation/evaluate_extraction.py` | `52336dd1e2c9d8108db9fdab0d373fe129b46c0f1fad0fb2c8a3bc081e550a97` | E10 | 草稿 |
 | `rewrite_query` | 2 | `history`、`question` | `evaluation/evaluate_qa.py` | `26c5779846c8a164ef25b9b68d5b6f764f26545b1dc9300ae292b93a1c3ac261` | J03 | 草稿 |
 | `answer_with_context` | 3 | `graph_context`、`context`、`question` | `evaluation/evaluate_qa.py` | `4ee7da769d815990ef0162bbfb4b79fdac0ffa0c7ee1b143e9993f2e07f05e27` | J05（v3：C02-2 / ADR-089） | 草稿 |

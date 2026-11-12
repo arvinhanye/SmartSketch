@@ -458,13 +458,16 @@ class ModelCallPolicy:
         """False when every provider usable for ``model`` (default: any) has an open breaker."""
         return any(provider.breaker.available() for provider, _ in self._candidates(model))
 
-    def bind(self, attribution: CallAttribution, *, deadline: float | None = None) -> BoundModelClient:
+    def bind(self, attribution: CallAttribution, *, deadline: float | None = None,
+             before_attempt: Callable[[], None] | None = None) -> BoundModelClient:
         """Client for one caller context; ``deadline`` is an absolute time on the policy clock."""
         if not isinstance(attribution, CallAttribution):
             raise TypeError("attribution must be a CallAttribution")
         if deadline is not None and not _is_seconds(deadline):
             raise ValueError("deadline must be a finite number or None")
-        return BoundModelClient(self, attribution, deadline)
+        if before_attempt is not None and not callable(before_attempt):
+            raise TypeError("before_attempt must be callable or None")
+        return BoundModelClient(self, attribution, deadline, before_attempt)
 
     # -- internals
 
@@ -478,6 +481,10 @@ class ModelCallPolicy:
         return found
 
     def _prewrite(self, bound: BoundModelClient, provider: _Provider, request: ModelRequest) -> str:
+        # Recheck on every physical retry/fallback, before creating a billable record.
+        # The caller releases any half-open circuit probe if this raises.
+        if bound.before_attempt is not None:
+            bound.before_attempt()
         attribution = bound.attribution
         if self.daily_token_budget == 0:
             raise BudgetExceededError("daily")
@@ -704,10 +711,12 @@ class ModelCallPolicy:
 class BoundModelClient:
     """``ModelClient`` for one caller context; numbers its physical calls 1, 2, 3 … (``call_seq``)."""
 
-    def __init__(self, policy: ModelCallPolicy, attribution: CallAttribution, deadline: float | None = None) -> None:
+    def __init__(self, policy: ModelCallPolicy, attribution: CallAttribution, deadline: float | None = None,
+                 before_attempt: Callable[[], None] | None = None) -> None:
         self._policy = policy
         self.attribution = attribution
         self.deadline = deadline
+        self.before_attempt = before_attempt
         self._seq_lock = threading.Lock()
         self._seq = 0
 

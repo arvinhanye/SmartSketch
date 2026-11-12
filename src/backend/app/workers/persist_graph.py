@@ -38,7 +38,9 @@ from enum import StrEnum
 from typing import Any, Final
 
 from app.config import Settings
-from app.repositories import course_locks
+from app.repositories import course_locks, fusion
+from app.repositories.graph_projection import write_snapshot
+from app.repositories.fusion import read_draft_scope
 from app.repositories.chunks import StoredChunk, get_chunks
 from app.repositories.graph_nodes import DraftNode, NodeSource, NodeWriteResult, derive_kp_id, write_draft_nodes_in
 from app.repositories.graph_relations import (
@@ -345,8 +347,8 @@ def cleanup_failed_task(
         guard = LeaseGuard.from_expiry(lock_seconds, lock.expires_at)
         with course_locks.held(sqlite_url, lock, lease_seconds=lock_seconds, guard=guard):
             guard.check()
-            scope = GraphScope(course_id, DRAFT_VERSION,
-                               effective_task_ids=_effective(sqlite_url, course_id))
+            with connect(sqlite_url) as database:
+                scope = read_draft_scope(database, course_id)
             with repo.persist_write_transaction(scope, check=guard.check, remaining=guard.remaining) as tx:
                 lock_draft(tx)
                 revoke_task(tx, task_id)
@@ -524,6 +526,8 @@ def _persist_stage(
             candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id)
         with steps.step("plan"):
             plan = build_plan(lease.course_id, lease.task_id, candidates)
+            with connect(sqlite_url) as database:
+                prepared = fusion.task_plan(database, lease.course_id, lease.task_id)
         with steps.step("chunks"):
             chunks = get_chunks(sqlite_url, course_id=lease.course_id, chunk_ids=_source_chunk_ids(plan))
     except LeaseLost:
@@ -545,6 +549,14 @@ def _persist_stage(
 
     def work(tx: ScopedTransaction) -> _Written:
         steps.neo4j_attempts += 1
+        if use_projection:
+            write_snapshot(tx, prepared.payload['after'])
+            mapped_ids = tuple(sorted({prepared.payload['mapping'][n.kp_id] for n in plan.nodes}))
+            old_ids = set(prepared.payload['mapping']) - set(prepared.payload['incoming_ids'])
+            rel_ids = tuple(e['p']['rel_id'] for e in prepared.payload['after']['edges']
+                            if lease.task_id in e['p'].get('contrib_tasks', []))
+            return _Written(NodeWriteResult(mapped_ids, tuple(k for k in mapped_ids if k not in old_ids), (), ()),
+                            RelationWriteResult(written=rel_ids), ())
         return _write_draft(tx, lease.task_id, plan, chunks)
 
     lock_release_started = False
@@ -580,8 +592,12 @@ def _persist_stage(
                     with steps.step("lease_check"):
                         check()
                         _check_lease(sqlite_url, lease)  # 租约已丢则不写 Neo4j
-                        scope = GraphScope(lease.course_id, DRAFT_VERSION,
-                                           effective_task_ids=_effective(sqlite_url, lease.course_id))
+                        with connect(sqlite_url) as database:
+                            scope = read_draft_scope(database, lease.course_id)
+                            stale = prepared is not None and fusion.read_draft_head(database, lease.course_id) != prepared.head
+                            use_projection = prepared is not None and not stale and bool(prepared.payload['groups'])
+                            if use_projection:
+                                scope = replace(scope, storage_version_id=prepared.storage_version_id)
                     with steps.step("neo4j"):
                         dedicated_started = True
                         with repo.persist_write_transaction(scope, check=check,
@@ -594,6 +610,9 @@ def _persist_stage(
                                     check()
                                     try:
                                         tx.commit(started_at=acquired[0])
+                                        if prepared is not None:
+                                            fusion.activate_plan(database, prepared, applied=use_projection,
+                                                                 reason='stale_snapshot' if stale else None)
                                         t6_seq = _t6_in(database, lease)
                                     except BaseException:
                                         if tx.commit_started:
@@ -720,7 +739,11 @@ def run_pipeline_once(
             stage = MERGE_STAGE if extracted.status is ExtractStatus.ADVANCED else ""
         if stage == MERGE_STAGE:
             timer.start()
-            merged = run_merge_stage(url, replace(lease, stage=stage))
+            if settings.DISAMBIGUATION_AUTO_MERGE_ENABLED:
+                from app.workers.fusion_task import run_fusion_stage
+                merged = run_fusion_stage(settings, replace(lease, stage=stage), repo=repo, toolkit=toolkit, **lock)
+            else:
+                merged = run_merge_stage(url, replace(lease, stage=stage))
             stages.append(timer.done(MERGE_STAGE, merged.status.value))
             stage = STAGE if merged.status is PersistStatus.ADVANCED else ""
         if stage == STAGE:

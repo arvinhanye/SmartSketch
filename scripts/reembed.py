@@ -60,6 +60,12 @@ from app.services.ai.embeddings import EmbeddingAdapter, EmbeddingBatchError, Em
 from app.services.versions.materialize import node_embedding_text  # noqa: E402
 
 DRAFT = "draft"
+
+
+def _is_draft_version(version: str | None) -> bool:
+    # Physical generations remain logical drafts, including retained undo copies.
+    return version == DRAFT or isinstance(version, str) and version.startswith('draftgen_')
+
 REMOVE_BATCH = 1000
 _STALE_INDEX = re.compile(r"^(?:chunk|kp)_embedding_([0-9a-f]{16})$")
 _STALE_PROPERTY = re.compile(r"^embedding_[0-9a-f]{16}$")
@@ -113,7 +119,7 @@ class _Item:
     @property
     def reusable(self) -> bool:
         # Chunk text and committed copies are immutable; a draft's text may have changed.
-        return self.has_target and self.version_id != DRAFT
+        return self.has_target and not _is_draft_version(self.version_id)
 
 
 def target_space(settings: Any) -> str:
@@ -242,7 +248,7 @@ def _classify(driver: Any, sqlite_url: str, space: str, versions: dict[tuple[str
     per_version: dict[tuple[str, str], int] = defaultdict(int)
     for r in kps:
         key = (r["course_id"], r["version_id"])
-        if r["version_id"] == DRAFT:
+        if _is_draft_version(r["version_id"]):
             drafts += 1
         elif key in versions:
             committed += 1
