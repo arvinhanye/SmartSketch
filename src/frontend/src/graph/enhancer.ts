@@ -32,6 +32,11 @@ export interface EnhanceOptions {
   onBlankClick?: () => void
   /** 点击一条关系线（UI-GRAPH-EDIT-02）：关系的契约 ID 与指针的页面坐标 */
   onEdgeClick?: (info: { relationId: string; clientX: number; clientY: number }) => void
+  /**
+   * 用户平移或缩放了画布（G6 的 `aftertransform`）。和 `onZoom` 不同：数据更新、重排标签后回报缩放值不算，
+   * 所以页面可以据此收起钉在屏幕位置上的浮层，而不会被一次普通的重绘误伤。
+   */
+  onTransform?: () => void
   /** 在节点上点右键（UI-GRAPH-EDIT-02） */
   onNodeMenu?: (info: { kpId: string; clientX: number; clientY: number }) => void
   /** 每次重排标签后回报“当前显示几个标签 / 共几个节点”，页面据此提示“放大可看到更多标签” */
@@ -394,6 +399,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
       const zoom = zoomOf(g)
       if (zoom === null) return
       deps.onZoom(round2(zoom))
+      options.onTransform?.()
       if (syncView(zoom)) deps.enqueue(pushView)
       scheduleLabels()
     })

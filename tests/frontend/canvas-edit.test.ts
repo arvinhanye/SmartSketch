@@ -339,13 +339,14 @@ describe('画布生命周期：关系线点击、节点右键与节点位置', (
     vi.useRealTimers()
     const onEdgeClick = vi.fn()
     const onNodeMenu = vi.fn()
+    const onTransform = vi.fn()
     let fake!: FakeEnhancedGraph
     const container = document.createElement('div')
     Object.defineProperty(container, 'clientWidth', { value: 800 })
     Object.defineProperty(container, 'clientHeight', { value: 600 })
     const lifecycle = createGraphLifecycle(container, {
       data,
-      enhance: { onEdgeClick, onNodeMenu },
+      enhance: { onEdgeClick, onNodeMenu, onTransform },
       factory: (init) => (fake = new FakeEnhancedGraph({ 'kp:a': [100, 50], 'kp:b': [300, 200] }, init)),
     })
     await vi.waitFor(() => expect(lifecycle.status).toBe('ready'))
@@ -355,6 +356,15 @@ describe('画布生命周期：关系线点击、节点右键与节点位置', (
     expect(onEdgeClick.mock.calls).toEqual([[{ relationId: 'r1', clientX: 210, clientY: 120 }]])
     fake.emit('node:contextmenu', { target: { id: 'kp:b' }, client: { x: 305, y: 198 } })
     expect(onNodeMenu.mock.calls).toEqual([[{ kpId: 'b', clientX: 305, clientY: 198 }]])
+
+    // 回归：只有真正的平移 / 缩放才通知 onTransform；数据更新后的重绘不算
+    expect(onTransform).not.toHaveBeenCalled()
+    lifecycle.update({ nodes: data.nodes, edges: data.edges.map((e) => ({ ...e, states: ['active'] })) } as GraphCanvasData)
+    await vi.waitFor(() => expect(lifecycle.status).toBe('ready'))
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(onTransform).not.toHaveBeenCalled()
+    fake.emit('aftertransform')
+    expect(onTransform).toHaveBeenCalledTimes(1)
 
     const anchors = lifecycle.anchors()
     expect(anchors.map((a) => a.kpId)).toEqual(['a', 'b'])

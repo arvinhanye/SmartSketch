@@ -1297,7 +1297,10 @@ describe('UI-GRAPH-EDIT-02 教师图谱页：关系线工具条、节点菜单�
     await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
     await wrapper.get('[data-test="ce-edge-reverse"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('[data-test="ce-error"]').text()).toContain('环路：知识点 k1 → 知识点 k2 → 知识点 k1')
+    // 环路只写一遍（组合式的错误文案里已经带了）
+    const errorText = wrapper.get('[data-test="ce-error"]').text()
+    expect(errorText).toContain('知识点 k1 → 知识点 k2 → 知识点 k1')
+    expect(errorText.split('知识点 k1 → 知识点 k2 → 知识点 k1')).toHaveLength(2)
     expect(canvasGraph(wrapper)!.edges[0]!.source).toBe('kp:k1')
     await openTab(wrapper, 'relations')
     expect(wrapper.find('[data-test="ce-error"]').exists()).toBe(false)

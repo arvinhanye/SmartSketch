@@ -222,8 +222,9 @@ onBeforeUnmount(() => {
     <!-- 画布上发起的操作失败时，原因就显示在画布上（不要求打开“编辑关系”页签） -->
     <div v-if="error || conflict || ed.undoError" class="ce-toast is-error" data-test="ce-error" role="alert">
       <span>
-        {{ ed.undoError ?? error ?? '这样改会让前置关系成环，未保存。' }}
-        <template v-if="conflict"> 环路：{{ conflict.join(' → ') }}</template>
+        <!-- 成环时组合式给的错误文案里已经带了环路；只有没有文案时才由这里补上环路 -->
+        <template v-if="ed.undoError ?? error">{{ ed.undoError ?? error }}</template>
+        <template v-else>这样改会让前置关系成环，未保存。环路：{{ (conflict ?? []).join(' → ') }}</template>
       </span>
       <button type="button" class="ce-toast__x" aria-label="关闭提示" @click="emit('dismissError')">×</button>
     </div>

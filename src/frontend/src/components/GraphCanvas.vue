@@ -156,6 +156,8 @@ function start(attempt = 0): void {
           reduceMotion: () => reduced.value,
           onBlankClick: () => emit('blankClick'),
           onHover: showTip,
+          // 只有真正的平移、缩放才算“画布动了”；数据更新后回报缩放值不算（否则刚打开的工具条会被自己触发的重绘收起）
+          onTransform: () => emit('viewChange'),
           onEdgeClick: (info) => emit('edgeClick', { relationId: info.relationId, ...local(info) }),
           onNodeMenu: (info) => emit('nodeMenu', { kpId: info.kpId, ...local(info) }),
           fitPads: props.fitPads,
@@ -175,7 +177,6 @@ function start(attempt = 0): void {
     },
     onZoom: (value) => {
       zoom.value = Math.round(value * 100) / 100
-      emit('viewChange')
     },
   })
   if (props.scope !== null) lifecycle.setScope(props.scope)

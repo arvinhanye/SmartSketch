@@ -605,6 +605,9 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 .app--graph .graph-workspace .gw-seg button[aria-pressed='true'], .app--graph .graph-workspace .gw-seg button[aria-pressed='true']:disabled, .app--graph .graph-workspace .gw-segmini button[aria-pressed='true'] { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; }
 .app--graph .graph-workspace .gw-btn:not(.gw-btn--ghost) { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; }
 .app--graph .graph-workspace .gw-btn:not(.gw-btn--ghost):hover:not(:disabled) { background: var(--ui-primary-press); border-color: var(--ui-primary-press); }
+/* 预览卡“就此提问”（UI-GRAPH-EDIT-02）：向日葵黄，和主按钮、描边按钮区分开；写在主按钮规则之后并带同样的前缀才压得过它 */
+.app--graph .graph-workspace .gw-btn.gw-btn--ask:not(.gw-btn--ghost) { background: var(--ui-highlight-soft); border: 1.5px solid var(--ui-highlight); color: #5c4300; }
+.app--graph .graph-workspace .gw-btn.gw-btn--ask:not(.gw-btn--ghost):hover:not(:disabled) { background: #ffedb8; border-color: var(--ui-highlight); }
 .app--graph .graph-workspace .recommendations .recommendations__item { border-color: var(--ui-line); background: var(--ui-surface-2); }
 .app--graph .graph-workspace .recommendations .recommendations__item:first-child { box-shadow: none; border-color: var(--ui-highlight); background: var(--ui-highlight-soft); }
 .app--graph .graph-workspace .recommendations .recommendations__item:first-child .recommendations__order { background: var(--ui-highlight); color: var(--ui-text); }
