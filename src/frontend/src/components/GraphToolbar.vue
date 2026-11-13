@@ -34,8 +34,10 @@ const props = withDefaults(
     vertical?: boolean
     /** 教师编辑区使用紧凑栏；其他页面保持原样。 */
     compact?: boolean
+    /** 不显示关系图例兼筛选（页面改用画布上的图例组件时，UI-GRAPH-UNDO-04） */
+    hideRelations?: boolean
   }>(),
-  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false, compact: false, radial: false },
+  { chapters: () => [], summary: null, canClear: false, selectedHidden: false, showStatuses: true, vertical: false, compact: false, radial: false, hideRelations: false },
 )
 
 const emit = defineEmits<{
@@ -132,7 +134,9 @@ const summaryText = computed(() => {
     aria-label="图谱筛选"
     :aria-orientation="vertical ? 'vertical' : 'horizontal'"
   >
-    <div class="graph-toolbar__search-wrap" :class="{ 'graph-toolbar__search-wrap--icon': compact }">
+    <!-- 页面可以用 #search 换成自己的搜索框（教师页复用学生页的候选搜索框） -->
+    <slot v-if="$slots.search" name="search" />
+    <div v-else class="graph-toolbar__search-wrap" :class="{ 'graph-toolbar__search-wrap--icon': compact }">
     <AppIcon v-if="compact" name="search" :size="16" />
     <input
       class="graph-toolbar__search"
@@ -145,7 +149,7 @@ const summaryText = computed(() => {
     />
     </div>
 
-    <fieldset class="graph-toolbar__group" data-test="relation-legend">
+    <fieldset v-if="!hideRelations" class="graph-toolbar__group" data-test="relation-legend">
       <legend>关系</legend>
       <label v-for="item in relationItems" :key="item.type" :data-relation="item.type">
         <input

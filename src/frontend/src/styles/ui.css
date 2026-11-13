@@ -126,12 +126,14 @@
 
 /* Remaining course pages: scoped management surfaces, no global resets. */
 .light-surface.ui-management .ui-sheet__inner { max-width: 1240px; }
+/* 下面几条通用控件规则不作用于 `.graph-workspace` 里的控件（UI-GRAPH-UNDO-04）：教师页复用学生页的搜索框与图例，
+   它们有自己的一套样式；用 :where() 排除，不改变这些规则本身的特异性。 */
 .light-surface.ui-management p { line-height: 1.65; }
-.light-surface.ui-management button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--gw-line); border-radius: 6px; background: var(--gw-panel); color: var(--gw-text); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: normal; }
-.light-surface.ui-management button:hover:not(:disabled) { background: var(--gw-hover); border-color: var(--gw-edge); }
-.light-surface.ui-management button:disabled { color: var(--gw-text-3); background: var(--gw-hover); opacity: 1; cursor: default; }
+.light-surface.ui-management button:where(:not(.graph-workspace *)) { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--gw-line); border-radius: 6px; background: var(--gw-panel); color: var(--gw-text); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: normal; }
+.light-surface.ui-management button:where(:not(.graph-workspace *)):hover:not(:disabled) { background: var(--gw-hover); border-color: var(--gw-edge); }
+.light-surface.ui-management button:where(:not(.graph-workspace *)):disabled { color: var(--gw-text-3); background: var(--gw-hover); opacity: 1; cursor: default; }
 .light-surface.ui-management button:focus-visible, .light-surface.ui-management a:focus-visible, .light-surface.ui-management summary:focus-visible { outline: 2px solid var(--gw-accent); outline-offset: 3px; }
-.light-surface.ui-management input:not([type=checkbox]):not([type=radio]), .light-surface.ui-management textarea, .light-surface.ui-management select { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid var(--gw-edge); border-radius: 6px; background: var(--gw-panel); color: var(--gw-text); font: inherit; font-size: 14px; }
+.light-surface.ui-management input:not([type=checkbox]):not([type=radio]):where(:not(.graph-workspace *)), .light-surface.ui-management textarea, .light-surface.ui-management select:where(:not(.graph-workspace *)) { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid var(--gw-edge); border-radius: 6px; background: var(--gw-panel); color: var(--gw-text); font: inherit; font-size: 14px; }
 .light-surface.ui-management input:focus-visible, .light-surface.ui-management select:focus-visible, .light-surface.ui-management textarea:focus-visible { outline: 2px solid var(--gw-accent); outline-offset: 2px; }
 .light-surface.ui-management input:is([type=checkbox],[type=radio]) { accent-color: var(--gw-accent); width: 16px; height: 16px; }
 .light-surface.ui-management button:is([type=submit],[data-test=vp-publish],[data-test=rv-approve],[data-test=rv-keep],[data-test=rv-merge-confirm],[data-test=ne-save],[data-test=nc-submit]) { background: var(--ss-primary); border-color: var(--ss-primary); color: white; }
@@ -759,3 +761,13 @@ div.ui-toast button.ui-toast__close:focus-visible { outline: 2px solid #fff; out
 .ce-toast { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; max-width:calc(100% - 32px); margin:0; padding:8px 8px 8px 14px; border-radius:10px; background:var(--ui-brand); color:#fff; box-shadow:var(--ui-shadow-pop); }
 .ce-toast.is-error { bottom:64px; background:var(--gw-danger-bg); color:var(--gw-danger); border:1px solid var(--gw-danger); }
 .ce-layer.ce-layer .ce-toast .ce-toast__x { border-color:transparent; background:transparent; color:inherit; padding:0 6px; }
+/* 撤销 / 重做（UI-GRAPH-UNDO-04） */
+.light-surface .teacher-graph__history { display:inline-flex; gap:4px; }
+/* 教师页复用的搜索框与图例（UI-GRAPH-UNDO-04） */
+.light-surface .teacher-graph__search { position: relative; z-index: 9; min-width: 0; }
+.light-surface .teacher-graph__search .gw-search { width: 300px; background: #fff; }
+/* 外壳已有聚焦描边：输入框自己不再画一层（通用的输入框聚焦规则会作用到这里） */
+.light-surface.ui-management .teacher-graph__search input:focus-visible { outline: none; }
+/* 候选浮层盖在文字面板上：用不透明白底，不透出下面的字（学生页下面是画布，用半透明加模糊） */
+.app--graph .light-surface .teacher-graph__search .gw-search__list { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.light-surface .teacher-graph__legend-host { display: contents; }

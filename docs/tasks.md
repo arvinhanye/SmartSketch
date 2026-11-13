@@ -1,5 +1,17 @@
 # 任务看板
 
+## 2026-11-12 Claude：撤销重做与两端统一的搜索、图例（UI-GRAPH-UNDO-04，图谱体验第三批）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-GRAPH-UNDO-04 | 实现与自动化验收完成，真实画布已实走（接口为替身），待真实后端复核与用户视觉签收（2026-11-13；review_status: ready_for_review） | Claude | 分支 `claude/graph-unify-undo-20261112`（基于 `main@50e6cba`，前两批 #347、#349 已合入）。教师图谱页：关系操作与知识点字段保存的撤销 / 重做（反向操作，按钮与快捷键）；改用学生页的搜索框与图例组件。文件：`composables/useEditHistory.ts`、`composables/useRelationHistory.ts`（新）、`composables/useRelationEditor.ts`、`composables/useNodeEditor.ts`、`composables/useCanvasEditing.ts`、`components/NodeEditor.vue`、`components/GraphToolbar.vue`、`views/TeacherGraphView.vue`、样式与前端测试；规格 `specs/course-knowledge-graph.md`「撤销重做与两端统一的搜索、图例」 | 不改后端、契约、数据与权限；“编辑关系”页签路径保留（端到端用例依赖）。`scripts/verify/frontend.sh full`、`./scripts/verify.sh`；真实后端实走 |
+
+- 验收证据（2026-11-13，详见 `docs/handoffs/claude-ui-graph-undo-04.md`）：新增 `edit-history.test.ts` 13 条（先红后绿），`h14.test.ts` 追加 10 条；因换用统一组件调整 6 条既有断言（行为不变，换触发方式与钩子）。`scripts/verify/frontend.sh full` exit 0（90 文件 / 1552 条），`./scripts/verify.sh` exit 0；后端与契约零改动。真实画布实走：搜索候选与逐个定位、改类型后 ⌘+Z / ⌘+Shift+Z（替身换编号仍找得到）、未保存时撤销不可用、保存名称后撤销并解锁；修掉搜索框双层描边与候选浮层透字。**未做**：真实后端（本机 Docker 未运行）。行为变化：教师页类型图例窄于 1280 像素时默认收起。
+- 用户确认（2026-11-12）：范围只做“统一搜索与图例 + 撤销重做”；点击行为不统一；撤销覆盖关系与知识点字段，删除知识点与合并不进记录；先合入前两批再从 main 开分支。
+- 暂缓并说明原因：章节折叠（抽取不给知识点分章，演示课程 64 个知识点全部未分章，需要后端 / AI 先提供章节归属）；前置链与两点路径视图（演示课程 71 条关系里只有 1 条前置；真实模型下的比例未验证）。
+- 与 Codex 的交集：PR #348（生成阶段消歧）给前端留了“覆盖概况、自动合并历史、撤销控件”的接入任务，不在本批范围，建议 #348 合入后单独安排；#348 与本分支只在 `docs/tasks.md` 上会冲突。
+- 风险：撤销靠反向操作，不是事务回滚——别人同时改图、后端拒绝时这一步会失效；撤销“删除关系”得到的是新关系；教师页换图例与搜索组件会动到多次确认过的工具栏排版，需要实看。回滚：还原本任务提交，无数据迁移。
+
 ## 2026-11-11 Claude：画布上的直接操作（UI-GRAPH-EDIT-02，图谱体验第二批，用户确认设计稿）
 
 | ID | 状态 | 负责人 | 范围 | 验收 |

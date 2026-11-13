@@ -155,6 +155,7 @@
 | [`tests/frontend/chat-ui-qa.test.ts`](frontend/chat-ui-qa.test.ts) | 问答页当前回答的出处、状态与失败卡、复制及输入区结构。 | UI-QA-01 |
 | [`tests/frontend/course-page-ui.test.ts`](frontend/course-page-ui.test.ts) | 课程页面的行列表与创建面板。 | 待确认 |
 | [`tests/frontend/d1-d3.test.ts`](frontend/d1-d3.test.ts) | 前端问答故障分类，区分截断、链路超时与资料未覆盖。 | D1/D3；ADR-082 |
+| [`tests/frontend/edit-history.test.ts`](frontend/edit-history.test.ts) | 撤销 / 重做记录的顺序、失败处理与快捷键，以及关系操作的反向操作。 | UI-GRAPH-UNDO-04；specs/course-knowledge-graph.md |
 | [`tests/frontend/graph-canvas-enhanced.test.ts`](frontend/graph-canvas-enhanced.test.ts) | GraphCanvas 增强模式与教师页沿用的普通模式。 | 待确认 |
 | [`tests/frontend/graph-chapter-layout.test.ts`](frontend/graph-chapter-layout.test.ts) | 章节分区布局 computeLayout 的真实 dagre 引擎、边界、替换引擎与规模对比。 | 待确认 |
 | [`tests/frontend/graph-detail-layout.test.ts`](frontend/graph-detail-layout.test.ts) | 知识点详情在不同场景中的关闭入口与自适应布局规则。 | 待确认 |

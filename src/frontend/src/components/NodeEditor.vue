@@ -22,7 +22,7 @@ import {
 const props = defineProps<{ kpId: string | null }>()
 
 const emit = defineEmits<{
-  saved: [kp: KnowledgePoint]
+  saved: [kp: KnowledgePoint, before?: KnowledgePoint]
   deleted: [kpId: string]
   refreshNeeded: []
   close: []
@@ -40,7 +40,7 @@ const api =
 const editor = useNodeEditor({
   api,
   kpId: toRef(props, 'kpId'),
-  onSaved: (kp) => emit('saved', kp),
+  onSaved: (kp, before) => emit('saved', kp, before),
   onDeleted: (kid) => emit('deleted', kid),
   onRefreshNeeded: () => emit('refreshNeeded'),
   onCourseForbidden: () => emit('courseForbidden'),
@@ -53,6 +53,8 @@ defineExpose({
   dirty,
   /** 打开现有的删除确认（UI-GRAPH-EDIT-02：画布节点菜单的“删除…”走这里，不另做一套确认） */
   requestDelete: () => openDeleteConfirm(),
+  /** 重新读取当前知识点（UI-GRAPH-UNDO-04：撤销 / 重做改了它的字段之后） */
+  reload: () => editor.reload(),
 })
 
 const uid = useId()

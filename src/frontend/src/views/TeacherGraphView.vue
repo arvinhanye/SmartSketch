@@ -8,31 +8,37 @@ import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY, KNOWLEDGE_DELETION_API_KEY } from '../api/knowledgeDetail'
-import { createNodeEditApi, NODE_EDIT_API_KEY } from '../api/nodeEdit'
+import { createNodeEditApi, NODE_EDIT_API_KEY, type KnowledgePoint } from '../api/nodeEdit'
 import { createRelationsApi, RELATIONS_API_KEY } from '../api/relations'
 import CanvasEditLayer from '../components/canvas/CanvasEditLayer.vue'
 import GraphCanvas from '../components/GraphCanvas.vue'
+import GraphLegend from '../components/GraphLegend.vue'
+import GraphSearch, { type SearchOption } from '../components/GraphSearch.vue'
 import GraphToolbar from '../components/GraphToolbar.vue'
 import KnowledgeDetail from '../components/KnowledgeDetail.vue'
 import NodeCreator from '../components/NodeCreator.vue'
 import NodeDeletionConfirm from '../components/NodeDeletionConfirm.vue'
 import { useNodeDeletion } from '../composables/useNodeDeletion'
-import NodeTypeLegend from '../components/NodeTypeLegend.vue'
+import ToastNotice from '../components/ToastNotice.vue'
 import NodeEditor from '../components/NodeEditor.vue'
 import RelationEditor from '../components/RelationEditor.vue'
 import { readArrangement, writeArrangement, type Arrangement } from '../composables/useArrangementPreference'
+import { useAutoDismiss } from '../composables/useAutoDismiss'
 import { useCanvasEditing } from '../composables/useCanvasEditing'
+import { useEditHistory } from '../composables/useEditHistory'
+import { useRelationHistory } from '../composables/useRelationHistory'
 import { useGraphLayout } from '../composables/useGraphLayout'
 import { useGraphShortcuts } from '../composables/useGraphShortcuts'
 import { readPanelWidth, writePanelWidth } from '../composables/usePanelWidthPreference'
 import { applyFocusStates } from '../graph/focusStates'
-import { normalizeQuery } from '../graph/search'
 import { kpIdFromElementId, nodeElementId } from '../graph/adapter'
 import type { GraphLayoutName } from '../graph/lifecycle'
 import {
   chapterOptions,
   countNodeTypes,
+  NODE_TYPE_LABELS,
   NODE_TYPE_ORDER,
+  RELATION_TYPE_ORDER,
   toggledNodeTypes,
   useGraphFilters,
   type KnowledgePointType,
@@ -95,6 +101,22 @@ const relations = useRelationEditor({
   onCourseForbidden: leaveForbidden,
 })
 
+// ---------------------------------------------------------------- 撤销 / 重做（UI-GRAPH-UNDO-04）
+// 有写请求在途、或编辑面板里有未保存的修改时不执行：撤销知识点字段会重新读取面板，不能把没保存的内容冲掉
+const history = useEditHistory({ busy: () => relations.saving.value || isDirty(), shortcuts: true })
+/** 带撤销记录的关系编辑：画布上的直接操作与“编辑关系”页签都用它，两处的修改进同一份记录 */
+const recordedRelations = useRelationHistory(relations, history)
+useAutoDismiss(history.notice, history.dismissNotice, { ms: 4500, keep: (value) => value.tone === 'error' })
+const historyBlocked = computed(() => history.working.value || relations.saving.value || nodeEditor.value?.dirty === true)
+const undoTitle = computed(() => {
+  if (nodeEditor.value?.dirty === true) return '有未保存的修改，先保存或放弃后才能撤销'
+  return history.undoLabel.value === null ? '没有可撤销的操作' : `撤销：${history.undoLabel.value}（Ctrl/⌘ + Z）`
+})
+const redoTitle = computed(() => {
+  if (nodeEditor.value?.dirty === true) return '有未保存的修改，先保存或放弃后才能重做'
+  return history.redoLabel.value === null ? '没有可重做的操作' : `重做：${history.redoLabel.value}（Ctrl/⌘ + Shift + Z）`
+})
+
 // 画布取连边编辑器的派生图：含保存中的临时边与成环冲突标色
 // UI-GRAPH-FIND-01：搜索只高亮命中，不把其余知识点从画布上移除
 const filters = useGraphFilters(() => (graph.value === null ? null : relations.canvasData.value), { search: 'highlight' })
@@ -143,9 +165,6 @@ const hiddenTypes = computed(() => allTypes.filter((t) => !filters.state.value.n
 function toggleType(type: KnowledgePointType): void {
   filters.state.value = { ...filters.state.value, nodeTypes: toggledNodeTypes(filters.state.value.nodeTypes, type) }
 }
-function restoreTypes(): void {
-  filters.state.value = { ...filters.state.value, nodeTypes: [...allTypes] }
-}
 
 type PanelTab = 'detail' | 'edit' | 'relations' | 'create'
 const tab = ref<PanelTab>('detail')
@@ -169,33 +188,59 @@ const currentName = computed(() => graph.value?.nodes.find((n) => n.id === selec
 // L13-2：搜索框回车定位；选中经过「未保存修改」守卫，画布聚焦到该节点
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
 const searchNotice = ref<string | null>(null)
-/** 回车依次定位下一个命中：关键字没变就接着上一次的位置往下走，到末尾回到第一个 */
-let locateQuery = ''
-const locateCursor = ref(-1)
-const searchCount = computed(() => {
-  const total = filters.matches.value.length
-  if (total === 0) return null
-  return locateCursor.value >= 0 && locateCursor.value < total ? `匹配 ${locateCursor.value + 1} / ${total}，回车定位下一个` : `匹配 ${total} 个，回车逐个定位`
+// UI-GRAPH-UNDO-04：教师页复用学生页的搜索框——候选、计数、上一个 / 下一个；定位仍然是“选中并聚焦”，经过未保存修改的确认
+const searchBox = ref<InstanceType<typeof GraphSearch> | null>(null)
+const searchCursor = ref(-1)
+const searchOptions = computed<SearchOption[]>(() => {
+  const g = graph.value
+  if (g === null) return []
+  const byId = new Map(g.nodes.map((n) => [n.id, n]))
+  const titles = new Map(chapters.value.map((c) => [c.id, c.title]))
+  return filters.matches.value.map((hit) => {
+    const node = byId.get(hit.kpId)
+    const chapter = node?.chapter_id == null ? '未分章' : (titles.get(node.chapter_id) ?? '未分章')
+    return { kpId: hit.kpId, name: hit.name, alias: hit.alias, meta: node === undefined ? chapter : `${chapter} · ${NODE_TYPE_LABELS[node.type]}` }
+  })
 })
-watch(
-  () => normalizeQuery(filters.state.value.query),
-  () => {
-    locateCursor.value = -1
-  },
-)
-function onLocate(query: string): void {
-  if (graph.value === null) return
-  // 工具栏的输入值与筛选状态由 v-model 同步；这里以筛选状态的命中为准
-  if (normalizeQuery(query) !== normalizeQuery(filters.state.value.query)) filters.state.value = { ...filters.state.value, query }
-  const hits = filters.matches.value
-  searchNotice.value = hits.length === 0 ? '未找到匹配的知识点，可调整关键字或筛选条件。' : null
-  if (hits.length === 0) return
-  const wanted = normalizeQuery(query)
-  const index = wanted === locateQuery && locateCursor.value >= 0 ? (locateCursor.value + 1) % hits.length : 0
-  locateQuery = wanted
-  locateCursor.value = index
+watch(filters.matches, () => {
+  searchCursor.value = -1
+})
+function goToHit(index: number): void {
+  const hit = filters.matches.value[index]
+  if (hit === undefined) return
+  searchCursor.value = index
+  searchNotice.value = null
   // C05-1：有未保存修改时先确认；画布只在选中真正切换后才聚焦，取消则画布与详情都留在原节点
-  guard.request(hits[index]!.kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
+  guard.request(hit.kpId, { then: (target) => target !== null && canvas.value?.focus(target) })
+}
+function onSearchStep(delta: 1 | -1): void {
+  if (graph.value === null) return
+  const total = filters.matches.value.length
+  if (total === 0) {
+    searchNotice.value = filters.state.value.query.trim() === '' ? null : '未找到匹配的知识点，可调整关键字或筛选条件。'
+    return
+  }
+  const from = searchCursor.value
+  goToHit(from < 0 ? (delta === 1 ? 0 : total - 1) : (from + delta + total) % total)
+}
+function onSearchPick(kpId: string): void {
+  goToHit(filters.matches.value.findIndex((hit) => hit.kpId === kpId))
+}
+function onSearchQuery(query: string): void {
+  filters.state.value = { ...filters.state.value, query }
+  searchNotice.value = null
+}
+
+// ---- 图例：与学生页同一个组件，浮在画布左下角；关系与类型的隐藏状态仍是筛选状态那一份
+const legendOpen = ref(typeof window === 'undefined' || window.innerWidth >= 1280)
+const hiddenRelations = computed(() => RELATION_TYPE_ORDER.filter((t) => !filters.state.value.relationTypes.includes(t)))
+const relationCounts = computed(() => {
+  const counts = Object.fromEntries(RELATION_TYPE_ORDER.map((t) => [t, 0])) as Record<(typeof RELATION_TYPE_ORDER)[number], number>
+  for (const edge of relations.canvasData.value?.edges ?? []) counts[edge.data.type] += 1
+  return counts
+})
+function restoreLegend(): void {
+  filters.state.value = { ...filters.state.value, relationTypes: [...RELATION_TYPE_ORDER], nodeTypes: [...allTypes] }
 }
 
 // L11：画布之外的可访问选择方式（键盘与自动化可用），选择同样经过「未保存修改」守卫
@@ -244,7 +289,9 @@ function onNodeClick(kpId: string): void {
 
 // ---------------------------------------------------------------- 画布上的直接操作（UI-GRAPH-EDIT-02）
 const editing = useCanvasEditing({
-  relations,
+  relations: recordedRelations,
+  // 删除提示上的“撤销”与工具栏的撤销是同一个动作
+  undoLast: () => history.undo(),
   anchors: () => canvas.value?.nodeAnchors() ?? [],
   // 查看、编辑、删除都要先切换选中：经过“未保存修改”确认，确认后才切页签
   onDetail: (kpId) => guard.request(kpId, { then: (target) => { if (target !== null) tab.value = 'detail' } }),
@@ -259,6 +306,46 @@ const editing = useCanvasEditing({
       },
     }),
 })
+// 删除提示只对应“刚才那次删除”：之后记录里的最后一步变了（又做了别的、或已被撤销），提示就收起
+let undoAnchor: string | null = null
+watch(editing.undo, (now) => {
+  undoAnchor = now === null ? null : history.undoLabel.value
+})
+watch(history.undoLabel, (label) => {
+  if (editing.undo.value !== null && label !== undoAnchor) editing.dismissUndo()
+})
+
+// ---- 知识点字段保存的撤销：把改过的字段改回保存前的值；保存前未锁定的，改回后再解锁
+const NODE_FIELDS = ['name', 'aliases', 'type', 'definition', 'importance', 'difficulty', 'status'] as const
+type NodeField = (typeof NODE_FIELDS)[number]
+async function applyNodeFields(kpId: string, fields: Record<string, unknown>, keepLocked: boolean): Promise<boolean> {
+  const cid = courseId.value
+  const current = graph.value?.nodes.find((n) => n.id === kpId)
+  if (cid === null || current === undefined) return false
+  try {
+    let saved = await nodeEditApi.update(cid, kpId, { ...fields, expected_revision: current.revision } as never)
+    if (!keepLocked && saved.locked) saved = await nodeEditApi.unlock(cid, kpId, saved.revision)
+    await teacher.refresh()
+    if (selected.value === kpId) nodeEditor.value?.reload()
+    return true
+  } catch {
+    return false
+  }
+}
+function onNodeSaved(after: KnowledgePoint, before?: KnowledgePoint): void {
+  if (before === undefined) return
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  const changed = NODE_FIELDS.filter((key: NodeField) => !same(key === 'aliases' ? (before.aliases ?? []) : before[key], key === 'aliases' ? (after.aliases ?? []) : after[key]))
+  // 保存前没有值的字段（如原先没填重要度）无法通过接口改回“没有”：这一步不进撤销记录
+  if (changed.length === 0 || changed.some((key) => key !== 'aliases' && before[key] === undefined)) return
+  const pick = (kp: KnowledgePoint) => Object.fromEntries(changed.map((key) => [key, key === 'aliases' ? (kp.aliases ?? []) : kp[key]]))
+  history.record({
+    label: `修改知识点「${before.name}」`,
+    undo: () => applyNodeFields(after.id, pick(before), before.locked),
+    redo: () => applyNodeFields(after.id, pick(after), true),
+  })
+}
+
 /** 画布上发起的关系操作失败时的说明：在“编辑关系”页签里由面板自己显示，这里不重复 */
 const canvasError = computed(() => (tab.value === 'relations' ? null : relations.error.value))
 const canvasConflict = computed(() => (tab.value === 'relations' ? null : (relations.conflict.value?.path.map((p) => p.name) ?? null)))
@@ -366,6 +453,8 @@ function chooseArrangement(next: GraphLayoutName | 'radial'): void {
 }
 // 同一页面实例里换课程（路由参数变化）：改用新课程记住的布局，没有就回到推荐值
 watch(courseId, (cid) => {
+  // 换课程：上一门课的撤销记录不带过来
+  history.clear()
   const stored = readArrangement(cid)
   arrangementChosen = stored !== null
   arrangement.value = stored ?? recommended.value ?? 'hierarchical'
@@ -419,13 +508,10 @@ onBeforeUnmount(() => workspaceObserver?.disconnect())
 const empty = computed(() => status.value === 'ready' && graph.value !== null && graph.value.nodes.length === 0)
 
 // 快捷键（UI-GRAPH-FIND-01）：/ 聚焦搜索，F 适应画布，+、- 缩放
-const filtersEl = ref<HTMLElement | null>(null)
 useGraphShortcuts({
   search: () => {
-    const input = filtersEl.value?.querySelector<HTMLInputElement>('input[type="search"]')
-    if (input == null) return false
-    input.focus()
-    input.select()
+    if (searchBox.value === null) return false
+    searchBox.value.focus()
   },
   fit: () => (canvas.value === null ? false : void canvas.value.fitTo()),
   zoomIn: () => (canvas.value === null ? false : void canvas.value.zoomBy(1.25)),
@@ -471,6 +557,7 @@ useGraphShortcuts({
 
     <template v-else-if="status === 'ready' && graph !== null">
       <p v-if="notice" data-test="tg-notice" role="status">{{ notice }}</p>
+      <ToastNotice v-if="history.notice.value" data-test="tg-history-notice" :tone="history.notice.value.tone" :text="history.notice.value.text" @dismiss="history.dismissNotice" />
       <p v-if="pairView && 'ids' in pairView" class="teacher-graph__pair" data-test="tg-pair-notice" role="status">
         正在查看疑似重复：「{{ pairView.names[0] }}」与「{{ pairView.names[1] }}」
         <button type="button" data-test="tg-pair-dismiss" @click="dismissPair">结束查看</button>
@@ -486,7 +573,7 @@ useGraphShortcuts({
       </p>
 
       <div ref="workspace" class="teacher-graph__body" :class="{ 'is-resizing': resizing }" :style="{ '--teacher-panel-width': `${panelWidth}px` }">
-        <aside ref="filtersEl" class="teacher-graph__filters" aria-label="筛选">
+        <aside class="teacher-graph__filters" aria-label="筛选">
           <GraphToolbar
             v-model="filters.state.value"
             :layout="arrangement"
@@ -496,23 +583,30 @@ useGraphShortcuts({
             :selected-hidden="selectedHidden"
             compact
             radial
+            hide-relations
             @update:layout="chooseArrangement"
             @clear="filters.clear"
-            @locate="onLocate"
           >
+            <template #search>
+              <div class="graph-workspace teacher-graph__search">
+                <GraphSearch ref="searchBox" :model-value="filters.state.value.query" :options="searchOptions" :cursor="searchCursor" @update:model-value="onSearchQuery" @step="onSearchStep" @pick="onSearchPick" />
+              </div>
+            </template>
             <template #actions>
+              <span class="teacher-graph__history" role="group" aria-label="撤销与重做">
+                <button type="button" data-test="tg-undo" :disabled="!history.canUndo.value || historyBlocked" :title="undoTitle" @click="history.undo()">撤销</button>
+                <button type="button" data-test="tg-redo" :disabled="!history.canRedo.value || historyBlocked" :title="redoTitle" @click="history.redo()">重做</button>
+              </span>
               <button type="button" class="teacher-graph__create" data-test="tg-create-open" :aria-pressed="tab === 'create'" @click="openCreator">
                 <AppIcon name="plus" /> 新建知识点
               </button>
             </template>
           </GraphToolbar>
           <p v-if="searchNotice" data-test="tg-search-notice" role="status">{{ searchNotice }}</p>
-          <p v-else-if="searchCount" class="ui-muted" data-test="tg-search-count" role="status">{{ searchCount }}</p>
         </aside>
 
         <div class="teacher-graph__canvas" data-test="tg-graph">
           <div class="teacher-graph__canvas-bar">
-            <NodeTypeLegend :counts="typeCounts" :hidden="hiddenTypes" @toggle="toggleType" @restore="restoreTypes" />
             <p class="teacher-graph__hint" :title="tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。'">
               {{ tab === 'relations' ? '在图上依次点击起点和终点来新建关系。' : '点击知识点查看详情或编辑；画布支持缩放与拖拽。' }}
             </p>
@@ -529,6 +623,19 @@ useGraphShortcuts({
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
           <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" @edge-click="editing.openEdge" @node-menu="editing.openMenu" @node-hover="editing.onNodeHover" @view-change="editing.onViewChange" @blank-click="editing.onViewChange" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick">
+            <div class="graph-workspace teacher-graph__legend-host">
+              <GraphLegend
+                :open="legendOpen"
+                :hidden-relations="hiddenRelations"
+                :hidden-types="hiddenTypes"
+                :relation-counts="relationCounts"
+                :type-counts="typeCounts"
+                @update:open="legendOpen = $event"
+                @toggle-relation="filters.toggleRelationType"
+                @toggle-type="toggleType"
+                @restore="restoreLegend"
+              />
+            </div>
             <CanvasEditLayer :editing="editing" :error="canvasError" :conflict="canvasConflict" @dismiss-error="dismissCanvasError" />
           </GraphCanvas>
         </div>
@@ -608,12 +715,13 @@ useGraphShortcuts({
             ref="nodeEditor"
             :kp-id="selected"
             @deleted="onDeleted"
+            @saved="onNodeSaved"
             @refresh-needed="teacher.refresh"
             @close="guard.request(null)"
             @course-forbidden="leaveForbidden"
           />
 
-          <RelationEditor v-if="tab === 'relations'" :editor="relations" />
+          <RelationEditor v-if="tab === 'relations'" :editor="recordedRelations" />
           <NodeCreator v-if="tab === 'create'" :creator="creator" :source-name="currentName" />
         </div>
       </div>

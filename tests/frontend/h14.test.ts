@@ -653,7 +653,8 @@ describe('有未保存修改时切换节点先确认', () => {
     async function search(wrapper: VueWrapper, query: string) {
       const input = wrapper.find('input[type="search"]')
       await input.setValue(query)
-      await input.trigger('keydown', { key: 'Enter' })
+      // UI-GRAPH-UNDO-04：教师页改用统一的搜索框，回车 = 提交搜索表单（定位下一个命中）
+      await wrapper.get('form[role="search"]').trigger('submit')
       await flushPromises()
     }
 
@@ -1043,12 +1044,16 @@ describe('教师图谱：按课程记住布局偏好', () => {
 })
 
 describe('教师图谱：节点类型图例与筛选同步', () => {
-  const legend = (wrapper: VueWrapper, type: string) => wrapper.get(`[data-test="node-legend-${type}"]`)
+  // UI-GRAPH-UNDO-04：教师页改用与学生页相同的图例组件
+  const legend = (wrapper: VueWrapper, type: string) => wrapper.get(`[data-test="legend-type-${type}"]`)
   const canvasNodeCount = (wrapper: VueWrapper) => (wrapper.findComponent(GraphCanvas).props('graph') as GraphCanvasData).nodes.length
 
   it('图例显示整张草稿图各类型个数；点击隐藏该类，画布节点随之减少，再点或“恢复全部类型”还原', async () => {
     const nodes = [kp('a'), kp('b'), kp('c', { type: 'theorem' } as Partial<KnowledgePoint>)]
     const { wrapper } = await mountPage(fakes({ nodes, edges: [] }))
+    // 与学生页同一个图例：窗口窄于 1280 像素时默认收起（测试环境宽 1024），先展开
+    expect(wrapper.find('[data-test="legend-type-concept"]').exists()).toBe(false)
+    await wrapper.get('[data-test="relation-legend"] .gw-legend__head').trigger('click')
     expect(legend(wrapper, 'concept').text()).toContain('2')
     expect(legend(wrapper, 'theorem').text()).toContain('1')
     expect(canvasNodeCount(wrapper)).toBe(3)
@@ -1058,10 +1063,10 @@ describe('教师图谱：节点类型图例与筛选同步', () => {
     // 计数取整张图，不随筛选变化
     expect(legend(wrapper, 'concept').text()).toContain('2')
     expect(legend(wrapper, 'concept').attributes('aria-pressed')).toBe('false')
-    await wrapper.get('[data-test="node-legend-restore"]').trigger('click')
+    await wrapper.get('[data-test="legend-restore"]').trigger('click')
     await flushPromises()
     expect(canvasNodeCount(wrapper)).toBe(3)
-    expect(wrapper.find('[data-test="node-legend-restore"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="legend-restore"]').exists()).toBe(false)
   })
 })
 
@@ -1102,7 +1107,8 @@ describe('UI-GRAPH-FIND-01 教师页：搜索高亮、循环定位与面板宽�
     await flushPromises()
   }
   async function enter(wrapper: VueWrapper) {
-    await wrapper.find('input[type="search"]').trigger('keydown', { key: 'Enter' })
+    // UI-GRAPH-UNDO-04：统一搜索框里回车 = 提交搜索表单
+    await wrapper.get('form[role="search"]').trigger('submit')
     await flushPromises()
   }
 
@@ -1123,17 +1129,17 @@ describe('UI-GRAPH-FIND-01 教师页：搜索高亮、循环定位与面板宽�
     const { wrapper } = await mountPage(fakes())
     const total = canvasNodeNames(wrapper).length
     await type(wrapper, '知识点')
-    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 ${total} 个`)
+    expect(wrapper.get('[data-test="gw-search-count"]').text()).toBe(`共 ${total} 个`)
     await enter(wrapper)
-    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 1 / ${total}`)
+    expect(wrapper.get('[data-test="gw-search-count"]').text()).toBe(`1 / ${total}`)
     const first = wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement
     const firstId = first.value
     await enter(wrapper)
-    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 2 / ${total}`)
+    expect(wrapper.get('[data-test="gw-search-count"]').text()).toBe(`2 / ${total}`)
     expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).not.toBe(firstId)
     for (let i = 2; i < total; i += 1) await enter(wrapper)
     await enter(wrapper)
-    expect(wrapper.get('[data-test="tg-search-count"]').text()).toContain(`匹配 1 / ${total}`)
+    expect(wrapper.get('[data-test="gw-search-count"]').text()).toBe(`1 / ${total}`)
     expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe(firstId)
 
     await type(wrapper, '不存在的知识点')
@@ -1441,5 +1447,227 @@ describe('UI-GRAPH-STABLE-03 教师图谱页：只改关系不重新布局', () 
     await vi.waitFor(() => expect(positionsOf(wrapper)).not.toBeNull())
     expect(positionsOf(wrapper)).not.toBe(before)
     expect(wrapper.find('[data-test="tg-relayout"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------- UI-GRAPH-UNDO-04：撤销与重做（整页）
+describe('UI-GRAPH-UNDO-04 教师图谱页：撤销与重做', () => {
+  const canvasOf = (wrapper: VueWrapper) => wrapper.findComponent(GraphCanvas)
+  const emit = async (wrapper: VueWrapper, event: string, payload?: unknown) => {
+    canvasOf(wrapper).vm.$emit(event, payload)
+    await flushPromises()
+  }
+  const undoBtn = (wrapper: VueWrapper) => wrapper.get('[data-test="tg-undo"]')
+  const redoBtn = (wrapper: VueWrapper) => wrapper.get('[data-test="tg-redo"]')
+  const edgeTriples = (wrapper: VueWrapper) => (canvasGraph(wrapper)?.edges ?? []).map((e) => `${e.source}-${e.data.type}->${e.target}`).sort()
+  function writable(f: Fakes): Fakes {
+    f.relations.update.mockImplementation(async (_cid, rid, body) => {
+      const old = f.server.edges.find((e) => e.id === rid)!
+      const next = { ...old, ...body } as Relation
+      f.server.edges = f.server.edges.map((e) => (e.id === rid ? next : e))
+      return next
+    })
+    f.relations.remove.mockImplementation(async (_cid, rid) => {
+      f.server.edges = f.server.edges.filter((e) => e.id !== rid)
+    })
+    f.nodeEdit.unlock.mockImplementation(async (_cid, kid) => {
+      const old = f.server.nodes.find((n) => n.id === kid)!
+      const next = { ...old, locked: false, revision: old.revision + 1 } as KnowledgePoint
+      f.server.nodes = f.server.nodes.map((n) => (n.id === kid ? next : n))
+      return next
+    })
+    return f
+  }
+  async function connect(wrapper: VueWrapper, from: string, to: string, type: string) {
+    await emit(wrapper, 'nodeMenu', { kpId: from, x: 10, y: 10 })
+    await wrapper.get('[data-test="ce-menu-connect"]').trigger('click')
+    await clickNode(wrapper, to)
+    await wrapper.get(`[data-test="ce-type-${type}"]`).trigger('click')
+    await flushPromises()
+  }
+
+  it('没有可撤销的操作时两个按钮都不可用；新建关系后可撤销，撤销后可重做，说明里写着是哪一步', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    expect(undoBtn(wrapper).attributes('disabled')).toBeDefined()
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+
+    await connect(wrapper, 'k2', 'k3', 'CONTAINS')
+    expect(edgeTriples(wrapper)).toEqual(['kp:k1-PREREQUISITE->kp:k2', 'kp:k2-CONTAINS->kp:k3'])
+    expect(undoBtn(wrapper).attributes('title')).toContain('撤销：新建关系 知识点 k2 → 知识点 k3（包含）')
+
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(f.relations.remove).toHaveBeenCalledTimes(1)
+    expect(edgeTriples(wrapper)).toEqual(['kp:k1-PREREQUISITE->kp:k2'])
+    expect(wrapper.get('[data-test="tg-history-notice"]').text()).toContain('已撤销：新建关系')
+    expect(undoBtn(wrapper).attributes('disabled')).toBeDefined()
+    expect(redoBtn(wrapper).attributes('title')).toContain('重做：新建关系')
+
+    await redoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledTimes(2)
+    expect(edgeTriples(wrapper)).toEqual(['kp:k1-PREREQUISITE->kp:k2', 'kp:k2-CONTAINS->kp:k3'])
+  })
+
+  it('改类型、反转可逐步撤销回最初的样子；做了新操作后不能再重做', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    await wrapper.get('[data-test="ce-edge-type"]').setValue('CONTAINS')
+    await flushPromises()
+    await wrapper.get('[data-test="ce-edge-reverse"]').trigger('click')
+    await flushPromises()
+    expect(edgeTriples(wrapper)).toEqual(['kp:k2-CONTAINS->kp:k1'])
+
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(edgeTriples(wrapper)).toEqual(['kp:k1-CONTAINS->kp:k2'])
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(edgeTriples(wrapper)).toEqual(['kp:k1-PREREQUISITE->kp:k2'])
+    expect(redoBtn(wrapper).attributes('disabled')).toBeUndefined()
+
+    await connect(wrapper, 'k2', 'k3', 'RELATED_TO')
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('删除关系后的“撤销”提示与工具栏撤销是同一个动作：只恢复一次，记录不重复', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    await wrapper.get('[data-test="ce-edge-delete"]').trigger('click')
+    await flushPromises()
+    expect(undoBtn(wrapper).attributes('title')).toContain('撤销：删除关系')
+    await wrapper.get('[data-test="ce-undo-btn"]').trigger('click')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledTimes(1)
+    expect(edgeTriples(wrapper)).toEqual(['kp:k1-PREREQUISITE->kp:k2'])
+    expect(undoBtn(wrapper).attributes('disabled')).toBeDefined()
+    expect(redoBtn(wrapper).attributes('title')).toContain('重做：删除关系')
+    expect(wrapper.find('[data-test="ce-undo"]').exists()).toBe(false)
+  })
+
+  it('删除提示还在时用工具栏撤销：提示随之收起', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    await wrapper.get('[data-test="ce-edge-delete"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="ce-undo"]').exists()).toBe(true)
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="ce-undo"]').exists()).toBe(false)
+    expect(f.relations.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('“编辑关系”页签里添加的关系也能撤销', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await openTab(wrapper, 'relations')
+    await clickNode(wrapper, 'k1')
+    await clickNode(wrapper, 'k3')
+    await wrapper.get('.relation-editor__form').trigger('submit')
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledTimes(1)
+    expect(undoBtn(wrapper).attributes('title')).toContain('撤销：新建关系 知识点 k1 → 知识点 k3')
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(f.relations.remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('保存知识点字段后撤销：字段改回保存前的值并解锁（保存前未锁定），面板重新读取；重做再改过去', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await clickNode(wrapper, 'k1')
+    await openTab(wrapper, 'edit')
+    await editName(wrapper, '新名字')
+    // 有未保存的修改时不能撤销 / 重做
+    expect(undoBtn(wrapper).attributes('title')).toContain('有未保存的修改')
+    await wrapper.find('[data-test="ne-save"]').trigger('click')
+    await flushPromises()
+    expect(f.server.nodes.find((n) => n.id === 'k1')).toMatchObject({ name: '新名字', locked: true })
+    expect(undoBtn(wrapper).attributes('title')).toContain('撤销：修改知识点「知识点 k1」')
+
+    const getsBefore = f.nodeEdit.get.mock.calls.length
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(f.nodeEdit.update).toHaveBeenLastCalledWith('c1', 'k1', { name: '知识点 k1', expected_revision: 2 })
+    expect(f.nodeEdit.unlock).toHaveBeenCalledTimes(1)
+    expect(f.server.nodes.find((n) => n.id === 'k1')).toMatchObject({ name: '知识点 k1', locked: false })
+    await vi.waitFor(() => expect((wrapper.find('[data-test="ne-name"]').element as HTMLInputElement).value).toBe('知识点 k1'))
+    expect(f.nodeEdit.get.mock.calls.length).toBeGreaterThan(getsBefore)
+
+    await redoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(f.server.nodes.find((n) => n.id === 'k1')).toMatchObject({ name: '新名字', locked: true })
+  })
+
+  it('反向操作被后端拒绝：说明未撤销，这一步移除，更早的记录还在', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await connect(wrapper, 'k2', 'k3', 'CONTAINS')
+    await emit(wrapper, 'edgeClick', { relationId: 'r1', x: 200, y: 90 })
+    await wrapper.get('[data-test="ce-edge-type"]').setValue('RELATED_TO')
+    await flushPromises()
+    f.relations.update.mockRejectedValueOnce(apiError(409, 'REVISION_CONFLICT'))
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="tg-history-notice"]').text()).toContain('未撤销：把 知识点 k1 → 知识点 k2 的类型')
+    expect(undoBtn(wrapper).attributes('title')).toContain('撤销：新建关系')
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('Ctrl/⌘+Z 撤销、Ctrl/⌘+Shift+Z 重做；焦点在搜索框里不触发', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await mountPage(f)
+    await connect(wrapper, 'k2', 'k3', 'CONTAINS')
+    const press = (init: KeyboardEventInit, target: EventTarget = document.body) => {
+      const event = new KeyboardEvent('keydown', { key: 'z', bubbles: true, cancelable: true, ...init })
+      target.dispatchEvent(event)
+      return event
+    }
+    expect(press({ metaKey: true }, wrapper.find('input[type="search"]').element).defaultPrevented).toBe(false)
+    expect(f.relations.remove).not.toHaveBeenCalled()
+    expect(press({ ctrlKey: true }).defaultPrevented).toBe(true)
+    await flushPromises()
+    expect(f.relations.remove).toHaveBeenCalledTimes(1)
+    press({ metaKey: true, shiftKey: true })
+    await flushPromises()
+    expect(f.relations.create).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------- UI-GRAPH-UNDO-04：教师页的统一搜索框与图例
+describe('UI-GRAPH-UNDO-04 教师图谱页：统一的搜索框与图例', () => {
+  it('搜索有候选浮层（章节与类型）；点候选即选中；“上一个”从末尾开始；工具栏不再有关系复选框', async () => {
+    const f = fakes()
+    const { wrapper } = await mountPage(f)
+    expect(wrapper.find('.graph-toolbar [data-test="relation-legend"] input[type="checkbox"]').exists()).toBe(false)
+    await wrapper.get('input[type="search"]').setValue('知识点')
+    await flushPromises()
+    const options = wrapper.findAll('[data-test="gw-search-option"]')
+    expect(options).toHaveLength(3)
+    expect(options[0]!.text()).toContain('第一章 栈 · 概念')
+    await options[2]!.trigger('click')
+    await flushPromises()
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe('k3')
+    expect(wrapper.get('[data-test="gw-search-count"]').text()).toBe('3 / 3')
+
+    await wrapper.get('[data-test="gw-search-prev"]').trigger('click')
+    await flushPromises()
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe('k2')
+  })
+
+  it('图例按关系类型隐藏与恢复：画布上的关系随之消失与回来', async () => {
+    const { wrapper } = await mountPage(fakes())
+    await wrapper.get('[data-test="relation-legend"] .gw-legend__head').trigger('click')
+    expect(canvasEdgeIds(wrapper)).toEqual(['r1'])
+    await wrapper.get('[data-test="legend-rel-PREREQUISITE"]').trigger('click')
+    await flushPromises()
+    expect(canvasEdgeIds(wrapper)).toEqual([])
+    await wrapper.get('[data-test="legend-restore"]').trigger('click')
+    await flushPromises()
+    expect(canvasEdgeIds(wrapper)).toEqual(['r1'])
   })
 })
