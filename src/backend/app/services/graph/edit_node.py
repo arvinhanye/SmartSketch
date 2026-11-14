@@ -33,6 +33,7 @@ from app.repositories.graph_edit import source_chunks
 from app.repositories.neo4j import GraphScope
 from app.repositories.sqlite import connect
 from app.repositories.tasks import read_effective_task_ids
+from app.repositories.fusion import read_draft_scope
 from app.schemas.contracts import KnowledgePoint
 from app.services.access import not_found
 from app.services.graph import audit
@@ -150,8 +151,7 @@ def _course_write(ctx: EditContext, course_id: str, *, reconcile_audit: bool = T
         raise CourseBusy(course_locks.current_holder(ctx.sqlite_url, course_id))
     with course_locks.held(ctx.sqlite_url, lock, lease_seconds=ctx.lock_seconds):
         with connect(ctx.sqlite_url) as database:
-            effective = read_effective_task_ids(database, course_id)
-        scope = GraphScope(course_id, DRAFT, effective_task_ids=effective)
+            scope = read_draft_scope(database, course_id)
         if reconcile_audit:
             audit.reconcile(ctx, scope)
         yield scope

@@ -23,6 +23,7 @@ EIGHT_PURPOSES = {
     "extract_entities_gleaning",
     "extract_relations",
     "judge_duplicate",
+    "resolve_duplicate",  # ADR-098: separate bounded semantic analysis; legacy E10 stays pinned
     "summarize_definition",
     "rewrite_query",
     "answer_with_context",
@@ -308,7 +309,7 @@ def _manifest_rows() -> dict[str, list[str]]:
     return rows
 
 
-def test_manifest_lists_exactly_the_eight_purposes():
+def test_manifest_lists_exactly_the_registered_purposes():
     assert set(_manifest_rows()) == EIGHT_PURPOSES
 
 
@@ -332,7 +333,8 @@ def test_every_template_file_is_in_manifest_and_loads_with_default_root():
         assert template.sha256 == digest.strip("`"), f"{purpose}: MANIFEST 摘要与文件不符，改模板须升版本并更新摘要"
         assert tuple(re.findall(r"`([a-z_]+)`", variables)) == template.variables, purpose
         assert evaluation.strip("`") == template.evaluation, purpose
-        assert template.evaluation in {"evaluation/evaluate_extraction.py", "evaluation/evaluate_qa.py"}
+        assert template.evaluation in {"evaluation/evaluate_extraction.py", "evaluation/evaluate_qa.py",
+                                       "evaluation/evaluate_disambiguation.py"}
 
 
 def test_not_yet_created_purpose_is_unknown_to_the_loader():

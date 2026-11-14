@@ -65,6 +65,7 @@ def _write_unit(
             attempts=result.attempts,
             error_code=result.error_code,
             result=result.result,
+            metadata=result.metadata,
         )
         _write_progress(database, lease, state, progress)
     return True

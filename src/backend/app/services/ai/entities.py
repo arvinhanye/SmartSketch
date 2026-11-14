@@ -94,7 +94,7 @@ class FailureReason(StrEnum):
 
 @dataclass(frozen=True)
 class EntitySource:
-    """候选的出处。``evidence_start``/``evidence_end`` 是块文本中的半开字符区间。"""
+    """候选出处的半开字符区间；ambiguous 为真时仅是一个匹配位置，不能视为精确提及。"""
 
     course_id: str
     document_id: str
@@ -103,6 +103,7 @@ class EntitySource:
     evidence_start: int
     evidence_end: int
     sources: tuple[ChunkSource, ...]
+    evidence_ambiguous: bool = False
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,7 @@ class EntityCandidate:
     evidence: str = field(repr=False)
     confidence: float | None
     source: EntitySource
+    occurrence_index: int | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -244,6 +246,10 @@ class EntityExtractor:
         candidates, dropped = _validate(items, identity, text)
         return outcome(candidates, dropped, None, result, calls)
 
+    def request_size(self, text: str) -> int:
+        from app.services.ai.request_budget import rendered_request_size
+        return rendered_request_size(self.prompt().render({"chunk_text": text}).text, self._max_output_tokens)
+
     def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:
         return ModelRequest(
             purpose=purpose,
@@ -300,7 +306,7 @@ def _validate(
     def drop(reason: DropReason) -> None:
         dropped[reason] = dropped.get(reason, 0) + 1
 
-    for item in items:
+    for item_index, item in enumerate(items):
         if not isinstance(item, dict):
             drop(DropReason.NOT_OBJECT)
             continue
@@ -324,7 +330,16 @@ def _validate(
         if not valid:
             drop(DropReason.INVALID_CONFIDENCE)
             continue
-        start = text.find(evidence)
+        ambiguous = False
+        if "evidence_start" in item:
+            start = item["evidence_start"]
+            if (type(start) is not int or start < 0 or
+                text[start:start + len(evidence)] != evidence):
+                drop(DropReason.INVALID_EVIDENCE)
+                continue
+        else:
+            start = text.find(evidence)
+            ambiguous = start >= 0 and text.find(evidence, start + 1) >= 0
         if start < 0:
             drop(DropReason.EVIDENCE_NOT_IN_CHUNK)
             continue
@@ -344,7 +359,9 @@ def _validate(
                     evidence_start=start,
                     evidence_end=end,
                     sources=_sources_for(layout, identity.sources, start, end),
+                    evidence_ambiguous=ambiguous,
                 ),
+                occurrence_index=item_index if ambiguous else None,
             )
         )
     return tuple(candidates), dropped

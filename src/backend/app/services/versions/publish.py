@@ -124,7 +124,8 @@ class PublishOutcome:
 def load_draft(sqlite_url: str, reader: GraphReader, state: versions.DraftState) -> DraftGraph:
     """按 V 读出可见草稿，组成 G01 的 ``DraftGraph``（调用方持课程写锁）。"""
     course_id = state.course_id
-    scope = GraphScope(course_id, DRAFT, effective_task_ids=list(state.effective_task_ids))
+    scope = GraphScope(course_id, DRAFT, effective_task_ids=list(state.effective_task_ids),
+                       storage_version_id=None if state.storage_version_id == DRAFT else state.storage_version_id)
     raw_nodes = reader.nodes(scope, "teacher")
     kp_ids = [str(p["kp_id"]) for p in raw_nodes]
     node_refs: dict[str, list[str]] = {k: [] for k in kp_ids}

@@ -183,3 +183,7 @@
 ### ADR-097 删除预览过期
 
 级联删除的 `preview_token` 必须为 64 位小写 SHA-256 十六进制指纹；缺少或格式错误为 422 `VALIDATION_ERROR`。持锁重算的指纹不同返回 409 `REVISION_CONFLICT`，`details.reason = deletion_preview_stale`、`details.kp_id` 标识目标；不进入编辑审计或删除，客户端须重新预览并再次明确确认。默认单点删除的节点修订冲突形状不变。
+
+## 自动合并撤销（ADR-100）
+
+预览 `POST /review/merges/{plan_id}/{group_id}/undo-preview` 的业务冲突返回 200 `status=conflict`；执行 `/undo` 的同一冲突返回 409 `REVISION_CONFLICT`，`details` 为 `FusionUndoResult`。提交围栏丢失/草稿并发变化时仍为该错误码，`details.reason=snapshot_changed`，须重新读取并预览，不保证带完整差异。锁竞争为 `COURSE_BUSY`，存储故障为 503 `STORAGE_UNAVAILABLE`，未应用/不存在/跨课程计划组为 404 `NOT_FOUND`。权限使用既有 401/403；重复已撤销请求 200 `already_undone`、`changed=false`。网络错误不能直接展示成功，先刷新历史确认。

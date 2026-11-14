@@ -134,6 +134,28 @@ def estimate(req: ModelRequest) -> int:
 # ---------------------------------------------------------------- backoff (有界)
 
 
+@pytest.mark.parametrize("route", ["retry", "fallback", "stream_fallback"])
+def test_semantic_guard_rechecked_before_every_physical_provider_attempt(tmp_path, route):
+    from app.workers.extraction.units import _AttemptClient
+    from app.services.credentials import CredentialUnavailable
+    env = Env(tmp_path, max_retries=1 if route == "retry" else 0, with_fallback=route != "retry")
+    env.primary.script(ModelServerError(PRIMARY_MODEL), "must not send")
+    if env.fallback is not None:
+        env.fallback.script("must not send")
+    def guard():
+        if env.primary.calls:
+            raise CredentialUnavailable("credential_revoked")
+    bound = _AttemptClient(env.policy, CallAttribution(course_id="course-1", task_id="task-1"), guard=guard)
+    with pytest.raises(CredentialUnavailable):
+        if route == "stream_fallback":
+            list(bound.stream(request()))
+        else:
+            bound.complete(request())
+    assert len(env.primary.calls) == 1
+    assert env.fallback is None or not env.fallback.calls
+    assert len(env.rows()) == 1  # no phantom sent/billable row for the stopped attempt
+
+
 def test_backoff_defaults_are_bounded_and_documented() -> None:
     assert DEFAULT_BACKOFF_BASE_SECONDS == 1.0
     assert DEFAULT_BACKOFF_MAX_SECONDS == 8.0

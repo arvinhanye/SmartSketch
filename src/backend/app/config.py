@@ -59,6 +59,17 @@ class Settings(BaseModel):
     LLM_FALLBACK_CHAT_MODEL: str = ""
 
     LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60, gt=0, allow_inf_nan=False)
+    DISAMBIGUATION_ANALYSIS_ENABLED: bool = False
+    DISAMBIGUATION_AUTO_MERGE_ENABLED: bool = False
+    DISAMBIGUATION_MAX_GLOBAL_PAIRS: int = Field(default=128, ge=1, le=4096)
+    DISAMBIGUATION_RECALL_TOP_K: int = Field(default=8, ge=1, le=64)
+    DISAMBIGUATION_MAX_CORPUS_NODES: int = Field(default=2000, ge=2, le=10000)
+    DISAMBIGUATION_MAX_CORPUS_BYTES: int = Field(default=2_000_000, ge=1024, le=20_000_000)
+    DISAMBIGUATION_MAX_PAIRS_PER_SECTION: int = Field(default=32, ge=1, le=256)
+    DISAMBIGUATION_MAX_INPUT_BYTES: int = Field(default=24000, ge=1024, le=1_000_000)
+    DISAMBIGUATION_EXTRACTION_MAX_INPUT_BYTES: int = Field(default=24000, ge=1024, le=1_000_000)
+    DISAMBIGUATION_EXTRACTION_MAX_WINDOWS: int = Field(default=64, ge=1, le=256)
+    DISAMBIGUATION_EXTRACTION_OVERLAP_CHARS: int = Field(default=512, ge=0, le=4096)
     LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS: float = Field(default=5, gt=0, allow_inf_nan=False)
     LLM_CHAT_TIMEOUT_SECONDS: float = Field(default=15, gt=0, allow_inf_nan=False)
     QA_SIMILARITY_THRESHOLD: float = Field(default=0.7, ge=0, le=1, allow_inf_nan=False)

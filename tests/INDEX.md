@@ -20,6 +20,20 @@
 | [`tests/backend/test_adr021.py`](backend/test_adr021.py) | 资料列表返回最新任务 ID，并支持删除尚未贡献图谱内容的资料。 | ADR-021 |
 | [`tests/backend/test_adr022.py`](backend/test_adr022.py) | 上传策略接口下发 UPLOAD_MAX_BYTES 配置的上传大小上限。 | ADR-022 |
 | [`tests/backend/test_adr079_register.py`](backend/test_adr079_register.py) | 学生自助注册接口及账号创建、注册限流行为。 | ADR-079 |
+| [`tests/backend/test_disambiguation_generation.py`](backend/test_disambiguation_generation.py) | 生成阶段语义分析预算、真实覆盖、来源核查与每次调用凭据保护。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_extraction_windows.py`](backend/test_extraction_windows.py) | 完整请求预算、Unicode 窗口覆盖、完整实体对及超限前置拒绝。 | ADR-101；DISAMBIG-BE-04 |
+| [`tests/backend/test_extraction_window_worker.py`](backend/test_extraction_window_worker.py) | 窗口来源还原、原子结果、调用守卫及接管策略固定。 | ADR-101；DISAMBIG-BE-04 |
+| [`tests/backend/test_disambiguation_review.py`](backend/test_disambiguation_review.py) | 有效语义审核、三态与技术覆盖、过期回退及过滤后计数。 | ADR-100；DISAMBIG-BE-03 |
+| [`tests/backend/test_disambiguation_api.py`](backend/test_disambiguation_api.py) | 覆盖/历史/撤销 HTTP 的教师权限、严格参数、分页与冲突协议。 | ADR-100；DISAMBIG-BE-03 |
+| [`tests/backend/test_disambiguation_mentions.py`](backend/test_disambiguation_mentions.py) | 提及身份、同名异义保护、旧检查点兼容与关系输入限定语。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_resolution.py`](backend/test_disambiguation_resolution.py) | 三态语义、差异复核、双侧引用和长输入/输出失败保护。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_metrics.py`](backend/test_disambiguation_metrics.py) | 消歧判定指标中误判和技术未检查分母的完整性。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_recall.py`](backend/test_disambiguation_recall.py) | 混合召回通道、课程/向量空间隔离和预算。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_disambiguation_mapping.py`](backend/test_disambiguation_mapping.py) | 完整组校验、来源保留和合并诱发图环拦截。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_generation.py`](backend/test_fusion_generation.py) | 向量物理调用前取消保护。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_storage.py`](backend/test_fusion_storage.py) | 物理草稿指针、不可变计划与过期保护，以及取消/失败资料的计划安全清理。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_graph_projection.py`](backend/test_graph_projection.py) | 新草稿副本写入和可见性协议。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_undo.py`](backend/test_fusion_undo.py) | 单组合并逆向差异、修订号单调递增、独立组撤销及后续内容冲突。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/backend/test_b05.py`](backend/test_b05.py) | FastAPI 应用工厂与健康检查契约。 | B05 |
 | [`tests/backend/test_b06.py`](backend/test_b06.py) | 环境变量配置读取、启动校验及向量空间验证。 | B06 |
 | [`tests/backend/test_c01.py`](backend/test_c01.py) | SQLite 连接、向前迁移与可恢复备份。 | C01 |
@@ -139,6 +153,7 @@
 
 | 文件 | 被测模块或功能（一句话） | 对应规格 / ADR / 任务 ID |
 | --- | --- | --- |
+| [`tests/frontend/disambiguation-api.test.ts`](frontend/disambiguation-api.test.ts) | 消歧客户端参数、取消信号、冲突透传与审核原因兼容。 | ADR-100；DISAMBIG-BE-03 |
 | [`tests/frontend/adr079.test.ts`](frontend/adr079.test.ts) | 学生自助注册页面与注册接口客户端。 | ADR-079 |
 | [`tests/frontend/answer-card.test.ts`](frontend/answer-card.test.ts) | AnswerCard 单条回答的状态标签、下一步、复制与重试。 | UI-QA-01 |
 | [`tests/frontend/app-graph-shell.test.ts`](frontend/app-graph-shell.test.ts) | App 中图谱与已升级课程页面的暗色外壳。 | 待确认 |
@@ -155,7 +170,7 @@
 | [`tests/frontend/chat-ui-qa.test.ts`](frontend/chat-ui-qa.test.ts) | 问答页当前回答的出处、状态与失败卡、复制及输入区结构。 | UI-QA-01 |
 | [`tests/frontend/course-page-ui.test.ts`](frontend/course-page-ui.test.ts) | 课程页面的行列表与创建面板。 | 待确认 |
 | [`tests/frontend/d1-d3.test.ts`](frontend/d1-d3.test.ts) | 前端问答故障分类，区分截断、链路超时与资料未覆盖。 | D1/D3；ADR-082 |
-| [`tests/frontend/edit-history.test.ts`](frontend/edit-history.test.ts) | 撤销 / 重做记录的顺序、失败处理与快捷键，以及关系操作的反向操作。 | UI-GRAPH-UNDO-04；specs/course-knowledge-graph.md |
+| [`tests/frontend/edit-history.test.ts`](frontend/edit-history.test.ts) | 撤销 / 重做的顺序、失败、快捷键、清空/释放代次与关系操作串行保护。 | UI-GRAPH-UNDO-04；specs/course-knowledge-graph.md |
 | [`tests/frontend/graph-canvas-enhanced.test.ts`](frontend/graph-canvas-enhanced.test.ts) | GraphCanvas 增强模式与教师页沿用的普通模式。 | 待确认 |
 | [`tests/frontend/graph-chapter-layout.test.ts`](frontend/graph-chapter-layout.test.ts) | 章节分区布局 computeLayout 的真实 dagre 引擎、边界、替换引擎与规模对比。 | 待确认 |
 | [`tests/frontend/graph-detail-layout.test.ts`](frontend/graph-detail-layout.test.ts) | 知识点详情在不同场景中的关闭入口与自适应布局规则。 | 待确认 |
@@ -188,7 +203,7 @@
 | [`tests/frontend/h11.test.ts`](frontend/h11.test.ts) | 学生已发布图谱页面的 API、状态、图卡切换、卡片分页与键盘操作。 | H11 |
 | [`tests/frontend/h12.test.ts`](frontend/h12.test.ts) | 课程成员 API、入口守卫、列表状态、添加移除学生与新版成员页布局。 | H12 |
 | [`tests/frontend/h13.test.ts`](frontend/h13.test.ts) | 会话存储、令牌注入、401 处理与登录页面。 | H13 |
-| [`tests/frontend/h14.test.ts`](frontend/h14.test.ts) | 教师草稿图谱页面的选中保护、详情编辑联动、连边、布局偏好和面板。 | C05-1 |
+| [`tests/frontend/h14.test.ts`](frontend/h14.test.ts) | 教师草稿图谱的选中保护、详情联动、连边、布局和面板；历史写入/读回、切课隔离、部分成功、草稿与迟到回调保护。 | C05-1 |
 | [`tests/frontend/home-topbar-nav.test.ts`](frontend/home-topbar-nav.test.ts) | 课程之外的课程列表与模型设置页移除侧栏，并在顶栏提供品牌和模型 API 入口。 | UI-PINE-01 |
 | [`tests/frontend/i06.test.ts`](frontend/i06.test.ts) | 学习进度 API、掌握状态视觉与乐观标记、推荐解释和列表及切课隔离。 | I06 |
 | [`tests/frontend/invite-code-api.test.ts`](frontend/invite-code-api.test.ts) | 邀请码契约 API 客户端。 | 待确认 |
@@ -234,6 +249,10 @@
 
 | 文件 | 被测模块或功能（一句话） | 对应规格 / ADR / 任务 ID |
 | --- | --- | --- |
+| [`tests/integration/test_fusion_projection.py`](integration/test_fusion_projection.py) | 真实 Neo4j 独立草稿副本往返、幂等和事务回滚。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/integration/test_disambiguation_review_api.py`](integration/test_disambiguation_review_api.py) | 真实 Neo4j 生成到审核/历史/HTTP 撤销闭环及教师编辑保护。 | ADR-100；DISAMBIG-BE-03 |
+| [`tests/integration/test_fusion_pipeline.py`](integration/test_fusion_pipeline.py) | 真实 Neo4j 生成映射、T6 原子性、接管、跨任务、单组/独立组撤销与节点修订。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/integration/test_extraction_window_fusion.py`](integration/test_extraction_window_fusion.py) | 真实 Neo4j 抽取缺口阻断合并、缓存失效及审核覆盖原因。 | ADR-101；DISAMBIG-BE-04 |
 | [`tests/integration/test_d2_publish.py`](integration/test_d2_publish.py) | 验证发布时文本块与知识点向量调用的计费记录，以及重复发布和回滚复制向量不新增调用。 | D2；ADR-082 |
 | [`tests/integration/test_demo_mode_live.py`](integration/test_demo_mode_live.py) | 验证演示模型上传到 worker 草稿生成的完整流程及 Neo4j 向量相似度阈值。 | ADR-076 |
 | [`tests/integration/test_f01.py`](integration/test_f01.py) | 验证本地 Neo4j 环境的 Compose、dev-up 脚本与 APOC 检查。 | F01 |

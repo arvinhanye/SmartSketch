@@ -11,6 +11,7 @@ from app.repositories.chunks import StoredChunk
 from app.repositories.extraction_checkpoints import Checkpoint, read_checkpoints
 from app.repositories.sqlite import connect
 from app.repositories.task_leases import Lease, LeaseLost
+from app.repositories.tasks import read_leased_task
 from app.services.ai.relations import SectionEntity
 from app.services.task_state import stage_progress_range
 from app.workers.extraction.candidates import (
@@ -47,6 +48,7 @@ from app.workers.extraction.units import (
     _extract_chunk,
     _extract_section,
 )
+from app.workers.extraction.windowed import checkpoint_policy
 
 # ---------------------------------------------------------------- 并发派发
 
@@ -166,6 +168,26 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
         existing = read_checkpoints(database, course_id=lease.course_id, task_id=lease.task_id)
     done_chunks = {c.unit_id: c for c in existing if c.unit_kind == "chunk" and c.unit_id in by_id}
     done_sections = {c.unit_id for c in existing if c.unit_kind == "section"}
+    versions = {c.result.get("entity_identity_version", 1) for c in done_chunks.values() if c.result is not None}
+    if len(versions) > 1 or any(type(v) is not int or v not in (1, 2) for v in versions):
+        raise ValueError("inconsistent checkpoint identity versions")
+    window_policy = checkpoint_policy(toolkit.window_policy,existing)
+    preserve = (next(iter(versions)) == 2) if versions else (window_policy is not None or toolkit.preserve_mentions)
+    toolkit = replace(toolkit, preserve_mentions=preserve,
+                      resolver=toolkit.resolver if preserve else None,
+                      window_policy=window_policy if preserve else None)
+    if preserve:
+        credential_guard = toolkit.guard
+        def guard() -> None:
+            if credential_guard is not None:
+                credential_guard()
+            with connect(sqlite_url) as database:
+                head = read_leased_task(database, lease.task_id, lease.token)
+            if head is None:
+                raise LeaseLost("lease unavailable before semantic request")
+            if head.cancel_requested:
+                raise _Halt("cancel")
+        toolkit = replace(toolkit, guard=guard)
 
     progress = _Progress(len(chunks))
     lower, upper = stage_progress_range(STAGE)
@@ -223,10 +245,15 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
         if isinstance(unit, StoredChunk):
             return _extract_chunk(toolkit, lease, limits, unit)
         members = [done_chunks[chunk.chunk_id] for chunk in unit.chunks]
+        task_entities = _group_entities(lease.task_id, lease.course_id, members)
         entities = tuple(
-            SectionEntity(entity.entity_id, lease.course_id, entity.name, entity.type)
-            for entity in _group_entities(lease.task_id, lease.course_id, members)
+            SectionEntity(entity.entity_id, lease.course_id, entity.name, entity.type,
+                          entity.candidates[0].definition if preserve else "",
+                          entity.candidates[0].evidence if preserve else "")
+            for entity in task_entities
         )
+        if preserve:
+            return _extract_section(toolkit, lease, limits, unit, entities, task_entities=task_entities)
         return _extract_section(toolkit, lease, limits, unit, entities)
 
     def write(unit: StoredChunk | _Section, result: _UnitResult) -> bool:

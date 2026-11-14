@@ -139,6 +139,8 @@ class SectionEntity:
     course_id: str
     name: str = field(repr=False)
     type: str
+    definition: str = field(default="", repr=False)
+    evidence: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True)
@@ -278,6 +280,12 @@ class RelationExtractor:
         candidates, dropped = _validate(items, entity_types, texts)
         return outcome(candidates, dropped, None, result, calls)
 
+    def request_size(self, entities: Sequence[SectionEntity], chunks: Sequence[SourceChunk]) -> int:
+        from app.services.ai.request_budget import rendered_request_size
+        text = self.prompt().render({"entity_table": _render_entities(entities),
+                                     "source_chunks": _render_chunks(chunks)}).text
+        return rendered_request_size(text, self._max_output_tokens)
+
     def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:
         return ModelRequest(
             purpose=purpose,
@@ -307,6 +315,8 @@ def _check_entities(course_id: str, entities: Sequence[SectionEntity]) -> dict[s
             raise ValueError(f"entity {entity.entity_id!r} has an empty name")
         if entity.type not in _ENTITY_TYPE_SET:
             raise ValueError(f"entity {entity.entity_id!r} has an unknown type")
+        if not isinstance(entity.definition, str) or not isinstance(entity.evidence, str):
+            raise ValueError("entity sense fields must be strings")
         if entity.entity_id in types:
             raise ValueError(f"duplicate entity_id {entity.entity_id!r}")
         types[entity.entity_id] = entity.type
@@ -331,7 +341,9 @@ def _check_chunks(course_id: str, chunks: Sequence[SourceChunk]) -> tuple[Source
 
 def _render_entities(entities: Sequence[SectionEntity]) -> str:
     rows = (
-        json.dumps({"id": e.entity_id, "name": e.name.strip(), "type": e.type}, ensure_ascii=False)
+        json.dumps({"id": e.entity_id, "name": e.name.strip(), "type": e.type} |
+                   ({"definition": e.definition, "evidence": e.evidence} if e.definition or e.evidence else {}),
+                   ensure_ascii=False)
         for e in entities
     )
     return "[\n" + ",\n".join(rows) + "\n]"

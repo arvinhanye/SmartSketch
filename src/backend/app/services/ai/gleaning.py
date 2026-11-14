@@ -86,6 +86,15 @@ def entity_name_key(name: str) -> str:
     return _WHITESPACE.sub("", unicodedata.normalize("NFKC", name).casefold())
 
 
+def entity_mention_key(candidate: EntityCandidate) -> tuple:
+    """Exact occurrence/content identity; a shared name alone is never sufficient."""
+    source = candidate.source
+    return (source.course_id, source.document_id, source.revision_id, source.chunk_id,
+            source.evidence_start, source.evidence_end, entity_name_key(candidate.name),
+            candidate.type, candidate.definition.strip(), candidate.evidence,
+            candidate.occurrence_index if source.evidence_ambiguous else None)
+
+
 class StopReason(StrEnum):
     DISABLED = "disabled"
     EMPTY_CHUNK = "empty_chunk"
@@ -177,19 +186,32 @@ class EntityGleaner:
         return self._enabled
 
     @property
+    def model(self) -> str:
+        return self._model
+
+    @property
     def max_rounds(self) -> int:
         return self._max_rounds
 
     def prompt(self) -> PromptTemplate:
         return self._prompts.get(GLEANING_PROMPT_PURPOSE, GLEANING_PROMPT_VERSION)
 
+    def request_size(self, text: str, known_entities: Sequence[EntityCandidate]) -> int:
+        from app.services.ai.request_budget import rendered_request_size
+        known = [{"name": c.name, "type": c.type} for c in known_entities]
+        rendered = self.prompt().render({"chunk_text": text, "entities_json": json.dumps(known, ensure_ascii=False)})
+        return rendered_request_size(rendered.text, self._max_output_tokens)
+
     def glean(
-        self, identity: ChunkIdentity, text: str, first_pass: Sequence[EntityCandidate]
+        self, identity: ChunkIdentity, text: str, first_pass: Sequence[EntityCandidate], *,
+        preserve_mentions: bool = False, round_limit: int | None = None,
     ) -> GleaningResult:
         if not isinstance(identity, ChunkIdentity):
             raise TypeError(f"identity must be ChunkIdentity, got {type(identity).__name__}")
         if not isinstance(text, str):
             raise TypeError("text must be str")
+        if round_limit is not None and (type(round_limit) is not int or not 1 <= round_limit <= self._max_rounds):
+            raise ValueError('round_limit must be within the configured round count')
         known_entities = tuple(first_pass)
         for candidate in known_entities:
             if not isinstance(candidate, EntityCandidate):
@@ -206,7 +228,8 @@ class EntityGleaner:
 
         template = self.prompt()
         known: list[dict[str, str]] = [{"name": c.name, "type": c.type} for c in known_entities]
-        seen = {entity_name_key(c.name) for c in known_entities}
+        key_of = entity_mention_key if preserve_mentions else lambda c: entity_name_key(c.name)
+        seen = {key_of(c) for c in known_entities}
         added: list[EntityCandidate] = []
         dropped: dict[DropReason, int] = {}
         duplicates = 0
@@ -217,7 +240,7 @@ class EntityGleaner:
         failure: ExtractionFailure | None = None
 
         try:
-            for _ in range(self._max_rounds):
+            for _ in range(self._max_rounds if round_limit is None else round_limit):
                 rounds += 1
                 rendered = template.render(
                     {"chunk_text": text, "entities_json": json.dumps(known, ensure_ascii=False)}
@@ -239,8 +262,8 @@ class EntityGleaner:
                     dropped[reason] = dropped.get(reason, 0) + count
                 new = 0
                 for candidate in candidates:
-                    key = entity_name_key(candidate.name)
-                    if key in seen:
+                    key = key_of(candidate)
+                    if key in seen and not (preserve_mentions and candidate.source.evidence_ambiguous):
                         duplicates += 1
                         continue
                     seen.add(key)
