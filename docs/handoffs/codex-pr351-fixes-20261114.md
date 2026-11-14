@@ -61,3 +61,7 @@ PYTHON=/Users/arvinhan/Desktop/SmartSketch-main/.venv/bin/python scripts/verify/
 ## 协调者整合验证
 
 2026-11-14：10 个已复审源码/测试/规格哈希均未变化；#350 的 387 个后端/测试/契约文件逐字保留。完整组合前端 91 文件 / 1578 passed，门禁 PASS、类型检查无错误、构建成功。终端中断后会话退出码不可取回，以上依据完整日志，不追记 exit 0；最终新 head 的 CI 另行核对。详见 `codex-pr-fixes-20261114.md`。
+
+基础门禁补跑已完成：`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh` exit 0，日志 `.demo/pr-fixes-20261114/pr351-integrated-basic-final.log`，退出码文件同名 `.exit`。最后推送 head `ffe967752d9428f701c8b662a660be3e3b32ab51`，主线依赖已完整整合。
+
+最终状态：head `ffe967752d9428f701c8b662a660be3e3b32ab51` 的 20 项 CI 全部通过，PR #351 已按依赖顺序合并为 `383d584e198170e65f9aa8c723c126edc66f2dc5`。主线 Git tree 与已验证 head 相同；后端 4529 passed / 27 登记 skip、前端 1578 passed、Neo4j 507 passed / 4 登记 skip、E2E 2+4 passed。合并后完成记录最初在本地归档，随后经用户明确授权通过单独文档 PR 发布；远端合并状态见对应 PR。

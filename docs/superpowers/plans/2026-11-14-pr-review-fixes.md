@@ -50,5 +50,5 @@ Files: `useEditHistory.ts`, `TeacherGraphView.vue`, `useTeacherGraph.ts`, `NodeE
 - [x] Independent reviewers assess both repair diffs, original seven failures and the five review-focus boundaries. Fix confirmed blockers with regression evidence.
 - [x] Update #348 from current main, verify, push to its existing branch, wait for CI and merge with an expected-head SHA guard.
 - [x] Update #350 to merged main, resolve task/index and test-helper parameter overlap while preserving both sides, rerun affected tests/basic and CI, retarget main and merge with an expected-head SHA guard.
-- [ ] Apply the isolated #351 repair patch, integrate current main, verify frontend/full compatibility and CI, then merge with an expected-head SHA guard.
-- [ ] Verify all three PR states and final main SHA; update tasks, review disposition and handoff with actual results and remaining acceptance limits.
+- [x] Apply the isolated #351 repair patch, integrate current main, verify frontend/full compatibility and CI, then merge with an expected-head SHA guard.
+- [x] Verify all three PR states and final main SHA; update tasks, review disposition and handoff with actual results and remaining acceptance limits.
