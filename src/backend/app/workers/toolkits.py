@@ -62,6 +62,7 @@ class TaskToolkits:
             resolver=(lambda bound: SemanticResolver(bound, model=model,
                 max_input_bytes=self._settings.DISAMBIGUATION_MAX_INPUT_BYTES))
                 if (self._settings.DISAMBIGUATION_ANALYSIS_ENABLED or self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
+            local_normalization=self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED,
             preserve_mentions=(self._settings.DISAMBIGUATION_ANALYSIS_ENABLED or self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED),
             analysis_max_pairs=self._settings.DISAMBIGUATION_MAX_PAIRS_PER_SECTION,
             window_policy=WindowPolicy.from_settings(self._settings),

@@ -135,6 +135,9 @@ def test_pipeline_logs_each_stage_duration(monkeypatch, caplog, clock):
     monkeypatch.setattr(persist_graph, "claim_next", lambda *a, **k: _lease())
     monkeypatch.setattr(persist_graph, "LeaseHeartbeat", _Heartbeat)
     monkeypatch.setattr(persist_graph, "ExtractLimits", SimpleNamespace(from_settings=lambda s: None))
+    # This timing-only pipeline replaces every storage/stage dependency; pinned
+    # normalization detection is likewise mocked. Real takeover is tested in BE-05.
+    monkeypatch.setattr("app.workers.relation_reconciliation.has_pinned_normalization", lambda *a: False)
 
     def timed(result, seconds=0.0):
         def run(*args, **kwargs):

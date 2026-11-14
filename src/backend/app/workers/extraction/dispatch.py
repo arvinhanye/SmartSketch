@@ -171,9 +171,11 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
     versions = {c.result.get("entity_identity_version", 1) for c in done_chunks.values() if c.result is not None}
     if len(versions) > 1 or any(type(v) is not int or v not in (1, 2) for v in versions):
         raise ValueError("inconsistent checkpoint identity versions")
+    from app.workers.extraction.local import checkpoint_normalization
+    normalization = checkpoint_normalization(toolkit.local_normalization, existing)
     window_policy = checkpoint_policy(toolkit.window_policy,existing)
     preserve = (next(iter(versions)) == 2) if versions else (window_policy is not None or toolkit.preserve_mentions)
-    toolkit = replace(toolkit, preserve_mentions=preserve,
+    toolkit = replace(toolkit, preserve_mentions=preserve, local_normalization=normalization and preserve,
                       resolver=toolkit.resolver if preserve else None,
                       window_policy=window_policy if preserve else None)
     if preserve:
@@ -263,7 +265,7 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
                                   lower + width * CHUNK_PROGRESS_SHARE * share)
             if written:
                 done_chunks[unit.chunk_id] = Checkpoint("chunk", unit.chunk_id, result.status,
-                                                       result.attempts, result.error_code, result.result)
+                                                       result.attempts, result.error_code, result.result, result.metadata)
                 count(result)
                 if result.status == "done":
                     succeeded_sections.add(section_of[unit.chunk_id])

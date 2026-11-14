@@ -22,6 +22,7 @@ EIGHT_PURPOSES = {
     "extract_entities",
     "extract_entities_gleaning",
     "extract_relations",
+    "extract_normalized_relations",  # ADR-102 separate reversible local-card mode
     "judge_duplicate",
     "resolve_duplicate",  # ADR-098: separate bounded semantic analysis; legacy E10 stays pinned
     "summarize_definition",

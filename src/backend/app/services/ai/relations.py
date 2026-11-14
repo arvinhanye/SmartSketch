@@ -42,6 +42,7 @@ import json
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from copy import copy
 from enum import StrEnum
 from typing import Any, Final
 
@@ -141,6 +142,7 @@ class SectionEntity:
     type: str
     definition: str = field(default="", repr=False)
     evidence: str = field(default="", repr=False)
+    canonical_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -217,6 +219,7 @@ class RelationExtractor:
             raise ValueError("model must be a non-empty string")
         if not _is_int(max_output_tokens) or max_output_tokens < 1:
             raise ValueError("max_output_tokens must be an int >= 1")
+        self._normalized = False
         self._client = client
         self._model = model
         self._max_output_tokens = max_output_tokens
@@ -227,7 +230,39 @@ class RelationExtractor:
     def model(self) -> str:
         return self._model
 
+    def normalized(self) -> RelationExtractor:
+        """A mode copy leaves factories and legacy/resumed tasks unchanged."""
+        result = copy(self)
+        result._normalized = True
+        return result
+
+    @property
+    def max_output_tokens(self) -> int:
+        return self._max_output_tokens
+
+    def entity_units(self, entities: Sequence[SectionEntity]) -> tuple[tuple[SectionEntity, ...], ...]:
+        """A semantic card is indivisible when a large relation table is windowed."""
+        if not self._normalized:
+            return tuple((e,) for e in entities)
+        groups: dict[str, list[SectionEntity]] = {}
+        for entity in entities:
+            groups.setdefault(entity.canonical_id or entity.entity_id, []).append(entity)
+        return tuple(tuple(v) for _,v in sorted(groups.items()))
+
+    def _render(self, entities: Sequence[SectionEntity]) -> str:
+        if not self._normalized:
+            return _render_entities(entities)
+        groups: dict[str, list[dict]] = {}
+        for entity in entities:
+            groups.setdefault(entity.canonical_id or entity.entity_id, []).append(dict(
+                id=entity.entity_id, name=entity.name, type=entity.type,
+                definition=entity.definition, evidence=entity.evidence))
+        return json.dumps([dict(canonical_id=k, members=sorted(v, key=lambda e: e['id']))
+                           for k, v in sorted(groups.items())], ensure_ascii=False)
+
     def prompt(self) -> PromptTemplate:
+        if self._normalized:
+            return self._prompts.get('extract_normalized_relations', 1)
         return self._prompts.get(RELATION_PROMPT_PURPOSE, RELATION_PROMPT_VERSION)
 
     def extract(
@@ -261,28 +296,34 @@ class RelationExtractor:
             return outcome((), {}, None, None, 0)
 
         rendered = template.render(
-            {"entity_table": _render_entities(entities), "source_chunks": _render_chunks(texts)}
+            {"entity_table": self._render(entities), "source_chunks": _render_chunks(texts)}
         )
         messages = (Message("user", rendered.text),)
-        result = self._client.complete(self._request(RELATION_PROMPT_PURPOSE, self._model, messages))
+        result = self._client.complete(self._request(template.purpose, self._model, messages))
         calls = 1
-        try:
+        def validate(result):
             items = _parse(result)
+            candidates, dropped = _validate(items, entity_types, texts, strict=self._normalized)
+            if self._normalized and any(k != RelationDropReason.DUPLICATE for k in dropped):
+                raise _OutputRejected(FailureReason.INVALID_STRUCTURE)
+            return candidates, dropped
+
+        try:
+            candidates, dropped = validate(result)
         except _OutputRejected:
             # 同一模型、同一消息修复一次（integrations「输出不合规」行）。
             result = self._client.complete(self._request(REPAIR_PURPOSE, result.model_requested, messages))
             calls = 2
             try:
-                items = _parse(result)
+                candidates, dropped = validate(result)
             except _OutputRejected as rejected:
                 return outcome((), {}, ExtractionFailure(rejected.reason, calls), result, calls)
 
-        candidates, dropped = _validate(items, entity_types, texts)
         return outcome(candidates, dropped, None, result, calls)
 
     def request_size(self, entities: Sequence[SectionEntity], chunks: Sequence[SourceChunk]) -> int:
         from app.services.ai.request_budget import rendered_request_size
-        text = self.prompt().render({"entity_table": _render_entities(entities),
+        text = self.prompt().render({"entity_table": self._render(entities),
                                      "source_chunks": _render_chunks(chunks)}).text
         return rendered_request_size(text, self._max_output_tokens)
 
@@ -380,7 +421,7 @@ def _edge_key(from_id: str, to_id: str, type_: str) -> tuple[str, str, str]:
 
 
 def _validate(
-    items: list[Any], entity_types: dict[str, str], chunks: tuple[SourceChunk, ...]
+    items: list[Any], entity_types: dict[str, str], chunks: tuple[SourceChunk, ...], *, strict: bool = False
 ) -> tuple[tuple[RelationCandidate, ...], dict[RelationDropReason, int]]:
     candidates: list[RelationCandidate] = []
     dropped: dict[RelationDropReason, int] = {}
@@ -416,7 +457,7 @@ def _validate(
         if not valid:
             drop(RelationDropReason.INVALID_CONFIDENCE)
             continue
-        located = _locate(evidence, chunks)
+        located = _strict_locate(item, evidence, chunks) if strict else _locate(evidence, chunks)
         if located is None:
             drop(RelationDropReason.EVIDENCE_NOT_IN_SOURCES)
             continue
@@ -468,3 +509,22 @@ def _locate(evidence: str, chunks: tuple[SourceChunk, ...]) -> tuple[SourceChunk
         if start >= 0:
             return chunk, start
     return None
+
+
+def _strict_locate(item, evidence, chunks):
+    if 'chunk_id' in item or 'evidence_start' in item:
+        chunk = next((c for c in chunks if c.identity.chunk_id == item.get('chunk_id')), None)
+        start = item.get('evidence_start')
+        if (chunk is not None and type(start) is int and start >= 0
+                and chunk.text[start:start+len(evidence)] == evidence):
+            return chunk, start
+        return None
+    found = None
+    for chunk in chunks:
+        start = chunk.text.find(evidence)
+        if start < 0:
+            continue
+        if found is not None or chunk.text.find(evidence, start + 1) >= 0:
+            return None
+        found = chunk, start
+    return found

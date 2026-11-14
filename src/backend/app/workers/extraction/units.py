@@ -34,6 +34,8 @@ from app.workers.extraction.types import (
 )
 from app.workers.extraction.analysis import analyze_section
 from app.workers.extraction import windowed
+from app.workers.extraction.local import relation_input_digest
+from app.services.fusion.local import local_normalization
 from app.services.ai.request_budget import WindowBudgetError, check_request_budget
 
 # ---------------------------------------------------------------- 模型调用
@@ -152,12 +154,15 @@ def _extract_chunk(
 
 
 def _with_coverage(result, toolkit, coverage):
+    metadata = dict(result.metadata or {})
+    if toolkit.local_normalization:
+        metadata['normalization_version'] = 1
     if toolkit.window_policy is None:
-        return result
+        return replace(result, metadata=metadata or None)
     if coverage is None:
         coverage = dict(version=1,status='partial',reason='request_not_completed',
                         planned_windows=None,completed_windows=0,input_digest=None)
-    return replace(result,metadata={'window_policy':asdict(toolkit.window_policy), 'window_coverage':coverage})
+    return replace(result,metadata={**metadata, 'window_policy':asdict(toolkit.window_policy), 'window_coverage':coverage})
 
 
 def _extract_section(
@@ -175,12 +180,16 @@ def _extract_section(
     def report(value):
         nonlocal coverage
         coverage = value
+    def extractor(client):
+        result = toolkit.relations(client)
+        return result.normalized() if toolkit.local_normalization else result
+
     prepared = None
     if toolkit.window_policy is not None:
         probe = _AttemptClient(toolkit.policy,CallAttribution(course_id=lease.course_id,task_id=lease.task_id),
             guard=toolkit.guard,max_input_bytes=toolkit.window_policy.max_input_bytes)
         try:
-            prepared = windowed.plan_relations(toolkit.relations(probe),entities,chunks,toolkit.window_policy,report)
+            prepared = windowed.plan_relations(extractor(probe),entities,chunks,toolkit.window_policy,report)
         except WindowBudgetError:
             return _with_coverage(_UnitResult('failed',1,OUTPUT_INVALID_CODE),toolkit,coverage)
     if toolkit.preserve_mentions:
@@ -198,14 +207,29 @@ def _extract_section(
         except ModelAuthError as exc:
             raise _Halt("auth") from exc
 
+    normalization = None
+    input_digest = None
+    if toolkit.local_normalization:
+        normalization = local_normalization(entities, analysis)
+        entities = tuple(replace(e, canonical_id=normalization['mapping'][e.entity_id]) for e in entities)
+        probe = _AttemptClient(toolkit.policy, CallAttribution(course_id=lease.course_id, task_id=lease.task_id),
+                               guard=toolkit.guard)
+        input_digest = relation_input_digest(section.section_id, entities, chunks, extractor(probe),
+                                             toolkit.window_policy, normalization)
+        if toolkit.window_policy is not None:
+            try:
+                prepared = windowed.plan_relations(extractor(probe), entities, chunks, toolkit.window_policy, report)
+            except WindowBudgetError:
+                return _with_coverage(_UnitResult('failed',1,OUTPUT_INVALID_CODE),toolkit,coverage)
+
     def body(client: ModelClient) -> Mapping[str, object] | str:
         if toolkit.window_policy is not None:
-            candidates, error = windowed.extract_relations(toolkit.relations(client),lease.course_id,entities,chunks,
+            candidates, error = windowed.extract_relations(extractor(client),lease.course_id,entities,chunks,
                                                            toolkit.window_policy,report,prepared=prepared)
             if error is not None:
                 return error
         else:
-            extraction = toolkit.relations(client).extract(lease.course_id, entities, chunks)
+            extraction = extractor(client).extract(lease.course_id, entities, chunks)
             if not extraction.ok:
                 return OUTPUT_INVALID_CODE
             candidates = extraction.candidates
@@ -215,6 +239,9 @@ def _extract_section(
         }
 
     result = _attempts(limits, lease, None, toolkit, body)
-    if result.result is not None and analysis is not None:
-        result = replace(result, result={**result.result, "analysis": analysis})
+    if result.result is not None:
+        additions = {} if analysis is None else {"analysis":analysis}
+        if normalization is not None:
+            additions.update(normalization=normalization, relation_input_digest=input_digest)
+        result = replace(result, result={**result.result, **additions})
     return _with_coverage(result, toolkit, coverage)

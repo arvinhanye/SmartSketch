@@ -114,6 +114,7 @@ class ExtractionToolkit:
     preserve_mentions: bool = False
     analysis_max_pairs: int = 32
     window_policy: WindowPolicy | None = None
+    local_normalization: bool = False
 
 
 @dataclass(frozen=True)

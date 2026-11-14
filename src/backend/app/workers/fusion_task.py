@@ -22,7 +22,8 @@ from app.services.fusion.mapping import fingerprint, plan_mapping
 from app.services.fusion.recall import RECALL_VERSION, RecallCard, recall_candidates
 from app.services.fusion.resolution import SemanticDecision
 from app.workers.extraction.units import _AttemptClient
-from app.workers.extraction.types import ExtractionToolkit
+from app.workers.extraction.types import ExtractionToolkit, ExtractLimits
+from app.workers.relation_reconciliation import settle_relations, reextract_section, reextraction_config
 
 
 class FusionCancelled(Exception):
@@ -135,7 +136,7 @@ def _extraction_coverage(checkpoints):
 
 def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
                    lock_seconds, lock_wait_seconds, embedding=None, max_corpus_nodes=2000,
-                   max_corpus_bytes=2_000_000):
+                   max_corpus_bytes=2_000_000, allow_auto_merge=True, extract_limits=None):
     from app.workers.persist_graph import build_plan, load_candidates
     _guard(sqlite_url, lease)
     with connect(sqlite_url) as db:
@@ -148,8 +149,11 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
     toolkit = toolkit if isinstance(toolkit, ExtractionToolkit) else toolkit(lease)
     check = lambda: _guard(sqlite_url, lease, toolkit.guard)
     check()
-    if toolkit.resolver is None: return None
-    resolver = toolkit.resolver(_AttemptClient(toolkit.policy,
+    sections = {c.unit_id:c for c in checkpoints if c.unit_kind=='section' and c.status=='done'
+                and c.result.get('normalization') is not None}
+    if toolkit.resolver is None and not sections: return None
+    limits = extract_limits or ExtractLimits(max_attempts=3)
+    resolver = None if toolkit.resolver is None or not allow_auto_merge else toolkit.resolver(_AttemptClient(toolkit.policy,
         CallAttribution(course_id=lease.course_id, task_id=lease.task_id, task_attempt=lease.attempt,
                         user_id=toolkit.user_id), guard=check))
     lock = course_locks.acquire(sqlite_url, lease.course_id, holder='fusion-read:'+lease.owner,
@@ -164,7 +168,7 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
             history = fusion.list_plans(db, lease.course_id)
         old = read_snapshot(repo, scope)
         guard.check(); check()
-    candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id)
+    candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id, provisional=True)
     plan = build_plan(lease.course_id, lease.task_id, candidates)
     before = _raw(old, plan, candidates, lease.task_id)
     lineage = _lineage(before, history)
@@ -176,19 +180,29 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
                                      {c for r in plan.relations for c in r.chunk_ids}))}
     digest = fingerprint(dict(version=2, head=asdict(head), before=before, lineage=lineage,
         extraction_checkpoints=[asdict(c) for c in checkpoints],
-        chunks={k: asdict(c) for k, c in chunks.items()}, model=resolver.model,
-        prompt=resolver.template.sha256, input_bytes=resolver.max_input_bytes,
-        output_tokens=resolver.max_output_tokens, max_pairs=max_pairs, top_k=top_k,
+        chunks={k: asdict(c) for k, c in chunks.items()}, model=None if resolver is None else resolver.model,
+        prompt=None if resolver is None else resolver.template.sha256,
+        input_bytes=None if resolver is None else resolver.max_input_bytes,
+        output_tokens=None if resolver is None else resolver.max_output_tokens,
+        relation_config=None if not sections else reextraction_config(toolkit,limits), max_pairs=max_pairs, top_k=top_k,
         max_corpus_nodes=max_corpus_nodes, max_corpus_bytes=max_corpus_bytes,
         embedding_space=None if embedding is None else embedding.space, recall_version=RECALL_VERSION))
     with connect(sqlite_url) as db:
         saved = fusion.task_plan(db, lease.course_id, lease.task_id)
-    if saved is not None and saved.input_digest == digest: return saved
+    if saved is not None and (saved.input_digest == digest or saved.payload.get('analysis_input_digest') == digest):
+        from app.repositories.relation_revisions import read_revision
+        with connect(sqlite_url) as db:
+            choices = saved.payload.get('relation_selection', {})
+            if all(read_revision(db, course_id=lease.course_id, task_id=lease.task_id,
+                                 section_id=sid, input_digest=v['digest']) is not None
+                   for sid,v in choices.items() if v['kind']=='revision'):
+                return saved
     cards = [RecallCard(n['kp_id'], n['course_id'], n['name'], '\n'.join(dict.fromkeys(
         [n['definition'], *[a['node']['definition'] for a in lineage[n['kp_id']]]])), tuple(n.get('aliases', [])))
              for n in before['nodes']]
     texts = [c.name+'\n'+c.definition+'\n'+'\n'.join(c.aliases) for c in cards]
-    reason = 'extraction_incomplete' if extraction_coverage['status'] != 'complete' else None
+    reason = 'extraction_incomplete' if extraction_coverage['status'] != 'complete' else (
+        'auto_merge_disabled' if resolver is None else None)
     if len(cards) > max_corpus_nodes or sum(len(t.encode('utf-8')) for t in texts) > max_corpus_bytes:
         reason = 'corpus_budget'
     if any(check_node(n, lease.course_id, chunks) for n in plan.nodes): reason = 'invalid_raw_candidate'
@@ -243,9 +257,30 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
                     d = resolver.resolve(left, right)
                 decisions_by_pair[key] = d
     decisions = list(decisions_by_pair.values())
-    mapped = plan_mapping(before, decisions, existing_ids=[n['kp_id'] for n in old['nodes']],
-        member_ids=member_ids, candidate_pairs=[] if recall is None else [(p.left_id,p.right_id) for p in recall.pairs],
-        forbidden_pairs=forbidden, protected_ids=protected)
+    def mapping(snapshot, split=(), disabled=False):
+        return plan_mapping(snapshot, () if disabled else decisions,
+            existing_ids=[n['kp_id'] for n in old['nodes']], member_ids=member_ids,
+            candidate_pairs=[] if recall is None or disabled else [(p.left_id,p.right_id) for p in recall.pairs],
+            forbidden_pairs=forbidden | set(split), protected_ids=protected)
+
+    mapped = mapping(before)
+    relation_selection = {}
+    relation_coverage = dict(status='complete', reextracted_sections=0, reasons=[])
+    if sections:
+        kp_ids = {e.entity_id:n.kp_id for e,n in zip(candidates.entities,plan.nodes,strict=True)}
+        def rebuild(selection, split, disabled):
+            nonlocal candidates, plan, before
+            candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id,
+                                         relation_selection=selection)
+            plan = build_plan(lease.course_id,lease.task_id,candidates)
+            before = _raw(old,plan,candidates,lease.task_id)
+            return mapping(before,split,disabled)
+
+        relation_selection,mapped,relation_coverage = settle_relations(
+            {sid:c.result for sid,c in sections.items()},mapped,kp_ids,
+            lambda sid: reextract_section(sqlite_url,lease,sections[sid],toolkit=toolkit,limits=limits),rebuild)
+        if relation_coverage['status'] != 'complete':
+            reason = 'relation_reextraction_incomplete'
     lineage_after = {}
     for old_id, canonical in mapped.mapping.items():
         lineage_after.setdefault(canonical, []).extend(lineage[old_id])
@@ -261,7 +296,11 @@ def prepare_fusion(sqlite_url, lease, *, repo, toolkit, max_pairs, top_k,
         total_pairs=total_pairs, examined_pairs=len(decisions), completed_pairs=completed,
         unprocessed_pairs=total_pairs-completed,
         completion='complete' if reason is None and completed==total_pairs else 'partial',
-        reason=reason, vector_error=vector_error, extraction_coverage=extraction_coverage)
+        reason=reason, vector_error=vector_error, extraction_coverage=extraction_coverage,
+        analysis_input_digest=digest,relation_selection=relation_selection,relation_coverage=relation_coverage)
+    if sections:
+        digest = fingerprint(dict(analysis=digest,relation_selection=relation_selection, before=before,
+                                  mapping=mapped.mapping,coverage=relation_coverage))
     check()
     with leased_transaction(sqlite_url, lease.task_id, lease.token) as db:
         task = read_leased_task(db, lease.task_id, lease.token)
@@ -281,11 +320,13 @@ def run_fusion_stage(settings, lease, *, repo, toolkit, **lock):
     from app.repositories.task_leases import release_after_transient_failure
     from app.workers.persist_graph import run_merge_stage, PersistOutcome, PersistStatus
     try:
-        embedding = build_embedding_adapter(settings) if settings.EMBEDDING_MODE == 'online' else None
+        embedding = build_embedding_adapter(settings) if settings.EMBEDDING_MODE == 'online' and settings.DISAMBIGUATION_AUTO_MERGE_ENABLED else None
         prepare_fusion(settings.SQLITE_URL, lease, repo=repo, toolkit=toolkit,
             max_pairs=settings.DISAMBIGUATION_MAX_GLOBAL_PAIRS, top_k=settings.DISAMBIGUATION_RECALL_TOP_K,
             max_corpus_nodes=settings.DISAMBIGUATION_MAX_CORPUS_NODES,
-            max_corpus_bytes=settings.DISAMBIGUATION_MAX_CORPUS_BYTES, embedding=embedding, **lock)
+            max_corpus_bytes=settings.DISAMBIGUATION_MAX_CORPUS_BYTES, embedding=embedding,
+            allow_auto_merge=settings.DISAMBIGUATION_AUTO_MERGE_ENABLED,
+            extract_limits=ExtractLimits.from_settings(settings), **lock)
     except FusionCancelled:
         pass  # C08 stage boundary consumes cancellation.
     except LeaseLost:
