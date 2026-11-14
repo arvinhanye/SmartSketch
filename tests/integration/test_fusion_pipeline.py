@@ -20,7 +20,7 @@ from tests.integration import test_f13 as f13
 from tests.integration.test_f13 import graph, live, db_url, storage
 
 
-def setup_task(db_url, storage, graph, monkeypatch, *, pairs=(), names=('概念11', '概念12')):
+def setup_task(db_url, storage, graph, monkeypatch, *, pairs=(), window_policy=None, names=('概念11', '概念12')):
     user = make_account(db_url, "teacher", "teacher")
     with connect(db_url) as db:
         db.execute("INSERT INTO courses(id,name,teacher_id) VALUES(?, 'test', ?)", (graph.course, user.id))
@@ -35,7 +35,7 @@ def setup_task(db_url, storage, graph, monkeypatch, *, pairs=(), names=('概念1
     client = FakeModelClient(responder=respond)
     policy = ModelCallPolicy(primary=client, store=SqliteCallStore(db_url), max_retries=0,
         failure_threshold=100, open_seconds=30, task_token_budget=10**9, daily_token_budget=10**9)
-    toolkit = ExtractionToolkit(policy=policy, preserve_mentions=True,
+    toolkit = ExtractionToolkit(policy=policy, preserve_mentions=True, window_policy=window_policy,
         entities=lambda c: EntityExtractor(c, model="m", max_output_tokens=4000),
         relations=lambda c: RelationExtractor(c, model="m", max_output_tokens=4000),
         resolver=lambda c: SemanticResolver(c, model="m"))

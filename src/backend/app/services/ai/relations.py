@@ -280,6 +280,12 @@ class RelationExtractor:
         candidates, dropped = _validate(items, entity_types, texts)
         return outcome(candidates, dropped, None, result, calls)
 
+    def request_size(self, entities: Sequence[SectionEntity], chunks: Sequence[SourceChunk]) -> int:
+        from app.services.ai.request_budget import rendered_request_size
+        text = self.prompt().render({"entity_table": _render_entities(entities),
+                                     "source_chunks": _render_chunks(chunks)}).text
+        return rendered_request_size(text, self._max_output_tokens)
+
     def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:
         return ModelRequest(
             purpose=purpose,

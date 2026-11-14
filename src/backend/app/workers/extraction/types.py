@@ -16,6 +16,7 @@ from app.services.ai.entities import EntityCandidate, EntityExtractor
 from app.services.ai.gleaning import EntityGleaner
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationCandidate, RelationExtractor
+from app.services.ai.extraction_windows import WindowPolicy
 from app.services.fusion.resolution import SemanticResolver
 from app.workers.parse_task import ParseOutcome
 
@@ -112,6 +113,7 @@ class ExtractionToolkit:
     resolver: Callable[[ModelClient], SemanticResolver] | None = None
     preserve_mentions: bool = False
     analysis_max_pairs: int = 32
+    window_policy: WindowPolicy | None = None
 
 
 @dataclass(frozen=True)
@@ -185,6 +187,7 @@ class _UnitResult:
     attempts: int
     error_code: str | None
     result: Mapping[str, object] | None = field(default=None, repr=False)
+    metadata: Mapping[str, object] | None = field(default=None, repr=False)
 
 
 # ---------------------------------------------------------------- 阶段编排

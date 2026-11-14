@@ -48,6 +48,7 @@ from app.workers.extraction.units import (
     _extract_chunk,
     _extract_section,
 )
+from app.workers.extraction.windowed import checkpoint_policy
 
 # ---------------------------------------------------------------- 并发派发
 
@@ -170,9 +171,11 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
     versions = {c.result.get("entity_identity_version", 1) for c in done_chunks.values() if c.result is not None}
     if len(versions) > 1 or any(type(v) is not int or v not in (1, 2) for v in versions):
         raise ValueError("inconsistent checkpoint identity versions")
-    preserve = (next(iter(versions)) == 2) if versions else toolkit.preserve_mentions
+    window_policy = checkpoint_policy(toolkit.window_policy,existing)
+    preserve = (next(iter(versions)) == 2) if versions else (window_policy is not None or toolkit.preserve_mentions)
     toolkit = replace(toolkit, preserve_mentions=preserve,
-                      resolver=toolkit.resolver if preserve else None)
+                      resolver=toolkit.resolver if preserve else None,
+                      window_policy=window_policy if preserve else None)
     if preserve:
         credential_guard = toolkit.guard
         def guard() -> None:

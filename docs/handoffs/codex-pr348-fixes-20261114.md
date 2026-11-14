@@ -1,6 +1,6 @@
 # PR #348 后端复审修复
 
-- 日期：2026-11-14；负责人 Codex；状态：实现完成，完整门禁与独立复审进行中。
+- 日期：2026-11-14；负责人 Codex；状态：实现完成，后端完整门禁通过；协调者已确认隔离 Neo4j、CI 与独立复审通过，准备合并。
 - 基线：PR #348 `04286ec9aae4db818e67109a2d82ad73b8f6c620`，协调者在 `codex/pr348-fixes-20261114` 整合当前 main。仅处理已确认 R348-1/2；不纳入撤下的租约观察。
 - 输入：[复审记录](../reviews/codex-pr-review-20261114.md)、[修复计划 Task 1](../superpowers/plans/2026-11-14-pr-review-fixes.md)；输出：两项后端修复、永久回归及规格补充。
 
@@ -18,13 +18,14 @@
 
 - 先红后绿：`.demo/pr-fixes-20261114/backend-red-verified.log` 为 **10 failed / 19 passed**，失败为旧 revision 复用和计划外键删除错误。首轮测试种子漏填 failed 任务的 error_code，已修正，原记录保留在 `backend-red.log`，不计为有效红证据。
 - `PYTHONPATH=src/backend:. .venv/bin/python -m pytest -q tests/backend/test_fusion_undo.py tests/backend/test_fusion_storage.py tests/backend/test_adr021.py tests/backend/test_disambiguation_api.py tests/backend/test_disambiguation_review.py`：**106 passed**，50.27s，既有 Starlette 弃用警告；日志 `backend-targeted-green.log`。
-- `scripts/verify/backend.sh full`：运行中；日志 `.demo/pr-fixes-20261114/backend-full.log`，结束码另存 `backend-full.exit`。
+- `scripts/verify/backend.sh full`：**4504 passed / 27 skipped**，1215.46s，末行 `PASS backend gate (full)`；日志 `.demo/pr-fixes-20261114/backend-full.log`。测试完成后，外层 zsh 日志包装脚本因向只读变量 `status` 赋值而退出 1，未生成原计划的 `backend-full.exit`；这不是测试或门禁失败，不将包装脚本退出码记为 0，也未重复运行已通过的完整测试。
 - 本轮受控文件 `git diff --check` 通过。basic、测试索引、前端、隔离 Neo4j 与最终独立复审由协调者统一运行并记录。
+- 协调者反馈：隔离 Neo4j 为 **504 passed / 4 登记 skip + 44 live passed**，退出 0；修复提交 `bfa83179e02efbccfffa198aca3863afb591db9b` 的 20 项 CI 与独立复审通过。最终远端状态由总任务记录汇总。
 
 ## 接口、风险与交接
 
 - 无新增 HTTP/API、配置、依赖或数据库迁移；不改已有迁移 021。不可变计划和撤销审计结构不变。
 - 正常撤销后的节点 revision 增大；旧编辑请求会按已有契约返回修订冲突。有关联后续变更仍保守拒绝；未放宽跨计划依赖冲突。
 - 自动合并仍默认关闭；未调用真实模型或操作开发数据库。本轮不能证明真实语义质量、生成速度或审核减负。
-- 下一步：协调者等待后端 full、真实 Neo4j 和独立复审，更新总任务记录后提交、推送、CI、按固定 head 合并。执行子任务未运行 git add/commit/switch/push。
+- 下一步：协调者提交本交接验证更新、更新总任务记录，并按已验证的固定 head 合并。执行子任务未运行 git add/commit/switch/push。
 - 回退：本轮无破坏性迁移；若回退代码，须同时回退这两处修复及其测试/规格，已写入较高 revision 的节点仍兼容旧整数契约。不可删除已提交审计或手动降低 revision。

@@ -186,20 +186,32 @@ class EntityGleaner:
         return self._enabled
 
     @property
+    def model(self) -> str:
+        return self._model
+
+    @property
     def max_rounds(self) -> int:
         return self._max_rounds
 
     def prompt(self) -> PromptTemplate:
         return self._prompts.get(GLEANING_PROMPT_PURPOSE, GLEANING_PROMPT_VERSION)
 
+    def request_size(self, text: str, known_entities: Sequence[EntityCandidate]) -> int:
+        from app.services.ai.request_budget import rendered_request_size
+        known = [{"name": c.name, "type": c.type} for c in known_entities]
+        rendered = self.prompt().render({"chunk_text": text, "entities_json": json.dumps(known, ensure_ascii=False)})
+        return rendered_request_size(rendered.text, self._max_output_tokens)
+
     def glean(
         self, identity: ChunkIdentity, text: str, first_pass: Sequence[EntityCandidate], *,
-        preserve_mentions: bool = False,
+        preserve_mentions: bool = False, round_limit: int | None = None,
     ) -> GleaningResult:
         if not isinstance(identity, ChunkIdentity):
             raise TypeError(f"identity must be ChunkIdentity, got {type(identity).__name__}")
         if not isinstance(text, str):
             raise TypeError("text must be str")
+        if round_limit is not None and (type(round_limit) is not int or not 1 <= round_limit <= self._max_rounds):
+            raise ValueError('round_limit must be within the configured round count')
         known_entities = tuple(first_pass)
         for candidate in known_entities:
             if not isinstance(candidate, EntityCandidate):
@@ -228,7 +240,7 @@ class EntityGleaner:
         failure: ExtractionFailure | None = None
 
         try:
-            for _ in range(self._max_rounds):
+            for _ in range(self._max_rounds if round_limit is None else round_limit):
                 rounds += 1
                 rendered = template.render(
                     {"chunk_text": text, "entities_json": json.dumps(known, ensure_ascii=False)}

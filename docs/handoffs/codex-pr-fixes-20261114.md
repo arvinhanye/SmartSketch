@@ -17,11 +17,17 @@
 - 后端新增回归：旧实现 10 failed / 19 passed，失败位置对应原缺陷；修复后相关模块 106 passed。
 - #348/main 兼容前端 full：90 文件、1532 passed，类型检查与构建通过，exit 0。
 - 测试索引检查通过；无新增文件时仅更新描述。
-- 基础门禁 exit 0；后端独立复审通过，无 P1/P2。独立实验覆盖 90 次反复合并/撤销、所有旧修订令牌拒绝、共享边双组撤销和 20 组真实 SQLite 删除矩阵。后端 full、真实 Neo4j 和新 head CI 仍待完成；完整日志在 `.demo/pr-fixes-20261114/`。
+- 基础门禁 exit 0；后端独立复审通过，无 P1/P2。独立实验覆盖 90 次反复合并/撤销、所有旧修订令牌拒绝、共享边双组撤销和 20 组真实 SQLite 删除矩阵。后端 full 4504 passed / 27 登记 skip，门禁输出 PASS；外层 zsh 包装器在记录退出码时误用只读变量导致 wrapper exit 1，未改记整个包装器成功。隔离 Neo4j 504 passed / 4 登记 skip + 44 live passed，exit 0；新 head 的 20 项 CI 全绿。完整日志在 `.demo/pr-fixes-20261114/`。
 
 ## 合并记录
 
-尚未推送或合并。所有 PR 必须在新的 head 上通过所需验证与复审，再使用 expected-head SHA 校验合并；不绕过保护规则。
+#348 已以 expected head `bfa83179e02efbccfffa198aca3863afb591db9b` 合并，main 合并提交 `d63116fb9cb23c5d25d334f9e8d2c3d62d9a9f52`。
+
+#350 已 retarget main，并合入上述主线；冲突只涉及任务记录、测试索引和 `setup_task` 的两个新增关键字参数（同时保留 `window_policy`、`names`）。生产代码、后端/集成测试、契约与预先验证的组合快照逐文件相同；54 条定向、basic、32 条真实 Neo4j 已通过。待新的 CI 和合并。
+
+#351 五项及复审新增回调边界均已修复，独立复审无剩余 P1/P2，固定原 head 快照全量 1575 passed；待与新主线整合验证和 CI。
+
+所有 PR 都使用 expected-head SHA 校验合并，不绕过保护规则。
 
 ## 风险与回退
 

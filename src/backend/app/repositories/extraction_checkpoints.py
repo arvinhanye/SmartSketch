@@ -29,6 +29,7 @@ class Checkpoint:
     attempts: int
     error_code: str | None
     result: Mapping[str, object] | None = field(repr=False)
+    metadata: Mapping[str, object] | None = field(default=None, repr=False)
 
 
 def _check(course_id: str, task_id: str, unit_kind: str | None) -> None:
@@ -50,18 +51,20 @@ def write_checkpoint(
     attempts: int,
     error_code: str | None = None,
     result: Mapping[str, object] | None = None,
+    metadata: Mapping[str, object] | None = None,
 ) -> bool:
     """插入一个检查点；同一单元已有检查点时不写（重放幂等），返回是否新写入。"""
     _check(course_id, task_id, unit_kind)
     if not database.in_transaction:
         raise RuntimeError("write_checkpoint must run inside the caller's leased transaction")
     encoded = None if result is None else json.dumps(dict(result), ensure_ascii=False, sort_keys=True)
+    meta = None if metadata is None else json.dumps(dict(metadata), ensure_ascii=False, sort_keys=True)
     return database.execute(
         """INSERT INTO task_chunk_checkpoints
-               (task_id, course_id, unit_kind, unit_id, status, attempts, error_code, result)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               (task_id, course_id, unit_kind, unit_id, status, attempts, error_code, result, metadata)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (task_id, unit_kind, unit_id) DO NOTHING""",
-        (task_id, course_id, unit_kind, unit_id, status, attempts, error_code, encoded),
+        (task_id, course_id, unit_kind, unit_id, status, attempts, error_code, encoded, meta),
     ).rowcount == 1
 
 
@@ -74,13 +77,14 @@ def read_checkpoints(
         clauses.append("unit_kind = ?")
         params.append(unit_kind)
     rows = database.execute(
-        f"""SELECT unit_kind, unit_id, status, attempts, error_code, result FROM task_chunk_checkpoints
+        f"""SELECT unit_kind, unit_id, status, attempts, error_code, result, metadata FROM task_chunk_checkpoints
             WHERE {' AND '.join(clauses)} ORDER BY unit_kind, unit_id""",
         params,
     ).fetchall()
     return tuple(
-        Checkpoint(kind, unit, status, attempts, code, None if raw is None else json.loads(raw))
-        for kind, unit, status, attempts, code, raw in rows
+        Checkpoint(kind, unit, status, attempts, code, None if raw is None else json.loads(raw),
+                   None if meta is None else json.loads(meta))
+        for kind, unit, status, attempts, code, raw, meta in rows
     )
 
 

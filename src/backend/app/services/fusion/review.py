@@ -53,6 +53,7 @@ def build_review_view(head: DraftHead, plan: FusionPlan | None, nodes: Sequence[
                 if d['status'] == 'complete' and d.get('verdict') in ('SAME','DIFFERENT','UNCERTAIN')}
     recall = data.get('recall')
     reasons = list(dict.fromkeys(filter(None, [data.get('reason'), data.get('vector_error'),
+        *data.get('extraction_coverage', {}).get('reasons', []),
         *[d.get('code') for d in data['decisions'] if d['status'] != 'complete'],
         *[d.get('code') for d in data.get('deferred_pairs', [])]])))
     total = data['total_pairs']

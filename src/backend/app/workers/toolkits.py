@@ -15,6 +15,7 @@ from app.services.ai.entities import EntityExtractor
 from app.services.ai.outbound import build_transport
 from app.services.ai.policy import CallStore, ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
+from app.services.ai.extraction_windows import WindowPolicy
 from app.services.fusion.resolution import SemanticResolver
 from app.services.credentials import CredentialCipher, CredentialError, CredentialUnavailable
 from app.workers.extract_task import ExtractionToolkit
@@ -63,4 +64,5 @@ class TaskToolkits:
                 if (self._settings.DISAMBIGUATION_ANALYSIS_ENABLED or self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
             preserve_mentions=(self._settings.DISAMBIGUATION_ANALYSIS_ENABLED or self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED),
             analysis_max_pairs=self._settings.DISAMBIGUATION_MAX_PAIRS_PER_SECTION,
+            window_policy=WindowPolicy.from_settings(self._settings),
         )
