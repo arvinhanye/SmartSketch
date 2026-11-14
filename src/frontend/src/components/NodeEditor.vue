@@ -49,7 +49,11 @@ const { status, original, form, dirty, locked, canSave, fieldErrors, loadError, 
   editor
 
 // 页面（H14）切换节点前据此确认是否丢弃未保存的修改
-defineExpose({ dirty })
+defineExpose({
+  dirty,
+  /** 打开现有的删除确认（UI-GRAPH-EDIT-02：画布节点菜单的“删除…”走这里，不另做一套确认） */
+  requestDelete: () => openDeleteConfirm(),
+})
 
 const uid = useId()
 const id = (field: string) => `ne-${field}${uid}`

@@ -82,3 +82,93 @@ def test_stale_plan_cannot_switch_draft_head(state):
         with pytest.raises(StaleFusionPlan): activate_plan(db, plan, applied=True)
         db.execute("COMMIT")
         assert read_draft_head(db, cid).storage_version_id == "draft"
+
+
+def _deletion_plan(url, cid, task_id='task', *, state='prepared', applied=False, audit=False):
+    from app.repositories.fusion import put_plan, read_draft_head
+    with connect(url) as db:
+        db.execute('BEGIN IMMEDIATE')
+        plan = put_plan(db, course_id=cid, task_id=task_id, head=read_draft_head(db, cid),
+                        input_digest=task_id, payload=dict(groups=[], before={}, after={}))
+        db.execute('UPDATE fusion_plans SET state=?,applied=? WHERE plan_id=?',
+                   (state, int(applied), plan.plan_id))
+        if audit:
+            actor = db.execute('SELECT teacher_id FROM courses WHERE id=?', (cid,)).fetchone()[0]
+            db.execute('INSERT INTO fusion_undos(undo_id,course_id,plan_id,group_id,actor_id,payload) '
+                       'VALUES(?,?,?,?,?,?)', ('undo-'+task_id, cid, plan.plan_id, 'group', actor, '{}'))
+        db.execute('COMMIT')
+    return plan
+
+
+@pytest.mark.parametrize('stage,plan_state', [('cancelled', 'prepared'), ('failed', 'prepared'),
+                                             ('failed', 'skipped')])
+def test_deleting_uncontributed_material_cleans_only_its_unapplied_plans(state, stage, plan_state):
+    from app.repositories.materials import delete_material, MaterialDeleted
+    url, cid = state
+    plan = _deletion_plan(url, cid, state=plan_state)
+    insert_queued_task(url, cid, 'other-material')
+    other = _deletion_plan(url, cid, 'other-material')
+    with connect(url) as db:
+        actor = db.execute('SELECT teacher_id FROM courses WHERE id=?', (cid,)).fetchone()[0]
+    another_course = create_course(url, name='other', description=None, creator_id=actor)
+    insert_queued_task(url, another_course.id, 'other-course')
+    foreign = _deletion_plan(url, another_course.id, 'other-course')
+    with connect(url) as db:
+        db.execute("UPDATE processing_tasks SET stage=?,cancel_requested=?,cleanup_pending=0,"
+                   "error_code=?,error_message=? WHERE id='task'",
+                   (stage, int(stage == 'cancelled'), 'INTERNAL_ERROR' if stage == 'failed' else None,
+                    'fixture failure' if stage == 'failed' else None))
+    assert isinstance(delete_material(url, 'doc-task', course_id=cid), MaterialDeleted)
+    with connect(url) as db:
+        assert {r[0] for r in db.execute('SELECT plan_id FROM fusion_plans')} == {other.plan_id, foreign.plan_id}
+        assert db.execute("SELECT id FROM processing_tasks WHERE id='task'").fetchall() == []
+        assert db.execute("SELECT id FROM materials WHERE id='doc-task'").fetchall() == []
+
+
+@pytest.mark.parametrize('stage,cleanup,reason', [('merging', 0, 'processing'),
+    ('failed', 1, 'cleanup_pending'), ('awaiting_review', 0, 'contributed'), ('completed', 0, 'contributed')])
+def test_material_deletion_guards_preserve_fusion_plans(state, stage, cleanup, reason):
+    from app.repositories.materials import delete_material, MaterialNotDeletable
+    url, cid = state
+    plan = _deletion_plan(url, cid)
+    with connect(url) as db:
+        db.execute("UPDATE processing_tasks SET stage=?,cleanup_pending=?,error_code=?,error_message=? WHERE id='task'",
+                   (stage, cleanup, 'INTERNAL_ERROR' if stage == 'failed' else None,
+                    'fixture failure' if stage == 'failed' else None))
+    result = delete_material(url, 'doc-task', course_id=cid)
+    assert isinstance(result, MaterialNotDeletable) and result.reason == reason
+    with connect(url) as db:
+        assert db.execute('SELECT plan_id FROM fusion_plans').fetchall() == [(plan.plan_id,)]
+
+
+@pytest.mark.parametrize('plan_state,applied,audit', [('committed', False, False),
+    ('prepared', True, False), ('prepared', False, True)])
+def test_material_deletion_refuses_plan_history_even_if_task_is_marked_failed(state, plan_state, applied, audit):
+    from app.repositories.fusion import put_plan, read_draft_head
+    from app.repositories.materials import delete_material, MaterialNotDeletable
+    url, cid = state
+    plan = _deletion_plan(url, cid, state=plan_state, applied=applied, audit=audit)
+    with connect(url) as db:
+        db.execute('BEGIN IMMEDIATE')
+        safe = put_plan(db, course_id=cid, task_id='task', head=read_draft_head(db, cid),
+                        input_digest='other-attempt', payload={})
+        db.execute("UPDATE processing_tasks SET stage='failed',error_code='INTERNAL_ERROR',"
+                   "error_message='fixture failure' WHERE id='task'")
+        db.execute('COMMIT')
+    result = delete_material(url, 'doc-task', course_id=cid)
+    assert isinstance(result, MaterialNotDeletable) and result.reason == 'contributed'
+    with connect(url) as db:
+        assert {r[0] for r in db.execute('SELECT plan_id FROM fusion_plans')} == {plan.plan_id, safe.plan_id}
+        assert db.execute('SELECT count(*) FROM fusion_undos').fetchone()[0] == int(audit)
+
+
+def test_other_course_material_lookup_never_removes_a_fusion_plan(state):
+    from app.repositories.materials import delete_material
+    url, cid = state
+    plan = _deletion_plan(url, cid)
+    with connect(url) as db:
+        db.execute("UPDATE processing_tasks SET stage='failed',error_code='INTERNAL_ERROR',"
+                   "error_message='fixture failure' WHERE id='task'")
+    assert delete_material(url, 'doc-task', course_id='another-course') is None
+    with connect(url) as db:
+        assert db.execute('SELECT plan_id FROM fusion_plans').fetchall() == [(plan.plan_id,)]

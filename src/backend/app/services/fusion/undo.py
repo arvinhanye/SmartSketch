@@ -73,8 +73,14 @@ def inverse_patch(payload, group_id, current, *, undone):
         if any(now.get(k) != before.get(k) for k in changed):
             return None, [dict(reason='dependent_content_changed', kind=kind, ids=sorted(affected))]
         for k in changed:
+            replacement = deepcopy(after[k]) if k in after else None
+            if kind == 'nodes' and replacement is not None:
+                # Undo is a new write, including resurrected absorbed nodes. Reusing
+                # the pre-merge token would admit stale edits after a later merge.
+                replacement['revision'] = max(int(replacement.get('revision', 1)),
+                    int(now.get(k, {}).get('revision', 0))) + 1
             now.pop(k, None)
-            if k in after: now[k] = deepcopy(after[k])
+            if replacement is not None: now[k] = replacement
         result[kind] = [now[k] for k in sorted(now)]
     validate_snapshot(result)
     cycle = find_cycle((n['kp_id'] for n in result['nodes']), [(e['from_id'], e['to_id'])

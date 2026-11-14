@@ -48,7 +48,20 @@ const props = withDefaults(
   { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined, showLabelStat: false },
 )
 
-const emit = defineEmits<{ nodeClick: [kpId: string]; blankClick: [] }>()
+const emit = defineEmits<{
+  nodeClick: [kpId: string]
+  blankClick: []
+  /** 画布每次建好并画完第一帧（含换布局后的重建）：页面可在此时做整组适应等需要画布已存在的操作 */
+  ready: []
+  /** 点击关系线（UI-GRAPH-EDIT-02）：坐标相对画布容器左上角 */
+  edgeClick: [info: { relationId: string; x: number; y: number }]
+  /** 在节点上点右键：坐标相对画布容器左上角 */
+  nodeMenu: [info: { kpId: string; x: number; y: number }]
+  /** 指针进入节点（知识点 ID）或离开（null）；触屏不发 */
+  nodeHover: [kpId: string | null]
+  /** 画布平移或缩放了：浮在节点、关系线旁的工具应当收起 */
+  viewChange: []
+}>()
 
 const factory = inject(GRAPH_FACTORY_KEY, loadG6Graph)
 const registry = inject(GRAPH_OBSTACLES_KEY, null)
@@ -95,6 +108,7 @@ const ariaLabel = computed(() =>
 )
 
 function showTip(info: { kpId: string; clientX: number; clientY: number } | null): void {
+  emit('nodeHover', info?.kpId ?? null)
   if (tipTimer !== null) clearTimeout(tipTimer)
   tip.value = null
   if (info === null || root.value === null) return
@@ -111,6 +125,12 @@ function showTip(info: { kpId: string; clientX: number; clientY: number } | null
       y: info.clientY - box.top,
     }
   }, 300)
+}
+
+/** 页面坐标 → 画布容器内坐标 */
+function local(point: { clientX: number; clientY: number }): { x: number; y: number } {
+  const box = root.value?.getBoundingClientRect()
+  return { x: point.clientX - (box?.left ?? 0), y: point.clientY - (box?.top ?? 0) }
 }
 
 function start(attempt = 0): void {
@@ -136,6 +156,10 @@ function start(attempt = 0): void {
           reduceMotion: () => reduced.value,
           onBlankClick: () => emit('blankClick'),
           onHover: showTip,
+          // 只有真正的平移、缩放才算“画布动了”；数据更新后回报缩放值不算（否则刚打开的工具条会被自己触发的重绘收起）
+          onTransform: () => emit('viewChange'),
+          onEdgeClick: (info) => emit('edgeClick', { relationId: info.relationId, ...local(info) }),
+          onNodeMenu: (info) => emit('nodeMenu', { kpId: info.kpId, ...local(info) }),
           fitPads: props.fitPads,
           onLabels: (shown, total) => {
             labelStat.value = { shown, total }
@@ -146,7 +170,10 @@ function start(attempt = 0): void {
     onNodeClick: (kpId) => emit('nodeClick', kpId),
     onStatus: (next) => {
       status.value = next
-      if (next === 'ready') drawnOnce.value = true
+      if (next === 'ready' && !drawnOnce.value) {
+        drawnOnce.value = true
+        emit('ready')
+      }
     },
     onZoom: (value) => {
       zoom.value = Math.round(value * 100) / 100
@@ -170,6 +197,8 @@ defineExpose({
   ensureVisible: (kpId: string) => lifecycle?.ensureVisible(kpId),
   /** 按比例缩放（快捷键 +、-） */
   zoomBy: (ratio: number) => lifecycle?.zoomBy(ratio),
+  /** 各节点当前在画布容器内的屏幕位置与半径（悬停工具、连线命中） */
+  nodeAnchors: () => lifecycle?.anchors() ?? [],
 })
 
 const zoomBy = (ratio: number): void => lifecycle?.zoomBy(ratio)
@@ -263,7 +292,10 @@ onBeforeUnmount(() => {
     :aria-busy="loading ? 'true' : 'false'"
     @pointerleave="leaveHover"
   >
-    <div ref="stage" class="graph-canvas__stage" role="img" :aria-label="ariaLabel" />
+    <!-- 右键留给节点菜单：画布上不弹浏览器自带菜单 -->
+    <div ref="stage" class="graph-canvas__stage" role="img" :aria-label="ariaLabel" @contextmenu.prevent />
+    <!-- 页面放在画布上的浮层（关系线工具条、节点菜单、连线）：坐标与本容器一致 -->
+    <slot />
     <div v-if="status === 'error'" class="graph-canvas__overlay" role="alert">
       <p>图谱渲染失败，请重试。</p>
       <button type="button" @click="retry">重试</button>

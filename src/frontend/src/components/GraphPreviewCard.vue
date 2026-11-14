@@ -19,9 +19,11 @@ defineProps<{
   unlocks: number
   /** 当前是否处于「只看相邻」 */
   localActive: boolean
+  /** 是否提供「就此提问」（问答页可用时；UI-GRAPH-EDIT-02） */
+  canAsk?: boolean
 }>()
 
-const emit = defineEmits<{ close: []; open: []; toggleLocal: [] }>()
+const emit = defineEmits<{ close: []; open: []; toggleLocal: []; ask: [] }>()
 
 const root = ref<HTMLElement | null>(null)
 useGraphObstacle(root)
@@ -45,6 +47,7 @@ useGraphObstacle(root)
       <button type="button" class="gw-btn gw-btn--ghost" data-test="gw-preview-local" :aria-pressed="localActive" @click="emit('toggleLocal')">
         {{ localActive ? '显示全部' : '只看相邻' }}
       </button>
+      <button v-if="canAsk" type="button" class="gw-btn gw-btn--ask" data-test="gw-preview-ask" title="带着这个知识点去问答页提问（不会自动发送）" @click="emit('ask')">就此提问</button>
       <span class="gw-hint">也可以再次点击该节点</span>
     </div>
   </aside>

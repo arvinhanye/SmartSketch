@@ -83,6 +83,22 @@ export type ReviewTarget =
 
 export type ReviewVerb = 'approve' | 'reject' | 'merge'
 
+/**
+ * 一次处理的结果（DEDUP-FIX F3）。页面只在 `applied` 时把它记成“本次已处理”：
+ * - `applied`：服务端确认本次写入生效；
+ * - `unchanged`：此前已处理过，本次没有写入（幂等重放）；
+ * - `stale`：条目已不在队列（别人处理了或知识点已删除），本次没有写入；
+ * - `failed`：被拒绝或结果不确定（成环、修订冲突、课程忙、网络中断等），条目去留以重新读取的队列为准；
+ * - `aborted`：没有发出或已作废（页面忙、换课程、卸载、无权限）。
+ */
+export type ResolveOutcome = 'applied' | 'unchanged' | 'stale' | 'failed' | 'aborted'
+
+/**
+ * 草稿图谱对预览是否可用（DEDUP-FIX F4）：`current` 与队列同一轮读到；`stale` 队列已更新但图没读到，
+ * 手里的是上一轮的图，不能再用来对比和预览；`unavailable` 从未读到。
+ */
+export type DraftState = 'current' | 'stale' | 'unavailable'
+
 export interface ItemError {
   key: string
   message: string
@@ -94,6 +110,8 @@ export interface ReviewNotice {
   tone: 'success' | 'info' | 'error'
   text: string
 }
+
+type DraftGraph = NonNullable<Awaited<ReturnType<DraftGraphApi['getDraft']>>>
 
 export interface UseReviewOptions {
   coursesApi: Pick<CoursesApi, 'get'>
@@ -197,6 +215,9 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
   const totals = shallowRef<ReviewCounts>(EMPTY_COUNTS)
   const cursors = shallowRef<Cursors>(EMPTY_CURSORS)
   const names = shallowRef<ReadonlyMap<string, string>>(new Map())
+  /** 最近一次读到的草稿图谱（UX-REVIEW-DEDUP-01：疑似重复的定义对比与合并预览用）；读不到为 null */
+  const draftGraph = shallowRef<DraftGraph | null>(null)
+  const draftState = ref<DraftState>('unavailable')
   const loadingMore = ref<ReviewItemKind | null>(null)
   const moreError = ref<{ kind: ReviewItemKind; message: string } | null>(null)
   const refreshing = ref(false)
@@ -250,6 +271,8 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     totals.value = EMPTY_COUNTS
     cursors.value = EMPTY_CURSORS
     names.value = new Map()
+    draftGraph.value = null
+    draftState.value = 'unavailable'
     loadingMore.value = null
     moreError.value = null
     refreshing.value = false
@@ -296,16 +319,19 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     cursors.value = { ...queue.next_cursors }
   }
 
-  async function readNames(cid: string, signal: AbortSignal): Promise<ReadonlyMap<string, string> | null> {
+  /** 草稿图谱只是显示辅助（名称、对比与预览）：读不到返回 null，页面退回 ID 与无预览形态 */
+  async function readDraft(cid: string, signal: AbortSignal): Promise<DraftGraph | null> {
     if (graphApi === undefined) return null
     try {
       const graph = await graphApi.getDraft(cid, { signal })
       if (graph?.course_id !== cid || !Array.isArray(graph.nodes)) return null
-      return new Map(graph.nodes.map((n) => [n.id, n.name]))
+      // 名称只需要节点；关系缺失时按没有关系处理，预览照常能画出两个知识点
+      return Array.isArray(graph.edges) ? graph : { ...graph, edges: [] }
     } catch {
-      return null // 名称只是显示辅助，读不到退回 ID
+      return null
     }
   }
+  const namesOf = (graph: DraftGraph): ReadonlyMap<string, string> => new Map(graph.nodes.map((n) => [n.id, n.name]))
 
   async function load(cid: string | null): Promise<void> {
     seq += 1
@@ -330,15 +356,17 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
       courseName.value = course.name
       if (course.my_role !== 'teacher') return reset('not_teacher')
 
-      const [queue, nameMap] = await Promise.all([
+      const [queue, draft] = await Promise.all([
         reviewApi.getQueue(cid, { limit: PAGE_SIZE }, { signal: own.signal }),
-        readNames(cid, own.signal),
+        readDraft(cid, own.signal),
       ])
       if (!current()) return
       if (!isQueue(queue)) return fail(INVALID_MESSAGE, true)
       store.commit(scope, () => {
         applyQueue(queue)
-        names.value = nameMap ?? new Map()
+        names.value = draft === null ? new Map() : namesOf(draft)
+        draftGraph.value = draft
+        draftState.value = draft === null ? 'unavailable' : 'current'
         status.value = 'ready'
       })
     } catch (cause) {
@@ -371,9 +399,9 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     loadingMore.value = null
     moreError.value = null
     try {
-      const [queue, nameMap] = await Promise.all([
+      const [queue, draft] = await Promise.all([
         reviewApi.getQueue(cid, { limit }, { signal: own.signal }),
-        readNames(cid, own.signal),
+        readDraft(cid, own.signal),
       ])
       if (!current()) return
       if (!isQueue(queue)) {
@@ -382,7 +410,14 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
       }
       store.commit(scope, () => {
         applyQueue(queue)
-        if (nameMap !== null) names.value = nameMap
+        if (draft !== null) {
+          names.value = namesOf(draft)
+          draftGraph.value = draft
+          draftState.value = 'current'
+        } else if (draftGraph.value !== null) {
+          // 队列是新的、图还是上一轮的：名称继续用作显示辅助，但对比与预览必须标为过期
+          draftState.value = 'stale'
+        }
         if (mergeDraft.value !== null && !queue.suspected_duplicates.some((p) => duplicateKey(p) === mergeDraft.value?.key)) {
           mergeDraft.value = null
         }
@@ -485,11 +520,11 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     return verb === 'reject' && target.kind !== 'suspected_duplicate'
   }
 
-  async function resolve(target: ReviewTarget, verb: ReviewVerb, primaryId?: string): Promise<void> {
+  async function resolve(target: ReviewTarget, verb: ReviewVerb, primaryId?: string): Promise<ResolveOutcome> {
     const cid = courseId.value
-    if (disposed || cid === null || status.value !== 'ready' || busyKey.value !== null) return
+    if (disposed || cid === null || status.value !== 'ready' || busyKey.value !== null) return 'aborted'
     const action = toAction(target, verb, primaryId)
-    if (action === null) return
+    if (action === null) return 'aborted'
     const key = itemKey(target)
     writeSeq += 1
     const token = writeSeq
@@ -504,29 +539,33 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     itemError.value = null
     notice.value = null
     let reread = false
+    let outcome: ResolveOutcome = 'aborted'
     try {
       const result = await reviewApi.resolve(cid, action, { signal: own.signal })
-      if (!current()) return
+      if (!current()) return 'aborted'
       store.commit(scope, () => {
         removeLocally(key)
         if (isCounts(result?.totals)) totals.value = { ...result.totals }
         else reread = true
         if (mergeDraft.value?.key === key) mergeDraft.value = null
         const changed = result?.changed !== false
+        outcome = changed ? 'applied' : 'unchanged'
         notice.value = { tone: changed ? 'success' : 'info', text: successText(target, verb, changed) }
         if (changed && affectsOthers(target, verb)) reread = true
       })
     } catch (cause) {
-      if (!current() || cause instanceof AbortedError) return
-      if (handleAccess(cause)) return
+      if (!current() || cause instanceof AbortedError) return 'aborted'
+      if (handleAccess(cause)) return 'aborted'
       reread = handleWriteError(cause, key)
+      outcome = cause instanceof ApiError && cause.code === 'NOT_FOUND' ? 'stale' : 'failed'
     } finally {
       if (token === writeSeq) busyKey.value = null
       release()
     }
     if (reread && current()) await refresh()
+    // 重新读取期间换了课程或页面已卸载：这次的结果不再属于当前页面
+    return current() ? outcome : 'aborted'
   }
-
   /** 写失败：返回是否需要重新读取队列 */
   function handleWriteError(cause: unknown, key: string): boolean {
     const itemFail = (message: string, cycle: ItemError['cycle'] = null) => {
@@ -585,10 +624,10 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     mergeDraft.value = null
   }
 
-  async function confirmMerge(pair: SuspectedDuplicate): Promise<void> {
+  async function confirmMerge(pair: SuspectedDuplicate): Promise<ResolveOutcome> {
     const draft = mergeDraft.value
-    if (draft === null || draft.key !== duplicateKey(pair)) return
-    await resolve({ kind: 'suspected_duplicate', pair }, 'merge', draft.primaryId)
+    if (draft === null || draft.key !== duplicateKey(pair)) return 'aborted'
+    return resolve({ kind: 'suspected_duplicate', pair }, 'merge', draft.primaryId)
   }
 
   // 其他页面清空了课程上下文（COURSE_FORBIDDEN、会话过期）
@@ -628,6 +667,8 @@ export function useReview({ coursesApi, reviewApi, graphApi, courseId, onCourseF
     notice,
     dismissNotice: () => { notice.value = null },
     mergeDraft,
+    draftGraph,
+    draftState,
     nameOf,
     reload: () => void load(courseId.value),
     refresh: () => refresh(),
