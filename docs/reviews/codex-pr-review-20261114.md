@@ -88,3 +88,9 @@
 本地证据位于 `.demo/pr-review-20261114/`，包括逐文件 JSON 清单、日志、`smartsketch-pr348-reproduce.py`、`pr351-regressions.test.ts`。临时固定快照为 `/tmp/smartsketch-pr348-snapshot`、`/tmp/smartsketch-pr350-fixed`、`/tmp/smartsketch-pr351-review-snapshot`。复现不得使用真实课程或真实凭据。
 
 下一步：先修复 #348 两项与 #351 五项并保留失败回归；复审新 head、通过 CI 后合并 #348，再将 #350 更新基线至 main 并复验。#351 可独立修复后合并。无 API/数据模型决定或规格行为被本次审查更改。
+
+## 后续修复闭环：PR-FIX-MERGE-04（2026-11-14）
+
+以上为修复前固定 head 的原始审核记录，保留其历史结论。用户随后明确授权修复全部 7 项问题；两项后端与五项前端问题均以永久回归先红后绿修复，独立复审无剩余 P1/P2。前端复审新增的迟到新建/删除回调问题也已修复并独立复验。
+
+三个 PR 已按 #348 → #350 → #351 依序合并，每个实际合并 head 均有 20 项成功 CI；主线为 `383d584e198170e65f9aa8c723c126edc66f2dc5`，与最终测试提交的树完全一致。后端 4529 passed / 27 登记 skip、前端 1578 passed、Neo4j 507 passed / 4 登记 skip、浏览器 E2E 2+4 passed。详见[修复与合并交接](../handoffs/codex-pr-fixes-20261114.md)。本附录为合并后的本地归档。
