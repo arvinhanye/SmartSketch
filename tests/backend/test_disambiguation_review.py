@@ -229,3 +229,16 @@ def test_projected_pair_aggregates_every_original_member_not_only_first_recall_p
     plan=replace(plan,applied=True)
     head=replace(head,storage_version_id=plan.storage_version_id)
     assert build_review_view(head,plan,nodes).proposals==()
+
+
+@pytest.mark.parametrize('verdict,expected',[('SAME',0),('UNCERTAIN',1),('DIFFERENT',0)])
+def test_relation_technical_gap_keeps_true_uncertainty_but_does_not_create_merge_review_work(verdict,expected):
+    head,plan,nodes=fixture(verdict)
+    payload={**plan.payload,'completion':'partial','reason':'relation_reextraction_incomplete',
+             'relation_coverage':{'status':'partial','reasons':['relation_reextraction_failed']}}
+    view=build_review_view(head,replace(plan,payload=payload),nodes)
+    assert len(view.proposals)==expected
+    assert view.summary['status']=='partial'
+    assert view.summary['review_pairs']==expected
+    assert view.summary['uncertain_pairs']==int(verdict=='UNCERTAIN')
+    assert 'relation_reextraction_failed' in view.summary['reasons']

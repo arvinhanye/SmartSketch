@@ -131,11 +131,14 @@ def relation_windows(extractor: RelationExtractor, entities: Sequence[SectionEnt
             raise
     # No quadratic materialization or unbounded fallback. Each pair must see
     # every source range; the cap is checked before any provider call.
-    if len(entities) * (len(entities) - 1) // 2 > policy.max_windows:
+    units = extractor.entity_units(entities)
+    if len(units) < 2:
+        raise WindowBudgetError('input_budget')
+    if len(units) * (len(units) - 1) // 2 > policy.max_windows:
         raise WindowBudgetError('window_limit')
     result = []
-    for pair in combinations(entities, 2):
-        windows = _source_windows(extractor, pair, chunks, policy)
+    for left,right in combinations(units, 2):
+        windows = _source_windows(extractor, left + right, chunks, policy)
         if len(result) + len(windows) > policy.max_windows:
             raise WindowBudgetError('window_limit')
         result.extend(windows)

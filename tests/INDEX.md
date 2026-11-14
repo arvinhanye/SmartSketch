@@ -22,6 +22,12 @@
 | [`tests/backend/test_adr079_register.py`](backend/test_adr079_register.py) | 学生自助注册接口及账号创建、注册限流行为。 | ADR-079 |
 | [`tests/backend/test_disambiguation_generation.py`](backend/test_disambiguation_generation.py) | 生成阶段语义分析预算、真实覆盖、来源核查与每次调用凭据保护。 | ADR-098；DISAMBIG-BE-01 |
 | [`tests/backend/test_extraction_windows.py`](backend/test_extraction_windows.py) | 完整请求预算、Unicode 窗口覆盖、完整实体对及超限前置拒绝。 | ADR-101；DISAMBIG-BE-04 |
+| [`tests/backend/test_local_normalization.py`](backend/test_local_normalization.py) | 局部 complete-link 语义卡、确定性与双判门槛。 | ADR-102；DISAMBIG-BE-05 |
+| [`tests/backend/test_normalized_relations.py`](backend/test_normalized_relations.py) | 原始端点、严格证据定位及整卡分窗。 | ADR-102；DISAMBIG-BE-05 |
+| [`tests/backend/test_local_normalization_worker.py`](backend/test_local_normalization_worker.py) | 规范化先后顺序、检查点版本及默认依赖隔离。 | ADR-102；DISAMBIG-BE-05 |
+| [`tests/backend/test_relation_revisions.py`](backend/test_relation_revisions.py) | 不可变关系版本、课程隔离、回滚保护。 | ADR-102；DISAMBIG-BE-05 |
+| [`tests/backend/test_relation_reconciliation.py`](backend/test_relation_reconciliation.py) | 受影响闭包、单调拆分、图环反证及失败上限。 | ADR-102；DISAMBIG-BE-05 |
+| [`tests/backend/test_relation_reextract_worker.py`](backend/test_relation_reextract_worker.py) | 关系重抽、输入缓存、接管及取消/租约/凭据围栏。 | ADR-102；DISAMBIG-BE-05 |
 | [`tests/backend/test_extraction_window_worker.py`](backend/test_extraction_window_worker.py) | 窗口来源还原、原子结果、调用守卫及接管策略固定。 | ADR-101；DISAMBIG-BE-04 |
 | [`tests/backend/test_disambiguation_review.py`](backend/test_disambiguation_review.py) | 有效语义审核、三态与技术覆盖、过期回退及过滤后计数。 | ADR-100；DISAMBIG-BE-03 |
 | [`tests/backend/test_disambiguation_api.py`](backend/test_disambiguation_api.py) | 覆盖/历史/撤销 HTTP 的教师权限、严格参数、分页与冲突协议。 | ADR-100；DISAMBIG-BE-03 |
@@ -252,6 +258,7 @@
 | [`tests/integration/test_fusion_projection.py`](integration/test_fusion_projection.py) | 真实 Neo4j 独立草稿副本往返、幂等和事务回滚。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/integration/test_disambiguation_review_api.py`](integration/test_disambiguation_review_api.py) | 真实 Neo4j 生成到审核/历史/HTTP 撤销闭环及教师编辑保护。 | ADR-100；DISAMBIG-BE-03 |
 | [`tests/integration/test_fusion_pipeline.py`](integration/test_fusion_pipeline.py) | 真实 Neo4j 生成映射、T6 原子性、接管、跨任务、单组/独立组撤销与节点修订。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/integration/test_local_relations_pipeline.py`](integration/test_local_relations_pipeline.py) | 真实 Neo4j 局部拆分、版本选择、失败回退、接管、过期计划与原端点撤销。 | ADR-102；DISAMBIG-BE-05 |
 | [`tests/integration/test_extraction_window_fusion.py`](integration/test_extraction_window_fusion.py) | 真实 Neo4j 抽取缺口阻断合并、缓存失效及审核覆盖原因。 | ADR-101；DISAMBIG-BE-04 |
 | [`tests/integration/test_d2_publish.py`](integration/test_d2_publish.py) | 验证发布时文本块与知识点向量调用的计费记录，以及重复发布和回滚复制向量不新增调用。 | D2；ADR-082 |
 | [`tests/integration/test_demo_mode_live.py`](integration/test_demo_mode_live.py) | 验证演示模型上传到 worker 草稿生成的完整流程及 Neo4j 向量相似度阈值。 | ADR-076 |

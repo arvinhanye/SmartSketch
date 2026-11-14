@@ -196,7 +196,11 @@ def test_metadata_rollback_blocks_active_tasks_and_preserves_finished_candidates
         assert 'metadata' in {r[1] for r in db.execute('PRAGMA table_info(task_chunk_checkpoints)')}
         db.execute("""UPDATE processing_tasks SET stage='cancelled',cancel_requested=1,
                    lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL WHERE id=?""",(lease.task_id,))
+        # Roll dependencies back in descending order; the original 022 assertions remain.
+        newer=MIGRATIONS_DIR/'023_relation_revisions.sql'
         db.execute('BEGIN')
+        for line in newer.read_text().splitlines():
+            if line.startswith('-- ROLLBACK: '): db.execute(line.removeprefix('-- ROLLBACK: '))
         for command in commands: db.execute(command)
         db.commit()
         assert db.execute('SELECT status,result FROM task_chunk_checkpoints ORDER BY unit_id').fetchall()==[

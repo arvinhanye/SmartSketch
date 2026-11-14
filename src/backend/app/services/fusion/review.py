@@ -47,6 +47,9 @@ def build_review_view(head: DraftHead, plan: FusionPlan | None, nodes: Sequence[
         auto_merged_groups=None, review_pairs=0, legacy_candidates=0, recall=None,
         reasons=['no_analysis' if plan is None else 'stale_analysis'])
     if plan is None or not _current(head, plan, undone):
+        if (plan is not None and plan.reason == 'stale_snapshot' and plan.payload.get('groups')
+                and any(v.get('kind') == 'initial' for v in plan.payload.get('relation_selection', {}).values())):
+            summary['reasons'].append('relation_dependency_stale')
         return ReviewView(summary)
     data = plan.payload
     complete = {tuple(sorted((d['left_id'], d['right_id']))): d for d in data['decisions']
@@ -54,6 +57,7 @@ def build_review_view(head: DraftHead, plan: FusionPlan | None, nodes: Sequence[
     recall = data.get('recall')
     reasons = list(dict.fromkeys(filter(None, [data.get('reason'), data.get('vector_error'),
         *data.get('extraction_coverage', {}).get('reasons', []),
+        *data.get('relation_coverage', {}).get('reasons', []),
         *[d.get('code') for d in data['decisions'] if d['status'] != 'complete'],
         *[d.get('code') for d in data.get('deferred_pairs', [])]])))
     total = data['total_pairs']
@@ -89,6 +93,10 @@ def build_review_view(head: DraftHead, plan: FusionPlan | None, nodes: Sequence[
         if any(d is None for d in proofs) or any(d['verdict']=='DIFFERENT' for d in proofs):
             continue
         verdict = 'UNCERTAIN' if any(d['verdict']=='UNCERTAIN' for d in proofs) else 'SAME'
+        if verdict == 'SAME' and data.get('relation_coverage', {}).get('status') == 'partial':
+            # A failed dependency repair disables merging as a technical safeguard;
+            # asking the teacher to approve SAME cannot supply the missing relations.
+            continue
         reason = 'semantic_uncertain' if verdict=='UNCERTAIN' else 'merge_blocked'
         evidence = dict(plan_id=plan.plan_id, verdict=verdict,
             basis=proofs[0]['basis'] if len({d['basis'] for d in proofs})==1 else 'mixed',

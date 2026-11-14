@@ -13,6 +13,8 @@ from app.repositories.chunks import (
     list_chunks,
     list_task_revisions,
 )
+from app.workers.extraction.local import select_initial
+from app.repositories.relation_revisions import read_revision
 from app.repositories.extraction_checkpoints import Checkpoint, read_checkpoints
 from app.repositories.sqlite import connect
 from app.services.ai.entities import EntityCandidate, EntitySource
@@ -186,10 +188,16 @@ def _group_entities(
 # ---------------------------------------------------------------- 读取待持久化候选
 
 
-def load_candidates(sqlite_url: str, *, course_id: str, task_id: str) -> ExtractionCandidates:
+def load_candidates(sqlite_url: str, *, course_id: str, task_id: str,
+                    relation_selection: Mapping | None = None, provisional: bool = False) -> ExtractionCandidates:
     """按课程隔离读出一个任务已结束单元的候选；他课任务得到空结果。"""
     with connect(sqlite_url) as database:
         checkpoints = read_checkpoints(database, course_id=course_id, task_id=task_id)
+        replacements = {}
+        for unit_id,choice in (relation_selection or {}).items():
+            if choice.get('kind') == 'revision':
+                replacements[unit_id] = read_revision(database,course_id=course_id,task_id=task_id,
+                                                      section_id=unit_id,input_digest=choice.get('digest'))
     chunk_rows = [c for c in checkpoints if c.unit_kind == "chunk"]
     section_rows = [c for c in checkpoints if c.unit_kind == "section"]
     entities = _group_entities(task_id, course_id, chunk_rows)
@@ -222,8 +230,18 @@ def load_candidates(sqlite_url: str, *, course_id: str, task_id: str) -> Extract
     for checkpoint in section_rows:
         if checkpoint.status == "done":
             assert checkpoint.result is not None
-            head = checkpoint.result["chunk_ids"][0]  # type: ignore[index]
-            for raw in checkpoint.result["relations"]:  # type: ignore[union-attr]
+            choice = (relation_selection or {}).get(checkpoint.unit_id)
+            if choice is not None and choice.get('kind') == 'revision':
+                replacement = replacements.get(checkpoint.unit_id)
+                selected = replacement.result if replacement is not None and replacement.status == 'done' else None
+            else:
+                selected = select_initial(checkpoint.result, choice, provisional)
+            if selected is None:
+                failed_sections.append(FailedSection(checkpoint.unit_id, OUTPUT_INVALID_CODE, None,
+                                                     tuple(checkpoint.result['chunk_ids'])))
+                continue
+            head = selected["chunk_ids"][0]  # type: ignore[index]
+            for raw in selected["relations"]:  # type: ignore[union-attr]
                 relations.append((_chunk_order(head), _decode_relation(course_id, raw)))
         else:
             section = known.get(checkpoint.unit_id)

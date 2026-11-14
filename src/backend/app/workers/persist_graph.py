@@ -523,11 +523,12 @@ def _persist_stage(
     try:
         task_guard.check()
         with steps.step("candidates"):
-            candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id)
-        with steps.step("plan"):
-            plan = build_plan(lease.course_id, lease.task_id, candidates)
             with connect(sqlite_url) as database:
                 prepared = fusion.task_plan(database, lease.course_id, lease.task_id)
+            candidates = load_candidates(sqlite_url, course_id=lease.course_id, task_id=lease.task_id,
+                relation_selection=None if prepared is None else prepared.payload.get('relation_selection'))
+        with steps.step("plan"):
+            plan = build_plan(lease.course_id, lease.task_id, candidates)
         with steps.step("chunks"):
             chunks = get_chunks(sqlite_url, course_id=lease.course_id, chunk_ids=_source_chunk_ids(plan))
     except LeaseLost:
@@ -598,6 +599,15 @@ def _persist_stage(
                             use_projection = prepared is not None and not stale and bool(prepared.payload['groups'])
                             if use_projection:
                                 scope = replace(scope, storage_version_id=prepared.storage_version_id)
+                    if stale:
+                        # A tentative local card depended on the now-stale global approval.
+                        # Independently re-extracted raw-member revisions remain safe.
+                        independent = {k:v for k,v in prepared.payload.get('relation_selection', {}).items()
+                                       if v.get('kind') != 'initial'}
+                        candidates = load_candidates(sqlite_url,course_id=lease.course_id,task_id=lease.task_id,
+                                                     relation_selection=independent)
+                        plan = build_plan(lease.course_id,lease.task_id,candidates)
+                        chunks = get_chunks(sqlite_url,course_id=lease.course_id,chunk_ids=_source_chunk_ids(plan))
                     with steps.step("neo4j"):
                         dedicated_started = True
                         with repo.persist_write_transaction(scope, check=check,
@@ -739,7 +749,8 @@ def run_pipeline_once(
             stage = MERGE_STAGE if extracted.status is ExtractStatus.ADVANCED else ""
         if stage == MERGE_STAGE:
             timer.start()
-            if settings.DISAMBIGUATION_AUTO_MERGE_ENABLED:
+            from app.workers.relation_reconciliation import has_pinned_normalization
+            if settings.DISAMBIGUATION_AUTO_MERGE_ENABLED or has_pinned_normalization(url,lease):
                 from app.workers.fusion_task import run_fusion_stage
                 merged = run_fusion_stage(settings, replace(lease, stage=stage), repo=repo, toolkit=toolkit, **lock)
             else:
