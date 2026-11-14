@@ -29,26 +29,26 @@
 
 Files: `services/fusion/undo.py`, `repositories/materials.py`, supporting fusion repository only if required; `tests/backend/test_fusion_undo.py`, material deletion tests and relevant integration tests; generation-disambiguation spec and backend handoff.
 
-- [ ] Add persistent tests for revision ABA, restored nodes and independent-group undo; run against the old code and confirm the intended failures.
-- [ ] Keep `inverse_patch(payload, group_id, current, *, undone)` compatible while assigning fresh revisions only to changed/restored nodes, preserving current revisions of unrelated nodes and all exact changed-content conflict checks. Verify independent undo order before adding any audit reconstruction mechanism.
-- [ ] Add real SQLite tests for prepared-plan cancellation/failure deletion, course scoping, cleanup_pending and contributed/applied-plan protection; confirm failure before fixing.
-- [ ] Clean only safe unapplied plans in the existing material deletion transaction after its guards, retaining migration 021 and audits.
-- [ ] Run targeted tests, backend full, basic and relevant isolated Neo4j integration; commit the repair with actual evidence.
+- [x] Add persistent tests for revision ABA, restored nodes and independent-group undo; run against the old code and confirm the intended failures.
+- [x] Keep `inverse_patch(payload, group_id, current, *, undone)` compatible while assigning fresh revisions only to changed/restored nodes, preserving current revisions of unrelated nodes and all exact changed-content conflict checks. Verify independent undo order before adding any audit reconstruction mechanism.
+- [x] Add real SQLite tests for prepared-plan cancellation/failure deletion, course scoping, cleanup_pending and contributed/applied-plan protection; confirm failure before fixing.
+- [x] Clean only safe unapplied plans in the existing material deletion transaction after its guards, retaining migration 021 and audits.
+- [x] Run targeted tests, backend full, basic and relevant isolated Neo4j integration; commit the repair with actual evidence.
 
 ## Task 2: Frontend repairs for #351
 
 Files: `useEditHistory.ts`, `TeacherGraphView.vue`, `useTeacherGraph.ts`, `NodeEditor.vue` or a focused composable if needed, related tests and graph spec.
 
-- [ ] Move the five temporary reproductions into existing persistent test modules and confirm they fail on the fixed PR head.
-- [ ] Bind history runs to a generation so `clear()` and disposal invalidate late completions; bind node writes and refresh to the original course/request scope.
-- [ ] Prevent editing from being silently overwritten during undo; invalidate redo on every successful new write even if that write cannot be undone.
-- [ ] Synchronize authoritative node/graph state after possible partial writes, distinguish incomplete undo, and await refresh before finishing history work.
-- [ ] Cover slow reads, failed unlock/read, course switch/unmount and repeated actions; run targeted tests and frontend full. Deliver a patch against `a1f0864` without mixing #348 changes.
+- [x] Move the five temporary reproductions into existing persistent test modules and confirm they fail on the fixed PR head.
+- [x] Bind history runs to a generation so `clear()` and disposal invalidate late completions; bind node writes and refresh to the original course/request scope.
+- [x] Prevent editing from being silently overwritten during undo; invalidate redo on every successful new write even if that write cannot be undone.
+- [x] Synchronize authoritative node/graph state after possible partial writes, distinguish incomplete undo, and await refresh before finishing history work.
+- [x] Cover slow reads, failed unlock/read, course switch/unmount and repeated actions; run targeted tests and frontend full. Deliver a patch against `a1f0864` without mixing #348 changes.
 
 ## Task 3: Review, CI and dependency integration
 
-- [ ] Independent reviewers assess both repair diffs, original seven failures and the five review-focus boundaries. Fix confirmed blockers with regression evidence.
-- [ ] Update #348 from current main, verify, push to its existing branch, wait for CI and merge with an expected-head SHA guard.
-- [ ] Update #350 to merged main, resolve documentation-only overlap while preserving both sides, rerun affected tests/basic and CI, retarget main and merge with an expected-head SHA guard.
+- [x] Independent reviewers assess both repair diffs, original seven failures and the five review-focus boundaries. Fix confirmed blockers with regression evidence.
+- [x] Update #348 from current main, verify, push to its existing branch, wait for CI and merge with an expected-head SHA guard.
+- [x] Update #350 to merged main, resolve task/index and test-helper parameter overlap while preserving both sides, rerun affected tests/basic and CI, retarget main and merge with an expected-head SHA guard.
 - [ ] Apply the isolated #351 repair patch, integrate current main, verify frontend/full compatibility and CI, then merge with an expected-head SHA guard.
 - [ ] Verify all three PR states and final main SHA; update tasks, review disposition and handoff with actual results and remaining acceptance limits.

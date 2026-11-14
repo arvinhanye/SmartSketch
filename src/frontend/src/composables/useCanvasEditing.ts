@@ -29,12 +29,14 @@ export interface UseCanvasEditingOptions {
   relations: RelationEditor
   /** 各节点当前的屏幕位置；画布没建好时返回空数组 */
   anchors: () => NodeAnchor[]
+  /** 撤销刚才的关系删除。给了就用它（页面的撤销记录），否则按原类型和端点重新建一条 */
+  undoLast?: () => Promise<boolean>
   onDetail: (kpId: string) => void
   onEdit: (kpId: string) => void
   onDelete: (kpId: string) => void
 }
 
-export function useCanvasEditing({ relations, anchors, onDetail, onEdit, onDelete }: UseCanvasEditingOptions) {
+export function useCanvasEditing({ relations, anchors, undoLast, onDetail, onEdit, onDelete }: UseCanvasEditingOptions) {
   const edgeTool = shallowRef<{ relationId: string; at: Point } | null>(null)
   const menu = shallowRef<{ kpId: string; at: Point } | null>(null)
   const hover = shallowRef<NodeAnchor | null>(null)
@@ -117,7 +119,7 @@ export function useCanvasEditing({ relations, anchors, onDetail, onEdit, onDelet
     const last = undo.value
     if (last === null || busy.value) return
     clearUndo()
-    const ok = await relations.createBetween(last.from, last.to, last.type, `已恢复关系：${nameOf(last.from)} → ${nameOf(last.to)}。`)
+    const ok = undoLast !== undefined ? await undoLast() : await relations.createBetween(last.from, last.to, last.type, `已恢复关系：${nameOf(last.from)} → ${nameOf(last.to)}。`)
     if (!ok) undoError.value = '撤销没有成功，关系未恢复。'
   }
 

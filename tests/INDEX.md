@@ -170,6 +170,7 @@
 | [`tests/frontend/chat-ui-qa.test.ts`](frontend/chat-ui-qa.test.ts) | 问答页当前回答的出处、状态与失败卡、复制及输入区结构。 | UI-QA-01 |
 | [`tests/frontend/course-page-ui.test.ts`](frontend/course-page-ui.test.ts) | 课程页面的行列表与创建面板。 | 待确认 |
 | [`tests/frontend/d1-d3.test.ts`](frontend/d1-d3.test.ts) | 前端问答故障分类，区分截断、链路超时与资料未覆盖。 | D1/D3；ADR-082 |
+| [`tests/frontend/edit-history.test.ts`](frontend/edit-history.test.ts) | 撤销 / 重做的顺序、失败、快捷键、清空/释放代次与关系操作串行保护。 | UI-GRAPH-UNDO-04；specs/course-knowledge-graph.md |
 | [`tests/frontend/graph-canvas-enhanced.test.ts`](frontend/graph-canvas-enhanced.test.ts) | GraphCanvas 增强模式与教师页沿用的普通模式。 | 待确认 |
 | [`tests/frontend/graph-chapter-layout.test.ts`](frontend/graph-chapter-layout.test.ts) | 章节分区布局 computeLayout 的真实 dagre 引擎、边界、替换引擎与规模对比。 | 待确认 |
 | [`tests/frontend/graph-detail-layout.test.ts`](frontend/graph-detail-layout.test.ts) | 知识点详情在不同场景中的关闭入口与自适应布局规则。 | 待确认 |
@@ -202,7 +203,7 @@
 | [`tests/frontend/h11.test.ts`](frontend/h11.test.ts) | 学生已发布图谱页面的 API、状态、图卡切换、卡片分页与键盘操作。 | H11 |
 | [`tests/frontend/h12.test.ts`](frontend/h12.test.ts) | 课程成员 API、入口守卫、列表状态、添加移除学生与新版成员页布局。 | H12 |
 | [`tests/frontend/h13.test.ts`](frontend/h13.test.ts) | 会话存储、令牌注入、401 处理与登录页面。 | H13 |
-| [`tests/frontend/h14.test.ts`](frontend/h14.test.ts) | 教师草稿图谱页面的选中保护、详情编辑联动、连边、布局偏好和面板。 | C05-1 |
+| [`tests/frontend/h14.test.ts`](frontend/h14.test.ts) | 教师草稿图谱的选中保护、详情联动、连边、布局和面板；历史写入/读回、切课隔离、部分成功、草稿与迟到回调保护。 | C05-1 |
 | [`tests/frontend/home-topbar-nav.test.ts`](frontend/home-topbar-nav.test.ts) | 课程之外的课程列表与模型设置页移除侧栏，并在顶栏提供品牌和模型 API 入口。 | UI-PINE-01 |
 | [`tests/frontend/i06.test.ts`](frontend/i06.test.ts) | 学习进度 API、掌握状态视觉与乐观标记、推荐解释和列表及切课隔离。 | I06 |
 | [`tests/frontend/invite-code-api.test.ts`](frontend/invite-code-api.test.ts) | 邀请码契约 API 客户端。 | 待确认 |

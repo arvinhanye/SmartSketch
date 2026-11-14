@@ -19,10 +19,10 @@ import {
  * - 修订冲突时并列展示「你的修改」与「最新内容」，由教师选择；失败时表单保留修改并明确说明未保存。
  * - 所有服务端文本以插值渲染，不用 `v-html`。
  */
-const props = defineProps<{ kpId: string | null }>()
+const props = defineProps<{ kpId: string | null; historyBusy?: boolean }>()
 
 const emit = defineEmits<{
-  saved: [kp: KnowledgePoint]
+  saved: [kp: KnowledgePoint, before?: KnowledgePoint]
   deleted: [kpId: string]
   refreshNeeded: []
   close: []
@@ -40,7 +40,7 @@ const api =
 const editor = useNodeEditor({
   api,
   kpId: toRef(props, 'kpId'),
-  onSaved: (kp) => emit('saved', kp),
+  onSaved: (kp, before) => emit('saved', kp, before),
   onDeleted: (kid) => emit('deleted', kid),
   onRefreshNeeded: () => emit('refreshNeeded'),
   onCourseForbidden: () => emit('courseForbidden'),
@@ -51,8 +51,11 @@ const { status, original, form, dirty, locked, canSave, fieldErrors, loadError, 
 // 页面（H14）切换节点前据此确认是否丢弃未保存的修改
 defineExpose({
   dirty,
+  saving,
   /** 打开现有的删除确认（UI-GRAPH-EDIT-02：画布节点菜单的“删除…”走这里，不另做一套确认） */
   requestDelete: () => openDeleteConfirm(),
+  /** 重新读取当前知识点（UI-GRAPH-UNDO-04：撤销 / 重做改了它的字段之后） */
+  reload: () => editor.reload(),
 })
 
 const uid = useId()
@@ -63,7 +66,7 @@ const root = ref<HTMLElement | null>(null)
 const confirmBox = ref<HTMLElement | null>(null)
 const deleteButton = ref<HTMLButtonElement | null>(null)
 const confirmingDelete = ref(false)
-const busy = computed(() => status.value === 'loading' || saving.value)
+const busy = computed(() => status.value === 'loading' || saving.value || props.historyBusy === true)
 
 function errorOf(field: EditableField): string | undefined {
   return fieldErrors.value[field]
@@ -74,6 +77,7 @@ function describedBy(field: EditableField): string | undefined {
 }
 
 async function onSave(): Promise<void> {
+  if (props.historyBusy) return
   await editor.save()
 }
 
@@ -147,6 +151,7 @@ watch(
     </div>
 
     <form v-else-if="original" class="node-editor__form" data-test="ne-form" novalidate @submit.prevent="onSave">
+      <fieldset class="node-editor__fields" :disabled="historyBusy">
       <header>
         <h2 :id="titleId" ref="title" data-test="ne-title" tabindex="-1">编辑：{{ original.name }}</h2>
         <p class="node-editor__meta">
@@ -327,6 +332,7 @@ watch(
         </button>
         <button type="button" data-test="ne-delete-no" :disabled="saving" @click="closeDeleteConfirm">取消</button>
       </div>
+      </fieldset>
     </form>
   </aside>
 </template>
@@ -358,6 +364,8 @@ watch(
 .node-editor__form {
   gap: 12px;
 }
+
+.node-editor__fields { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }
 
 .node-editor__meta {
   color: #555;

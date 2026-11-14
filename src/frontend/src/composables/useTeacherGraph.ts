@@ -155,46 +155,46 @@ export function useTeacherGraph({ coursesApi, graphApi, courseId, onCourseForbid
    * 刷新在途时编辑器若已写回 store（保存、删除、连边成功），这份响应可能早于那次写入，
    * 丢弃并重新拉取，不让旧快照盖掉刚成功的修改。
    */
-  async function refresh(): Promise<void> {
+  async function refresh(): Promise<boolean> {
     const cid = courseId.value
-    if (disposed || cid === null || status.value !== 'ready' || store.courseId !== cid) return
+    if (disposed || cid === null || status.value !== 'ready' || store.courseId !== cid) return false
     const { token, scope, own, release } = begin()
     const current = () => !disposed && token === seq && scope.isCurrent()
     const base = store.graph
     let again = false
+    let synced = false
     refreshing.value = true
     refreshError.value = null
     try {
       const result = await graphApi.getDraft(cid, { signal: own.signal })
-      if (!current()) return
+      if (!current()) return false
       if (store.graph !== base) {
         again = true
-        return
-      }
-      if (!isDraftOf(result, cid)) {
+      } else if (!isDraftOf(result, cid)) {
         refreshError.value = REFRESH_FAILED_MESSAGE
-        return
+      } else {
+        synced = store.commit(scope, () => {
+          store.setGraph(scope, result)
+          chapters.value = Array.isArray(result.chapters) ? result.chapters : []
+        })
       }
-      store.commit(scope, () => {
-        store.setGraph(scope, result)
-        chapters.value = Array.isArray(result.chapters) ? result.chapters : []
-      })
     } catch (cause) {
-      if (!current() || cause instanceof AbortedError) return
+      if (!current() || cause instanceof AbortedError) return false
       if (cause instanceof ApiError && (cause.code === 'COURSE_FORBIDDEN' || cause.code === 'ROLE_FORBIDDEN')) {
         handle(cause)
-        return
+        return false
       }
       if (cause instanceof ApiError && cause.status === 401) {
         handle(cause)
-        return
+        return false
       }
       refreshError.value = REFRESH_FAILED_MESSAGE
     } finally {
       if (token === seq) refreshing.value = false
       release()
     }
-    if (again) await refresh()
+    if (again && current()) return refresh()
+    return synced && current()
   }
 
   // 编辑器收到 COURSE_FORBIDDEN、会话过期等会清空课程上下文；若仍停在本页，给出错误态而不是空白
@@ -225,7 +225,7 @@ export function useTeacherGraph({ coursesApi, graphApi, courseId, onCourseForbid
     refreshing,
     refreshError,
     reload: () => void load(courseId.value),
-    refresh: () => void refresh(),
+    refresh,
   }
 }
 

@@ -84,8 +84,8 @@ export interface UseNodeEditorOptions {
   api: NodeEditApi
   /** 当前编辑的知识点；null 表示未选择 */
   kpId: Ref<string | null>
-  /** 服务端确认保存或解锁后 */
-  onSaved?: (kp: KnowledgePoint) => void
+  /** 服务端确认保存或解锁后。保存时附带保存前的知识点（撤销用，UI-GRAPH-UNDO-04）；解锁不带 */
+  onSaved?: (kp: KnowledgePoint, before?: KnowledgePoint) => void
   /** 服务端确认删除后 */
   onDeleted?: (kpId: string) => void
   /** 节点已被删除或数据异常：页面应重新加载图谱 */
@@ -602,6 +602,7 @@ export function useNodeEditor({ api, kpId, onSaved, onDeleted, onRefreshNeeded, 
       return false
     }
     const changes = current.changes
+    const before = original.value
     return write(
       'save',
       (scope, kid, revision, signal) =>
@@ -612,7 +613,7 @@ export function useNodeEditor({ api, kpId, onSaved, onDeleted, onRefreshNeeded, 
         submitted.value = false
         replaceNode(scope, kp)
         notice.value = kp.locked ? '已保存。该知识点已锁定，后续自动抽取不会覆盖。' : '已保存。'
-        onSaved?.(kp)
+        onSaved?.(kp, before ?? undefined)
         return true
       },
     )
@@ -691,8 +692,13 @@ export function useNodeEditor({ api, kpId, onSaved, onDeleted, onRefreshNeeded, 
     submitted.value = false
   }
 
-  function reload(): void {
-    void load(kpId.value)
+  async function reload(): Promise<boolean> {
+    const kid = kpId.value
+    const cid = store.courseId
+    const loading = load(kid)
+    const token = seq
+    await loading
+    return !disposed && token === seq && kpId.value === kid && store.courseId === cid && status.value === 'ready' && original.value?.id === kid
   }
 
   // ------------------------------------------------------------ 切换
