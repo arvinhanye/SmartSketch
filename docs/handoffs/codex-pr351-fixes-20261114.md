@@ -64,4 +64,4 @@ PYTHON=/Users/arvinhan/Desktop/SmartSketch-main/.venv/bin/python scripts/verify/
 
 基础门禁补跑已完成：`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh` exit 0，日志 `.demo/pr-fixes-20261114/pr351-integrated-basic-final.log`，退出码文件同名 `.exit`。最后推送 head `ffe967752d9428f701c8b662a660be3e3b32ab51`，主线依赖已完整整合。
 
-最终状态：head `ffe967752d9428f701c8b662a660be3e3b32ab51` 的 20 项 CI 全部通过，PR #351 已按依赖顺序合并为 `383d584e198170e65f9aa8c723c126edc66f2dc5`。主线 Git tree 与已验证 head 相同；后端 4529 passed / 27 登记 skip、前端 1578 passed、Neo4j 507 passed / 4 登记 skip、E2E 2+4 passed。合并后完成记录为本地归档，远端状态见 PR。
+最终状态：head `ffe967752d9428f701c8b662a660be3e3b32ab51` 的 20 项 CI 全部通过，PR #351 已按依赖顺序合并为 `383d584e198170e65f9aa8c723c126edc66f2dc5`。主线 Git tree 与已验证 head 相同；后端 4529 passed / 27 登记 skip、前端 1578 passed、Neo4j 507 passed / 4 登记 skip、E2E 2+4 passed。合并后完成记录最初在本地归档，随后经用户明确授权通过单独文档 PR 发布；远端合并状态见对应 PR。
