@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onScopeDispose, ref, shallowRef } from 'vue'
 
 /**
  * 撤销 / 重做记录（UI-GRAPH-UNDO-04）。
@@ -10,13 +10,15 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
  */
 export const HISTORY_LIMIT = 50
 
+export type HistoryResult = boolean | { ok: boolean; reason: string }
+
 export interface HistoryStep {
   /** 这一步做了什么，用在按钮说明和提示里，如“删除关系 A → B（包含）” */
   label: string
   /** 执行反向操作；返回是否成功 */
-  undo(): Promise<boolean>
+  undo(): Promise<HistoryResult>
   /** 把这一步重新做一遍；返回是否成功 */
-  redo(): Promise<boolean>
+  redo(): Promise<HistoryResult>
 }
 
 export interface UseEditHistoryOptions {
@@ -35,6 +37,8 @@ function isEditable(target: EventTarget | null): boolean {
 
 export function useEditHistory(options: UseEditHistoryOptions = {}) {
   const limit = options.limit ?? HISTORY_LIMIT
+  let generation = 0
+  let disposed = false
   const undoStack = shallowRef<HistoryStep[]>([])
   const redoStack = shallowRef<HistoryStep[]>([])
   const working = ref(false)
@@ -44,11 +48,16 @@ export function useEditHistory(options: UseEditHistoryOptions = {}) {
   const canRedo = computed(() => redoStack.value.length > 0)
   const undoLabel = computed(() => undoStack.value.at(-1)?.label ?? null)
   const redoLabel = computed(() => redoStack.value.at(-1)?.label ?? null)
-  const blocked = () => working.value || options.busy?.() === true
+  const blocked = () => disposed || working.value || options.busy?.() === true
+
+  function invalidateRedo(): void {
+    redoStack.value = []
+  }
 
   function record(step: HistoryStep): void {
+    if (disposed) return
     undoStack.value = [...undoStack.value, step].slice(-limit)
-    redoStack.value = []
+    invalidateRedo()
   }
 
   async function run(kind: 'undo' | 'redo'): Promise<boolean> {
@@ -56,33 +65,45 @@ export function useEditHistory(options: UseEditHistoryOptions = {}) {
     const to = kind === 'undo' ? redoStack : undoStack
     const step = from.value.at(-1)
     if (blocked() || step === undefined) return false
+    const owner = generation
     working.value = true
     from.value = from.value.slice(0, -1)
     let ok = false
+    let reason = ''
     try {
-      ok = await (kind === 'undo' ? step.undo() : step.redo())
+      const result = await (kind === 'undo' ? step.undo() : step.redo())
+      ok = typeof result === 'boolean' ? result : result.ok
+      reason = typeof result === 'boolean' ? '' : result.reason
     } catch {
       ok = false
     } finally {
-      working.value = false
+      if (owner === generation) working.value = false
     }
+    if (disposed || owner !== generation) return false
     if (ok) {
       to.value = [...to.value, step].slice(-limit)
       notice.value = { tone: 'success', text: `${kind === 'undo' ? '已撤销' : '已重做'}：${step.label}` }
     } else {
       notice.value = {
         tone: 'error',
-        text: kind === 'undo' ? `未撤销：${step.label}。这一步已从撤销记录中移除。` : `未重做：${step.label}。这一步已从记录中移除。`,
+        text: (kind === 'undo' ? `未撤销：${step.label}。这一步已从撤销记录中移除。` : `未重做：${step.label}。这一步已从记录中移除。`) + reason,
       }
     }
     return ok
   }
 
   function clear(): void {
+    generation += 1
+    working.value = false
     undoStack.value = []
     redoStack.value = []
     notice.value = null
   }
+
+  onScopeDispose(() => {
+    disposed = true
+    clear()
+  })
 
   if (options.shortcuts === true) {
     const onKeydown = (event: KeyboardEvent): void => {
@@ -108,6 +129,7 @@ export function useEditHistory(options: UseEditHistoryOptions = {}) {
     working,
     notice,
     record,
+    invalidateRedo,
     undo: () => run('undo'),
     redo: () => run('redo'),
     clear,

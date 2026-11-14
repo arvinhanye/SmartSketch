@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 import { RELATION_STYLES, type RelationType } from '../graph/adapter'
 import type { EditHistory } from './useEditHistory'
 import type { RelationEditor } from './useRelationEditor'
@@ -36,6 +37,7 @@ export function useRelationHistory(relations: RelationEditor, history: EditHisto
   }
 
   async function createBetween(from: string, to: string, type: RelationType, success?: string): Promise<boolean> {
+    if (history.working.value) return false
     const ok = await relations.createBetween(from, to, type, success)
     if (!ok) return false
     const [a, b] = names(type, from, to)
@@ -48,6 +50,7 @@ export function useRelationHistory(relations: RelationEditor, history: EditHisto
   }
 
   async function createRelation(): Promise<boolean> {
+    if (history.working.value) return false
     const from = relations.fromId.value
     const to = relations.toId.value
     // 起点或终点没选：交回原来的校验与提示
@@ -58,6 +61,7 @@ export function useRelationHistory(relations: RelationEditor, history: EditHisto
   }
 
   async function changeType(relationId: string, type: RelationType): Promise<boolean> {
+    if (history.working.value) return false
     const before = relations.describeRelation(relationId)
     const ok = await relations.changeType(relationId, type)
     if (!ok || before === null || before.type === type) return ok
@@ -71,6 +75,7 @@ export function useRelationHistory(relations: RelationEditor, history: EditHisto
   }
 
   async function reverseRelation(relationId: string): Promise<boolean> {
+    if (history.working.value) return false
     const before = relations.describeRelation(relationId)
     const ok = await relations.reverseRelation(relationId)
     if (!ok || before === null) return ok
@@ -84,6 +89,7 @@ export function useRelationHistory(relations: RelationEditor, history: EditHisto
   }
 
   async function deleteRelation(relationId: string): Promise<boolean> {
+    if (history.working.value) return false
     const before = relations.describeRelation(relationId)
     const ok = await relations.deleteRelation(relationId)
     if (!ok || before === null) return ok
@@ -97,5 +103,9 @@ export function useRelationHistory(relations: RelationEditor, history: EditHisto
     return true
   }
 
-  return { ...relations, createBetween, createRelation, changeType, reverseRelation, deleteRelation }
+  return {
+    ...relations,
+    saving: computed(() => relations.saving.value || history.working.value),
+    createBetween, createRelation, changeType, reverseRelation, deleteRelation,
+  }
 }

@@ -8,7 +8,7 @@ import { HTTP_CLIENT_KEY } from '../api/client'
 import { COURSES_API_KEY } from '../api/courses'
 import { createDraftGraphApi, DRAFT_GRAPH_API_KEY } from '../api/graph'
 import { createKnowledgeDetailApi, KNOWLEDGE_DETAIL_API_KEY, KNOWLEDGE_DELETION_API_KEY } from '../api/knowledgeDetail'
-import { createNodeEditApi, NODE_EDIT_API_KEY, type KnowledgePoint } from '../api/nodeEdit'
+import { createNodeEditApi, NODE_EDIT_API_KEY } from '../api/nodeEdit'
 import { createRelationsApi, RELATIONS_API_KEY } from '../api/relations'
 import CanvasEditLayer from '../components/canvas/CanvasEditLayer.vue'
 import GraphCanvas from '../components/GraphCanvas.vue'
@@ -26,6 +26,7 @@ import { readArrangement, writeArrangement, type Arrangement } from '../composab
 import { useAutoDismiss } from '../composables/useAutoDismiss'
 import { useCanvasEditing } from '../composables/useCanvasEditing'
 import { useEditHistory } from '../composables/useEditHistory'
+import { useNodeHistory } from '../composables/useNodeHistory'
 import { useRelationHistory } from '../composables/useRelationHistory'
 import { useGraphLayout } from '../composables/useGraphLayout'
 import { useGraphShortcuts } from '../composables/useGraphShortcuts'
@@ -103,11 +104,12 @@ const relations = useRelationEditor({
 
 // ---------------------------------------------------------------- 撤销 / 重做（UI-GRAPH-UNDO-04）
 // 有写请求在途、或编辑面板里有未保存的修改时不执行：撤销知识点字段会重新读取面板，不能把没保存的内容冲掉
-const history = useEditHistory({ busy: () => relations.saving.value || isDirty(), shortcuts: true })
+const writesBusy = () => relations.saving.value || nodeEditor.value?.saving === true || creator.busy.value || deletion?.status.value === 'deleting'
+const history = useEditHistory({ busy: () => writesBusy() || isDirty(), shortcuts: true })
 /** 带撤销记录的关系编辑：画布上的直接操作与“编辑关系”页签都用它，两处的修改进同一份记录 */
 const recordedRelations = useRelationHistory(relations, history)
 useAutoDismiss(history.notice, history.dismissNotice, { ms: 4500, keep: (value) => value.tone === 'error' })
-const historyBlocked = computed(() => history.working.value || relations.saving.value || nodeEditor.value?.dirty === true)
+const historyBlocked = computed(() => history.working.value || writesBusy() || nodeEditor.value?.dirty === true)
 const undoTitle = computed(() => {
   if (nodeEditor.value?.dirty === true) return '有未保存的修改，先保存或放弃后才能撤销'
   return history.undoLabel.value === null ? '没有可撤销的操作' : `撤销：${history.undoLabel.value}（Ctrl/⌘ + Z）`
@@ -263,8 +265,9 @@ const creator = useNodeCreator({
   detailApi,
   sourceKpId: selected,
   onCreated: async (kp) => {
-    await teacher.refresh()
-    guard.request(kp.id)
+    history.invalidateRedo()
+    // refresh 的结果同时验证课程作用域、请求代次和页面存活；失效或读回失败不再切换选中。
+    if (await teacher.refresh()) guard.request(kp.id)
   },
 })
 function openCreator(): void {
@@ -315,36 +318,15 @@ watch(history.undoLabel, (label) => {
   if (editing.undo.value !== null && label !== undoAnchor) editing.dismissUndo()
 })
 
-// ---- 知识点字段保存的撤销：把改过的字段改回保存前的值；保存前未锁定的，改回后再解锁
-const NODE_FIELDS = ['name', 'aliases', 'type', 'definition', 'importance', 'difficulty', 'status'] as const
-type NodeField = (typeof NODE_FIELDS)[number]
-async function applyNodeFields(kpId: string, fields: Record<string, unknown>, keepLocked: boolean): Promise<boolean> {
-  const cid = courseId.value
-  const current = graph.value?.nodes.find((n) => n.id === kpId)
-  if (cid === null || current === undefined) return false
-  try {
-    let saved = await nodeEditApi.update(cid, kpId, { ...fields, expected_revision: current.revision } as never)
-    if (!keepLocked && saved.locked) saved = await nodeEditApi.unlock(cid, kpId, saved.revision)
-    await teacher.refresh()
-    if (selected.value === kpId) nodeEditor.value?.reload()
-    return true
-  } catch {
-    return false
-  }
-}
-function onNodeSaved(after: KnowledgePoint, before?: KnowledgePoint): void {
-  if (before === undefined) return
-  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
-  const changed = NODE_FIELDS.filter((key: NodeField) => !same(key === 'aliases' ? (before.aliases ?? []) : before[key], key === 'aliases' ? (after.aliases ?? []) : after[key]))
-  // 保存前没有值的字段（如原先没填重要度）无法通过接口改回“没有”：这一步不进撤销记录
-  if (changed.length === 0 || changed.some((key) => key !== 'aliases' && before[key] === undefined)) return
-  const pick = (kp: KnowledgePoint) => Object.fromEntries(changed.map((key) => [key, key === 'aliases' ? (kp.aliases ?? []) : kp[key]]))
-  history.record({
-    label: `修改知识点「${before.name}」`,
-    undo: () => applyNodeFields(after.id, pick(before), before.locked),
-    redo: () => applyNodeFields(after.id, pick(after), true),
-  })
-}
+// 节点历史的课程作用域、写入与读回同步由组合式逻辑负责。
+const nodeHistory = useNodeHistory({
+  api: nodeEditApi,
+  history,
+  courseId,
+  refresh: teacher.refresh,
+  reloadEditor: async (kpId) => selected.value !== kpId || nodeEditor.value === null ? true : nodeEditor.value.reload(),
+  onCourseForbidden: leaveForbidden,
+})
 
 /** 画布上发起的关系操作失败时的说明：在“编辑关系”页签里由面板自己显示，这里不重复 */
 const canvasError = computed(() => (tab.value === 'relations' ? null : relations.error.value))
@@ -360,6 +342,7 @@ const notice = ref<string | null>(null)
 let justDeleted: string | null = null
 
 function onDeleted(kpId: string): void {
+  history.invalidateRedo()
   justDeleted = kpId
   notice.value = '知识点已删除，与它相连的关系已一并删除。'
   filters.select(null)
@@ -370,12 +353,14 @@ const deletion = deletionApi === null ? null : useNodeDeletion({
   api: deletionApi, courseId, selectedId: selected, identity: computed(() => session.accessToken),
   onCourseForbidden: leaveForbidden,
   onDeleted: async (kpId, impact) => {
+    history.invalidateRedo()
     justDeleted = kpId
     notice.value = impact !== null && impact.deleted_count > 1
       ? `已删除「${impact.root_name}」及 ${impact.deleted_count - 1} 个下级知识点，相关关系一并删除。`
       : '知识点已删除，与它相连的关系已一并删除。'
-    await teacher.refresh()
+    // 删除确认仍属于当前选中时立即清空；刷新期间用户可能已选中别的节点并开始编辑。
     filters.select(null)
+    await teacher.refresh()
   },
 })
 
@@ -658,7 +643,7 @@ useGraphShortcuts({
           @lostpointercapture="endResize"
           @keydown="resizeKey"
         />
-        <div class="teacher-graph__panel" id="teacher-knowledge-panel">
+        <div class="teacher-graph__panel" id="teacher-knowledge-panel" :inert="history.working.value">
           <p v-if="nodeEditor?.dirty" class="ui-unsaved" role="status">未保存</p>
           <div class="teacher-graph__tabs" role="group" aria-label="面板切换">
             <button
@@ -715,7 +700,8 @@ useGraphShortcuts({
             ref="nodeEditor"
             :kp-id="selected"
             @deleted="onDeleted"
-            @saved="onNodeSaved"
+            @saved="nodeHistory.onSaved"
+            :history-busy="history.working.value"
             @refresh-needed="teacher.refresh"
             @close="guard.request(null)"
             @course-forbidden="leaveForbidden"

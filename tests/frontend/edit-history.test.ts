@@ -9,6 +9,12 @@ import type { RelationEditor } from '../../src/frontend/src/composables/useRelat
  * UI-GRAPH-UNDO-04：撤销 / 重做记录（useEditHistory）与关系操作的反向操作（useRelationHistory）。
  * 教师页整页流程在 h14.test.ts。
  */
+function pendingResult() {
+  let resolve!: (ok: boolean) => void
+  const promise = new Promise<boolean>(done => { resolve = done })
+  return { promise, resolve }
+}
+
 function step(log: string[], name: string, ok: { undo?: boolean; redo?: boolean } = {}) {
   return {
     label: name,
@@ -91,6 +97,41 @@ describe('useEditHistory', () => {
     busy.value = true
     expect(await history.redo()).toBe(false)
     expect(slow.redo).not.toHaveBeenCalled()
+  })
+
+  it('clear 使旧请求失效，旧请求收尾不能结束新课程的在途操作', async () => {
+    const gates = [pendingResult(), pendingResult()]
+    const history = effectScope().run(() => useEditHistory())!
+    history.record({ label: '旧课程', undo: () => gates[0]!.promise, redo: async () => true })
+    const oldRun = history.undo()
+    history.clear()
+    history.record({ label: '新课程', undo: () => gates[1]!.promise, redo: async () => true })
+    const newRun = history.undo()
+    gates[0]!.resolve(true)
+    expect(await oldRun).toBe(false)
+    expect(history.working.value).toBe(true)
+    expect(history.notice.value).toBeNull()
+    expect(history.canRedo.value).toBe(false)
+    gates[1]!.resolve(true)
+    expect(await newRun).toBe(true)
+    expect(history.redoLabel.value).toBe('新课程')
+  })
+
+  it.each([true, false])('作用域释放后忽略在途结果 %s，不能恢复记录或提示', async (ok) => {
+    const gate = pendingResult()
+    const scope = effectScope()
+    const history = scope.run(() => useEditHistory())!
+    history.record({ label: '已离开', undo: () => gate.promise, redo: async () => true })
+    const run = history.undo()
+    scope.stop()
+    gate.resolve(ok)
+    expect(await run).toBe(false)
+    expect(history.working.value).toBe(false)
+    expect(history.canUndo.value).toBe(false)
+    expect(history.canRedo.value).toBe(false)
+    expect(history.notice.value).toBeNull()
+    history.record(step([], '迟到保存'))
+    expect(history.canUndo.value).toBe(false)
   })
 
   it(`最多保留 ${HISTORY_LIMIT} 步，超出时丢弃最早的；clear 清空两边`, async () => {
@@ -210,6 +251,20 @@ function setupRelations(initial: Edge[] = [{ id: 'rel:CONTAINS:a:b', type: 'CONT
 }
 
 describe('useRelationHistory', () => {
+  it('历史步骤在途时不能插入普通关系写入，结束后恢复编辑', async () => {
+    const { recorded, history, edges } = setupRelations()
+    const gate = pendingResult()
+    history.record({ label: '节点撤销', undo: () => gate.promise, redo: async () => true })
+    const pending = history.undo()
+    expect(await recorded.createBetween('a', 'c', 'CONTAINS')).toBe(false)
+    expect(await recorded.deleteRelation('rel:CONTAINS:a:b')).toBe(false)
+    expect(triples(edges.value)).toEqual(['a-CONTAINS->b'])
+    gate.resolve(true)
+    await pending
+    expect(await recorded.createBetween('a', 'c', 'CONTAINS')).toBe(true)
+    expect(history.canRedo.value).toBe(false)
+  })
+
   it('新建：撤销删掉它，重做再建回来', async () => {
     const { recorded, history, edges } = setupRelations()
     expect(await recorded.createBetween('a', 'c', 'PREREQUISITE')).toBe(true)

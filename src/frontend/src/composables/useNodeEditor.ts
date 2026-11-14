@@ -692,8 +692,13 @@ export function useNodeEditor({ api, kpId, onSaved, onDeleted, onRefreshNeeded, 
     submitted.value = false
   }
 
-  function reload(): void {
-    void load(kpId.value)
+  async function reload(): Promise<boolean> {
+    const kid = kpId.value
+    const cid = store.courseId
+    const loading = load(kid)
+    const token = seq
+    await loading
+    return !disposed && token === seq && kpId.value === kid && store.courseId === cid && status.value === 'ready' && original.value?.id === kid
   }
 
   // ------------------------------------------------------------ 切换

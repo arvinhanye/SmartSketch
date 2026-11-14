@@ -1486,6 +1486,179 @@ describe('UI-GRAPH-UNDO-04 教师图谱页：撤销与重做', () => {
     await flushPromises()
   }
 
+  // 请求边界用可控 API 替身；Vue 页面、历史、课程作用域与面板均为真实实现。
+  const mounted: VueWrapper[] = []
+  afterEach(() => { for (const wrapper of mounted.splice(0)) wrapper.unmount() })
+  async function savedNode(f: Fakes) {
+    const page = await mountPage(f)
+    mounted.push(page.wrapper)
+    await clickNode(page.wrapper, 'k1')
+    await openTab(page.wrapper, 'edit')
+    await editName(page.wrapper, '已保存的名字')
+    await page.wrapper.get('[data-test="ne-save"]').trigger('click')
+    await flushPromises()
+    return page
+  }
+
+  it('节点撤销期间锁住输入与写操作，完成读回后才允许继续编辑', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await savedNode(f)
+    const gate = deferred<void>()
+    const update = f.nodeEdit.update.getMockImplementation()!
+    f.nodeEdit.update.mockImplementationOnce(async (...args) => { await gate.promise; return update(...args) })
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="ne-name"]').element.matches(':disabled')).toBe(true)
+    expect(wrapper.get('[data-test="ne-unlock"]').element.matches(':disabled')).toBe(true)
+    gate.resolve()
+    await flushPromises()
+    expect((wrapper.get('[data-test="ne-name"]').element as HTMLInputElement).value).toBe('知识点 k1')
+    expect(wrapper.get('[data-test="ne-name"]').element.matches(':disabled')).toBe(false)
+    await editName(wrapper, '撤销后的新草稿')
+    expect(undoBtn(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it.each(['update', 'unlock', 'graph', 'panel'] as const)('节点撤销的 %s 在途时切课，取消原课程请求并丢弃旧历史', async (phase) => {
+    const f = writable(fakes())
+    const { wrapper, router } = await savedNode(f)
+    const gate = deferred<void>()
+    let signal: AbortSignal | undefined
+    if (phase === 'update') {
+      const update = f.nodeEdit.update.getMockImplementation()!
+      f.nodeEdit.update.mockImplementationOnce(async (...args) => { signal = args[3]?.signal; await gate.promise; return update(...args) })
+    } else if (phase === 'unlock') {
+      const unlock = f.nodeEdit.unlock.getMockImplementation()!
+      f.nodeEdit.unlock.mockImplementationOnce(async (...args) => { signal = args[3]?.signal; await gate.promise; return unlock(...args) })
+    } else if (phase === 'graph') {
+      f.draft.getDraft.mockImplementationOnce(async (_cid, control) => {
+        signal = control?.signal
+        await gate.promise
+        return draft('c1', f.server.nodes, f.server.edges)
+      })
+    } else {
+      f.nodeEdit.get.mockImplementationOnce(async (_cid, kid, control) => {
+        signal = control?.signal
+        await gate.promise
+        return detailOf(f.server.nodes.find(n => n.id === kid)!)
+      })
+    }
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    f.draft.getDraft.mockImplementation(async cid => draft(cid, [kp('c2-only', {}, 'c2')]))
+    await router.push('/courses/c2/graph/edit')
+    await flushPromises()
+    expect(signal?.aborted).toBe(true)
+    const requests = { unlock: f.nodeEdit.unlock.mock.calls.length, graph: f.draft.getDraft.mock.calls.length, panel: f.nodeEdit.get.mock.calls.length }
+    gate.resolve()
+    await flushPromises()
+    expect(canvasNodeNames(wrapper)).toEqual(['知识点 c2-only'])
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="tg-history-notice"]').exists()).toBe(false)
+    // 已失效的 UPDATE 不应再发 unlock，任一旧请求也不能继续刷新新课程或重载面板。
+    expect({ unlock: f.nodeEdit.unlock.mock.calls.length, graph: f.draft.getDraft.mock.calls.length, panel: f.nodeEdit.get.mock.calls.length }).toEqual(requests)
+  })
+
+  it.each(['update', 'unlock', 'graph', 'panel'] as const)('节点撤销的 %s 在途时卸载，取消请求且不继续后续步骤', async (phase) => {
+    const f = writable(fakes())
+    const { wrapper } = await savedNode(f)
+    const gate = deferred<void>()
+    let signal: AbortSignal | undefined
+    if (phase === 'update') {
+      const update = f.nodeEdit.update.getMockImplementation()!
+      f.nodeEdit.update.mockImplementationOnce(async (...args) => { signal = args[3]?.signal; await gate.promise; return update(...args) })
+    } else if (phase === 'unlock') {
+      const unlock = f.nodeEdit.unlock.getMockImplementation()!
+      f.nodeEdit.unlock.mockImplementationOnce(async (...args) => { signal = args[3]?.signal; await gate.promise; return unlock(...args) })
+    } else if (phase === 'graph') {
+      f.draft.getDraft.mockImplementationOnce(async (_cid, control) => { signal = control?.signal; await gate.promise; return draft('c1', f.server.nodes, f.server.edges) })
+    } else {
+      f.nodeEdit.get.mockImplementationOnce(async (_cid, kid, control) => { signal = control?.signal; await gate.promise; return detailOf(f.server.nodes.find(n => n.id === kid)!) })
+    }
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    wrapper.unmount()
+    expect(signal?.aborted).toBe(true)
+    const requests = [f.nodeEdit.unlock.mock.calls.length, f.draft.getDraft.mock.calls.length, f.nodeEdit.get.mock.calls.length]
+    gate.resolve()
+    await flushPromises()
+    expect([f.nodeEdit.unlock.mock.calls.length, f.draft.getDraft.mock.calls.length, f.nodeEdit.get.mock.calls.length]).toEqual(requests)
+  })
+
+  it('首次填写空字段的保存不能撤销，但仍使旧重做失效，不能覆盖新保存的名称', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await savedNode(f)
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    await editName(wrapper, '更新后的名字')
+    await wrapper.get('[data-test="ne-difficulty"]').setValue('0.7')
+    await wrapper.get('[data-test="ne-save"]').trigger('click')
+    await flushPromises()
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+    await redoBtn(wrapper).trigger('click')
+    expect(f.server.nodes.find(n => n.id === 'k1')!.name).toBe('更新后的名字')
+  })
+
+  it('解锁虽然不进撤销记录，成功后也清空旧重做', async () => {
+    const f = writable(fakes({ nodes: [kp('k1', { locked: true }), kp('k2')] }))
+    const { wrapper } = await savedNode(f)
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="ne-unlock"]').trigger('click')
+    await flushPromises()
+    expect(f.server.nodes.find(n => n.id === 'k1')!.locked).toBe(false)
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it('撤销字段已成功、解锁失败时同步真实字段并报告未完整完成', async () => {
+    const f = writable(fakes())
+    const { wrapper } = await savedNode(f)
+    f.nodeEdit.unlock.mockRejectedValueOnce(apiError(409, 'REVISION_CONFLICT'))
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(canvasNodeNames(wrapper)).toContain('知识点 k1')
+    expect((wrapper.get('[data-test="ne-name"]').element as HTMLInputElement).value).toBe('知识点 k1')
+    expect(wrapper.get('[data-test="ne-lock-state"]').text()).toContain('已锁定')
+    expect(wrapper.get('[data-test="tg-history-notice"]').text()).toContain('未撤销')
+    expect(wrapper.get('[data-test="tg-history-notice"]').text()).toContain('解锁')
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it.each(['graph', 'panel'] as const)('撤销写入成功但 %s 读回失败时不报告成功、不开放重做', async phase => {
+    const f = writable(fakes())
+    const { wrapper } = await savedNode(f)
+    if (phase === 'graph') f.draft.getDraft.mockRejectedValueOnce(new NetworkError(new Error('offline')))
+    else f.nodeEdit.get.mockRejectedValueOnce(new NetworkError(new Error('offline')))
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="tg-history-notice"]').text()).toContain('未撤销')
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+  })
+
+  it.each(['graph', 'panel'] as const)('等到慢 %s 读回完成再允许重做，重做使用新的修订', async phase => {
+    const f = writable(fakes())
+    const { wrapper } = await savedNode(f)
+    const update = f.nodeEdit.update.getMockImplementation()!
+    f.nodeEdit.update.mockImplementation(async (...args) => {
+      const [, kid, body] = args
+      if (body.expected_revision !== f.server.nodes.find(n => n.id === kid)!.revision) throw apiError(409, 'REVISION_CONFLICT')
+      return update(...args)
+    })
+    const gate = deferred<void>()
+    if (phase === 'graph') f.draft.getDraft.mockImplementationOnce(async () => { await gate.promise; return draft('c1', f.server.nodes, f.server.edges) })
+    else f.nodeEdit.get.mockImplementationOnce(async (_cid, kid) => { await gate.promise; return detailOf(f.server.nodes.find(n => n.id === kid)!) })
+    await undoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(redoBtn(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="tg-history-notice"]').exists()).toBe(false)
+    gate.resolve()
+    await flushPromises()
+    expect(redoBtn(wrapper).attributes('disabled')).toBeUndefined()
+    await redoBtn(wrapper).trigger('click')
+    await flushPromises()
+    expect(f.server.nodes.find(n => n.id === 'k1')).toMatchObject({ name: '已保存的名字', locked: true, revision: 5 })
+    expect(wrapper.get('[data-test="tg-history-notice"]').text()).toContain('已重做')
+  })
+
   it('没有可撤销的操作时两个按钮都不可用；新建关系后可撤销，撤销后可重做，说明里写着是哪一步', async () => {
     const f = writable(fakes())
     const { wrapper } = await mountPage(f)
@@ -1592,7 +1765,7 @@ describe('UI-GRAPH-UNDO-04 教师图谱页：撤销与重做', () => {
     const getsBefore = f.nodeEdit.get.mock.calls.length
     await undoBtn(wrapper).trigger('click')
     await flushPromises()
-    expect(f.nodeEdit.update).toHaveBeenLastCalledWith('c1', 'k1', { name: '知识点 k1', expected_revision: 2 })
+    expect(f.nodeEdit.update).toHaveBeenLastCalledWith('c1', 'k1', { name: '知识点 k1', expected_revision: 2 }, { signal: expect.any(AbortSignal) })
     expect(f.nodeEdit.unlock).toHaveBeenCalledTimes(1)
     expect(f.server.nodes.find((n) => n.id === 'k1')).toMatchObject({ name: '知识点 k1', locked: false })
     await vi.waitFor(() => expect((wrapper.find('[data-test="ne-name"]').element as HTMLInputElement).value).toBe('知识点 k1'))
@@ -1669,5 +1842,82 @@ describe('UI-GRAPH-UNDO-04 教师图谱页：统一的搜索框与图例', () =>
     await wrapper.get('[data-test="legend-restore"]').trigger('click')
     await flushPromises()
     expect(canvasEdgeIds(wrapper)).toEqual(['r1'])
+  })
+})
+
+// PR #351 复审：refresh 变为可等待之后，成功写入的后续 UI 也必须隔离晚到结果。
+describe('成功写入后的刷新隔离', () => {
+  const mounted: VueWrapper[] = []
+  afterEach(() => { for (const wrapper of mounted.splice(0)) wrapper.unmount() })
+
+  it('新建后刷新在途时换课程，不选中旧课程的新节点', async () => {
+    const f = fakes()
+    const created = kp('created-in-c1')
+    Object.assign(f.nodeEdit, { create: vi.fn<NodeEditApi['create']>(async () => {
+      f.server.nodes.push(created)
+      return created
+    }) })
+    const { wrapper, router } = await mountPage(f)
+    mounted.push(wrapper)
+    await clickNode(wrapper, 'k1')
+    await wrapper.get('[data-test="tg-create-open"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="tg-create-name"]').setValue('新节点')
+    await wrapper.get('[data-test="tg-create-definition"]').setValue('定义')
+    const gate = deferred<GraphExchange>()
+    f.draft.getDraft.mockReturnValueOnce(gate.promise)
+    await wrapper.get('.node-creator__form').trigger('submit')
+    await flushPromises()
+    f.server.nodes = [kp('b', {}, 'c2')]
+    f.server.edges = []
+    await router.push('/courses/c2/graph/edit')
+    await flushPromises()
+    await clickNode(wrapper, 'b')
+    await openTab(wrapper, 'edit')
+    gate.resolve(draft('c1', [created]))
+    await flushPromises()
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe('b')
+    expect(wrapper.get('[data-test="ne-title"]').text()).toContain('知识点 b')
+    expect(wrapper.find('[data-test="tg-discard-confirm"]').exists()).toBe(false)
+  })
+
+  it.each(['c1', 'c2'])('删除后刷新在途时选中 %s 的其他节点，不丢失其未保存草稿', async targetCourse => {
+    const f = fakes()
+    const preview: KnowledgePointDeletion = {
+      root_id: 'k1', root_name: '知识点 k1', root_revision: 1, cascade: false,
+      deleted_count: 1, relation_count: 1, preview_token: 'a'.repeat(64), retained: [],
+      nodes: [{ id: 'k1', name: '知识点 k1', depth: 0 }],
+    }
+    const deletion: KnowledgeDeletionApi = {
+      deleteImpact: vi.fn(async () => preview),
+      remove: vi.fn(async () => {
+        f.server.nodes = f.server.nodes.filter(n => n.id !== 'k1')
+        f.server.edges = []
+        return null
+      }),
+    }
+    const { wrapper, router } = await mountPage(f, '/courses/c1/graph/edit', 'teacher', deletion)
+    mounted.push(wrapper)
+    await clickNode(wrapper, 'k1')
+    await wrapper.get('[data-test="kd-delete"]').trigger('click')
+    await flushPromises()
+    const gate = deferred<GraphExchange>()
+    f.draft.getDraft.mockReturnValueOnce(gate.promise)
+    await wrapper.get('[data-test="nd-confirm"]').trigger('click')
+    await flushPromises()
+    const oldGraph = draft('c1', [...f.server.nodes])
+    const selectedId = targetCourse === 'c1' ? 'k2' : 'b'
+    if (targetCourse === 'c2') {
+      f.server.nodes = [kp('b', {}, 'c2')]
+      await router.push('/courses/c2/graph/edit')
+      await flushPromises()
+    }
+    await clickNode(wrapper, selectedId)
+    await openTab(wrapper, 'edit')
+    await editName(wrapper, '另一个节点的未保存草稿')
+    gate.resolve(oldGraph)
+    await flushPromises()
+    expect((wrapper.get('[data-test="tg-node-picker"]').element as HTMLSelectElement).value).toBe(selectedId)
+    expect((wrapper.get('[data-test="ne-name"]').element as HTMLInputElement).value).toBe('另一个节点的未保存草稿')
   })
 })
