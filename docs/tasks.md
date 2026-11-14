@@ -1,5 +1,17 @@
 # 任务看板
 
+## 2026-11-14 Codex：PACKAGE-RC-55C0C17 最新主线安装包
+
+- 状态 DONE（安装包、镜像分发和匿名拉取验证完成）；负责人 Codex；用户授权制作对应最新 main 的安装包，并确认仅向现有公开 GHCR 仓库新增 `rc-55c0c17` 前后端镜像。
+- 输入：已核对远端 main `55c0c174e0b7fabc68a842352a3e1068f369babd` 的干净跟踪源码快照；输出 `rc-55c0c17` 的 Mac Intel / Windows x64 包、固定镜像摘要、SHA256SUMS 与交接记录。
+- 范围：沿用现有 Dockerfiles、Go 1.26.8、发行 Compose 与打包器；不修改产品功能或默认消歧开关；原 Desktop 40 项改动保持原样。
+- 风险：安装包必须引用实际可拉取的对应版本镜像；Windows 交叉编译不等于实机验收；源码门禁不等于真实模型质量或正式验收。保留旧包与镜像，不覆盖既有安装或数据。
+- 验证：`./scripts/verify.sh`、启动器 unit/vet、打包/发行定向测试、镜像源码一致性与敏感文件排除、包成员/二进制版本/摘要检查；使用本轮新镜像做隔离生命周期冒烟。交接 `docs/handoffs/codex-package-rc-55c0c17.md`。
+- 结果：basic、Go unit/vet 通过；打包测试 13 passed、入口保护 4 passed；本次新镜像的隔离登录/停启、两安装隔离、备份/重复恢复 3 passed（697.40s）。两份包及 SHA256SUMS 位于 `dist/rc-55c0c17/`；包内版本和镜像摘要已验证，Windows 实机与旧版升级未验收。前后端镜像已上传；空认证配置、排除凭据助手的环境下按固定摘要拉取均 exit 0，匿名读取 tag 与摘要清单也均为 200 且内容哈希一致（缓存命中，不计冷下载速度）。Release 发布记录见下；两包内容和校验和不变，原 Desktop 40 项状态/内容不变。
+- Release 发布续办（2026-11-14，DONE）：用户授权创建 `rc-55c0c17` 预发布，仅上传两份既有安装包与 SHA256SUMS，保留全部旧版本。先以草稿上传，核验三附件的名称、大小及 GitHub 服务端 SHA256 全部与本地一致，再公开为预发布。最终 [Release](https://github.com/arvinhanye/SmartSketch/releases/tag/rc-55c0c17) ID `445432576`，`draft=false`、`prerelease=true`，tag 指向 `55c0c174e0b7fabc68a842352a3e1068f369babd`；原 3 个 Release（含草稿）及 16 个附件逐项核对保持原样。SHA256SUMS 完整回下载逐字节一致；两大包的可选完整回下载因网络缓慢取消，不计下载验收通过，使用服务端 SHA256 核对上传内容。证据 `.demo/package-rc-55c0c17/release-publication/`；本轮不改产品源码或重建安装包。
+- 记录入主线（2026-11-14）：用户授权提交、推送、创建 PR，并在最终检查通过后合并 main。范围限定本任务看板段落、`docs/handoffs/codex-package-rc-55c0c17.md`、`packaging/release-manifest.rc-55c0c17.json`；分支 `codex/package-release-records-rc55c0c17`。本轮重新核对实际发行清单、Release/tag/附件和其他工作树保护快照，运行基础检查与打包定向测试；最终合并状态以对应 PR 为准，安装包构建基线和发行 tag 继续保持 `55c0c17`。
+- 本轮记录验证：basic exit 0；打包定向 13 passed（6.25s）；实际清单、包内清单、远端 tag/附件哈希一致；3/3 文件自查无待修复项，`git diff --check` 通过。PR 最终检查全绿后按固定 head 合并；其他 40 项改动保持原样。
+
 ## 2026-11-14 Codex：DISAMBIG-BE-05-PUBLISH 整合、复审与发布
 
 - 状态 DONE（整合实现、独立复审与本地工程验收；发布状态以本分支对应 PR 为准）；负责人 Codex；用户明确授权将 BE-05 整合到最新 main，复审与测试通过后提交、推送、开 PR 并合并。
