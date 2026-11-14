@@ -29,9 +29,9 @@
 | [`tests/backend/test_disambiguation_recall.py`](backend/test_disambiguation_recall.py) | 混合召回通道、课程/向量空间隔离和预算。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/backend/test_disambiguation_mapping.py`](backend/test_disambiguation_mapping.py) | 完整组校验、来源保留和合并诱发图环拦截。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/backend/test_fusion_generation.py`](backend/test_fusion_generation.py) | 向量物理调用前取消保护。 | ADR-099；DISAMBIG-BE-02 |
-| [`tests/backend/test_fusion_storage.py`](backend/test_fusion_storage.py) | 物理草稿指针、不可变计划与过期保护。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_storage.py`](backend/test_fusion_storage.py) | 物理草稿指针、不可变计划与过期保护，以及取消/失败资料的计划安全清理。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/backend/test_graph_projection.py`](backend/test_graph_projection.py) | 新草稿副本写入和可见性协议。 | ADR-099；DISAMBIG-BE-02 |
-| [`tests/backend/test_fusion_undo.py`](backend/test_fusion_undo.py) | 单组合并逆向差异及后续内容冲突。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_undo.py`](backend/test_fusion_undo.py) | 单组合并逆向差异、修订号单调递增、独立组撤销及后续内容冲突。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/backend/test_b05.py`](backend/test_b05.py) | FastAPI 应用工厂与健康检查契约。 | B05 |
 | [`tests/backend/test_b06.py`](backend/test_b06.py) | 环境变量配置读取、启动校验及向量空间验证。 | B06 |
 | [`tests/backend/test_c01.py`](backend/test_c01.py) | SQLite 连接、向前迁移与可恢复备份。 | C01 |
@@ -161,6 +161,7 @@
 | [`tests/frontend/b04.test.ts`](frontend/b04.test.ts) | 课程上下文 store。 | B04 |
 | [`tests/frontend/b15.test.ts`](frontend/b15.test.ts) | HTTP 客户端的路径、请求响应、错误、认证、取消超时及课程作用域联动。 | B15；B04 |
 | [`tests/frontend/c12.test.ts`](frontend/c12.test.ts) | 任务 SSE 的解析、事件运行时校验与订阅。 | C12 |
+| [`tests/frontend/canvas-edit.test.ts`](frontend/canvas-edit.test.ts) | 画布直接操作的状态逻辑、编辑浮层组件，以及关系线点击、节点右键与节点位置的画布接线。 | UI-GRAPH-EDIT-02；specs/course-knowledge-graph.md |
 | [`tests/frontend/chat-question-limit.test.ts`](frontend/chat-question-limit.test.ts) | 问答输入框与契约保持一致的 2000 字问题长度上限。 | M11/C2 |
 | [`tests/frontend/chat-send-lock.test.ts`](frontend/chat-send-lock.test.ts) | 问答发送期间的逻辑层与页面防重复提交，并保留显式停止。 | 待确认 |
 | [`tests/frontend/chat-sources.test.ts`](frontend/chat-sources.test.ts) | chatSources 的回答状态文字、当前回答出处与复制内容。 | UI-QA-01 |
@@ -170,6 +171,7 @@
 | [`tests/frontend/graph-canvas-enhanced.test.ts`](frontend/graph-canvas-enhanced.test.ts) | GraphCanvas 增强模式与教师页沿用的普通模式。 | 待确认 |
 | [`tests/frontend/graph-chapter-layout.test.ts`](frontend/graph-chapter-layout.test.ts) | 章节分区布局 computeLayout 的真实 dagre 引擎、边界、替换引擎与规模对比。 | 待确认 |
 | [`tests/frontend/graph-detail-layout.test.ts`](frontend/graph-detail-layout.test.ts) | 知识点详情在不同场景中的关闭入口与自适应布局规则。 | 待确认 |
+| [`tests/frontend/graph-direct-edit.test.ts`](frontend/graph-direct-edit.test.ts) | 成环预判与节点命中纯函数；学生预览卡“就此提问”与问答页预填。 | UI-GRAPH-EDIT-02 |
 | [`tests/frontend/graph-enhancer.test.ts`](frontend/graph-enhancer.test.ts) | 图谱增强器的展示装饰、语义缩放、标签排布、视口适应、悬停与章节外框。 | 待确认 |
 | [`tests/frontend/graph-find.test.ts`](frontend/graph-find.test.ts) | 图谱查找（高亮而非隐藏、别名、候选、逐个定位）、画布快捷键、学生页视图状态写入地址与面板宽度记忆。 | UI-GRAPH-FIND-01；specs/course-knowledge-graph.md |
 | [`tests/frontend/graph-fit.test.ts`](frontend/graph-fit.test.ts) | 图谱范围适应 computeFit 与底部边距 bottomPad。 | 待确认 |
@@ -217,6 +219,7 @@
 | [`tests/frontend/lazy-view.test.ts`](frontend/lazy-view.test.ts) | 路由页面按需加载。 | 待确认 |
 | [`tests/frontend/local-view.test.ts`](frontend/local-view.test.ts) | useLocalView 局部图视图、知识点集合与图范围限制。 | 待确认 |
 | [`tests/frontend/login-scrollbar-style.test.ts`](frontend/login-scrollbar-style.test.ts) | 登录页表单栏滚动条与页面溢出的样式约束。 | 待确认 |
+| [`tests/frontend/merge-preview.test.ts`](frontend/merge-preview.test.ts) | 合并两个知识点前后局部图的前端推算（改接、去重、别名、相邻知识点上限）。 | UX-REVIEW-DEDUP-01；ADR-047 |
 | [`tests/frontend/model-discovery.test.ts`](frontend/model-discovery.test.ts) | ModelSettingsView 模型设置页的服务商卡片式单选。 | UI-PINE-01 |
 | [`tests/frontend/model-settings-ui.test.ts`](frontend/model-settings-ui.test.ts) | 模型设置页面的分区、可访问性与随账号角色变化的文案。 | 待确认 |
 | [`tests/frontend/n03-n05.test.ts`](frontend/n03-n05.test.ts) | 模型运行状态的账号隔离、保存测试清除互斥以及测试对象与表单一致性。 | N03；N04；N05 |
@@ -229,6 +232,8 @@
 | [`tests/frontend/redesign-chat.test.ts`](frontend/redesign-chat.test.ts) | ChatView 问答页改版的展示行为。 | 待确认 |
 | [`tests/frontend/register-layout.test.ts`](frontend/register-layout.test.ts) | 学生注册页外观、结构及与登录页版式的一致性。 | 待确认 |
 | [`tests/frontend/resume-learning.test.ts`](frontend/resume-learning.test.ts) | 学生课程列表继续学习主卡的课程选择、进度推荐读取与失败隐藏。 | UI-PINE-01 |
+| [`tests/frontend/review-dedup.test.ts`](frontend/review-dedup.test.ts) | 审核页疑似重复的并排对比组件与合并预览小图。 | UX-REVIEW-DEDUP-01；specs/teacher-review-publish.md |
+| [`tests/frontend/source-counts.test.ts`](frontend/source-counts.test.ts) | 知识点来源数量的按需读取、缓存、失效与课程隔离。 | UX-REVIEW-DEDUP-01（DEDUP-FIX F2） |
 | [`tests/frontend/student-graph-workbench.test.ts`](frontend/student-graph-workbench.test.ts) | 学生图谱工作台的预览详情、局部视图、图例筛选、章节聚焦、响应式面板与可访问性。 | 待确认 |
 | [`tests/frontend/teacher-embedding-settings.test.ts`](frontend/teacher-embedding-settings.test.ts) | 教师模型设置页的向量设置可见性、表单与同名按钮区分。 | 待确认 |
 | [`tests/frontend/toast-notice.test.ts`](frontend/toast-notice.test.ts) | ToastNotice 提示与自动消失逻辑，以及审核页固定弹窗避免布局位移的样式。 | 待确认 |
@@ -243,7 +248,7 @@
 | --- | --- | --- |
 | [`tests/integration/test_fusion_projection.py`](integration/test_fusion_projection.py) | 真实 Neo4j 独立草稿副本往返、幂等和事务回滚。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/integration/test_disambiguation_review_api.py`](integration/test_disambiguation_review_api.py) | 真实 Neo4j 生成到审核/历史/HTTP 撤销闭环及教师编辑保护。 | ADR-100；DISAMBIG-BE-03 |
-| [`tests/integration/test_fusion_pipeline.py`](integration/test_fusion_pipeline.py) | 真实 Neo4j 生成映射、T6 原子性、接管、跨任务与单组撤销。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/integration/test_fusion_pipeline.py`](integration/test_fusion_pipeline.py) | 真实 Neo4j 生成映射、T6 原子性、接管、跨任务、单组/独立组撤销与节点修订。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/integration/test_d2_publish.py`](integration/test_d2_publish.py) | 验证发布时文本块与知识点向量调用的计费记录，以及重复发布和回滚复制向量不新增调用。 | D2；ADR-082 |
 | [`tests/integration/test_demo_mode_live.py`](integration/test_demo_mode_live.py) | 验证演示模型上传到 worker 草稿生成的完整流程及 Neo4j 向量相似度阈值。 | ADR-076 |
 | [`tests/integration/test_f01.py`](integration/test_f01.py) | 验证本地 Neo4j 环境的 Compose、dev-up 脚本与 APOC 检查。 | F01 |

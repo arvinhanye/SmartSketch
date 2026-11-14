@@ -41,7 +41,7 @@ import { toKnowledgeCards, useStudentGraph } from '../composables/useStudentGrap
 import type { RelationType } from '../graph/adapter'
 import { createObstacleRegistry, GRAPH_OBSTACLES_KEY } from '../graph/obstacles'
 import { masteryOfStates } from '../graph/presentation'
-import { COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
+import { CHAT_ROUTE, COURSE_ROUTE, homeRouteFor, NOTICE_COURSE_FORBIDDEN, ROOT_ROUTE, STUDENT_GRAPH_ROUTE } from '../router'
 import { useSessionStore } from '../stores/session'
 
 /**
@@ -385,6 +385,14 @@ function toggleLayout(): void {
 }
 const ready = computed(() => status.value === 'ready' && graph.value !== null && !empty.value)
 
+// ---------------------------------------------------------------- 预览卡“就此提问”（UI-GRAPH-EDIT-02）
+const canAsk = computed(() => router.hasRoute(CHAT_ROUTE) && courseId.value !== null)
+/** 带着知识点名称去问答页：那边预填问题、不自动发送 */
+function askAbout(name: string): void {
+  if (courseId.value === null) return
+  void router.push({ name: CHAT_ROUTE, params: { cid: courseId.value }, query: { about: name } })
+}
+
 // ---------------------------------------------------------------- 快捷键（UI-GRAPH-FIND-01）
 const onCanvas = (): boolean => ready.value && mode.value === 'graph' && canvas.value !== null
 useGraphShortcuts({
@@ -672,6 +680,8 @@ watch(
             @close="focus.clearPreview"
             @open="focus.open(preview.id)"
             @toggle-local="localView.toggle(preview.id)"
+            :can-ask="canAsk"
+            @ask="askAbout(preview.name)"
           />
 
           <div v-if="mode === 'graph'" class="student-graph__canvas" data-test="sg-graph">

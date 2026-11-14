@@ -1,5 +1,28 @@
 # 任务看板
 
+## 2026-11-14 Codex：PR-FIX-MERGE-04 修复七项问题并依序合并
+
+- 状态 IN_PROGRESS；负责人 Codex；用户明确授权修复上一轮 7 项问题，测试和复审通过后按依赖顺序合并 #348、#350、#351。
+- 输入：上一轮固定提交审查与可复现反例；输出：#348 两项后端修复、#351 五项前端修复、持久回归测试、独立复审与新 CI、三个 PR 的最终合并状态。
+- 所有权：后端修复负责 `src/backend/`、相关后端/集成测试和 `specs/generation-disambiguation.md`；前端修复在固定 #351 临时快照内完成并交付补丁，负责前端/前端测试与图谱规格；协调者负责任务、索引、交接、合并和门禁。不会同步编辑同一功能文件。
+- 约束：不改公开 API、不升级依赖、不调用真实模型、不迁移开发库、不纳入其他工作树未提交批次。保留不可变审计与有效贡献删除保护；以原始反例红→绿和现有测试证明修复。
+- 验收：`./scripts/verify.sh`、后端/前端 full、相关真实 Neo4j 集成与新 PR CI；修复后独立审查无 P1/P2，再以固定 head 依序合并。计划见 `docs/superpowers/plans/2026-11-14-pr-review-fixes.md`。
+- #348 修复进展：两处最小生产修复，新增回归先红后绿，相关 106 passed；basic 和兼容前端 full 1532 passed；独立复审无 P1/P2，完整后端/Neo4j/新 CI 尚待。专项交接 `docs/handoffs/codex-pr348-fixes-20261114.md`；全程记录 `docs/handoffs/codex-pr-fixes-20261114.md`。
+
+## 2026-11-14 Codex：PR-REVIEW-MERGE-03 开放 PR 审核与合并
+
+- 状态 REVIEW_COMPLETE / MERGE_BLOCKED；负责人 Codex；用户授权检查、审核并合并仓库开放 PR，覆盖此前批次“不自动合并”的交付限制。
+- 输入：PR #348 `04286ec`、#350 `27339d9`、#351 `a1f0864`，main `50e6cba`，对应规格、交接、CI 和审查记录；输出：固定提交审查、必要冲突处理、验证证据、按依赖顺序的合并结果。
+- 范围与依赖：#348 生成消歧基础；#350 依赖 #348 的有界窗口；#351 前端撤销重做。仅操作本工作树与本轮 PR，不纳入其他工作树未提交成果，不改默认模型开关或开发数据库。
+- 风险：双存储投影及撤销、跨窗口覆盖、前端历史并发、主线兼容和既有 CI 偶发失败。三个 PR 分别只读审查；协调者核对发现、合并和最终状态。
+- 验证：OCR delegate 文件/规则覆盖；`./scripts/verify.sh`，最小相关测试，合并冲突后的前端/后端适用门禁及 GitHub CI；记录未验证的真实模型、人工视觉和跨浏览器范围。交付 `docs/reviews/codex-pr-review-20261114.md` 与 `docs/handoffs/codex-pr-review-20261114.md`。
+
+- 结果：#348 两项 P2（失败/取消资料删除被新外键阻断、撤销回退节点修订号导致旧请求通过）；#351 五项 P2（输入丢失、切课历史污染、旧重做覆盖新保存、部分成功不同步、图谱刷新未等待）。#350 未发现本批新增 P1/P2，但依赖 #348。全部保留开放；本轮未推送或合并。
+- CI 复核：#351 唯一红项为既有密文篡改测试的随机无修改问题，单项重跑成功（run `43434532004` attempt 2）；不把 CI 绿灯视为上述反例已修复。
+- 验证：#348 与 main 的本地兼容快照 basic exit 0、定向 150 passed；#350 固定 head 窗口回归 24 passed；#351 原相关测试 101 passed，五条新增反例全部失败并经协调者复跑确认。前端 full 的类型检查通过，测试/构建被共享依赖缓存写入权限阻断（EPERM），未计通过。真实模型和新浏览器验收未做。
+- 交付：[审核报告](reviews/codex-pr-review-20261114.md)、[交接](handoffs/codex-pr-review-20261114.md)。反例与覆盖清单保存在本地 `.demo/pr-review-20261114/`；试合并已撤销，代码恢复开始时 main `50e6cba`。
+
+
 ## 2026-11-11 Codex：DISAMBIG-PR-01 提交已完成的消歧批次
 
 - 状态 READY_FOR_PR（提交前全部复验通过）；负责人 Codex；用户授权先提交现有 BE-01～03 与设计/交接，再创建指向 main 的 PR，随后继续后端计划。本次授权更新此前“保留未提交、未推送”的交付约束，不授权自动合并 PR。
@@ -47,6 +70,34 @@
 - 验收：区分已复现缺陷、契约兼容缺口与后续增强；完整说明生成阶段流程、自动与人工边界、长上下文保护、跨任务可见性及撤销、速度与质量指标；校验文档链接、`git diff --check` 和 `./scripts/verify.sh`（basic）。
 - 实际结果：两份文档交付；前端交接列出 5 个已复现缺陷与 1 个契约兼容缺口，附代码位置、证据、修复边界和验收；设计包含文献、生成流程、同课程已有节点、误合并保护、撤销、长上下文、新版前端适配及评测口径。`PATH="$PWD/.venv/bin:$PATH" ./scripts/verify.sh`（basic）exit 0；文档相对链接/代码围栏/空白检查通过，`git diff --check` 通过。仅两份新 Markdown 和本任务段落变化；Claude 工作树未修改，未提交、未推送。未修复前端缺陷、未实施消歧、未运行真实模型评测。
 - 待落实：字段贡献或不可变投影的存储选择、新契约版本、真实模型评测配置/预算，以及质量指标签收；设计中的新接口、完成度和验收目标均为提案。实施前同步相关规格/架构/ADR，并登记独立实施任务。本轮不视为批准或完成这些改造。
+## 2026-11-11 Claude：画布上的直接操作（UI-GRAPH-EDIT-02，图谱体验第二批，用户确认设计稿）
+
+| ID | 状态 | 负责人 | 范围 | 验收 |
+| --- | --- | --- | --- | --- |
+| UI-GRAPH-EDIT-02 | 实现与自动化验收完成，真实画布已实测（接口为替身），待真实后端复核与用户视觉签收（2026-11-11；review_status: ready_for_review） | Claude | 分支 `claude/graph-direct-edit-20261111`（基于 `claude/ux-backlog-20261111@d102915`，即 PR #347）。教师页：关系线点击工具条（改类型 / 反转 / 可撤销删除）、节点右键与“⋯”菜单、连接柄拖线与“从这里连线…”、成环预判；学生页：预览卡“就此提问”。文件：`graph/cycle.ts`、`graph/hitTest.ts`（新）、`graph/enhancer.ts`、`graph/lifecycle.ts`、`components/GraphCanvas.vue`、`components/canvas/*`（新）、`composables/useCanvasEditing.ts`（新）、`composables/useRelationEditor.ts`、`views/TeacherGraphView.vue`、`components/GraphPreviewCard.vue`、`views/StudentGraphView.vue`、`views/ChatView.vue`、样式与前端测试；规格 `specs/course-knowledge-graph.md`「画布上的直接操作」 | 不改后端、契约、数据与权限；“编辑关系”页签与既有 `data-test` 钩子保留（端到端用例依赖 `tg-tab-relations`）。`scripts/verify/frontend.sh full`、`./scripts/verify.sh`；隔离真实后端实走 |
+
+- 用户确认的三项取舍：① 只有从连接柄开始拖才是连线，另有“从这里连线…”点选路径；② 拖动中做前端成环预判，最终以后端为准；③ 关系线删除不弹确认、给可撤销提示，节点删除保留现有确认流程。
+- 与设计稿的出入：教师页菜单里没有“只看相邻”（教师页目前没有局部视图，另行排期）。
+- 验收证据（2026-11-11，详见 `docs/handoffs/claude-ui-graph-edit-02.md`）：新增 `graph-direct-edit.test.ts` 9 条、`canvas-edit.test.ts` 15 条，`h14.test.ts` 追加 9 条；`scripts/verify/frontend.sh full` exit 0（89 文件 / 1523 条），`./scripts/verify.sh` exit 0；后端与契约零改动。真实 G6 画布上用真实鼠标走通：点关系线出工具条、删除并撤销、悬停出“⋯”与连接柄、从连接柄拖线并选类型、右键菜单（临时预览页，接口为内存替身，已删除）。**未做**：真实后端（当时 Docker 未运行）、学生“就此提问”的浏览器实走、触屏与其他浏览器。已知既有问题被放大：关系增删后整图重新布局。
+- UI-GRAPH-EDIT-02 真实后端复核（2026-11-11）：隔离环境（临时 Neo4j / SQLite、演示课程 64 节点）上逐项通过——关系线工具条、改类型 200、反转成环 409 并回滚、删除 204 与撤销 201、连接柄拖线 201 与成环预判、右键菜单、学生“就此提问”到问答页预填。复核中修掉 3 处：工具条被数据更新后的缩放回报误收起（上一轮引入的回归，已补回归测试）、成环提示环路重复、“就此提问”按钮颜色被盖。未覆盖：修订冲突、网络失败。详见 `docs/handoffs/claude-ui-graph-edit-02.md`「真实后端复核」。
+- UI-GRAPH-STABLE-03（2026-11-11，同一分支追加，用户确认）：DONE（待视觉签收）。教师页只增删改关系或删除知识点时节点位置不动、画布不重建；出现新知识点等才重新计算；关系与排布时不同时提供“重新排布”。`useGraphLayout` 新增 `stable` 选项，学生页不变。测试先红后绿（`graph-layout-composable.test.ts` 5 条、`h14.test.ts` 1 条）；真实画布实测连线后位置不变、“重新排布”可用。规格 `specs/course-knowledge-graph.md`「关系增删后节点位置不动」。
+- 风险：G6 的边命中与右键事件、HTML 连接柄与画布拖拽的配合只能在真实浏览器里验证；撤销删除是重新建边，原关系的编号、来源与状态不恢复。回滚：还原本任务提交，无数据迁移。
+
+## 2026-11-11 待优化：面向非技术用户的两项体验问题（用户提出，待设计）
+
+背景（用户 2026-11-11 提出）：软件的使用者是教师和学生，必须保证在计算机知识储备不足的情况下也能顺畅使用。下面两项是当前体验最差的地方，先登记为待优化项；均**未开始、未认领**，动手前需要先做需求澄清并更新规格。
+
+| ID | 状态 | 负责人 | 现状（按 main `31a7e6c` 的代码核对） | 待定 / 验收方向 |
+| --- | --- | --- | --- | --- |
+| UX-MODEL-SETUP-01 | OPEN / 待设计 | — | 模型 API 设置页（`views/ModelSettingsView.vue`、`components/EmbeddingSettings.vue`）：通用模型要依次选供应商、填服务地址、填 API Key、刷新并选择模型名称，另有“高级选项”和“测试连接”，最后保存；教师还有第二张“向量模型 API”卡片，要再填一遍供应商、服务地址、API Key、模型名称和向量维度。页面用语是“服务地址”“API Key”“向量维度”这类术语，没有分步引导，也没有“去哪里拿 Key”的说明。 | 待定：是否做分步向导（选供应商 → 粘贴 Key → 自动测试并选好默认模型）；常见供应商是否预填服务地址与推荐模型；向量模型是否对教师默认隐藏、沿用系统默认；出错提示改成能照着做的话。约束：ADR-080（个人凭据加密存储）、ADR-081 / ADR-092（向量配置）不变，不改变密钥的存储与权限边界。验收方向：不懂“服务地址 / 模型名称”的教师只凭页面提示能完成配置并看到“可用”结果；失败时知道下一步做什么。 |
+| UX-REVIEW-DEDUP-01 | 前端实现与自动化验收完成，待真实后端走查与用户视觉签收（2026-11-11；review_status: ready_for_review） | Claude（前端） | 审核页（`views/ReviewView.vue`、`composables/useReview.ts`）的“疑似重复知识点”一栏是纯文字列表：每条只有两个名称、相似度百分比和原因；点“合并…”后选主知识点、看一段文字说明再“确认合并”，或点“不是重复”。一次只能处理一条（任一请求在途时所有按钮禁用），没有批量操作。页面上看不到这两个知识点的定义、各自连着哪些关系，也看不到合并前后图谱的变化；要看图只能点“编辑图谱”离开本页。 | 待定：在哪里处理（留在审核页加图谱预览，还是搬到图谱编辑页里就地处理）；合并前是否并排显示两个知识点的定义、来源与相邻关系，并预览合并后的局部图；是否支持批量（如“高相似度的一键全部合并”）及其撤销办法；合并成环（409 `CYCLE_DETECTED`）时怎样用图说明。约束：合并规则（ADR-047：名称并入别名、关系与来源迁移、主知识点锁定）与环检测不变。验收方向：教师不离开当前页面就能看清“这两个是不是同一个东西”以及“合并后图会变成什么样”；处理一批重复项的点击次数明显减少。 |
+
+- UX-REVIEW-DEDUP-01 前端认领（2026-11-11，Claude，分支 `claude/ux-backlog-20261111`）：用户确认“先做这项、审核页预览与图谱内查看两处都做、不做批量”，并确认设计稿。范围只含前端：`views/ReviewView.vue`、`composables/useReview.ts`（暴露草稿图）、新增 `graph/mergePreview.ts`、`components/review/DuplicateCompare.vue`、`components/review/MergePreviewGraph.vue`、`views/TeacherGraphView.vue`（`pair` 参数高亮）、`styles/ui.css`、相关前端测试；规格 `specs/teacher-review-publish.md`「疑似重复知识点：对比与合并预览」。**边界：Codex 正在改进疑似重复的产生方式（规范化与消歧去重），本任务不碰后端、契约和审核队列的数据形状，只消费现有字段，未知 `reason`、缺失相似度都要能显示。** 风险：合并后预览是前端按 ADR-047 推算，可能与服务端结果有出入（界面标“预计”）；审核页布局由三栏改为左右两区，既有 H09 测试的钩子需保留。回滚：还原本任务提交，无数据迁移。
+- UX-REVIEW-DEDUP-01 验收证据（2026-11-11，详见 `docs/handoffs/claude-ux-review-dedup-01.md`）：新增 `merge-preview.test.ts` 8 条（先红后绿）、`review-dedup.test.ts` 9 条，`h09.test.ts` 追加 7 条、`h14.test.ts` 追加 3 条；H09 原有 42 条未改且通过。`scripts/verify/frontend.sh full` exit 0（86 文件 / 1470 条），`./scripts/verify.sh` exit 0；`src/backend`、`src/contracts` 零改动。样式在临时预览页（示例数据，已删除）上看过。**未做**：连真实后端的完整流程（本机 Docker 未启动）、预览与真实合并结果的对照、窄屏与读屏。
+- UX-REVIEW-DEDUP-01 审查意见修复（2026-11-11）：Codex 的 `docs/handoffs/codex-to-claude-review-dedup-fixes-20261111.md` 提出 F1～F6，六条我在 `8420097` 上都复现或确认成立。F1（长按 M 连续合并）、F2（来源显示 0 处）、F3（404 记为已合并）、F4（旧预览无提示）、F5（单选框方向键被抢）FIXED，先写失败回归再改；F6（缺 `similarity` 整页报错）OPEN，登记为待契约任务，规格已改回与契约一致。`scripts/verify/frontend.sh full` exit 0（87 文件 / 1490 条），`./scripts/verify.sh` exit 0；隔离真实后端（临时 Neo4j / SQLite、临时课程 4 对疑似重复）上逐场景复核通过，环境已清理。后端与契约零改动。详见 `docs/handoffs/claude-ux-review-dedup-01.md`「审查意见修复」。
+- **待契约任务（未认领）**：`SuspectedDuplicate.similarity` 是否改为可选（F6）。需要后端 / 契约任务先改 OpenAPI 与生成类型，前端再放宽 `useReview.ts` 的 `isDuplicate`；与 Codex 的消歧去重设计一并决定。
+- 与图谱体验后续批次的关系：UX-REVIEW-DEDUP-01 若选择“在图谱里就地处理”，会用到第二批计划中的节点菜单与边的直接操作，两者的先后需要一起定。
+- 来源：2026-11-10 体验差距分析之后的用户反馈；现状描述是读代码得到的，没有在浏览器里逐步走过这两个流程。
 
 ## 2026-11-11 Codex：MAIN-INTEGRATE-02 历史独有改动审查与收敛
 

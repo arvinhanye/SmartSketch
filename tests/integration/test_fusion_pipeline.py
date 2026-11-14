@@ -20,7 +20,7 @@ from tests.integration import test_f13 as f13
 from tests.integration.test_f13 import graph, live, db_url, storage
 
 
-def setup_task(db_url, storage, graph, monkeypatch, *, pairs=()):
+def setup_task(db_url, storage, graph, monkeypatch, *, pairs=(), names=('概念11', '概念12')):
     user = make_account(db_url, "teacher", "teacher")
     with connect(db_url) as db:
         db.execute("INSERT INTO courses(id,name,teacher_id) VALUES(?, 'test', ?)", (graph.course, user.id))
@@ -40,7 +40,7 @@ def setup_task(db_url, storage, graph, monkeypatch, *, pairs=()):
         relations=lambda c: RelationExtractor(c, model="m", max_output_tokens=4000),
         resolver=lambda c: SemanticResolver(c, model="m"))
     monkeypatch.setattr(f13, "_toolkit", lambda _: toolkit)
-    lease = f13._to_merging(db_url, storage, f13._material(list(pairs), ["概念11", "概念12"]), graph.course)
+    lease = f13._to_merging(db_url, storage, f13._material(list(pairs), list(names)), graph.course)
     return lease, toolkit, client, user.id
 
 
@@ -190,6 +190,49 @@ def test_undo_restores_raw_occurrences_idempotently_and_keeps_later_nodes(db_url
         result = read_snapshot(graph.repo, fusion.read_draft_scope(db, graph.course))
     assert {n['name'] for n in result['nodes']} == {'概念11', '概念12', '概念99'}
     assert len(result['evidence']) == 3
+    original = {n['kp_id']: n['revision'] for n in plan.payload['before']['nodes']}
+    merged = {n['kp_id']: n['revision'] for n in plan.payload['after']['nodes']}
+    for node in result['nodes']:
+        if node['kp_id'] in original:
+            assert node['revision'] > max(original[node['kp_id']], merged.get(node['kp_id'], 0))
+
+
+@live
+@pytest.mark.parametrize('reverse', [False, True])
+def test_independent_automatic_groups_undo_in_either_order_with_fresh_node_revisions(
+        db_url, storage, graph, monkeypatch, reverse):
+    from app.services.fusion.undo import undo_merge
+    lease, toolkit, model, actor = setup_task(db_url, storage, graph, monkeypatch,
+                                            names=('概念11', '概念12', '概念13', '概念14'))
+    def respond(request):
+        pair = json.loads(request.messages[0].content.splitlines()[-1])
+        names = {pair['left']['name'], pair['right']['name']}
+        same = names <= {'概念11', '概念12'} or names <= {'概念13', '概念14'}
+        return json.dumps(dict(verdict='SAME' if same else 'DIFFERENT', basis='mixed',
+            reason='fixture independent groups', differences=[] if same else ['different group'],
+            left_source_ids=[pair['left']['sources'][0]['source_id']],
+            right_source_ids=[pair['right']['sources'][0]['source_id']]))
+    monkeypatch.setattr(model, '_responder', respond)
+    plan = prepare(db_url, lease, graph, toolkit)
+    assert len(plan.payload['groups']) == 2
+    persist_graph.run_merge_stage(db_url, lease)
+    assert f13._persist(db_url, lease, graph.repo).status is persist_graph.PersistStatus.ADVANCED
+    groups = list(reversed(plan.payload['groups'])) if reverse else plan.payload['groups']
+    prior_restored = {}
+    for group in groups:
+        with connect(db_url) as db:
+            head = fusion.read_draft_head(db, graph.course)
+        result = undo_merge(sqlite_url=db_url, repo=graph.repo, course_id=graph.course,
+            plan_id=plan.plan_id, group_id=group['group_id'], actor_id=actor,
+            expected_revision=head.draft_revision, lock_seconds=60, wait_seconds=0)
+        assert result.status == 'undone'
+        with connect(db_url) as db:
+            current = read_snapshot(graph.repo, fusion.read_draft_scope(db, graph.course))
+        nodes = {n['kp_id']: n for n in current['nodes']}
+        assert all(nodes[key] == node for key, node in prior_restored.items())
+        prior_restored.update({key: nodes[key] for key in group['members']})
+    assert {n['name'] for n in current['nodes']} == {'概念11', '概念12', '概念13', '概念14'}
+    assert all(n['revision'] > 1 for n in current['nodes'])
 
 
 @live
