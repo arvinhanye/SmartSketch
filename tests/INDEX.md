@@ -20,6 +20,18 @@
 | [`tests/backend/test_adr021.py`](backend/test_adr021.py) | 资料列表返回最新任务 ID，并支持删除尚未贡献图谱内容的资料。 | ADR-021 |
 | [`tests/backend/test_adr022.py`](backend/test_adr022.py) | 上传策略接口下发 UPLOAD_MAX_BYTES 配置的上传大小上限。 | ADR-022 |
 | [`tests/backend/test_adr079_register.py`](backend/test_adr079_register.py) | 学生自助注册接口及账号创建、注册限流行为。 | ADR-079 |
+| [`tests/backend/test_disambiguation_generation.py`](backend/test_disambiguation_generation.py) | 生成阶段语义分析预算、真实覆盖、来源核查与每次调用凭据保护。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_review.py`](backend/test_disambiguation_review.py) | 有效语义审核、三态与技术覆盖、过期回退及过滤后计数。 | ADR-100；DISAMBIG-BE-03 |
+| [`tests/backend/test_disambiguation_api.py`](backend/test_disambiguation_api.py) | 覆盖/历史/撤销 HTTP 的教师权限、严格参数、分页与冲突协议。 | ADR-100；DISAMBIG-BE-03 |
+| [`tests/backend/test_disambiguation_mentions.py`](backend/test_disambiguation_mentions.py) | 提及身份、同名异义保护、旧检查点兼容与关系输入限定语。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_resolution.py`](backend/test_disambiguation_resolution.py) | 三态语义、差异复核、双侧引用和长输入/输出失败保护。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_metrics.py`](backend/test_disambiguation_metrics.py) | 消歧判定指标中误判和技术未检查分母的完整性。 | ADR-098；DISAMBIG-BE-01 |
+| [`tests/backend/test_disambiguation_recall.py`](backend/test_disambiguation_recall.py) | 混合召回通道、课程/向量空间隔离和预算。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_disambiguation_mapping.py`](backend/test_disambiguation_mapping.py) | 完整组校验、来源保留和合并诱发图环拦截。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_generation.py`](backend/test_fusion_generation.py) | 向量物理调用前取消保护。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_storage.py`](backend/test_fusion_storage.py) | 物理草稿指针、不可变计划与过期保护，以及取消/失败资料的计划安全清理。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_graph_projection.py`](backend/test_graph_projection.py) | 新草稿副本写入和可见性协议。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/backend/test_fusion_undo.py`](backend/test_fusion_undo.py) | 单组合并逆向差异、修订号单调递增、独立组撤销及后续内容冲突。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/backend/test_b05.py`](backend/test_b05.py) | FastAPI 应用工厂与健康检查契约。 | B05 |
 | [`tests/backend/test_b06.py`](backend/test_b06.py) | 环境变量配置读取、启动校验及向量空间验证。 | B06 |
 | [`tests/backend/test_c01.py`](backend/test_c01.py) | SQLite 连接、向前迁移与可恢复备份。 | C01 |
@@ -139,6 +151,7 @@
 
 | 文件 | 被测模块或功能（一句话） | 对应规格 / ADR / 任务 ID |
 | --- | --- | --- |
+| [`tests/frontend/disambiguation-api.test.ts`](frontend/disambiguation-api.test.ts) | 消歧客户端参数、取消信号、冲突透传与审核原因兼容。 | ADR-100；DISAMBIG-BE-03 |
 | [`tests/frontend/adr079.test.ts`](frontend/adr079.test.ts) | 学生自助注册页面与注册接口客户端。 | ADR-079 |
 | [`tests/frontend/answer-card.test.ts`](frontend/answer-card.test.ts) | AnswerCard 单条回答的状态标签、下一步、复制与重试。 | UI-QA-01 |
 | [`tests/frontend/app-graph-shell.test.ts`](frontend/app-graph-shell.test.ts) | App 中图谱与已升级课程页面的暗色外壳。 | 待确认 |
@@ -233,6 +246,9 @@
 
 | 文件 | 被测模块或功能（一句话） | 对应规格 / ADR / 任务 ID |
 | --- | --- | --- |
+| [`tests/integration/test_fusion_projection.py`](integration/test_fusion_projection.py) | 真实 Neo4j 独立草稿副本往返、幂等和事务回滚。 | ADR-099；DISAMBIG-BE-02 |
+| [`tests/integration/test_disambiguation_review_api.py`](integration/test_disambiguation_review_api.py) | 真实 Neo4j 生成到审核/历史/HTTP 撤销闭环及教师编辑保护。 | ADR-100；DISAMBIG-BE-03 |
+| [`tests/integration/test_fusion_pipeline.py`](integration/test_fusion_pipeline.py) | 真实 Neo4j 生成映射、T6 原子性、接管、跨任务、单组/独立组撤销与节点修订。 | ADR-099；DISAMBIG-BE-02 |
 | [`tests/integration/test_d2_publish.py`](integration/test_d2_publish.py) | 验证发布时文本块与知识点向量调用的计费记录，以及重复发布和回滚复制向量不新增调用。 | D2；ADR-082 |
 | [`tests/integration/test_demo_mode_live.py`](integration/test_demo_mode_live.py) | 验证演示模型上传到 worker 草稿生成的完整流程及 Neo4j 向量相似度阈值。 | ADR-076 |
 | [`tests/integration/test_f01.py`](integration/test_f01.py) | 验证本地 Neo4j 环境的 Compose、dev-up 脚本与 APOC 检查。 | F01 |

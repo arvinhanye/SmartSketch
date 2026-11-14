@@ -45,6 +45,7 @@ from app.services.ai.entities import EntityExtractor
 from app.services.ai.factory import build_model_clients, model_id
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationExtractor
+from app.services.fusion.resolution import SemanticResolver
 from app.services.startup import validate_embedding_space, validate_schema_current
 from app.services.versions.reconcile import SweepReport, sweep
 from app.workers.extract_task import ExtractionToolkit
@@ -81,6 +82,10 @@ def build_toolkit(settings: Settings) -> ToolkitSource:
         policy=policy,
         entities=lambda client: EntityExtractor(client, model=model, max_output_tokens=MAX_OUTPUT_TOKENS),
         relations=lambda client: RelationExtractor(client, model=model, max_output_tokens=MAX_OUTPUT_TOKENS),
+        resolver=(lambda client: SemanticResolver(client, model=model,
+            max_input_bytes=settings.DISAMBIGUATION_MAX_INPUT_BYTES)) if (settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
+        preserve_mentions=(settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED),
+        analysis_max_pairs=settings.DISAMBIGUATION_MAX_PAIRS_PER_SECTION,
     )
 
 

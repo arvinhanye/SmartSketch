@@ -107,12 +107,18 @@ class GraphScope:
     course_id: str
     version_id: str
     effective_task_ids: Sequence[str] | None = None
+    storage_version_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("course_id", "version_id"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise GraphScopeError(f"{name} is required")
+        if self.version_id.startswith("draftgen_"):
+            raise GraphScopeError("physical drafts cannot be addressed as published versions")
+        if self.storage_version_id is not None:
+            if self.version_id != "draft" or not re.fullmatch(r"draftgen_[a-zA-Z0-9_-]{1,128}", self.storage_version_id):
+                raise GraphScopeError("invalid physical draft scope")
         tasks = self.effective_task_ids
         if tasks is not None:
             if isinstance(tasks, (str, bytes)) or not isinstance(tasks, Sequence):
@@ -210,7 +216,7 @@ def _parameters(
     if not required <= names:
         raise GraphScopeError("Cypher is missing required scope parameters")
     params = dict(extra or {})
-    params.update(course_id=scope.course_id, version_id=scope.version_id)
+    params.update(course_id=scope.course_id, version_id=scope.storage_version_id or scope.version_id)
     # Reserved even for published queries; caller extras never supply scope or V.
     params.pop("effective_task_ids", None)
     if scope.effective_task_ids is not None:

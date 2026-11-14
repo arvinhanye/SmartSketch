@@ -16,6 +16,7 @@ from app.services.ai.entities import EntityCandidate, EntityExtractor
 from app.services.ai.gleaning import EntityGleaner
 from app.services.ai.policy import ModelCallPolicy
 from app.services.ai.relations import RelationCandidate, RelationExtractor
+from app.services.fusion.resolution import SemanticResolver
 from app.workers.parse_task import ParseOutcome
 
 logger = logging.getLogger("app.workers.extract_task")
@@ -108,11 +109,14 @@ class ExtractionToolkit:
     guard: Callable[[], None] | None = None
     #: personal 模式下任务快照里的模型名；全局模式为 None（模型名已固化在抽取器工厂里）。
     model: str | None = None
+    resolver: Callable[[ModelClient], SemanticResolver] | None = None
+    preserve_mentions: bool = False
+    analysis_max_pairs: int = 32
 
 
 @dataclass(frozen=True)
 class TaskEntity:
-    """任务内去重后的实体：同一规范化名称的全部候选（各自带出处）。名称与类型取首次出现者。"""
+    """任务候选及出处：旧 v1 按名称分组；v2 仅合并相同出现和内容，不做语义合并。"""
 
     entity_id: str
     name: str = field(repr=False)

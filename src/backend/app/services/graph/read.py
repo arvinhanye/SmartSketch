@@ -34,6 +34,7 @@ from app.repositories.graph_read import GraphReader, NodeEvidence
 from app.repositories.neo4j import GraphScope
 from app.repositories.sqlite import connect
 from app.repositories.tasks import read_effective_task_ids
+from app.repositories.fusion import read_draft_scope
 from app.schemas.contracts import (
     Chapter,
     GraphExchange,
@@ -83,8 +84,8 @@ def resolve_target(sqlite_url: str, access: CourseAccess, version: int | None) -
     role = access.member.role
     if role == "teacher" and version is None:
         with connect(sqlite_url) as database:
-            v = read_effective_task_ids(database, course.id)
-        return ReadTarget(GraphScope(course.id, DRAFT, effective_task_ids=v), "teacher", None)
+            scope = read_draft_scope(database, course.id)
+        return ReadTarget(scope, "teacher", None)
     if course.published_version is None or course.published_version_id is None:
         raise graph_not_published()
     if version is not None and version != course.published_version:

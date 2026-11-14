@@ -819,12 +819,102 @@ export interface paths {
          *     分页为键集分页（keyset），处理掉已看过的条目不会让后面的条目被跳过或重复：
          *     不带 `kind` 时三栏各返回第一页；带 `kind` 时只填该栏（其余两栏为空数组），`cursor` 取上一页
          *     `next_cursors` 中该栏的值。`cursor` 不带 `kind`、无法解析或属于另一栏时 422。
-         *     `totals` 始终是三栏的完整条数，与分页无关。
+         *     `totals` 始终是过滤后三栏的完整条数，与分页无关。有效生成消歧分析排除明确不同和已自动合并项，技术未完成单列覆盖；无有效分析时兼容名称队列并返回 legacy/not_analyzed 或 stale。读取不触发模型。
          *
          */
         get: operations["getReviewQueue"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/review/disambiguation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        /** 读取当前草稿消歧覆盖（教师） */
+        get: operations["getDisambiguationCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/review/merges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        /** 分页读取自动合并历史（教师） */
+        get: operations["listAutomaticMerges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/review/merges/{plan_id}/{group_id}/undo-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                plan_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 预览撤销一组合并（教师）
+         * @description 只处理本课程已实际应用的自动合并组；再次核验教师身份、课程锁、修订及依赖冲突。预览冲突返回 200 conflict；执行冲突返回 409 REVISION_CONFLICT，details 为 FusionUndoResult；重复已撤销请求返回 200 already_undone。不改变任务终态或发布快照。
+         */
+        post: operations["previewAutomaticMergeUndo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{cid}/review/merges/{plan_id}/{group_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                plan_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 撤销一组自动合并（教师）
+         * @description 只处理本课程已实际应用的自动合并组；再次核验教师身份、课程锁、修订及依赖冲突。预览冲突返回 200 conflict；执行冲突返回 409 REVISION_CONFLICT，details 为 FusionUndoResult；重复已撤销请求返回 200 already_undone。不改变任务终态或发布快照。
+         */
+        post: operations["undoAutomaticMerge"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1743,6 +1833,86 @@ export interface components {
             edges: components["schemas"]["Relation"][];
             stats?: components["schemas"]["GraphStats"];
         };
+        /** @description 当前草稿消歧覆盖。null 表示无有效分析；review_pairs/legacy_candidates 为可见节点对，auto_merged_groups 为组，其余语义计数为原始成员对。空审核队列不代表检查完整。 */
+        DisambiguationCoverage: {
+            /** @enum {string} */
+            status: "not_analyzed" | "complete" | "partial" | "stale";
+            /** @enum {string} */
+            queue_mode: "legacy" | "semantic";
+            draft_revision: number;
+            plan_id: string | null;
+            task_id: string | null;
+            /** @constant */
+            pair_unit: "original_member_pairs";
+            total_pairs: number | null;
+            examined_pairs: number | null;
+            completed_pairs: number | null;
+            same_pairs: number | null;
+            different_pairs: number | null;
+            uncertain_pairs: number | null;
+            technical_unchecked_pairs: number | null;
+            auto_merged_groups: number | null;
+            review_pairs: number;
+            legacy_candidates: number;
+            recall: components["schemas"]["DisambiguationRecallCoverage"] | null;
+            reasons: string[];
+        };
+        DisambiguationRecallCoverage: {
+            /** @constant */
+            pair_unit: "visible_node_pairs";
+            total_pairs: number;
+            retrieved_pairs: number;
+            truncated_pairs: number;
+            limited_queries: number;
+            missing_channels: string[];
+        };
+        ReviewSemanticAnalysis: {
+            plan_id: string;
+            /** @enum {string} */
+            verdict: "SAME" | "UNCERTAIN";
+            /** @enum {string} */
+            basis: "material" | "model_knowledge" | "mixed";
+            reasons: string[];
+            differences: string[];
+            constraints: string[];
+        };
+        FusionMergeHistory: {
+            draft_revision: number;
+            items: components["schemas"]["FusionMergeRecord"][];
+            next_cursor: string | null;
+        };
+        FusionMergeRecord: {
+            plan_id: string;
+            group_id: string;
+            task_id: string;
+            canonical_id: string;
+            members: components["schemas"]["KnowledgePointRef"][];
+            /** @enum {string} */
+            status: "applied" | "undone";
+            created_at: string;
+            undone_at: string | null;
+        };
+        /** @description 课程草稿修订号；必须是整数。拒绝 null、bool、字符串数字、额外字段。 */
+        FusionUndoRequest: {
+            expected_revision: number;
+        };
+        FusionUndoConflict: {
+            reason: string;
+            /** @enum {string} */
+            kind?: "nodes" | "edges" | "evidence";
+            ids?: string[];
+        };
+        /** @description 预览不写入；执行冲突为 409 REVISION_CONFLICT，details 采用同一结构。已撤销重复请求幂等。 */
+        FusionUndoResult: {
+            plan_id: string;
+            group_id: string;
+            /** @enum {string} */
+            status: "ready" | "conflict" | "undone" | "already_undone";
+            changed: boolean;
+            current_revision: number;
+            affected_ids: string[];
+            conflicts: components["schemas"]["FusionUndoConflict"][];
+        };
         /**
          * @description 审核队列的三栏（ADR-060）。
          * @enum {string}
@@ -1754,6 +1924,7 @@ export interface components {
             isolated_nodes: number;
         };
         ReviewQueue: {
+            disambiguation?: components["schemas"]["DisambiguationCoverage"];
             low_confidence_relations: components["schemas"]["Relation"][];
             suspected_duplicates: components["schemas"]["SuspectedDuplicate"][];
             isolated_nodes: components["schemas"]["KnowledgePointRef"][];
@@ -1765,15 +1936,16 @@ export interface components {
                 isolated_nodes: string | null;
             };
         };
-        /** @description 一对名称疑似重复的知识点（ADR-060，E08 名称归一）。`reason` 为 `same_key`（归一主键相同）、
+        /** @description 一对待人工确认的知识点（ADR-060，E08 名称归一）。`reason` 为 `same_key`（归一主键相同）、
          *     `alias`（一方的名称或别名与另一方的名称或别名归一后相同）或 `containment`（较短名称是较长名称的前缀）；
-         *     `similarity` 前两者为 1，包含候选为有效字符比 较短/较长。`candidates` 按 `id` 升序。
+         *     `similarity` 前两者为 1，包含候选为有效字符比 较短/较长。`candidates` 按 `id` 升序。新增 semantic_uncertain / merge_blocked 表示有效语义未决 / 同义但未通过自动合并约束。非词面候选 similarity 为 0，仅用于排序，不是正确概率。
          *      */
         SuspectedDuplicate: {
+            analysis?: components["schemas"]["ReviewSemanticAnalysis"];
             candidates: components["schemas"]["KnowledgePointRef"][];
             similarity: number;
             /** @enum {string} */
-            reason: "same_key" | "alias" | "containment";
+            reason: "same_key" | "alias" | "containment" | "semantic_uncertain" | "merge_blocked";
         };
         ReviewAction: components["schemas"]["ReviewRelationAction"] | components["schemas"]["ReviewDuplicateAction"] | components["schemas"]["ReviewIsolatedAction"];
         ReviewRelationAction: {
@@ -3957,6 +4129,165 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    getDisambiguationCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 读取当前草稿消歧覆盖 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisambiguationCoverage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+            /** @description 存储暂不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAutomaticMerges: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页读取自动合并历史 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FusionMergeHistory"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+            /** @description 存储暂不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    previewAutomaticMergeUndo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                plan_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FusionUndoRequest"];
+            };
+        };
+        responses: {
+            /** @description 预览撤销一组合并 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FusionUndoResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+            /** @description 存储暂不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    undoAutomaticMerge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 课程 ID，所有查询的第一隔离条件 */
+                cid: components["parameters"]["CourseId"];
+                plan_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FusionUndoRequest"];
+            };
+        };
+        responses: {
+            /** @description 撤销一组自动合并 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FusionUndoResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+            /** @description 存储暂不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     resolveReviewItem: {

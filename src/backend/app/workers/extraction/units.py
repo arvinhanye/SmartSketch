@@ -30,7 +30,9 @@ from app.workers.extraction.types import (
     _Halt,
     _Section,
     _UnitResult,
+    TaskEntity,
 )
+from app.workers.extraction.analysis import analyze_section
 
 # ---------------------------------------------------------------- 模型调用
 
@@ -38,9 +40,11 @@ from app.workers.extraction.types import (
 class _AttemptClient:
     """一次块/小节尝试的客户端：修复调用走 ``is_repair=True`` 的绑定，各自独立记录（E04 交接）。"""
 
-    def __init__(self, policy: ModelCallPolicy, attribution: CallAttribution) -> None:
-        self._main = policy.bind(attribution)
-        self._repair = policy.bind(replace(attribution, is_repair=True))
+    def __init__(self, policy: ModelCallPolicy, attribution: CallAttribution, *,
+                 guard: Callable[[], None] | None = None) -> None:
+        options = {} if guard is None else {"before_attempt": guard}
+        self._main = policy.bind(attribution, **options)
+        self._repair = policy.bind(replace(attribution, is_repair=True), **options)
 
     def _pick(self, request: ModelRequest) -> ModelClient:
         return self._repair if request.purpose == REPAIR_PURPOSE else self._main
@@ -71,6 +75,7 @@ def _attempts(
                 chunk_attempt=attempt,
                 user_id=toolkit.user_id,
             ),
+            guard=toolkit.guard if toolkit.preserve_mentions else None,
         )
         try:
             outcome = body(client)
@@ -105,13 +110,21 @@ def _extract_chunk(
             return OUTPUT_INVALID_CODE
         candidates = extraction.candidates
         if toolkit.gleaner is not None:
-            gleaned = toolkit.gleaner(client).glean(identity, chunk.text, candidates)
+            gleaned = toolkit.gleaner(client).glean(identity, chunk.text, candidates,
+                                                   preserve_mentions=toolkit.preserve_mentions)
             if gleaned.error_code is not None:
                 return gleaned.error_code
             if not gleaned.ok:
                 return OUTPUT_INVALID_CODE
             candidates = candidates + gleaned.added
-        return {"entities": [_encode_entity(candidate) for candidate in candidates]}
+        if toolkit.preserve_mentions:
+            # An ordinal distinguishes unresolved outputs; it is not a guessed text position.
+            candidates = tuple(replace(c, occurrence_index=i) if c.source.evidence_ambiguous else c
+                               for i, c in enumerate(candidates))
+        result: dict[str, object] = {"entities": [_encode_entity(candidate) for candidate in candidates]}
+        if toolkit.preserve_mentions:
+            result["entity_identity_version"] = 2
+        return result
 
     return _attempts(limits, lease, chunk.chunk_id, toolkit, body)
 
@@ -122,8 +135,24 @@ def _extract_section(
     limits: ExtractLimits,
     section: _Section,
     entities: Sequence[SectionEntity],
+    *, task_entities: Sequence[TaskEntity] = (),
 ) -> _UnitResult:
     chunks = tuple(SourceChunk(_identity(chunk), chunk.text) for chunk in section.chunks)
+    analysis = None
+    if toolkit.preserve_mentions:
+        client = _AttemptClient(toolkit.policy, CallAttribution(course_id=lease.course_id,
+            task_id=lease.task_id, task_attempt=lease.attempt, chunk_attempt=1, user_id=toolkit.user_id),
+            guard=toolkit.guard)
+        try:
+            resolver = None if toolkit.resolver is None else toolkit.resolver(client)
+            analysis = analyze_section(task_entities, {c.chunk_id: c for c in section.chunks},
+                                       resolver=resolver, max_pairs=toolkit.analysis_max_pairs)
+        except ModelUnavailableError as exc:
+            raise _Halt("circuit") from exc
+        except CallRecordError as exc:
+            raise _Halt("storage") from exc
+        except ModelAuthError as exc:
+            raise _Halt("auth") from exc
 
     def body(client: ModelClient) -> Mapping[str, object] | str:
         extraction = toolkit.relations(client).extract(lease.course_id, entities, chunks)
@@ -134,4 +163,7 @@ def _extract_section(
             "relations": [_encode_relation(candidate) for candidate in extraction.candidates],
         }
 
-    return _attempts(limits, lease, None, toolkit, body)
+    result = _attempts(limits, lease, None, toolkit, body)
+    if result.result is not None and analysis is not None:
+        result = replace(result, result={**result.result, "analysis": analysis})
+    return result

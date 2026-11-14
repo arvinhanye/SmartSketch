@@ -131,11 +131,11 @@ class GraphReader:
 # 草稿作用域只为满足 F02 的参数约定；本查询列出草稿之外的全部版本副本，不读草稿内容。
 _VERSION_IDS = """
 MATCH (k:KnowledgePoint {course_id: $course_id})
-WHERE k.version_id <> $version_id AND $effective_task_ids IS NOT NULL
+WHERE k.version_id <> $version_id AND NOT k.version_id STARTS WITH 'draftgen_' AND $effective_task_ids IS NOT NULL
 RETURN DISTINCT k.version_id AS version_id
 UNION
 MATCH (c:Chapter {course_id: $course_id})
-WHERE c.version_id <> $version_id AND $effective_task_ids IS NOT NULL
+WHERE c.version_id <> $version_id AND NOT c.version_id STARTS WITH 'draftgen_' AND $effective_task_ids IS NOT NULL
 RETURN DISTINCT c.version_id AS version_id
 """
 
@@ -143,4 +143,4 @@ RETURN DISTINCT c.version_id AS version_id
 def stored_version_ids(repo: Neo4jRepository, course_id: str) -> set[str]:
     """G05 清扫：本课程在 Neo4j 中存有副本的全部非草稿 ``version_id``。"""
     rows = repo.read(_VERSION_IDS, GraphScope(course_id, DRAFT, effective_task_ids=()), reader="worker")
-    return {str(r["version_id"]) for r in rows}
+    return {str(r["version_id"]) for r in rows if not str(r["version_id"]).startswith("draftgen_")}

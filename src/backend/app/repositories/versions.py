@@ -507,6 +507,7 @@ class DraftState:
     task_watermark: int
     effective_task_ids: tuple[str, ...]
     revisions: tuple[tuple[str, str, str, str], ...]
+    storage_version_id: str = "draft"
 
 
 def read_draft_state(sqlite_url: str, course_id: str) -> DraftState:
@@ -516,7 +517,7 @@ def read_draft_state(sqlite_url: str, course_id: str) -> DraftState:
         database.execute("BEGIN")
         try:
             row = database.execute(
-                "SELECT draft_revision, published_version_id FROM courses WHERE id = ?", (course_id,)
+                "SELECT draft_revision, published_version_id, draft_storage_version FROM courses WHERE id = ?", (course_id,)
             ).fetchone()
             if row is None:
                 raise LookupError("course not found")
@@ -539,7 +540,7 @@ def read_draft_state(sqlite_url: str, course_id: str) -> DraftState:
             ))
         finally:
             database.execute("COMMIT")
-    return DraftState(course_id, int(row[0]), row[1], int(watermark), tasks, revisions)  # type: ignore[arg-type]
+    return DraftState(course_id, int(row[0]), row[1], int(watermark), tasks, revisions, row[2])  # type: ignore[arg-type]
 
 
 def complete_published_tasks(database: sqlite3.Connection, course_id: str, task_watermark: int) -> int:

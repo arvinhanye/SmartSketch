@@ -599,6 +599,91 @@ def test_takeover_after_chunks_skips_finished_sections(db_url, storage):
     assert [k for _, k in script2.calls] == [second_section]
 
 
+class SemanticScript(Script):
+    """Real worker test adapter, with semantic responses independent from extraction."""
+    def __init__(self):
+        super().__init__()
+        self.semantic_calls = 0
+        self.semantic_bad = False
+        self.semantic_hook = None
+
+    def __call__(self, request):
+        if "当前检查阶段" in request.messages[0].content:
+            self.semantic_calls += 1
+            if self.semantic_hook:
+                self.semantic_hook()
+            if self.semantic_bad:
+                return "{bad"
+            data = json.loads(request.messages[0].content.splitlines()[-1])
+            return json.dumps(dict(verdict="DIFFERENT", basis="material", reason="不同课程概念",
+                differences=["含义不同"], left_source_ids=[data["left"]["sources"][0]["source_id"]],
+                right_source_ids=[data["right"]["sources"][0]["source_id"]]))
+        return super().__call__(request)
+
+
+def _semantic_toolkit(db_url, script):
+    from app.services.fusion.resolution import SemanticResolver
+    return dataclasses.replace(_toolkit(db_url, script), preserve_mentions=True, analysis_max_pairs=2,
+        resolver=lambda client: SemanticResolver(client, model=MODEL))
+
+
+def test_disambiguation_analysis_persisted_with_section_and_mentions(db_url, storage):
+    lease, _ = _extracting(db_url, storage)
+    script = SemanticScript()
+    result = _run(db_url, lease, _semantic_toolkit(db_url, script))
+    assert result.status is ExtractStatus.ADVANCED and script.semantic_calls == 4
+    payloads = [json.loads(r[0]) for r in _sql(db_url,
+        "SELECT result FROM task_chunk_checkpoints WHERE task_id=? AND unit_kind='section'", lease.task_id)]
+    assert all(p["analysis"]["completion"] == "partial" and len(p["analysis"]["decisions"]) == 2 for p in payloads)
+    candidates = load_candidates(db_url, course_id=COURSE, task_id=lease.task_id)
+    assert len(candidates.entities) > len({e.name for e in candidates.entities})
+    assert all(e.entity_id.startswith("ment_") for e in candidates.entities)
+    assert candidates.relations
+    assert all(r.from_id in {e.entity_id for e in candidates.entities} for r in candidates.relations)
+
+
+def test_disambiguation_bad_output_keeps_relations_and_failure_separate(db_url, storage):
+    lease, _ = _extracting(db_url, storage)
+    script = SemanticScript(); script.semantic_bad = True
+    result = _run(db_url, lease, _semantic_toolkit(db_url, script))
+    assert result.status is ExtractStatus.ADVANCED and result.sections_failed == 0
+    assert load_candidates(db_url, course_id=COURSE, task_id=lease.task_id).relations
+    payloads = [json.loads(r[0]) for r in _sql(db_url,
+        "SELECT result FROM task_chunk_checkpoints WHERE task_id=? AND unit_kind='section'", lease.task_id)]
+    assert all(d["status"] == "failed" and d["verdict"] is None for p in payloads for d in p["analysis"]["decisions"])
+
+
+def test_disambiguation_takeover_disabled_preserves_identity_and_completed_analysis(db_url, storage):
+    lease, chunks = _extracting(db_url, storage)
+    script = SemanticScript()
+    def crash(_):
+        raise _Crash()
+    script.hooks["sec:" + chunks[5]] = crash
+    with pytest.raises(_Crash):
+        _run(db_url, lease, _semantic_toolkit(db_url, script))
+    assert len(_checkpoints(db_url, lease.task_id, "section")) == 1
+    before = _sql(db_url, "SELECT result FROM task_chunk_checkpoints WHERE task_id=? AND unit_kind='section'", lease.task_id)
+    _sql(db_url, "UPDATE processing_tasks SET lease_expires_at=unixepoch()-1 WHERE id=?", lease.task_id)
+    takeover = _claim(db_url, "worker-b")
+    second = SemanticScript()
+    assert _run(db_url, takeover, _toolkit(db_url, second)).status is ExtractStatus.ADVANCED
+    assert second.semantic_calls == 0
+    assert before[0] in _sql(db_url, "SELECT result FROM task_chunk_checkpoints WHERE task_id=? AND unit_kind='section'", lease.task_id)
+    candidates = load_candidates(db_url, course_id=COURSE, task_id=lease.task_id)
+    assert all(e.entity_id.startswith("ment_") for e in candidates.entities)
+    assert all(r.from_id in {e.entity_id for e in candidates.entities} and
+               r.to_id in {e.entity_id for e in candidates.entities} for r in candidates.relations)
+
+
+def test_disambiguation_cancel_during_judgment_stops_next_request_and_checkpoint(db_url, storage):
+    lease, _ = _extracting(db_url, storage)
+    script = SemanticScript()
+    script.semantic_hook = lambda: _sql(db_url, "UPDATE processing_tasks SET cancel_requested=1 WHERE id=?", lease.task_id)
+    result = _run(db_url, lease, _semantic_toolkit(db_url, script))
+    assert result.status is ExtractStatus.CANCELLED and script.semantic_calls == 1
+    assert not _checkpoints(db_url, lease.task_id, "section")
+
+
 def test_checkpoint_rows_are_immutable_and_course_scoped(db_url, storage):
     lease, chunk_ids = _extracting(db_url, storage)
     _run(db_url, lease, _toolkit(db_url, Script()))

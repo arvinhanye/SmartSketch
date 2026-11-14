@@ -51,6 +51,8 @@ export const DUPLICATE_REASON_LABELS: Readonly<Record<SuspectedDuplicate['reason
   same_key: '名称归一后相同',
   alias: '名称或别名相同',
   containment: '一个名称是另一个的前缀',
+  semantic_uncertain: '同义关系仍需确认',
+  merge_blocked: '同义提案未通过自动合并约束',
 }
 
 export const PAGE_SIZE = 50

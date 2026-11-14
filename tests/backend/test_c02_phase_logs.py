@@ -149,7 +149,7 @@ def test_pipeline_logs_each_stage_duration(monkeypatch, caplog, clock):
     monkeypatch.setattr(persist_graph, "run_persist_stage",
                         timed(SimpleNamespace(status=persist_graph.PersistStatus.ADVANCED), 0.05))
     settings = SimpleNamespace(SQLITE_URL="sqlite:///unused", STORAGE_DIR="unused", UPLOAD_MAX_BYTES=1,
-                               TASK_LEASE_SECONDS=60, TASK_MAX_ATTEMPTS=3)
+                               TASK_LEASE_SECONDS=60, TASK_MAX_ATTEMPTS=3, DISAMBIGUATION_AUTO_MERGE_ENABLED=False)
     result = persist_graph.run_pipeline_once(settings, toolkit=lambda lease: object(), repo=None, storage=object())
     assert [stage for stage, _ in result.stages] == ["parsing", "extracting", "merging", "persisting"]
     lines = [_fields(r.getMessage()) for r in caplog.records if r.getMessage().startswith("task stage done")]
@@ -215,7 +215,9 @@ def _persist(monkeypatch, caplog, clock, *, lock=object(), repo=None, lease_chec
 
     monkeypatch.setattr(persist_graph.course_locks, "held", held_context or held)
     monkeypatch.setattr(persist_graph, "_check_lease", lease_check or _TimedStep(clock, 2))
-    monkeypatch.setattr(persist_graph, "_effective", _TimedStep(clock, 2, ("t1",)))
+    monkeypatch.setattr(persist_graph.fusion, "task_plan", lambda *a: None)
+    monkeypatch.setattr(persist_graph, "read_draft_scope", _TimedStep(clock, 2,
+        persist_graph.GraphScope("c1", "draft", ("t1",))))
     monkeypatch.setattr(persist_graph, "_write_draft", _TimedStep(clock, 40, written))
     monkeypatch.setattr(persist_graph, "_t6_in", _TimedStep(clock, 8, 1))
 

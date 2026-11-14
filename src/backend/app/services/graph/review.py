@@ -42,11 +42,12 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any, Final
 
-from app.repositories import review as store
+from app.repositories import review as store, fusion
 from app.repositories.graph_edit import bump_draft_revision
-from app.repositories.neo4j import GraphScope, ScopedTransaction
+from app.repositories.neo4j import GraphScope, ScopedTransaction, RepositoryError
 from app.repositories.sqlite import connect
 from app.repositories.tasks import read_effective_task_ids
+from app.repositories.fusion import read_draft_scope
 from app.schemas.contracts import KnowledgePointRef, Relation
 from app.services.access import not_found
 from app.services.fusion.normalize import (
@@ -59,6 +60,7 @@ from app.services.fusion.normalize import (
 from app.services.graph.edit_node import EditContext, InvalidEdit, _course_write
 from app.services.graph.merge_nodes import merge_nodes
 from app.services.graph.read import _chunk_names, _chunks, _relation, _relation_chunk_ids, _source_ref
+from app.services.fusion.review import build_review_view
 
 __all__ = [
     "DEFAULT_LIMIT",
@@ -105,6 +107,7 @@ class DuplicatePair:
     right: Mapping[str, Any]
     similarity: float
     reason: str
+    analysis: Mapping[str, Any] | None = None
 
     @property
     def key(self) -> tuple[Any, ...]:
@@ -118,6 +121,7 @@ class Classified:
     relations: list[Mapping[str, Any]]
     duplicates: list[DuplicatePair]
     isolated: list[Mapping[str, Any]]
+    disambiguation: dict[str, Any] | None = None
 
     def totals(self) -> dict[str, int]:
         return {"low_confidence_relations": len(self.relations), "suspected_duplicates": len(self.duplicates),
@@ -190,7 +194,8 @@ def _pairs(nodes: Sequence[Mapping[str, Any]]) -> list[DuplicatePair]:
 
 
 def classify(nodes: Iterable[Mapping[str, Any]], edges: Iterable[Mapping[str, Any]], *,
-             dismissed_pairs: Iterable[tuple[str, str]] = (), dismissed_isolated: Iterable[str] = ()) -> Classified:
+             dismissed_pairs: Iterable[tuple[str, str]] = (), dismissed_isolated: Iterable[str] = (),
+             semantic_pairs: Sequence[DuplicatePair] | None = None) -> Classified:
     """把可见草稿分成三栏。``nodes`` 为节点属性，``edges`` 为 ``{type, from_id, to_id, p}``。"""
     by_id = {str(p["kp_id"]): p for p in nodes}
     edges = list(edges)
@@ -200,7 +205,9 @@ def classify(nodes: Iterable[Mapping[str, Any]], edges: Iterable[Mapping[str, An
 
     live = [p for p in by_id.values() if not _rejected(p)]
     skip = {tuple(sorted(pair)) for pair in dismissed_pairs}
-    duplicates = [d for d in _pairs(live) if (str(d.left["kp_id"]), str(d.right["kp_id"])) not in skip]
+    duplicates = [d for d in (_pairs(live) if semantic_pairs is None else semantic_pairs)
+                  if (str(d.left["kp_id"]), str(d.right["kp_id"])) not in skip]
+    duplicates.sort(key=lambda d: d.key)
 
     touched: set[str] = set()
     for e in edges:
@@ -257,16 +264,35 @@ def page(items: Sequence[Any], key: Any, after: tuple[Any, ...] | None, limit: i
 
 def _draft_scope(sqlite_url: str, course_id: str) -> GraphScope:
     with connect(sqlite_url) as database:
-        v = read_effective_task_ids(database, course_id)
-    return GraphScope(course_id, DRAFT, effective_task_ids=v)
+        return read_draft_scope(database, course_id)
 
 
 def _classified(ctx: EditContext, course_id: str) -> tuple[GraphScope, Classified]:
-    scope = _draft_scope(ctx.sqlite_url, course_id)
-    nodes = ctx.reader.nodes(scope, "teacher")
-    edges = ctx.reader.edges(scope, "teacher")
-    pairs, kept = store.read_dismissals(ctx.sqlite_url, course_id)
-    return scope, classify(nodes, edges, dismissed_pairs=pairs, dismissed_isolated=kept)
+    # A bounded retry prevents mixing a newly activated projection with the old
+    # SQLite head. Never run inference or take a long-lived write lock on reads.
+    for _ in range(2):
+        head,scope,plan,undone = fusion.review_snapshot(ctx.sqlite_url,course_id)
+        nodes = ctx.reader.nodes(scope, "teacher")
+        edges = ctx.reader.edges(scope, "teacher")
+        pairs, kept = store.read_dismissals(ctx.sqlite_url, course_id)
+        with connect(ctx.sqlite_url) as db:
+            if fusion.read_draft_head(db, course_id) != head:
+                continue
+        view = build_review_view(head, plan, nodes, undone=undone)
+        semantic = None
+        if view.summary['queue_mode'] == 'semantic':
+            by_id = {n['kp_id']: n for n in nodes}
+            semantic = []
+            for p in view.proposals:
+                left, right = by_id[p.left_id], by_id[p.right_id]
+                lexical = _pairs([left, right])
+                semantic.append(DuplicatePair(left,right,lexical[0].similarity if lexical else 0.0,
+                                              p.reason,p.analysis))
+        c = classify(nodes,edges,dismissed_pairs=pairs,dismissed_isolated=kept,semantic_pairs=semantic)
+        summary = {**view.summary, 'review_pairs':len(c.duplicates) if semantic is not None else 0,
+                   'legacy_candidates':len(c.duplicates) if semantic is None else 0}
+        return scope, Classified(c.relations,c.duplicates,c.isolated,summary)
+    raise RepositoryError()
 
 
 def _ref(p: Mapping[str, Any]) -> dict[str, Any]:
@@ -295,6 +321,7 @@ def read_queue(ctx: EditContext, course_id: str, *, kind: str | None = None, cur
     scope, c = _classified(ctx, course_id)
     body: dict[str, Any] = {"low_confidence_relations": [], "suspected_duplicates": [], "isolated_nodes": [],
                             "totals": c.totals(),
+                            "disambiguation": c.disambiguation,
                             "next_cursors": {column: None for column in _COLUMN.values()}}
     wanted = KINDS if kind is None else (kind,)
     if RELATIONS in wanted:
@@ -304,7 +331,8 @@ def read_queue(ctx: EditContext, course_id: str, *, kind: str | None = None, cur
     if DUPLICATES in wanted:
         chosen, last = page(c.duplicates, lambda d: d.key, after if kind else None, limit)
         body["suspected_duplicates"] = [{"candidates": [_ref(d.left), _ref(d.right)], "similarity": d.similarity,
-                                         "reason": d.reason} for d in chosen]
+                                         "reason": d.reason, **({"analysis":d.analysis} if d.analysis else {})}
+                                        for d in chosen]
         body["next_cursors"]["suspected_duplicates"] = last and encode_cursor(DUPLICATES, last)
     if ISOLATED in wanted:
         chosen, last = page(c.isolated, isolated_key, after if kind else None, limit)

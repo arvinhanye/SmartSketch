@@ -43,12 +43,14 @@ def test_invite_code_format_is_enforced_in_database(invitation_db, code):
 
 def test_invite_rollback_preserves_course_members_and_reapplies(invitation_db):
     url, teacher, course = invitation_db
-    migration = MIGRATIONS_DIR / "020_course_invite_codes.sql"
+    # Roll back dependent migrations first; history must remain a contiguous prefix.
+    migrations = [p for p in sorted(MIGRATIONS_DIR.glob("*.sql")) if p.name[:3] >= "020"]
     with connect(url) as db:
         db.execute("INSERT INTO course_invite_codes (code, course_id) VALUES (?, ?)", ("ABC234", course.id))
-        for line in migration.read_text().splitlines():
-            if line.startswith("-- ROLLBACK:"):
-                db.execute(line.split("ROLLBACK:", 1)[1].strip())
+        for migration in reversed(migrations):
+            for line in migration.read_text().splitlines():
+                if line.startswith("-- ROLLBACK:"):
+                    db.execute(line.split("ROLLBACK:", 1)[1].strip())
         assert db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'course_invite_codes'").fetchone() is None
     assert get_member(url, course.id, teacher.id).role == "teacher"
-    assert migrate(url) == ["020"]
+    assert migrate(url) == [p.name[:3] for p in migrations]

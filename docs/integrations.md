@@ -88,6 +88,14 @@
 | `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` | 正数，且 < `LLM_CHAT_TIMEOUT_SECONDS` | `5` | 流式问答首字超时；到点前未出字才允许切备用 | 占位（D-02e） |
 | `LLM_CHAT_TIMEOUT_SECONDS` | 正数 | `15` | 问答链路（问题改写 + 流式生成）整体上限（赛题 ≤ 15 秒）；链路内任何调用及重试都不得超出剩余时间 | 占位（D-02e） |
 | `LLM_MAX_CONCURRENCY` | 整数 ≥ 1 | `8` | 抽取 worker 的块/小节共享池上限；环境变量可覆盖，多个 worker 上限相加；API 问答独立 | EXTRACT-PERF-01 用户已确认（2026-11-05） |
+| `DISAMBIGUATION_AUTO_MERGE_ENABLED` | 布尔 | `false` | 启用 v2 提及、小节分析及 merging 全局消歧和安全映射；不改已有 v1 身份，prepared 计划进入 persisting 后仍按固定结果消费 | ADR-099 |
+| `DISAMBIGUATION_MAX_GLOBAL_PAIRS` | 整数 1～4096 | `128` | 全局召回候选对预算；最多每对 3 次逻辑裁决调用，物理重试仍受 E04 约束 | ADR-099 |
+| `DISAMBIGUATION_RECALL_TOP_K` | 整数 1～64 | `8` | 各节点各通道近邻上限，再取并集截到全局预算 | ADR-099 |
+| `DISAMBIGUATION_MAX_CORPUS_NODES` | 整数 2～10000 | `2000` | 全局分析节点预算；超出保留原始候选并记录 partial | ADR-099 |
+| `DISAMBIGUATION_MAX_CORPUS_BYTES` | 整数 1024～20000000 | `2000000` | 召回文本 UTF-8 总字节预算；不裁掉限定语来凑预算 | ADR-099 |
+| `DISAMBIGUATION_ANALYSIS_ENABLED` | 布尔 | `false` | 第一批生成消歧分析与提及身份；只写分析检查点，不自动合并；接管遵循已有任务身份模式 | ADR-098 |
+| `DISAMBIGUATION_MAX_PAIRS_PER_SECTION` | 整数 1～256 | `32` | 小节最多分析候选对数，超出显式 partial；使用名称/别名及词项召回；未提供真实向量时记录缺失通道 | ADR-098 |
+| `DISAMBIGUATION_MAX_INPUT_BYTES` | 整数 1024～1000000 | `24000` | 完整语义请求 UTF-8 字节加 256 包装开销和输出 Token×4 预留的保守上限；不是供应商有效窗口保证，超限不调用 | ADR-098 |
 | `LLM_MAX_RETRIES` | 整数 ≥ 0 | `2` | ADR-011 三层重试中的 L1：单次调用在同一供应商上的重试次数，不含首次 | 占位（D-02e） |
 | `LLM_CIRCUIT_FAILURE_THRESHOLD` | 整数 ≥ 1 | `5` | 连续失败多少次后熔断；主用、备用、向量各自计数 | 占位（D-02e） |
 | `LLM_CIRCUIT_OPEN_SECONDS` | 整数 ≥ 1 | `30` | 熔断持续时长，到期放一次试探调用；与 ADR-011 阶段级退避首档 30 秒对齐 | 占位（D-02e） |

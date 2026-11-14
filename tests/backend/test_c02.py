@@ -110,10 +110,11 @@ def test_course_tables_have_the_specified_columns(db_url):
         member_info = database.execute("PRAGMA table_info(course_members)").fetchall()
     member_columns = {row[1] for row in member_info}
     member_pk = [row[1] for row in sorted(member_info, key=lambda r: r[5]) if row[5]]
-    # Course/CourseCreate (api.v1.yaml) + teacher-review-publish.md「courses 增加」
+    # Course/CourseCreate + teacher-review-publish + generation-disambiguation (migration 021)
     assert course_columns == {
         "id", "name", "description", "teacher_id", "created_at",
         "published_version_id", "published_version", "draft_revision", "published_from_revision",
+        "draft_storage_version",
     }
     # identity-access.md §3.1
     assert member_columns == {"course_id", "user_id", "role", "added_by", "created_at"}

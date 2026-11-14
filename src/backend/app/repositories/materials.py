@@ -173,6 +173,25 @@ def _delete_material(
             return MaterialNotDeletable(stage, "cleanup_pending")
 
     scope = (course_id, material_id)
+    protected_plan = database.execute(
+        """SELECT t.stage FROM fusion_plans p
+           JOIN processing_tasks t ON t.id=p.task_id AND t.course_id=p.course_id
+           WHERE t.course_id=? AND t.document_id=?
+             AND (p.state='committed' OR p.applied=1 OR EXISTS
+                  (SELECT 1 FROM fusion_undos u WHERE u.plan_id=p.plan_id)) LIMIT 1""", scope,
+    ).fetchone()
+    if protected_plan is not None:
+        return MaterialNotDeletable(protected_plan[0], "contributed")
+
+    # Only unsuccessful, unapplied analysis belongs to this deletion. Immutable
+    # committed plans and undo audit must survive even an inconsistent task state.
+    database.execute(
+        """DELETE FROM fusion_plans WHERE course_id=? AND applied=0
+             AND state IN ('prepared','skipped')
+             AND NOT EXISTS (SELECT 1 FROM fusion_undos u WHERE u.plan_id=fusion_plans.plan_id)
+             AND task_id IN (SELECT id FROM processing_tasks WHERE course_id=? AND document_id=?
+                             AND stage IN ('failed','cancelled'))""", (course_id, *scope),
+    )
     database.execute("DELETE FROM chunks WHERE course_id = ? AND material_id = ?", scope)
     database.execute("DELETE FROM task_revisions WHERE course_id = ? AND material_id = ?", scope)
     database.execute("DELETE FROM material_revisions WHERE course_id = ? AND material_id = ?", scope)
