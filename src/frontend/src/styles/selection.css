@@ -1,0 +1,39 @@
+/* 界面文字不参与拖选；不在 app/body 上禁用选择，正文和来源默认保持可复制。 */
+.app :where(
+  h1, h2, h3, h4, h5, h6,
+  label, legend, summary,
+  .auth-layout,
+  .app-header, .app-topbar, .app-rail, .app-drawer, .app-nav,
+  [role='toolbar'], [role='tablist'],
+  .ui-page-header, .ui-section-heading, .ui-actions, .ui-chip, .ui-entry,
+  .graph-toolbar, .teacher-graph__tabs,
+  .gw-legend, .gw-search, .gw-count, .gw-next__head, .gw-panel__head,
+  .knowledge-cards__pager, .answer__head
+) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 输入框可能位于 label、工具栏或认证布局内，显式恢复其原生选择/编辑能力。 */
+.app :where(input, textarea, [contenteditable]:not([contenteditable='false'])) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 业务内容里的标题也属于可复制内容，不能跟随界面标题一起禁选。 */
+.app :where(
+  .chat-markdown, .chat-markdown *,
+  .knowledge-detail h2, .knowledge-detail h3,
+  .current-name, .resume__title, .gw-title,
+  .source-viewer, .source-viewer__head,
+  .app-topbar__name
+) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 邀请码保留点击即全选的行为，包括 WebKit。 */
+.app .course-invite__code {
+  -webkit-user-select: all;
+  user-select: all;
+}
