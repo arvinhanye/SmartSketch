@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import type { CanvasEditing } from '../../composables/useCanvasEditing'
 import { RELATION_TYPES } from '../../composables/useRelationEditor'
 import { RELATION_STYLES, type RelationType } from '../../graph/adapter'
+import { NODE_BASE_PX } from '../../graph/scale'
 
 /**
  * 画布上的编辑浮层（UI-GRAPH-EDIT-02）：关系线工具条、节点悬停工具（“⋯”与连接柄）、节点菜单、
@@ -20,6 +21,18 @@ const root = ref<HTMLElement | null>(null)
 const menuEl = ref<HTMLElement | null>(null)
 const chooserEl = ref<HTMLElement | null>(null)
 const typeOptions = RELATION_TYPES.map((type) => ({ type, label: RELATION_STYLES[type].label }))
+// 与节点的屏幕尺寸同步；保留可点击尺寸并限制最大值，避免大倍率时按钮膨胀。
+const toolScale = computed(() => Math.min(1.5, Math.max(0.9, (ed.value.hover?.r ?? 18) * 2 / NODE_BASE_PX)))
+const moreStyle = computed(() => {
+  const node = ed.value.hover, scale = toolScale.value
+  return node === null ? {} : { left: `${node.x + node.r * 0.72 - 2 * scale}px`, top: `${node.y - node.r * 0.72 - 20 * scale}px`,
+    width: `${22 * scale}px`, height: `${22 * scale}px`, fontSize: `${14 * scale}px` }
+})
+const handleStyle = computed(() => {
+  const node = ed.value.hover, scale = toolScale.value
+  return node === null ? {} : { left: `${node.x + node.r - 3 * scale}px`, top: `${node.y - 8 * scale}px`,
+    width: `${16 * scale}px`, height: `${16 * scale}px` }
+})
 
 /** 浮层不越出画布：按容器尺寸收紧 */
 function clampTo(x: number, y: number, width: number, height: number): { left: string; top: string } {
@@ -149,7 +162,7 @@ onBeforeUnmount(() => {
         data-test="ce-more"
         aria-label="更多操作"
         title="更多操作（也可以在节点上点右键）"
-        :style="{ left: `${ed.hover.x + ed.hover.r * 0.72 - 2}px`, top: `${ed.hover.y - ed.hover.r * 0.72 - 20}px` }"
+        :style="moreStyle"
         @pointerenter="editing.holdHover"
         @pointerleave="editing.releaseHover"
         @click="editing.openMenu({ kpId: ed.hover.kpId, x: ed.hover.x + ed.hover.r, y: ed.hover.y - ed.hover.r })"
@@ -162,7 +175,7 @@ onBeforeUnmount(() => {
         data-test="ce-handle"
         aria-label="从这里拖出连线"
         title="按住拖到另一个知识点，建立关系"
-        :style="{ left: `${ed.hover.x + ed.hover.r - 3}px`, top: `${ed.hover.y - 8}px` }"
+        :style="handleStyle"
         @pointerenter="editing.holdHover"
         @pointerleave="editing.releaseHover"
         @pointerdown="onHandleDown"

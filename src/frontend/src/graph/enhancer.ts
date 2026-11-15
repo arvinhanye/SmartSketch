@@ -37,6 +37,8 @@ export interface EnhanceOptions {
    * 所以页面可以据此收起钉在屏幕位置上的浮层，而不会被一次普通的重绘误伤。
    */
   onTransform?: () => void
+  /** 节点位置/尺寸已完成绘制（含拖动与布局），供现有悬停浮层读取最新几何。 */
+  onGeometryChange?: () => void
   /** 在节点上点右键（UI-GRAPH-EDIT-02） */
   onNodeMenu?: (info: { kpId: string; clientX: number; clientY: number }) => void
   /** 每次重排标签后回报“当前显示几个标签 / 共几个节点”，页面据此提示“放大可看到更多标签” */
@@ -393,6 +395,10 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
   function attach(): void {
     const g = deps.graph()
     if (g === null) return
+    // G6 drag-element 的 translateElementBy 也走 draw；完成后读坐标，避免拖动事件早于实际位移。
+    g.on('afterdraw', () => {
+      if (live() && deps.graph() === g) options.onGeometryChange?.()
+    })
     // 语义缩放：缩小时标签按档位放大，屏幕上保持约 13px；节点、线、箭头按屏幕下限放大
     g.on('aftertransform', () => {
       if (!live() || deps.graph() !== g) return

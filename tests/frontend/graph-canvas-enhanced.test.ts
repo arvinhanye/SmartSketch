@@ -111,6 +111,15 @@ afterEach(() => {
 })
 
 describe('GraphCanvas 增强模式', () => {
+  it('节点绘制完成后通知浮层刷新位置，不冒充视口平移缩放', async () => {
+    const {wrapper,graphs}=setup()
+    await settle()
+    const canvas=wrapper.findComponent(GraphCanvas)
+    graphs[0]!.emit('afterdraw')
+    expect(canvas.emitted('geometryChange')).toHaveLength(1)
+    expect(canvas.emitted('viewChange')).toBeUndefined()
+    wrapper.unmount()
+  })
   it('章节布局失败的基础模式恢复后重建增强生命周期，控件可以缩放', async () => {
     const enhanced = ref(false), positions = ref<Positions|null>(null)
     const { wrapper, graphs } = setup({ enhanced, positions })

@@ -61,6 +61,8 @@ const emit = defineEmits<{
   nodeHover: [kpId: string | null]
   /** 画布平移或缩放了：浮在节点、关系线旁的工具应当收起 */
   viewChange: []
+  /** 绘制完成后节点位置/尺寸可能改变；只刷新已存在的悬停工具。 */
+  geometryChange: []
 }>()
 
 const factory = inject(GRAPH_FACTORY_KEY, loadG6Graph)
@@ -158,6 +160,7 @@ function start(attempt = 0): void {
           onHover: showTip,
           // 只有真正的平移、缩放才算“画布动了”；数据更新后回报缩放值不算（否则刚打开的工具条会被自己触发的重绘收起）
           onTransform: () => emit('viewChange'),
+          onGeometryChange: () => emit('geometryChange'),
           onEdgeClick: (info) => emit('edgeClick', { relationId: info.relationId, ...local(info) }),
           onNodeMenu: (info) => emit('nodeMenu', { kpId: info.kpId, ...local(info) }),
           fitPads: props.fitPads,

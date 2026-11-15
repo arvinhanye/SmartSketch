@@ -607,7 +607,7 @@ useGraphShortcuts({
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" @edge-click="editing.openEdge" @node-menu="editing.openMenu" @node-hover="editing.onNodeHover" @view-change="editing.onViewChange" @blank-click="editing.onViewChange" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick">
+          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" @edge-click="editing.openEdge" @node-menu="editing.openMenu" @node-hover="editing.onNodeHover" @geometry-change="editing.refreshHover" @view-change="editing.onViewChange" @blank-click="editing.onViewChange" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick">
             <div class="graph-workspace teacher-graph__legend-host">
               <GraphLegend
                 :open="legendOpen"
