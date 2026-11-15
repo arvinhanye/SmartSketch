@@ -32,6 +32,7 @@ import './styles.css'
 import './styles/tokens.css'
 import './styles/graph-workspace.css'
 import './styles/ui.css'
+import './styles/selection.css'
 
 const appName = '智绘学途'
 // 未安装路由时（如 B02 单独挂载外壳）只渲染标题，不报错

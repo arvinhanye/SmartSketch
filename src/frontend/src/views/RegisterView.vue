@@ -309,7 +309,7 @@ async function submit(): Promise<void> {
   font-size: 12px;
   line-height: 1.6;
 }
-.register :is(input, button, a):focus-visible {
+.register :is(button, a):focus-visible {
   outline: 2px solid var(--ui-highlight);
   outline-offset: 3px;
 }

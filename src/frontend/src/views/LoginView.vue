@@ -242,7 +242,7 @@ async function submit(): Promise<void> {
   line-height: 1.7;
   margin: 0 0 16px;
 }
-.login :is(input, button, a):focus-visible {
+.login :is(button, a):focus-visible {
   outline: 2px solid var(--ui-highlight);
   outline-offset: 3px;
 }
