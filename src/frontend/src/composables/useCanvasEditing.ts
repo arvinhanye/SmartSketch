@@ -14,6 +14,8 @@ import type { RelationEditor, RelationRow } from './useRelationEditor'
 export const UNDO_MS = 6000
 /** 指针离开节点后悬停工具再留多久（给指针移到“⋯”和连接柄上的时间） */
 export const HOVER_LINGER_MS = 350
+/** 小节点不显示比节点本身还抢眼的快捷按钮；单位是当前屏幕像素。 */
+export const NODE_TOOLS_MIN_DIAMETER = 32
 
 export interface Point {
   x: number
@@ -124,6 +126,17 @@ export function useCanvasEditing({ relations, anchors, undoLast, onDetail, onEdi
   }
 
   // ---------------------------------------------------------------- 节点悬停工具与菜单
+  function visibleAnchor(kpId: string): NodeAnchor | null {
+    const anchor = anchors().find((a) => a.kpId === kpId)
+    return anchor !== undefined && anchor.r * 2 >= NODE_TOOLS_MIN_DIAMETER ? anchor : null
+  }
+  /** 节点拖动/布局/重绘完成后更新快照，不延长悬停，也不重新打开已关闭的工具。 */
+  function refreshHover(): void {
+    const previous = hover.value
+    if (previous === null) return
+    const current = visibleAnchor(previous.kpId)
+    if (current === null || current.x !== previous.x || current.y !== previous.y || current.r !== previous.r) hover.value = current
+  }
   function onNodeHover(kpId: string | null): void {
     clearHoverTimer()
     if (menu.value !== null || edgeTool.value !== null || connect.value !== null) return
@@ -133,7 +146,7 @@ export function useCanvasEditing({ relations, anchors, undoLast, onDetail, onEdi
       }, HOVER_LINGER_MS)
       return
     }
-    hover.value = anchors().find((a) => a.kpId === kpId) ?? null
+    hover.value = visibleAnchor(kpId)
   }
   /** 指针进入悬停工具：别让它消失 */
   function holdHover(): void {
@@ -229,6 +242,7 @@ export function useCanvasEditing({ relations, anchors, undoLast, onDetail, onEdi
     undoDelete,
     dismissUndo: clearUndo,
     onNodeHover,
+    refreshHover,
     holdHover,
     releaseHover,
     openMenu,

@@ -47,11 +47,11 @@ function stub(edges: Edge[] = [{ id: 'r1', type: 'PREREQUISITE', from_id: 'a', t
   return { relations: relations as unknown as RelationEditor, raw: relations, saving }
 }
 
-function setup(edges?: Edge[]) {
+function setup(edges?: Edge[], anchors: () => NodeAnchor[] = () => ANCHORS) {
   const s = stub(edges)
   const handlers = { onDetail: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn() }
   const scope = effectScope()
-  const editing = scope.run(() => useCanvasEditing({ relations: s.relations, anchors: () => ANCHORS, ...handlers }))!
+  const editing = scope.run(() => useCanvasEditing({ relations: s.relations, anchors, ...handlers }))!
   return { editing, ...s, handlers, scope }
 }
 
@@ -126,6 +126,43 @@ describe('useCanvasEditing：关系线', () => {
 })
 
 describe('useCanvasEditing：悬停工具与节点菜单', () => {
+  it('屏幕直径不足 32px 不显示工具，右键菜单仍可用', () => {
+    const { editing, scope } = setup(undefined, () => [{kpId:'a',x:100,y:100,r:15.9}])
+    editing.onNodeHover('a')
+    expect(editing.hover.value).toBe(null)
+    editing.openMenu({kpId:'a',x:100,y:100})
+    expect(editing.menu.value?.kpId).toBe('a')
+    scope.stop()
+  })
+
+  it('移动后刷新到最新位置；缩小或移除节点后不残留按钮，也不凭空创建悬停', () => {
+    let positions:NodeAnchor[]=[{kpId:'a',x:100,y:100,r:16}]
+    const { editing, scope } = setup(undefined, () => positions)
+    editing.onNodeHover('a')
+    expect(editing.hover.value).toEqual(positions[0])
+    positions=[{kpId:'a',x:250,y:180,r:24}]
+    editing.refreshHover()
+    expect(editing.hover.value).toEqual(positions[0])
+    positions=[{kpId:'a',x:250,y:180,r:8}]
+    editing.refreshHover()
+    expect(editing.hover.value).toBe(null)
+    positions=[{kpId:'a',x:250,y:180,r:24}]
+    editing.refreshHover()
+    expect(editing.hover.value).toBe(null)
+    editing.onNodeHover('a');positions=[];editing.refreshHover()
+    expect(editing.hover.value).toBe(null)
+    scope.stop()
+  })
+
+  it('刷新位置不延长离开节点后的停留计时', () => {
+    const {editing,scope}=setup()
+    editing.onNodeHover('a');editing.onNodeHover(null)
+    vi.advanceTimersByTime(HOVER_LINGER_MS-1)
+    editing.refreshHover()
+    vi.advanceTimersByTime(2)
+    expect(editing.hover.value).toBe(null)
+    scope.stop()
+  })
   it('悬停节点出现工具；离开后稍留片刻再消失，指针进入工具则保留', () => {
     const { editing } = setup()
     editing.onNodeHover('b')
@@ -239,6 +276,26 @@ function mountLayer(edges?: Edge[]) {
 }
 
 describe('CanvasEditLayer', () => {
+  it('两个按钮随可见节点适度缩放，移动后 DOM 位置同步', async () => {
+    let position:NodeAnchor={kpId:'a',x:100,y:100,r:18}
+    const {editing,scope}=setup(undefined,()=>[position])
+    editing.onNodeHover('a')
+    const wrapper=mount(CanvasEditLayer,{props:{editing,error:null,conflict:null}})
+    const more=()=>wrapper.get('[data-test=ce-more]').element as HTMLButtonElement
+    const handle=()=>wrapper.get('[data-test=ce-handle]').element as HTMLButtonElement
+    const left=more().style.left
+    expect(more().style.width).toBe('22px')
+    expect(handle().style.width).toBe('16px')
+    position={...position,x:240,y:190,r:36};editing.refreshHover();await flushPromises()
+    expect(more().style.left).not.toBe(left)
+    expect(parseFloat(more().style.width)).toBeGreaterThan(22)
+    expect(parseFloat(handle().style.width)).toBeGreaterThan(16)
+    expect(parseFloat(more().style.width)).toBeLessThanOrEqual(33)
+    position={...position,r:7};editing.refreshHover();await flushPromises()
+    expect(wrapper.find('[data-test=ce-more]').exists()).toBe(false)
+    expect(wrapper.find('[data-test=ce-handle]').exists()).toBe(false)
+    wrapper.unmount();scope.stop()
+  })
   it('关系线工具条：类型下拉、反转、删除；“相关”没有反转；请求在途时都不可用', async () => {
     const { wrapper, editing, raw, saving } = mountLayer()
     editing.openEdge({ relationId: 'r1', x: 200, y: 90 })
@@ -340,13 +397,14 @@ describe('画布生命周期：关系线点击、节点右键与节点位置', (
     const onEdgeClick = vi.fn()
     const onNodeMenu = vi.fn()
     const onTransform = vi.fn()
+    const onGeometryChange = vi.fn()
     let fake!: FakeEnhancedGraph
     const container = document.createElement('div')
     Object.defineProperty(container, 'clientWidth', { value: 800 })
     Object.defineProperty(container, 'clientHeight', { value: 600 })
     const lifecycle = createGraphLifecycle(container, {
       data,
-      enhance: { onEdgeClick, onNodeMenu, onTransform },
+      enhance: { onEdgeClick, onNodeMenu, onTransform, onGeometryChange },
       factory: (init) => (fake = new FakeEnhancedGraph({ 'kp:a': [100, 50], 'kp:b': [300, 200] }, init)),
     })
     await vi.waitFor(() => expect(lifecycle.status).toBe('ready'))
@@ -372,7 +430,13 @@ describe('画布生命周期：关系线点击、节点右键与节点位置', (
     const expected = fake.getViewportByCanvas([100, 50])
     expect([anchors[0]!.x, anchors[0]!.y]).toEqual([expected[0], expected[1]])
     expect(anchors[0]!.r).toBeGreaterThanOrEqual(18 * zoom)
+    fake.pos['kp:a']=[240,180]
+    fake.emit('afterdraw')
+    expect(onGeometryChange).toHaveBeenCalledTimes(1)
+    expect(lifecycle.anchors()[0]!.x).toBe(fake.getViewportByCanvas([240,180])[0])
     lifecycle.destroy()
+    fake.emit('afterdraw')
+    expect(onGeometryChange).toHaveBeenCalledTimes(1)
     expect(lifecycle.anchors()).toEqual([])
   })
 })
