@@ -33,13 +33,15 @@ export function decorateNodeData(
   data: G6NodeData,
   states: readonly string[] | undefined,
   view: ViewState,
+  showAllLabels = false,
 ): G6NodeData {
   return {
     ...data,
     k: view.labelK,
     nk: view.floors.nodeK,
     lw: view.floors.lwMin,
-    labelOn: view.labelShown === null ? true : view.labelShown.has(id),
+    labelOn: showAllLabels || view.labelShown === null || view.labelShown.has(id),
+    labelAll: showAllLabels,
     mastery: masteryOfStates(states),
   }
 }

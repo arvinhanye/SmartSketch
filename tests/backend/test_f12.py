@@ -368,6 +368,10 @@ def test_migration_012_rolls_back_and_reapplies(s):
     database = sqlite3.connect(s.url.removeprefix("sqlite:///"))
     try:
         with database:
+            # 026 requires processing to finish or be cancelled before rollback.
+            # The shared edit fixture otherwise leaves this synthetic task extracting.
+            database.execute("UPDATE processing_tasks SET stage='cancelled',cancel_requested=1 "
+                             "WHERE id='t-running' AND course_id=?", (s.course.id,))
             for path in [*later, target]:
                 for line in rollback_lines(path):
                     database.execute(line)

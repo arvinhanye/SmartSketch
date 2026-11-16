@@ -299,7 +299,7 @@ def test_failed_input_state_with_unknown_code_is_invalid():
 
 
 # REVIEW-C08 R03: an unknown event kind is not a legal event in the wrong stage.
-@pytest.mark.parametrize("kind", ["made_up", "resume", "CLAIM", ""])
+@pytest.mark.parametrize("kind", ["made_up", "restart_unknown", "CLAIM", ""])
 def test_unknown_event_kind_is_invalid_event(kind):
     assert_rejected(TaskState("parsing", .04), TransitionEvent(kind), "invalid_event")
 

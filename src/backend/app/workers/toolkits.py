@@ -20,10 +20,6 @@ from app.services.fusion.resolution import SemanticResolver
 from app.services.credentials import CredentialCipher, CredentialError, CredentialUnavailable
 from app.workers.extract_task import ExtractionToolkit
 
-# 与 K02 评测脚本的缺省值一致（evaluation/run_live_extraction.py）
-MAX_OUTPUT_TOKENS = 4096
-
-
 class TaskToolkits:
     def __init__(self, settings: Settings, *, cipher: CredentialCipher | None = None,
                  store: CallStore | None = None, transport: HttpTransport | None = None) -> None:
@@ -54,16 +50,27 @@ class TaskToolkits:
         model, task_id = binding.model, lease.task_id
         return ExtractionToolkit(
             policy=policy,
-            entities=lambda bound: EntityExtractor(bound, model=model, max_output_tokens=MAX_OUTPUT_TOKENS),
-            relations=lambda bound: RelationExtractor(bound, model=model, max_output_tokens=MAX_OUTPUT_TOKENS),
+            entities=lambda bound: EntityExtractor(bound, model=model, max_output_tokens=self._settings.LLM_EXTRACTION_MAX_OUTPUT_TOKENS),
+            relations=lambda bound: RelationExtractor(
+                bound, model=model, max_output_tokens=self._settings.LLM_EXTRACTION_MAX_OUTPUT_TOKENS,
+                timeout_seconds=self._settings.LLM_RELATION_TIMEOUT_SECONDS,
+            ),
             user_id=binding.user_id,
             guard=lambda: self._require_active(task_id),
             model=model,
-            resolver=(lambda bound: SemanticResolver(bound, model=model,
-                max_input_bytes=self._settings.DISAMBIGUATION_MAX_INPUT_BYTES))
+            resolver=(lambda bound: SemanticResolver(
+                bound, model=model, max_input_bytes=self._settings.DISAMBIGUATION_MAX_INPUT_BYTES,
+                max_output_tokens=self._settings.DISAMBIGUATION_MAX_OUTPUT_TOKENS,
+            ))
                 if (self._settings.DISAMBIGUATION_ANALYSIS_ENABLED or self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
             local_normalization=self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED,
             preserve_mentions=(self._settings.DISAMBIGUATION_ANALYSIS_ENABLED or self._settings.DISAMBIGUATION_AUTO_MERGE_ENABLED),
             analysis_max_pairs=self._settings.DISAMBIGUATION_MAX_PAIRS_PER_SECTION,
+            analysis_context=dict(
+                mode="personal",
+                base_url=binding.base_url,
+                model=model,
+                disable_thinking=binding.disable_thinking,
+            ),
             window_policy=WindowPolicy.from_settings(self._settings),
         )

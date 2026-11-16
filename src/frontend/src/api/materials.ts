@@ -14,6 +14,8 @@ export type MaterialDocument = components['schemas']['Document']
 export type DocumentFormat = components['schemas']['DocumentFormat']
 export type UploadAccepted = components['schemas']['UploadAccepted']
 export type TaskSnapshot = components['schemas']['Task']
+export type TaskActivity = components['schemas']['TaskActivity']
+export type TaskActivityPhase = TaskActivity['phase']
 export type UploadPolicy = components['schemas']['UploadPolicy']
 /** 409 `TASK_NOT_CANCELLABLE` 的 `details`（`specs/task-processing.md` §4） */
 export type TaskNotCancellableDetails = components['schemas']['TaskNotCancellableError']['details']
@@ -29,6 +31,10 @@ export interface MaterialsApi {
   uploadPolicy(cid: string, control?: RequestControl): Promise<UploadPolicy>
   /** 协作式取消；受理均为 200，以响应体 `stage` 与 `cancel_requested` 为准，不可取消为 409 */
   cancelTask(tid: string, control?: RequestControl): Promise<TaskSnapshot>
+  /** 读取已落盘的处理详情；与 SSE 生命周期独立。 */
+  taskActivity(tid: string, control?: RequestControl): Promise<TaskActivity>
+  /** 继续已取消的原任务，复用资料与完整检查点。 */
+  resumeTask(tid: string, control?: RequestControl): Promise<TaskSnapshot>
 }
 
 /** 视图经 inject 取得资料接口，测试可注入假实现 */
@@ -52,5 +58,9 @@ export function createMaterialsApi(client: HttpClient): MaterialsApi {
       client.request('get', '/api/v1/courses/{cid}/upload-policy', { ...control, params: { cid } }),
     cancelTask: (tid, control = {}) =>
       client.request('post', '/api/v1/tasks/{tid}/cancel', { ...control, params: { tid } }),
+    taskActivity: (tid, control = {}) =>
+      client.request('get', '/api/v1/tasks/{tid}/activity', { ...control, params: { tid } }),
+    resumeTask: (tid, control = {}) =>
+      client.request('post', '/api/v1/tasks/{tid}/resume', { ...control, params: { tid } }),
   }
 }

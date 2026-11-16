@@ -45,7 +45,7 @@ _CANCELLABLE_SQL = "('parsing', 'extracting', 'merging')"
 _LEASE_FREE_SQL = "(lease_expires_at IS NULL OR lease_expires_at < unixepoch())"
 # Claimable condition C (§8.2).
 _CLAIMABLE_SQL = (
-    "attempt < :max_attempts AND not_before <= unixepoch() AND cancel_requested = 0 "
+    "attempt - resume_attempt_base < :max_attempts AND not_before <= unixepoch() AND cancel_requested = 0 "
     f"AND (stage = 'queued' OR (stage IN {_PROCESSING_SQL} AND {_LEASE_FREE_SQL}))"
 )
 
@@ -242,7 +242,7 @@ def reclaim_expired(sqlite_url: str, *, max_attempts: int) -> ReclaimResult:
     """Reclaim processing tasks whose lease expired or was released (§8.2 回收).
 
     Order: cancel requested → ``cancelled`` (T8, the reclaimer acts as the checkpoint);
-    else ``attempt ≥ max_attempts`` → ``failed`` with ``TASK_ATTEMPTS_EXHAUSTED``;
+    else this manual run's attempts are exhausted → ``failed`` with ``TASK_ATTEMPTS_EXHAUSTED``;
     else untouched, waiting for takeover. A ``persisting`` task failed here (or by
     ``release_after_transient_failure``) gets ``cleanup_pending`` (§8.4, F13). Also lists ``failed`` tasks with
     ``cleanup_pending`` for the §8.4 cleanup retry. Returned terminal tasks need an SSE push.
@@ -264,7 +264,7 @@ def reclaim_expired(sqlite_url: str, *, max_attempts: int) -> ReclaimResult:
                     cleanup_pending = CASE WHEN stage = 'persisting' THEN 1 ELSE cleanup_pending END,
                     stage = 'failed', lease_owner = NULL, lease_token = NULL,
                     lease_expires_at = NULL, updated_at = {_NOW_TEXT}
-                WHERE stage IN {_PROCESSING_SQL} AND attempt >= :max_attempts
+                WHERE stage IN {_PROCESSING_SQL} AND attempt - resume_attempt_base >= :max_attempts
                     AND {_LEASE_FREE_SQL}
                 RETURNING id, course_id, stage""",
             {"message": _EXHAUSTED_MESSAGE, "max_attempts": max_attempts},
@@ -297,7 +297,7 @@ def release_after_transient_failure(
 ) -> ReleaseOutcome:
     """Active release after a stage-level temporary fault (§8.3 主动释放).
 
-    Clears the lease and sets ``not_before = now + 30 s × 2^(attempt − 1)``; when the
+    Clears the lease and backs off by ``30 s × 2^(attempt − resume_attempt_base − 1)``; when the
     attempt was the last one it performs T9 with ``code`` and ``details = {attempts, stage}``
     instead — including LLM_UNAVAILABLE in ``merging`` (ADR-017 decision 6). A code that C08
     does not allow for the stage (e.g. LLM_UNAVAILABLE in ``parsing``) raises ``ValueError``
@@ -309,13 +309,14 @@ def release_after_transient_failure(
         raise ValueError("code must be STORAGE_UNAVAILABLE or LLM_UNAVAILABLE")
     with _immediate(sqlite_url) as database:
         row = database.execute(
-            "SELECT attempt, stage FROM processing_tasks WHERE id = ? AND lease_token = ?",
+            "SELECT attempt, stage, resume_attempt_base FROM processing_tasks WHERE id = ? AND lease_token = ?",
             (task_id, token),
         ).fetchone()
         if row is None:
             return ReleaseOutcome("lost")
-        attempt, stage = row
-        if attempt >= max_attempts:
+        attempt, stage, resume_attempt_base = row
+        run_attempt = attempt - resume_attempt_base
+        if run_attempt >= max_attempts:
             details = _exhaustion_details(attempt, stage)
             if not failure_code_allowed(code, stage, details):
                 raise ValueError(f"{code} is not a failure code for stage {stage}")
@@ -338,7 +339,7 @@ def release_after_transient_failure(
         released = database.execute(
             f"""UPDATE processing_tasks
                 SET lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
-                    not_before = unixepoch() + ? * (1 << (attempt - 1)),
+                    not_before = unixepoch() + ? * (1 << (attempt - resume_attempt_base - 1)),
                     updated_at = {_NOW_TEXT}
                 WHERE id = ? AND lease_token = ?
                 RETURNING not_before""",

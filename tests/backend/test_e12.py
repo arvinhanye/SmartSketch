@@ -501,7 +501,7 @@ def test_cancel_before_start_goes_straight_to_cancelled(db_url, storage):
 
 
 def test_cancel_takes_effect_at_the_next_chunk_boundary(db_url, storage):
-    """TASK-4：在途调用完成后其结果不写检查点；之后不再调用模型，任务转 cancelled。"""
+    """ADR-103：保存在途完整结果，之后不再调用模型，任务转 cancelled。"""
     lease, chunk_ids = _extracting(db_url, storage)
     script = Script()
 
@@ -514,7 +514,7 @@ def test_cancel_takes_effect_at_the_next_chunk_boundary(db_url, storage):
     outcome = _run(db_url, lease, _toolkit(db_url, script))
 
     assert outcome.status is ExtractStatus.CANCELLED
-    assert set(_checkpoints(db_url, lease.task_id)) == {chunk_ids[0], chunk_ids[1]}
+    assert set(_checkpoints(db_url, lease.task_id)) == {chunk_ids[0], chunk_ids[1], chunk_ids[2]}
     assert {key for _, key in script.calls} == {_key(chunk_ids, i) for i in range(3)}
     row = _row(db_url, lease.task_id)
     assert row["stage"] == "cancelled" and row["lease_token"] is None and row["error_code"] is None
@@ -534,7 +534,7 @@ def test_cancel_during_relation_phase_is_honoured(db_url, storage):
     outcome = _run(db_url, lease, _toolkit(db_url, script))
 
     assert outcome.status is ExtractStatus.CANCELLED
-    assert _checkpoints(db_url, lease.task_id, "section") == {}
+    assert len(_checkpoints(db_url, lease.task_id, "section")) == 1
     assert _row(db_url, lease.task_id)["stage"] == "cancelled"
 
 
@@ -990,12 +990,10 @@ def test_revoked_credential_fails_the_task_before_any_model_call(db_url, storage
 def test_credential_revoked_mid_stage_stops_further_chunks(db_url, storage):
     lease, _chunk_ids = _extracting(db_url, storage)
     script = Script()
-    allowed = {"left": 2}
-
     def guard() -> None:
-        if allowed["left"] == 0:
+        # Revocation follows actual model work, not the number of guard checks.
+        if len(script.calls) >= 2:
             raise CredentialUnavailable("credential_revoked")
-        allowed["left"] -= 1
 
     toolkit = dataclasses.replace(_toolkit(db_url, script), guard=guard)
 

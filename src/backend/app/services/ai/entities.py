@@ -56,7 +56,7 @@ __all__ = [
 
 #: 提示词用途与本模块固定使用的版本；改模板须同时升此版本与 ``prompts/MANIFEST.md``。
 ENTITY_PROMPT_PURPOSE: Final = "extract_entities"
-ENTITY_PROMPT_VERSION: Final = 2
+ENTITY_PROMPT_VERSION: Final = 3
 #: 修复调用的 ``ModelRequest.purpose``（E02 接口注释的示例值；E03 用途枚举待定，见交接待决）。
 REPAIR_PURPOSE: Final = "repair"
 

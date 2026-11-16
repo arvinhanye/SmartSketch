@@ -87,9 +87,9 @@ def test_groups_differ_only_in_stage_configuration(fake_results):
     two = fake_results["two_stage"]["outcome"].run_log
     glean = fake_results["two_stage_gleaning"]["outcome"].run_log
     assert single["prompt_versions"] == {"extract_joint": 1}
-    assert two["prompt_versions"] == {"extract_entities": 2, "extract_relations": 2}
-    assert glean["prompt_versions"] == {"extract_entities": 2, "extract_relations": 2,
-                                        "extract_entities_gleaning": 2}
+    assert two["prompt_versions"] == {"extract_entities": 3, "extract_relations": 2}
+    assert glean["prompt_versions"] == {"extract_entities": 3, "extract_relations": 2,
+                                        "extract_entities_gleaning": 3}
     assert two["gleaning"]["enabled"] is False
     assert glean["gleaning"] == {"enabled": True, "max_rounds": 1, "added": 0}
     assert set(single["model_calls"]["by_purpose"]) == {"extract_joint"}

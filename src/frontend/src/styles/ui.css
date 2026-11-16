@@ -561,6 +561,8 @@
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .node-legend { flex: none; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__hint { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .light-surface.ui-teacher-workspace .teacher-graph__canvas-bar .teacher-graph__picker { flex: 0 1 260px; min-width: 160px; }
+.light-surface.ui-teacher-workspace .teacher-graph__labels { display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; font-size: 12px; cursor: pointer; }
+.light-surface.ui-teacher-workspace .teacher-graph__labels input { width: auto; margin: 0; accent-color: var(--gw-accent); }
 
 /* UI-BATCH2-01：教师图谱详情的来源行与标题焦点 */
 .light-surface.ui-teacher-workspace .teacher-graph__panel .knowledge-detail h2[tabindex='-1']:focus { outline: none; }

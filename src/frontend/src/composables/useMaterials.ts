@@ -5,9 +5,10 @@ import type { TaskStage, TaskSubscription } from '../api/taskEvents'
 import { useCourseStore } from '../stores/course'
 import { FORMAT_LABEL, formatOf, formatBytes, sameChapterOtherFormat, validateMaterialFile } from './materials/files'
 import { ACTIVE_STAGES, ALL_STAGES, CANCELLABLE_STAGES, STREAM_NOTICE, taskStatusOf } from './materials/status'
+import { watchTaskActivity, type ActivityWatch } from './materials/activity'
 import {
   CANCEL_REASON_MESSAGE, DELETE_REASON_MESSAGE, NETWORK_MESSAGE,
-  cancelErrorMessage, deleteErrorMessage, isNetworkFailure, limitBytesOf, taskErrorMessage, uploadFailure,
+  cancelErrorMessage, deleteErrorMessage, isNetworkFailure, limitBytesOf, resumeErrorMessage, taskErrorMessage, uploadFailure,
 } from './materials/errors'
 import type { DeleteState, ErrorBody, MaterialRow, PageSession, PageStatus, TrackedTask, UseMaterialsOptions } from './materials/types'
 
@@ -26,7 +27,7 @@ export type { TaskStatusKind, TaskStatus, PageStatus, StreamStatus, MaterialRow,
  * - 上传成功后按 `task_id` 经 C12 `TaskEventsClient` 订阅进度，作用域取自课程 store。
  * - 「取消中」只看服务端 `cancel_requested = true` 且非终态，「已取消」只看 `stage = cancelled`；
  *   409 `TASK_NOT_CANCELLABLE` 以 `details.stage` 刷新界面，不假装取消成功（`specs/task-processing.md` §4）。
- * - 失败/取消后的重试 = 用本次会话保留的同一文件重新上传，生成新任务（I3：不复活旧任务；契约无再处理端点）。
+ * - 已取消任务可以继续原任务，复用完整结果；重新上传是独立操作，会创建新任务。
  * - 列表中仍在处理的资料按 `Document.task_id` 续订进度（ADR-021），刷新页面后仍可看进度与取消。
  * - 失败/已取消的资料可删除（ADR-021）：先确认再请求；409 `DOCUMENT_NOT_DELETABLE` 以 `details.stage` 刷新。
  * - 离开页面（路由离开、卸载、切课）关闭全部订阅并中止在途请求；迟到回调一律丢弃。
@@ -60,6 +61,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
   const canRetryUpload = ref(false)
 
   let session: PageSession | null = null
+  const activityReaders = new Map<string, ActivityWatch>()
 
   const alive = (s: PageSession) => s === session && !s.disposed
 
@@ -69,6 +71,8 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     session = null
     s.disposed = true
     s.controller.abort()
+    for (const reader of activityReaders.values()) reader.close()
+    activityReaders.clear()
     for (const sub of [...s.subs.values()]) sub.close()
     s.subs.clear()
   }
@@ -190,34 +194,69 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
   ): void {
     const t = tracked.value[documentId]
     if (!t) return
+    t.stateVersion += 1
     t.stage = data.stage
     t.progress = data.progress
     if (data.cancel_requested !== undefined) t.cancelRequested = data.cancel_requested
     t.error = data.stage === 'failed' ? (data.error ?? null) : null
+    t.hasSnapshot = true
+    if (!ACTIVE_STAGES.has(t.stage)) activityReaders.get(documentId)?.refresh()
+  }
+
+  function readActivity(s: PageSession, documentId: string): void {
+    const t = tracked.value[documentId]
+    if (!t || !alive(s)) return
+    activityReaders.get(documentId)?.close()
+    const reader = watchTaskActivity({
+      api: materialsApi, taskId: t.taskId, signal: s.controller.signal,
+      shouldPoll: () => alive(s) && tracked.value[documentId] === t && ACTIVE_STAGES.has(t.stage),
+      stateVersion: () => t.stateVersion,
+      onActivity: (value) => {
+        if (!alive(s) || tracked.value[documentId] !== t) return
+        const wasActive = ACTIVE_STAGES.has(t.stage)
+        t.activity = value
+        t.activityReceivedAt = Date.now()
+        t.activityUnavailable = false
+        t.stage = value.stage
+        t.progress = value.progress
+        t.cancelRequested = value.cancel_requested
+        t.hasSnapshot = true
+        if (ACTIVE_STAGES.has(value.stage) && !wasActive) {
+          t.resumeError = null
+          subscribe(s, documentId)
+        }
+      },
+      onUnavailable: () => {
+        if (alive(s) && tracked.value[documentId] === t) t.activityUnavailable = true
+      },
+    })
+    activityReaders.set(documentId, reader)
   }
 
   function subscribe(s: PageSession, documentId: string): void {
     const t = tracked.value[documentId]
     if (!t || !alive(s)) return
     const { taskId } = t
+    const generation = ++t.streamGeneration
+    const currentSubscription = () => alive(s) && tracked.value[documentId] === t && t.streamGeneration === generation
     s.subs.get(taskId)?.close()
     s.subs.delete(taskId)
     t.stream = 'connecting'
     let sub: TaskSubscription | undefined
     sub = taskEvents.subscribe(taskId, s.scope, {
       onUpdate: (update) => {
-        if (!alive(s)) return
+        if (!currentSubscription()) return
         const data = update.source === 'stream' ? update.data : update.task
         if (update.source === 'poll' && (update.task.id !== taskId || update.task.course_id !== s.courseId)) return
         applySnapshot(documentId, data)
       },
       onState: (state) => {
-        if (!alive(s)) return
+        if (!currentSubscription()) return
         const current = tracked.value[documentId]
         if (current) current.stream = state
       },
       onClose: (reason) => {
-        if (!alive(s)) return
+        if (!currentSubscription()) return
         if (sub !== undefined && s.subs.get(taskId) === sub) s.subs.delete(taskId)
         const current = tracked.value[documentId]
         if (!current) return
@@ -241,27 +280,33 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       stream: 'connecting',
       cancelPending: false,
       cancelError: null,
+      activity: null, activityReceivedAt: 0, activityUnavailable: false,
+      resumePending: false, resumeError: null, hasSnapshot: false, streamGeneration: 0, stateVersion: 0,
     }
     subscribe(s, accepted.document_id)
+    readActivity(s, accepted.document_id)
   }
 
   /** 列表中仍在处理、尚未跟踪的资料：按 `task_id` 续订进度（ADR-021） */
   function adopt(s: PageSession): void {
     for (const d of documents.value) {
-      if (!d.task_id || !ACTIVE_STAGES.has(d.parse_status) || tracked.value[d.id]) continue
+      if (!d.task_id || (!ACTIVE_STAGES.has(d.parse_status) && d.parse_status !== 'cancelled') || tracked.value[d.id]) continue
       tracked.value[d.id] = {
         taskId: d.task_id,
         documentId: d.id,
         filename: d.filename,
         stage: d.parse_status,
         progress: 0,
-        cancelRequested: false,
+        cancelRequested: d.parse_status === 'cancelled',
         error: null,
         stream: 'connecting',
         cancelPending: false,
         cancelError: null,
+        activity: null, activityReceivedAt: 0, activityUnavailable: false,
+        resumePending: false, resumeError: null, hasSnapshot: false, streamGeneration: 0, stateVersion: 0,
       }
-      subscribe(s, d.id)
+      if (ACTIVE_STAGES.has(d.parse_status)) subscribe(s, d.id)
+      readActivity(s, d.id)
     }
   }
 
@@ -382,6 +427,38 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     }
   }
 
+  async function resume(documentId: string): Promise<void> {
+    const s = session
+    const t = tracked.value[documentId]
+    if (s === null || !alive(s) || !t || t.resumePending || t.cancelPending || deletions.value[documentId]?.pending) return
+    if (t.stage !== 'cancelled' || !t.activity?.resumable) return
+    t.resumePending = true
+    t.resumeError = null
+    // 同 task_id 重开也必须丢弃上一次连接/读取的迟到消息。
+    t.streamGeneration += 1
+    s.subs.get(t.taskId)?.close()
+    s.subs.delete(t.taskId)
+    activityReaders.get(documentId)?.close()
+    try {
+      const snapshot = await materialsApi.resumeTask(t.taskId, { signal: s.controller.signal })
+      if (!alive(s) || tracked.value[documentId] !== t) return
+      if (snapshot.id !== t.taskId || snapshot.course_id !== s.courseId || snapshot.document_id !== documentId) {
+        t.resumeError = '继续处理失败，请刷新任务状态。'
+        return
+      }
+      applySnapshot(documentId, snapshot)
+      t.cancelError = null
+      if (deletions.value[documentId]) deletions.value[documentId]!.confirming = false
+      if (ACTIVE_STAGES.has(t.stage)) subscribe(s, documentId)
+    } catch (cause) {
+      if (!alive(s) || cause instanceof AbortedError) return
+      t.resumeError = resumeErrorMessage(cause)
+    } finally {
+      t.resumePending = false
+      if (alive(s) && tracked.value[documentId] === t) readActivity(s, documentId)
+    }
+  }
+
   // ------------------------------------------------------------ 删除（ADR-021）
 
   function deletionOf(documentId: string): DeleteState {
@@ -405,6 +482,8 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
   }
 
   function forget(s: PageSession, documentId: string): void {
+    activityReaders.get(documentId)?.close()
+    activityReaders.delete(documentId)
     const t = tracked.value[documentId]
     if (t) {
       s.subs.get(t.taskId)?.close()
@@ -445,7 +524,10 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
             doc.id === documentId ? { ...doc, parse_status: stage as TaskStage } : doc,
           )
           const t = tracked.value[documentId]
-          if (t) t.stage = stage as TaskStage
+          if (t) {
+            t.stage = stage as TaskStage
+            t.cancelRequested = false
+          }
         }
         d.blocked = reason !== 'cleanup_pending'
         d.error = (typeof reason === 'string' && DELETE_REASON_MESSAGE[reason]) || '资料当前不能删除。'
@@ -470,9 +552,10 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     const stage = t?.stage ?? fallbackStage
     const status = taskStatusOf({ stage, cancelRequested: t?.cancelRequested ?? false })
     const ended = status.kind === 'failed' || status.kind === 'cancelled'
-    const canRetry = ended && retryable.value[documentId] === true
+    const canRetry = ended && retryable.value[documentId] === true && !t?.resumePending
+    const canResume = stage === 'cancelled' && t?.activity?.resumable === true && !t.cancelPending && !deletions.value[documentId]?.pending
     const stream = t?.stream
-    const streamNotice = t && !ended && stream ? (STREAM_NOTICE[stream] ?? null) : null
+    const streamNotice = t && ACTIVE_STAGES.has(stage) && stream ? (STREAM_NOTICE[stream] ?? null) : null
     const deletion = deletions.value[documentId]
     return {
       documentId,
@@ -480,16 +563,23 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
       formatLabel: format === null ? '未知格式' : FORMAT_LABEL[format],
       sizeLabel: sizeBytes === undefined ? null : formatBytes(sizeBytes),
       status,
-      progressPercent: t ? Math.round(Math.min(1, Math.max(0, t.progress)) * 100) : null,
+      progressPercent: t && (t.hasSnapshot || t.activity) ? Math.round(Math.min(1, Math.max(0, t.progress)) * 100) : null,
       canCancel: !!t && CANCELLABLE_STAGES.has(t.stage) && !t.cancelRequested,
       cancelPending: t?.cancelPending ?? false,
       cancelError: t?.cancelError ?? null,
+      activity: t?.activity ?? null,
+      activityReceivedAt: t?.activityReceivedAt ?? 0,
+      activityUnavailable: t?.activityUnavailable ?? false,
+      canResume,
+      resumePending: t?.resumePending ?? false,
+      resumeError: t?.resumeError ?? null,
       errorMessage: status.kind === 'failed' ? taskErrorMessage(t?.error ?? null) : null,
       canRetry,
-      needsReselect: ended && !canRetry,
+      needsReselect: ended && !canRetry && !canResume && !t?.resumePending &&
+        (stage !== 'cancelled' || !t || t.activity?.resumable === false),
       streamNotice,
       canReconnect: !!t && stream === 'broken' && ACTIVE_STAGES.has(t.stage),
-      canDelete: ended && !(deletion?.blocked ?? false),
+      canDelete: ended && !t?.resumePending && !(deletion?.blocked ?? false),
       confirmingDelete: deletion?.confirming ?? false,
       deletePending: deletion?.pending ?? false,
       deleteError: deletion?.error ?? null,
@@ -539,6 +629,7 @@ export function useMaterials({ materialsApi, coursesApi, taskEvents, courseId }:
     retryUpload,
     retryTask,
     cancel,
+    resume,
     reconnect,
     requestDelete,
     cancelDelete,

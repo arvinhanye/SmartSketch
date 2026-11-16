@@ -71,7 +71,7 @@ logger = logging.getLogger(__name__)
 
 #: 提示词用途与本模块固定使用的版本；改模板须同时升此版本与 ``prompts/MANIFEST.md``。
 GLEANING_PROMPT_PURPOSE: Final = "extract_entities_gleaning"
-GLEANING_PROMPT_VERSION: Final = 2
+GLEANING_PROMPT_VERSION: Final = 3
 
 #: 默认补漏轮数与硬上限。构造参数超出 ``1..MAX_ROUNDS_HARD_LIMIT`` 即报错，不静默截断。
 DEFAULT_MAX_ROUNDS: Final = 1

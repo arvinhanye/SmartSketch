@@ -1331,6 +1331,95 @@
         }
       }
     },
+    "/api/v1/tasks/{tid}/activity": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TaskId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "任务当前工作与完成数量",
+        "description": "只读派生进度，供页面每3秒刷新；不改变SSE v1。等待时间以 observed_at 与 active_requests.started_at 为准，终态不继续计时。",
+        "operationId": "getTaskActivity",
+        "responses": {
+          "200": {
+            "description": "当前任务活动和已保存结果计数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskActivity"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{tid}/resume": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/TaskId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "继续已取消任务（教师）",
+        "description": "仅显式恢复已取消且无旧租约的任务，保留task_id、已完成结果与累计预算；个人模式仅原创建教师可继续。\n当前模型端点、名称和思考配置须与原任务一致，密钥可轮换。恢复后客户端重新订阅SSE并废弃旧连接回调。\n",
+        "operationId": "resumeTask",
+        "responses": {
+          "200": {
+            "description": "原任务已恢复，以返回的阶段和进度为准",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "当前不可继续，或个人模型配置缺失",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskNotResumableError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelConfigRequiredError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks/{tid}/event-ticket": {
       "parameters": [
         {
@@ -3440,6 +3529,7 @@
           "DUPLICATE_RELATION",
           "NODE_LOCKED",
           "TASK_NOT_CANCELLABLE",
+          "TASK_NOT_RESUMABLE",
           "PUBLISH_BLOCKED",
           "RATE_LIMITED",
           "LLM_UNAVAILABLE",
@@ -3919,6 +4009,298 @@
           "completed",
           "failed",
           "cancelled"
+        ]
+      },
+      "TaskActivityUnits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "completed",
+          "failed",
+          "total"
+        ],
+        "properties": {
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "TaskActiveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "purpose",
+          "count",
+          "started_at"
+        ],
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "description": "模型调用用途，不含提示词、模型地址或凭据"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "当前轮同用途在途请求中最早的开始时间"
+          }
+        }
+      },
+      "TaskGlobalDisambiguation": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "当前全局检查计划的原子对进度。total是实际计划数；complete阶段不代表所有裁决成功。计数分组相加等于total，reused为completed子集。",
+        "required": [
+          "total",
+          "completed",
+          "failed",
+          "deferred",
+          "reused",
+          "inflight",
+          "pending",
+          "total_possible",
+          "phase",
+          "updated_at"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deferred": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reused": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inflight": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_possible": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "planning",
+              "running",
+              "complete"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TaskActivity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "stage",
+          "progress",
+          "cancel_requested",
+          "phase",
+          "attempt",
+          "observed_at",
+          "last_activity_at",
+          "worker_active",
+          "retry_at",
+          "active_requests",
+          "chunks",
+          "sections",
+          "disambiguation",
+          "global_disambiguation",
+          "resumable"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/TaskStage"
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "cancel_requested": {
+            "type": "boolean"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "parsing",
+              "entities",
+              "disambiguating",
+              "relations",
+              "repair",
+              "merging",
+              "persisting",
+              "cancelling",
+              "cancelled",
+              "awaiting_review",
+              "completed",
+              "failed",
+              "waiting",
+              "retrying"
+            ]
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "worker_active": {
+            "type": "boolean"
+          },
+          "retry_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "active_requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskActiveRequest"
+            }
+          },
+          "chunks": {
+            "$ref": "#/components/schemas/TaskActivityUnits"
+          },
+          "sections": {
+            "$ref": "#/components/schemas/TaskActivityUnits"
+          },
+          "disambiguation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "completed"
+            ],
+            "properties": {
+              "completed": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "小节阶段已保存的完整语义裁决数，不包含全局消歧"
+              }
+            }
+          },
+          "global_disambiguation": {
+            "description": "无可确认的当前全局持久化计划时为null，不能视为尚未处理或0/0。",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskGlobalDisambiguation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resumable": {
+            "type": "boolean",
+            "description": "当前用户和任务满足恢复的基本条件；提交仍重新校验模型配置与并发状态"
+          }
+        }
+      },
+      "TaskNotResumableDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stage",
+          "reason"
+        ],
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/TaskStage"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "not_cancelled",
+              "worker_active",
+              "artifacts_missing",
+              "model_config_changed"
+            ]
+          }
+        }
+      },
+      "ModelConfigRequiredError": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "MODEL_CONFIG_REQUIRED"
+              }
+            }
+          }
+        ]
+      },
+      "TaskNotResumableError": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "required": [
+              "code",
+              "details"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "TASK_NOT_RESUMABLE"
+              },
+              "details": {
+                "$ref": "#/components/schemas/TaskNotResumableDetails"
+              }
+            }
+          }
         ]
       },
       "TaskCounts": {

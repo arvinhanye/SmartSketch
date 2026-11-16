@@ -1,10 +1,9 @@
 """Append-only relation versions are scoped, atomic and rollback protected."""
 import sqlite3
-from pathlib import Path
 
 import pytest
 
-from app.repositories.sqlite import connect
+from app.repositories.sqlite import MIGRATIONS_DIR, connect
 from tests.backend.test_fusion_storage import state
 
 
@@ -53,7 +52,7 @@ def test_failed_revision_never_has_candidate_payload(state):
 def test_rollback_refuses_active_pinned_task_then_preserves_original_checkpoints(state):
     from app.repositories.extraction_checkpoints import write_checkpoint
     url,cid=state
-    path=Path(__file__).parents[2]/'src/backend/migrations/023_relation_revisions.sql'
+    path=MIGRATIONS_DIR/'023_relation_revisions.sql'
     statements=[line.split('-- ROLLBACK: ',1)[1] for line in path.read_text().splitlines()
                 if line.startswith('-- ROLLBACK: ')]
     with connect(url) as db:
@@ -67,6 +66,12 @@ def test_rollback_refuses_active_pinned_task_then_preserves_original_checkpoints
         db.execute('ROLLBACK')
         db.execute("UPDATE processing_tasks SET stage='cancelled',cancel_requested=1 WHERE id='task'")
         db.execute('BEGIN IMMEDIATE')
+        for newer in sorted(MIGRATIONS_DIR.glob('*.sql'), reverse=True):
+            if newer.name[:3] <= '023':
+                break
+            for line in newer.read_text().splitlines():
+                if line.startswith('-- ROLLBACK: '):
+                    db.execute(line.removeprefix('-- ROLLBACK: '))
         for s in statements: db.execute(s)
         db.execute('COMMIT')
         assert db.execute('SELECT count(*) FROM task_chunk_checkpoints').fetchone()[0]==1

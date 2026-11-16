@@ -199,6 +199,8 @@ export interface GraphLifecycle {
   zoomToReadable(): void
   /** 增强模式：浮层出现、消失、展开收起后重新排布标签 */
   relayoutLabels(): void
+  /** 增强模式：切换全部名称与自动避让 */
+  setShowAllLabels(show: boolean): void
   /** 增强模式：指针离开整个画布容器时结束悬停淡化 */
   leaveHover(): void
   /** 增强模式：各节点当前在容器内的屏幕位置与半径（UI-GRAPH-EDIT-02）；未开启增强或尚未建图时为空 */
@@ -324,7 +326,7 @@ export function buildGraphOptions(init: CanvasGraphInit): GraphOptions {
         // 悬停（瞬时，强淡化）：悬停节点与其直接相邻保持清楚，其余退成近底色小点并隐去标签与角标
         hovered: { stroke: C.accent, lineWidth: (d: unknown) => Math.max(2.5, lwMin(d) * 2), labelFontWeight: 700 },
         hoverRelated: { stroke: C.accent, lineWidth: (d: unknown) => Math.max(2, lwMin(d) * 1.5) },
-        hoverFaded: { fill: C.fadedFill, stroke: C.fadedStroke, lineWidth: 1, iconFill: C.fadedIcon, halo: false, label: false, badge: false },
+        hoverFaded: { fill: C.fadedFill, stroke: C.fadedStroke, lineWidth: 1, iconFill: C.fadedIcon, halo: false, label: (d) => nd(d).labelAll === true, badge: false },
       },
     },
     edge: {
@@ -712,6 +714,9 @@ export function createGraphLifecycle(container: HTMLElement, options: GraphLifec
     },
     relayoutLabels() {
       if (alive()) enhancer?.relayoutLabels()
+    },
+    setShowAllLabels(show) {
+      if (alive()) enhancer?.setShowAllLabels(show)
     },
     leaveHover() {
       if (alive()) enhancer?.leaveHover()

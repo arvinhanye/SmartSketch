@@ -46,9 +46,11 @@ def _protected_relation(p):
     return p.get('contrib_manual') or p.get('source') == 'manual' or p.get('status') in ('approved', 'rejected')
 
 
-def project_snapshot(snapshot: Mapping, mapping: Mapping[str, str]) -> dict:
+def project_snapshot(snapshot: Mapping, mapping: Mapping[str, str], *, projection_version: int = 1) -> dict:
     """Preserve every source/contribution; reject collapsing any explicit relationship."""
     validate_snapshot(snapshot)
+    if type(projection_version) is not int or projection_version not in (1, 2):
+        raise ValueError('unsupported projection version')
     result = deepcopy(dict(snapshot))
     by_id = {n["kp_id"]: n for n in result["nodes"]}
     if set(mapping) != set(by_id) or any(v not in by_id or mapping[v] != v for v in mapping.values()):
@@ -59,6 +61,9 @@ def project_snapshot(snapshot: Mapping, mapping: Mapping[str, str]) -> dict:
     for new, members in sorted(buckets.items()):
         node = by_id[new]
         if len(members) > 1:
+            from app.services.fusion.definitions import merged_definition
+            if projection_version == 2:
+                node['definition'] = merged_definition(members, node)
             aliases = {s for n in members for s in [n["name"], *n.get("aliases", [])] if s != node["name"]}
             node["aliases"] = sorted(aliases)
             node["contrib_tasks"] = sorted({t for n in members for t in n.get("contrib_tasks", [])})
@@ -167,7 +172,7 @@ def plan_mapping(snapshot: Mapping, decisions: Sequence[SemanticDecision], *, ex
         canonical = min(members, key=lambda k: (k not in existing, k))
         tentative = {k: canonical if v in (mapping[a], mapping[b]) else v for k, v in mapping.items()}
         try:
-            candidate = project_snapshot(snapshot, tentative)
+            candidate = project_snapshot(snapshot, tentative, projection_version=2)
         except ValueError as exc:
             blocked.append(dict(members=sorted(members), reason=str(exc))); continue
         old_a, old_b = mapping[a], mapping[b]

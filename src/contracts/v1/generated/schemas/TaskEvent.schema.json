@@ -42,6 +42,7 @@
         "DUPLICATE_RELATION",
         "NODE_LOCKED",
         "TASK_NOT_CANCELLABLE",
+        "TASK_NOT_RESUMABLE",
         "PUBLISH_BLOCKED",
         "RATE_LIMITED",
         "LLM_UNAVAILABLE",

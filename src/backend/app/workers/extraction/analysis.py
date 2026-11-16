@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 import hashlib
 import json
+from typing import Protocol
 
 from app.repositories.chunks import StoredChunk
 from app.services.ai.client import ModelAuthError, ModelError
@@ -17,6 +18,11 @@ from app.workers.extraction.types import TaskEntity
 
 class _AmbiguousEvidence(ValueError):
     pass
+
+
+class DecisionCache(Protocol):
+    def get(self, digest: str, left: str, right: str) -> Mapping | None: ...
+    def put(self, digest: str, decision: Mapping) -> None: ...
 
 
 def _entity(entity: TaskEntity, chunks: Mapping[str, StoredChunk]) -> FusionEntity:
@@ -41,7 +47,8 @@ def _entity(entity: TaskEntity, chunks: Mapping[str, StoredChunk]) -> FusionEnti
 
 
 def analyze_section(entities: Sequence[TaskEntity], chunks: Mapping[str, StoredChunk], *,
-                    resolver: SemanticResolver | None, max_pairs: int) -> dict:
+                    resolver: SemanticResolver | None, max_pairs: int,
+                    cache: DecisionCache | None = None, context: Mapping | None = None) -> dict:
     if type(max_pairs) is not int or max_pairs < 1:
         raise ValueError("max_pairs must be positive")
     ordered = sorted(entities, key=lambda e: e.entity_id)
@@ -57,7 +64,7 @@ def analyze_section(entities: Sequence[TaskEntity], chunks: Mapping[str, StoredC
                        input_budget=None if resolver is None else resolver.max_input_bytes,
                        output_budget=None if resolver is None else resolver.max_output_tokens,
                        recall_version=RECALL_VERSION, top_k=8,
-                       max_pairs=max_pairs)
+                       max_pairs=max_pairs, cache_version=1, context=context)
     digest = hashlib.sha256(json.dumps(digest_data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     recall = recall_candidates([RecallCard(e.entity_id, e.candidates[0].source.course_id, e.name,
         e.candidates[0].definition) for e in ordered], top_k=8, max_pairs=max_pairs)
@@ -75,7 +82,20 @@ def analyze_section(entities: Sequence[TaskEntity], chunks: Mapping[str, StoredC
                 decision = SemanticDecision(left.entity_id, right.entity_id, "failed", code="invalid_evidence")
             else:
                 try:
-                    decision = resolver.resolve(a, b)
+                    cached = None if cache is None else cache.get(digest, a.entity_id, b.entity_id)
+                    if cached is None:
+                        decision = resolver.resolve(a, b)
+                        if cache is not None and decision.status == 'complete':
+                            cache.put(digest, asdict(decision))
+                    else:
+                        # Stored JSON restores tuple fields so replay has the same report shape.
+                        fields = dict(cached)
+                        for name in ('left_source_ids', 'right_source_ids', 'differences', 'model_ids'):
+                            fields[name] = tuple(fields.get(name, ()))
+                        decision = SemanticDecision(**fields)
+                        if (decision.status != 'complete' or decision.left_id != a.entity_id or
+                            decision.right_id != b.entity_id):
+                            raise ValueError('invalid cached semantic decision')
                 except (ModelAuthError, ModelUnavailableError, CallRecordError):
                     raise  # task-level policy and auth failures retain existing lifecycle semantics
                 except ModelError:

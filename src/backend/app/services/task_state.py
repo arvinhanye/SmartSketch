@@ -105,7 +105,7 @@ _CANCELLABLE = frozenset({"parsing", "extracting", "merging"})
 _PROCESSING = _CANCELLABLE | {"persisting"}
 _NEXT = {"parsing": "extracting", "extracting": "merging", "merging": "persisting"}
 _EVENT_KINDS = frozenset(
-    {"claim", "stage_done", "checkpoint", "progress", "persisted", "fail", "cancel_request", "published"}
+    {"claim", "stage_done", "checkpoint", "progress", "persisted", "fail", "cancel_request", "published", "resume"}
 )
 # specs/task-processing.md §6: closed failure-code set and the stages that may raise each code.
 FAILURE_CODE_STAGES = {
@@ -189,9 +189,8 @@ def apply_event(state: TaskState, event: TransitionEvent) -> Applied | Rejected:
         return reject("invalid_state")
     if not isinstance(event, TransitionEvent):
         return reject("invalid_event")
-    if state.stage in _TERMINAL:
+    if state.stage in _TERMINAL and event.kind != "resume":
         return reject("already_terminal")
-
     kind = event.kind
     if not isinstance(kind, str) or kind not in _EVENT_KINDS:
         return reject("invalid_event")
@@ -200,6 +199,15 @@ def apply_event(state: TaskState, event: TransitionEvent) -> Applied | Rejected:
             return reject("invalid_event")
     elif event.progress is not None or (kind != "fail" and event.error is not None):
         return reject("invalid_event")
+
+    if kind == "resume" and state.stage == "cancelled":
+        # Explicit API-only exception: the caller also checks artifacts, credentials and
+        # absence of a worker lease before committing this transition in one transaction.
+        stage = ("queued" if state.progress == 0 else "parsing" if state.progress < .1
+                 else "extracting" if state.progress < .6 else "merging")
+        return accept(TaskState(stage, state.progress, False))
+    if state.stage in _TERMINAL:
+        return reject("already_terminal")
 
     if kind == "cancel_request":
         if state.stage == "queued":

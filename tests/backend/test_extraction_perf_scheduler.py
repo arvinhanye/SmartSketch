@@ -164,7 +164,8 @@ def test_threshold_halt_drops_late_result_and_never_dispatches_remaining_blocks(
 
 
 @pytest.mark.parametrize("stop", ["cancel", "lost"])
-def test_mixed_inflight_results_are_discarded_after_cancel_or_lease_loss(db_url, storage, monkeypatch, stop):
+def test_mixed_inflight_results_are_preserved_only_for_cancellation(db_url, storage, monkeypatch, stop):
+    """Cancel retains completed work for resume; losing the lease forbids writes."""
     lease, chunks, script, tail_started, release_tail = tail_case(db_url, storage)
     section_started, release_section, observed = (threading.Event() for _ in range(3))
     script.hooks["sec:" + chunks[0]] = hold(release_section, section_started)
@@ -175,6 +176,10 @@ def test_mixed_inflight_results_are_discarded_after_cancel_or_lease_loss(db_url,
         assert tail_started.wait(WAIT)
         assert section_started.wait(WAIT), "test requires one block and one section in flight"
         before = e12._checkpoints(db_url, lease.task_id)
+        assert set(before) == set(chunks[:9])
+        progress_before = e12._row(db_url, lease.task_id)["progress"]
+        calls_before = list(script.calls)
+        assert len(calls_before) == 11
         if stop == "cancel":
             e12._sql(db_url, "UPDATE processing_tasks SET cancel_requested = 1 WHERE id = ?", lease.task_id)
         else:
@@ -185,8 +190,16 @@ def test_mixed_inflight_results_are_discarded_after_cancel_or_lease_loss(db_url,
         outcome = future.result(5)
 
     assert outcome.status is (e12.ExtractStatus.CANCELLED if stop == "cancel" else e12.ExtractStatus.LOST)
-    assert e12._checkpoints(db_url, lease.task_id) == before
-    assert e12._checkpoints(db_url, lease.task_id, "section") == {}
+    checkpoints = e12._checkpoints(db_url, lease.task_id)
+    sections = e12._checkpoints(db_url, lease.task_id, "section")
+    if stop == "cancel":
+        assert checkpoints == {**before, chunks[9]: ("done", 1, None)}
+        assert len(sections) == 1 and list(sections.values()) == [("done", 1, None)]
+    else:
+        assert checkpoints == before
+        assert sections == {}
+    assert e12._row(db_url, lease.task_id)["progress"] == progress_before
+    assert script.calls == calls_before  # No new requests, repairs, or retries after either stop.
     assert [key for _, key in script.calls if key.startswith("sec:")] == ["sec:" + chunks[0]]
 
 

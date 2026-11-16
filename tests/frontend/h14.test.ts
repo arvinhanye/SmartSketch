@@ -974,6 +974,21 @@ describe('教师图谱：首屏总览与径向布局', () => {
     expect(radios(wrapper)).toEqual(['层次', '径向', '力导向'])
   })
 
+  it('默认显示全部名称，关闭后切换布局仍保留自动避让选择', async () => {
+    const { wrapper } = await mountPage(fakes())
+    const toggle = wrapper.get('input[aria-label="显示全部名称"]')
+    const canvas = wrapper.findComponent(GraphCanvas)
+    expect((toggle.element as HTMLInputElement).checked).toBe(true)
+    expect(canvas.props('showAllLabels')).toBe(true)
+    await toggle.setValue(false)
+    expect(canvas.props('showAllLabels')).toBe(false)
+    await wrapper.findAll('[role="radiogroup"][aria-label="布局"] input')[1]!.setValue(true)
+    await flushPromises()
+    expect(canvas.props('showAllLabels')).toBe(false)
+    await toggle.setValue(true)
+    expect(canvas.props('showAllLabels')).toBe(true)
+  })
+
   it('节点少、层次布局形状正常时默认层次；手动切到径向后画布换用径向位置与直线边', async () => {
     const { wrapper } = await mountPage(fakes())
     const canvas = wrapper.findComponent(GraphCanvas)

@@ -57,7 +57,7 @@ class NoopResizeObserver {
   disconnect(): void {}
 }
 
-function setup(props: { enhanced?: boolean | Ref<boolean>; positions?: Ref<Positions | null>; layout?: Ref<GraphLayoutName>; scope?: Ref<string[] | null>; g6RemovesMinimap?: boolean } = {}) {
+function setup(props: { enhanced?: boolean | Ref<boolean>; positions?: Ref<Positions | null>; layout?: Ref<GraphLayoutName>; scope?: Ref<string[] | null>; showAllLabels?: Ref<boolean>; g6RemovesMinimap?: boolean } = {}) {
   const graphs: FakeEnhancedGraph[] = []
   const factory: CanvasGraphFactory = (init) => {
     const g = new FakeEnhancedGraph({}, init)
@@ -86,6 +86,7 @@ function setup(props: { enhanced?: boolean | Ref<boolean>; positions?: Ref<Posit
           positions: positions.value,
           layout: layout.value,
           scope: scope.value,
+          ...(props.showAllLabels === undefined ? {} : { showAllLabels: props.showAllLabels.value }),
           onNodeClick: (id: string) => clicked.push(id),
           onBlankClick: blank,
         })
@@ -111,6 +112,27 @@ afterEach(() => {
 })
 
 describe('GraphCanvas 增强模式', () => {
+  it('全部名称属性经生命周期到达真实排布，关闭后恢复重叠避让', async () => {
+    const showAllLabels = ref(true)
+    const positions = ref<Positions | null>(new Map([['a', { x: 100, y: 100 }], ['b', { x: 100, y: 100 }]]))
+    const { graphs } = setup({ showAllLabels, positions })
+    await settle()
+    await vi.waitFor(() => {
+      const latest = graphs[0]!.nodeUpdates.at(-1)!
+      expect(latest.map((n) => n.data.labelOn)).toEqual([true, true])
+      expect(latest.map((n) => n.data.labelAll)).toEqual([true, true])
+    })
+    showAllLabels.value = false
+    await vi.waitFor(() => expect(graphs[0]!.nodeUpdates.at(-1)!.map((n) => n.data.labelOn)).toEqual([true, false]))
+  })
+
+  it('未传全部名称时保留学生页自动避让默认值', async () => {
+    const positions = ref<Positions | null>(new Map([['a', { x: 100, y: 100 }], ['b', { x: 100, y: 100 }]]))
+    const { graphs } = setup({ positions })
+    await settle()
+    await vi.waitFor(() => expect(graphs[0]!.nodeUpdates.at(-1)!.map((n) => n.data.labelOn)).toEqual([true, false]))
+  })
+
   it('节点绘制完成后通知浮层刷新位置，不冒充视口平移缩放', async () => {
     const {wrapper,graphs}=setup()
     await settle()

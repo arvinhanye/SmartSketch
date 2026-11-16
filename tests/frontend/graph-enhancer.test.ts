@@ -122,6 +122,46 @@ describe('语义缩放', () => {
 })
 
 describe('标签排布', () => {
+  it('全部名称模式保留重叠节点名称，缩放和新数据不会重新隐藏', async () => {
+    const { graph, enhancer, drain } = setup({ showAllLabels: true })
+    enhancer.decorate({ nodes: [kp('a'), kp('b')], edges: [] })
+    enhancer.attach()
+    await enhancer.afterRender()
+    await sleep(10)
+    await drain()
+    expect(graph.nodeUpdates.at(-1)!.map((n) => n.data.labelOn)).toEqual([true, true])
+    expect(graph.nodeUpdates.at(-1)!.map((n) => n.data.labelAll)).toEqual([true, true])
+    graph.zoom = 0.2
+    graph.emit('aftertransform')
+    await sleep(10)
+    await drain()
+    const updated = enhancer.decorate({ nodes: [kp('a'), kp('b'), kp('c')], edges: [] })
+    expect(updated.nodes.map((n) => n.data.labelOn)).toEqual([true, true, true])
+    await enhancer.afterRender()
+    await sleep(10)
+    await drain()
+    expect(graph.nodeUpdates.at(-1)!.map((n) => n.data.labelOn)).toEqual([true, true, true])
+  })
+
+  it('关闭全部名称后恢复原避让计数，再开启恢复所有名称', async () => {
+    const labels = vi.fn()
+    const { graph, enhancer, drain } = setup({ showAllLabels: true, onLabels: labels })
+    enhancer.decorate({ nodes: [kp('a'), kp('b')], edges: [] })
+    await enhancer.afterRender()
+    await sleep(10)
+    await drain()
+    enhancer.setShowAllLabels(false)
+    await sleep(10)
+    await drain()
+    expect(graph.nodeUpdates.at(-1)!.map((n) => n.data.labelOn)).toEqual([true, false])
+    expect(labels).toHaveBeenLastCalledWith(1, 2)
+    enhancer.setShowAllLabels(true)
+    await sleep(10)
+    await drain()
+    expect(graph.nodeUpdates.at(-1)!.map((n) => n.data.labelOn)).toEqual([true, true])
+    expect(labels).toHaveBeenLastCalledWith(2, 2)
+  })
+
   it('两个节点重叠时只保留优先级高的（搜索命中 > 普通）', async () => {
     const { graph, enhancer, drain } = setup()
     enhancer.decorate({ nodes: [st(kp('a'), 'match'), kp('b')], edges: [] })

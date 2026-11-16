@@ -16,13 +16,27 @@
 
 | 文件 | 被测模块或功能（一句话） | 对应规格 / ADR / 任务 ID |
 | --- | --- | --- |
+| [`tests/backend/test_cancelled_result_reuse.py`](backend/test_cancelled_result_reuse.py) | 取消期间完整结果保留、并发收尾与失租/课程围栏。 | TASK-CONTINUE-01；ADR-103 |
+| [`tests/backend/test_fusion_decisions.py`](backend/test_fusion_decisions.py) | 全局逐对持久化、取消/重试复用、并行上限、完整输入失效与026回退。 | GLOBAL-RESUME-01；ADR-104 |
+| [`tests/backend/test_global_activity.py`](backend/test_global_activity.py) | 全局真实计划计数、复用子集、当前attempt/摘要隔离、取消与失租不伪装在途。 | GLOBAL-RESUME-01；ADR-104 |
+| [`tests/backend/test_disambiguation_output_config.py`](backend/test_disambiguation_output_config.py) | 消歧三工厂输出配置、输入边界和provider有效上限/审计一致。 | GLOBAL-RESUME-01 |
+| [`tests/backend/test_embedding_analysis_context.py`](backend/test_embedding_analysis_context.py) | embedding非秘密配置身份用于全局计划缓存失效，不改向量空间兼容。 | GLOBAL-RESUME-01 |
+| [`tests/backend/test_task_activity.py`](backend/test_task_activity.py) | 任务活动读模型、真实在途等待、计数与课程/修订隔离。 | TASK-CONTINUE-01；ADR-103 |
+| [`tests/backend/test_task_resume.py`](backend/test_task_resume.py) | 取消任务显式继续、个人凭据恢复、重试配额、并发与结果复用。 | TASK-CONTINUE-01；ADR-103 |
 | [`tests/backend/test_264_cleanup_lock.py`](backend/test_264_cleanup_lock.py) | 图持久化清理遵循 ADR-094 定义的执行顺序与课程锁边界。 | ADR-094；ADR-072 |
 | [`tests/backend/test_adr021.py`](backend/test_adr021.py) | 资料列表返回最新任务 ID，并支持删除尚未贡献图谱内容的资料。 | ADR-021 |
 | [`tests/backend/test_adr022.py`](backend/test_adr022.py) | 上传策略接口下发 UPLOAD_MAX_BYTES 配置的上传大小上限。 | ADR-022 |
 | [`tests/backend/test_adr079_register.py`](backend/test_adr079_register.py) | 学生自助注册接口及账号创建、注册限流行为。 | ADR-079 |
 | [`tests/backend/test_disambiguation_generation.py`](backend/test_disambiguation_generation.py) | 生成阶段语义分析预算、真实覆盖、来源核查与每次调用凭据保护。 | ADR-098；DISAMBIG-BE-01 |
 | [`tests/backend/test_extraction_windows.py`](backend/test_extraction_windows.py) | 完整请求预算、Unicode 窗口覆盖、完整实体对及超限前置拒绝。 | ADR-101；DISAMBIG-BE-04 |
+| [`tests/backend/test_relation_timeout_config.py`](backend/test_relation_timeout_config.py) | 关系独立超时、归一化/修复继承与两种工厂缓存身份设置。 | RELATION-RESUME-01 |
+| [`tests/backend/test_section_decisions.py`](backend/test_section_decisions.py) | 完整语义裁决缓存的不可变、隔离、级联与迁移回退。 | RELATION-RESUME-01 |
+| [`tests/backend/test_section_analysis_resume.py`](backend/test_section_analysis_resume.py) | 部分语义裁决恢复、输入摘要失效和失败/未完成双判不缓存。 | RELATION-RESUME-01 |
+| [`tests/backend/test_section_decision_worker.py`](backend/test_section_decision_worker.py) | 关系熔断接管不重做完整消歧，缓存读写受租约/取消/课程围栏保护。 | RELATION-RESUME-01 |
+| [`tests/backend/test_extraction_budget_config.py`](backend/test_extraction_budget_config.py) | 放大抽取预算贯通个人/共享工厂、归一化与修复，完整关系表和配置边界。 | EXTRACTION-BUDGET-1000X；[生成消歧规格](../specs/generation-disambiguation.md) |
+| [`tests/backend/test_provider_output_limits.py`](backend/test_provider_output_limits.py) | 供应商输出限额与实际发送、主备/流式审计和无 usage 计费一致。 | EXTRACTION-BUDGET-1000X；E03；E04 |
 | [`tests/backend/test_local_normalization.py`](backend/test_local_normalization.py) | 局部 complete-link 语义卡、确定性与双判门槛。 | ADR-102；DISAMBIG-BE-05 |
+| [`tests/backend/test_explicit_relations.py`](backend/test_explicit_relations.py) | 显式关系候选、否定/问句/同名与名称内连词保护，单次请求确认和预算。 | SEMANTIC-QUALITY-01 |
 | [`tests/backend/test_normalized_relations.py`](backend/test_normalized_relations.py) | 原始端点、严格证据定位及整卡分窗。 | ADR-102；DISAMBIG-BE-05 |
 | [`tests/backend/test_local_normalization_worker.py`](backend/test_local_normalization_worker.py) | 规范化先后顺序、检查点版本及默认依赖隔离。 | ADR-102；DISAMBIG-BE-05 |
 | [`tests/backend/test_relation_revisions.py`](backend/test_relation_revisions.py) | 不可变关系版本、课程隔离、回滚保护。 | ADR-102；DISAMBIG-BE-05 |

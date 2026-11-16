@@ -12,6 +12,7 @@ from app.repositories.extraction_checkpoints import Checkpoint, read_checkpoints
 from app.repositories.sqlite import connect
 from app.repositories.task_leases import Lease, LeaseLost
 from app.repositories.tasks import read_leased_task
+from app.repositories.section_decisions import has_live_lease
 from app.services.ai.relations import SectionEntity
 from app.services.task_state import stage_progress_range
 from app.workers.extraction.candidates import (
@@ -49,6 +50,7 @@ from app.workers.extraction.units import (
     _extract_section,
 )
 from app.workers.extraction.windowed import checkpoint_policy
+from app.workers.extraction.decision_cache import SectionDecisionCache
 
 # ---------------------------------------------------------------- 并发派发
 
@@ -62,8 +64,8 @@ class _Dispatcher(Generic[_U]):
 
     ``halt`` 取值：``cancel``（边界读到取消标志）、``lost``、``threshold``（``after_write`` 判定）、
     ``auth``（鉴权失败，任务终止）、``circuit``/``storage``（阶段级临时故障）。出现后不再派发；
-    ``cancel``/``lost``/``threshold``/``auth`` 之后完成的单元不写检查点，``circuit``/``storage`` 之后
-    正常完成的单元照常写入（结果有效）。
+    ``lost``/``threshold``/``auth`` 之后完成的单元不写检查点；取消后已在途的完整结果仍在
+    原租约和凭据围栏下保存，不派发新工作或推进进度。
     """
 
     def __init__(
@@ -109,7 +111,7 @@ class _Dispatcher(Generic[_U]):
         except _Halt as halt:
             self.halt = self.halt or halt.reason
             return
-        if self.halt in ("cancel", "lost", "threshold", "auth"):
+        if self.halt in ("lost", "threshold", "auth"):
             return
         try:
             if not self._write(unit, result):
@@ -178,18 +180,18 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
     toolkit = replace(toolkit, preserve_mentions=preserve, local_normalization=normalization and preserve,
                       resolver=toolkit.resolver if preserve else None,
                       window_policy=window_policy if preserve else None)
-    if preserve:
-        credential_guard = toolkit.guard
-        def guard() -> None:
-            if credential_guard is not None:
-                credential_guard()
-            with connect(sqlite_url) as database:
-                head = read_leased_task(database, lease.task_id, lease.token)
-            if head is None:
-                raise LeaseLost("lease unavailable before semantic request")
-            if head.cancel_requested:
-                raise _Halt("cancel")
-        toolkit = replace(toolkit, guard=guard)
+    credential_guard = toolkit.guard
+    def guard() -> None:
+        if credential_guard is not None:
+            credential_guard()
+        with connect(sqlite_url) as database:
+            head = read_leased_task(database, lease.task_id, lease.token)
+            live = has_live_lease(database, task_id=lease.task_id, token=lease.token)
+        if head is None or head.course_id != lease.course_id or head.stage != STAGE or not live:
+            raise LeaseLost("lease unavailable before model request")
+        if head.cancel_requested:
+            raise _Halt("cancel")
+    toolkit = replace(toolkit, guard=guard)
 
     progress = _Progress(len(chunks))
     lower, upper = stage_progress_range(STAGE)
@@ -255,10 +257,13 @@ def _run(sqlite_url: str, lease: Lease, toolkit: ExtractionToolkit, limits: Extr
             for entity in task_entities
         )
         if preserve:
-            return _extract_section(toolkit, lease, limits, unit, entities, task_entities=task_entities)
+            return _extract_section(toolkit, lease, limits, unit, entities, task_entities=task_entities,
+                decision_cache=SectionDecisionCache(sqlite_url, lease, unit.section_id, guard=credential_guard))
         return _extract_section(toolkit, lease, limits, unit, entities)
 
     def write(unit: StoredChunk | _Section, result: _UnitResult) -> bool:
+        if credential_guard is not None:
+            credential_guard()
         if isinstance(unit, StoredChunk):
             share = (progress.chunks_done + 1) / progress.chunks_total
             written = _write_unit(sqlite_url, lease, "chunk", unit.chunk_id, result,

@@ -6,6 +6,7 @@ import json
 import sqlite3
 from collections.abc import Mapping
 from app.repositories.extraction_checkpoints import write_checkpoint
+from app.repositories.section_decisions import has_live_lease
 from app.repositories.task_leases import (
     Lease,
     LeaseLost,
@@ -48,12 +49,16 @@ def _write_progress(database: sqlite3.Connection, lease: Lease, state: TaskState
 def _write_unit(
     sqlite_url: str, lease: Lease, kind: str, unit_id: str, result: _UnitResult, progress: float
 ) -> bool:
-    """块/小节边界：取消标志为真 → 不写并返回 ``False``；否则写检查点与进度。"""
+    """Preserve complete in-flight work under cancellation, without advancing progress."""
     with leased_transaction(sqlite_url, lease.task_id, lease.token) as database:
+        task = read_leased_task(database, lease.task_id, lease.token)
+        if (task is None or task.course_id != lease.course_id or task.stage != STAGE or
+            not has_live_lease(database, task_id=lease.task_id, token=lease.token)):
+            raise LeaseLost('extraction checkpoint lease unavailable')
         state = _state_in(database, lease)
         if state.stage != STAGE:
             raise RuntimeError(f"task {lease.task_id} left the {STAGE} stage under this lease")
-        if state.cancel_requested:
+        if state.cancel_requested and result.status != 'done':
             return False
         write_checkpoint(
             database,
@@ -67,8 +72,9 @@ def _write_unit(
             result=result.result,
             metadata=result.metadata,
         )
-        _write_progress(database, lease, state, progress)
-    return True
+        if not state.cancel_requested:
+            _write_progress(database, lease, state, progress)
+    return not state.cancel_requested
 
 
 def _boundary(sqlite_url: str, lease: Lease, event: str) -> TaskState:

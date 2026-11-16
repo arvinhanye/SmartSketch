@@ -16,6 +16,8 @@ import { GRAPH_COLORS, GRAPH_FONT } from './theme'
  */
 
 export interface EnhanceOptions {
+  /** 显示所有节点名称；缺省沿用自动避让 */
+  showAllLabels?: boolean
   /** 浮层的屏幕包围盒（相对画布容器）：hard 参与镜头适应与标签避让，soft（如可展开的图例）只避让标签 */
   obstacles?: () => { hard: readonly Box[]; soft: readonly Box[] }
   /** 小地图容器；缺省不画小地图 */
@@ -80,6 +82,8 @@ export interface Enhancer {
   ensureVisible(kpId: string): Promise<void>
   /** 浮层变化（出现、消失、展开收起）后重新排布标签 */
   relayoutLabels(): void
+  /** 切换全部名称与自动避让，不改变图数据或视口 */
+  setShowAllLabels(show: boolean): void
   /** 指针离开整个画布：结束悬停（悬停淡化的兜底之一，只依赖节点的 pointerleave 在快速移动时不可靠） */
   leaveHover(): void
   /** 当前各节点在画布容器内的屏幕位置与半径（UI-GRAPH-EDIT-02：悬停工具与连线命中）；取不到时为空数组 */
@@ -126,6 +130,7 @@ const round2 = (value: number): number => Math.round(value * 100) / 100
 export function createEnhancer(deps: EnhancerDeps): Enhancer {
   const { options } = deps
   let view: ViewState = INITIAL_VIEW
+  let showAllLabels = options.showAllLabels ?? false
   let nodes: CanvasNode[] = []
   let edges: CanvasEdge[] = []
   let chapterOf = new Map<string, string | null>()
@@ -149,7 +154,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
   const animation = (ms: number) => (options.reduceMotion?.() === true ? false : { duration: ms, easing: 'ease-out' })
 
   function decoratedNodes(): CanvasNode[] {
-    return nodes.map((n) => ({ ...n, data: decorateNodeData(n.id, n.data, n.states, view) }))
+    return nodes.map((n) => ({ ...n, data: decorateNodeData(n.id, n.data, n.states, view, showAllLabels) }))
   }
   function decoratedEdges(): CanvasEdge[] {
     return edges.map((e) => {
@@ -236,6 +241,7 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
   }
 
   function planNow(): Set<string> | null {
+    if (showAllLabels) return new Set(nodes.map((n) => n.id))
     const g = deps.graph()
     if (g === null || g.getElementPosition === undefined || g.getViewportByCanvas === undefined) return null
     const zoom = zoomOf(g)
@@ -546,6 +552,13 @@ export function createEnhancer(deps: EnhancerDeps): Enhancer {
       }
     },
     relayoutLabels: scheduleLabels,
+    setShowAllLabels(show) {
+      if (!live() || showAllLabels === show) return
+      showAllLabels = show
+      view = { ...view, labelShown: null }
+      deps.enqueue(pushView)
+      scheduleLabels()
+    },
     leaveHover() {
       if (live() && (pointerId !== null || hoverId !== null)) endHover()
     },

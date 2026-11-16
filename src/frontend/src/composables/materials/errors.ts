@@ -107,3 +107,21 @@ export function cancelErrorMessage(cause: unknown): string {
   }
   return '取消失败，请稍后重试。'
 }
+
+export function resumeErrorMessage(cause: unknown): string {
+  if (isNetworkFailure(cause)) return '无法连接服务器，请刷新任务状态后再试。'
+  if (cause instanceof ApiError) {
+    if (cause.status === 401) return '登录已失效，请重新登录。'
+    if (cause.status === 403) return '当前账号无权继续该任务，请使用原上传账号。'
+    if (cause.status === 404) return '任务不存在或已无权访问。'
+    if (cause.code === 'MODEL_CONFIG_REQUIRED') return '继续前需要先配置你的模型 API。'
+    if (cause.code === 'TASK_NOT_RESUMABLE') {
+      const reason = cause.details?.reason
+      if (reason === 'worker_active') return '任务仍在停止，请等取消完成后再继续。'
+      if (reason === 'model_config_changed') return '模型配置已变化，无法复用这次任务。请恢复原配置，或重新上传资料。'
+      if (reason === 'artifacts_missing') return '原资料或处理记录已不完整，请重新上传资料。'
+      return '任务当前不能继续，请刷新任务状态。'
+    }
+  }
+  return '继续处理失败，请稍后重试。'
+}

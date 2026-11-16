@@ -42,10 +42,12 @@ const props = withDefaults(
     initialView?: 'readable' | 'overview'
     /** 总览下标签只显示一部分时，在画布左下角提示“显示 n/m 个标签”（教师页） */
     showLabelStat?: boolean
+    /** 显示全部名称；关闭时按现有自动避让规则决定名称可见性 */
+    showAllLabels?: boolean
     /** 整组适应时四周留白（像素），缺省按学生页的浮层 */
     fitPads?: Partial<{ left: number; right: number; top: number; bottom: number }>
   }>(),
-  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined, showLabelStat: false },
+  { label: '课程知识图谱', layout: 'hierarchical', enhanced: false, audience: 'student', positions: null, scope: null, arrangement: 'layered', initialView: 'readable', fitPads: undefined, showLabelStat: false, showAllLabels: false },
 )
 
 const emit = defineEmits<{
@@ -153,6 +155,7 @@ function start(attempt = 0): void {
     initialView: props.initialView,
     enhance: props.enhanced
       ? {
+          showAllLabels: props.showAllLabels,
           obstacles: () => (stage.value !== null && registry !== null ? registry.boxes(stage.value) : { hard: [], soft: [] }),
           minimap: mini.value,
           reduceMotion: () => reduced.value,
@@ -278,6 +281,11 @@ watch(
   (scope) => lifecycle?.setScope(scope),
 )
 
+watch(
+  () => props.showAllLabels,
+  (show) => lifecycle?.setShowAllLabels(show),
+)
+
 onActivated(() => lifecycle?.refreshSize())
 onBeforeUnmount(() => {
   stopObstacles?.()
@@ -319,7 +327,7 @@ onBeforeUnmount(() => {
         <button type="button" class="gw-tool" aria-label="放大到可读大小" title="放大到可读大小（标签字号舒适的缩放）" data-test="zoom-readable" @click="toReadable"><AppIcon name="readable" /></button>
       </div>
     </div>
-    <p v-if="showLabelStat && enhanced && labelStat !== null && labelStat.shown < labelStat.total && (zoom ?? 0) < READABLE_ZOOM && !loading" class="gw-labelstat" data-test="label-stat" role="status">
+    <p v-if="showLabelStat && !showAllLabels && enhanced && labelStat !== null && labelStat.shown < labelStat.total && (zoom ?? 0) < READABLE_ZOOM && !loading" class="gw-labelstat" data-test="label-stat" role="status">
       显示 {{ labelStat.shown }} / {{ labelStat.total }} 个标签 · 放大可看到更多
     </p>
     <div v-if="tip" class="gw-tip" role="tooltip" :style="{ left: `${tip.x + 14}px`, top: `${tip.y + 14}px` }">{{ tip.text }}</div>
