@@ -182,6 +182,7 @@ class ErrorCode(Enum):
     DUPLICATE_RELATION = 'DUPLICATE_RELATION'
     NODE_LOCKED = 'NODE_LOCKED'
     TASK_NOT_CANCELLABLE = 'TASK_NOT_CANCELLABLE'
+    TASK_NOT_RESUMABLE = 'TASK_NOT_RESUMABLE'
     PUBLISH_BLOCKED = 'PUBLISH_BLOCKED'
     RATE_LIMITED = 'RATE_LIMITED'
     LLM_UNAVAILABLE = 'LLM_UNAVAILABLE'
@@ -384,6 +385,124 @@ class TaskStage(Enum):
     cancelled = 'cancelled'
 
 
+class TaskActivityUnits(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    completed: Annotated[int, Field(ge=0)]
+    failed: Annotated[int, Field(ge=0)]
+    total: Annotated[int, Field(ge=0)]
+
+
+class TaskActiveRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    purpose: Annotated[
+        str, Field(description='模型调用用途，不含提示词、模型地址或凭据')
+    ]
+    count: Annotated[int, Field(ge=1)]
+    started_at: Annotated[
+        datetime, Field(description='当前轮同用途在途请求中最早的开始时间')
+    ]
+
+
+class Phase(Enum):
+    planning = 'planning'
+    running = 'running'
+    complete = 'complete'
+
+
+class TaskGlobalDisambiguation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    total: Annotated[int, Field(ge=0)]
+    completed: Annotated[int, Field(ge=0)]
+    failed: Annotated[int, Field(ge=0)]
+    deferred: Annotated[int, Field(ge=0)]
+    reused: Annotated[int, Field(ge=0)]
+    inflight: Annotated[int, Field(ge=0)]
+    pending: Annotated[int, Field(ge=0)]
+    total_possible: Annotated[int, Field(ge=0)]
+    phase: Phase
+    updated_at: datetime
+
+
+class Phase1(Enum):
+    queued = 'queued'
+    parsing = 'parsing'
+    entities = 'entities'
+    disambiguating = 'disambiguating'
+    relations = 'relations'
+    repair = 'repair'
+    merging = 'merging'
+    persisting = 'persisting'
+    cancelling = 'cancelling'
+    cancelled = 'cancelled'
+    awaiting_review = 'awaiting_review'
+    completed = 'completed'
+    failed = 'failed'
+    waiting = 'waiting'
+    retrying = 'retrying'
+
+
+class Disambiguation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    completed: Annotated[
+        int, Field(description='小节阶段已保存的完整语义裁决数，不包含全局消歧', ge=0)
+    ]
+
+
+class TaskActivity(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: str
+    stage: TaskStage
+    progress: Annotated[float, Field(ge=0.0, le=1.0)]
+    cancel_requested: bool
+    phase: Phase1
+    attempt: Annotated[int, Field(ge=0)]
+    observed_at: datetime
+    last_activity_at: datetime
+    worker_active: bool
+    retry_at: Optional[datetime] = None
+    active_requests: list[TaskActiveRequest]
+    chunks: TaskActivityUnits
+    sections: TaskActivityUnits
+    disambiguation: Disambiguation
+    global_disambiguation: Annotated[
+        Optional[TaskGlobalDisambiguation],
+        Field(
+            description='无可确认的当前全局持久化计划时为null，不能视为尚未处理或0/0。'
+        ),
+    ] = None
+    resumable: Annotated[
+        bool,
+        Field(
+            description='当前用户和任务满足恢复的基本条件；提交仍重新校验模型配置与并发状态'
+        ),
+    ]
+
+
+class Reason(Enum):
+    not_cancelled = 'not_cancelled'
+    worker_active = 'worker_active'
+    artifacts_missing = 'artifacts_missing'
+    model_config_changed = 'model_config_changed'
+
+
+class TaskNotResumableDetails(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    stage: TaskStage
+    reason: Reason
+
+
 class TaskCounts(BaseModel):
     chunks_done: Annotated[Optional[int], Field(ge=0)] = None
     chunks_total: Annotated[Optional[int], Field(ge=0)] = None
@@ -465,7 +584,7 @@ class FixedStageProgress(BaseModel):
     pass
 
 
-class Reason(Enum):
+class Reason1(Enum):
     processing = 'processing'
     contributed = 'contributed'
     cleanup_pending = 'cleanup_pending'
@@ -476,7 +595,7 @@ class DocumentNotDeletableDetails(BaseModel):
         extra='forbid',
     )
     stage: TaskStage
-    reason: Reason
+    reason: Reason1
 
 
 class TaskPersistingDetails(BaseModel):
@@ -1080,7 +1199,7 @@ class NextCursors(BaseModel):
     isolated_nodes: Optional[str] = None
 
 
-class Reason1(Enum):
+class Reason2(Enum):
     same_key = 'same_key'
     alias = 'alias'
     containment = 'containment'
@@ -1092,7 +1211,7 @@ class SuspectedDuplicate(BaseModel):
     analysis: Optional[ReviewSemanticAnalysis] = None
     candidates: Annotated[list[KnowledgePointRef], Field(max_length=2, min_length=2)]
     similarity: Annotated[float, Field(ge=0.0, le=1.0)]
-    reason: Reason1
+    reason: Reason2
 
 
 class Action(Enum):
@@ -1707,6 +1826,15 @@ class Document(BaseModel):
         ),
     ] = None
     uploaded_at: datetime
+
+
+class ModelConfigRequiredError(Error):
+    code: Literal['MODEL_CONFIG_REQUIRED'] = 'MODEL_CONFIG_REQUIRED'
+
+
+class TaskNotResumableError(Error):
+    code: Literal['TASK_NOT_RESUMABLE']
+    details: TaskNotResumableDetails
 
 
 class TaskActive(TaskBase, FixedStageProgress):

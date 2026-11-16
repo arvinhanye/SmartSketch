@@ -18,7 +18,7 @@ from app.services.ai.embeddings import EmbeddedVector
 from app.services.fusion.candidates import cosine_similarity
 from app.services.fusion.normalize import normalize_name
 
-RECALL_VERSION = 1
+RECALL_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -96,11 +96,6 @@ def recall_candidates(cards: Sequence[RecallCard], *, top_k: int, max_pairs: int
             found.setdefault(key, {})[channel] = max(found.get(key, {}).get(channel, 0), 1/(60+rank))
 
     for c in items:
-        own = set()
-        for name in (c.name, *c.aliases):
-            for key in normalize_name(name).keys:
-                own.update(names[key])
-        add(c.entity_id, {k: 1. for k in own}, "name")
         scores: dict[str, float] = defaultdict(float)
         for term in tokens[c.entity_id]:
             hits = postings[term]
@@ -112,8 +107,29 @@ def recall_candidates(cards: Sequence[RecallCard], *, top_k: int, max_pairs: int
         if vectors is not None:
             add(c.entity_id, {other: cosine_similarity(vectors[c.entity_id], vectors[other])
                               for other in ids if other != c.entity_id}, "vector")
-    pairs = [RecalledPair(a, b, tuple(sorted(channels)), sum(channels.values()))
-             for (a, b), channels in found.items()]
-    pairs.sort(key=lambda p: (-p.rank_score, p.left_id, p.right_id))
-    return RecallResult(tuple(pairs[:max_pairs]), len(items)*(len(items)-1)//2,
-                        max(0, len(pairs)-max_pairs), ("vector",) if vectors is None else (), limited)
+    total_recalled = 0
+
+    def candidates():
+        nonlocal total_recalled
+        # Stream exact-name pairs instead of retaining an O(n²) pair table.
+        # The weak-channel table is already bounded by per-node top-k.
+        for card in items:
+            own = set()
+            for name in (card.name, *card.aliases):
+                for key in normalize_name(name).keys:
+                    own.update(names[key])
+            for other in sorted(own):
+                if card.entity_id >= other:
+                    continue
+                channels = found.pop((card.entity_id, other), {})
+                channels['name'] = 1 / 61
+                total_recalled += 1
+                yield RecalledPair(card.entity_id, other, tuple(sorted(channels)), sum(channels.values()))
+        for (a, b), channels in found.items():
+            total_recalled += 1
+            yield RecalledPair(a, b, tuple(sorted(channels)), sum(channels.values()))
+
+    pairs = heapq.nsmallest(max_pairs, candidates(),
+        key=lambda p: ('name' not in p.channels, -p.rank_score, p.left_id, p.right_id))
+    return RecallResult(tuple(pairs), len(items)*(len(items)-1)//2,
+                        max(0, total_recalled-max_pairs), ("vector",) if vectors is None else (), limited)

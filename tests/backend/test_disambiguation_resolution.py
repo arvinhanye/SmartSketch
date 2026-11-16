@@ -53,10 +53,10 @@ def test_different_does_not_request_definition_or_second_vote():
 
 
 def test_conflicting_verifier_is_uncertain_not_majority_vote():
-    client, service = resolver(reply(), reply("DIFFERENT"))
+    client, service = resolver(reply(), reply("DIFFERENT"), reply("UNCERTAIN"))
     result = service.resolve(*pair())
     assert result.verdict == "UNCERTAIN" and result.status == "complete"
-    assert result.code == "verification_disagreed" and len(client.calls) == 2
+    assert result.code == "verification_disagreed" and len(client.calls) == 3
 
 
 @pytest.mark.parametrize("bad", ["{bad", reply(left_source_ids=["s2"]),
@@ -93,10 +93,20 @@ def test_long_input_is_deferred_without_silent_truncation_or_calls():
     assert result.verdict is None and len(client.calls) == 0
 
 
-def test_output_reservation_is_part_of_budget():
-    client, service = resolver(max_output_tokens=2000, max_input_bytes=7000)
-    assert service.resolve(*pair()).code == "input_budget"
-    assert not client.calls
+def test_input_budget_counts_utf8_and_wrapper_independently_of_output_limit():
+    client, service = resolver(reply("DIFFERENT"), max_output_tokens=1_024_000)
+    assert service.resolve(*pair()).status == "complete"
+    prompt = client.calls[0].request.messages[0].content
+    required = len(prompt.encode("utf-8")) + 256
+
+    for budget, status in ((required, "complete"), (required - 1, "deferred")):
+        client, service = resolver(reply("DIFFERENT"), max_output_tokens=1_024_000, max_input_bytes=budget)
+        result = service.resolve(*pair())
+        assert result.status == status
+        if status == "deferred":
+            assert result.code == "input_budget" and not client.calls
+        else:
+            assert client.calls[0].request.messages[0].content == prompt
 
 
 def test_course_isolation_rejects_before_model_call():
@@ -131,3 +141,46 @@ def test_budget_rejection_is_deferred_without_retry():
 def test_invalid_limits_rejected(field, value):
     with pytest.raises(ValueError):
         resolver(**{field: value})
+
+
+def grounded_reply(**changes):
+    value=dict(grounding={
+        'left': {'source_id':'s1','quote':'散列表支持按键查询。'},
+        'right': {'source_id':'s2','quote':'哈希表用于存储键值对。'}},
+        resolved_differences=[{'difference':'对象不同','explanation':'两句描述同一键值结构的用途，未指定不同对象。'}])
+    value.update(changes)
+    return reply(**value)
+
+
+def test_verification_conflict_can_be_resolved_once_with_addressable_source_evidence():
+    client, service = resolver(reply(),reply('DIFFERENT'),grounded_reply())
+    result=service.resolve(*pair())
+    assert result.verdict=='SAME' and result.status=='complete' and result.code is None
+    assert result.model_calls==len(client.calls)==3
+    assert '对象不同' in client.calls[2].request.messages[0].content
+    assert result.prompt_sha256==service.template.sha256
+
+
+@pytest.mark.parametrize('bad', [reply(), grounded_reply(grounding={
+    'left':{'source_id':'s1','quote':'材料不存在的话'},
+    'right':{'source_id':'s2','quote':'哈希表用于存储键值对。'}}),
+    grounded_reply(resolved_differences=[])])
+def test_supplement_cannot_overrule_conflict_without_valid_grounding(bad):
+    client, service=resolver(reply(),reply('DIFFERENT'),bad,bad)
+    result=service.resolve(*pair())
+    assert result.status=='failed' and result.verdict is None
+    assert result.model_calls==len(client.calls)==4
+
+
+def test_uncertain_supplement_same_still_requires_blind_verification():
+    client,service=resolver(reply('UNCERTAIN',differences=['对象不同']),grounded_reply(),reply())
+    result=service.resolve(*pair())
+    assert result.verdict=='SAME' and len(client.calls)==3
+    assert '对象不同' not in client.calls[2].request.messages[0].content
+
+
+def test_supplement_disagreement_stays_uncertain_and_does_not_loop():
+    client,service=resolver(reply(),reply('DIFFERENT'),reply('UNCERTAIN'))
+    result=service.resolve(*pair())
+    assert result.status=='complete' and result.verdict=='UNCERTAIN'
+    assert len(client.calls)==3 and result.code=='verification_disagreed'

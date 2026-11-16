@@ -11,7 +11,7 @@ specs/grounded-qa.md QA-28/29.
 1. picks the role: primary unless its breaker is open, then the fallback (only when one is
    configured, the request's model has a fallback model and its breaker admits the call);
 2. pre-writes a ``sent`` row in ``model_calls`` with a fresh ULID ``call_id``, the input
-   estimate (E03 ``estimate_input_tokens``) and the declared output ceiling; the store
+   estimate (E03 ``estimate_input_tokens``) and the output ceiling after applying provider limits; the store
    rejects the call when ``used >= budget`` for the task or the Beijing day. A budget of 0
    sends nothing. **If the pre-write fails, no request is sent** (``CallRecordError``);
 3. sends the request and writes the outcome back by ``call_id`` (usage, responded model,
@@ -78,7 +78,7 @@ from .client import (
     StreamReasoning,
     StreamEvent,
 )
-from .compatible import estimate_input_tokens
+from .compatible import CompatibleModelClient, estimate_input_tokens
 
 if TYPE_CHECKING:
     from app.config import Settings
@@ -347,6 +347,12 @@ class _Provider:
     client: ModelClient = field(repr=False)
     breaker: CircuitBreaker
 
+    def prepare_request(self, request: ModelRequest, model: str) -> ModelRequest:
+        request = request if model == request.model else replace(request, model=model)
+        if isinstance(self.client, CompatibleModelClient):
+            request = self.client.apply_output_limit(request)
+        return request
+
 
 # ---------------------------------------------------------------- policy
 
@@ -601,7 +607,7 @@ class ModelCallPolicy:
         cut = False
         for provider, model in self._candidates(request.model):
             assert model is not None
-            call_request = request if model == request.model else replace(request, model=model)
+            call_request = provider.prepare_request(request, model)
             for retry in range(self.max_retries + 1):
                 attempt_request = self._bounded(bound, call_request, last)
                 if not provider.breaker.acquire():
@@ -651,8 +657,7 @@ class ModelCallPolicy:
         last: BaseException | None = None
         for provider, model in self._candidates(request.model):
             assert model is not None
-            call_request = self._bounded(
-                bound, request if model == request.model else replace(request, model=model), last)
+            call_request = self._bounded(bound, provider.prepare_request(request, model), last)
             if not provider.breaker.acquire():
                 continue
             try:

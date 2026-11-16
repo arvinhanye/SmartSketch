@@ -116,6 +116,8 @@ function fakeMaterialsApi(overrides: Partial<MaterialsApi> = {}) {
         }),
     ),
     cancelTask: vi.fn<MaterialsApi['cancelTask']>(overrides.cancelTask ?? (async (tid) => task(tid, 'cancelled'))),
+    taskActivity: vi.fn(overrides.taskActivity ?? (async () => { throw apiError(404, 'NOT_FOUND') })),
+    resumeTask: vi.fn(overrides.resumeTask ?? (async (tid: string) => task(tid, 'extracting'))),
     deleteDocument: vi.fn<MaterialsApi['deleteDocument']>(overrides.deleteDocument ?? (async () => undefined)),
     uploadPolicy: vi.fn<MaterialsApi['uploadPolicy']>(
       overrides.uploadPolicy ?? (async () => ({ max_bytes: DEFAULT_MAX_BYTES })),
@@ -232,6 +234,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 async function mountPage({
@@ -330,6 +333,23 @@ describe('H02 资料 API 封装', () => {
     await api.cancelTask('t1')
     expect(calls[0]!.url).toBe('/api/v1/tasks/t1/cancel')
     expect(calls[0]!.init?.method).toBe('POST')
+  })
+
+  it('读取详情和继续原任务使用独立端点，保留任务ID和鉴权', async () => {
+    const { calls, fetch } = recordingFetch(() => json(activity('t/9')))
+    const api = createMaterialsApi(createHttpClient({ fetch, getAccessToken: () => 'tok' }))
+    await api.taskActivity('t/9')
+    await api.resumeTask('t/9')
+    expect(calls.map((c) => [c.url, c.init?.method])).toEqual([
+      ['/api/v1/tasks/t%2F9/activity', 'GET'], ['/api/v1/tasks/t%2F9/resume', 'POST'],
+    ])
+    expect(new Headers(calls[1]!.init?.headers).get('Authorization')).toBe('Bearer tok')
+  })
+
+  it('继续冲突保留TASK_NOT_RESUMABLE错误码以显示可操作原因', async () => {
+    const { fetch } = recordingFetch(() => json({ code: 'TASK_NOT_RESUMABLE', message: 'private', details: { stage: 'cancelled', reason: 'model_config_changed' } }, 409))
+    const api = createMaterialsApi(createHttpClient({ fetch }))
+    await expect(api.resumeTask('t9')).rejects.toMatchObject({ code: 'TASK_NOT_RESUMABLE', details: { reason: 'model_config_changed' } })
   })
 
   it('uploadPolicy 走契约 GET /api/v1/courses/{cid}/upload-policy（ADR-022）', async () => {
@@ -1298,5 +1318,360 @@ describe('C05-4 同章不同格式的重复上传提示', () => {
     expect(wrapper.get('[data-test="upload-submit"]').attributes('disabled')).toBeUndefined()
     await chooseFile(wrapper, file('ch2-process.pdf'))
     expect(wrapper.find('[data-test="upload-duplicate-hint"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------- TASK-CONTINUE：持久化进度与同任务继续
+function activity(tid = 't9', overrides: Record<string, unknown> = {}) {
+  return {
+    task_id: tid, stage: 'extracting', progress: 0.5833333333, cancel_requested: false, phase: 'relations', attempt: 1,
+    observed_at: '2026-11-15T16:42:00Z', last_activity_at: '2026-11-15T16:41:00Z',
+    worker_active: true, retry_at: null,
+    active_requests: [{ purpose: 'extract_normalized_relations', count: 1, started_at: '2026-11-15T16:40:55Z' }],
+    chunks: { completed: 8, failed: 0, total: 8 }, sections: { completed: 5, failed: 0, total: 6 },
+    disambiguation: { completed: 111 }, global_disambiguation: null, resumable: false, ...overrides,
+  } as never
+}
+
+describe('TASK-CONTINUE 处理详情与继续处理', () => {
+  it('刷新后显示真实处理内容与完成数，等待时间每秒变化而无需新的SSE事件', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date('2026-11-15T16:42:00Z'))
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'extracting', task_id: 't9' })],
+      taskActivity: async () => activity(),
+    })
+    const { wrapper } = await mountPage({ materials })
+    const r = row(wrapper, 'd9')
+    expect(r.text()).toContain('正在抽取关系')
+    expect(r.text()).toContain('资料块 8 / 8')
+    expect(r.text()).toContain('关系小节 5 / 6')
+    expect(r.text()).toContain('小节消歧已保存 111 对')
+    expect(r.text()).toContain('1 分 5 秒')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(r.text()).toContain('1 分 7 秒')
+    wrapper.unmount()
+    const calls = materials.taskActivity.mock.calls.length
+    await vi.advanceTimersByTimeAsync(6000)
+    expect(materials.taskActivity).toHaveBeenCalledTimes(calls)
+  })
+
+  it('取消后刷新仍显示已保存数量和继续入口，无需原文件；继续使用原任务', async () => {
+    let resumed = false
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('t9', resumed ? {} : { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: true }),
+      resumeTask: async () => { resumed = true; return task('t9', 'extracting', { document_id: 'd9', progress: 0.5833333 }) },
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').text()).toContain('小节消歧已保存 111 对')
+    expect(row(wrapper, 'd9').text()).not.toContain('请重新选择文件上传')
+    await row(wrapper, 'd9').get('[data-test="task-resume"]').trigger('click')
+    await flushPromises()
+    expect(materials.resumeTask).toHaveBeenCalledWith('t9', expect.anything())
+    expect(materials.upload).not.toHaveBeenCalled()
+    expect(events.last().taskId).toBe('t9')
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('抽取中')
+    expect(row(wrapper, 'd9').get('[data-test="material-progress"]').attributes('aria-valuenow')).toBe('58')
+  })
+
+  it('继续请求防双击，取消中的任务不出现继续入口', async () => {
+    const pending = deferred<Task>()
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('t9', { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: true }),
+      resumeTask: () => pending.promise,
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    const b = row(wrapper, 'd9').get('[data-test="task-resume"]')
+    await b.trigger('click')
+    await b.trigger('click')
+    expect(materials.resumeTask).toHaveBeenCalledTimes(1)
+    expect(b.attributes('disabled')).toBeDefined()
+    pending.resolve(task('t9', 'extracting', { document_id: 'd9', cancel_requested: true }))
+    await flushPromises()
+    events.stage('t9', 'extracting', 0.58, true)
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('取消中')
+    expect(row(wrapper, 'd9').find('[data-test="task-resume"]').exists()).toBe(false)
+  })
+
+  it('恢复失败说明模型配置变化，不伪装为运行，也不回显服务端原文', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('t9', { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: true }),
+      resumeTask: async () => { throw apiError(409, 'TASK_NOT_RESUMABLE' as ErrorCode, { stage: 'cancelled', reason: 'model_config_changed' }) },
+    })
+    const { wrapper } = await mountPage({ materials })
+    await row(wrapper, 'd9').get('[data-test="task-resume"]').trigger('click')
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="resume-error"]').text()).toContain('模型配置')
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('已取消')
+    expect(row(wrapper, 'd9').text()).not.toContain('服务端原文')
+  })
+
+  it('终态不把旧的模型请求当成仍在等待；详情失败保留计数并提示暂不可用', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date('2026-11-15T16:42:00Z'))
+    let reads = 0
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'extracting', task_id: 't9' })],
+      taskActivity: async () => { if (reads++ === 0) return activity(); throw new NetworkError(new TypeError('offline')) },
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+    expect(row(wrapper, 'd9').text()).toContain('详情更新暂不可用')
+    expect(row(wrapper, 'd9').text()).toContain('小节消歧已保存 111 对')
+    events.cancelled('t9', 0.58)
+    await flushPromises()
+    expect(row(wrapper, 'd9').text()).not.toContain('请求进行中')
+    const readsAfterCancel = materials.taskActivity.mock.calls.length
+    await vi.advanceTimersByTimeAsync(6000)
+    expect(materials.taskActivity).toHaveBeenCalledTimes(readsAfterCancel)
+  })
+})
+
+describe('TASK-CONTINUE 恢复生命周期隔离', () => {
+  it('同一任务继续后忽略旧SSE连接迟到的取消事件', async () => {
+    let cancelled = false
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'extracting', task_id: 't9' })],
+      taskActivity: async () => activity('t9', cancelled ? { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: true } : {}),
+      resumeTask: async () => { cancelled = false; return task('t9', 'extracting', { document_id: 'd9', progress: 0.58 }) },
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    const old = events.last('t9')
+    cancelled = true
+    events.cancelled('t9', 0.58)
+    await flushPromises()
+    await row(wrapper, 'd9').get('[data-test="task-resume"]').trigger('click')
+    await flushPromises()
+    old.handlers.onUpdate({ source: 'stream', event: 'cancelled', final: true, data: { task_id: 't9', stage: 'cancelled', progress: 0.58, cancel_requested: true } })
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('抽取中')
+    expect(row(wrapper, 'd9').find('[data-test="task-resume"]').exists()).toBe(false)
+    expect(events.subs).toHaveLength(2)
+  })
+
+  it('不接收其他任务的activity或错误计数，避免伪造已完成结果', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('foreign-task', { stage: 'cancelled', resumable: true }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').find('[data-test="task-resume"]').exists()).toBe(false)
+    expect(row(wrapper, 'd9').find('[data-test="task-activity"]').exists()).toBe(false)
+    expect(row(wrapper, 'd9').text()).toContain('详情更新暂不可用')
+  })
+})
+
+describe('TASK-CONTINUE 详情与状态并发', () => {
+  it.each(['conflict', 'network'])('继续请求%s但服务端已恢复时，从新详情同步真实状态并重新订阅', async (failure) => {
+    let resumed = false
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('t9', resumed ? {} : { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: true }),
+      resumeTask: async () => {
+        resumed = true
+        if (failure === 'conflict') throw apiError(409, 'TASK_NOT_RESUMABLE' as ErrorCode, { stage: 'extracting', reason: 'not_cancelled' })
+        throw new NetworkError(new TypeError('connection closed after server accepted'))
+      },
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    await row(wrapper, 'd9').get('[data-test="task-resume"]').trigger('click')
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('抽取中')
+    expect(row(wrapper, 'd9').find('[data-test="task-resume"]').exists()).toBe(false)
+    expect(row(wrapper, 'd9').find('[data-test="resume-error"]').exists()).toBe(false)
+    expect(events.last('t9').closed).toBe(false)
+  })
+
+  it('较早详情不能覆盖SSE取消；下一次详情可确认取消后的可继续状态', async () => {
+    const pending = deferred<ReturnType<typeof activity>>()
+    let reads = 0
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'extracting', task_id: 't9' })],
+      taskActivity: async () => ++reads === 1 ? pending.promise : activity('t9', { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: true }),
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    events.cancelled('t9', 0.58)
+    pending.resolve(activity())
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('已取消')
+    expect(row(wrapper, 'd9').find('[data-test="task-resume"]').exists()).toBe(true)
+    expect(row(wrapper, 'd9').text()).not.toContain('请求进行中')
+  })
+
+  it('SSE失效时详情仍能确认已结束，不继续展示活动请求', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    let reads = 0
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'extracting', task_id: 't9' })],
+      taskActivity: async () => reads++ === 0 ? activity() : activity('t9', { stage: 'awaiting_review', phase: 'awaiting_review', progress: 0.95, worker_active: false, active_requests: [] }),
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    events.stage('t9', 'extracting', 0.58)
+    events.close('t9', { kind: 'fatal', error: new Error('stream disconnected') })
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="material-status"]').text()).toBe('待审核')
+    expect(row(wrapper, 'd9').text()).not.toContain('请求进行中')
+    expect(row(wrapper, 'd9').find('[data-test="stream-status"]').exists()).toBe(false)
+    const count = materials.taskActivity.mock.calls.length
+    await vi.advanceTimersByTimeAsync(6000)
+    expect(materials.taskActivity).toHaveBeenCalledTimes(count)
+  })
+})
+
+describe('TASK-CONTINUE 暂时无法读取详情', () => {
+  it('已取消任务详情暂不可用时，不引导重新上传并丢失复用机会', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => { throw new NetworkError(new TypeError('offline')) },
+    })
+    const { wrapper } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').text()).toContain('详情更新暂不可用')
+    expect(row(wrapper, 'd9').text()).not.toContain('请重新选择文件上传')
+  })
+
+  it('服务端确认取消任务不可继续时，才引导选择文件重新上传', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('t9', { stage: 'cancelled', phase: 'cancelled', cancel_requested: true, worker_active: false, active_requests: [], resumable: false }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').text()).toContain('请重新选择文件上传')
+    expect(row(wrapper, 'd9').find('[data-test="task-resume"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------- GLOBAL-RESUME：全局对级进度，与小节缓存分开
+function globalDisambiguation(overrides: Record<string, unknown> = {}) {
+  return {
+    total: 120, completed: 40, failed: 3, deferred: 5, reused: 31, inflight: 4, pending: 68,
+    total_possible: 3160, phase: 'running', updated_at: '2026-11-15T16:42:00Z', ...overrides,
+  }
+}
+
+describe('GLOBAL-RESUME 全局消歧真实进度', () => {
+  it('全局完成对数直接显示持久化记录，与小节111对及模型调用数分别展示', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'merging', task_id: 't9' })],
+      taskActivity: async () => activity('t9', {
+        stage: 'merging', phase: 'disambiguating', progress: 0.6,
+        global_disambiguation: globalDisambiguation(),
+        active_requests: [{ purpose: 'resolve_duplicate', count: 2, started_at: '2026-11-15T16:40:55Z' }],
+      }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    const r = row(wrapper, 'd9')
+    expect(r.get('[data-test="task-current-phase"]').text()).toContain('正在进行全局消歧')
+    expect(r.text()).toContain('小节消歧已保存 111 对')
+    const g = r.get('[data-test="global-disambiguation"]')
+    expect(g.get('[data-test="global-completed"]').text()).toContain('已完成 40 / 120 对')
+    expect(g.text()).toContain('已复用 31 对')
+    expect(g.text()).toContain('处理中 4 对')
+    expect(g.text()).toContain('待处理 68 对')
+    expect(g.text()).toContain('失败 3 对')
+    expect(g.text()).toContain('技术未检查 5 对')
+    expect(g.text()).toContain('3040 对未纳入本批候选计划')
+    expect(r.get('[data-test="task-request-wait"]').text()).toContain('全局消歧：2 个请求进行中')
+  })
+
+  it('小节缓存数量不变时，全局对级进度仍随新快照更新', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date('2026-11-15T16:42:00Z'))
+    let reads = 0
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'merging', task_id: 't9' })],
+      taskActivity: async () => activity('t9', {
+        stage: 'merging', phase: 'disambiguating', progress: 0.6,
+        global_disambiguation: globalDisambiguation(reads++ ? { completed: 43, pending: 65 } : {}),
+      }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').get('[data-test="global-completed"]').text()).toContain('40 / 120')
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(row(wrapper, 'd9').get('[data-test="global-completed"]').text()).toContain('43 / 120')
+    expect(row(wrapper, 'd9').text()).toContain('小节消歧已保存 111 对')
+  })
+
+  it('取消后刷新仍展示全局完成数及缓存复用量，不把持久化记录当实时请求', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'cancelled', task_id: 't9' })],
+      taskActivity: async () => activity('t9', {
+        stage: 'cancelled', phase: 'cancelled', progress: 0.6, cancel_requested: true,
+        worker_active: false, active_requests: [], resumable: true,
+        global_disambiguation: globalDisambiguation({ inflight: 0, pending: 72 }),
+      }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    const g = row(wrapper, 'd9').get('[data-test="global-disambiguation"]')
+    expect(g.text()).toContain('已完成 40 / 120 对')
+    expect(g.text()).toContain('已复用 31 对')
+    expect(g.text()).toContain('进度已保存')
+    expect(row(wrapper, 'd9').find('[data-test="task-request-wait"]').exists()).toBe(false)
+  })
+
+  it('本批结束仍保留失败和技术未检查，未将它们计入语义完成', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'merging', task_id: 't9' })],
+      taskActivity: async () => activity('t9', {
+        stage: 'merging', phase: 'merging', progress: 0.7, active_requests: [],
+        global_disambiguation: globalDisambiguation({ completed: 100, failed: 3, deferred: 17, reused: 40, inflight: 0, pending: 0, phase: 'complete' }),
+      }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    const g = row(wrapper, 'd9').get('[data-test="global-disambiguation"]')
+    expect(g.text()).toContain('本批检查已结束')
+    expect(g.get('[data-test="global-completed"]').text()).toContain('100 / 120')
+    expect(g.text()).toContain('技术未检查 17 对')
+    expect(g.text()).not.toContain('120 / 120')
+  })
+
+  it('缺少持久化全局记录时明确暂无记录，不伪造0/0或声称尚未开始', async () => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'merging', task_id: 't9' })],
+      taskActivity: async () => activity('t9', { stage: 'merging', phase: 'merging', global_disambiguation: null }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').text()).toContain('全局消歧暂无已保存的进度')
+    expect(row(wrapper, 'd9').find('[data-test="global-completed"]').exists()).toBe(false)
+    expect(row(wrapper, 'd9').text()).not.toContain('尚未开始')
+  })
+
+  it.each([
+    { completed: -1 }, { completed: 42 }, { reused: 41 }, { total_possible: 119 },
+    { inflight: 0.5 }, { phase: 'everything_done' }, { phase: 'complete' }, { updated_at: 'not-a-date' },
+  ])('拒绝不一致的全局计数或元数据 %j', async (invalid) => {
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'merging', task_id: 't9' })],
+      taskActivity: async () => activity('t9', { stage: 'merging', global_disambiguation: globalDisambiguation(invalid) }),
+    })
+    const { wrapper } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').find('[data-test="task-activity"]').exists()).toBe(false)
+    expect(row(wrapper, 'd9').text()).toContain('详情更新暂不可用')
+  })
+})
+
+describe('GLOBAL-RESUME 终态保留的旧在途计数', () => {
+  it.each(['awaiting_review', 'completed'] as const)('SSE确认%s但详情刷新失败时，旧在途对数明确标为上次记录', async (stage) => {
+    let reads = 0
+    const materials = fakeMaterialsApi({
+      list: async () => [doc('d9', { parse_status: 'merging', task_id: 't9' })],
+      taskActivity: async () => {
+        if (reads++ > 0) throw new NetworkError(new TypeError('offline after completion'))
+        return activity('t9', { stage: 'merging', phase: 'disambiguating', global_disambiguation: globalDisambiguation() })
+      },
+    })
+    const { wrapper, events } = await mountPage({ materials })
+    expect(row(wrapper, 'd9').get('[data-test="global-disambiguation"]').text()).toContain('处理中 4 对')
+    if (stage === 'awaiting_review') events.stage('t9', stage, 0.95)
+    else events.last('t9').handlers.onUpdate({ source: 'stream', event: 'done', final: true, data: { task_id: 't9', stage: 'completed', progress: 1 } })
+    await flushPromises()
+    expect(row(wrapper, 'd9').get('[data-test="global-disambiguation"]').text()).toContain('上次记录处理中 4 对')
+    expect(row(wrapper, 'd9').text()).toContain('详情更新暂不可用')
+    expect(row(wrapper, 'd9').find('[data-test="task-request-wait"]').exists()).toBe(false)
   })
 })

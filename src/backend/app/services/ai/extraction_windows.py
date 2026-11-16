@@ -21,7 +21,7 @@ class WindowPolicy:
     def __post_init__(self):
         if (type(self.max_input_bytes) is not int or self.max_input_bytes < 1 or
             type(self.overlap_chars) is not int or not 0 <= self.overlap_chars <= 4096 or
-            type(self.max_windows) is not int or not 1 <= self.max_windows <= 256 or
+            type(self.max_windows) is not int or not 1 <= self.max_windows <= 64_000 or
             type(self.version) is not int or self.version != 1):
             raise ValueError('invalid extraction window policy')
 

@@ -163,10 +163,12 @@ def test_new_task_not_before_defaults_to_its_creation_time(db_url, new_task):
 
 
 def _migrations_with_probe(tmp_path: Path) -> tuple[Path, str]:
-    lease_sql = _lease_migration()
+    # Claim uses the current repository schema (including manual-resume attempt bases).
+    # The 005 migration/backfill test above remains pinned to its historical boundary.
+    current_sql = sorted(MIGRATIONS.glob('*.sql'))[-1]
     directory = tmp_path / "with-probe"
-    _copy_migrations_through(directory, lease_sql)
-    probe_version = f"{int(lease_sql.name[:3]) + 1:03d}"
+    _copy_migrations_through(directory, current_sql)
+    probe_version = f"{int(current_sql.name[:3]) + 1:03d}"
     (directory / f"{probe_version}_lease_probe.sql").write_text(
         "CREATE TABLE lease_probe (id INTEGER PRIMARY KEY);\n", encoding="utf-8"
     )

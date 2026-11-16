@@ -37,7 +37,7 @@ def test_complete_group_preserves_names_definitions_sources_and_contributions():
     result = plan_mapping(raw, [same("a", "b"), same("a", "c"), same("b", "c")], existing_ids={"b"})
     assert raw == original and len(result.snapshot["nodes"]) == 1
     node = result.snapshot["nodes"][0]
-    assert node["kp_id"] == "b" and node["definition"] == "定义b"
+    assert node["kp_id"] == "b" and node["definition"].splitlines() == ["定义b", "定义a", "定义c"]
     assert set(node["aliases"]) == {"a", "c"} and set(node["contrib_tasks"]) == {"ta", "tb", "tc"}
     assert set(node["merged_from"]) == {"a", "c"} and not node["locked"]
     assert len(result.snapshot["evidence"]) == 3
@@ -101,3 +101,43 @@ def test_existing_merged_group_cannot_expand_without_original_member_proofs():
     raw['evidence'] = [e for e in raw['evidence'] if e['kp_id']!='b']
     raw['nodes'][0]['merged_from'] = ['b']
     assert not plan_mapping(raw, [same('a','c')], existing_ids={'a'}).groups
+
+
+def test_merge_keeps_substantive_definition_with_stable_canonical_id():
+    from app.services.fusion.mapping import plan_mapping
+    raw=snapshot()
+    raw['nodes'][0].update(name='链栈', definition='链栈属于本章的数据结构。')
+    raw['nodes'][1].update(name='链栈', definition='链栈用单链表存储栈元素，在表头执行入栈和出栈。')
+    result=plan_mapping(raw,[same('a','b')],existing_ids={'a'})
+    merged=next(n for n in result.snapshot['nodes'] if n['kp_id']=='a')
+    assert merged['definition']=='链栈用单链表存储栈元素，在表头执行入栈和出栈。'
+    assert merged['kp_id']=='a' and raw['nodes'][0]['definition']=='链栈属于本章的数据结构。'
+
+
+def test_merge_preserves_complementary_conditions_without_slicing_formula():
+    from app.services.fusion.mapping import plan_mapping
+    raw=snapshot()
+    raw['nodes'][0]['definition']='长度为(rear-front+C)%C。'
+    raw['nodes'][1]['definition']='保留一个空槽时，最多存储C-1个元素。'
+    merged=plan_mapping(raw,[same('a','b')],existing_ids={'a'}).snapshot['nodes'][0]
+    assert '长度为(rear-front+C)%C。' in merged['definition']
+    assert '保留一个空槽时，最多存储C-1个元素。' in merged['definition']
+
+
+def test_definition_overflow_keeps_whole_definition_and_original_provenance():
+    from app.services.fusion.mapping import plan_mapping
+    raw=snapshot()
+    first='甲'*260+'。仅当n>0。'; second='乙'*300+'。仅当n<0。'
+    raw['nodes'][0]['definition']=first;raw['nodes'][1]['definition']=second
+    merged=plan_mapping(raw,[same('a','b')],existing_ids={'a'}).snapshot['nodes'][0]
+    assert merged['definition'] in (first,second)
+    assert len(merged['definition'])<=500
+
+
+def test_structural_definition_with_qualifier_is_not_generic_membership():
+    from app.services.fusion.mapping import plan_mapping
+    raw=snapshot()
+    raw['nodes'][0].update(name='栈',definition='栈是遵循后进先出原则的数据结构。')
+    raw['nodes'][1].update(name='栈',definition='栈的插入和删除操作限制在栈顶。')
+    merged=plan_mapping(raw,[same('a','b')],existing_ids={'a'}).snapshot['nodes'][0]
+    assert '遵循后进先出' in merged['definition'] and '限制在栈顶' in merged['definition']

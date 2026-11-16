@@ -262,7 +262,7 @@ class RelationExtractor:
 
     def prompt(self) -> PromptTemplate:
         if self._normalized:
-            return self._prompts.get('extract_normalized_relations', 1)
+            return self._prompts.get('extract_normalized_relations', 2)
         return self._prompts.get(RELATION_PROMPT_PURPOSE, RELATION_PROMPT_VERSION)
 
     def extract(
@@ -296,7 +296,7 @@ class RelationExtractor:
             return outcome((), {}, None, None, 0)
 
         rendered = template.render(
-            {"entity_table": self._render(entities), "source_chunks": _render_chunks(texts)}
+            self._render_values(entities, texts)
         )
         messages = (Message("user", rendered.text),)
         result = self._client.complete(self._request(template.purpose, self._model, messages))
@@ -321,10 +321,17 @@ class RelationExtractor:
 
         return outcome(candidates, dropped, None, result, calls)
 
+    def _render_values(self, entities, chunks):
+        values = {"entity_table": self._render(entities), "source_chunks": _render_chunks(chunks)}
+        if self._normalized:
+            from app.services.ai.explicit_relations import explicit_relations
+            # Hints are candidate recall, never authoritative graph edges.
+            values['relation_hints'] = json.dumps(explicit_relations(entities, chunks), ensure_ascii=False)
+        return values
+
     def request_size(self, entities: Sequence[SectionEntity], chunks: Sequence[SourceChunk]) -> int:
         from app.services.ai.request_budget import rendered_request_size
-        text = self.prompt().render({"entity_table": self._render(entities),
-                                     "source_chunks": _render_chunks(chunks)}).text
+        text = self.prompt().render(self._render_values(entities, chunks)).text
         return rendered_request_size(text, self._max_output_tokens)
 
     def _request(self, purpose: str, model: str, messages: tuple[Message, ...]) -> ModelRequest:

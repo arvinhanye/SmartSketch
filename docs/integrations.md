@@ -84,7 +84,9 @@
 
 | 变量 | 类型与约束 | 样例 | 用途 | 状态 |
 | --- | --- | --- | --- | --- |
-| `LLM_REQUEST_TIMEOUT_SECONDS` | 正数 | `60` | worker 侧非流式调用（抽取、补漏、裁决、归并）的单次 HTTP 超时；问答链路不用此值 | 占位（D-02e） |
+| `LLM_EXTRACTION_MAX_OUTPUT_TOKENS` | 整数 1～4096000 | `4096` | 实体、关系（含归一化）与对应修复的配置输出上限；个人和共享工厂一致。官方 DeepSeek 已核验模型实际不超过 393216，审计及无 usage 估算使用发送值 | EXTRACTION-BUDGET-1000X |
+| `LLM_RELATION_TIMEOUT_SECONDS` | 有限正数 | `180` | 关系抽取、归一化关系及关系修复的单次总超时；个人和共享工厂统一设置，独立于实体/语义裁决 | RELATION-RESUME-01 |
+| `LLM_REQUEST_TIMEOUT_SECONDS` | 正数 | `60` | worker 侧实体抽取、补漏、语义裁决/归并的单次 HTTP 超时；关系调用使用独立变量，问答链路不用此值 | 占位（D-02e） |
 | `LLM_CHAT_FIRST_TOKEN_TIMEOUT_SECONDS` | 正数，且 < `LLM_CHAT_TIMEOUT_SECONDS` | `5` | 流式问答首字超时；到点前未出字才允许切备用 | 占位（D-02e） |
 | `LLM_CHAT_TIMEOUT_SECONDS` | 正数 | `15` | 问答链路（问题改写 + 流式生成）整体上限（赛题 ≤ 15 秒）；链路内任何调用及重试都不得超出剩余时间 | 占位（D-02e） |
 | `LLM_MAX_CONCURRENCY` | 整数 ≥ 1 | `8` | 抽取 worker 的块/小节共享池上限；环境变量可覆盖，多个 worker 上限相加；API 问答独立 | EXTRACT-PERF-01 用户已确认（2026-11-05） |
@@ -96,8 +98,8 @@
 | `DISAMBIGUATION_ANALYSIS_ENABLED` | 布尔 | `false` | 第一批生成消歧分析与提及身份；只写分析检查点，不自动合并；接管遵循已有任务身份模式 | ADR-098 |
 | `DISAMBIGUATION_MAX_PAIRS_PER_SECTION` | 整数 1～256 | `32` | 小节最多分析候选对数，超出显式 partial；使用名称/别名及词项召回；未提供真实向量时记录缺失通道 | ADR-098 |
 | `DISAMBIGUATION_MAX_INPUT_BYTES` | 整数 1024～1000000 | `24000` | 完整语义请求 UTF-8 字节加 256 包装开销和输出 Token×4 预留的保守上限；不是供应商有效窗口保证，超限不调用 | ADR-098 |
-| `DISAMBIGUATION_EXTRACTION_MAX_INPUT_BYTES` | 整数 1024～1000000 | `24000` | 消歧新任务的实体/关系/补漏/修复完整请求上限，包含包装及输出预留；不等于模型有效上下文 | ADR-101 |
-| `DISAMBIGUATION_EXTRACTION_MAX_WINDOWS` | 整数 1～256 | `64` | 每块或小节单次尝试的累计窗口上限（含补漏）；主计划/必需最少窗口超限零调用，动态补漏超限在该轮调用前停止并记录缺口 | ADR-101 |
+| `DISAMBIGUATION_EXTRACTION_MAX_INPUT_BYTES` | 整数 1024～24000000 | `24000` | 消歧新任务的实体/关系/补漏/修复完整请求上限，包含包装及输出预留；不等于模型有效上下文 | ADR-101 |
+| `DISAMBIGUATION_EXTRACTION_MAX_WINDOWS` | 整数 1～64000 | `64` | 每块或小节单次尝试的累计窗口上限（含补漏）；主计划/必需最少窗口超限零调用，动态补漏超限在该轮调用前停止并记录缺口 | ADR-101 |
 | `DISAMBIGUATION_EXTRACTION_OVERLAP_CHARS` | 整数 0～4096 | `512` | 同一来源块相邻窗口的字符重叠；小节来源尽量重叠邻接块；原始块 ID/位置不变 | ADR-101 |
 | `LLM_MAX_RETRIES` | 整数 ≥ 0 | `2` | ADR-011 三层重试中的 L1：单次调用在同一供应商上的重试次数，不含首次 | 占位（D-02e） |
 | `LLM_CIRCUIT_FAILURE_THRESHOLD` | 整数 ≥ 1 | `5` | 连续失败多少次后熔断；主用、备用、向量各自计数 | 占位（D-02e） |
@@ -391,3 +393,13 @@ docker compose --profile app down        # 保留 app-data 卷
 ## 2026-10-05 Mac下载信任门禁
 
 preview Intel二进制经GitHub下载后有隔离属性且未签名，系统明确拒绝PID44020。当前本机可用Developer ID Application身份数0，签名与公证接入待用户说明条件；不采集私钥/证书密码，不加入业务环境变量。源码仅修137错误提示，不移除隔离、不关安全策略，不冒充Apple验证。正式签名公证与下载后验收仍OPEN。
+
+### 2026-11-15 本机抽取预算验证
+
+用户授权本机抽取输出、完整请求字节与窗口设置为 4096000 / 24000000 / 64000（各 1000 倍），任务/日 token 软预算为 500000000 / 5000000000。仓库默认值保留原值，安装环境显式覆盖；旧检查点仍固定旧窗口，新任务才使用新设置。语义裁决输出、并发、重试、超时和思考模式不是这三个抽取额度，沿用原设置。
+
+[DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/) 与[模型页](https://api-docs.deepseek.com/quick_start/pricing/)（2026-11-15 核验）声明 `max_tokens` 至多 393216。仅官方 `https://api.deepseek.com` 标准端口及已知模型 `deepseek-flash`、`deepseek-v4-pro`、`deepseek-v4-flash`、`deepseek-v4-flash-vision-exp` 应用该 cap。此值与内部 4096000 配置上限区分；未知兼容服务不猜测上限，实际上下文仍由服务商约束。主备选定后预写与实际发送使用同一有效输出额度，不把无 usage 失败按未发送的额度核算。
+
+### 消歧输出预算（GLOBAL-RESUME-01）
+
+`DISAMBIGUATION_MAX_OUTPUT_TOKENS` 默认1024、可配置至1,024,000；本机按用户授权设置1,024,000。个人/系统语义裁决工厂均使用，初判/复核/修复一致，真实发送额度由已有供应商适配上限限制且审计记有效值。输入字节预算与输出独立，不裁切证据；不修改用户思考配置。全局模型对级并行沿用LLM_MAX_CONCURRENCY，不新增外部服务或凭据。

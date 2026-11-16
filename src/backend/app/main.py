@@ -25,6 +25,8 @@ from app.api.progress import router as progress_router
 from app.api.recommend import router as recommend_router
 from app.api.health import router as health_router
 from app.api.task_cancel import router as task_cancel_router
+from app.api.task_activity import router as task_activity_router
+from app.api.task_resume import router as task_resume_router
 from app.api.tasks import router as tasks_router
 from app.api.materials import policy_router as upload_policy_router
 from app.api.materials import router as materials_router
@@ -118,6 +120,8 @@ def create_app() -> FastAPI:
     application.include_router(chat_router)
     application.include_router(event_tickets_router)
     application.include_router(task_cancel_router)
+    application.include_router(task_activity_router)
+    application.include_router(task_resume_router)
     application.include_router(tasks_router)
     application.include_router(invite_codes_router)
     application.include_router(courses_router)

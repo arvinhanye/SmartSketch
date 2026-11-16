@@ -80,3 +80,6 @@ ModelDiscoveryResult = _module.ModelDiscoveryResult
 
 EmbeddingConfig = _module.EmbeddingConfig
 EmbeddingConfigUpdate = _module.EmbeddingConfigUpdate
+
+TaskNotResumableError = _module.TaskNotResumableError
+ModelConfigRequiredError = _module.ModelConfigRequiredError

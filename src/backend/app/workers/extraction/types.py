@@ -115,6 +115,7 @@ class ExtractionToolkit:
     analysis_max_pairs: int = 32
     window_policy: WindowPolicy | None = None
     local_normalization: bool = False
+    analysis_context: Mapping[str, object] | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)

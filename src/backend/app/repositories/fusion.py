@@ -89,6 +89,17 @@ def get_plan(database, course_id: str, plan_id: str) -> FusionPlan | None:
 
 
 def task_plan(database, course_id: str, task_id: str) -> FusionPlan | None:
+    # A resumed input can select an older immutable plan. Its choice must survive a
+    # later persisting lease takeover; activity's current-attempt filter is separate.
+    if database.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='task_fusion_analysis'").fetchone():
+        analyses = database.execute('''SELECT selected_plan_id FROM task_fusion_analysis
+            WHERE course_id=? AND task_id=? ORDER BY is_current DESC''', (course_id,task_id)).fetchall()
+        if analyses:
+            chosen = database.execute('''SELECT selected_plan_id FROM task_fusion_analysis
+                WHERE course_id=? AND task_id=? AND is_current=1''', (course_id,task_id)).fetchone()
+            return None if chosen is None or chosen[0] is None else _plan(database.execute(
+                f'SELECT {_COLUMNS} FROM fusion_plans WHERE course_id=? AND task_id=? AND plan_id=?',
+                (course_id,task_id,chosen[0])).fetchone())
     return _plan(database.execute(f"SELECT {_COLUMNS} FROM fusion_plans WHERE course_id=? AND task_id=? "
                                   "ORDER BY rowid DESC LIMIT 1", (course_id, task_id)).fetchone())
 

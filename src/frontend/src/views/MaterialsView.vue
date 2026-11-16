@@ -2,6 +2,7 @@
 import PageSheet from '../components/PageSheet.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppIcon from '../components/AppIcon.vue'
+import TaskActivityDetails from '../components/TaskActivityDetails.vue'
 import { computed, inject, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { COURSES_API_KEY } from '../api/courses'
@@ -48,6 +49,7 @@ const {
   retryUpload,
   retryTask,
   cancel,
+  resume,
   reconnect,
   requestDelete,
   cancelDelete,
@@ -189,12 +191,29 @@ function onDrop(event: DragEvent): void {
             >
               {{ row.progressPercent }}%
             </progress>
+            <TaskActivityDetails
+              v-if="row.activity"
+              :activity="row.activity"
+              :received-at="row.activityReceivedAt"
+              :unavailable="row.activityUnavailable"
+              :status="row.status.kind"
+            />
+            <p v-else-if="row.activityUnavailable" class="hint" data-test="activity-unavailable" role="status">详情更新暂不可用，请稍后刷新。</p>
             <p v-if="row.errorMessage" data-test="task-error" role="alert">{{ row.errorMessage }}</p>
             <p v-if="row.cancelError" data-test="cancel-error" role="alert">{{ row.cancelError }}</p>
+            <p v-if="row.resumeError" data-test="resume-error" role="alert">{{ row.resumeError }}</p>
             <p v-if="row.streamNotice" data-test="stream-status" role="status">{{ row.streamNotice }}</p>
             <p v-if="row.deleteError" data-test="delete-error" role="alert">{{ row.deleteError }}</p>
             <p v-if="row.needsReselect" class="hint">如需再次处理，请重新选择文件上传。</p>
             <div class="actions">
+              <button
+                v-if="row.canResume"
+                type="button"
+                data-test="task-resume"
+                :disabled="row.resumePending || runtime.needsConfig"
+                :aria-label="`继续处理「${row.filename}」`"
+                @click="resume(row.documentId)"
+              >{{ row.resumePending ? '正在继续…' : '继续处理' }}</button>
               <button
                 v-if="row.canCancel"
                 type="button"
@@ -253,6 +272,7 @@ function onDrop(event: DragEvent): void {
                 </button>
               </template>
             </div>
+            <p v-if="row.canResume" class="hint">继续会复用已保存的结果，无需重新上传。</p>
           </li>
         </ul>
       </section>

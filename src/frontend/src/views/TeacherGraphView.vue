@@ -189,6 +189,7 @@ const currentName = computed(() => graph.value?.nodes.find((n) => n.id === selec
 
 // L13-2：搜索框回车定位；选中经过「未保存修改」守卫，画布聚焦到该节点
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null)
+const showAllLabels = ref(true)
 const searchNotice = ref<string | null>(null)
 // UI-GRAPH-UNDO-04：教师页复用学生页的搜索框——候选、计数、上一个 / 下一个；定位仍然是“选中并聚焦”，经过未保存修改的确认
 const searchBox = ref<InstanceType<typeof GraphSearch> | null>(null)
@@ -598,6 +599,10 @@ useGraphShortcuts({
             <button v-if="layoutStale && arrangement !== 'force'" type="button" class="teacher-graph__relayout" data-test="tg-relayout" title="关系变了之后节点位置保持不动；点这里按现在的关系重新排布整张图" @click="relayout">
               重新排布
             </button>
+            <label class="teacher-graph__labels">
+              <input v-model="showAllLabels" type="checkbox" aria-label="显示全部名称" />
+              显示全部名称
+            </label>
             <label class="teacher-graph__picker">
               选择知识点
               <select data-test="tg-node-picker" :value="selected ?? ''" @change="onPick">
@@ -607,7 +612,7 @@ useGraphShortcuts({
             </label>
           </div>
           <p v-if="layoutError" role="status" class="ui-muted">章节布局暂不可用，已切换到基础布局。</p>
-          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" @edge-click="editing.openEdge" @node-menu="editing.openMenu" @node-hover="editing.onNodeHover" @geometry-change="editing.refreshHover" @view-change="editing.onViewChange" @blank-click="editing.onViewChange" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick">
+          <GraphCanvas ref="canvas" :graph="canvasGraph" @ready="onCanvasReady" @edge-click="editing.openEdge" @node-menu="editing.openMenu" @node-hover="editing.onNodeHover" @geometry-change="editing.refreshHover" @view-change="editing.onViewChange" @blank-click="editing.onViewChange" :layout="canvasLayout" :arrangement="arrangement === 'radial' ? 'radial' : 'layered'" initial-view="overview" :fit-pads="TEACHER_FIT_PADS" show-label-stat :show-all-labels="showAllLabels" :enhanced="!layoutError" :positions="canvasPositions" audience="teacher" label="课程知识图谱（草稿）" @node-click="onNodeClick">
             <div class="graph-workspace teacher-graph__legend-host">
               <GraphLegend
                 :open="legendOpen"

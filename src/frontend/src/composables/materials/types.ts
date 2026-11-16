@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import type { components } from '../../../../contracts/v1/generated/typescript/openapi'
 import type { CoursesApi } from '../../api/courses'
-import type { MaterialsApi } from '../../api/materials'
+import type { MaterialsApi, TaskActivity } from '../../api/materials'
 import type { TaskEventsClient, TaskStage, TaskStreamState, TaskSubscription } from '../../api/taskEvents'
 import type { CourseRequestScope } from '../../stores/course'
 
@@ -29,6 +29,12 @@ export interface MaterialRow {
   canCancel: boolean
   cancelPending: boolean
   cancelError: string | null
+  activity: TaskActivity | null
+  activityReceivedAt: number
+  activityUnavailable: boolean
+  canResume: boolean
+  resumePending: boolean
+  resumeError: string | null
   errorMessage: string | null
   /** 本次会话保留了该文件，可一键重新上传 */
   canRetry: boolean
@@ -62,6 +68,14 @@ export interface TrackedTask {
   stream: StreamStatus
   cancelPending: boolean
   cancelError: string | null
+  activity: TaskActivity | null
+  activityReceivedAt: number
+  activityUnavailable: boolean
+  resumePending: boolean
+  resumeError: string | null
+  hasSnapshot: boolean
+  streamGeneration: number
+  stateVersion: number
 }
 
 /** 一次「打开某课程资料页」的生命周期；离开或切课即作废 */

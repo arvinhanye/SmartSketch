@@ -750,7 +750,9 @@ def run_pipeline_once(
         if stage == MERGE_STAGE:
             timer.start()
             from app.workers.relation_reconciliation import has_pinned_normalization
-            if settings.DISAMBIGUATION_AUTO_MERGE_ENABLED or has_pinned_normalization(url,lease):
+            with connect(url) as database:
+                previously_prepared = fusion.task_plan(database,lease.course_id,lease.task_id) is not None
+            if settings.DISAMBIGUATION_AUTO_MERGE_ENABLED or has_pinned_normalization(url,lease) or previously_prepared:
                 from app.workers.fusion_task import run_fusion_stage
                 merged = run_fusion_stage(settings, replace(lease, stage=stage), repo=repo, toolkit=toolkit, **lock)
             else:

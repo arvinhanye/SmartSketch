@@ -274,3 +274,20 @@ AGENTS.md、ADR-003、`.claude/rules/backend.md` 等共同契约沿用概念名�
 Go 启动核心位于 launcher/，仅管理本机独立 Docker 安装；其 loopback HTTP 控制接口不是业务 API。配置/安装 ID/发行摘要位于用户私有目录，业务数据留在 ID 对应命名卷。浏览器向导把向量基础设施配置写入本机 .env；业务后端仍仅从环境变量读取。个人生成模型设置沿用 ADR-080，不增加全站向量配置 API。
 
 发行 Compose 位于 packaging/compose.release.yaml，无 Neo4j 宿主端口，web 仅绑定 127.0.0.1。服务、schema、embedding space、索引与代理探测齐备才 READY。首位教师由容器 stdin 工具事务创建；不公开教师注册。升级先阻断、停机整组快照；恢复暂存并二次确认，保留原卷。缺真实发行摘要/三平台验收时不声明正式可用，stage_c_status 与 technical_freeze 不变。
+
+### 关系抽取恢复缓存（RELATION-RESUME-01，2026-11-15）
+
+SQLite 迁移 024 新增 `task_section_decisions`，主键 `(task_id, section_id, input_digest, left_id, right_id)`，外键任务删除级联，课程范围由写入触发器校验。行仅包含完整 SemanticDecision JSON 与时间，不存凭据；更新被禁止，冲突幂等。它独立于完整小节的 `task_chunk_checkpoints`，因此一对裁决成功后可在关系抽取结束前持久化；不会将未完成小节误判为关系已完成。
+
+提取编排层构建带租约的缓存读写器，分析服务通过可选回调复用/保存完整裁决；仓储只执行 SQL。读写事务检查当前课程、extracting 阶段、租约和取消，网络裁决在事务之外；完整输入摘要隔离不同语义上下文。旧代码回退先执行 024 缓存表回退步骤，不删除资料、模型调用或图谱业务数据。
+
+
+### 任务工作详情与取消后继续（ADR-103）
+
+GET task activity 从 SQLite 调用账本、当前任务修订、检查点和完整消歧缓存派生，无模型调用、无逐秒写；与 SSE v1 并行。POST resume 在受控事务恢复同一 cancelled 任务，重新核验权限、资料和个人模型绑定，实际 attempt 保持单调，025 的 resume_attempt_base/resume_count 仅划分手动继续后的重试配额。取消时已完成结果允许在原有效租约内保存，不触发新请求或图写；详情见任务规格§9。
+
+### 全局消歧恢复（ADR-104）
+
+SQLite026持久化全局检查计划和逐对完整语义结果；worker在merging阶段用现有并发上限调度独立候选对，稳定序重组后再做映射及图约束。取消和重试保留完整裁决，旧租约/凭据撤销拒写。activity区分小节与全局计数，未准备当前计划返回null。独立DISAMBIGUATION_MAX_OUTPUT_TOKENS经模型工厂和provider cap贯通；完整输入字节限与输出额度分开。详细身份/失效/回退协议见生成消歧规格§12。
+
+SEMANTIC-QUALITY-01 保持原抽取架构：关系句式召回只给同次模型请求提供待核实线索，不直接写边；语境补证有界、证据可定位；规范ID和定义选择分开，融合计划持久化projection_version以兼容历史撤销。详见specs/generation-disambiguation.md §13。

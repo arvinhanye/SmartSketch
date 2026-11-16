@@ -65,7 +65,7 @@ def test_merge_undo_and_different_merge_never_reuses_the_original_revision():
     from tests.backend.test_disambiguation_mapping import same
     raw = snapshot()
     first = plan_mapping(raw, [same('a', 'b')], existing_ids={'a'})
-    payload = dict(before=raw, groups=[dict(group_id='ab', members=['a', 'b'], canonical_id='a')])
+    payload = dict(projection_version=2, before=raw, groups=[dict(group_id='ab', members=['a', 'b'], canonical_id='a')])
     restored, conflicts = inverse_patch(payload, 'ab', first.snapshot, undone=())
     assert not conflicts
     second = plan_mapping(restored, [same('a', 'c')], existing_ids={'a'})
@@ -102,3 +102,15 @@ def test_revision_only_teacher_change_still_blocks_undo():
     current['nodes'][0]['revision'] += 2
     result, conflicts = inverse_patch(p, 'ab', current, undone=())
     assert result is None and conflicts[0]['reason'] == 'affected_content_changed'
+
+
+def test_legacy_merge_definition_is_replayed_with_legacy_projection_on_undo():
+    from app.services.fusion.undo import inverse_patch
+    p=fixture()
+    originals={n['kp_id']:n for n in p['before']['nodes']}
+    for node in p['after']['nodes']:
+        node['definition']=originals[node['kp_id']]['definition']
+    restored,conflicts=inverse_patch(p,'ab',deepcopy(p['after']),undone=())
+    assert not conflicts and restored is not None
+    assert next(n for n in restored['nodes'] if n['kp_id']=='a')['definition']=='定义a'
+    assert next(n for n in restored['nodes'] if n['kp_id']=='c')['definition']=='定义c'

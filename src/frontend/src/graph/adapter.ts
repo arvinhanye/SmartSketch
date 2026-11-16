@@ -58,6 +58,7 @@ export interface G6NodeData {
   nk?: number // 节点放大系数
   lw?: number // 线宽屏幕下限（画布像素）
   labelOn?: boolean // 标签是否显示
+  labelAll?: boolean // 全部名称模式：悬停淡化也保留名称
   mastery?: 'mastered' | 'learning' | 'unknown'
 }
 

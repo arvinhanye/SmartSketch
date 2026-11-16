@@ -38,8 +38,8 @@ def pinned_task(url,storage,*,course='c',initial_edge=True,external_edge=False):
         if state['failure']:
             if isinstance(state['failure'],Exception): raise state['failure']
             return state['failure']
-        table=text.split('实体表（',1)[1].split('：\n',1)[1].split('\n\n来源资料',1)[0]
-        cards=json.loads(table); members=[e for card in cards for e in card['members']]
+        table=text.split('实体表（',1)[1].split('：\n',1)[1]
+        cards,_=json.JSONDecoder().raw_decode(table); members=[e for card in cards for e in card['members']]
         ids={e['name']:e['id'] for e in members}
         rows=[dict(from_id=ids['哈希表'],to_id=ids['索引'],type='RELATED_TO',evidence='哈希表与索引相关。')] if external_edge else [dict(from_id=members[0]['id'],to_id=members[1]['id'],type='RELATED_TO',evidence='二者有区别。')]
         return json.dumps({'relations':rows if state['edge'] else []},ensure_ascii=False)

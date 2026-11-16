@@ -11,7 +11,7 @@ from app.services.ai.prompts import PromptLibrary
 from app.services.fusion.judge import FusionEntity, validate_pair
 
 PURPOSE = "resolve_duplicate"
-VERSION = 1
+VERSION = 2
 Verdict = Literal["SAME", "DIFFERENT", "UNCERTAIN"]
 
 
@@ -66,6 +66,34 @@ def _parse(value: object, left: FusionEntity, right: FusionEntity) -> dict | Non
                 differences=tuple(s.strip() for s in differences))
 
 
+def _grounded(value, left, right, issues):
+    grounding = value.get('grounding')
+    answers = value.get('resolved_differences')
+    if not isinstance(grounding, dict) or not isinstance(answers, list):
+        return False
+    addressed = set()
+    for answer in answers:
+        if not isinstance(answer, dict):
+            return False
+        difference, explanation = answer.get('difference'), answer.get('explanation')
+        if (not isinstance(difference, str) or difference not in issues or
+            not isinstance(explanation, str) or not 1 <= len(explanation.strip()) <= 500):
+            return False
+        addressed.add(difference)
+    if addressed != set(issues):
+        return False
+    for key, entity in (('left', left), ('right', right)):
+        item = grounding.get(key)
+        if not isinstance(item, dict):
+            return False
+        source_id, quote = item.get('source_id'), item.get('quote')
+        if (not isinstance(source_id, str) or source_id not in value[key+'_source_ids'] or
+            not isinstance(quote, str) or not 1 <= len(quote.strip()) <= 500 or
+            not any(s.source_id == source_id and quote in s.quote for s in entity.evidence)):
+            return False
+    return True
+
+
 class SemanticResolver:
     def __init__(self, client: ModelClient, *, model: str, max_output_tokens: int = 1024,
                  max_input_bytes: int = 24000, prompts: PromptLibrary | None = None) -> None:
@@ -91,12 +119,14 @@ class SemanticResolver:
                                     model_calls=calls, model_ids=tuple(dict.fromkeys(models)),
                                     prompt_sha256=self.template.sha256, **(parsed or {}))
 
-        first = None
-        for phase in ("初次同义判断", "独立差异复核"):
-            rendered = self.template.render(dict(phase=phase, pair_json=data)).text
-            # Conservative byte ceiling, not a claim about a provider's effective window.
-            # Include wrapper overhead and output reservation; never cut evidence silently.
-            if len(rendered.encode("utf-8")) + 256 + 4 * self.max_output_tokens > self.max_input_bytes:
+        def ask(phase, issues=()):
+            nonlocal calls, repairs_left
+            payload = data if not issues else json.dumps(
+                dict(left=_card(left), right=_card(right), unresolved_differences=list(issues)),
+                ensure_ascii=False, sort_keys=True)
+            rendered = self.template.render(dict(phase=phase, pair_json=payload)).text
+            # Budget the full input and its wrapper. The output limit is enforced separately.
+            if len(rendered.encode("utf-8")) + 256 > self.max_input_bytes:
                 return finish("deferred", "input_budget")
             purpose = PURPOSE
             while True:
@@ -114,7 +144,11 @@ class SemanticResolver:
                     return finish("failed", "model_error")
                 models.append(result.model_responded or result.model_requested)
                 try:
-                    parsed = None if result.finish_reason == "length" else _parse(result.json(), left, right)
+                    value = result.json()
+                    parsed = None if result.finish_reason == "length" else _parse(value, left, right)
+                    if parsed is not None and issues and parsed['verdict'] == 'SAME':
+                        if not _grounded(value, left, right, issues):
+                            parsed = None
                 except ModelOutputError:
                     parsed = None
                 if parsed is not None:
@@ -123,14 +157,32 @@ class SemanticResolver:
                     return finish("failed", "invalid_output")
                 repairs_left -= 1
                 purpose = "repair"
-            if first is None:
-                if parsed["verdict"] != "SAME":
-                    return finish("complete", parsed=parsed)
-                first = parsed
-            elif parsed["verdict"] != "SAME":
-                parsed["verdict"] = "UNCERTAIN"
-                return finish("complete", "verification_disagreed", parsed)
-            else:
-                parsed["basis"] = first["basis"] if first["basis"] == parsed["basis"] else "mixed"
-                return finish("complete", parsed=parsed)
-        raise AssertionError("unreachable resolution state")
+            return parsed
+
+        first = ask("初次同义判断")
+        if isinstance(first, SemanticDecision):
+            return first
+        if first['verdict'] == 'DIFFERENT':
+            return finish('complete', parsed=first)
+        supplemented = first['verdict'] == 'UNCERTAIN'
+        if supplemented:
+            first = ask('语境补证', first['differences'] or (first['reason'],))
+            if isinstance(first, SemanticDecision):
+                return first
+            if first['verdict'] != 'SAME':
+                return finish('complete', parsed=first)
+        # This request remains blind to earlier model conclusions and explanations.
+        verified = ask('独立差异复核')
+        if isinstance(verified, SemanticDecision):
+            return verified
+        if verified['verdict'] != 'SAME':
+            if not supplemented:
+                resolved = ask('语境补证', verified['differences'] or (verified['reason'],))
+                if isinstance(resolved, SemanticDecision):
+                    return resolved
+                verified = resolved
+            if verified['verdict'] != 'SAME':
+                verified['verdict'] = 'UNCERTAIN'
+                return finish('complete', 'verification_disagreed', verified)
+        verified['basis'] = first['basis'] if first['basis'] == verified['basis'] else 'mixed'
+        return finish('complete', parsed=verified)

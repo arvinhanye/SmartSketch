@@ -8,12 +8,12 @@
 
 | 用途 | 版本 | 变量 | evaluation | 模板摘要 sha256 | 负责任务 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `extract_entities` | 2 | `chunk_text` | `evaluation/evaluate_extraction.py` | `3d7cfca562e1f3685e1def3915215d922dec2f94b72dc57037bc10903dd059e6` | E05 | 草稿 |
-| `extract_entities_gleaning` | 2 | `chunk_text`、`entities_json` | `evaluation/evaluate_extraction.py` | `61a0c8d0040e457d8310dc0d9e451769ee89e0b3c004fa73e8278042b3397c7e` | E06 | 草稿 |
+| `extract_entities` | 3 | `chunk_text` | `evaluation/evaluate_extraction.py` | `68775db5a80f269b1bb0b8a514b5edbd07c7470c9872deac2e2706d73adfc0c8` | E05 | 草稿 |
+| `extract_entities_gleaning` | 3 | `chunk_text`、`entities_json` | `evaluation/evaluate_extraction.py` | `b5846481081867f5074cfe59966dfd639297d63d81478a3575d337cedd59149d` | E06 | 草稿 |
 | `extract_relations` | 2 | `entity_table`、`source_chunks` | `evaluation/evaluate_extraction.py` | `be9c788194869a7421e3058dc73923608697995bb50e662de6a60d1b6cc963d6` | E11 | 草稿 |
-| `extract_normalized_relations` | 1 | `entity_table`、`source_chunks` | `evaluation/evaluate_extraction.py` | `2be92d14baed15eee678b42d74c532c4984f06a84e586834cd2afe5b33d2e161` | E11 | 草稿 |
+| `extract_normalized_relations` | 2 | `entity_table`、`source_chunks`、`relation_hints` | `evaluation/evaluate_extraction.py` | `bd2104f9ec3526d8bacc43c1b935f0074d4ab8c991955c217ae7e8fcbd853d75` | E11 | 草稿 |
 | `judge_duplicate` | 2 | `name_a`、`definition_a`、`sources_a`、`name_b`、`definition_b`、`sources_b` | `evaluation/evaluate_extraction.py` | `1523521301541090a9c82c0b3398a534bfa655a30d211f9cca7d220aeada589d` | E10 | 草稿 |
-| `resolve_duplicate` | 1 | `phase`、`pair_json` | `evaluation/evaluate_disambiguation.py` | `c75e2cae12db7222649ae4829235cf839d0fb56a302e468d36ded55fc0f288bc` | DISAMBIG-BE-01 | 草稿 |
+| `resolve_duplicate` | 2 | `phase`、`pair_json` | `evaluation/evaluate_disambiguation.py` | `2c2768338f09fd5cd1317c480eddfa952677566edce97634d9e60cf875bc606f` | DISAMBIG-BE-01 | 草稿 |
 | `summarize_definition` | 2 | `name`、`definitions`、`sources` | `evaluation/evaluate_extraction.py` | `52336dd1e2c9d8108db9fdab0d373fe129b46c0f1fad0fb2c8a3bc081e550a97` | E10 | 草稿 |
 | `rewrite_query` | 2 | `history`、`question` | `evaluation/evaluate_qa.py` | `26c5779846c8a164ef25b9b68d5b6f764f26545b1dc9300ae292b93a1c3ac261` | J03 | 草稿 |
 | `answer_with_context` | 3 | `graph_context`、`context`、`question` | `evaluation/evaluate_qa.py` | `4ee7da769d815990ef0162bbfb4b79fdac0ffa0c7ee1b143e9993f2e07f05e27` | J05（v3：C02-2 / ADR-089） | 草稿 |

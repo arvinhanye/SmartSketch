@@ -52,6 +52,12 @@ describe('buildGraphOptions 新主题', () => {
     expect(call(s.badges, node())).toEqual([])
   })
 
+  it('全部名称模式在悬停淡化时仍保留名称，自动模式维持原隐藏行为', () => {
+    const label = options().node.state.hoverFaded!.label
+    expect(call(label, node({ labelAll: true }))).toBe(true)
+    expect(call(label, node())).toBe(false)
+  })
+
   it('状态名清单：持久状态与悬停瞬时状态', () => {
     const o = options()
     expect(Object.keys(o.node.state).sort()).toEqual([
@@ -67,7 +73,8 @@ describe('buildGraphOptions 新主题', () => {
     const { node: n, edge: e } = options()
     expect(n.state.dimmed).toMatchObject({ fill: GRAPH_COLORS.dimmedFill, stroke: GRAPH_COLORS.dimmedStroke })
     expect(n.state.dimmed).not.toHaveProperty('opacity')
-    expect(n.state.hoverFaded).toMatchObject({ fill: GRAPH_COLORS.fadedFill, stroke: GRAPH_COLORS.fadedStroke, label: false, badge: false })
+    expect(n.state.hoverFaded).toMatchObject({ fill: GRAPH_COLORS.fadedFill, stroke: GRAPH_COLORS.fadedStroke, badge: false })
+    expect(call(n.state.hoverFaded!.label, node())).toBe(false)
     expect(e.state.hoverFaded).toMatchObject({ stroke: GRAPH_COLORS.fadedEdge, lineWidth: 1, halo: false })
     expect(e.state.dimmed).not.toHaveProperty('opacity')
   })

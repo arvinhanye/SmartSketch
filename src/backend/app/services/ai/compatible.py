@@ -69,6 +69,7 @@ import ssl
 import threading
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
+from dataclasses import replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final, Literal, Protocol
 from urllib.parse import urlsplit
@@ -151,6 +152,16 @@ if TYPE_CHECKING:
 
 # ---------------------------------------------------------------- chat adapter
 
+# https://api-docs.deepseek.com/api/create-chat-completion/
+_DEEPSEEK_MAX_OUTPUT_TOKENS: Final = 393_216
+# https://api-docs.deepseek.com/quick_start/pricing/
+_DEEPSEEK_MODELS: Final = frozenset({
+    "deepseek-flash",
+    "deepseek-v4-pro",
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
+})
+
 
 class CompatibleModelClient(_CompatibleHttpClient):
     """``ModelClient`` for one OpenAI-compatible provider (base URL + key); model per request."""
@@ -180,6 +191,12 @@ class CompatibleModelClient(_CompatibleHttpClient):
         if max_tokens_field not in MAX_TOKENS_FIELDS:
             raise ValueError(f"CompatibleModelClient: max_tokens_field must be one of {sorted(MAX_TOKENS_FIELDS)}")
         self._max_tokens_field = max_tokens_field
+        endpoint = urlsplit(self._url)
+        self._is_official_deepseek = (
+            endpoint.scheme == "https"
+            and endpoint.hostname == "api.deepseek.com"
+            and endpoint.port in (None, 443)
+        )
         # ADR-090: extra request fields fixed at construction (a deep, plain copy); never override core fields
         self._extra_body = _plain_copy(extra_body or {})
         clash = sorted(set(self._extra_body) & CORE_PAYLOAD_FIELDS)
@@ -211,7 +228,18 @@ class CompatibleModelClient(_CompatibleHttpClient):
 
     # -- request
 
+    def apply_output_limit(self, request: ModelRequest) -> ModelRequest:
+        """Apply a documented limit for the selected endpoint and request model."""
+        if (
+            self._is_official_deepseek
+            and request.model in _DEEPSEEK_MODELS
+            and request.max_output_tokens > _DEEPSEEK_MAX_OUTPUT_TOKENS
+        ):
+            return replace(request, max_output_tokens=_DEEPSEEK_MAX_OUTPUT_TOKENS)
+        return request
+
     def build_payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
+        request = self.apply_output_limit(request)
         payload: dict[str, Any] = {
             "model": request.model,
             "messages": [{"role": message.role, "content": message.content} for message in request.messages],

@@ -80,7 +80,7 @@ def test_output_validates_and_scores(run_mod, ev, gold, fake_run):
     assert preds["dataset_id"] == gold["dataset_id"]
     assert preds["entities"] and preds["relations"]
     assert all(item["source"] == "ai" for item in preds["entities"] + preds["relations"])
-    assert preds["prompt_versions"]["extract_entities"] == 2
+    assert preds["prompt_versions"]["extract_entities"] == 3
     assert preds["prompt_versions"]["extract_relations"] == 2
     report = ev.score(gold, preds)
     assert report["hard_indicators"]["verdict"] == ev.VERDICT_FAKE
@@ -227,7 +227,7 @@ def test_key_never_appears_in_output_or_log(run_mod, tmp_path, capsys):
 
 def test_gleaning_is_optional_and_recorded(run_mod, gold):
     outcome = run_mod.run(copy.deepcopy(gold), environ=dict(FAKE_ENV), glean_rounds=1)
-    assert outcome.predictions["prompt_versions"]["extract_entities_gleaning"] == 2
+    assert outcome.predictions["prompt_versions"]["extract_entities_gleaning"] == 3
     assert outcome.run_log["gleaning"]["enabled"] is True
     assert outcome.run_log["model_calls"]["by_purpose"]["extract_entities_gleaning"] == 16
 

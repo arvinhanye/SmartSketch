@@ -456,6 +456,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{tid}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 任务当前工作与完成数量
+         * @description 只读派生进度，供页面每3秒刷新；不改变SSE v1。等待时间以 observed_at 与 active_requests.started_at 为准，终态不继续计时。
+         */
+        get: operations["getTaskActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{tid}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 继续已取消任务（教师）
+         * @description 仅显式恢复已取消且无旧租约的任务，保留task_id、已完成结果与累计预算；个人模式仅原创建教师可继续。
+         *     当前模型端点、名称和思考配置须与原任务一致，密钥可轮换。恢复后客户端重新订阅SSE并废弃旧连接回调。
+         *
+         */
+        post: operations["resumeTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{tid}/event-ticket": {
         parameters: {
             query?: never;
@@ -1218,7 +1264,7 @@ export interface components {
          * @description 错误码全集，逐条说明见 `errors.v1.md`
          * @enum {string}
          */
-        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN" | "MODEL_CONFIG_REQUIRED" | "INVITE_CODE_INVALID" | "ALREADY_MEMBER";
+        ErrorCode: "UNAUTHENTICATED" | "COURSE_FORBIDDEN" | "ROLE_FORBIDDEN" | "NOT_FOUND" | "GRAPH_NOT_PUBLISHED" | "UNSUPPORTED_FORMAT" | "FILE_TOO_LARGE" | "VALIDATION_ERROR" | "CYCLE_DETECTED" | "DANGLING_ENDPOINT" | "DUPLICATE_RELATION" | "NODE_LOCKED" | "TASK_NOT_CANCELLABLE" | "TASK_NOT_RESUMABLE" | "PUBLISH_BLOCKED" | "RATE_LIMITED" | "LLM_UNAVAILABLE" | "DOCUMENT_UNREADABLE" | "EXTRACTION_INCOMPLETE" | "STORAGE_UNAVAILABLE" | "INTERNAL_ERROR" | "TASK_ATTEMPTS_EXHAUSTED" | "PUBLISH_IN_PROGRESS" | "COURSE_BUSY" | "BUDGET_EXCEEDED" | "DOCUMENT_NOT_DELETABLE" | "REVISION_CONFLICT" | "USERNAME_TAKEN" | "MODEL_CONFIG_REQUIRED" | "INVITE_CODE_INVALID" | "ALREADY_MEMBER";
         PublishBlockedReason: components["schemas"]["PublishBlockedCycleReason"] | components["schemas"]["PublishBlockedOtherReason"];
         /** @description ADR-012 V3 的前置关系环路，须给出环上的知识点 ID。 */
         PublishBlockedCycleReason: {
@@ -1354,6 +1400,77 @@ export interface components {
          * @enum {string}
          */
         TaskStage: "queued" | "parsing" | "extracting" | "merging" | "persisting" | "awaiting_review" | "completed" | "failed" | "cancelled";
+        TaskActivityUnits: {
+            completed: number;
+            failed: number;
+            total: number;
+        };
+        TaskActiveRequest: {
+            /** @description 模型调用用途，不含提示词、模型地址或凭据 */
+            purpose: string;
+            count: number;
+            /**
+             * Format: date-time
+             * @description 当前轮同用途在途请求中最早的开始时间
+             */
+            started_at: string;
+        };
+        /** @description 当前全局检查计划的原子对进度。total是实际计划数；complete阶段不代表所有裁决成功。计数分组相加等于total，reused为completed子集。 */
+        TaskGlobalDisambiguation: {
+            total: number;
+            completed: number;
+            failed: number;
+            deferred: number;
+            reused: number;
+            inflight: number;
+            pending: number;
+            total_possible: number;
+            /** @enum {string} */
+            phase: "planning" | "running" | "complete";
+            /** Format: date-time */
+            updated_at: string;
+        };
+        TaskActivity: {
+            task_id: string;
+            stage: components["schemas"]["TaskStage"];
+            progress: number;
+            cancel_requested: boolean;
+            /** @enum {string} */
+            phase: "queued" | "parsing" | "entities" | "disambiguating" | "relations" | "repair" | "merging" | "persisting" | "cancelling" | "cancelled" | "awaiting_review" | "completed" | "failed" | "waiting" | "retrying";
+            attempt: number;
+            /** Format: date-time */
+            observed_at: string;
+            /** Format: date-time */
+            last_activity_at: string;
+            worker_active: boolean;
+            /** Format: date-time */
+            retry_at: string | null;
+            active_requests: components["schemas"]["TaskActiveRequest"][];
+            chunks: components["schemas"]["TaskActivityUnits"];
+            sections: components["schemas"]["TaskActivityUnits"];
+            disambiguation: {
+                /** @description 小节阶段已保存的完整语义裁决数，不包含全局消歧 */
+                completed: number;
+            };
+            /** @description 无可确认的当前全局持久化计划时为null，不能视为尚未处理或0/0。 */
+            global_disambiguation: components["schemas"]["TaskGlobalDisambiguation"] | null;
+            /** @description 当前用户和任务满足恢复的基本条件；提交仍重新校验模型配置与并发状态 */
+            resumable: boolean;
+        };
+        TaskNotResumableDetails: {
+            stage: components["schemas"]["TaskStage"];
+            /** @enum {string} */
+            reason: "not_cancelled" | "worker_active" | "artifacts_missing" | "model_config_changed";
+        };
+        ModelConfigRequiredError: components["schemas"]["Error"] & {
+            /** @constant */
+            code?: "MODEL_CONFIG_REQUIRED";
+        };
+        TaskNotResumableError: components["schemas"]["Error"] & {
+            /** @constant */
+            code: "TASK_NOT_RESUMABLE";
+            details: components["schemas"]["TaskNotResumableDetails"];
+        };
         TaskCounts: {
             chunks_done?: number;
             chunks_total?: number;
@@ -3581,6 +3698,65 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             /** @description 任务不存在，或调用者是任务所在课程的非成员（`NOT_FOUND`，二者不可区分，不含任务快照字段）。 */
             404: components["responses"]["NotFound"];
+        };
+    };
+    getTaskActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前任务活动和已保存结果计数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskActivity"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resumeTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原任务已恢复，以返回的阶段和进度为准 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description 当前不可继续，或个人模型配置缺失 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskNotResumableError"] | components["schemas"]["ModelConfigRequiredError"];
+                };
+            };
         };
     };
     issueEventTicket: {

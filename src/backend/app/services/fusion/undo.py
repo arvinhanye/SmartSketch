@@ -38,7 +38,8 @@ def _without(payload, excluded):
     for group in payload['groups']:
         if group['group_id'] not in excluded:
             mapping.update({k: group['canonical_id'] for k in group['members']})
-    return project_snapshot(payload['before'], mapping)
+    return project_snapshot(payload['before'], mapping,
+                            projection_version=payload.get('projection_version', 1))
 
 
 def _index(snapshot, kind):

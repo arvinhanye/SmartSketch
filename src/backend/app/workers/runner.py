@@ -50,7 +50,7 @@ from app.services.startup import validate_embedding_space, validate_schema_curre
 from app.services.versions.reconcile import SweepReport, sweep
 from app.workers.extract_task import ExtractionToolkit
 from app.workers.persist_graph import ToolkitSource, run_pipeline_once
-from app.workers.toolkits import MAX_OUTPUT_TOKENS, TaskToolkits
+from app.workers.toolkits import TaskToolkits
 
 LOG = logging.getLogger("app.workers")
 
@@ -81,13 +81,25 @@ def build_toolkit(settings: Settings) -> ToolkitSource:
     )
     return ExtractionToolkit(
         policy=policy,
-        entities=lambda client: EntityExtractor(client, model=model, max_output_tokens=MAX_OUTPUT_TOKENS),
-        relations=lambda client: RelationExtractor(client, model=model, max_output_tokens=MAX_OUTPUT_TOKENS),
-        resolver=(lambda client: SemanticResolver(client, model=model,
-            max_input_bytes=settings.DISAMBIGUATION_MAX_INPUT_BYTES)) if (settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
+        entities=lambda client: EntityExtractor(client, model=model, max_output_tokens=settings.LLM_EXTRACTION_MAX_OUTPUT_TOKENS),
+        relations=lambda client: RelationExtractor(
+            client, model=model, max_output_tokens=settings.LLM_EXTRACTION_MAX_OUTPUT_TOKENS,
+            timeout_seconds=settings.LLM_RELATION_TIMEOUT_SECONDS,
+        ),
+        resolver=(lambda client: SemanticResolver(
+            client, model=model, max_input_bytes=settings.DISAMBIGUATION_MAX_INPUT_BYTES,
+            max_output_tokens=settings.DISAMBIGUATION_MAX_OUTPUT_TOKENS,
+        )) if (settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED) else None,
         local_normalization=settings.DISAMBIGUATION_AUTO_MERGE_ENABLED,
         preserve_mentions=(settings.DISAMBIGUATION_ANALYSIS_ENABLED or settings.DISAMBIGUATION_AUTO_MERGE_ENABLED),
         analysis_max_pairs=settings.DISAMBIGUATION_MAX_PAIRS_PER_SECTION,
+        analysis_context=dict(
+            mode=settings.LLM_MODE,
+            base_url=settings.LLM_BASE_URL,
+            model=model,
+            fallback_base_url=settings.LLM_FALLBACK_BASE_URL,
+            fallback_model=settings.LLM_FALLBACK_EXTRACTION_MODEL,
+        ),
         window_policy=WindowPolicy.from_settings(settings),
     )
 

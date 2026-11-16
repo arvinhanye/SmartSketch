@@ -206,6 +206,8 @@ async function mountMaterials() {
     list: vi.fn<MaterialsApi['list']>(async () => []),
     upload: vi.fn<MaterialsApi['upload']>(async () => ({ task_id: 't1', document_id: 'd1' })),
     cancelTask: vi.fn<MaterialsApi['cancelTask']>(),
+    taskActivity: vi.fn<MaterialsApi['taskActivity']>(async () => { throw new Error('activity unavailable in settings fixture') }),
+    resumeTask: vi.fn<MaterialsApi['resumeTask']>(),
     deleteDocument: vi.fn<MaterialsApi['deleteDocument']>(),
     uploadPolicy: vi.fn<MaterialsApi['uploadPolicy']>(async () => ({ max_bytes: 52_428_800 })),
   }

@@ -9,8 +9,9 @@ import threading
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from contextvars import ContextVar
 
@@ -145,6 +146,17 @@ class EmbeddingAdapter:
         self.space = space or (
             f"fake/{self._dimensions}" if is_fake else f"real/{self._model}/{self._dimensions}"
         )
+        self._analysis_context = MappingProxyType({
+            "mode": settings.EMBEDDING_MODE,
+            "model": self._model,
+            "dimensions": self._dimensions,
+            "base_url": settings.EMBEDDING_BASE_URL,
+        })
+
+    @property
+    def analysis_context(self) -> Mapping[str, str | int]:
+        """Embedding source for analysis fingerprints, separate from the vector-space label."""
+        return self._analysis_context
 
     @property
     def records_calls(self) -> bool:

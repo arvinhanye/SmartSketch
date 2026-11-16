@@ -32,7 +32,7 @@ from app.workers.extraction.types import (
     _UnitResult,
     TaskEntity,
 )
-from app.workers.extraction.analysis import analyze_section
+from app.workers.extraction.analysis import DecisionCache, analyze_section
 from app.workers.extraction import windowed
 from app.workers.extraction.local import relation_input_digest
 from app.services.fusion.local import local_normalization
@@ -84,7 +84,7 @@ def _attempts(
                 chunk_attempt=attempt,
                 user_id=toolkit.user_id,
             ),
-            guard=toolkit.guard if toolkit.preserve_mentions else None,
+            guard=toolkit.guard,
             max_input_bytes=None if toolkit.window_policy is None else toolkit.window_policy.max_input_bytes,
         )
         try:
@@ -172,6 +172,7 @@ def _extract_section(
     section: _Section,
     entities: Sequence[SectionEntity],
     *, task_entities: Sequence[TaskEntity] = (),
+    decision_cache: DecisionCache | None = None,
 ) -> _UnitResult:
     chunks = tuple(SourceChunk(_identity(chunk), chunk.text) for chunk in section.chunks)
     analysis = None
@@ -199,7 +200,8 @@ def _extract_section(
         try:
             resolver = None if toolkit.resolver is None else toolkit.resolver(client)
             analysis = analyze_section(task_entities, {c.chunk_id: c for c in section.chunks},
-                                       resolver=resolver, max_pairs=toolkit.analysis_max_pairs)
+                                       resolver=resolver, max_pairs=toolkit.analysis_max_pairs,
+                                       cache=decision_cache, context=toolkit.analysis_context)
         except ModelUnavailableError as exc:
             raise _Halt("circuit") from exc
         except CallRecordError as exc:
