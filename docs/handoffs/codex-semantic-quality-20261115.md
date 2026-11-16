@@ -1,6 +1,6 @@
 # SEMANTIC-QUALITY-01：课程图谱语义与关系覆盖修复
 
-状态：实现及相关验证完成；用户接受本轮验证并要求停止重复测试，部署结果待补。基线为 main `d9d16ca` 上现有本机修复；模型API设置PR不在本次范围。用户授权按已确认方案修复并减少有材料依据可连接的孤立节点。
+状态：实现、相关验证和本机部署完成；用户接受本轮验证并要求停止重复测试，真实新图质量待用户验收。基线为 main `d9d16ca` 上现有本机修复；本轮汇总提交 `9d161ed`，PR [#357](https://github.com/arvinhanye/SmartSketch/pull/357) 已创建，未合并。模型API设置PR不在本次范围。
 
 ## 交付
 
@@ -29,8 +29,12 @@
 
 ## 部署和回退
 
-拟更新后端 `smartsketch-backend:semantic-quality-d9d16ca`，保留web `smartsketch-frontend:chapter3-labels-d9d16ca`，同一端口8080。更新入口 `.demo/semantic-quality-20261115/update_backend.py start`；停止前拒绝存在活动生成任务，SQLite备份并校验，保持全部数据卷/预算/模型设置。无迁移。
+已更新后端 `smartsketch-backend:semantic-quality-d9d16ca`，保留web `smartsketch-frontend:chapter3-labels-d9d16ca`，同一端口8080。更新入口 `.demo/semantic-quality-20261115/update_backend.py start`；停止前确认无活动生成任务，SQLite备份并完整性校验，保持全部数据卷/预算/模型设置。本次语义升级无新增迁移。
 
-回退入口同脚本的 `rollback`，只回到global-resume后端；已有projection_version=2新计划时拒绝回退，避免旧代码无法正确处理新定义的撤销。现有总启动器会保留新的后端镜像。实际部署/数据对比结果待补。
+回退入口同脚本的 `rollback`，只回到global-resume后端；已有projection_version=2新计划时拒绝回退，避免旧代码无法正确处理新定义的撤销。现有总启动器已指向新的后端镜像。
+
+部署确认：API/worker各48项实际运行源码摘要均匹配；四项服务healthy，8080健康返回ok。web与Neo4j容器ID保持不变；12张业务/缓存/模型配置表全部列行的摘要、任务状态与数据库版本前后一致；图谱及证据快照一致，仍70节点/71边，模型账本1277条未增加。浏览器已刷新并打开Ahn的“我的课程”页面。上述为版本/健康/数据保留检查，没有重新运行测试或发起真实模型请求。
+
+下一步由用户新建测试课程、重新导入第三章材料验证新召回/提示词/定义规则；既有完成草稿不会自动重算。实际孤立数量和关系质量须比较新生成结果，不能据本轮工程验证宣称已达标。
 
 本机验证材料在 `.demo/semantic-quality-20261115/`，含基线、RED/GREEN、全量/集成日志、离线比较、构建摘要及部署前后快照，不提交真实资料、数据库、镜像或日志。
